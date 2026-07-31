@@ -74,10 +74,16 @@ export function AgentRunListTable({
   runs,
   loading,
   processNameMap,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }: {
   runs: AgentRun[];
   loading: boolean;
   processNameMap?: Map<string, string>;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }) {
   const handle = useHandleFromPath();
   const modelPricing = useModelPricing();
@@ -178,6 +184,17 @@ export function AgentRunListTable({
               })}
           </tbody>
         </table>
+        {hasMore && (
+          <div className="flex justify-center border-t py-3">
+            <button
+              onClick={onLoadMore}
+              disabled={loadingMore}
+              className="rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loadingMore ? 'Loading…' : 'Load more'}
+            </button>
+          </div>
+        )}
       </div>
       <AgentLogPanel run={selectedRun} onClose={() => setSelectedRun(null)} />
     </>

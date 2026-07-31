@@ -81,5 +81,16 @@ export const auditEvents = pgTable(
       table.actorId,
       table.timestamp.desc(),
     ),
+    // Backs `getByNamespace`'s keyset-paginated read (Monitoring → Users /
+    // Tasks tabs) — `WHERE workspace = ... ORDER BY timestamp DESC` had no
+    // matching index before this: entityIdx/processIdx both filter on
+    // workspace but sort by different trailing columns, so the namespace-
+    // wide, unfiltered-by-entity read this query does still needed a full
+    // sort over every row in the workspace.
+    workspaceTimestampIdx: index('audit_events_workspace_timestamp_idx').on(
+      table.workspace,
+      table.timestamp.desc(),
+      table.id.desc(),
+    ),
   }),
 );

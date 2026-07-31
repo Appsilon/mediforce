@@ -9,23 +9,30 @@ import {
  * GET /api/agent-runs
  *
  * Accepted query params:
- *   - `namespace` — narrow to a single workspace handle (intersected with
- *                    caller membership; out-of-scope handle → 403)
- *   - `runId`     — filter to one process instance
- *   - `stepId`    — filter to one step within `runId` (requires `runId`)
- *   - `limit`     — max items (1..200, default 50)
- *   - `cursor`    — opaque token from a prior `nextCursor`
+ *   - `namespace`          — narrow to a single workspace handle (intersected
+ *                            with caller membership; out-of-scope handle → 403)
+ *   - `runId`               — filter to one process instance
+ *   - `stepId`              — filter to one step within `runId` (requires `runId`)
+ *   - `limit`               — max items (1..200, default 50)
+ *   - `cursor`              — opaque token from a prior `nextCursor`
+ *   - `status`              — raw AgentRunStatus filter
+ *   - `cardStatus`          — KPI-card bucket filter (see AgentRunCardStatusSchema)
+ *   - `processInstanceId`   — repeatable; pre-resolved workflow-name filter
  */
 export const GET = createRouteAdapter<typeof ListAgentRunsInputSchema, ListAgentRunsInput>(
   ListAgentRunsInputSchema,
   (req) => {
     const params = req.nextUrl.searchParams;
+    const processInstanceIds = params.getAll('processInstanceId');
     return {
       namespace: params.get('namespace') ?? undefined,
       runId: params.get('runId') ?? undefined,
       stepId: params.get('stepId') ?? undefined,
       limit: params.get('limit') ?? undefined,
       cursor: params.get('cursor') ?? undefined,
+      status: params.get('status') ?? undefined,
+      cardStatus: params.get('cardStatus') ?? undefined,
+      processInstanceIds: processInstanceIds.length > 0 ? processInstanceIds : undefined,
     };
   },
   listAgentRuns,

@@ -8,6 +8,24 @@ export const InstanceStatusSchema = z.enum([
   'failed',
 ]);
 
+/**
+ * UI-facing status bucket derived from `{status, pauseReason, error}` — see
+ * `packages/platform-ui/src/lib/workflow-status.ts`'s `getWorkflowStatus`
+ * for the JS derivation. Declared here (not in platform-ui) so the Postgres
+ * repository's `displayStatus` filter/aggregation can share the same
+ * literal set instead of hand-rolling a parallel string union — the SQL
+ * `CASE` expression in `process-instance-repository.ts` must stay in sync
+ * with `getWorkflowStatus`'s branching by hand; there is no way to share
+ * the branching logic itself across JS and SQL, only the vocabulary.
+ */
+export const WorkflowDisplayStatusSchema = z.enum([
+  'in_progress',
+  'waiting_for_human',
+  'error',
+  'cancelled',
+  'completed',
+]);
+
 export const ProcessInstanceSchema = z.object({
   id: z.string().min(1),
   definitionName: z.string().min(1),
@@ -59,6 +77,7 @@ export const ProcessInstanceSchema = z.object({
 });
 
 export type InstanceStatus = z.infer<typeof InstanceStatusSchema>;
+export type WorkflowDisplayStatus = z.infer<typeof WorkflowDisplayStatusSchema>;
 export type ProcessInstance = z.infer<typeof ProcessInstanceSchema>;
 
 /**

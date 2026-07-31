@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { MonitoringSummary } from '@mediforce/platform-api/contract';
-import type { HumanTask, ProcessInstance } from '@mediforce/platform-core';
-import { buildHumanTask, buildProcessInstance } from '@mediforce/platform-core/testing';
+import type { HumanTask } from '@mediforce/platform-core';
+import { buildHumanTask } from '@mediforce/platform-core/testing';
 import { createQueryWrapper } from '@/test/react-query';
 
 const summaryMock = vi.fn<(...args: unknown[]) => Promise<{ summary: MonitoringSummary }>>();
-const runsListMock = vi.fn<(...args: unknown[]) => Promise<{ runs: ProcessInstance[] }>>();
 const tasksListMock = vi.fn<(...args: unknown[]) => Promise<{ tasks: HumanTask[] }>>();
 class ApiErrorMock extends Error {
   constructor(public status: number) {
@@ -16,7 +15,6 @@ class ApiErrorMock extends Error {
 vi.mock('@/lib/mediforce', () => ({
   mediforce: {
     monitoring: { summary: summaryMock },
-    runs: { list: runsListMock },
     tasks: { list: tasksListMock },
   },
   ApiError: ApiErrorMock,
@@ -32,7 +30,6 @@ const EMPTY_SUMMARY: MonitoringSummary = {
 
 beforeEach(() => {
   summaryMock.mockReset();
-  runsListMock.mockReset();
   tasksListMock.mockReset();
 });
 
@@ -70,7 +67,7 @@ describe('useMonitoringSummary', () => {
 });
 
 describe('useMonitoringData', () => {
-  it('composes rows from runs/tasks, scoped to the handle, and keeps the summary request alive', async () => {
+  it('composes tasks, scoped to the handle, and keeps the summary request alive', async () => {
     summaryMock.mockResolvedValue({
       summary: {
         runs: { running: 2, paused: 1, completed: 3, failed: 1 },
@@ -78,30 +75,22 @@ describe('useMonitoringData', () => {
         roleTaskCounts: { reviewer: { pending: 1, claimed: 1 } },
       },
     });
-    runsListMock.mockResolvedValue({
-      runs: [
-        buildProcessInstance({ id: 'r-1', status: 'paused', createdAt: '2024-01-02T00:00:00.000Z' }),
-        buildProcessInstance({ id: 'r-2', status: 'created', createdAt: '2024-01-01T00:00:00.000Z' }),
-      ],
-    });
     tasksListMock.mockResolvedValue({
       tasks: [buildHumanTask({ id: 't-1', assignedRole: 'reviewer' })],
     });
     const { wrapper } = createQueryWrapper();
 
     const { result } = renderHook(() => useMonitoringData('team-alpha'), { wrapper });
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => expect(result.current.tasks.map((t) => t.id)).toEqual(['t-1']));
 
-    // Still calls the summary endpoint (Workflows tab's KPI cards derive
-    // their own counts from `instances` via getWorkflowStatus, but the
-    // request itself stays wired per ADR-0006 §4 NICE LIVE).
+    // Still calls the summary endpoint — the request itself stays wired per
+    // ADR-0006 §4 NICE LIVE even though nothing in MonitoringData reads its
+    // value directly anymore (Workflows tab reads mediforce.runs.statusCounts
+    // instead — a real SQL aggregation, not a client-side tally).
     expect(summaryMock).toHaveBeenCalledWith({ handle: 'team-alpha' });
-    expect(runsListMock).toHaveBeenCalledWith(expect.objectContaining({ namespace: 'team-alpha' }));
     expect(tasksListMock).toHaveBeenCalledWith(
       expect.objectContaining({ namespace: 'team-alpha', status: ['pending', 'claimed'] }),
     );
-    expect(result.current.instances.map((i) => i.id)).toEqual(['r-1', 'r-2']);
-    expect(result.current.tasks.map((t) => t.id)).toEqual(['t-1']);
   });
 
   it('does not fetch when handle is undefined', () => {
@@ -109,8 +98,7 @@ describe('useMonitoringData', () => {
     const { result } = renderHook(() => useMonitoringData(undefined), { wrapper });
 
     expect(summaryMock).not.toHaveBeenCalled();
-    expect(runsListMock).not.toHaveBeenCalled();
     expect(tasksListMock).not.toHaveBeenCalled();
-    expect(result.current.loading).toBe(true);
+    expect(result.current.tasks).toEqual([]);
   });
 });

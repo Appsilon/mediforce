@@ -1,21 +1,17 @@
 import type { AuditEvent } from '@mediforce/platform-core';
 import { formatStepName } from './format';
 
-/** The four actions the Users tab activity table understands. Everything
- *  else audit_events carries (agent.*, workflow.*, namespace.*, ...) is
- *  real data too, just not "user activity" in the sense this table means —
- *  filtering here, not at the query layer, keeps the read simple (one
- *  namespace-wide fetch) while the table only ever shows what it claims to. */
-const USER_ACTIVITY_ACTIONS = new Set([
+/** The four actions the Users tab activity table understands. Passed
+ *  server-side as the `actions` filter (`useNamespaceAuditEventsPage`) so a
+ *  fetched page only ever contains what this table claims to show — real
+ *  filtering at the query layer, not a client-side pass over an
+ *  over-fetched, unfiltered read. */
+export const USER_ACTIVITY_ACTIONS = [
   'user.signed_in',
   'instance.started',
   'instance.cancelled',
   'task.completed',
-]);
-
-export function isUserActivityEvent(event: AuditEvent): boolean {
-  return USER_ACTIVITY_ACTIONS.has(event.action);
-}
+] as const;
 
 const EVENT_NAMES: Record<string, string> = {
   'user.signed_in': 'Sign in',
@@ -60,30 +56,4 @@ export function formatEventDetails(
     default:
       return 'no data';
   }
-}
-
-export interface UserActivityFilters {
-  actorId: string | null;
-  action: string | null;
-  /** `YYYY-MM-DD`, as produced by `<input type="date">` — inclusive of the
-   *  whole local day. */
-  fromDate: string | null;
-  toDate: string | null;
-}
-
-export function filterUserActivity(
-  events: AuditEvent[],
-  filters: UserActivityFilters,
-): AuditEvent[] {
-  const from = filters.fromDate ? new Date(`${filters.fromDate}T00:00:00.000`) : null;
-  const to = filters.toDate ? new Date(`${filters.toDate}T23:59:59.999`) : null;
-
-  return events.filter((event) => {
-    if (filters.actorId !== null && event.actorId !== filters.actorId) return false;
-    if (filters.action !== null && event.action !== filters.action) return false;
-    const eventTime = new Date(event.timestamp);
-    if (from !== null && eventTime < from) return false;
-    if (to !== null && eventTime > to) return false;
-    return true;
-  });
 }

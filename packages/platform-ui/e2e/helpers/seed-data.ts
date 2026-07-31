@@ -14,6 +14,24 @@ const twoDaysAgo = new Date(Date.now() - 2 * 86400_000).toISOString();
 const threeDaysAgo = new Date(Date.now() - 3 * 86400_000).toISOString();
 const nextWeek = new Date(Date.now() + 7 * 86400_000).toISOString();
 
+// Distinct hour-spaced timestamps for the `runs-page`/`agent-runs-page`/
+// `audit-events-page` journeys (Monitoring pagination + KPI E2E coverage).
+// Keyset pagination orders newest-first, so each fixture group needs
+// strictly increasing timestamps to make page boundaries deterministic.
+const fiveHoursAgo = new Date(Date.now() - 5 * 3600_000).toISOString();
+const fourHoursAgo = new Date(Date.now() - 4 * 3600_000).toISOString();
+const threeHoursAgo = new Date(Date.now() - 3 * 3600_000).toISOString();
+const twoHoursAgo = new Date(Date.now() - 2 * 3600_000).toISOString();
+
+// Minute-spaced timestamps for monitoring.journey.ts's Load-More E2E
+// fixtures (21 rows per tab — one over PAGE_SIZE=20 — generated in a loop
+// rather than hand-written, since determinism only needs strictly
+// increasing values and 21 hour-spaced constants would need almost a full
+// day of headroom for no added benefit).
+function minutesAgo(n: number): string {
+  return new Date(Date.now() - n * 60_000).toISOString();
+}
+
 // Local-dev-only: gives the Agents-tab "Log" column something real to show
 // via the actual AgentLogViewer pipeline (an AgentEvent announcing a log
 // file path, which /api/step-logs reads from disk) instead of mocking the
@@ -353,6 +371,11 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
     // Dedicated completed instance for archive-from-list journey — isolated so
     // archiving doesn't affect other tests that read proc-completed-1/2.
+    // `createdAt: oneHourAgo` (not threeDaysAgo): the Monitoring → Workflows
+    // tab / standalone `/runs` page default to the newest 20 runs
+    // (server-side pagination) — a `threeDaysAgo` row falls off page 1 once
+    // enough newer fixtures exist, so this journey's target row needs to
+    // stay recent to remain deterministically visible without a Load More.
     'proc-archive-target': {
       id: 'proc-archive-target',
       namespace: 'test',
@@ -365,7 +388,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       variables: { studyId: 'study-archive' },
       triggerType: 'manual',
       triggerPayload: {},
-      createdAt: threeDaysAgo,
+      createdAt: oneHourAgo,
       updatedAt: twoDaysAgo,
       createdBy: testUserId,
       pauseReason: null,
@@ -589,7 +612,176 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       assignedRoles: [],
       deletedAt: twoDaysAgo,
     },
+    // Dedicated runs for runs-page.journey.ts (GET /api/runs/page +
+    // GET /api/runs/status-counts). Unique `definitionName` so the
+    // `workflow` filter isolates exactly these 5 rows, one per
+    // `WorkflowDisplayStatus` bucket — status-counts assertions stay exact
+    // even while parallel journeys mutate other runs under the shared
+    // `test` namespace. Distinct hour-spaced `createdAt` values make the
+    // newest-first keyset order deterministic: 5 (newest) → 1 (oldest).
+    'proc-runs-page-journey-1': {
+      id: 'proc-runs-page-journey-1',
+      namespace: 'test',
+      definitionName: 'Runs Page Journey Workflow',
+      definitionVersion: '1.0.0',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: fiveHoursAgo,
+      updatedAt: fiveHoursAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+    },
+    'proc-runs-page-journey-2': {
+      id: 'proc-runs-page-journey-2',
+      namespace: 'test',
+      definitionName: 'Runs Page Journey Workflow',
+      definitionVersion: '1.0.0',
+      status: 'running',
+      currentStepId: 'in-progress-step',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: fourHoursAgo,
+      updatedAt: fourHoursAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+    },
+    'proc-runs-page-journey-3': {
+      id: 'proc-runs-page-journey-3',
+      namespace: 'test',
+      definitionName: 'Runs Page Journey Workflow',
+      definitionVersion: '1.0.0',
+      status: 'paused',
+      currentStepId: 'waiting-step',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeHoursAgo,
+      updatedAt: threeHoursAgo,
+      createdBy: 'system',
+      pauseReason: 'waiting_for_human',
+      error: null,
+      assignedRoles: [],
+    },
+    'proc-runs-page-journey-4': {
+      id: 'proc-runs-page-journey-4',
+      namespace: 'test',
+      definitionName: 'Runs Page Journey Workflow',
+      definitionVersion: '1.0.0',
+      status: 'failed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: twoHoursAgo,
+      updatedAt: twoHoursAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: 'Cancelled by user',
+      assignedRoles: [],
+    },
+    'proc-runs-page-journey-5': {
+      id: 'proc-runs-page-journey-5',
+      namespace: 'test',
+      definitionName: 'Runs Page Journey Workflow',
+      definitionVersion: '1.0.0',
+      status: 'failed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: oneHourAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: 'Agent timeout after 30s',
+      assignedRoles: [],
+    },
+    // Parent instance for agent-runs-page.journey.ts (GET /api/agent-runs +
+    // GET /api/agent-runs/card-status-counts). The four agent runs below
+    // (see `agentRuns`) all point at this instance so tests can scope with
+    // `processInstanceId=proc-agent-runs-page-journey` and stay unaffected
+    // by parallel journeys' agent runs in the shared `test` namespace.
+    'proc-agent-runs-page-journey': {
+      id: 'proc-agent-runs-page-journey',
+      namespace: 'test',
+      definitionName: 'Agent Runs Page Journey Workflow',
+      definitionVersion: '1.0.0',
+      status: 'running',
+      currentStepId: 'step-running',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: fourHoursAgo,
+      updatedAt: now,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+    },
+    // Parent instance for monitoring.journey.ts's Agents-tab Load More +
+    // "KPI cards report the real DB count, not just the loaded rows" L4 UI
+    // coverage (distinct from agent-runs-page.journey.ts's L3 API coverage
+    // above). Unique `definitionName` so the Agents tab's own "Workflow"
+    // filter <select> isolates exactly the 21 agent runs below (see
+    // `monitoringLoadMoreAgentRuns`) — an exact filter, not a KPI-bucket
+    // lower bound.
+    'proc-monitoring-loadmore-agents': {
+      id: 'proc-monitoring-loadmore-agents',
+      namespace: 'test',
+      definitionName: 'Monitoring LoadMore Agent Workflow',
+      definitionVersion: '1.0.0',
+      status: 'running',
+      currentStepId: 'step-monitoring-loadmore',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: minutesAgo(50_000),
+      updatedAt: now,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+    },
   };
+
+  const MONITORING_LOADMORE_AGENT_RUN_COUNT = 21;
+  // 21 agent runs, all `running` with `fallbackReason: null` — avoids the
+  // running/error double-count landmine noted below (`error` bucket keys
+  // off `fallbackReason` alone, regardless of `status`). PAGE_SIZE=20, so
+  // 21 rows makes Load More deterministic: 20 -> 21 -> button gone.
+  // Minute-spaced `startedAt`, newest first (i=1 newest) — offset by
+  // 50,000 minutes (~34 days), well past `threeDaysAgo` (the oldest named
+  // constant above), so this batch never crowds the Agents tab's
+  // *unfiltered* top-20 view out from under other tests in this file that
+  // assert on specific rows there (e.g. the `twoDaysAgo`-started escalated
+  // run) — isolation for our own tests comes from the workflow filter, not
+  // from recency.
+  const monitoringLoadMoreAgentRuns: Record<string, Record<string, unknown>> = {};
+  for (let i = 1; i <= MONITORING_LOADMORE_AGENT_RUN_COUNT; i++) {
+    const id = `20000000-0000-4000-9000-${String(i).padStart(12, '0')}`;
+    monitoringLoadMoreAgentRuns[id] = {
+      id,
+      processInstanceId: 'proc-monitoring-loadmore-agents',
+      stepId: `step-monitoring-loadmore-${i}`,
+      pluginId: 'monitoring-loadmore-plugin',
+      autonomyLevel: 'L1',
+      status: 'running',
+      envelope: null,
+      fallbackReason: null,
+      startedAt: minutesAgo(50_000 + i),
+      completedAt: null,
+      executorType: 'agent',
+      reviewerType: 'none',
+    };
+  }
 
   const agentRuns: Record<string, Record<string, unknown>> = {
     [RUN_COMPLETED_1_ID]: {
@@ -688,6 +880,76 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       executorType: 'agent',
       reviewerType: 'none',
     },
+    // Dedicated runs for agent-runs-page.journey.ts, one per
+    // `AgentRunCardStatus` bucket (running/completed/error/flagged — see
+    // `cardStatusConditions` in process-instance-repository.ts's agent-run
+    // counterpart). All parented to `proc-agent-runs-page-journey` so
+    // `processInstanceId` filtering isolates them from concurrent journeys.
+    // `agent_runs.id` is a Postgres uuid column — fixed v4-shaped literals,
+    // distinct from the `...8000...` series above. Distinct hour-spaced
+    // `startedAt` values make the newest-first keyset order deterministic:
+    // running (newest) → completed → error → flagged (oldest).
+    '00000000-0000-4000-9000-000000000001': {
+      id: '00000000-0000-4000-9000-000000000001',
+      processInstanceId: 'proc-agent-runs-page-journey',
+      stepId: 'step-flagged',
+      pluginId: 'page-journey-plugin',
+      autonomyLevel: 'L3',
+      status: 'escalated',
+      envelope: null,
+      fallbackReason: 'low_confidence',
+      startedAt: fourHoursAgo,
+      completedAt: fourHoursAgo,
+      executorType: 'agent',
+      reviewerType: 'human',
+    },
+    '00000000-0000-4000-9000-000000000002': {
+      id: '00000000-0000-4000-9000-000000000002',
+      processInstanceId: 'proc-agent-runs-page-journey',
+      stepId: 'step-error',
+      pluginId: 'page-journey-plugin',
+      autonomyLevel: 'L2',
+      // `error` bucket is driven purely by `fallbackReason`, not `status`
+      // (see `cardStatusConditions` in agent-run-repository.ts) — `status`
+      // must be something other than 'completed'/'running'/'escalated'/
+      // 'flagged' here, or this row would double-count into that bucket too.
+      status: 'interrupted',
+      envelope: null,
+      fallbackReason: 'error',
+      startedAt: threeHoursAgo,
+      completedAt: threeHoursAgo,
+      executorType: 'agent',
+      reviewerType: 'none',
+    },
+    '00000000-0000-4000-9000-000000000003': {
+      id: '00000000-0000-4000-9000-000000000003',
+      processInstanceId: 'proc-agent-runs-page-journey',
+      stepId: 'step-completed',
+      pluginId: 'page-journey-plugin',
+      autonomyLevel: 'L2',
+      status: 'completed',
+      envelope: null,
+      fallbackReason: null,
+      startedAt: twoHoursAgo,
+      completedAt: twoHoursAgo,
+      executorType: 'agent',
+      reviewerType: 'none',
+    },
+    '00000000-0000-4000-9000-000000000004': {
+      id: '00000000-0000-4000-9000-000000000004',
+      processInstanceId: 'proc-agent-runs-page-journey',
+      stepId: 'step-running',
+      pluginId: 'page-journey-plugin',
+      autonomyLevel: 'L1',
+      status: 'running',
+      envelope: null,
+      fallbackReason: null,
+      startedAt: oneHourAgo,
+      completedAt: null,
+      executorType: 'agent',
+      reviewerType: 'none',
+    },
+    ...monitoringLoadMoreAgentRuns,
   };
 
   const agentEvents: Record<string, Record<string, unknown>> = {
@@ -700,6 +962,39 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       timestamp: oneHourAgo,
     },
   };
+
+  const MONITORING_LOADMORE_ACTOR_ID = 'monitoring-loadmore-actor';
+  const MONITORING_LOADMORE_EVENT_COUNT = 21;
+  // 21 audit events, one PAGE_SIZE(20) over the limit, shared by
+  // monitoring.journey.ts's Users AND Tasks tab Load-More tests —
+  // `task.completed` is a member of both USER_ACTIVITY_ACTIONS and
+  // TASK_ACTIVITY_ACTIONS, so the same batch isolates cleanly on either
+  // tab. Unique `actorId` + the matching `namespaceMembers` entry below
+  // (so the tab's own "User" filter <select> can select it) gives exact
+  // isolation from whatever parallel journeys write to the shared `test`
+  // namespace. Minute-spaced `timestamp`, newest first (i=1 newest) —
+  // offset by 50,000 minutes (~34 days), well past `threeDaysAgo` (the
+  // oldest named constant above), so this batch never crowds the Users/
+  // Tasks tabs' *unfiltered* top-20 view out from under other tests in
+  // this file that assert on specific rows there (e.g. `audit-workflow-
+  // cancelled` at `twoDaysAgo`) — isolation for our own tests comes from
+  // the actor filter, not from recency.
+  const monitoringLoadMoreAuditEvents: Record<string, Record<string, unknown>> = {};
+  for (let i = 1; i <= MONITORING_LOADMORE_EVENT_COUNT; i++) {
+    monitoringLoadMoreAuditEvents[`audit-monitoring-loadmore-${i}`] = {
+      actorId: MONITORING_LOADMORE_ACTOR_ID,
+      actorType: 'user',
+      actorRole: 'member',
+      action: 'task.completed',
+      description: `Monitoring load-more fixture event ${i}`,
+      timestamp: minutesAgo(50_000 + i),
+      inputSnapshot: { taskId: `task-monitoring-loadmore-${i}`, stepId: 'monitoring-loadmore-step' },
+      outputSnapshot: { status: 'completed' },
+      basis: 'Fixture for monitoring.journey.ts Load More coverage',
+      entityType: 'humanTask',
+      entityId: `task-monitoring-loadmore-${i}`,
+    };
+  }
 
   const auditEvents: Record<string, Record<string, unknown>> = {
     'audit-1': {
@@ -837,6 +1132,54 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       entityId: 'task-claimed-1',
       processInstanceId: 'proc-running-1',
     },
+    // Dedicated events for audit-events-page.journey.ts (GET
+    // /api/audit-events). Unique `actorId` so filtering on it isolates
+    // exactly these 3 rows from concurrent journeys' events in the shared
+    // `test` namespace. No `processInstanceId`, so postgres-seed.ts's
+    // workspace resolution falls back to TEST_ORG_HANDLE — same pattern as
+    // `audit-signin-password`. Distinct hour-spaced timestamps make the
+    // newest-first keyset order deterministic: 3 (newest) → 1 (oldest).
+    // Event 3 uses a different `action` to exercise the `action` filter.
+    'audit-page-journey-1': {
+      actorId: 'audit-page-journey-actor',
+      actorType: 'user',
+      actorRole: 'owner',
+      action: 'user.signed_in',
+      description: 'Page journey fixture event 1',
+      timestamp: threeHoursAgo,
+      inputSnapshot: {},
+      outputSnapshot: {},
+      basis: 'Fixture for audit-events-page.journey.ts',
+      entityType: 'user',
+      entityId: 'audit-page-journey-actor',
+    },
+    'audit-page-journey-2': {
+      actorId: 'audit-page-journey-actor',
+      actorType: 'user',
+      actorRole: 'owner',
+      action: 'user.signed_in',
+      description: 'Page journey fixture event 2',
+      timestamp: twoHoursAgo,
+      inputSnapshot: {},
+      outputSnapshot: {},
+      basis: 'Fixture for audit-events-page.journey.ts',
+      entityType: 'user',
+      entityId: 'audit-page-journey-actor',
+    },
+    'audit-page-journey-3': {
+      actorId: 'audit-page-journey-actor',
+      actorType: 'user',
+      actorRole: 'owner',
+      action: 'task.completed',
+      description: 'Page journey fixture event 3',
+      timestamp: oneHourAgo,
+      inputSnapshot: {},
+      outputSnapshot: {},
+      basis: 'Fixture for audit-events-page.journey.ts',
+      entityType: 'humanTask',
+      entityId: 'audit-page-journey-actor',
+    },
+    ...monitoringLoadMoreAuditEvents,
   };
 
   const stepExecutions: Record<string, Record<string, unknown>> = {
@@ -1343,6 +1686,47 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       ],
       createdAt: threeDaysAgo,
     },
+    // Backs `proc-agent-runs-page-journey` (see `processInstances` above,
+    // added earlier this session for agent-runs-page.journey.ts's L3 API
+    // coverage). That fixture set never got a matching `workflowDefinitions`
+    // entry, which is harmless for the API-only journey but 404s `GET
+    // /api/processes/:id/steps` the moment the Agents tab actually *renders*
+    // one of these runs (AgentRunListTable's `PermissionsCell` calls it per
+    // row) — a real pre-existing bug this L4 UI journey newly exercises.
+    // Fixed here rather than filed as a follow-up: additive, one fixture
+    // object, same shape as the entry below it.
+    'test:Agent Runs Page Journey Workflow:1': {
+      name: 'Agent Runs Page Journey Workflow',
+      namespace: 'test',
+      version: 1,
+      title: 'Agent Runs Page Journey Workflow',
+      description: 'Minimal definition backing agent-runs-page.journey.ts\'s fixtures, added so the Agents tab (which resolves per-row step permissions) doesn\'t 404 when it renders these runs.',
+      steps: [
+        { id: 'step-running', name: 'Step Running', type: 'review', executor: 'agent', agent: { allowedTools: [] } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'step-running', to: 'done' }],
+      createdAt: fourHoursAgo,
+    },
+    // Backs `proc-monitoring-loadmore-agents` (see `processInstances` above)
+    // — exists only so `GET /api/processes/:id/steps` (called per row by
+    // AgentRunListTable's `PermissionsCell` in the live Agents tab) resolves
+    // instead of 404ing; the fixture agent runs' individual stepIds don't
+    // need to match an entry here (`useStepAllowedTools` degrades to "no
+    // data" on a miss, same as any step with no allowed-tools list).
+    'test:Monitoring LoadMore Agent Workflow:1': {
+      name: 'Monitoring LoadMore Agent Workflow',
+      namespace: 'test',
+      version: 1,
+      title: 'Monitoring LoadMore Agent Workflow',
+      description: 'Minimal definition backing monitoring.journey.ts\'s Agents-tab Load More fixtures.',
+      steps: [
+        { id: 'step-monitoring-loadmore', name: 'Monitoring LoadMore Step', type: 'review', executor: 'agent', agent: { allowedTools: [] } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'step-monitoring-loadmore', to: 'done' }],
+      createdAt: minutesAgo(50_000),
+    },
   };
 
   const namespaces: Record<string, Record<string, unknown>> = {
@@ -1362,6 +1746,18 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       uid: testUserId,
       role: 'owner',
       joinedAt: '2024-01-01T00:00:00.000Z',
+    },
+    // Synthetic member for monitoring.journey.ts's Users/Tasks Load-More
+    // tests — no corresponding real auth account needed (`workspace_members`
+    // has no FK on `uid`; see postgres-seed.ts's writer). Its only purpose
+    // is to make `monitoring-loadmore-actor` selectable in the Users/Tasks
+    // tabs' "User" filter <select>, which is populated from real workspace
+    // members, not from the audit events themselves.
+    [MONITORING_LOADMORE_ACTOR_ID]: {
+      id: MONITORING_LOADMORE_ACTOR_ID,
+      uid: MONITORING_LOADMORE_ACTOR_ID,
+      role: 'member',
+      joinedAt: threeDaysAgo,
     },
   };
 

@@ -3,12 +3,11 @@
 import { useQuery } from '@tanstack/react-query';
 import type { MonitoringSummary } from '@mediforce/platform-api/contract';
 import { ACTIONABLE_STATUSES } from '@mediforce/platform-api/contract';
-import type { HumanTask, ProcessInstance } from '@mediforce/platform-core';
+import type { HumanTask } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 import { NICE_LIVE_INTERVAL_MS, STANDARD_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
-import { useProcessInstances } from './use-process-instances';
 
 /**
  * Workspace dashboard summary via `mediforce.monitoring.summary`. NICE LIVE
@@ -41,28 +40,28 @@ export function useMonitoringSummary(handle: string | undefined): {
 }
 
 export interface MonitoringData {
-  instances: ProcessInstance[];
   tasks: HumanTask[];
-  loading: boolean;
 }
 
 /**
  * Monitoring tabs page data — composes the compact `useMonitoringSummary`
- * aggregate (kept alive here so the summary request still fires; the
- * Workflows tab's KPI cards derive their counts from `instances` directly
- * via `getWorkflowStatus` instead) with the row-level headless hooks the
- * tabs' tables/lists need (`useProcessInstances`, `mediforce.tasks.list`).
- * STANDARD LIVE per ADR-0006 §4 for the row-level reads.
+ * aggregate (kept alive here so the summary request still fires) with the
+ * row-level headless hooks the tabs' tables/lists need
+ * (`mediforce.tasks.list`). STANDARD LIVE per ADR-0006 §4 for the row-level
+ * reads.
+ *
+ * Deliberately does NOT fetch process instances here — the Workflows tab
+ * used to (`useProcessInstances('all', ...)`, up to 10k rows, on every
+ * Monitoring page load regardless of active tab) purely to JS-count KPI
+ * cards; it now reads `mediforce.runs.statusCounts` (a real SQL
+ * aggregation) and `AllRunsPanel` paginates its own row-level fetch. See
+ * workflows-tab.tsx.
+ *
+ * No `loading` field — Tasks tab (the only consumer) doesn't gate any UI
+ * on it; each tab's own hooks own their own loading state.
  */
 export function useMonitoringData(handle: string | undefined): MonitoringData {
-  const { loading: summaryLoading } = useMonitoringSummary(handle);
-
-  const { data: instances, loading: instancesLoading } = useProcessInstances(
-    'all',
-    undefined,
-    false,
-    handle ?? '',
-  );
+  useMonitoringSummary(handle);
 
   const tasksQuery = useQuery({
     queryKey: queryKeys.tasks.byNamespace(handle ?? '', { status: [...ACTIONABLE_STATUSES] }),
@@ -77,11 +76,8 @@ export function useMonitoringData(handle: string | undefined): MonitoringData {
     retry: stopRetryOn4xx,
     refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
   });
-  const tasks = tasksQuery.data ?? [];
 
   return {
-    instances,
-    tasks,
-    loading: summaryLoading || instancesLoading || tasksQuery.isLoading,
+    tasks: tasksQuery.data ?? [],
   };
 }

@@ -3,6 +3,7 @@ import {
   InstanceStatusSchema,
   ProcessInstanceSchema,
   RunNameEntrySchema,
+  WorkflowDisplayStatusSchema,
 } from '@mediforce/platform-core';
 
 /**
@@ -94,6 +95,72 @@ export const ListRunsOutputSchema = z.object({
 
 export type ListRunsInput = z.infer<typeof ListRunsInputSchema>;
 export type ListRunsOutput = z.infer<typeof ListRunsOutputSchema>;
+
+/**
+ * Contract for `GET /api/runs/page` — keyset-paginated, newest-first list
+ * backing Monitoring → Workflows and the standalone `/runs` page (via
+ * `AllRunsPanel`). Separate from `ListRunsInputSchema`/`runs.list` (kept
+ * unbounded-by-cursor for the CLI's `run-list` command and
+ * `getMonitoringSummary`'s internal read) rather than overloading it, so
+ * neither existing consumer's contract shifts under it.
+ */
+export const ListRunsPageInputSchema = z.object({
+  namespace: z.string().min(1).optional(),
+  workflow: z.string().min(1).optional(),
+  dryRun: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+  /** `false` (default) excludes archived runs; `true` includes them —
+   *  mirrors the Monitoring "Show archived" toggle, pushed server-side so a
+   *  paginated page isn't silently emptied by over-fetch-then-filter. */
+  archived: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+  /** UI-facing status bucket (see `WorkflowDisplayStatusSchema`) — what a
+   *  clicked KPI card filters the table to. Narrower and more useful here
+   *  than the raw `status` column, since it's what the table's badges and
+   *  the KPI cards themselves actually show. */
+  displayStatus: WorkflowDisplayStatusSchema.optional(),
+  /** Opaque keyset cursor from a previous page's `nextCursor` — omit for
+   *  page 1. */
+  cursor: z.string().min(1).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});
+
+export const ListRunsPageOutputSchema = z.object({
+  runs: z.array(ProcessInstanceSchema),
+  nextCursor: z.string().optional(),
+});
+
+export type ListRunsPageInput = z.infer<typeof ListRunsPageInputSchema>;
+export type ListRunsPageOutput = z.infer<typeof ListRunsPageOutputSchema>;
+
+/**
+ * Contract for `GET /api/runs/status-counts` — grouped `WorkflowDisplayStatus`
+ * counts for the Workflows tab's KPI cards, computed in Postgres (not by
+ * fetching rows and tallying in JS). Accepts the same
+ * `namespace`/`workflow`/`dryRun`/`archived` filters as `ListRunsPageInputSchema`
+ * (everything except `displayStatus` itself and pagination — the whole
+ * point is reporting every bucket's count regardless of which one, if any,
+ * is the table's active filter).
+ */
+export const GetWorkflowStatusCountsInputSchema = z.object({
+  namespace: z.string().min(1).optional(),
+  workflow: z.string().min(1).optional(),
+  dryRun: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+  archived: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+});
+
+export const WorkflowDisplayStatusCountsSchema = z.object({
+  in_progress: z.number().int().nonnegative(),
+  waiting_for_human: z.number().int().nonnegative(),
+  error: z.number().int().nonnegative(),
+  cancelled: z.number().int().nonnegative(),
+  completed: z.number().int().nonnegative(),
+});
+
+export const GetWorkflowStatusCountsOutputSchema = z.object({
+  counts: WorkflowDisplayStatusCountsSchema,
+});
+
+export type GetWorkflowStatusCountsInput = z.infer<typeof GetWorkflowStatusCountsInputSchema>;
+export type GetWorkflowStatusCountsOutput = z.infer<typeof GetWorkflowStatusCountsOutputSchema>;
 
 /**
  * Contract for `GET /api/runs/names`.

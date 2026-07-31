@@ -70,6 +70,10 @@ class StubProcessInstanceRepository implements ProcessInstanceRepository {
   async updateStepExecution(): Promise<void> { throw new Error('stub'); }
   async getIdsByDefinitionName(): Promise<string[]> { throw new Error('stub'); }
   async setDeletedByDefinitionName(): Promise<void> { throw new Error('stub'); }
+  async listPage(): Promise<never> { throw new Error('stub'); }
+  async listPageInNamespaces(): Promise<never> { throw new Error('stub'); }
+  async countByDisplayStatus(): Promise<never> { throw new Error('stub'); }
+  async countByDisplayStatusInNamespaces(): Promise<never> { throw new Error('stub'); }
 }
 
 function eventBase(
@@ -261,6 +265,76 @@ function contract(
           actorType: 'bogus',
         } as unknown as Omit<AuditEvent, 'serverTimestamp'>),
       ).rejects.toThrow();
+    });
+
+    it('getByNamespace returns newest-first pages with a working cursor', async () => {
+      const instanceId = randomUUID();
+      await registerInstance(instanceId, 'ws-1');
+      for (const ts of [
+        '2026-01-01T08:00:00.000Z',
+        '2026-01-01T09:00:00.000Z',
+        '2026-01-01T10:00:00.000Z',
+      ]) {
+        await repo.append(eventBase({ processInstanceId: instanceId, timestamp: ts }));
+      }
+
+      const page1 = await repo.getByNamespace('ws-1', { limit: 2 });
+      expect(page1.items.map((e) => e.timestamp)).toEqual([
+        '2026-01-01T10:00:00.000Z',
+        '2026-01-01T09:00:00.000Z',
+      ]);
+      expect(page1.nextCursor).toBeDefined();
+
+      const page2 = await repo.getByNamespace('ws-1', { limit: 2, cursor: page1.nextCursor });
+      expect(page2.items.map((e) => e.timestamp)).toEqual(['2026-01-01T08:00:00.000Z']);
+      expect(page2.nextCursor).toBeUndefined();
+    });
+
+    it('getByNamespace filters by actions, actorId, and date range', async () => {
+      const instanceId = randomUUID();
+      await registerInstance(instanceId, 'ws-1');
+      await repo.append(eventBase({
+        processInstanceId: instanceId,
+        action: 'instance.started',
+        actorId: 'user-A',
+        timestamp: '2026-01-05T00:00:00.000Z',
+      }));
+      await repo.append(eventBase({
+        processInstanceId: instanceId,
+        action: 'task.completed',
+        actorId: 'user-B',
+        timestamp: '2026-01-10T00:00:00.000Z',
+      }));
+      await repo.append(eventBase({
+        processInstanceId: instanceId,
+        action: 'task.completed',
+        actorId: 'user-A',
+        timestamp: '2026-01-20T00:00:00.000Z',
+      }));
+
+      const byAction = await repo.getByNamespace('ws-1', { limit: 20, actions: ['task.completed'] });
+      expect(byAction.items).toHaveLength(2);
+      expect(byAction.items.every((e) => e.action === 'task.completed')).toBe(true);
+
+      const byActor = await repo.getByNamespace('ws-1', { limit: 20, actorId: 'user-A' });
+      expect(byActor.items).toHaveLength(2);
+      expect(byActor.items.every((e) => e.actorId === 'user-A')).toBe(true);
+
+      const byDateRange = await repo.getByNamespace('ws-1', {
+        limit: 20,
+        fromDate: '2026-01-08',
+        toDate: '2026-01-15',
+      });
+      expect(byDateRange.items).toHaveLength(1);
+      expect(byDateRange.items[0]!.timestamp).toBe('2026-01-10T00:00:00.000Z');
+
+      const combined = await repo.getByNamespace('ws-1', {
+        limit: 20,
+        actions: ['task.completed'],
+        actorId: 'user-A',
+      });
+      expect(combined.items).toHaveLength(1);
+      expect(combined.items[0]!.timestamp).toBe('2026-01-20T00:00:00.000Z');
     });
   });
 }

@@ -4,18 +4,17 @@ import { formatStepName } from './format';
 /** Real `task.*` actions that represent something a human did to a task.
  *  `task.created` is system-generated (workflow engine advancing a step) and
  *  `process.resumed_after_task` is a process-level side effect of
- *  `task.completed`, not a distinct task action — both excluded. */
-const TASK_ACTIVITY_ACTIONS = new Set([
+ *  `task.completed`, not a distinct task action — both excluded.
+ *
+ *  Passed server-side as the `actions` filter (`useNamespaceAuditEventsPage`)
+ *  so a fetched page only ever contains what this table claims to show. */
+export const TASK_ACTIVITY_ACTIONS = [
   'task.viewed',
   'task.claimed',
   'task.completed',
   'task.attachment_added',
   'task.attachment_deleted',
-]);
-
-export function isTaskActivityEvent(event: AuditEvent): boolean {
-  return TASK_ACTIVITY_ACTIONS.has(event.action);
-}
+] as const;
 
 const EVENT_NAMES: Record<string, string> = {
   'task.viewed': 'Viewed',
@@ -46,30 +45,4 @@ export function taskIdFromEvent(event: AuditEvent): string | null {
 export function taskTitleFromEvent(event: AuditEvent): string {
   const stepId = event.inputSnapshot.stepId;
   return typeof stepId === 'string' ? formatStepName(stepId) : 'Task';
-}
-
-export interface TaskActivityFilters {
-  actorId: string | null;
-  action: string | null;
-  /** `YYYY-MM-DD`, as produced by `<input type="date">` — inclusive of the
-   *  whole local day. */
-  fromDate: string | null;
-  toDate: string | null;
-}
-
-export function filterTaskActivity(
-  events: AuditEvent[],
-  filters: TaskActivityFilters,
-): AuditEvent[] {
-  const from = filters.fromDate ? new Date(`${filters.fromDate}T00:00:00.000`) : null;
-  const to = filters.toDate ? new Date(`${filters.toDate}T23:59:59.999`) : null;
-
-  return events.filter((event) => {
-    if (filters.actorId !== null && event.actorId !== filters.actorId) return false;
-    if (filters.action !== null && event.action !== filters.action) return false;
-    const eventTime = new Date(event.timestamp);
-    if (from !== null && eventTime < from) return false;
-    if (to !== null && eventTime > to) return false;
-    return true;
-  });
 }

@@ -151,8 +151,13 @@ test.describe('Monitoring Journey', () => {
 
     // Two action types, each backed by a real seeded audit_events row (see
     // seed-data.ts's audit-task-claimed / audit-task-completed fixtures).
+    // `.first()` on 'Completed': with server-side pagination this table is
+    // namespace-wide and unscoped to this test's own fixtures, so the top-20
+    // default page can (and, once the Load-More fixture batch below exists,
+    // reliably does) contain more than one `task.completed` row — this only
+    // needs to prove the badge shows up somewhere, not that it's unique.
     await expect(rows.getByText('Claimed')).toBeVisible({ timeout: 10_000 });
-    await expect(rows.getByText('Completed')).toBeVisible();
+    await expect(rows.getByText('Completed').first()).toBeVisible();
 
     // "Task" resolves the real step name and links to the real task, not a
     // placeholder — same formatStepName convention as everywhere else.
@@ -233,5 +238,76 @@ test.describe('Monitoring Journey', () => {
     await page.getByRole('button', { name: 'Clear' }).click();
     await expect(page.getByText('Filtered by:')).not.toBeVisible();
     await expect(rows.getByText('Compliance Check')).toBeVisible();
+  });
+
+  test('Users tab: Load More grows the table from 20 to 21 rows via a real actor filter, then disappears', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/monitoring`);
+    await page.getByRole('tab', { name: 'Users' }).click();
+
+    // 21 dedicated audit events (seed-data.ts's `monitoring-loadmore-actor`
+    // batch — one PAGE_SIZE(20) over the limit) isolate exactly by actorId
+    // via the tab's own "User" filter (first combobox), so this is an
+    // exact assertion, not a lower bound.
+    await page.getByRole('combobox').nth(0).selectOption({ value: 'monitoring-loadmore-actor' });
+
+    const rows = page.locator('tbody tr');
+    await expect(rows).toHaveCount(20, { timeout: 10_000 });
+    const loadMoreButton = page.getByRole('button', { name: 'Load more' });
+    await expect(loadMoreButton).toBeVisible();
+
+    await loadMoreButton.click();
+    await expect(rows).toHaveCount(21);
+    await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
+  });
+
+  test('Tasks tab: Load More grows the table from 20 to 21 rows via a real actor filter, then disappears', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/monitoring`);
+    await page.getByRole('tab', { name: 'Tasks' }).click();
+
+    // Same 21-event batch as the Users tab test above — `task.completed`
+    // is in both USER_ACTIVITY_ACTIONS and TASK_ACTIVITY_ACTIONS, so one
+    // fixture batch proves Load More on both tabs.
+    await page.getByRole('combobox').nth(0).selectOption({ value: 'monitoring-loadmore-actor' });
+
+    const rows = page.locator('tbody tr');
+    await expect(rows).toHaveCount(20, { timeout: 10_000 });
+    const loadMoreButton = page.getByRole('button', { name: 'Load more' });
+    await expect(loadMoreButton).toBeVisible();
+
+    await loadMoreButton.click();
+    await expect(rows).toHaveCount(21);
+    await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
+  });
+
+  test('Agents tab: KPI cards report the true DB count independent of the ≤20 loaded rows, and Load More grows the table', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/monitoring`);
+    await page.getByRole('tab', { name: 'Agents' }).click();
+
+    // 21 dedicated agent runs (seed-data.ts's "Monitoring LoadMore Agent
+    // Workflow" parent instance), all `running` — isolate exactly via the
+    // tab's own "Workflow" filter (first combobox), an exact filter rather
+    // than a KPI-bucket lower bound.
+    await page.getByRole('combobox').nth(0).selectOption({ label: 'Monitoring LoadMore Agent Workflow' });
+
+    // The whole point of server-side KPI aggregation: the cards show the
+    // real count of the filtered set (21), not a tally of the ≤20 rows
+    // rendered in the table below them.
+    await expect(page.getByRole('button', { name: /Total runs/ }).first()).toContainText('21', { timeout: 10_000 });
+    await expect(page.getByRole('button', { name: /Running/ }).first()).toContainText('21');
+    await expect(page.getByRole('button', { name: /Completed/ }).first()).toContainText('0');
+    await expect(page.getByText('20 of 21 runs')).toBeVisible();
+
+    const rows = page.locator('tbody tr');
+    await expect(rows).toHaveCount(20);
+    const loadMoreButton = page.getByRole('button', { name: 'Load more' });
+    await expect(loadMoreButton).toBeVisible();
+
+    await loadMoreButton.click();
+    await expect(rows).toHaveCount(21);
+    await expect(page.getByText('21 of 21 runs')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
   });
 });

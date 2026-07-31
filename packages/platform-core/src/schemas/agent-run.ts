@@ -33,3 +33,16 @@ export const AgentRunSchema = z.object({
 
 export type AgentRunStatus = z.infer<typeof AgentRunStatusSchema>;
 export type AgentRun = z.infer<typeof AgentRunSchema>;
+
+/**
+ * KPI-card bucket for Monitoring → Agents — coarser than `AgentRunStatus`
+ * and not a 1:1 mapping to it: `error` is derived from `fallbackReason`
+ * (`'error'` or `'timeout'`), never from `status` directly (see the comment
+ * on `agent-run-list-table.tsx`'s `STATUS_STYLES` — `timed_out`/`error` are
+ * declared on `AgentRunStatusSchema` but never actually written to a real
+ * row), and `flagged` covers both `escalated` and `flagged` statuses.
+ * `running`/`completed` do map straight through. `paused`/`interrupted`
+ * intentionally have no bucket — same as the KPI cards' 4-of-6 coverage.
+ */
+export const AgentRunCardStatusSchema = z.enum(['running', 'completed', 'error', 'flagged']);
+export type AgentRunCardStatus = z.infer<typeof AgentRunCardStatusSchema>;

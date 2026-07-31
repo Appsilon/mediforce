@@ -31,6 +31,12 @@ interface RunsTableProps {
   emptyMessage?: string;
   /** Map of instanceId → active task ID for direct task links. */
   activeTaskByInstance?: Map<string, string>;
+  /** True when the server has more rows beyond `runs` — shows the "Load
+   *  more" footer. Omit (or false) to hide it entirely (e.g. a fully-loaded
+   *  small table with no pagination source). */
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 type SortField = 'cost' | 'started' | null;
@@ -69,6 +75,9 @@ export function RunsTable({
   runHref,
   emptyMessage = 'No runs found.',
   activeTaskByInstance,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }: RunsTableProps) {
   const handle = useHandleFromPath();
   const { toast } = useToast();
@@ -420,6 +429,17 @@ export function RunsTable({
           })}
         </tbody>
       </table>
+      {hasMore && (
+        <div className="flex justify-center border-t py-3">
+          <button
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loadingMore ? 'Loading…' : 'Load more'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

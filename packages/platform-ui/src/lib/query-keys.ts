@@ -50,6 +50,18 @@ export const queryKeys = {
      *  prefix so mutation-driven invalidations refresh labels without per-site
      *  wiring; keyed by handle so two workspaces don't share a cache entry. */
     nameMap: (handle: string) => ['runs', 'name-map', handle] as const,
+    /** Keyset-paginated run list (Monitoring → Workflows, `/runs`) — distinct
+     *  from `byHandle` (the unbounded legacy read) since the two coexist. */
+    page: (
+      handle: string,
+      filters: { workflow?: string; dryRun?: boolean; archived?: boolean; displayStatus?: string },
+    ) => ['runs', 'page', handle, { ...filters }] as const,
+    /** Grouped WorkflowDisplayStatus counts backing the Workflows tab's KPI
+     *  cards — same filter shape as `page` minus `displayStatus` itself. */
+    statusCounts: (
+      handle: string,
+      filters: { workflow?: string; dryRun?: boolean; archived?: boolean },
+    ) => ['runs', 'status-counts', handle, { ...filters }] as const,
   },
   run: (runId: string) => ['run', runId] as const,
 
@@ -114,6 +126,18 @@ export const queryKeys = {
       handle: string | undefined,
       filters?: { runId?: string; stepId?: string },
     ) => ['agent-runs', handle ?? null, { ...filters }] as const,
+    /** Keyset-paginated list (Monitoring → Agents) — distinct from `list`
+     *  (the unbounded legacy read) since the two coexist. */
+    page: (
+      handle: string,
+      filters: { status?: string; cardStatus?: string; processInstanceIds?: readonly string[] },
+    ) => ['agent-runs', 'page', handle, { ...filters }] as const,
+    /** Grouped AgentRunCardStatus counts backing the Agents tab's KPI
+     *  cards — same filter shape as `page` minus `cardStatus` itself. */
+    cardStatusCounts: (
+      handle: string,
+      filters: { status?: string; processInstanceIds?: readonly string[] },
+    ) => ['agent-runs', 'card-status-counts', handle, { ...filters }] as const,
   },
   /** Single agent-run detail key (singular `agent-run`). */
   agentRun: (agentRunId: string) => ['agent-run', agentRunId] as const,
@@ -125,6 +149,12 @@ export const queryKeys = {
   modelRegistry: {
     list: () => ['model-registry'] as const,
   },
-  /** Workspace-wide audit trail (Monitoring → Users tab). */
-  namespaceAuditEvents: (handle: string) => ['namespace-audit-events', handle] as const,
+  /** Workspace-wide audit trail (Monitoring → Users / Tasks tabs) —
+   *  keyset-paginated, server-side filtered by action set + actor +
+   *  date range. Each tab passes its own `actions` slice, so the two
+   *  tabs' pages don't share a cache entry. */
+  namespaceAuditEvents: (
+    handle: string,
+    filters: { actions: readonly string[]; actorId?: string; fromDate?: string; toDate?: string },
+  ) => ['namespace-audit-events', handle, { ...filters }] as const,
 } as const;

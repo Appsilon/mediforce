@@ -77,4 +77,49 @@ describe('listNamespaceAuditEvents handler', () => {
 
     expect(result.events).toEqual([]);
   });
+
+  it('filters by actions — only the requested action set is returned', async () => {
+    const scope = createTestScope({ auditRepo, instanceRepo });
+    const result = await listNamespaceAuditEvents(
+      { namespace: 'team-alpha', actions: ['task.completed'] },
+      scope,
+    );
+
+    expect(result.events.map((e) => e.action)).toEqual(['task.completed']);
+  });
+
+  it('filters by actorId', async () => {
+    const scope = createTestScope({ auditRepo, instanceRepo });
+    await auditRepo.append(
+      buildAuditEvent({
+        processInstanceId: 'inst-a',
+        action: 'task.completed',
+        actorId: 'someone-else',
+      }),
+    );
+    const result = await listNamespaceAuditEvents(
+      { namespace: 'team-alpha', actorId: 'someone-else' },
+      scope,
+    );
+
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]!.actorId).toBe('someone-else');
+  });
+
+  it('paginates with a working cursor, newest first', async () => {
+    const scope = createTestScope({ auditRepo, instanceRepo });
+    const page1 = await listNamespaceAuditEvents({ namespace: 'team-alpha', limit: 2 }, scope);
+    expect(page1.events).toHaveLength(2);
+    expect(page1.nextCursor).toBeDefined();
+
+    const page2 = await listNamespaceAuditEvents(
+      { namespace: 'team-alpha', limit: 2, cursor: page1.nextCursor },
+      scope,
+    );
+    expect(page2.events).toHaveLength(1);
+    expect(page2.nextCursor).toBeUndefined();
+
+    const seenActions = [...page1.events, ...page2.events].map((e) => e.action).sort();
+    expect(seenActions).toEqual(['instance.started', 'task.completed', 'user.signed_in']);
+  });
 });

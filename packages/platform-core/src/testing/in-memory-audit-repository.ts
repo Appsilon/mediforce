@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { AuditEventSchema, type AuditEvent } from '../schemas/audit-event';
-import type { AuditRepository } from '../interfaces/audit-repository';
+import type { AuditRepository, GetByNamespaceOptions, GetByNamespacePage } from '../interfaces/audit-repository';
 import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository';
+import { encodeAuditEventCursor, decodeAuditEventCursor } from '../cursors/audit-event-cursor';
 
 /**
  * In-memory implementation of AuditRepository for testing.
@@ -40,6 +42,7 @@ export class InMemoryAuditRepository implements AuditRepository {
     const { namespace: _namespace, ...rest } = event;
     const completeEvent = AuditEventSchema.parse({
       ...rest,
+      id: rest.id ?? randomUUID(),
       serverTimestamp: new Date().toISOString(),
     });
 
@@ -98,14 +101,55 @@ export class InMemoryAuditRepository implements AuditRepository {
 
   async getByNamespace(
     namespace: string,
-    options?: { limit?: number },
-  ): Promise<AuditEvent[]> {
-    const filtered = this.records
+    options?: GetByNamespaceOptions,
+  ): Promise<GetByNamespacePage> {
+    let filtered = this.records
       .filter((r) => r.workspace === namespace)
-      .map((r) => r.event)
-      .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      .map((r) => r.event);
+    if (options?.actions !== undefined && options.actions.length > 0) {
+      const actionSet = new Set(options.actions);
+      filtered = filtered.filter((e) => actionSet.has(e.action));
+    }
+    if (options?.actorId !== undefined) {
+      filtered = filtered.filter((e) => e.actorId === options.actorId);
+    }
+    if (options?.fromDate !== undefined) {
+      const from = `${options.fromDate}T00:00:00.000Z`;
+      filtered = filtered.filter((e) => e.timestamp >= from);
+    }
+    if (options?.toDate !== undefined) {
+      const to = `${options.toDate}T23:59:59.999Z`;
+      filtered = filtered.filter((e) => e.timestamp <= to);
+    }
 
-    return options?.limit ? filtered.slice(0, options.limit) : filtered;
+    filtered.sort((a, b) => {
+      if (a.timestamp !== b.timestamp) return a.timestamp < b.timestamp ? 1 : -1;
+      const aId = a.id ?? '';
+      const bId = b.id ?? '';
+      return aId < bId ? 1 : aId > bId ? -1 : 0;
+    });
+
+    if (options?.cursor !== undefined) {
+      const after = decodeAuditEventCursor(options.cursor);
+      if (after !== null) {
+        filtered = filtered.filter(
+          (e) =>
+            e.timestamp < after.timestamp
+            || (e.timestamp === after.timestamp && (e.id ?? '') < after.id),
+        );
+      }
+    }
+
+    const limit = options?.limit ?? 20;
+    const items = filtered.slice(0, limit);
+    const last = items[items.length - 1];
+    const hasMore = filtered.length > items.length;
+    return {
+      items,
+      ...(hasMore && last !== undefined && last.id !== undefined
+        ? { nextCursor: encodeAuditEventCursor(last.timestamp, last.id) }
+        : {}),
+    };
   }
 
   /** Test helper: get all stored events */

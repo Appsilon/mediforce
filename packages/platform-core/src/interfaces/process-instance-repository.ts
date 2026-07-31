@@ -1,4 +1,4 @@
-import type { ProcessInstance, RunNameEntry } from '../schemas/process-instance';
+import type { ProcessInstance, RunNameEntry, WorkflowDisplayStatus } from '../schemas/process-instance';
 import type { StepExecution } from '../schemas/step-execution';
 import type { InstanceStatus } from '../schemas/process-instance';
 
@@ -20,6 +20,45 @@ export interface ListInstancesOptions {
   limit?: number;
   dryRun?: boolean;
 }
+
+/**
+ * Options for the keyset-paginated `listPage`/`listPageInNamespaces` pair —
+ * separate from `ListInstancesOptions` (which backs the unbounded
+ * `listAll`/`listInNamespaces` other consumers like
+ * `summarizeRunsByWorkflow` still rely on) so this feature's filters don't
+ * ripple into every existing caller of the older methods.
+ */
+export interface ListInstancesPageOptions {
+  definitionName?: string;
+  namespace?: string;
+  dryRun?: boolean;
+  /** `false` (default) excludes archived runs; omit/`true` to include them —
+   *  mirrors the Monitoring "Show archived" toggle, pushed server-side so a
+   *  paginated page isn't silently emptied by client-side over-filtering. */
+  archived?: boolean;
+  /** Bucket derived from `{status, pauseReason, error}` — see
+   *  `WorkflowDisplayStatusSchema`'s docstring. The repository translates
+   *  this into the same branching `getWorkflowStatus` implements in JS. */
+  displayStatus?: WorkflowDisplayStatus;
+  /** Opaque keyset cursor from a previous page's `nextCursor` — omit for
+   *  page 1. Malformed/unknown cursors are treated as "no cursor" (page 1),
+   *  same robustness rule as `getById` returning `null` on missing. */
+  cursor?: string;
+  limit: number;
+}
+
+export interface ListInstancesPage {
+  readonly items: readonly ProcessInstance[];
+  readonly nextCursor?: string;
+}
+
+/** Per-`WorkflowDisplayStatus` counts for the Workflows tab's KPI cards —
+ *  computed as a single grouped COUNT in Postgres, not by fetching rows and
+ *  tallying in JS. Respects the same `namespace`/`dryRun`/`archived` filters
+ *  as `listPage`/`listPageInNamespaces` (everything except `displayStatus`
+ *  and `cursor`/`limit`, since the whole point is to report every bucket's
+ *  count regardless of which one — if any — is the active table filter). */
+export type WorkflowDisplayStatusCounts = Record<WorkflowDisplayStatus, number>;
 
 /**
  * Per-workflow run aggregate for the workspace home cards. Computed without
@@ -70,6 +109,30 @@ export interface ProcessInstanceRepository {
 
   listAll(options: ListInstancesOptions): Promise<ProcessInstance[]>;
   listInNamespaces(allowed: readonly string[], options: ListInstancesOptions): Promise<ProcessInstance[]>;
+
+  /** System-actor keyset-paginated list — newest first, `(createdAt, id)`
+   *  tie-break. See `ListInstancesPageOptions`. */
+  listPage(options: ListInstancesPageOptions): Promise<ListInstancesPage>;
+  /** Namespace-scoped keyset-paginated list — items whose workspace is in
+   *  `allowed`, further narrowed by `options.namespace` under intersection
+   *  semantics (same convention as `listInNamespaces`). */
+  listPageInNamespaces(
+    allowed: readonly string[],
+    options: ListInstancesPageOptions,
+  ): Promise<ListInstancesPage>;
+
+  /** Grouped counts per `WorkflowDisplayStatus`, system-actor (no workspace
+   *  filter beyond `options.namespace`/`options.dryRun`/`options.archived`
+   *  if set). See `WorkflowDisplayStatusCounts`. */
+  countByDisplayStatus(
+    options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
+  ): Promise<WorkflowDisplayStatusCounts>;
+  /** Namespace-scoped variant — counts only runs whose workspace is in
+   *  `allowed`, further narrowed by `options.namespace`. */
+  countByDisplayStatusInNamespaces(
+    allowed: readonly string[],
+    options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
+  ): Promise<WorkflowDisplayStatusCounts>;
 
   /**
    * Projected `{ id, definitionName }` view of every non-deleted run in a

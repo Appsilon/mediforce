@@ -5,13 +5,12 @@ import Link from 'next/link';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { MonitoringData } from '@/hooks/use-monitoring';
-import { useNamespaceAuditEvents, useNamespaceMemberNames } from '@/hooks/use-namespace-audit-events';
+import { useNamespaceAuditEventsPage, useNamespaceMemberNames } from '@/hooks/use-namespace-audit-events';
 import { useProcessNameMap } from '@/hooks/use-agent-runs';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import {
-  isTaskActivityEvent,
-  filterTaskActivity,
+  TASK_ACTIVITY_ACTIONS,
   formatTaskEventName,
   taskIdFromEvent,
   taskTitleFromEvent,
@@ -25,16 +24,6 @@ const EVENT_STYLES: Record<string, string> = {
   'task.attachment_added': 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300',
   'task.attachment_deleted': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
 };
-
-// Fixed order for the filter dropdown — every possible action every time,
-// not just whatever happens to appear in this page's current data.
-const ALL_TASK_ACTIONS = [
-  'task.viewed',
-  'task.claimed',
-  'task.completed',
-  'task.attachment_added',
-  'task.attachment_deleted',
-];
 
 interface Props {
   data: MonitoringData;
@@ -55,14 +44,27 @@ function SkeletonRow() {
 export function TasksTab({ data }: Props) {
   const { tasks } = data;
   const handle = useHandleFromPath();
-  const { data: events, loading: eventsLoading } = useNamespaceAuditEvents(handle);
-  const memberNames = useNamespaceMemberNames(handle);
-  const processNames = useProcessNameMap(handle);
-
   const [actorFilter, setActorFilter] = useState<string | null>(null);
   const [actionFilter, setActionFilter] = useState<string | null>(null);
   const [fromDate, setFromDate] = useState<string | null>(null);
   const [toDate, setToDate] = useState<string | null>(null);
+
+  const actions = actionFilter !== null ? [actionFilter] : [...TASK_ACTIVITY_ACTIONS];
+  const {
+    data: events,
+    loading: eventsLoading,
+    hasMore,
+    loadingMore,
+    loadMore,
+  } = useNamespaceAuditEventsPage({
+    namespace: handle,
+    actions,
+    actorId: actorFilter,
+    fromDate,
+    toDate,
+  });
+  const memberNames = useNamespaceMemberNames(handle);
+  const processNames = useProcessNameMap(handle);
 
   const overdueTasks = useMemo(
     () =>
@@ -72,20 +74,15 @@ export function TasksTab({ data }: Props) {
     [tasks],
   );
 
-  const activity = useMemo(() => events.filter(isTaskActivityEvent), [events]);
-
-  // Only actors who actually show up in this workspace's task activity — not
-  // every member, most of whom may never have touched a task.
-  const actors = useMemo(() => {
-    const ids = new Set(activity.map((e) => e.actorId));
-    return Array.from(ids).sort((a, b) =>
-      (memberNames.get(a) ?? a).localeCompare(memberNames.get(b) ?? b),
-    );
-  }, [activity, memberNames]);
-
-  const filtered = useMemo(
-    () => filterTaskActivity(activity, { actorId: actorFilter, action: actionFilter, fromDate, toDate }),
-    [activity, actorFilter, actionFilter, fromDate, toDate],
+  // Every workspace member, not just ones with loaded activity — with
+  // server-side pagination there's no complete client-side event set to
+  // derive "who actually has activity" from.
+  const actors = useMemo(
+    () =>
+      Array.from(memberNames.entries())
+        .map(([uid, name]) => ({ uid, name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [memberNames],
   );
 
   const hasFilter = actorFilter !== null || actionFilter !== null || fromDate !== null || toDate !== null;
@@ -101,9 +98,9 @@ export function TasksTab({ data }: Props) {
             className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
           >
             <option value="">All Users</option>
-            {actors.map((actorId) => (
-              <option key={actorId} value={actorId}>
-                {memberNames.get(actorId) ?? actorId}
+            {actors.map(({ uid, name }) => (
+              <option key={uid} value={uid}>
+                {name}
               </option>
             ))}
           </select>
@@ -114,7 +111,7 @@ export function TasksTab({ data }: Props) {
             className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
           >
             <option value="">All Actions</option>
-            {ALL_TASK_ACTIONS.map((action) => (
+            {TASK_ACTIVITY_ACTIONS.map((action) => (
               <option key={action} value={action}>
                 {formatTaskEventName(action)}
               </option>
@@ -140,7 +137,7 @@ export function TasksTab({ data }: Props) {
           </div>
 
           <span className="text-sm text-muted-foreground">
-            {hasFilter ? `${filtered.length} of ${activity.length} events` : `${activity.length} events`}
+            {events.length} events loaded
           </span>
         </div>
 
@@ -158,7 +155,7 @@ export function TasksTab({ data }: Props) {
             <tbody>
               {eventsLoading
                 ? Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
-                : filtered.length === 0
+                : events.length === 0
                 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
@@ -166,7 +163,7 @@ export function TasksTab({ data }: Props) {
                     </td>
                   </tr>
                 )
-                : filtered.map((event: AuditEvent, i) => {
+                : events.map((event: AuditEvent, i) => {
                   const taskId = taskIdFromEvent(event);
                   const workflowName = event.processInstanceId ? processNames.get(event.processInstanceId) : undefined;
                   return (
@@ -208,6 +205,17 @@ export function TasksTab({ data }: Props) {
                 })}
             </tbody>
           </table>
+          {hasMore && (
+            <div className="flex justify-center border-t py-3">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
