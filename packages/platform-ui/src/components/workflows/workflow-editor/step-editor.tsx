@@ -298,11 +298,12 @@ export function StepEditor({
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold leading-tight truncate">{step.name || 'Unnamed step'}</p>
+          {/* executor · type, matching the canvas node badge order (type last). */}
           <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[10px] text-muted-foreground">{execStyle.label}</span>
+            <span className="text-[10px] text-muted-foreground/30">·</span>
             <TypeIcon className={cn('h-3 w-3 shrink-0', typeStyle.color)} strokeWidth={1.5} />
             <span className="text-[10px] text-muted-foreground">{typeStyle.label}</span>
-            <span className="text-[10px] text-muted-foreground/30">·</span>
-            <span className="text-[10px] text-muted-foreground">{execStyle.label}</span>
           </div>
         </div>
       </div>
@@ -335,6 +336,15 @@ export function StepEditor({
           />
         </FieldRow>
 
+        {/* Executor before type, matching the block picker / canvas node order
+            (executor -> type) so the two panels read consistently. */}
+        <FieldRow label="executor" tooltip={TIP.executor}>
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5" title="executor is set at creation. To change, remove this step and add a new one.">
+            <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
+            <span>{execStyle.label}</span>
+          </span>
+        </FieldRow>
+
         <FieldRow label="type" tooltip={TIP.type}>
           <span
             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5"
@@ -342,13 +352,6 @@ export function StepEditor({
           >
             <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
             {STEP_TYPE_LABELS[step.type] ?? step.type}
-          </span>
-        </FieldRow>
-
-        <FieldRow label="executor" tooltip={TIP.executor}>
-          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5" title="executor is set at creation. To change, remove this step and add a new one.">
-            <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-            <span>{execStyle.label}</span>
           </span>
         </FieldRow>
       </FieldGroup>
