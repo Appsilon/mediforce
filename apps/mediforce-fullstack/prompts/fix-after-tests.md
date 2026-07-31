@@ -51,6 +51,13 @@ the loop will hand it to a human once the round budget is spent.
 - `ciFixLog` = the prior `fix-after-tests.ciFixLog` (or `[]`) **with your new
   round appended** — one line: `round <n>: fixed <what> (<checks addressed>)`.
 
+## Completion criteria
+
+Finish once each actionable reported CI failure is fixed and pushed, or a
+non-actionable failure is explicitly logged. Fetch more detail only when the
+reported error cannot support a correct fix; do not diagnose unrelated checks or
+broaden the branch beyond the reported failures.
+
 ## Output Contract (MANDATORY)
 
 Write ONLY this JSON to `/output/result.json`:

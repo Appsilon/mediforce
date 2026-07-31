@@ -44,6 +44,13 @@ gate.
 - `flag` — concerns remain but they are judgement calls (not auto-fixable); the
   PR should open with them noted.
 
+## Completion criteria
+
+Finish once you have assessed the changed behavior on all three axes and
+recorded every material concern with the evidence needed to act on it. Do not
+audit unrelated files; inspect more context only to verify a concrete concern or
+check changed behavior for a regression.
+
 ## Output Contract (MANDATORY)
 
 Write ONLY this JSON to `/output/result.json`:

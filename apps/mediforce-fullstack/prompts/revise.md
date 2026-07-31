@@ -30,6 +30,12 @@ test suite (no install in-container).
 - `reviseLog` = the prior `revise.reviseLog` (or `[]`) **with your new pass
   appended** — one line summarising what this pass changed.
 
+## Completion criteria
+
+Finish once every mechanically fixable concern is addressed and pushed, with any
+remaining judgement call recorded in the log. Do not turn review fixes into a
+new refactor or investigate unrelated code.
+
 ## Output Contract (MANDATORY)
 
 Write ONLY this JSON to `/output/result.json`:

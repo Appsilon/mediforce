@@ -73,6 +73,14 @@ that quietly makes a product call is worse than a question.
 - `questions` — ONLY the unresolved `decision`-kind questions. Empty when
   `needsHuman` is false.
 
+## Completion criteria
+
+Finish as soon as every blocker is resolved, dropped as moot, or retained as a
+genuine human decision, and the plan carries the evidence `implement` needs.
+Research only the listed blockers (or concrete questions derived from an absent
+list); do not continue through docs or history once they cannot change the plan
+or the `needsHuman` decision.
+
 ## Output Contract (MANDATORY)
 
 Headless step — no human reads your chat. Write ONLY this JSON to

@@ -83,6 +83,13 @@ escalate/pause the *run* rather than route it — that would strand the issue on
 not dispatch `task_assigned`). `needsHuman` is the router; confidence is
 observability.
 
+Every agent prompt also states its own completion criteria. A configured timeout
+is a hard ceiling, never a time quota: agents finish as soon as their output
+contract has the evidence required for that step, and deepen their work only to
+close a known correctness gap or material risk. This stays prompt-owned for now;
+the deferred platform-level `completionCriteria` field is tracked in
+[#1119](https://github.com/Appsilon/mediforce/issues/1119).
+
 ## Label state machine (`fullstack:` namespace)
 
 GitHub auto-creates these on first use; no pre-setup required.

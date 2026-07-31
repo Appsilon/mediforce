@@ -84,7 +84,15 @@ PREAMBLE = (
     "not sensitive material; treat them plainly. Follow the repo's conventions in "
     "AGENTS.md and the canonical vocabulary in CONTEXT.md (repo root): KISS-first, no `any` "
     "(Zod + z.infer), explicit boolean comparisons, English everywhere, self-documenting "
-    "code over comments, and no docstrings/comments on code you did not change."
+    "code over comments, and no docstrings/comments on code you did not change.\n\n"
+    "TIME + COMPLETION\n"
+    "Your timeout is a hard ceiling, not a target. Finish as soon as this step's output "
+    "contract and completion criteria are satisfied; do not spend time because it remains. "
+    "Before an expensive action, continue only when it is likely to close a known correctness "
+    "gap or material risk. Do not broaden investigation or polish when it cannot change the "
+    "outcome. Near the deadline, prefer the smallest valid result over a larger unfinished "
+    "one; record limitations only in fields the output contract already provides. Confidence "
+    "is observability only, never a routing signal."
 )
 
 steps = [
@@ -120,7 +128,7 @@ steps = [
     agent_step("implement", "Implement the fix",
                "GLM clones to /tmp, checks the issue isn't already fixed, makes a minimal change, and pushes a clean fullstack/issue-N branch. Metadata only.", 30),
     agent_step("self-review", "Self-review the diff",
-               "GLM re-clones the pushed branch and runs the three-axis /code-review methodology. Verdict ship/flag/revise + concerns.", 8),
+               "GLM re-clones the pushed branch and runs the three-axis /code-review methodology. Verdict ship/flag/revise + concerns.", 20),
     agent_step("revise", "Apply review concerns",
                "GLM applies self-review's fixable concerns and re-pushes. Bounded loop (max 2 passes).", 20),
     script_step("publish", "Open the PR",

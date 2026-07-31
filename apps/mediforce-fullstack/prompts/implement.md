@@ -55,6 +55,13 @@ attempt and push; a later review pass annotates concerns. Only report
 `changed: false, reason: "confused"` (or `"broken"`) when you are genuinely stuck
 or the issue itself is malformed.
 
+## Completion criteria
+
+Finish as soon as you have either verified that the issue is already fixed or
+pushed the smallest complete change and the test update the repository expects.
+Do not add opportunistic cleanup, broaden the scope, or re-research answers
+already supplied by `draft-plan` unless the current code disproves them.
+
 ## Output Contract (MANDATORY)
 
 Write ONLY this JSON to `/output/result.json`:

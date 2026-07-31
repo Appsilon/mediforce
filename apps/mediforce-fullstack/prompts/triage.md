@@ -133,6 +133,13 @@ verdict has to earn itself.
 - Do not gate on "this looks big", "I'd want to check with someone", or "there
   might be an edge case". Those are reading tasks, not decisions.
 
+## Completion criteria
+
+Finish the batch as soon as every candidate has a valid verdict and the evidence
+or blockers that verdict requires. Do not inspect unrelated code or exhaustively
+read history. Read another source only to verify a concrete claim, resolve a
+known blocker, or distinguish a repository fact from a human decision.
+
 ## Output Contract (MANDATORY)
 
 Headless step — no human reads your chat. Write ONLY this JSON to
