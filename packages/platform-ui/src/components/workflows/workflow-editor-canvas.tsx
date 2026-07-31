@@ -22,7 +22,7 @@ import type { NewStepPayload } from '@/lib/control-mode';
 import { BlockPicker } from './block-picker';
 import { StepEditor } from './workflow-editor/step-editor';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
-import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets } from './workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, nonGraphFieldsDiffer } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 
 function JsonCodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -320,7 +320,7 @@ export function WorkflowEditorCanvas({
         const retargeted = retargetVerdictTargets(
           prev,
           resolvedInsertAfterId,
-          insertBeforeId ?? 'all',
+          insertBeforeId ?? null,
           newId,
         );
         const next = [...retargeted];
@@ -342,7 +342,7 @@ export function WorkflowEditorCanvas({
       setEditedSteps((prev) => {
         // Any verdict pointing at the terminal now routes through the inserted
         // step, mirroring the transition rewiring below.
-        const retargeted = retargetVerdictTargets(prev, 'any', terminalStep.id, newId);
+        const retargeted = retargetVerdictTargets(prev, null, terminalStep.id, newId);
         const next = [...retargeted];
         next.splice(terminalIdx, 0, newStep);
         return next;
@@ -368,13 +368,11 @@ export function WorkflowEditorCanvas({
     // step's successor — its first outgoing target, falling back to the terminal
     // step — mirroring how the transition rewiring below bridges incoming edges
     // to outgoing ones.
-    const successorId =
-      editedTransitions.find((t) => t.from === stepId)?.to
-      ?? editedSteps.find((s) => s.type === 'terminal')?.id;
+    const successorId = bridgeTargetForDeletion(editedSteps, editedTransitions, stepId);
     setEditedSteps((prev) => {
       const filtered = prev.filter((s) => s.id !== stepId);
       return successorId !== undefined
-        ? retargetVerdictTargets(filtered, 'any', stepId, successorId)
+        ? retargetVerdictTargets(filtered, null, stepId, successorId)
         : filtered;
     });
     setEditedTransitions((prev) => {
@@ -459,8 +457,7 @@ export function WorkflowEditorCanvas({
       // authorable fields (title, triggers, metadata, …) are page state, not
       // canvas state. Rather than silently discard edits to them, refuse and
       // point the user at where those fields live.
-      const { steps: _steps, transitions: _transitions, ...nonGraphFields } = doc;
-      if (JSON.stringify(nonGraphFields) !== JSON.stringify(wdJsonFields ?? {})) {
+      if (nonGraphFieldsDiffer(doc, wdJsonFields)) {
         setJsonError(
           'This editor applies steps & transitions only. Edit other fields (title, triggers, metadata, …) in workflow settings, then reapply.',
         );
