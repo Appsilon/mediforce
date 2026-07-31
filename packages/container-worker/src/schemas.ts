@@ -33,7 +33,12 @@ export const DockerJobDataSchema = z.object({
   /** Image build metadata — when present, worker ensures image exists before docker run. */
   imageBuild: z.object({
     image: z.string(),
+    /** SSH-form git URL — cache-tag identity only, not the clone transport. */
     repoUrl: z.string(),
+    /** Original user-supplied repo reference — decides the clone transport
+     *  (anonymous HTTPS for a public `owner/repo` shorthand). Optional for
+     *  backward compatibility with in-flight jobs; falls back to `repoUrl`. */
+    repoRef: z.string().optional(),
     commit: z.string(),
     dockerfile: z.string().optional(),
     repoToken: z.string().optional(),

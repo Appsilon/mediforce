@@ -15,10 +15,17 @@ import { createLineStreamReader } from '@mediforce/platform-core';
 
 export interface ImageBuildMeta {
   image: string;
+  /** SSH-form git URL — used only as the cache-tag identity (deriveBuildTag + the
+   *  `mediforce.build.commit` label). Not the clone transport. */
   repoUrl: string;
+  /** Original user-supplied repo reference (pre-normalization): the step `repo` or
+   *  workflow `externalSkillsRepo.url`. Decides the clone transport — a public
+   *  `owner/repo` shorthand clones over anonymous HTTPS, exactly like skills-fetch. */
+  repoRef: string;
   commit: string;
   dockerfile?: string;
-  /** Resolved token for authenticated HTTPS clone. When absent, falls back to SSH deploy key. */
+  /** Resolved token for authenticated HTTPS clone. When absent, the transport falls
+   *  back to whatever the reference form implies (anonymous HTTPS / SSH). */
   repoToken?: string;
 }
 

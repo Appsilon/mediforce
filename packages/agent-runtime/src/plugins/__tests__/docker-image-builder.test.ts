@@ -152,6 +152,66 @@ describe('buildImageFromRepo', () => {
 
     expect(rmMock).toHaveBeenCalledWith('/tmp/mediforce-build-abc', { recursive: true, force: true });
   });
+
+  it('clones a public owner/repo repoRef over anonymous HTTPS, no SSH deploy key', async () => {
+    execSyncMock.mockReturnValue(Buffer.from(''));
+
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'git@github.com:Appsilon/mediforce.git',
+      repoRef: 'Appsilon/mediforce',
+      commit: 'abc123',
+    });
+
+    const calls = execSyncMock.mock.calls;
+    const remoteAdd = calls.find(([cmd]) => String(cmd).includes('remote add origin'));
+    expect(remoteAdd).toBeDefined();
+    expect(String(remoteAdd![0])).toContain('"https://github.com/Appsilon/mediforce"');
+
+    // A public clone must not reference a deploy key — no GIT_SSH_COMMAND on any git call.
+    for (const callArgs of calls) {
+      const env = (callArgs[1] as { env?: Record<string, string> }).env ?? {};
+      expect(env.GIT_SSH_COMMAND).toBeUndefined();
+    }
+  });
+
+  it('uses authenticated HTTPS when a token is provided, no SSH deploy key', async () => {
+    execSyncMock.mockReturnValue(Buffer.from(''));
+
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'git@github.com:Appsilon/mediforce.git',
+      repoRef: 'Appsilon/mediforce',
+      commit: 'abc123',
+      repoToken: 'TOK',
+    });
+
+    const remoteAdd = execSyncMock.mock.calls.find(([cmd]) => String(cmd).includes('remote add origin'));
+    expect(String(remoteAdd![0])).toContain('https://x-access-token:TOK@github.com/Appsilon/mediforce.git');
+
+    for (const callArgs of execSyncMock.mock.calls) {
+      const env = (callArgs[1] as { env?: Record<string, string> }).env ?? {};
+      expect(env.GIT_SSH_COMMAND).toBeUndefined();
+    }
+  });
+
+  it('clones a git@ repoRef over SSH and sets GIT_SSH_COMMAND', async () => {
+    execSyncMock.mockReturnValue(Buffer.from(''));
+
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'git@github.com:Appsilon/mediforce.git',
+      repoRef: 'git@github.com:Appsilon/mediforce.git',
+      commit: 'abc123',
+    });
+
+    const remoteAdd = execSyncMock.mock.calls.find(([cmd]) => String(cmd).includes('remote add origin'));
+    expect(String(remoteAdd![0])).toContain('"git@github.com:Appsilon/mediforce.git"');
+
+    const gitCall = execSyncMock.mock.calls.find(([cmd]) => String(cmd).startsWith('git '));
+    const env = (gitCall![1] as { env: Record<string, string> }).env;
+    expect(env.GIT_SSH_COMMAND).toBeDefined();
+  });
 });
 
 describe('ensureImage', () => {

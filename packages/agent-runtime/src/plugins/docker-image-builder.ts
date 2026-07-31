@@ -9,11 +9,15 @@ import { execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { prepareDeployKeyPath, toHttpsWithToken } from './container-plugin';
+import { prepareDeployKeyPath, resolveRepoCloneUrl } from './container-plugin';
 
 export interface BuildImageOptions {
   image: string;
+  /** SSH-form git URL — cache-tag identity only, not the clone transport. */
   repoUrl: string;
+  /** Original user-supplied repo reference — decides the clone transport. Falls
+   *  back to `repoUrl` (SSH form) so legacy callers keep their previous behaviour. */
+  repoRef?: string;
   commit: string;
   dockerfile?: string;
   repoToken?: string;
@@ -22,6 +26,7 @@ export interface BuildImageOptions {
 export interface EnsureImageOptions {
   image: string;
   repoUrl?: string;
+  repoRef?: string;
   commit?: string;
   dockerfile?: string;
   repoToken?: string;
@@ -58,14 +63,18 @@ export async function getImageBuildCommit(image: string): Promise<string | null>
 }
 
 export async function buildImageFromRepo(options: BuildImageOptions): Promise<void> {
-  const { image, repoUrl, commit, dockerfile = 'Dockerfile', repoToken } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile = 'Dockerfile', repoToken } = options;
   const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-build-'));
 
   try {
-    const cloneUrl = repoToken ? toHttpsWithToken(repoUrl, repoToken) : repoUrl;
+    const { cloneUrl, useSsh } = resolveRepoCloneUrl(repoRef ?? repoUrl, repoToken);
+    // SSH clones need a deploy key + GIT_SSH_COMMAND; anonymous/authenticated HTTPS
+    // and local paths must not reference the deploy key at all.
     const execOpts = {
       stdio: 'pipe' as const,
-      env: { ...process.env, GIT_SSH_COMMAND: getGitSshCommand() },
+      env: useSsh
+        ? { ...process.env, GIT_SSH_COMMAND: getGitSshCommand() }
+        : { ...process.env },
     };
 
     // Clone repo at specific commit (sparse — fetch only what we need)
@@ -120,7 +129,7 @@ export async function ensureImage(options: EnsureImageOptions): Promise<void> {
         console.log(`[docker-image-builder] Image "${image}" stale (${currentCommit?.slice(0, 8)} → ${commit.slice(0, 8)}), rebuilding`);
       }
 
-      await buildImageFromRepo({ image, repoUrl, commit, dockerfile, repoToken });
+      await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, repoToken });
     } finally {
       buildLocks.delete(image);
     }

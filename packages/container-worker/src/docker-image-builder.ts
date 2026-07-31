@@ -56,6 +56,30 @@ export async function getImageBuildCommit(image: string): Promise<string | null>
   }
 }
 
+/** Normalize a repo reference to SSH clone URL and HTTPS browsable URL.
+ *  Mirrors the copy in agent-runtime/plugins/container-plugin.ts — container-worker
+ *  cannot import from agent-runtime without dragging in its whole dependency tree. */
+function normalizeRepoUrls(repo: string): { gitUrl: string; httpsUrl: string } {
+  if (repo.startsWith('/') || repo.startsWith('.')) {
+    return { gitUrl: repo, httpsUrl: '' };
+  }
+  if (repo.startsWith('git@')) {
+    const match = repo.match(/git@github\.com:(.+?)(?:\.git)?$/);
+    const orgRepo = match ? match[1] : repo;
+    return { gitUrl: repo, httpsUrl: `https://github.com/${orgRepo}` };
+  }
+  if (repo.startsWith('https://')) {
+    const clean = repo.replace(/\.git$/, '');
+    const match = clean.match(/https:\/\/github\.com\/(.+)/);
+    const sshUrl = match ? `git@github.com:${match[1]}.git` : `${clean}.git`;
+    return { gitUrl: sshUrl, httpsUrl: clean };
+  }
+  return {
+    gitUrl: `git@github.com:${repo}.git`,
+    httpsUrl: `https://github.com/${repo}`,
+  };
+}
+
 function toHttpsWithToken(sshUrl: string, token: string): string {
   const match = sshUrl.match(/git@github\.com:(.+?)(?:\.git)?$/);
   if (match) {
@@ -64,21 +88,45 @@ function toHttpsWithToken(sshUrl: string, token: string): string {
   return sshUrl.replace('https://', `https://x-access-token:${token}@`);
 }
 
+/** Resolve the clone URL + transport for a repo reference, honouring the form the
+ *  user supplied. Mirrors resolveRepoCloneUrl in agent-runtime/plugins/container-plugin.ts
+ *  so the image-build clone path picks the transport the same way skills-fetch does. */
+function resolveRepoCloneUrl(
+  repoRef: string,
+  repoToken?: string,
+): { cloneUrl: string; useSsh: boolean } {
+  if (repoToken) {
+    return { cloneUrl: toHttpsWithToken(normalizeRepoUrls(repoRef).gitUrl, repoToken), useSsh: false };
+  }
+  if (repoRef.startsWith('git@')) {
+    return { cloneUrl: repoRef, useSsh: true };
+  }
+  if (repoRef.startsWith('https://') || repoRef.startsWith('/') || repoRef.startsWith('.')) {
+    return { cloneUrl: repoRef, useSsh: false };
+  }
+  return { cloneUrl: normalizeRepoUrls(repoRef).httpsUrl, useSsh: false };
+}
+
 export async function buildImageFromRepo(options: {
   image: string;
   repoUrl: string;
+  repoRef?: string;
   commit: string;
   dockerfile?: string;
   repoToken?: string;
 }): Promise<void> {
-  const { image, repoUrl, commit, dockerfile = 'Dockerfile', repoToken } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile = 'Dockerfile', repoToken } = options;
   const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-build-'));
 
   try {
-    const cloneUrl = repoToken ? toHttpsWithToken(repoUrl, repoToken) : repoUrl;
+    const { cloneUrl, useSsh } = resolveRepoCloneUrl(repoRef ?? repoUrl, repoToken);
+    // SSH clones need a deploy key + GIT_SSH_COMMAND; anonymous/authenticated HTTPS
+    // and local paths must not reference the deploy key at all.
     const execOpts = {
       stdio: 'pipe' as const,
-      env: { ...process.env, GIT_SSH_COMMAND: getGitSshCommand() },
+      env: useSsh
+        ? { ...process.env, GIT_SSH_COMMAND: getGitSshCommand() }
+        : { ...process.env },
     };
 
     execSync(`git init "${buildDir}"`, execOpts);
@@ -102,11 +150,12 @@ export async function buildImageFromRepo(options: {
 export async function ensureImage(options: {
   image: string;
   repoUrl?: string;
+  repoRef?: string;
   commit?: string;
   dockerfile?: string;
   repoToken?: string;
 }): Promise<void> {
-  const { image, repoUrl, commit, dockerfile, repoToken } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile, repoToken } = options;
 
   if (!repoUrl || !commit) {
     const exists = await imageExistsLocally(image);
@@ -126,5 +175,5 @@ export async function ensureImage(options: {
     console.log(`[docker-image-builder] Image "${image}" stale (${currentCommit?.slice(0, 8)} → ${commit.slice(0, 8)}), rebuilding`);
   }
 
-  await buildImageFromRepo({ image, repoUrl, commit, dockerfile, repoToken });
+  await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, repoToken });
 }

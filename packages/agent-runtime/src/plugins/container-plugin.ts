@@ -168,6 +168,7 @@ export function resolveImageBuild(
     return {
       image: image ?? deriveBuildTag(repoUrl, commit, dockerfile),
       repoUrl,
+      repoRef: repo,
       commit,
       dockerfile,
       repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
@@ -177,10 +178,12 @@ export function resolveImageBuild(
   if (dockerfile && isWorkflowAgentContext(context)) {
     const wfRepo = context.workflowDefinition.externalSkillsRepo;
     if (wfRepo?.url && wfRepo?.commit) {
-      const repoUrl = repo ? normalizeRepoUrls(repo).gitUrl : normalizeRepoUrls(wfRepo.url).gitUrl;
+      const repoRef = repo ?? wfRepo.url;
+      const repoUrl = normalizeRepoUrls(repoRef).gitUrl;
       return {
         image: image ?? deriveBuildTag(repoUrl, commit ?? wfRepo.commit, dockerfile),
         repoUrl,
+        repoRef,
         commit: commit ?? wfRepo.commit,
         dockerfile,
         repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
@@ -214,17 +217,20 @@ export function toHttpsWithToken(sshUrl: string, token: string): string {
 }
 
 /**
- * Resolve the clone URL + transport for a skills repo reference, honouring the
- * form the user supplied: an `https://` URL clones over HTTPS, a `git@` URL
- * clones over SSH. We never silently convert one to the other.
+ * Resolve the clone URL + transport for a repo reference, honouring the form the
+ * user supplied: an `https://` URL clones over HTTPS, a `git@` URL clones over
+ * SSH. We never silently convert one to the other.
  *
  *   - token present  → authenticated HTTPS (`x-access-token`); a PAT only works
  *                      over HTTPS, mirroring the main-repo clone path
  *   - `git@…`        → SSH as given (needs deploy key + `GIT_SSH_COMMAND`)
  *   - `https://…` / local path → HTTPS / local as given
  *   - `owner/repo` shorthand   → anonymous HTTPS (github default)
+ *
+ * Shared by the skills-fetch and the lazy image-build clone paths so they pick
+ * the transport the same way — a public repo never needs a deploy key.
  */
-export function resolveSkillsCloneUrl(
+export function resolveRepoCloneUrl(
   repoRef: string,
   repoToken?: string,
 ): { cloneUrl: string; useSsh: boolean } {
@@ -462,7 +468,7 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
     const cloneDir = mkdtempSync(join(tmpdir(), 'mediforce-skills-clone-'));
 
     try {
-      const { cloneUrl, useSsh } = resolveSkillsCloneUrl(repoRef, repoToken);
+      const { cloneUrl, useSsh } = resolveRepoCloneUrl(repoRef, repoToken);
       // SSH refs need a deploy key + GIT_SSH_COMMAND; HTTPS and local paths must not set it.
       const execOpts = {
         stdio: 'pipe' as const,
