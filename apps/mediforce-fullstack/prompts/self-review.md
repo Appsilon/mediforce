@@ -14,12 +14,12 @@ cd /tmp/review && git fetch --depth 50 origin <implement.branch> && git checkout
 git fetch --depth 50 origin main && git diff origin/main...HEAD
 ```
 
-The clone carries `AGENTS.md`, `docs/CONTEXT.md`, and
+The clone carries `AGENTS.md`, `CONTEXT.md`, and
 `.claude/skills/code-review/references/review-checklist.md` — review **against**
 them.
 
 ### Review along three axes
-- **Standards** — file-by-file vs `AGENTS.md` + `docs/CONTEXT.md` + the checklist
+- **Standards** — file-by-file vs `AGENTS.md` + `CONTEXT.md` + the checklist
   + `docs/adr/`: convention violations (cite the rule), dead code, DRY/KISS,
   reuse misses (grep before flagging), comment quality.
 - **Spec** — fetch the issue (`gh`/REST via `$GITHUB_TOKEN`). Does the diff
@@ -44,6 +44,13 @@ gate.
 - `flag` — concerns remain but they are judgement calls (not auto-fixable); the
   PR should open with them noted.
 
+## Completion criteria
+
+Finish once you have assessed the changed behavior on all three axes and
+recorded every material concern with the evidence needed to act on it. Do not
+audit unrelated files; inspect more context only to verify a concrete concern or
+check changed behavior for a regression.
+
 ## Output Contract (MANDATORY)
 
 Write ONLY this JSON to `/output/result.json`:
@@ -52,9 +59,15 @@ Write ONLY this JSON to `/output/result.json`:
 {
   "issueNumber": 123,
   "verdict": "ship | revise | flag",
-  "concerns": ["<axis>: <file:line> — issue — suggestion", "..."]
+  "concerns": ["<axis>: <file:line> — issue — suggestion", "..."],
+  "confidence": 0.0,
+  "confidence_rationale": "..."
 }
 ```
+
+`confidence` (0–1) is how often a review like this would reach the right verdict;
+`confidence_rationale` says why in 1–2 sentences. Both are recorded for
+observability and do **not** route the run.
 
 `concerns` may be empty for `ship`. Each concern is one line, prefixed with its
 axis. Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "..."}`.
