@@ -21,7 +21,10 @@ let preparedDeployKeyPath: string | null = null;
  */
 function prepareDeployKeyPath(): string {
   const source = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
-  if (!existsSync(source) || !statSync(source).isFile()) return source;
+  if (!existsSync(source)) return source;
+  if (!statSync(source).isFile()) {
+    throw new Error(`Deploy key path "${source}" must point to a regular file.`);
+  }
   if (preparedDeployKeyPath && existsSync(preparedDeployKeyPath) && statSync(preparedDeployKeyPath).isFile()) return preparedDeployKeyPath;
   const dir = mkdtempSync(join(tmpdir(), 'mediforce-ssh-'));
   const dest = join(dir, 'deploy_key');

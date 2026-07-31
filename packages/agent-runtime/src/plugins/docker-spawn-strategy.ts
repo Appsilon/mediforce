@@ -21,7 +21,7 @@ export interface ImageBuildMeta {
   repoRef: string;
   commit: string;
   dockerfile?: string;
-  /** Resolved token for authenticated HTTPS clone. When absent, falls back to SSH deploy key. */
+  /** Resolved token for authenticated HTTPS clones; SSH refs without a token use the deploy key. */
   repoToken?: string;
 }
 
