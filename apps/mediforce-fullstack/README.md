@@ -8,8 +8,8 @@ removed/migrated subsystem). It implements them as ready-for-review PRs,
 **researching its own open questions against the code and docs** and escalating
 to a human only for genuine product/policy decisions, self-reviews with a bounded
 revise loop, then **watches CI on the PR and auto-fixes red checks** (bounded,
-handing persistent failures to a human). Idempotent and self-healing via labels
-and a 2-hour lease.
+handing persistent failures to a human). Idempotent and recoverable through
+explicit retry labels.
 
 ## Pipeline (22 steps)
 
@@ -17,7 +17,7 @@ and a 2-hour lease.
 fetch-candidates ─┬─ triage ──── apply-verdicts ──── select ─┬─ (go)          claim ─ implement ─┐
  (list + partition,│  (clone main,  (write labels;    (pick,   │                                     │
   cap batch,       │   verify +      close obsolete   determin- │                                     │
-  reclaim leases,  │   classify once)  cc author)      istic)   │                                     │
+  release retries, │   classify once)  cc author)      istic)   │                                     │
   attemptCount)    └─ (nothing new) ───────────────── select ─┴─ (needs-approval) draft-plan ─┬─ (needsHuman=false) claim ─┘
                                                              └─ (nothing) done-empty          └─ (true) notify-gate ─ clarify-approve(human)
                                                                                                         approve ┘   reject → mark-needs-info
@@ -78,10 +78,10 @@ Every agent step also emits `confidence` + `confidence_rationale` into
 from the step output, so they show up per-step in the run UI without reaching any
 transition. **`agent.confidenceThreshold` is deliberately left unset**: below the
 threshold the runtime hands off to `FallbackHandler`, whose three behaviours all
-escalate/pause the *run* rather than route it — that would strand the issue on
-`fullstack:in-progress` until the 2h lease expires, silently (the platform does
-not dispatch `task_assigned`). `needsHuman` is the router; confidence is
-observability.
+escalate/pause the *run* rather than route it — that leaves the issue on
+`fullstack:in-progress` until a human explicitly adds `fullstack:retry` (the
+platform does not dispatch `task_assigned`). `needsHuman` is the router;
+confidence is observability.
 
 Every agent prompt also states its own completion criteria. A configured timeout
 is a hard ceiling, never a time quota: agents finish as soon as their output
@@ -92,7 +92,14 @@ the deferred platform-level `completionCriteria` field is tracked in
 
 ## Label state machine (`fullstack:` namespace)
 
-GitHub auto-creates these on first use; no pre-setup required.
+Labels written by the pipeline are created on first use. Because `fullstack:retry`
+is applied by a human rather than written by the pipeline, create that label once
+in GitHub before using the recovery flow (Issues → Labels → New label), or run:
+
+```bash
+gh label create fullstack:retry --repo Appsilon/mediforce \
+  --color B60205 --description "Human-requested fullstack retry"
+```
 
 | Label | Meaning | Set by |
 |-------|---------|--------|
@@ -101,7 +108,8 @@ GitHub auto-creates these on first use; no pre-setup required.
 | `fullstack:manual` | Not automatable; needs a human | `apply-verdicts` |
 | `fullstack:obsolete` | Proven no longer applicable → labelled **and closed** (reversibly, cc the author) | `apply-verdicts` |
 | `fullstack:prio-high/med/low` | Selection order (on go / needs-approval) | `apply-verdicts` |
-| `fullstack:in-progress` | Active lease (TTL 2h; reclaimed if stale) | `claim` |
+| `fullstack:in-progress` | Active ownership marker; remains until terminal cleanup or an explicit retry | `claim` |
+| `fullstack:retry` | Explicit human request to release `in-progress` and retry on the next tick | human / `fetch-candidates` |
 | `fullstack:awaiting-human` | Gate plan posted; a human owns it (never reclaimed) | `notify-gate` |
 | `fullstack:pr-open` | PR opened; CI loop may still be running | `publish` |
 | `fullstack:ci-failing` | CI stayed red after the auto-fix budget — a human owns it | `mark-ci-failed` |
@@ -124,9 +132,17 @@ carrying **only a verdict or `needs-info` label** back into `triage`, and
 | `fullstack:go` / `fullstack:needs-approval` | re-triaged; verdict + prio reconciled |
 | `fullstack:manual` | re-triaged unconditionally (not just on edit) — this is how the stale-`manual` graveyard gets re-checked for obsolescence |
 | `fullstack:needs-info` | `needs-info` stripped, then re-triaged |
-| `fullstack:in-progress` (fresh lease) | **untouched** — live implementation work |
+| `fullstack:in-progress` | **untouched** — live or interrupted implementation work |
 | `fullstack:pr-open`, `fullstack:awaiting-human` | **untouched** — in-flight / human-owned |
-| `fullstack:in-progress` (stale lease) | reclaimed as usual (self-heal, unchanged) |
+
+### Retrying an interrupted run
+
+An issue labelled `fullstack:in-progress` is never retried automatically. If a
+run was interrupted after claiming the issue, inspect any pushed branch or open
+PR first, then add `fullstack:retry` to the GitHub issue. The next pipeline tick
+consumes that label, releases `fullstack:in-progress`, and sends the issue
+through triage again. This is deliberately per-issue and auditable; it does not
+requeue the whole backlog.
 
 Reassigned issues re-judge **fresh** — they carry `attemptCount: 0` (the toggle
 deliberately does not spend a rate-limited GitHub `events` call across the whole
@@ -195,7 +211,6 @@ pipeline step** — it is not in the workflow definition.
 | `TRIAGE_BATCH_MAX` | no | workflow | `fetch-candidates` | Max issues handed to `triage` per tick (default `10`) — caps the grounded (clone + verify) triage pass; overflow re-collects next tick | Workflow secrets/env |
 | `APP_BASE_URL` | no | workflow/ns | `notify-gate` | Mediforce base URL for the gate comment link | Workflow/namespace env |
 | `FULLSTACK_REPO` | no | workflow | all scripts | Target repo (default `Appsilon/mediforce`) | `build/env.example.json` |
-| `LEASE_TTL_HOURS` | no | workflow | `fetch-candidates` | Stale-lease reclaim threshold (default `2`) | `build/env.example.json` |
 | `MAX_ATTEMPTS` | no | workflow | `triage` | Poison-pill cap — after N failed attempts → `manual` (default `3`) | `build/env.example.json` |
 | `REVIEW_MAX` | no | workflow | `publish` (+ transition) | Max revise passes before push-as-draft (default `2`) | `build/env.example.json` |
 | `CI_WAIT_MINUTES` | no | workflow | `arm-timer` | Minutes to wait per CI poll before checking (default `15`) — secret/env ref so it is changeable without re-registering | Workflow secrets/env |
@@ -213,7 +228,8 @@ pipeline step** — it is not in the workflow definition.
 
 > **`GITHUB_TOKEN` write scope is the single most important thing to get right.**
 > The whole pipeline pushes branches and opens PRs. A read-only token makes every
-> `implement` fail → the lease is reclaimed in 2h → retried → a silent loop.
+> `implement` fail → the issue remains `fullstack:in-progress` until a human adds
+> `fullstack:retry`.
 
 ### The gate reviewer (how a human is selected + notified)
 
@@ -273,11 +289,11 @@ correct JSON escaping) by the assembler:
 
 ```bash
 python3 build/build_wd.py        # regenerates src/mediforce-fullstack.wd.json
-node   tests/run_tests.mjs        # pure-logic tests (56, no secrets)
+node   tests/run_tests.mjs        # pure-logic tests (57, no secrets)
 for f in scripts/*.mjs; do node --check "$f"; done   # syntax
 ```
 
-Non-secret env + tunables (`FULLSTACK_REPO`, `LEASE_TTL_HOURS`, `MAX_ATTEMPTS`,
+Non-secret env + tunables (`FULLSTACK_REPO`, `MAX_ATTEMPTS`,
 `REVIEW_MAX`, and the `{{…}}` secret references) live in
 [`build/env.example.json`](build/env.example.json). Edit `scripts/*.mjs` / `prompts/*.md` /
 `build/env.example.json` and re-run the assembler — do **not** hand-edit the embedded
@@ -305,7 +321,7 @@ pinning). Validate first with `--dry-run`.
   the wait/resume infra is built for it, and the issue stays `pr-open` (out of the
   pool) throughout.
 - **`awaiting-human` has no TTL.** A gate assigned to a reporter who never
-  answers sits indefinitely (the human owns it, unlike the `in-progress` lease).
+  answers sits indefinitely (the human owns it, unlike the `in-progress` ownership marker).
   This is why both `triage` and `draft-plan` are biased against escalating.
   Planned: escalate stale `awaiting-human` (> N days) → re-ping / reassign to
   admin, alongside the Phase 2 stale-PR shepherd.

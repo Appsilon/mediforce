@@ -4,8 +4,8 @@
 // of issues that need an LLM triage pass this tick:
 //   - brand-new issues carrying no `fullstack:` verdict/lifecycle label
 //   - `fullstack:manual` issues edited since they were declined (re-judge-on-edit)
-//   - stale `fullstack:in-progress` leases (older than LEASE_TTL_HOURS, no PR) —
-//     the lease is released here and the issue re-enters triage (self-heal)
+//   - issues explicitly marked `fullstack:retry` — the retry label is released
+//     here and the issue re-enters triage (on-demand recovery)
 //
 // Bot-authored issues (Renovate's "Dependency Dashboard" et al.) are excluded
 // wholesale: they are trackers this pipeline never implements, and the bot's
@@ -19,7 +19,7 @@
 // ESCAPE HATCH: set FULLSTACK_REASSIGN=true (default off) to force a re-judge of
 // every issue carrying only a verdict/needs-info label (go / needs-approval /
 // manual / needs-info) — it re-enters triage and apply-verdicts overwrites the
-// stored verdict. In-flight/human-owned states (in-progress lease, pr-open,
+// stored verdict. In-flight/human-owned states (in-progress ownership marker, pr-open,
 // awaiting-human) are always protected. Because this reads a workflow-global env
 // ref, it re-judges the backlog on EVERY tick while enabled — flip it on, let the
 // backlog drain over a few ticks (see the batch cap below), then flip it off.
@@ -39,7 +39,7 @@
 // off fetch-candidates / apply-verdicts route to done-empty when it is set.
 //
 // Reads:  /output/input.json (unused — cron tick), env GITHUB_TOKEN, FULLSTACK_REPO,
-//         LEASE_TTL_HOURS, MAX_ATTEMPTS, FULLSTACK_REASSIGN, TRIAGE_ONLY, TRIAGE_BATCH_MAX
+//         MAX_ATTEMPTS, FULLSTACK_REASSIGN, TRIAGE_ONLY, TRIAGE_BATCH_MAX
 // Writes: /output/result.json
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -47,13 +47,13 @@ import { readFileSync, writeFileSync } from 'node:fs';
 export const VERDICT_LABELS = ['fullstack:go', 'fullstack:needs-approval', 'fullstack:manual'];
 export const LIFECYCLE_LABELS = ['fullstack:in-progress', 'fullstack:awaiting-human', 'fullstack:pr-open', 'fullstack:needs-info'];
 const IN_PROGRESS = 'fullstack:in-progress';
+const RETRY_LABEL = 'fullstack:retry';
 const MANUAL = 'fullstack:manual';
 const PR_OPEN = 'fullstack:pr-open';
 const NEEDS_INFO = 'fullstack:needs-info';
 const AWAITING_HUMAN = 'fullstack:awaiting-human';
 
 const REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';
-const LEASE_TTL_HOURS = Number(process.env.LEASE_TTL_HOURS || '2');
 const MAX_ATTEMPTS = Number(process.env.MAX_ATTEMPTS || '3');
 /** Coerce a string env flag (true/1/yes/on, case-insensitive) to a boolean. Pure. */
 export const truthyFlag = (value) => /^\s*(true|1|yes|on)\s*$/i.test(value || '');
@@ -91,22 +91,20 @@ export function newestEventTime(events) {
   return latest;
 }
 
-/** Newest created_at of a `labeled <name>` event, and how many such events exist. */
+/** Count `labeled <name>` events so manual retries retain the attempt count. */
 export function summariseLabelEvents(events, name) {
-  let latest = null;
   let count = 0;
   for (const e of events) {
     if (e.event === 'labeled' && e.label && e.label.name === name) {
       count += 1;
-      if (!latest || new Date(e.created_at).getTime() > new Date(latest).getTime()) latest = e.created_at;
     }
   }
-  return { latestAt: latest, count };
+  return { count };
 }
 
 /** Decide what to do with one issue given its labels + events. Pure.
  *  `reassign === true` forces a re-judge of already-verdicted / parked issues. */
-export function classifyIssue(issue, events, nowMs, ttlHours, maxAttempts, reassign) {
+export function classifyIssue(issue, events, reassign = false) {
   // Bot-authored issues (e.g. Renovate's "Dependency Dashboard") are trackers this
   // pipeline never implements, and the bot rewrites them constantly — bumping
   // `updated_at` far past the `fullstack:manual` label event, which latched the
@@ -117,19 +115,19 @@ export function classifyIssue(issue, events, nowMs, ttlHours, maxAttempts, reass
   const has = (l) => labels.includes(l);
 
   // Always protected: an open PR or an open human gate is in-flight work that a
-  // reassign must never yank back into triage.
+  // retry or reassign must never yank back into triage.
   if (has(PR_OPEN) || has(AWAITING_HUMAN)) return { action: 'skip' };
 
   const attempts = summariseLabelEvents(events, IN_PROGRESS).count;
 
-  // An active lease is live implementation work; reassign does not interrupt it
-  // (only the stale-lease self-heal reclaims, exactly as before).
+  // An in-progress issue is owned indefinitely. A human must add fullstack:retry
+  // before the pipeline may release it and start another attempt.
   if (has(IN_PROGRESS)) {
-    const { latestAt } = summariseLabelEvents(events, IN_PROGRESS);
-    const ageHours = latestAt ? (nowMs - new Date(latestAt).getTime()) / 3_600_000 : Infinity;
-    if (ageHours > ttlHours) return { action: 'reclaim', attemptCount: attempts };
+    if (has(RETRY_LABEL)) return { action: 'retry', attemptCount: attempts };
     return { action: 'skip' };
   }
+
+  if (has(RETRY_LABEL)) return { action: 'retry', attemptCount: attempts };
 
   // Parked for a human. Reassign re-opens it: strip needs-info (a lifecycle label
   // apply-verdicts does not manage), then re-triage.
@@ -188,22 +186,40 @@ async function main() {
     if (batch.length < 100) break;
   }
 
-  const nowMs = Date.now();
   const unclassified = [];
   for (const issue of collected) {
     const labels = labelNames(issue);
-    const touchesLifecycleOrManual = labels.includes(IN_PROGRESS) || labels.includes(MANUAL);
-    // Only issues wearing in-progress / manual need the (rate-limited) events call.
-    const events = touchesLifecycleOrManual
+    const touchesManagedLabels = labels.includes(IN_PROGRESS) || labels.includes(MANUAL) || labels.includes(RETRY_LABEL);
+    // Only issues wearing in-progress / manual / retry need the (rate-limited) events call.
+    const events = touchesManagedLabels
       ? await gh(`/repos/${REPO}/issues/${issue.number}/events?per_page=100`)
       : [];
-    const decision = classifyIssue(issue, events, nowMs, LEASE_TTL_HOURS, MAX_ATTEMPTS, REASSIGN);
+    const decision = classifyIssue(issue, events, REASSIGN);
 
-    if (decision.action === 'reclaim') {
-      // Release the expired lease so the issue re-enters triage.
-      await gh(`/repos/${REPO}/issues/${issue.number}/labels/${encodeURIComponent(IN_PROGRESS)}`, { method: 'DELETE' })
-        .catch((err) => console.error(`reclaim: failed to drop lease on #${issue.number}: ${err.message}`));
-      unclassified.push(toCandidate(issue, decision.attemptCount, MAX_ATTEMPTS));
+    if (decision.action === 'retry') {
+      // Release the explicitly requested retry so the issue re-enters triage.
+      let released = true;
+      if (labels.includes(IN_PROGRESS)) {
+        try {
+          await gh(`/repos/${REPO}/issues/${issue.number}/labels/${encodeURIComponent(IN_PROGRESS)}`, { method: 'DELETE' });
+        } catch (err) {
+          released = false;
+          console.error(`retry: failed to drop in-progress label on #${issue.number}: ${err.message}`);
+        }
+      }
+      if (released) {
+        try {
+          await gh(`/repos/${REPO}/issues/${issue.number}/labels/${encodeURIComponent(RETRY_LABEL)}`, { method: 'DELETE' });
+        } catch (err) {
+          released = false;
+          console.error(`retry: failed to drop retry label on #${issue.number}: ${err.message}`);
+        }
+      }
+      if (released) {
+        unclassified.push(toCandidate(issue, decision.attemptCount, MAX_ATTEMPTS));
+      } else {
+        console.error(`retry: #${issue.number} was not queued because label release was incomplete`);
+      }
     } else if (decision.action === 'reopen') {
       // Reassign re-opens a parked issue: drop needs-info so apply-verdicts can
       // write a fresh verdict without select's needs-info block stranding it.
