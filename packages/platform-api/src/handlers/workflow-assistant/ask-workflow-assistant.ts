@@ -139,7 +139,6 @@ function validateResultingGraph(
     visibility: 'private',
     steps: orderedSteps,
     transitions: mergedTransitions,
-    triggers: [{ type: 'manual', name: 'start' }],
   }));
   const referenceErrors = validateStepReferences(applied.steps, mergedTransitions)
     .filter((i) => i.severity === 'error')
