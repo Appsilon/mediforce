@@ -46,6 +46,21 @@ contract is uniform.
   against the current contract (fail-fast) and again at fire time against the
   resolved version's contract — a drifted payload **skips the tick with an audit
   reason**, never a hard error.
+- **A static payload belongs to cron rows only.** `manual` and `webhook` rows have
+  a caller who supplies the payload, so accepting one on those kinds would create a
+  second, silently-merged input channel. Create rejects it; update accepts
+  `--schedule`, `--payload`, or both and rejects a non-cron row rather than stamping
+  a schedule onto a webhook; an empty payload object means "clear", identically on
+  create and update; `importTriggers` validates payloads on the same rule so an
+  imported row can never be one a write would have refused.
+- **One resolver decides which version a firing validates against.** Attach-time and
+  fire-time validation are only comparable if they agree on the version, and "manual
+  resolves a different version than cron" would reintroduce per-trigger behaviour
+  through the back door. All paths — manual/API start, webhook, cron heartbeat,
+  spawn, and cron attach — share one resolution policy (ADR-0011's default version
+  when runnable, else the newest non-archived, non-deleted version). An explicitly
+  pinned `definitionVersion` still bypasses resolution and may name an archived
+  version.
 
 ## Considered options
 
@@ -72,6 +87,10 @@ contract is uniform.
   it as an opaque non-null JSON object. There is deliberately **no `array` type**:
   a webhook body maps by top-level key, so an opaque array has nothing to map and
   nests under an `object` field instead — one escape hatch, not two.
+- **`datetime` is now validated.** It previously fell through the validator's type
+  switch to "unchecked", so a `datetime` field accepted anything. A total contract
+  cannot have a declared type that enforces nothing, so it validates as `date` does.
+  Payloads that passed only because the field was unchecked are now rejected.
 - The cron trigger config schema grows an optional validated `payload`; the cron
   fire path gains the same validation every other trigger runs.
 - Spawned child workflows use the same validation before firing; failures follow

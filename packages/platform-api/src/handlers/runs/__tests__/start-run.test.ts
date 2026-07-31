@@ -133,6 +133,99 @@ describe('startRun handler', () => {
     );
   });
 
+  // An unpinned start resolves through the same shared policy as the cron
+  // heartbeat and spawn (ADR-0011), so a manual firing and a cron firing of the
+  // same workflow land on the same version — and therefore on the same
+  // `triggerInput` contract (ADR-0012). The old `getLatestVersion` read was
+  // archived-inclusive.
+  describe('version resolution', () => {
+    async function saveFlow(version: number, extra: Record<string, unknown> = {}): Promise<void> {
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({ name: 'flow', namespace: 'team-alpha', version, ...extra }),
+      );
+    }
+
+    function scopeWithTrigger(fireWorkflow: ReturnType<typeof vi.fn>) {
+      const scope = createTestScope({
+        processRepo,
+        instanceRepo,
+        auditRepo,
+        caller: userCaller('u-1', ['team-alpha']),
+      });
+      Object.assign(scope.system, { manualTrigger: { fireWorkflow } });
+      return scope;
+    }
+
+    it('skips an archived head and starts the newest live version', async () => {
+      await saveFlow(1);
+      await saveFlow(2, { archived: true });
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-live', namespace: 'team-alpha' }));
+      const fireWorkflow = vi
+        .fn()
+        .mockResolvedValue({ instanceId: 'inst-live', status: 'created' as const });
+
+      await startRun(
+        {
+          namespace: 'team-alpha',
+          definitionName: 'flow',
+          triggerName: 'manual',
+          triggeredBy: 'u-1',
+        },
+        scopeWithTrigger(fireWorkflow),
+      );
+
+      expect(fireWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({ definitionVersion: 1 }),
+      );
+    });
+
+    it('throws NotFoundError when every version is archived', async () => {
+      await saveFlow(1, { archived: true });
+      const fireWorkflow = vi.fn();
+
+      await expect(
+        startRun(
+          {
+            namespace: 'team-alpha',
+            definitionName: 'flow',
+            triggerName: 'manual',
+            triggeredBy: 'u-1',
+          },
+          scopeWithTrigger(fireWorkflow),
+        ),
+      ).rejects.toBeInstanceOf(NotFoundError);
+      expect(fireWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('still starts an explicitly pinned archived version', async () => {
+      // Pinning a version is a deliberate act — resolution is what the pin
+      // replaces, so an archived pin keeps working exactly as before.
+      await saveFlow(1);
+      await saveFlow(2, { archived: true });
+      await instanceRepo.create(
+        buildProcessInstance({ id: 'inst-pinned', namespace: 'team-alpha' }),
+      );
+      const fireWorkflow = vi
+        .fn()
+        .mockResolvedValue({ instanceId: 'inst-pinned', status: 'created' as const });
+
+      await startRun(
+        {
+          namespace: 'team-alpha',
+          definitionName: 'flow',
+          definitionVersion: 2,
+          triggerName: 'manual',
+          triggeredBy: 'u-1',
+        },
+        scopeWithTrigger(fireWorkflow),
+      );
+
+      expect(fireWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({ definitionVersion: 2 }),
+      );
+    });
+  });
+
   it('throws NotFoundError when the definition name is unknown', async () => {
     const fireWorkflow = vi.fn();
     const scope = createTestScope({

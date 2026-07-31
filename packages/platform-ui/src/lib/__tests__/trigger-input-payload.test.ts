@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { TriggerInputField } from '@mediforce/platform-core';
-import { buildTriggerPayload, hasInvalidObjectInput } from '../trigger-input-payload';
+import {
+  buildTriggerPayload,
+  hasInvalidObjectInput,
+  parseCronPayloadText,
+} from '../trigger-input-payload';
 
 function field(partial: Partial<TriggerInputField> & { name: string }): TriggerInputField {
   return { type: 'string', ...partial } as TriggerInputField;
@@ -60,6 +64,24 @@ describe('buildTriggerPayload', () => {
       enabled: false,
       sites: ['S1'],
     });
+  });
+});
+
+describe('parseCronPayloadText', () => {
+  it('reads empty or blank text as "no payload"', () => {
+    expect(parseCronPayloadText('')).toEqual({});
+    expect(parseCronPayloadText('   \n ')).toEqual({});
+  });
+
+  it('parses a JSON object', () => {
+    expect(parseCronPayloadText('{"studyId": "S-1"}')).toEqual({ studyId: 'S-1' });
+  });
+
+  it('is null for anything that is not a JSON object, so submit stays blocked', () => {
+    expect(parseCronPayloadText('{"a": ')).toBeNull();
+    expect(parseCronPayloadText('[1, 2]')).toBeNull();
+    expect(parseCronPayloadText('null')).toBeNull();
+    expect(parseCronPayloadText('"S-1"')).toBeNull();
   });
 });
 

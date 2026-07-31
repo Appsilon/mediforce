@@ -4,7 +4,12 @@ import type {
   TriggerResource,
   WebhookTriggerResource,
 } from '@mediforce/platform-core';
-import { WebhookTriggerConfigSchema, validatePayload } from '@mediforce/platform-core';
+import {
+  RUNNABLE_VERSION_REASONS,
+  WebhookTriggerConfigSchema,
+  resolveRunnableVersion,
+  validatePayload,
+} from '@mediforce/platform-core';
 import { validateCronSchedule } from '@mediforce/workflow-engine';
 import { toPortableTrigger } from '@mediforce/platform-core';
 import type { PortableTrigger } from '@mediforce/platform-core';
@@ -28,7 +33,6 @@ import type {
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
-import { resolveRunnableVersion } from '../workflows/_resolve-runnable-version';
 
 function labelFor(type: TriggerResource['type']): string {
   if (type === 'cron') return 'Cron';
@@ -61,7 +65,11 @@ async function assertPayloadMatchesContract(
   definitionName: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  const resolution = await resolveRunnableVersion(scope, namespace, definitionName);
+  const resolution = await resolveRunnableVersion(
+    scope.workflowDefinitions,
+    namespace,
+    definitionName,
+  );
   if (!resolution.ok) return;
 
   const validation = validatePayload(payload, resolution.def.triggerInput ?? []);
@@ -79,6 +87,18 @@ async function assertPayloadMatchesContract(
         `${validation.errors.map((error) => error.message).join('; ')}${hint}`,
     );
   }
+}
+
+/** The `payload` half of a cron row's config. An absent payload and an empty one
+ *  are the same state: `--payload '{}'` is documented as "clear the payload", so
+ *  the key is omitted rather than stored as `{}` — a cleared row is
+ *  indistinguishable from one that never had a payload, including in the
+ *  portable export. Shared by create and update so the two agree. */
+function payloadConfigOf(
+  payload: Record<string, unknown> | undefined,
+): { payload?: Record<string, unknown> } {
+  if (payload === undefined || Object.keys(payload).length === 0) return {};
+  return { payload };
 }
 
 /** Append the `<type>.trigger.deleted` audit event for a removed row. Shared by
@@ -115,14 +135,22 @@ function webhookUrlFor(trigger: WebhookTriggerResource): string {
 }
 
 // A Trigger can only attach to an existing, visible, non-deleted workflow.
+// Resolved through the same helper as attach-time validation and the heartbeat,
+// so all three read the workflow the same way. Only `noLiveVersion` is tolerated:
+// a fully-archived workflow still exists and still owns its trigger rows (rows
+// outlive versions), so it keeps taking edits and exports — the verdict on
+// whether it can fire is left to fire time.
 async function assertWorkflowExists(
   scope: CallerScope,
   namespace: string,
   definitionName: string,
 ): Promise<void> {
-  const latest = await scope.workflowDefinitions.getLatestVersion(namespace, definitionName);
-  const deleted = await scope.workflowDefinitions.isNameDeleted(namespace, definitionName);
-  if (latest === 0 || deleted) {
+  const resolution = await resolveRunnableVersion(
+    scope.workflowDefinitions,
+    namespace,
+    definitionName,
+  );
+  if (!resolution.ok && resolution.reason !== RUNNABLE_VERSION_REASONS.noLiveVersion) {
     throw new NotFoundError(`Workflow '${definitionName}' not found in '${namespace}'`);
   }
 }
@@ -216,9 +244,7 @@ export async function createTrigger(
       enabled: input.enabled,
       config: {
         schedule: input.schedule as string,
-        // Omitted rather than stored as `{}` when absent, so a payload-less row
-        // is byte-identical to one written before ADR-0012.
-        ...(input.payload === undefined ? {} : { payload: input.payload }),
+        ...payloadConfigOf(input.payload),
       },
       // Anchor the fire cursor to creation time so the schedule starts at its next
       // slot rather than back-firing history from the workflow's createdAt on the
@@ -329,13 +355,10 @@ export async function createTrigger(
   return { trigger: created, webhookUrl };
 }
 
-/**
- * Edit a cron row's config — its schedule, its static payload, or both.
- *
- * `config` is written whole (it is one jsonb column), so an omitted field is
- * carried over from the current row rather than dropped: updating only the
- * payload must not silently erase the schedule.
- */
+/** Edit a cron row's config — its schedule, its static payload, or both. `config`
+ *  is written whole (it is one jsonb column), so an omitted field is carried over
+ *  from the current row rather than dropped: updating only the payload must not
+ *  silently erase the schedule. */
 export async function updateTrigger(
   input: UpdateTriggerInput,
   scope: CallerScope,
@@ -353,8 +376,8 @@ export async function updateTrigger(
   );
   // Only cron rows carry an editable config: a webhook's `path` is its identity
   // (rebinding it is a delete + create) and a manual row has no config at all.
-  // The pre-ADR-0012 handler took `schedule` unconditionally and would happily
-  // stamp one onto a webhook row, corrupting it.
+  // Without this guard a `schedule` would be stamped onto a webhook row,
+  // corrupting it.
   if (current.type !== 'cron') {
     throw new ValidationError(
       `Only cron triggers have an editable schedule or payload; '${input.triggerName}' is ${current.type}`,
@@ -370,11 +393,10 @@ export async function updateTrigger(
   }
 
   const schedule = input.schedule ?? current.config.schedule;
-  // `payload: {}` is a deliberate clear, so drop the key entirely rather than
-  // storing an empty object — that keeps a cleared row identical to one that
-  // never had a payload, including in the portable export.
-  const payload = input.payload === undefined ? current.config.payload : input.payload;
-  const hasPayload = payload !== undefined && Object.keys(payload).length > 0;
+  const payloadConfig = payloadConfigOf(
+    input.payload === undefined ? current.config.payload : input.payload,
+  );
+  const hasPayload = payloadConfig.payload !== undefined;
 
   const now = new Date().toISOString();
   const trigger = await scope.triggers.update(
@@ -382,7 +404,7 @@ export async function updateTrigger(
     input.definitionName,
     input.triggerName,
     {
-      config: { schedule, ...(hasPayload ? { payload } : {}) },
+      config: { schedule, ...payloadConfig },
       updatedAt: now,
     },
   );
@@ -405,7 +427,7 @@ export async function updateTrigger(
       ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
       ...(input.payload === undefined ? {} : { payload: input.payload }),
     },
-    outputSnapshot: { schedule, ...(hasPayload ? { payload } : {}) },
+    outputSnapshot: { schedule, ...payloadConfig },
     basis: 'Trigger config updated via API',
     entityType: 'trigger',
     entityId: `${input.definitionName}/${input.triggerName}`,

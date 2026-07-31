@@ -39,8 +39,7 @@ describe('CronTrigger', () => {
       'cron-heartbeat',
       'cron',
       { region: 'eu' },
-      // No transport metadata on this firing, so no opts at all — a payload-only
-      // cron call is byte-identical to the pre-ADR-0012 one.
+      // `opts`: this firing carries no context, so no transport metadata is passed.
       undefined,
     );
 
@@ -50,9 +49,8 @@ describe('CronTrigger', () => {
   /**
    * A cron firing splits into two namespaces (ADR-0012): the row's static input
    * becomes the trigger-agnostic `triggerPayload`, and the tick's own
-   * `schedule`/`firedAt` become `triggerContext`. Before this they were fused
-   * into one payload, so `${triggerPayload.schedule}` in a step encoded "a cron
-   * started me".
+   * `schedule`/`firedAt` become `triggerContext`, so `${triggerPayload.*}` in a
+   * step never encodes "a cron started me".
    */
   describe('payload / context split', () => {
     const definition: WorkflowDefinition = {

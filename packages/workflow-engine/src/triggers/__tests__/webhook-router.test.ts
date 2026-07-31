@@ -65,27 +65,43 @@ function webhookRow(
 
 let processRepo: InMemoryProcessRepository;
 let triggerRepo: InMemoryTriggerRepository;
-let engine: WorkflowEngine;
 let router: WebhookRouter;
+/** The instance repo `router` writes to, so a test can read the run back. */
+let instanceRepo: InMemoryProcessInstanceRepository;
+
+/** Router over a fresh instance repo, wired to the current `processRepo` /
+ *  `triggerRepo`. Rebinds `instanceRepo` so the caller reads back what fired. */
+function buildRouter(): WebhookRouter {
+  instanceRepo = new InMemoryProcessInstanceRepository();
+  const engine = new WorkflowEngine(
+    processRepo,
+    instanceRepo,
+    new InMemoryAuditRepository(),
+    undefined,
+    undefined,
+    undefined,
+    new InMemoryHumanTaskRepository(),
+    new InMemoryCoworkSessionRepository(),
+  );
+  return new WebhookRouter(engine, processRepo, triggerRepo);
+}
+
+/** Fire the standard webhook at the standard path with a contract-satisfying body. */
+async function fire(overrides: Partial<Parameters<WebhookRouter['route']>[0]> = {}) {
+  return router.route({
+    namespace: 'examples',
+    workflowName: 'execution-summaries-api',
+    suffix: '/execution-summaries',
+    method: 'POST',
+    body: validBody,
+    ...overrides,
+  });
+}
 
 beforeEach(async () => {
   processRepo = new InMemoryProcessRepository();
   triggerRepo = new InMemoryTriggerRepository();
-  const instanceRepo = new InMemoryProcessInstanceRepository();
-  const auditRepo = new InMemoryAuditRepository();
-  const humanTaskRepo = new InMemoryHumanTaskRepository();
-  const coworkSessionRepo = new InMemoryCoworkSessionRepository();
-  engine = new WorkflowEngine(
-    processRepo,
-    instanceRepo,
-    auditRepo,
-    undefined,
-    undefined,
-    undefined,
-    humanTaskRepo,
-    coworkSessionRepo,
-  );
-  router = new WebhookRouter(engine, processRepo, triggerRepo);
+  router = buildRouter();
   await processRepo.saveWorkflowDefinition(definition);
   await triggerRepo.create(webhookRow());
 });
@@ -107,27 +123,7 @@ describe('WebhookRouter', () => {
   });
 
   it('persists triggerPayload on the created instance', async () => {
-    const instanceRepo = new InMemoryProcessInstanceRepository();
-    engine = new WorkflowEngine(
-      processRepo,
-      instanceRepo,
-      new InMemoryAuditRepository(),
-      undefined,
-      undefined,
-      undefined,
-      new InMemoryHumanTaskRepository(),
-      new InMemoryCoworkSessionRepository(),
-    );
-    router = new WebhookRouter(engine, processRepo, triggerRepo);
-
-    const result = await router.route({
-      namespace: 'examples',
-      workflowName: 'execution-summaries-api',
-      suffix: '/execution-summaries',
-      method: 'POST',
-      body: validBody,
-      headers: { 'x-trace': 'abc' },
-    });
+    const result = await fire({ headers: { 'x-trace': 'abc' } });
     expect(result.status).toBe(202);
     if (result.status !== 202) return;
 
@@ -151,6 +147,37 @@ describe('WebhookRouter', () => {
     expect(instance?.currentStepId).toBe('echo');
   });
 
+  it('strips credential headers from triggerContext, case-insensitively', async () => {
+    // The strip is the adapter's guarantee (ADR-0012), not the HTTP forwarder's:
+    // any caller of route() gets it. `triggerContext.headers.*` is readable from
+    // every step, so a forwarded credential would be interpolable into an
+    // outbound `http` action by any workflow author in the namespace.
+    const result = await fire({
+      headers: {
+        // Mixed case proves the strip does not rely on the caller lowercasing:
+        // HTTP header names are case-insensitive.
+        Authorization: 'Bearer secret',
+        'proxy-authorization': 'Basic secret',
+        Cookie: 'session=secret',
+        'X-Api-Key': 'platform-secret',
+        'x-trace': 'abc',
+        'Content-Type': 'application/json',
+      },
+    });
+    expect(result.status).toBe(202);
+    if (result.status !== 202) return;
+
+    const instance = await instanceRepo.getById(result.runId);
+    // Ordinary headers survive with their original casing; every credential
+    // header is gone, whatever case the caller sent it in.
+    expect(instance?.triggerContext).toEqual({
+      headers: { 'x-trace': 'abc', 'Content-Type': 'application/json' },
+      query: {},
+      method: 'POST',
+      path: '/execution-summaries',
+    });
+  });
+
   it('fills in a declared default for a field the body omits', async () => {
     // The `default` belongs to the contract, so a sender who leaves the field
     // out lands on the same value a manual firing would (ADR-0012).
@@ -165,29 +192,7 @@ describe('WebhookRouter', () => {
     await processRepo.saveWorkflowDefinition(withDefault);
     await triggerRepo.create(webhookRow({ workflowName: 'defaulted-summaries' }));
 
-    const instanceRepo = new InMemoryProcessInstanceRepository();
-    router = new WebhookRouter(
-      new WorkflowEngine(
-        processRepo,
-        instanceRepo,
-        new InMemoryAuditRepository(),
-        undefined,
-        undefined,
-        undefined,
-        new InMemoryHumanTaskRepository(),
-        new InMemoryCoworkSessionRepository(),
-      ),
-      processRepo,
-      triggerRepo,
-    );
-
-    const result = await router.route({
-      namespace: 'examples',
-      workflowName: 'defaulted-summaries',
-      suffix: '/execution-summaries',
-      method: 'POST',
-      body: validBody,
-    });
+    const result = await fire({ workflowName: 'defaulted-summaries' });
     expect(result.status).toBe(202);
     if (result.status !== 202) return;
 
@@ -421,5 +426,61 @@ describe('WebhookRouter', () => {
       body: validBody,
     });
     expect(result.status).toBe(202);
+  });
+
+  // The webhook path resolves its version through the same shared policy as a
+  // manual start, the cron heartbeat, and spawn (ADR-0011). It used to call
+  // `getLatestWorkflowVersion`, which is archived-inclusive and ignores the
+  // default pointer — so the same workflow could run a different `triggerInput`
+  // contract depending on which trigger fired it, the exact split ADR-0012 closes.
+  describe('runnable version resolution', () => {
+    /** A second version of the standard workflow, saved alongside v1. */
+    async function saveVersion(version: number): Promise<void> {
+      await processRepo.saveWorkflowDefinition({ ...definition, version });
+    }
+
+    it('honours the default version pointer instead of the highest version', async () => {
+      await saveVersion(2);
+      await processRepo.setDefaultWorkflowVersion('examples', 'execution-summaries-api', 1);
+
+      const result = await fire();
+      expect(result.status).toBe(202);
+      if (result.status !== 202) return;
+
+      const instance = await instanceRepo.getById(result.runId);
+      expect(instance?.definitionVersion).toBe('1');
+    });
+
+    it('falls back to the newest live version when the head is archived', async () => {
+      await saveVersion(2);
+      await processRepo.setVersionArchived('examples', 'execution-summaries-api', 2, true);
+
+      const result = await fire();
+      expect(result.status).toBe(202);
+      if (result.status !== 202) return;
+
+      const instance = await instanceRepo.getById(result.runId);
+      expect(instance?.definitionVersion).toBe('1');
+    });
+
+    it('returns 404 without firing when every version is archived', async () => {
+      await processRepo.setVersionArchived('examples', 'execution-summaries-api', 1, true);
+
+      const result = await fire();
+      expect(result.status).toBe(404);
+      if (result.status !== 404) return;
+      expect(result.error).toContain('No runnable workflow definition');
+      // The trigger row still resolves, so only the version check stands between
+      // a stale webhook and a ghost run on a retired definition.
+      expect(await instanceRepo.listAll({})).toEqual([]);
+    });
+
+    it('returns 404 without firing when the workflow is deleted', async () => {
+      await processRepo.setWorkflowDeleted('examples', 'execution-summaries-api', true);
+
+      const result = await fire();
+      expect(result.status).toBe(404);
+      expect(await instanceRepo.listAll({})).toEqual([]);
+    });
   });
 });

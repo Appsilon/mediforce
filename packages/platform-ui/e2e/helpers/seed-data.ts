@@ -1569,6 +1569,50 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
+  // Owned by cron-trigger-payload.journey.ts, which attaches, edits and deletes
+  // cron rows on it. Kept apart from `Trigger Input Test` so that mutation never
+  // touches a workflow other journeys read. `studyId` is required with NO
+  // default, so a payload-less cron row is rejected at attach time (ADR-0012);
+  // `priority` carries a default, so it never forces a payload of its own.
+  workflowDefinitions['test:Cron Payload Test:1'] = {
+    name: 'Cron Payload Test',
+    namespace: 'test',
+    version: 1,
+    title: 'Workflow whose cron rows carry a static payload',
+    description: 'Test workflow for the per-row cron payload editor',
+    steps: [
+      { id: 'process', name: 'Process Data', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'process', to: 'done' }],
+    triggerInput: [
+      { name: 'studyId', type: 'string', required: true, description: 'Study identifier' },
+      { name: 'priority', type: 'select', required: false, options: ['low', 'normal', 'high'], default: 'normal', description: 'Run priority' },
+    ],
+    createdAt: twoDaysAgo,
+  };
+
+  // Owned by object-trigger-input.journey.ts. A single required `object` field —
+  // ADR-0012's escape hatch for an opaque third-party body — which the Start Run
+  // form renders as a JSON textarea. Separate workflow so the object field can be
+  // required (and so block submit) without changing `Trigger Input Test`.
+  workflowDefinitions['test:Object Input Test:1'] = {
+    name: 'Object Input Test',
+    namespace: 'test',
+    version: 1,
+    title: 'Workflow with an object-typed trigger input',
+    description: 'Test workflow whose trigger input nests an opaque JSON body',
+    steps: [
+      { id: 'process', name: 'Process Data', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'process', to: 'done' }],
+    triggerInput: [
+      { name: 'webhookBody', type: 'object', required: true, description: 'Opaque upstream payload' },
+    ],
+    createdAt: twoDaysAgo,
+  };
+
   // Minimal workflow for verdict-with-params.journey.ts. Contains the
   // supply-chain-assessment step so advanceStep succeeds when the test submits
   // the task — Supply Chain Review v1 lacks this step and would 500.

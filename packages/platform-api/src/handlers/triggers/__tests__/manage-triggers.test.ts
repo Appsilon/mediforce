@@ -449,6 +449,39 @@ describe('trigger handlers (cron on the unified table, ADR-0011)', () => {
       });
     });
 
+    it('creates without a payload key when passed an empty object', async () => {
+      // Create and update must read `{}` the same way — the CLI documents
+      // `--payload '{}'` as "clear the payload". Create used to test only for
+      // `undefined`, so a row created this way persisted `payload: {}` and the
+      // portable export carried it, unlike the identical updated row.
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({
+          name: 'optional-input',
+          version: 1,
+          namespace: 'team-alpha',
+          triggerInput: [{ name: 'region', type: 'string', required: false }],
+        }),
+      );
+      const scope = buildScope();
+
+      const result = await createTrigger(
+        {
+          namespace: 'team-alpha',
+          definitionName: 'optional-input',
+          triggerName: 'nightly',
+          type: 'cron',
+          schedule: '0 3 * * *',
+          enabled: true,
+          payload: {},
+        },
+        scope,
+      );
+
+      expect(result.trigger.type === 'cron' && result.trigger.config).toEqual({
+        schedule: '0 3 * * *',
+      });
+    });
+
     it('rejects clearing a payload the contract still requires', async () => {
       const scope = buildScope();
       await createTrigger(

@@ -3,7 +3,11 @@ import type {
   ProcessInstance,
   WorkflowDefinition,
 } from '@mediforce/platform-core';
-import { resolveStrandedBudgetMs, validatePayload } from '@mediforce/platform-core';
+import {
+  resolveRunnableVersion,
+  resolveStrandedBudgetMs,
+  validatePayload,
+} from '@mediforce/platform-core';
 import { validateCronSchedule, isDue } from '@mediforce/workflow-engine';
 import type {
   HeartbeatInput,
@@ -14,7 +18,6 @@ import type {
 import type { CallerScope } from '../../repositories/index';
 import { ForbiddenError, PreconditionFailedError } from '../../errors';
 import { resumeWait } from '../processes/resume-wait';
-import { resolveRunnableVersion } from '../workflows/_resolve-runnable-version';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
 
@@ -119,7 +122,11 @@ export async function heartbeat(
   );
 
   for (const trigger of cronTriggers) {
-    const resolution = await resolveRunnableVersion(scope, trigger.namespace, trigger.workflowName);
+    const resolution = await resolveRunnableVersion(
+      scope.workflowDefinitions,
+      trigger.namespace,
+      trigger.workflowName,
+    );
     if (!resolution.ok) {
       skipped.push({
         definitionName: trigger.workflowName,

@@ -14,6 +14,10 @@ function makeTrigger(results?: Map<string, { instanceId: string }>) {
   };
 }
 
+// A spawn resolves its child's version through the shared policy
+// (`resolveRunnableVersion`), so the fake repo answers the three reads that
+// policy makes. A workflow at `latestVersions[name] === 0` has no versions at
+// all, which is how "definition not found" is expressed.
 function makeProcessRepo(
   latestVersions?: Record<string, number>,
   // Child `triggerInput` contracts by workflow name. A name with no entry
@@ -24,13 +28,24 @@ function makeProcessRepo(
     Array<{ name: string; type?: string; required?: boolean; default?: unknown }>
   >,
 ) {
+  const versionOf = (name: string) => latestVersions?.[name] ?? 3;
+  const definitionOf = (name: string, version: number) => ({
+    name,
+    version,
+    triggerInput: contracts?.[name] ?? [],
+  });
   return {
-    getLatestWorkflowVersion: vi.fn().mockImplementation((_ns: string, name: string) => {
-      return Promise.resolve(latestVersions?.[name] ?? 3);
+    isWorkflowNameDeleted: vi.fn().mockResolvedValue(false),
+    listWorkflowVersions: vi.fn().mockImplementation((_ns: string, name: string) => {
+      const version = versionOf(name);
+      return Promise.resolve(version === 0 ? [] : [definitionOf(name, version)]);
     }),
-    getWorkflowDefinition: vi.fn().mockImplementation((_ns: string, name: string) => {
-      return Promise.resolve({ name, triggerInput: contracts?.[name] ?? [] });
-    }),
+    getDefaultWorkflowVersion: vi.fn().mockResolvedValue(null),
+    getWorkflowDefinition: vi
+      .fn()
+      .mockImplementation((_ns: string, name: string, version: number) => {
+        return Promise.resolve(definitionOf(name, version));
+      }),
   };
 }
 
@@ -254,7 +269,7 @@ describe('createSpawnActionHandler', () => {
       baseCtx,
     );
 
-    expect(repo.getLatestWorkflowVersion).not.toHaveBeenCalled();
+    expect(repo.listWorkflowVersions).not.toHaveBeenCalled();
     expect(trigger.fireWorkflow).toHaveBeenCalledWith(
       expect.objectContaining({ definitionVersion: 7 }),
     );
@@ -305,7 +320,7 @@ describe('createSpawnActionHandler', () => {
     ).rejects.toThrow('spawn fan-out exceeds maximum of 50');
   });
 
-  it('errors when definition not found (version 0)', async () => {
+  it('errors when definition not found (no versions)', async () => {
     const trigger = makeTrigger();
     const repo = makeProcessRepo({ 'missing-wf': 0 });
     const handler = createSpawnActionHandler(trigger as never, repo as never);
@@ -320,6 +335,127 @@ describe('createSpawnActionHandler', () => {
 
     expect(result.errorCount).toBe(1);
     expect(result.errors[0].message).toContain('not found');
+  });
+
+  // A spawned child resolves its version through the same policy as a manual
+  // start and the cron heartbeat (ADR-0011), so the three can never fire
+  // different versions — and therefore never validate against different
+  // `triggerInput` contracts. Spawn used to take `getLatestWorkflowVersion`,
+  // which is archived-inclusive.
+  describe('version resolution', () => {
+    function makeVersionedRepo(versions: Array<{ version: number; archived?: boolean }>) {
+      return {
+        isWorkflowNameDeleted: vi.fn().mockResolvedValue(false),
+        listWorkflowVersions: vi.fn().mockImplementation((_ns: string, name: string) =>
+          Promise.resolve(versions.map((entry) => ({ ...entry, name, triggerInput: [] }))),
+        ),
+        getDefaultWorkflowVersion: vi.fn().mockResolvedValue(null),
+        getWorkflowDefinition: vi
+          .fn()
+          .mockImplementation((_ns: string, name: string, version: number) =>
+            Promise.resolve({ name, version, triggerInput: [] }),
+          ),
+      };
+    }
+
+    it('skips an archived head and fires the newest live version', async () => {
+      const trigger = makeTrigger();
+      const repo = makeVersionedRepo([{ version: 1 }, { version: 2, archived: true }]);
+      const handler = createSpawnActionHandler(trigger as never, repo as never);
+
+      await handler(
+        { targets: { definitionName: 'child-wf' }, continueOnSpawnError: true },
+        baseCtx,
+      );
+
+      expect(trigger.fireWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({ definitionVersion: 1 }),
+      );
+    });
+
+    it('errors instead of firing when every version is archived', async () => {
+      const trigger = makeTrigger();
+      const repo = makeVersionedRepo([{ version: 1, archived: true }]);
+      const handler = createSpawnActionHandler(trigger as never, repo as never);
+
+      const result = asSpawn(await handler(
+        { targets: { definitionName: 'child-wf' }, continueOnSpawnError: true },
+        baseCtx,
+      ));
+
+      expect(trigger.fireWorkflow).not.toHaveBeenCalled();
+      expect(result.errors[0]!.message).toContain('No live version');
+    });
+
+    it('errors instead of firing a deleted workflow', async () => {
+      const trigger = makeTrigger();
+      const repo = makeVersionedRepo([{ version: 1 }]);
+      repo.isWorkflowNameDeleted.mockResolvedValue(true);
+      const handler = createSpawnActionHandler(trigger as never, repo as never);
+
+      const result = asSpawn(await handler(
+        { targets: { definitionName: 'child-wf' }, continueOnSpawnError: true },
+        baseCtx,
+      ));
+
+      expect(trigger.fireWorkflow).not.toHaveBeenCalled();
+      expect(result.errors[0]!.message).toContain('Workflow deleted');
+    });
+
+    it('fires a pinned version even when it is archived', async () => {
+      const trigger = makeTrigger();
+      const repo = makeVersionedRepo([{ version: 1, archived: true }]);
+      const handler = createSpawnActionHandler(trigger as never, repo as never);
+
+      await handler(
+        {
+          targets: { definitionName: 'child-wf', definitionVersion: 1 },
+          continueOnSpawnError: true,
+        },
+        baseCtx,
+      );
+
+      expect(trigger.fireWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({ definitionVersion: 1 }),
+      );
+    });
+
+    it('errors instead of firing unvalidated when the resolved definition is unreadable', async () => {
+      // The version resolved, so a null definition means it vanished between the
+      // two reads. Firing it would skip the contract check entirely — the child
+      // would accept a payload POST /api/runs rejects.
+      const trigger = makeTrigger();
+      const repo = makeVersionedRepo([{ version: 1 }]);
+      repo.getWorkflowDefinition.mockResolvedValue(null);
+      const handler = createSpawnActionHandler(trigger as never, repo as never);
+
+      const result = asSpawn(await handler(
+        {
+          targets: { definitionName: 'child-wf', payload: { stray: 1 } },
+          continueOnSpawnError: true,
+        },
+        baseCtx,
+      ));
+
+      expect(trigger.fireWorkflow).not.toHaveBeenCalled();
+      expect(result.errorCount).toBe(1);
+      expect(result.errors[0]!.message).toContain("'child-wf' v1");
+      expect(result.errors[0]!.message).toContain('not found');
+    });
+
+    it('throws the unreadable-definition error when continueOnSpawnError is false', async () => {
+      const trigger = makeTrigger();
+      const repo = makeVersionedRepo([{ version: 1 }]);
+      repo.getWorkflowDefinition.mockResolvedValue(null);
+      const handler = createSpawnActionHandler(trigger as never, repo as never);
+
+      await expect(
+        handler(
+          { targets: { definitionName: 'child-wf' }, continueOnSpawnError: false },
+          baseCtx,
+        ),
+      ).rejects.toThrow(/not found/);
+    });
   });
 
   // ADR-0012: a spawned child's `triggerInput` is its total input contract, so a

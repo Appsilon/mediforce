@@ -19,6 +19,17 @@ export function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && Array.isArray(value) === false;
 }
 
+/**
+ * Parse a cron trigger's static payload editor text into the payload to send.
+ * Empty text means "no payload", so it parses to `{}`; anything that isn't a
+ * JSON object is `null` so the caller can block submit rather than post
+ * something the server will only reject.
+ */
+export function parseCronPayloadText(text: string): Record<string, unknown> | null {
+  if (text.trim().length === 0) return {};
+  return parseJsonObjectText(text);
+}
+
 /** True while any `object` field holds non-empty text that would be rejected. */
 export function hasInvalidObjectInput(
   fields: TriggerInputField[],

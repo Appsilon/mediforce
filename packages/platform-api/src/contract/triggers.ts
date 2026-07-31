@@ -60,10 +60,9 @@ export const CreateTriggerOutputSchema = z.object({
 });
 
 /** Edit a cron row's config. Both fields are optional so a caller can retime a
- *  schedule without restating its payload (and vice versa), but omitting both is
- *  a no-op write that would still bump `updatedAt` and emit an audit event, so
- *  the handler rejects it. `payload: {}` is a real value — it *clears* the
- *  static input — and is distinguishable from omission. */
+ *  schedule without restating its payload, but omitting both is a no-op write
+ *  that would still bump `updatedAt` and emit an audit event, so the handler
+ *  rejects it. `payload: {}` *clears* the static input, distinct from omission. */
 export const UpdateTriggerInputSchema = z.object({
   ...key,
   schedule: z.string().min(1).optional(),

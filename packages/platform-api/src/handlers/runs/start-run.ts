@@ -1,4 +1,4 @@
-import { validatePayload } from '@mediforce/platform-core';
+import { resolveRunnableVersion, validatePayload } from '@mediforce/platform-core';
 import { ManualTriggerNotDeclaredError } from '@mediforce/workflow-engine';
 import type { StartRunInput, StartRunOutput } from '../../contract/runs';
 import type { CallerScope } from '../../repositories/index';
@@ -11,18 +11,26 @@ export async function startRun(
   scope: CallerScope,
 ): Promise<StartRunOutput> {
   const requestNamespace = input.namespace ?? '';
+  // An unpinned start resolves through the one shared policy (ADR-0011), the
+  // same one the cron heartbeat and spawn use: a manual firing and a cron firing
+  // of the same workflow must land on the same version, or ADR-0012's single
+  // `triggerInput` contract splits in two. `getLatestVersion` used here before
+  // was archived-inclusive, so a workflow whose head is archived started on a
+  // version nothing else would fire. An explicit `definitionVersion` still wins
+  // outright — pinning an archived version is a deliberate act.
   let version = input.definitionVersion;
-  if (!version) {
-    const resolved = await scope.workflowDefinitions.getLatestVersion(
+  if (version === undefined) {
+    const resolution = await resolveRunnableVersion(
+      scope.workflowDefinitions,
       requestNamespace,
       input.definitionName,
     );
-    if (resolved === 0) {
+    if (!resolution.ok) {
       throw new NotFoundError(
-        `No workflow definition found for '${input.definitionName}'`,
+        `No runnable workflow definition found for '${input.definitionName}': ${resolution.reason}`,
       );
     }
-    version = resolved;
+    version = resolution.def.version;
   }
 
   const definition = await scope.workflowDefinitions.get(

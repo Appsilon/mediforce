@@ -9,23 +9,11 @@ import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
  * so this handler only owns URL parsing, delegating to WebhookRouter, and
  * fire-and-forget kicking the auto-runner. Decision B5: full async — the
  * caller polls /api/runs/<runId> for completion.
+ *
+ * Headers are forwarded raw; WebhookRouter strips credential headers before
+ * they reach the Run's `triggerContext` (ADR-0012), so the guarantee holds for
+ * every caller of the adapter rather than for this route alone.
  */
-/**
- * Request headers that never reach the run. Everything else lands on the Run's
- * `triggerContext` (ADR-0012), which is persisted to `process_instances` and
- * readable from any step as `${triggerContext.headers.*}` — so forwarding these
- * would let any workflow author in the namespace interpolate the caller's
- * credentials (including this platform's own `x-api-key`) straight into an
- * outbound `http` action. The endpoint has already authenticated by this point,
- * so nothing downstream needs them.
- */
-const CREDENTIAL_HEADERS = new Set([
-  'authorization',
-  'proxy-authorization',
-  'cookie',
-  'x-api-key',
-]);
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
@@ -60,7 +48,6 @@ export async function POST(
 
   const headers: Record<string, string> = {};
   req.headers.forEach((value, key) => {
-    if (CREDENTIAL_HEADERS.has(key.toLowerCase())) return;
     headers[key] = value;
   });
   const query: Record<string, string> = {};

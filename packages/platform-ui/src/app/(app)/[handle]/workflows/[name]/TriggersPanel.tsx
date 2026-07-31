@@ -12,6 +12,7 @@ import {
   type WebhookTrigger,
 } from '@/hooks/use-workflow-triggers';
 import { formatCron } from '@/lib/format-cron';
+import { parseCronPayloadText } from '@/lib/trigger-input-payload';
 import { cn } from '@/lib/utils';
 
 const SCHEDULE_HELPER_TEXT =
@@ -78,8 +79,7 @@ function exampleValueFor(field: TriggerInputField): unknown {
 
 /** The exact body this webhook accepts, built from the workflow's `triggerInput`.
  *  Under ADR-0012 the body's top-level keys *are* the declared fields, so the
- *  example is derivable rather than guessed — which is what closes the old
- *  "what should the body be?" question the generic placeholder left open. */
+ *  example is derivable rather than guessed. */
 function exampleBodyFor(triggerInput: TriggerInputField[]): string {
   const body = Object.fromEntries(
     triggerInput.map((field) => [field.name, exampleValueFor(field)]),
@@ -145,13 +145,10 @@ function errorMessage(err: unknown): string {
 }
 
 /** A cron tick has no caller, so the input it hands the Run is edited here, per
- *  row (ADR-0012) — that is what lets two schedules on one workflow fire
- *  different constants. The server validates against `triggerInput`; this only
- *  catches "that isn't JSON" so the user isn't round-tripping for a typo.
- *
- *  Rendered as raw JSON rather than a generated per-field form: the same editor
- *  has to express an `object`-typed field's arbitrary nesting, which no flat
- *  form covers, and a cron payload is authored once and rarely touched. */
+ *  row (ADR-0012). The server validates against `triggerInput`; this only catches
+ *  "that isn't JSON" so the user isn't round-tripping for a typo. Raw JSON rather
+ *  than a generated per-field form: an `object`-typed field's arbitrary nesting
+ *  fits no flat form, and a cron payload is authored once and rarely touched. */
 function CronPayloadEditor({
   value,
   onChange,
@@ -165,7 +162,7 @@ function CronPayloadEditor({
   contractLoading: boolean;
   disabled: boolean;
 }) {
-  const malformed = value.trim().length > 0 && parseJsonObject(value) === null;
+  const malformed = value.trim().length > 0 && parseCronPayloadText(value) === null;
   return (
     <div>
       <label className="mb-1 block text-sm font-medium">Payload</label>
@@ -196,20 +193,6 @@ function CronPayloadEditor({
       {malformed && <p className="mt-1 text-xs text-destructive">Not valid JSON.</p>}
     </div>
   );
-}
-
-/** Parse an editor value into the payload to send. Empty text means "no
- *  payload"; anything that isn't a JSON object is `null` so the caller can block
- *  submit rather than post something the server will only reject. */
-function parseJsonObject(raw: string): Record<string, unknown> | null {
-  if (raw.trim().length === 0) return {};
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
-    return parsed as Record<string, unknown>;
-  } catch {
-    return null;
-  }
 }
 
 /** Render a stored payload back into editor text. An absent or empty payload
@@ -814,7 +797,7 @@ function CronTriggerRow({
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string>('');
 
-  const draftPayload = parseJsonObject(payloadDraft);
+  const draftPayload = parseCronPayloadText(payloadDraft);
   // Only send `payload` when the user actually edited it. Resending an
   // unchanged one re-runs attach-time validation, so a row whose payload has
   // drifted behind a newer contract — which ADR-0012 says should skip at fire
@@ -1002,7 +985,7 @@ function AddCronTriggerForm({
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string>('');
 
-  const parsedPayload = parseJsonObject(payload);
+  const parsedPayload = parseCronPayloadText(payload);
   const canSubmit =
     triggerName.trim().length > 0 &&
     schedule.trim().length > 0 &&

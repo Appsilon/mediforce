@@ -398,6 +398,20 @@ export type { ConfigValidationResult } from './validation/config-validator';
 export { validatePayload } from './validation/payload-validator';
 export type { PayloadValidationError, PayloadValidationResult } from './validation/payload-validator';
 
+// Version resolution — the one policy every unpinned firing resolves through
+export {
+  RUNNABLE_VERSION_REASONS,
+  pickRunnableVersion,
+  resolveRunnableVersion,
+  toWorkflowVersionSource,
+} from './workflows/resolve-runnable-version';
+export type {
+  RunnableVersion,
+  RunnableVersionReason,
+  VersionCandidate,
+  WorkflowVersionSource,
+} from './workflows/resolve-runnable-version';
+
 // MCP resolver (pure; wires AgentDefinition + step restrictions + catalog)
 export {
   resolveEffectiveMcp,
