@@ -98,7 +98,7 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
 }
 
 export async function ensureImage(options: EnsureImageOptions): Promise<void> {
-  const { image, repoUrl, commit, dockerfile, repoToken } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile, repoToken } = options;
 
   // If repo+commit not provided, just check existence
   if (!repoUrl || !commit) {
