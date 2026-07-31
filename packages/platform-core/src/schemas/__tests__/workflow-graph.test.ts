@@ -16,7 +16,6 @@ describe('toProcessDefinition', () => {
         step('done', { type: 'terminal' }),
       ],
       transitions: [{ from: 'start', to: 'decide' }],
-      triggers: [{ type: 'manual', name: 'start' }],
     };
     const result = toProcessDefinition(definition);
     expect(result.name).toBe('wf');

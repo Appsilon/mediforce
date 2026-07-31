@@ -12,7 +12,6 @@ function definition(steps: Step[], transitions: ProcessDefinition['transitions']
     version: '1',
     steps,
     transitions,
-    triggers: [{ type: 'manual', name: 'start' }],
   };
 }
 

@@ -110,7 +110,6 @@ const decisionDef: WorkflowDefinition = {
     { from: 'decide', to: 'draft' },
     { from: 'decide', to: 'rejected' },
   ],
-  triggers: [{ type: 'manual', name: 'Start Decision' }],
 };
 
 const actor: StepActor = { id: 'user-1', role: 'operator' };

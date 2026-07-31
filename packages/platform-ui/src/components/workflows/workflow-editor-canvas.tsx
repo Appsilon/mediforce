@@ -485,7 +485,6 @@ export function WorkflowEditorCanvas({
         visibility: 'private',
         steps: orderedSteps,
         transitions: mergedTransitions,
-        triggers: [{ type: 'manual', name: 'start' }],
       });
       if (validationErrors.length > 0) {
         setJsonError(validationErrors[0]);

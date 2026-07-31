@@ -19,7 +19,6 @@ export function toProcessDefinition(definition: WorkflowDefinition): ProcessDefi
       ...(step.metadata ? { metadata: step.metadata } : {}),
     })),
     transitions: definition.transitions,
-    triggers: definition.triggers,
     ...(definition.description ? { description: definition.description } : {}),
     ...(definition.metadata ? { metadata: definition.metadata } : {}),
   };
