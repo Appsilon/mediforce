@@ -97,7 +97,7 @@ PREAMBLE = (
 
 steps = [
     script_step("fetch-candidates", "Fetch candidate issues",
-                "List open issues; partition the ones needing triage (new, edited-since-declined, or a released stale lease); reclaim expired in-progress leases; carry attemptCount."),
+                "List open issues; partition the ones needing triage (new, edited-since-declined, or explicitly retried); release explicit retries; carry attemptCount."),
     agent_step("triage", "Triage + classify batch",
                "GLM clones main and verifies each un-triaged issue against the code, classifying it go / needs-approval / manual / obsolete (+ priority). Judgment is persisted as labels so each issue is analysed once; obsolete issues are auto-closed downstream.", 30),
     script_step("apply-verdicts", "Persist verdict labels",
@@ -105,7 +105,7 @@ steps = [
     script_step("select", "Select next issue",
                 "Deterministic: fresh label-filtered query of the actionable pool, sort by priority then oldest, pick one, and recover the persisted blockers for a needs-approval pick. No LLM."),
     script_step("claim", "Claim the issue",
-                "Set the fullstack:in-progress lease (fails hard so implement never runs unclaimed)."),
+                "Set the fullstack:in-progress ownership marker (fails hard so implement never runs unclaimed)."),
     agent_step("draft-plan", "Research + plan",
                "GLM clones main and works triage's blockers: resolves the missing-context/scope ones against the code and docs, and emits needsHuman only when a genuine product/policy decision survives. false -> implement directly, true -> human gate.", 20),
     script_step("notify-gate", "Ping reviewer, hand to human",
@@ -147,7 +147,7 @@ steps = [
     script_step("mark-ci-failed", "CI failed -> human",
                 "Auto-fix budget spent (or CI stuck): convert the PR to draft, append the fix history + failing-check summary, label fullstack:ci-failing, and comment for a human."),
     script_step("mark-fixed", "Close already-fixed issue",
-                "Comment the evidence and close an issue implement found already resolved; drop the lease."),
+                "Comment the evidence and close an issue implement found already resolved; drop ownership."),
     script_step("mark-needs-info", "Park pending clarification",
                 "Swap working labels for fullstack:needs-info and comment (gate reject, or implement bail)."),
     terminal("done", "Done", "Terminal: attempt finished (PR opened, closed, or parked)."),
@@ -206,7 +206,7 @@ wd = {
         "implements them as ready-for-review PRs, researching open questions against the "
         "code and escalating to a human only for genuine product/policy decisions, "
         "self-reviews with a bounded revise loop, and auto-closes already-fixed "
-        "issues. Idempotent + self-healing via labels and a 2h lease."
+        "issues. Idempotent + recoverable via explicit retry labels."
     ),
     "roles": ["admin"],
     "preamble": PREAMBLE,

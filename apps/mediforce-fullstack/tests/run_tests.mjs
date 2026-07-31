@@ -23,34 +23,43 @@ function test(name, fn) {
 const NOW = new Date('2026-07-01T12:00:00Z').getTime();
 const hoursAgo = (h) => new Date(NOW - h * 3_600_000).toISOString();
 const lbl = (...names) => names.map((name) => ({ name }));
+const classify = (issue, events = [], reassign = false) => classifyIssue(issue, events, reassign);
 
 // ---- fetch-candidates.classifyIssue ----
 test('new issue with no labels → triage', () => {
-  assert.equal(classifyIssue({ labels: [] }, [], NOW, 2, 3).action, 'triage');
+  assert.equal(classify({ labels: [] }).action, 'triage');
 });
 test('pr-open issue → skip', () => {
-  assert.equal(classifyIssue({ labels: lbl('fullstack:pr-open') }, [], NOW, 2, 3).action, 'skip');
+  assert.equal(classify({ labels: lbl('fullstack:pr-open') }).action, 'skip');
 });
-test('fresh in-progress lease → skip', () => {
-  const events = [{ event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(0.5) }];
-  assert.equal(classifyIssue({ labels: lbl('fullstack:in-progress') }, events, NOW, 2, 3).action, 'skip');
+test('in-progress issue → skip regardless of age', () => {
+  const events = [{ event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: '2026-06-01T12:00:00Z' }];
+  assert.equal(classify({ labels: lbl('fullstack:in-progress') }, events).action, 'skip');
 });
-test('stale in-progress lease → reclaim', () => {
-  const events = [{ event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(5) }];
-  const d = classifyIssue({ labels: lbl('fullstack:in-progress') }, events, NOW, 2, 3);
-  assert.equal(d.action, 'reclaim');
+test('in-progress issue with retry label → retry on demand', () => {
+  const events = [{ event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: '2026-06-01T12:00:00Z' }];
+  const d = classify({ labels: lbl('fullstack:in-progress', 'fullstack:retry') }, events);
+  assert.equal(d.action, 'retry');
+  assert.equal(d.attemptCount, 1);
+});
+test('retry label without in-progress marker → retry on demand', () => {
+  assert.equal(classify({ labels: lbl('fullstack:retry') }).action, 'retry');
+});
+test('retry never overrides an open PR or human gate', () => {
+  assert.equal(classify({ labels: lbl('fullstack:pr-open', 'fullstack:retry') }).action, 'skip');
+  assert.equal(classify({ labels: lbl('fullstack:awaiting-human', 'fullstack:retry') }).action, 'skip');
 });
 test('manual, not edited → skip', () => {
-  const events = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: hoursAgo(10) }];
-  const issue = { labels: lbl('fullstack:manual'), updated_at: hoursAgo(20) };
-  assert.equal(classifyIssue(issue, events, NOW, 2, 3).action, 'skip');
+  const events = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: '2026-06-01T12:00:00Z' }];
+  const issue = { labels: lbl('fullstack:manual'), updated_at: '2026-06-01T12:00:00Z' };
+  assert.equal(classify(issue, events).action, 'skip');
 });
 test('manual, genuine edit since decline (updated_at outruns every event) → triage (re-judge)', () => {
   // A body edit or new comment bumps updated_at but creates no issue event (the
   // events API omits both), so updated_at outruns the newest event → re-judge.
-  const events = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: hoursAgo(10) }];
-  const issue = { labels: lbl('fullstack:manual'), updated_at: hoursAgo(1) };
-  assert.equal(classifyIssue(issue, events, NOW, 2, 3).action, 'triage');
+  const events = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: '2026-06-01T12:00:00Z' }];
+  const issue = { labels: lbl('fullstack:manual'), updated_at: '2026-06-01T13:00:00Z' };
+  assert.equal(classify(issue, events).action, 'triage');
 });
 test('manual, unrelated label added after decline → skip (label bump is not a content edit)', () => {
   // Repro of #425: a human added an unrelated label a day after the bot declined.
@@ -58,65 +67,61 @@ test('manual, unrelated label added after decline → skip (label bump is not a 
   // so it is not a content edit — comparing updated_at to the manual label event alone
   // re-triaged it every tick forever. It must skip.
   const events = [
-    { event: 'labeled', label: { name: 'fullstack:manual' }, created_at: hoursAgo(30) },
-    { event: 'labeled', label: { name: 'dogfooding' }, created_at: hoursAgo(3) },
+    { event: 'labeled', label: { name: 'fullstack:manual' }, created_at: '2026-06-01T12:00:00Z' },
+    { event: 'labeled', label: { name: 'dogfooding' }, created_at: '2026-06-01T13:00:00Z' },
   ];
-  const issue = { labels: lbl('fullstack:manual', 'dogfooding'), updated_at: hoursAgo(3) };
-  assert.equal(classifyIssue(issue, events, NOW, 2, 3).action, 'skip');
+  const issue = { labels: lbl('fullstack:manual', 'dogfooding'), updated_at: '2026-06-01T13:00:00Z' };
+  assert.equal(classify(issue, events).action, 'skip');
 });
 test('bot-authored manual issue that keeps being edited → skip (no re-triage loop)', () => {
   // Renovate rewrites its "Dependency Dashboard" constantly, bumping updated_at far
   // past the manual label event. The edited-since heuristic latched on and re-triaged
   // it every tick; bot-authored issues must never enter the pipeline.
-  const events = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: hoursAgo(10) }];
-  const issue = { labels: lbl('fullstack:manual'), updated_at: hoursAgo(1), user: { type: 'Bot' } };
-  assert.equal(classifyIssue(issue, events, NOW, 2, 3).action, 'skip');
+  const events = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: '2026-06-01T12:00:00Z' }];
+  const issue = { labels: lbl('fullstack:manual'), updated_at: '2026-06-01T13:00:00Z', user: { type: 'Bot' } };
+  assert.equal(classify(issue, events).action, 'skip');
 });
 test('bot-authored issue with no labels → skip (never triaged)', () => {
-  assert.equal(classifyIssue({ labels: [], user: { type: 'Bot' } }, [], NOW, 2, 3).action, 'skip');
+  assert.equal(classify({ labels: [], user: { type: 'Bot' } }).action, 'skip');
 });
 test('bot-authored issue is protected even under reassign → skip', () => {
-  const events = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: hoursAgo(10) }];
-  const issue = { labels: lbl('fullstack:manual'), updated_at: hoursAgo(1), user: { type: 'Bot' } };
-  assert.equal(classifyIssue(issue, events, NOW, 2, 3, true).action, 'skip');
+  const events = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: '2026-06-01T12:00:00Z' }];
+  const issue = { labels: lbl('fullstack:manual'), updated_at: '2026-06-01T13:00:00Z', user: { type: 'Bot' } };
+  assert.equal(classify(issue, events, true).action, 'skip');
 });
 test('already go-labelled → skip (not re-analysed)', () => {
-  assert.equal(classifyIssue({ labels: lbl('fullstack:go') }, [], NOW, 2, 3).action, 'skip');
+  assert.equal(classify({ labels: lbl('fullstack:go') }).action, 'skip');
 });
 test('attemptCount counts in-progress labelings', () => {
   const events = [
-    { event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(9) },
-    { event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(5) },
-    { event: 'unlabeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(7) },
+    { event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: '2026-06-01T12:00:00Z' },
+    { event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: '2026-06-01T13:00:00Z' },
+    { event: 'unlabeled', label: { name: 'fullstack:in-progress' }, created_at: '2026-06-01T14:00:00Z' },
   ];
   assert.equal(summariseLabelEvents(events, 'fullstack:in-progress').count, 2);
-  assert.equal(classifyIssue({ labels: lbl('fullstack:in-progress') }, events, NOW, 2, 3).attemptCount, 2);
+  assert.equal(classify({ labels: lbl('fullstack:in-progress', 'fullstack:retry') }, events).attemptCount, 2);
 });
 
 // ---- fetch-candidates.classifyIssue: FULLSTACK_REASSIGN escape hatch ----
 test('reassign re-judges go / needs-approval / manual → triage', () => {
-  const staleManual = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: hoursAgo(10) }];
-  const notEdited = { labels: lbl('fullstack:manual'), updated_at: hoursAgo(20) };
-  assert.equal(classifyIssue({ labels: lbl('fullstack:go') }, [], NOW, 2, 3, true).action, 'triage');
-  assert.equal(classifyIssue({ labels: lbl('fullstack:needs-approval') }, [], NOW, 2, 3, true).action, 'triage');
-  assert.equal(classifyIssue(notEdited, staleManual, NOW, 2, 3, true).action, 'triage');
+  const staleManual = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: '2026-06-01T12:00:00Z' }];
+  const notEdited = { labels: lbl('fullstack:manual'), updated_at: '2026-06-01T12:00:00Z' };
+  assert.equal(classify({ labels: lbl('fullstack:go') }, [], true).action, 'triage');
+  assert.equal(classify({ labels: lbl('fullstack:needs-approval') }, [], true).action, 'triage');
+  assert.equal(classify(notEdited, staleManual, true).action, 'triage');
 });
 test('reassign re-opens needs-info → reopen (strips label, re-triages)', () => {
-  assert.equal(classifyIssue({ labels: lbl('fullstack:needs-info') }, [], NOW, 2, 3, true).action, 'reopen');
+  assert.equal(classify({ labels: lbl('fullstack:needs-info') }, [], true).action, 'reopen');
 });
 test('reassign never touches in-flight / human-owned states', () => {
-  assert.equal(classifyIssue({ labels: lbl('fullstack:pr-open') }, [], NOW, 2, 3, true).action, 'skip');
-  assert.equal(classifyIssue({ labels: lbl('fullstack:awaiting-human') }, [], NOW, 2, 3, true).action, 'skip');
-  const freshLease = [{ event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(0.5) }];
-  assert.equal(classifyIssue({ labels: lbl('fullstack:in-progress') }, freshLease, NOW, 2, 3, true).action, 'skip');
-});
-test('reassign still reclaims a stale lease (self-heal unchanged)', () => {
-  const staleLease = [{ event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(5) }];
-  assert.equal(classifyIssue({ labels: lbl('fullstack:in-progress') }, staleLease, NOW, 2, 3, true).action, 'reclaim');
+  assert.equal(classify({ labels: lbl('fullstack:pr-open') }, [], true).action, 'skip');
+  assert.equal(classify({ labels: lbl('fullstack:awaiting-human') }, [], true).action, 'skip');
+  const oldInProgressEvent = [{ event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: '2026-06-01T12:00:00Z' }];
+  assert.equal(classify({ labels: lbl('fullstack:in-progress') }, oldInProgressEvent, true).action, 'skip');
 });
 test('reassign off (default): go / needs-info still skip', () => {
-  assert.equal(classifyIssue({ labels: lbl('fullstack:go') }, [], NOW, 2, 3, false).action, 'skip');
-  assert.equal(classifyIssue({ labels: lbl('fullstack:needs-info') }, [], NOW, 2, 3, false).action, 'skip');
+  assert.equal(classify({ labels: lbl('fullstack:go') }).action, 'skip');
+  assert.equal(classify({ labels: lbl('fullstack:needs-info') }).action, 'skip');
 });
 
 // ---- fetch-candidates.truthyFlag (TRIAGE_ONLY / FULLSTACK_REASSIGN coercion) ----
@@ -360,7 +365,7 @@ test('parseBlockersComment: newest marker comment wins after a re-triage', () =>
 test('claim drops needs-approval: the self-resolved plan path skips notify-gate', () => {
   // draft-plan -> claim bypasses notify-gate, which is what normally swaps
   // needs-approval for awaiting-human. Leaving it on would keep the issue in
-  // select's pool once the PR lands and the lease is dropped.
+  // select's pool once the PR lands and ownership is dropped.
   assert.ok(CLAIM_DROP.includes('fullstack:needs-approval'));
   assert.ok(CLAIM_DROP.includes('fullstack:go'));
   assert.ok(CLAIM_DROP.includes('fullstack:awaiting-human'));
