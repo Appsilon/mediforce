@@ -133,6 +133,46 @@ describe('buildImageFromRepo', () => {
     expect(buildCmd).toMatch(/-f\s+\S*Dockerfile/);
   });
 
+  it('clones a public owner/repo ref over anonymous HTTPS without a deploy key (#1079)', async () => {
+    execSyncMock.mockReturnValue(Buffer.from(''));
+
+    await buildImageFromRepo({
+      image: 'test-image',
+      // repoUrl keeps the SSH-normalized form (cache-tag identity).
+      repoUrl: 'git@github.com:owner/repo.git',
+      // repoRef carries the user-supplied shorthand so the transport is decided from it.
+      repoRef: 'owner/repo',
+      commit: 'abc123',
+    });
+
+    const calls = execSyncMock.mock.calls;
+    const remoteAdd = calls.find(([cmd]) => String(cmd).includes('remote add origin'));
+    expect(remoteAdd).toBeDefined();
+    // Anonymous HTTPS — no token, no SSH.
+    expect(String(remoteAdd![0])).toContain('https://github.com/owner/repo');
+    expect(String(remoteAdd![0])).not.toContain('git@github.com');
+    // No GIT_SSH_COMMAND for an anonymous HTTPS clone — the deploy key is never referenced.
+    const env = remoteAdd![1].env as NodeJS.ProcessEnv;
+    expect(env.GIT_SSH_COMMAND).toBeUndefined();
+  });
+
+  it('clones a git@ ref over SSH and sets GIT_SSH_COMMAND (#1079)', async () => {
+    execSyncMock.mockReturnValue(Buffer.from(''));
+
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'git@github.com:owner/repo.git',
+      repoRef: 'git@github.com:owner/repo.git',
+      commit: 'abc123',
+    });
+
+    const calls = execSyncMock.mock.calls;
+    const remoteAdd = calls.find(([cmd]) => String(cmd).includes('remote add origin'));
+    expect(String(remoteAdd![0])).toContain('git@github.com:owner/repo.git');
+    const env = remoteAdd![1].env as NodeJS.ProcessEnv;
+    expect(env.GIT_SSH_COMMAND).toContain('ssh -i');
+  });
+
   it('cleans up temp dir even on build failure', async () => {
     let callCount = 0;
     execSyncMock.mockImplementation(() => {

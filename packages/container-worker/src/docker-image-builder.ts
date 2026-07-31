@@ -64,9 +64,61 @@ function toHttpsWithToken(sshUrl: string, token: string): string {
   return sshUrl.replace('https://', `https://x-access-token:${token}@`);
 }
 
+/** Normalize a repo reference to SSH clone URL and HTTPS browsable URL.
+ *  NOTE: Keep in sync with the exported copy in
+ *  `packages/agent-runtime/src/plugins/container-plugin.ts`. */
+function normalizeRepoUrls(repo: string): { gitUrl: string; httpsUrl: string } {
+  if (repo.startsWith('/') || repo.startsWith('.')) {
+    return { gitUrl: repo, httpsUrl: '' };
+  }
+  if (repo.startsWith('git@')) {
+    const match = repo.match(/git@github\.com:(.+?)(?:\.git)?$/);
+    const orgRepo = match ? match[1] : repo;
+    return { gitUrl: repo, httpsUrl: `https://github.com/${orgRepo}` };
+  }
+  if (repo.startsWith('https://')) {
+    const clean = repo.replace(/\.git$/, '');
+    const match = clean.match(/https:\/\/github\.com\/(.+)/);
+    const sshUrl = match ? `git@github.com:${match[1]}.git` : `${clean}.git`;
+    return { gitUrl: sshUrl, httpsUrl: clean };
+  }
+  return {
+    gitUrl: `git@github.com:${repo}.git`,
+    httpsUrl: `https://github.com/${repo}`,
+  };
+}
+
+/**
+ * Resolve the clone URL + transport for a repo reference, honouring the form
+ * the user supplied. NOTE: Keep in sync with the exported `resolveRepoCloneUrl`
+ * in `packages/agent-runtime/src/plugins/container-plugin.ts`.
+ *
+ *   - token present  → authenticated HTTPS (`x-access-token`)
+ *   - `git@…`        → SSH as given (needs deploy key + `GIT_SSH_COMMAND`)
+ *   - `https://…` / local path → HTTPS / local as given
+ *   - `owner/repo` shorthand   → anonymous HTTPS (github default)
+ */
+function resolveRepoCloneUrl(
+  repoRef: string,
+  repoToken?: string,
+): { cloneUrl: string; useSsh: boolean } {
+  if (repoToken) {
+    return { cloneUrl: toHttpsWithToken(normalizeRepoUrls(repoRef).gitUrl, repoToken), useSsh: false };
+  }
+  if (repoRef.startsWith('git@')) {
+    return { cloneUrl: repoRef, useSsh: true };
+  }
+  if (repoRef.startsWith('https://') || repoRef.startsWith('/') || repoRef.startsWith('.')) {
+    return { cloneUrl: repoRef, useSsh: false };
+  }
+  return { cloneUrl: normalizeRepoUrls(repoRef).httpsUrl, useSsh: false };
+}
+
 export async function buildImageFromRepo(options: {
   image: string;
   repoUrl: string;
+  /** Pre-normalization repo reference used to pick the clone transport. Defaults to `repoUrl`. */
+  repoRef?: string;
   commit: string;
   dockerfile?: string;
   repoToken?: string;
@@ -75,10 +127,12 @@ export async function buildImageFromRepo(options: {
   const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-build-'));
 
   try {
-    const cloneUrl = repoToken ? toHttpsWithToken(repoUrl, repoToken) : repoUrl;
+    const { cloneUrl, useSsh } = resolveRepoCloneUrl(options.repoRef ?? repoUrl, repoToken);
+    // SSH refs need a deploy key + GIT_SSH_COMMAND; HTTPS / local clones must not set it —
+    // a public repo cloned anonymously never references the deploy key.
     const execOpts = {
       stdio: 'pipe' as const,
-      env: { ...process.env, GIT_SSH_COMMAND: getGitSshCommand() },
+      env: useSsh ? { ...process.env, GIT_SSH_COMMAND: getGitSshCommand() } : { ...process.env },
     };
 
     execSync(`git init "${buildDir}"`, execOpts);
@@ -102,11 +156,12 @@ export async function buildImageFromRepo(options: {
 export async function ensureImage(options: {
   image: string;
   repoUrl?: string;
+  repoRef?: string;
   commit?: string;
   dockerfile?: string;
   repoToken?: string;
 }): Promise<void> {
-  const { image, repoUrl, commit, dockerfile, repoToken } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile, repoToken } = options;
 
   if (!repoUrl || !commit) {
     const exists = await imageExistsLocally(image);
@@ -126,5 +181,5 @@ export async function ensureImage(options: {
     console.log(`[docker-image-builder] Image "${image}" stale (${currentCommit?.slice(0, 8)} → ${commit.slice(0, 8)}), rebuilding`);
   }
 
-  await buildImageFromRepo({ image, repoUrl, commit, dockerfile, repoToken });
+  await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, repoToken });
 }

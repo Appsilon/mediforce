@@ -16,6 +16,9 @@ import { createLineStreamReader } from '@mediforce/platform-core';
 export interface ImageBuildMeta {
   image: string;
   repoUrl: string;
+  /** User-supplied repo reference (pre-normalization), used to pick the clone transport.
+   *  `repoUrl` stays the SSH-normalized form so it remains the cache-tag identity. */
+  repoRef: string;
   commit: string;
   dockerfile?: string;
   /** Resolved token for authenticated HTTPS clone. When absent, falls back to SSH deploy key. */
