@@ -9,7 +9,7 @@ import { execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { prepareDeployKeyPath, resolveRepoCloneUrl } from './container-plugin';
+import { cloneRepoAtCommit } from './git-clone';
 
 export interface BuildImageOptions {
   image: string;
@@ -34,10 +34,6 @@ const BUILD_COMMIT_LABEL = 'mediforce.build.commit';
 
 /** In-process mutex to avoid concurrent builds of the same image. */
 const buildLocks = new Map<string, Promise<void>>();
-
-function getGitSshCommand(): string {
-  return `ssh -i ${prepareDeployKeyPath()} -o StrictHostKeyChecking=no -o IdentitiesOnly=yes`;
-}
 
 export async function imageExistsLocally(image: string): Promise<boolean> {
   try {
@@ -65,19 +61,8 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
   const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-build-'));
 
   try {
-    const { cloneUrl, useSsh } = resolveRepoCloneUrl(options.repoRef ?? repoUrl, repoToken);
-    // SSH refs need a deploy key + GIT_SSH_COMMAND; HTTPS / local clones must not set it —
-    // a public repo cloned anonymously never references the deploy key.
-    const execOpts = {
-      stdio: 'pipe' as const,
-      env: useSsh ? { ...process.env, GIT_SSH_COMMAND: getGitSshCommand() } : { ...process.env },
-    };
-
     // Clone repo at specific commit (sparse — fetch only what we need)
-    execSync(`git init "${buildDir}"`, execOpts);
-    execSync(`git -C "${buildDir}" remote add origin "${cloneUrl}"`, execOpts);
-    execSync(`git -C "${buildDir}" fetch origin "${commit}" --depth 1`, execOpts);
-    execSync(`git -C "${buildDir}" checkout FETCH_HEAD`, execOpts);
+    cloneRepoAtCommit(buildDir, options.repoRef ?? repoUrl, commit, repoToken);
 
     // Build image — use the Dockerfile's directory as build context so COPY paths work naturally
     const dockerfilePath = join(buildDir, dockerfile);

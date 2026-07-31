@@ -32,10 +32,9 @@ afterEach(() => {
   delete process.env.DEPLOY_KEY_PATH;
 });
 
-function remoteAddCall(): Parameters<typeof execSync> {
-  const call = execSyncMock.mock.calls.find(([command]) => String(command).includes('remote add origin'));
-  if (!call) throw new Error('Expected a git remote-add call');
-  return call;
+/** git fetch invocations in call order — one per attempted clone transport. */
+function fetchCalls(): Parameters<typeof execSync>[] {
+  return execSyncMock.mock.calls.filter(([command]) => String(command).includes(' fetch '));
 }
 
 describe('container-worker buildImageFromRepo', () => {
@@ -47,7 +46,7 @@ describe('container-worker buildImageFromRepo', () => {
       commit: 'abc123',
     });
 
-    const [command, options] = remoteAddCall();
+    const [command, options] = fetchCalls()[0];
     expect(String(command)).toContain('https://github.com/owner/repo');
     expect(options?.env?.GIT_SSH_COMMAND).toBeUndefined();
   });
@@ -60,8 +59,30 @@ describe('container-worker buildImageFromRepo', () => {
       commit: 'abc123',
     });
 
-    const [command, options] = remoteAddCall();
+    const [command, options] = fetchCalls()[0];
     expect(String(command)).toContain('git@github.com:owner/repo.git');
+    expect(options?.env?.GIT_SSH_COMMAND).toContain('ssh -i');
+  });
+
+  it('falls back to the SSH deploy key when anonymous HTTPS cannot see a private owner/repo', async () => {
+    execSyncMock.mockImplementation((command) => {
+      if (String(command).includes('fetch "https://github.com/owner/private"')) {
+        throw new Error('remote: Repository not found');
+      }
+      return Buffer.from('');
+    });
+
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'git@github.com:owner/private.git',
+      repoRef: 'owner/private',
+      commit: 'abc123',
+    });
+
+    const fetches = fetchCalls();
+    expect(fetches).toHaveLength(2);
+    const [command, options] = fetches[1];
+    expect(String(command)).toContain('git@github.com:owner/private.git');
     expect(options?.env?.GIT_SSH_COMMAND).toContain('ssh -i');
   });
 

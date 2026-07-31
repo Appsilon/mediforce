@@ -52,68 +52,21 @@
  * `/output/result.json`. A rename is a breaking change across all those and
  * belongs in its own PR.
  */
-import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, cpSync, chmodSync, copyFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync } from 'node:fs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { tmpdir, homedir } from 'node:os';
+import { tmpdir } from 'node:os';
 import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
+import { normalizeRepoUrls } from '@mediforce/platform-core';
+import { cloneRepoAtCommit } from './git-clone';
 import { writeFile } from 'node:fs/promises';
 import type { GitMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env';
 import type { ImageBuildMeta } from './docker-spawn-strategy';
 import { WorkspaceManager, type RunWorkspaceHandle } from '../workspace/workspace-manager';
 import { copyOutputFilesIntoWorkspace } from '../workspace/output-files';
-
-let preparedDeployKeyPath: string | null = null;
-
-/**
- * Returns a deploy-key path that ssh will accept — copies the configured key
- * to a private tmp file with 0600 perms so host-side mount modes can't break us.
- *
- * NOTE: Keep in sync with the duplicated copy in
- * `packages/container-worker/src/docker-image-builder.ts` — container-worker cannot
- * import from agent-runtime without dragging in its whole dependency tree.
- */
-export function prepareDeployKeyPath(): string {
-  const source = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
-  if (!existsSync(source)) return source;
-  if (!statSync(source).isFile()) {
-    throw new Error(`Deploy key path "${source}" must point to a regular file.`);
-  }
-  if (preparedDeployKeyPath && existsSync(preparedDeployKeyPath) && statSync(preparedDeployKeyPath).isFile()) return preparedDeployKeyPath;
-  const dir = mkdtempSync(join(tmpdir(), 'mediforce-ssh-'));
-  const dest = join(dir, 'deploy_key');
-  copyFileSync(source, dest);
-  chmodSync(dest, 0o600);
-  preparedDeployKeyPath = dest;
-  return dest;
-}
-
-/** Normalize a repo reference to SSH clone URL and HTTPS browsable URL.
- *  Supports: "org/repo", "git@github.com:org/repo.git", "https://github.com/org/repo", "/path/to/bare.git" */
-export function normalizeRepoUrls(repo: string): { gitUrl: string; httpsUrl: string } {
-  if (repo.startsWith('/') || repo.startsWith('.')) {
-    return { gitUrl: repo, httpsUrl: '' };
-  }
-  if (repo.startsWith('git@')) {
-    const match = repo.match(/git@github\.com:(.+?)(?:\.git)?$/);
-    const orgRepo = match ? match[1] : repo;
-    return { gitUrl: repo, httpsUrl: `https://github.com/${orgRepo}` };
-  }
-  if (repo.startsWith('https://')) {
-    const clean = repo.replace(/\.git$/, '');
-    const match = clean.match(/https:\/\/github\.com\/(.+)/);
-    const sshUrl = match ? `git@github.com:${match[1]}.git` : `${clean}.git`;
-    return { gitUrl: sshUrl, httpsUrl: clean };
-  }
-  return {
-    gitUrl: `git@github.com:${repo}.git`,
-    httpsUrl: `https://github.com/${repo}`,
-  };
-}
 
 export function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext): ctx is WorkflowAgentContext {
   return 'step' in ctx && 'workflowDefinition' in ctx;
@@ -208,45 +161,6 @@ const SKILLS_CACHE_DIR = join(tmpdir(), 'mediforce-skills-cache');
 export function skillsCacheDir(repoUrl: string, commit: string, skillsDir: string): string {
   const hash = createHash('sha256').update(`${repoUrl}\0${commit}\0${skillsDir}`).digest('hex').slice(0, 16);
   return join(SKILLS_CACHE_DIR, hash);
-}
-
-/** Convert SSH git URL to HTTPS with token for authenticated clone. */
-export function toHttpsWithToken(sshUrl: string, token: string): string {
-  const match = sshUrl.match(/git@github\.com:(.+?)(?:\.git)?$/);
-  if (match) {
-    return `https://x-access-token:${token}@github.com/${match[1]}.git`;
-  }
-  return sshUrl.replace('https://', `https://x-access-token:${token}@`);
-}
-
-/**
- * Resolve the clone URL + transport for a repo reference, honouring the
- * form the user supplied: an `https://` URL clones over HTTPS, a `git@` URL
- * clones over SSH. We never silently convert one to the other.
- *
- * Shared by the skills-fetch and the image-build clone paths so they pick the
- * same transport for the same reference.
- *
- *   - token present  → authenticated HTTPS (`x-access-token`); a PAT only works
- *                      over HTTPS, mirroring the main-repo clone path
- *   - `git@…`        → SSH as given (needs deploy key + `GIT_SSH_COMMAND`)
- *   - `https://…` / local path → HTTPS / local as given
- *   - `owner/repo` shorthand   → anonymous HTTPS (github default)
- */
-export function resolveRepoCloneUrl(
-  repoRef: string,
-  repoToken?: string,
-): { cloneUrl: string; useSsh: boolean } {
-  if (repoToken) {
-    return { cloneUrl: toHttpsWithToken(normalizeRepoUrls(repoRef).gitUrl, repoToken), useSsh: false };
-  }
-  if (repoRef.startsWith('git@')) {
-    return { cloneUrl: repoRef, useSsh: true };
-  }
-  if (repoRef.startsWith('https://') || repoRef.startsWith('/') || repoRef.startsWith('.')) {
-    return { cloneUrl: repoRef, useSsh: false };
-  }
-  return { cloneUrl: normalizeRepoUrls(repoRef).httpsUrl, useSsh: false };
 }
 
 /**
@@ -471,19 +385,7 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
     const cloneDir = mkdtempSync(join(tmpdir(), 'mediforce-skills-clone-'));
 
     try {
-      const { cloneUrl, useSsh } = resolveRepoCloneUrl(repoRef, repoToken);
-      // SSH refs need a deploy key + GIT_SSH_COMMAND; HTTPS and local paths must not set it.
-      const execOpts = {
-        stdio: 'pipe' as const,
-        env: useSsh
-          ? { ...process.env, GIT_SSH_COMMAND: `ssh -i ${prepareDeployKeyPath()} -o StrictHostKeyChecking=no -o IdentitiesOnly=yes` }
-          : { ...process.env },
-      };
-
-      execSync(`git init "${cloneDir}"`, execOpts);
-      execSync(`git -C "${cloneDir}" remote add origin "${cloneUrl}"`, execOpts);
-      execSync(`git -C "${cloneDir}" fetch origin "${commit}" --depth 1`, execOpts);
-      execSync(`git -C "${cloneDir}" checkout FETCH_HEAD`, execOpts);
+      cloneRepoAtCommit(cloneDir, repoRef, commit, repoToken);
 
       const sourceDir = join(cloneDir, skillsDir);
       if (!existsSync(sourceDir)) {

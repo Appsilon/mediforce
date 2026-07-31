@@ -29,6 +29,11 @@ beforeEach(() => {
   rmMock.mockResolvedValue(undefined);
 });
 
+/** git fetch invocations in call order — one per attempted clone transport. */
+function fetchCalls(): Parameters<typeof execSync>[] {
+  return execSyncMock.mock.calls.filter(([command]) => String(command).includes(' fetch '));
+}
+
 describe('imageExistsLocally', () => {
   it('returns true when docker image inspect succeeds', async () => {
     execSyncMock.mockReturnValueOnce(Buffer.from(''));
@@ -84,10 +89,9 @@ describe('buildImageFromRepo', () => {
 
     const calls = execSyncMock.mock.calls.map(([cmd]) => String(cmd));
 
-    // Should init, add remote, fetch commit, checkout (uses git -C <dir> syntax)
+    // Should init, fetch the commit from the clone URL, checkout (uses git -C <dir> syntax)
     expect(calls.some((cmd) => cmd.includes('git init'))).toBe(true);
-    expect(calls.some((cmd) => cmd.includes('remote add origin'))).toBe(true);
-    expect(calls.some((cmd) => cmd.includes('fetch origin "abc123"'))).toBe(true);
+    expect(calls.some((cmd) => cmd.includes('fetch "/tmp/test-repo.git" "abc123"'))).toBe(true);
     expect(calls.some((cmd) => cmd.includes('checkout FETCH_HEAD'))).toBe(true);
 
     // Should docker build with label
@@ -145,17 +149,12 @@ describe('buildImageFromRepo', () => {
       commit: 'abc123',
     });
 
-    const calls = execSyncMock.mock.calls;
-    const remoteAdd = calls.find(([cmd]) => String(cmd).includes('remote add origin'));
-    expect(remoteAdd).toBeDefined();
-    if (!remoteAdd) throw new Error('Expected a git remote-add call');
-    const options = remoteAdd[1];
-    if (!options) throw new Error('Expected git remote-add options');
+    const [command, options] = fetchCalls()[0];
     // Anonymous HTTPS — no token, no SSH.
-    expect(String(remoteAdd[0])).toContain('https://github.com/owner/repo');
-    expect(String(remoteAdd[0])).not.toContain('git@github.com');
+    expect(String(command)).toContain('https://github.com/owner/repo');
+    expect(String(command)).not.toContain('git@github.com');
     // No GIT_SSH_COMMAND for an anonymous HTTPS clone — the deploy key is never referenced.
-    expect(options.env?.GIT_SSH_COMMAND).toBeUndefined();
+    expect(options?.env?.GIT_SSH_COMMAND).toBeUndefined();
   });
 
   it('clones a git@ ref over SSH and sets GIT_SSH_COMMAND', async () => {
@@ -168,21 +167,37 @@ describe('buildImageFromRepo', () => {
       commit: 'abc123',
     });
 
-    const calls = execSyncMock.mock.calls;
-    const remoteAdd = calls.find(([cmd]) => String(cmd).includes('remote add origin'));
-    if (!remoteAdd) throw new Error('Expected a git remote-add call');
-    const options = remoteAdd[1];
-    if (!options) throw new Error('Expected git remote-add options');
-    expect(String(remoteAdd[0])).toContain('git@github.com:owner/repo.git');
-    expect(options.env?.GIT_SSH_COMMAND).toContain('ssh -i');
+    const [command, options] = fetchCalls()[0];
+    expect(String(command)).toContain('git@github.com:owner/repo.git');
+    expect(options?.env?.GIT_SSH_COMMAND).toContain('ssh -i');
+  });
+
+  it('falls back to the SSH deploy key when anonymous HTTPS cannot see a private owner/repo', async () => {
+    execSyncMock.mockImplementation((command) => {
+      if (String(command).includes('fetch "https://github.com/owner/private"')) {
+        throw new Error('remote: Repository not found');
+      }
+      return Buffer.from('');
+    });
+
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'git@github.com:owner/private.git',
+      repoRef: 'owner/private',
+      commit: 'abc123',
+    });
+
+    const fetches = fetchCalls();
+    expect(fetches).toHaveLength(2);
+    const [command, options] = fetches[1];
+    expect(String(command)).toContain('git@github.com:owner/private.git');
+    expect(options?.env?.GIT_SSH_COMMAND).toContain('ssh -i');
   });
 
   it('cleans up temp dir even on build failure', async () => {
-    let callCount = 0;
-    execSyncMock.mockImplementation(() => {
-      callCount++;
+    execSyncMock.mockImplementation((command) => {
       // Fail on docker build (after git commands succeed)
-      if (callCount >= 5) throw new Error('docker build failed');
+      if (String(command).includes('docker build')) throw new Error('docker build failed');
       return Buffer.from('');
     });
 

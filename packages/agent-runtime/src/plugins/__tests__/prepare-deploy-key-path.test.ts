@@ -13,7 +13,7 @@ function makeTmpDir(): string {
 
 async function importFresh() {
   vi.resetModules();
-  return import('../container-plugin');
+  return import('../git-clone');
 }
 
 beforeEach(() => {
