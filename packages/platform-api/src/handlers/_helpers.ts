@@ -5,9 +5,9 @@ import type { CallerScope } from '../repositories/index';
 /**
  * Resolve the deployment's configured public base URL from platform settings,
  * or `undefined` when unset. Notification adapters use this to override their
- * construction-time `NEXT_PUBLIC_PLATFORM_URL`/localhost fallback so invite
- * links point at the real host. A trailing slash is stripped so callers can
- * safely append `/login` etc.
+ * construction-time `APP_BASE_URL`/`NEXT_PUBLIC_APP_URL`/localhost fallback so
+ * invite links point at the real host. A trailing slash is stripped so callers
+ * can safely append `/login` etc.
  */
 export async function resolveConfiguredBaseUrl(
   scope: CallerScope,

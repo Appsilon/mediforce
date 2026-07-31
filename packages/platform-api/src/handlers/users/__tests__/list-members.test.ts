@@ -72,6 +72,13 @@ describe('listNamespaceMembers handler', () => {
     const result = await listNamespaceMembers({ namespace: 'alpha' }, scope);
 
     expect(result.members).toHaveLength(2);
+    // Manager fields are gated: a plain member sees no email / lastSignInTime.
+    for (const member of result.members) {
+      expect(member.email).toBeNull();
+      expect(member.lastSignInTime).toBeNull();
+    }
+    // Roster (uid/role/displayName) stays visible.
+    expect(result.members[0]).toMatchObject({ uid: 'uid-owner', role: 'owner', displayName: 'Alpha Owner' });
   });
 
   it('returns the list for an owner of the namespace', async () => {
@@ -88,6 +95,11 @@ describe('listNamespaceMembers handler', () => {
     const result = await listNamespaceMembers({ namespace: 'alpha' }, scope);
 
     expect(result.members.map((m) => m.uid)).toEqual(['uid-owner', 'uid-member']);
+    // Owner is privileged: real email + lastSignInTime come through.
+    expect(result.members[0]).toMatchObject({
+      email: 'owner@alpha.test',
+      lastSignInTime: '2026-05-01T10:00:00.000Z',
+    });
   });
 
   it('throws NotFoundError (anti-enum) when caller is not a namespace member', async () => {

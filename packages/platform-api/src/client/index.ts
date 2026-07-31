@@ -102,6 +102,8 @@ import {
   GetProcessOutputSchema,
   ListAuditEventsInputSchema,
   ListAuditEventsOutputSchema,
+  ListNamespaceAuditEventsInputSchema,
+  ListNamespaceAuditEventsOutputSchema,
   ListAgentEventsInputSchema,
   ListAgentEventsOutputSchema,
   GetProcessStepsInputSchema,
@@ -123,6 +125,8 @@ import {
   ListPluginsOutputSchema,
   ClaimTaskInputSchema,
   ClaimTaskOutputSchema,
+  RecordTaskViewedInputSchema,
+  RecordTaskViewedOutputSchema,
   CompleteTaskInputSchema,
   CompleteTaskOutputSchema,
   ListAttachmentsInputSchema,
@@ -251,6 +255,8 @@ import {
   type GetTaskOutput,
   type ClaimTaskInput,
   type ClaimTaskOutput,
+  type RecordTaskViewedInput,
+  type RecordTaskViewedOutput,
   type CompleteTaskInput,
   type CompleteTaskOutput,
   type RegisterWorkflowBody,
@@ -370,6 +376,8 @@ import {
   type GetProcessOutput,
   type ListAuditEventsInput,
   type ListAuditEventsOutput,
+  type ListNamespaceAuditEventsInput,
+  type ListNamespaceAuditEventsOutput,
   type ListAgentEventsInput,
   type ListAgentEventsOutput,
   type GetProcessStepsInput,
@@ -517,6 +525,7 @@ export class Mediforce {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
     get: (input: GetTaskInput) => Promise<GetTaskOutput>;
     claim: (input: ClaimTaskInput) => Promise<ClaimTaskOutput>;
+    recordViewed: (input: RecordTaskViewedInput) => Promise<RecordTaskViewedOutput>;
     complete: (input: CompleteTaskInput) => Promise<CompleteTaskOutput>;
     attachments: {
       list: (input: ListAttachmentsInput) => Promise<ListAttachmentsOutput>;
@@ -543,6 +552,9 @@ export class Mediforce {
   readonly processes: {
     get: (input: GetProcessInput) => Promise<GetProcessOutput>;
     listAuditEvents: (input: ListAuditEventsInput) => Promise<ListAuditEventsOutput>;
+    listNamespaceAuditEvents: (
+      input: ListNamespaceAuditEventsInput,
+    ) => Promise<ListNamespaceAuditEventsOutput>;
     agentEvents: (input: ListAgentEventsInput) => Promise<ListAgentEventsOutput>;
     getSteps: (input: GetProcessStepsInput) => Promise<GetProcessStepsOutput>;
   };
@@ -775,6 +787,7 @@ export class Mediforce {
           role: validated.role,
           stepId: validated.stepId,
           status: validated.status,
+          namespace: validated.namespace,
         });
         const res = await this.request(`/api/tasks${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.list');
@@ -796,6 +809,16 @@ export class Mediforce {
           undefined,
           ClaimTaskOutputSchema,
           'mediforce.tasks.claim',
+        );
+      },
+      recordViewed: async (input) => {
+        const validated = RecordTaskViewedInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/tasks/${encodeURIComponent(validated.taskId)}/viewed`,
+          undefined,
+          RecordTaskViewedOutputSchema,
+          'mediforce.tasks.recordViewed',
         );
       },
       complete: async (input) => {
@@ -871,6 +894,16 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.processes.listAuditEvents');
         return ListAuditEventsOutputSchema.parse(body);
+      },
+      listNamespaceAuditEvents: async (input) => {
+        const validated = ListNamespaceAuditEventsInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          limit: validated.limit !== undefined ? String(validated.limit) : undefined,
+        });
+        const res = await this.request(`/api/audit-events${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.processes.listNamespaceAuditEvents');
+        return ListNamespaceAuditEventsOutputSchema.parse(body);
       },
       agentEvents: async (input) => {
         const validated = ListAgentEventsInputSchema.parse(input);

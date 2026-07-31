@@ -5,8 +5,8 @@ import type { ResendInviteInput, ResendInviteOutput } from '../../contract/users
 import { actorFromCaller, resolveConfiguredBaseUrl } from '../_helpers';
 
 /**
- * Re-send the workspace-notification email for a pending workspace member
- * (seed-based model, PLAN-0002 §3.1).
+ * Re-send a fresh activation email for a pending workspace member — the
+ * expired-invite recovery path (seed-based model, PLAN-0002 §3.1).
  *
  *   1. Caller must be `owner`/`admin` of `namespaceHandle` (apiKey bypass).
  *   2. Look up the target user's email via
@@ -14,9 +14,9 @@ import { actorFromCaller, resolveConfiguredBaseUrl } from '../_helpers';
  *   3. Refuse if the invite isn't pending anymore — `isInvitePending` returns
  *      `false` once the invitee has a session or has set a password. This guard
  *      stops an admin from re-notifying a colleague who is already active.
- *   4. Re-send the workspace-notification email (best-effort) via
- *      `scope.system.inviteNotificationService.sendWorkspaceNotificationEmail`.
- *      There is no temp password to rotate in the seed-based model. Email
+ *   4. Re-arm the create-password gate (`setMustChangePassword`) and send a
+ *      fresh activation email with a new one-time 7-day sign-in link
+ *      (best-effort) via `scope.system.inviteNotificationService`. Email
  *      failures don't fail the response — `emailSent` flips to `false`.
  *   5. Append `invitation.resent` to the audit log.
  *
@@ -46,6 +46,10 @@ export async function resendInvite(
     );
   }
 
+  // Re-arm the create-password gate — cheap insurance the flag is set even for
+  // a pending row seeded before the gate existed.
+  await scope.userProfiles.setMustChangePassword(input.uid, true);
+
   let emailSent = false;
   const notify = scope.system.inviteNotificationService;
   if (notify !== null) {
@@ -53,7 +57,7 @@ export async function resendInvite(
       const baseUrl = await resolveConfiguredBaseUrl(scope);
       const namespace = await scope.workspaces.getNamespace(input.namespaceHandle);
       const workspaceName = namespace?.displayName ?? input.namespaceHandle;
-      await notify.sendWorkspaceNotificationEmail({
+      await notify.sendActivationEmail({
         toEmail: email,
         inviterName: workspaceName,
         workspaceName,

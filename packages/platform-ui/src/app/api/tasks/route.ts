@@ -13,6 +13,7 @@ import {
  *   - `role`       — narrow to an assigned role
  *   - `stepId`     — optional filter within the chosen base set
  *   - `status`     — repeatable; e.g. `?status=pending&status=claimed`
+ *   - `namespace`  — narrows the `role` / caller-scope axes to one workspace
  *   - (none)       — caller-scope axis: returns every task whose parent run
  *                    belongs to a workspace the caller is a member of
  *                    (system actors see every task)
@@ -31,6 +32,7 @@ export const GET = createRouteAdapter<typeof ListTasksInputSchema, ListTasksInpu
       role: params.get('role') ?? undefined,
       stepId: params.get('stepId') ?? undefined,
       status: statuses.length > 0 ? statuses : undefined,
+      namespace: params.get('namespace') ?? undefined,
     };
   },
   listTasks,

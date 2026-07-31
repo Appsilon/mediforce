@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   InMemoryAuditRepository,
   InMemoryPlatformSettingsRepository,
+  InMemoryUserProfileRepository,
 } from '@mediforce/platform-core/testing';
 import { resendInvite } from '../resend-invite';
 import {
@@ -16,6 +17,7 @@ import {
 import type {
   InviteNotificationService,
   InviteService,
+  SendActivationEmailInput,
   SendWorkspaceNotificationEmailInput,
 } from '../../../services/invite-notification';
 
@@ -34,12 +36,18 @@ function inviteServiceStub(stub: InviteServiceStub): InviteService {
 
 function recordingNotifier(): InviteNotificationService & {
   sendWorkspaceCalls: SendWorkspaceNotificationEmailInput[];
+  sendActivationCalls: SendActivationEmailInput[];
 } {
   const sendWorkspaceCalls: SendWorkspaceNotificationEmailInput[] = [];
+  const sendActivationCalls: SendActivationEmailInput[] = [];
   return {
     sendWorkspaceCalls,
+    sendActivationCalls,
     async sendWorkspaceNotificationEmail(input) {
       sendWorkspaceCalls.push(input);
+    },
+    async sendActivationEmail(input) {
+      sendActivationCalls.push(input);
     },
   };
 }
@@ -59,16 +67,18 @@ describe('resendInvite handler', () => {
     auditRepo = new InMemoryAuditRepository();
   });
 
-  it('re-sends the workspace-notification email and audits for an apiKey caller', async () => {
+  it('re-sends a fresh activation email, re-arms the gate, and audits for an apiKey caller', async () => {
     const inviteService = inviteServiceStub({
       email: 'pending@example.test',
       pending: true,
     });
     const notifier = recordingNotifier();
+    const userProfileRepo = new InMemoryUserProfileRepository();
     const scope = createTestScope({
       auditRepo,
       inviteService,
       inviteNotificationService: notifier,
+      userProfileRepo,
     });
 
     const result = await resendInvite(baseInput, scope);
@@ -79,7 +89,8 @@ describe('resendInvite handler', () => {
       emailSent: true,
     });
     expect(inviteService.isInvitePending).toHaveBeenCalledWith('uid-target');
-    expect(notifier.sendWorkspaceCalls).toEqual([
+    expect((await userProfileRepo.getProfile('uid-target'))?.mustChangePassword).toBe(true);
+    expect(notifier.sendActivationCalls).toEqual([
       {
         toEmail: 'pending@example.test',
         inviterName: 'alpha',
@@ -87,9 +98,10 @@ describe('resendInvite handler', () => {
         workspaceHandle: 'alpha',
       },
     ]);
+    expect(notifier.sendWorkspaceCalls).toHaveLength(0);
   });
 
-  it('passes the configured platform.baseUrl through to the resent workspace-notification email', async () => {
+  it('passes the configured platform.baseUrl through to the resent activation email', async () => {
     const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
     await platformSettingsRepo.set('platform.baseUrl', 'https://phuse.mediforce.ai');
     const inviteService = inviteServiceStub({
@@ -106,7 +118,7 @@ describe('resendInvite handler', () => {
 
     await resendInvite(baseInput, scope);
 
-    expect(notifier.sendWorkspaceCalls).toEqual([
+    expect(notifier.sendActivationCalls).toEqual([
       {
         toEmail: 'pending@example.test',
         inviterName: 'alpha',
@@ -189,6 +201,7 @@ describe('resendInvite handler', () => {
     await expect(resendInvite(baseInput, scope)).rejects.toBeInstanceOf(
       PreconditionFailedError,
     );
+    expect(notifier.sendActivationCalls).toHaveLength(0);
     expect(notifier.sendWorkspaceCalls).toHaveLength(0);
   });
 
@@ -199,6 +212,9 @@ describe('resendInvite handler', () => {
     });
     const notifier: InviteNotificationService = {
       async sendWorkspaceNotificationEmail() {
+        throw new Error('mailgun down');
+      },
+      async sendActivationEmail() {
         throw new Error('mailgun down');
       },
     };
@@ -216,21 +232,24 @@ describe('resendInvite handler', () => {
     consoleError.mockRestore();
   });
 
-  it('returns emailSent=false when inviteNotificationService is null', async () => {
+  it('re-arms the gate even when inviteNotificationService is null', async () => {
     const inviteService = inviteServiceStub({
       email: 'pending@example.test',
       pending: true,
     });
+    const userProfileRepo = new InMemoryUserProfileRepository();
     const scope = createTestScope({
       auditRepo,
       inviteService,
       inviteNotificationService: null,
+      userProfileRepo,
     });
 
     const result = await resendInvite(baseInput, scope);
 
     expect(result.emailSent).toBe(false);
     expect(result.email).toBe('pending@example.test');
+    expect((await userProfileRepo.getProfile('uid-target'))?.mustChangePassword).toBe(true);
   });
 
   it('writes an invitation.resent audit event attributed to the caller', async () => {

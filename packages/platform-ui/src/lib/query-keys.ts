@@ -27,6 +27,9 @@ export const queryKeys = {
     /** All tasks for a role, optionally narrowed by status. */
     byRole: (role: string, filters?: { status?: HumanTaskStatus[] }) =>
       ['tasks', { role, ...filters }] as const,
+    /** Every task in a workspace, optionally narrowed by status. */
+    byNamespace: (namespace: string, filters?: { status?: HumanTaskStatus[] }) =>
+      ['tasks', { namespace, ...filters }] as const,
     /** Caller-scope axis: every task visible to the caller across roles + instances. */
     forCaller: (filters?: { status?: HumanTaskStatus[] }) =>
       ['tasks', { caller: 'me', ...filters }] as const,
@@ -118,4 +121,10 @@ export const queryKeys = {
     /** Per-workspace dashboard summary. */
     summary: (handle: string) => ['monitoring', handle] as const,
   },
+  /** Platform-wide model registry list (not workspace-scoped). */
+  modelRegistry: {
+    list: () => ['model-registry'] as const,
+  },
+  /** Workspace-wide audit trail (Monitoring → Users tab). */
+  namespaceAuditEvents: (handle: string) => ['namespace-audit-events', handle] as const,
 } as const;

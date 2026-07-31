@@ -8,6 +8,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PostgresInviteService } from '../../auth/postgres-invite-service';
 import { authUsers } from '../schema/auth-user';
+import { authAccounts } from '../schema/auth-account';
+import { authSessions } from '../schema/auth-session';
 import { userRoles } from '../schema/user-role';
 import { workspaces, workspaceMembers } from '../schema/workspace';
 import * as schema from '../schema/index';
@@ -163,5 +165,81 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
     });
     expect(await service.getUserEmail(uid)).toBe('lookup@acme.com');
     expect(await service.getUserEmail('nope')).toBeNull();
+  });
+
+  describe('isInvitePending', () => {
+    it('is pending for a freshly seeded user (no session, no oauth, no password)', async () => {
+      const { uid } = await service.seedInvite({
+        email: 'fresh@acme.com',
+        workspaceHandle: 'acme',
+        membership: 'member',
+      });
+      expect(await service.isInvitePending(uid)).toBe(true);
+    });
+
+    it('is NOT pending for an OAuth-only user (linked auth_accounts row, no password)', async () => {
+      const { uid } = await service.seedInvite({
+        email: 'google@acme.com',
+        workspaceHandle: 'acme',
+        membership: 'member',
+      });
+      await db.insert(authAccounts).values({
+        userId: uid,
+        type: 'oidc',
+        provider: 'google',
+        providerAccountId: 'google-sub-123',
+      });
+      expect(await service.isInvitePending(uid)).toBe(false);
+    });
+
+    it('is NOT pending for a user with an active session', async () => {
+      const { uid } = await service.seedInvite({
+        email: 'session@acme.com',
+        workspaceHandle: 'acme',
+        membership: 'member',
+      });
+      await db.insert(authSessions).values({
+        sessionToken: 'tok-abc',
+        userId: uid,
+        expires: new Date(Date.now() + 60_000),
+      });
+      expect(await service.isInvitePending(uid)).toBe(false);
+    });
+
+    it('is NOT pending for a user who set a password', async () => {
+      const { uid } = await service.seedInvite({
+        email: 'pwd@acme.com',
+        workspaceHandle: 'acme',
+        membership: 'member',
+      });
+      await db
+        .update(authUsers)
+        .set({ passwordHash: 'bcrypt-hash' })
+        .where(eq(authUsers.id, uid));
+      expect(await service.isInvitePending(uid)).toBe(false);
+    });
+
+    it('is NOT pending for a user with BOTH a password hash and an oauth account', async () => {
+      const { uid } = await service.seedInvite({
+        email: 'both@acme.com',
+        workspaceHandle: 'acme',
+        membership: 'member',
+      });
+      await db.insert(authAccounts).values({
+        userId: uid,
+        type: 'oidc',
+        provider: 'google',
+        providerAccountId: 'google-sub-both',
+      });
+      await db
+        .update(authUsers)
+        .set({ passwordHash: 'bcrypt-hash' })
+        .where(eq(authUsers.id, uid));
+      expect(await service.isInvitePending(uid)).toBe(false);
+    });
+
+    it('is NOT pending for an unknown uid', async () => {
+      expect(await service.isInvitePending('does-not-exist')).toBe(false);
+    });
   });
 });

@@ -17,6 +17,7 @@ import { UserProfileLink } from '@/components/user-profile-link';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
+import { mediforce } from '@/lib/mediforce';
 
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
@@ -58,6 +59,17 @@ export function HumanStepView({
 
   const { data: remainingTasks } = useMyActionableTasksByRole(task.assignedRole);
   const remainingTaskCount = remainingTasks.filter((t) => t.id !== task.id).length;
+
+  // Fire-and-forget `task.viewed` audit event, once per task shown — not on
+  // every re-render (e.g. polling). Failures (e.g. non-user callers, which
+  // shouldn't happen from this browser view) are swallowed since this is
+  // best-effort telemetry, not a user-facing action.
+  const recordedViewFor = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (recordedViewFor.current === task.id) return;
+    recordedViewFor.current = task.id;
+    void mediforce.tasks.recordViewed({ taskId: task.id }).catch(() => {});
+  }, [task.id]);
 
   const bodyEntry = resolveTaskBody(task);
   const BodyComponent = bodyEntry.Component;
