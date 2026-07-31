@@ -2,8 +2,9 @@
 // Run: node tests/run_tests.mjs   (no secrets/network needed — pure functions only)
 import assert from 'node:assert/strict';
 import { classifyIssue, summariseLabelEvents, truthyFlag } from '../scripts/fetch-candidates.mjs';
-import { reconcile, closeReason } from '../scripts/apply-verdicts.mjs';
-import { rankCandidates, priorityOf, isActionable } from '../scripts/select.mjs';
+import { reconcile, closeReason, blockersComment } from '../scripts/apply-verdicts.mjs';
+import { rankCandidates, priorityOf, isActionable, parseBlockersComment } from '../scripts/select.mjs';
+import { DROP as CLAIM_DROP } from '../scripts/claim.mjs';
 import { labelsToStrip } from '../scripts/reset-labels.mjs';
 import { resolveReviewer, buildGateComment } from '../scripts/notify-gate.mjs';
 import { reviewOutcome, buildPrBody } from '../scripts/publish.mjs';
@@ -317,6 +318,52 @@ test('buildFailedBody: appends history + failing-check summary, idempotent', () 
   assert.ok(body.includes('typecheck'));
   assert.ok(body.includes('exhausted after 3 rounds'));
   assert.equal(buildFailedBody(body, ['round 1: tried'], failing, 'exhausted after 3 rounds'), body);
+});
+
+// ---- triage blockers: apply-verdicts writes them, select reads them back ----
+// The two scripts are embedded standalone, so the marker literal is duplicated;
+// these round-trips are what keep the writer and the reader in sync.
+const BLOCKERS = [
+  { question: 'Should the banner be dismissible?', kind: 'decision' },
+  { question: 'Which handler owns namespace filtering?', kind: 'missing-context' },
+];
+test('blockers round-trip: comment written by apply-verdicts parses back in select', () => {
+  const comments = [{ body: blockersComment(BLOCKERS) }];
+  assert.deepEqual(parseBlockersComment(comments), BLOCKERS);
+});
+test('blockers comment stays human-readable (question + kind visible)', () => {
+  const body = blockersComment(BLOCKERS);
+  assert.ok(body.includes('Should the banner be dismissible?'));
+  assert.ok(body.includes('`decision`'));
+  assert.ok(body.includes('`missing-context`'));
+});
+test('blockers: empty and undefined lists round-trip as []', () => {
+  assert.deepEqual(parseBlockersComment([{ body: blockersComment([]) }]), []);
+  assert.deepEqual(parseBlockersComment([{ body: blockersComment(undefined) }]), []);
+});
+test('parseBlockersComment: no marker comment → [] (issue triaged before blockers existed)', () => {
+  assert.deepEqual(parseBlockersComment([{ body: 'just a human comment' }]), []);
+  assert.deepEqual(parseBlockersComment([]), []);
+  assert.deepEqual(parseBlockersComment(undefined), []);
+});
+test('parseBlockersComment: hand-mangled payload → [] rather than throwing', () => {
+  assert.deepEqual(parseBlockersComment([{ body: '<!-- fullstack:blockers {oops -->' }]), []);
+  assert.deepEqual(parseBlockersComment([{ body: '<!-- fullstack:blockers {"a":1} -->' }]), []);
+});
+test('parseBlockersComment: newest marker comment wins after a re-triage', () => {
+  const stale = [{ question: 'stale', kind: 'scope' }];
+  const comments = [{ body: blockersComment(stale) }, { body: blockersComment(BLOCKERS) }];
+  assert.deepEqual(parseBlockersComment(comments), BLOCKERS);
+});
+
+// ---- claim drops every label that would leave the issue selectable ----
+test('claim drops needs-approval: the self-resolved plan path skips notify-gate', () => {
+  // draft-plan -> claim bypasses notify-gate, which is what normally swaps
+  // needs-approval for awaiting-human. Leaving it on would keep the issue in
+  // select's pool once the PR lands and the lease is dropped.
+  assert.ok(CLAIM_DROP.includes('fullstack:needs-approval'));
+  assert.ok(CLAIM_DROP.includes('fullstack:go'));
+  assert.ok(CLAIM_DROP.includes('fullstack:awaiting-human'));
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

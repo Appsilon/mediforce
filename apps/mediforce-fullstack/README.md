@@ -4,11 +4,12 @@ An autonomous **issue → PR** agent for `Appsilon/mediforce`. On a 15-minute cr
 it triages open issues **once** — cloning `main` and verifying each issue against
 the actual code, then persisting the verdict as `fullstack:` labels and
 **auto-closing the ones it proves obsolete** (already fixed, or targeting a
-removed/migrated subsystem). It implements the confident ones as ready-for-review
-PRs, gates the ambiguous ones for a human, self-reviews with a bounded revise
-loop, then **watches CI on the PR and auto-fixes red checks** (bounded, handing
-persistent failures to a human). Idempotent and self-healing via labels and a
-2-hour lease.
+removed/migrated subsystem). It implements them as ready-for-review PRs,
+**researching its own open questions against the code and docs** and escalating
+to a human only for genuine product/policy decisions, self-reviews with a bounded
+revise loop, then **watches CI on the PR and auto-fixes red checks** (bounded,
+handing persistent failures to a human). Idempotent and self-healing via labels
+and a 2-hour lease.
 
 ## Pipeline (22 steps)
 
@@ -17,8 +18,9 @@ fetch-candidates ─┬─ triage ──── apply-verdicts ──── selec
  (list + partition,│  (clone main,  (write labels;    (pick,   │                                     │
   cap batch,       │   verify +      close obsolete   determin- │                                     │
   reclaim leases,  │   classify once)  cc author)      istic)   │                                     │
-  attemptCount)    └─ (nothing new) ───────────────── select ─┴─ (needs-approval) draft-plan ─ notify-gate ─ clarify-approve(human)
-                                                             └─ (nothing) done-empty                  approve ┘   reject → mark-needs-info
+  attemptCount)    └─ (nothing new) ───────────────── select ─┴─ (needs-approval) draft-plan ─┬─ (needsHuman=false) claim ─┘
+                                                             └─ (nothing) done-empty          └─ (true) notify-gate ─ clarify-approve(human)
+                                                                                                        approve ┘   reject → mark-needs-info
 
 implement ─┬─ changed        → self-review ⇄ revise (≤2)  → publish ─┐
            ├─ already-fixed  → mark-fixed (comment + close) → done    │
@@ -41,14 +43,61 @@ Only `triage`, `draft-plan`, `implement`, `self-review`, `revise`, and
 `fix-after-tests` are LLM agents. Everything else is deterministic script/action
 — no MCP, no `agentId`, no external Agent Definition to configure.
 
+### Who owns the open questions
+
+The gate exists for decisions **the codebase cannot answer**, not for the agent's
+uncertainty about how the code works. That split is enforced in two places:
+
+- `triage` may only emit `needs-approval` with at least one `blocker` of
+  `kind: "decision"` — a product/policy call, a user-visible behaviour or public
+  API choice with no precedent, an irreversible change, or a cross-package
+  architectural direction. Blockers of kind `missing-context` (a code/doc fact
+  triage did not have time to establish) and `scope` (several viable approaches)
+  do **not** justify a gate on their own. When torn, triage reads more code
+  rather than escalating: a wrong `go` costs one implement pass, a wrong
+  `needs-approval` stalls the issue indefinitely — `awaiting-human` has no expiry.
+- `draft-plan` then **clones `main` and works that blocker list**, resolving the
+  `missing-context` and `scope` ones against the code, `docs/adr/`, `CHANGELOG.md`
+  and `git log`. It emits `needsHuman: false` when only its own research was
+  needed — routing straight to `claim → implement` with its `resolvedAnswers`
+  carried into the `implement` prompt — and `needsHuman: true` only when a real
+  `decision` survives.
+
+The transition tests `output.needsHuman == false`, not `!= true`, so a malformed
+or missing value falls back to the human gate rather than to autonomous code
+changes. The eager path requires the agent to say `false` explicitly.
+
+Blockers are persisted by `apply-verdicts` as an updatable marker comment
+(`<!-- fullstack:blockers […] -->`) on the issue, and recovered by `select` — an
+issue is normally selected several ticks after it was triaged, long after
+triage's step output is gone. An issue labelled before blockers existed simply
+yields `[]`, and `draft-plan` derives its own list from the issue text.
+
+Every agent step also emits `confidence` + `confidence_rationale` into
+`/output/result.json`. The runtime lifts them onto the envelope and strips them
+from the step output, so they show up per-step in the run UI without reaching any
+transition. **`agent.confidenceThreshold` is deliberately left unset**: below the
+threshold the runtime hands off to `FallbackHandler`, whose three behaviours all
+escalate/pause the *run* rather than route it — that would strand the issue on
+`fullstack:in-progress` until the 2h lease expires, silently (the platform does
+not dispatch `task_assigned`). `needsHuman` is the router; confidence is
+observability.
+
+Every agent prompt also states its own completion criteria. A configured timeout
+is a hard ceiling, never a time quota: agents finish as soon as their output
+contract has the evidence required for that step, and deepen their work only to
+close a known correctness gap or material risk. This stays prompt-owned for now;
+the deferred platform-level `completionCriteria` field is tracked in
+[#1119](https://github.com/Appsilon/mediforce/issues/1119).
+
 ## Label state machine (`fullstack:` namespace)
 
 GitHub auto-creates these on first use; no pre-setup required.
 
 | Label | Meaning | Set by |
 |-------|---------|--------|
-| `fullstack:go` | Confident → auto-implement (agent verdict **or** human override) | `apply-verdicts` / a human |
-| `fullstack:needs-approval` | Doable, needs human sign-off first | `apply-verdicts` |
+| `fullstack:go` | Every open question answerable from the repo → auto-implement (agent verdict **or** human override) | `apply-verdicts` / a human |
+| `fullstack:needs-approval` | Carries at least one `decision`-kind blocker → route through `draft-plan`, which resolves what it can and gates only the residue | `apply-verdicts` |
 | `fullstack:manual` | Not automatable; needs a human | `apply-verdicts` |
 | `fullstack:obsolete` | Proven no longer applicable → labelled **and closed** (reversibly, cc the author) | `apply-verdicts` |
 | `fullstack:prio-high/med/low` | Selection order (on go / needs-approval) | `apply-verdicts` |
@@ -200,11 +249,11 @@ Being in the map == has a Mediforce account and is an eligible approver.
 ## Output contracts (per step)
 
 - `fetch-candidates` → `{ unclassifiedCount, unclassified[]:{number,title,body,url,author,attemptCount,poison,createdAt,updatedAt} }`
-- `triage` (agent) → `{ verdicts[]:{issueNumber,suitability:go|needs-approval|manual,priority:high|med|low,reason} }`
-- `apply-verdicts` → `{ applied, results[] }`
-- `select` → `{ selected, issueNumber, suitability, priority, title, body, url, author }`
+- `triage` (agent) → `{ verdicts[]:{issueNumber,suitability:go|needs-approval|manual|obsolete,priority:high|med|low,evidence?,category?,blockers[]:{question,kind:decision|missing-context|scope},reason} }`
+- `apply-verdicts` → `{ applied, closed, results[], triageOnly }`
+- `select` → `{ selected, issueNumber, suitability, priority, title, body, url, author, blockers[] }`
 - `claim` → `{ issueNumber, claimed }`
-- `draft-plan` (agent) → `{ issueNumber, planSummary, questions[] }`
+- `draft-plan` (agent) → `{ issueNumber, needsHuman, planSummary, resolvedAnswers[]:{question,answer,evidence}, questions[] }`
 - `notify-gate` → `{ issueNumber, reviewerId, reviewerIsCreator, creatorLogin, commented }`
 - `implement` (agent) → `{ issueNumber, changed, branch, baseBranch, prTitle, prBody, summary, testsNote, reason?, evidence? }`
 - `self-review` (agent) → `{ issueNumber, verdict:ship|flag|revise, concerns[] }`
@@ -224,7 +273,7 @@ correct JSON escaping) by the assembler:
 
 ```bash
 python3 build/build_wd.py        # regenerates src/mediforce-fullstack.wd.json
-node   tests/run_tests.mjs        # pure-logic tests (36, no secrets)
+node   tests/run_tests.mjs        # pure-logic tests (56, no secrets)
 for f in scripts/*.mjs; do node --check "$f"; done   # syntax
 ```
 
@@ -257,8 +306,16 @@ pinning). Validate first with `--dry-run`.
   pool) throughout.
 - **`awaiting-human` has no TTL.** A gate assigned to a reporter who never
   answers sits indefinitely (the human owns it, unlike the `in-progress` lease).
+  This is why both `triage` and `draft-plan` are biased against escalating.
   Planned: escalate stale `awaiting-human` (> N days) → re-ping / reassign to
   admin, alongside the Phase 2 stale-PR shepherd.
+- **A self-resolved plan can be wrong.** `draft-plan` deciding `needsHuman: false`
+  on a question that did need a human produces a PR that makes an unwanted call.
+  It is bounded the same way every other attempt is — the PR is opened for review
+  and never auto-merged, `self-review` annotates it, and `MAX_ATTEMPTS` retires a
+  repeatedly-failing issue to `manual`. Each `draft-plan` run records
+  `confidence` + `confidence_rationale`, so the bias is tunable from evidence
+  rather than by guessing.
 - **Rare duplicate PR** is accepted (the TOCTOU window between `select` and
   `claim`); recoverable by closing one PR.
 - **`FULLSTACK_REASSIGN` is workflow-global, not per-run.** A workflow cannot
