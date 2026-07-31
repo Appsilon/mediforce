@@ -245,7 +245,7 @@ export default function WorkflowDefinitionVersionPage() {
             <StartRunButton
               workflowName={decodedName}
               version={definition.version}
-              hasManualTrigger={definition.triggers?.some((trigger) => trigger.type === 'manual') ?? false}
+              hasManualTrigger={hasManualTrigger}
               archived={definition.archived === true}
               label="Save & Start Run"
               mode="production"
