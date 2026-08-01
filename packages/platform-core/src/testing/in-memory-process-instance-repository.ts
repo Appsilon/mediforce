@@ -1,11 +1,17 @@
 import {
   ProcessInstanceSchema,
   StepExecutionSchema,
+  getWorkflowStatus,
+  encodeProcessInstanceCursor,
+  decodeProcessInstanceCursor,
   type ProcessInstanceRepository,
   type ProcessInstance,
   type InstanceStatus,
   type StepExecution,
   type ListInstancesOptions,
+  type ListInstancesPageOptions,
+  type ListInstancesPage,
+  type WorkflowDisplayStatusCounts,
   type WorkflowRunSummaryResult,
 } from '../index';
 import { RunNameEntrySchema, type RunNameEntry } from '../schemas/process-instance';
@@ -82,6 +88,100 @@ export class InMemoryProcessInstanceRepository
       allowed.includes(i.namespace ?? ''),
     );
     return this.applyListFilters(inScope, options);
+  }
+
+  async listPage(options: ListInstancesPageOptions): Promise<ListInstancesPage> {
+    return this.listPageImpl([...this.instances.values()], options);
+  }
+
+  async listPageInNamespaces(
+    allowed: readonly string[],
+    options: ListInstancesPageOptions,
+  ): Promise<ListInstancesPage> {
+    const inScope = [...this.instances.values()].filter((i) =>
+      allowed.includes(i.namespace ?? ''),
+    );
+    return this.listPageImpl(inScope, options);
+  }
+
+  private listPageImpl(
+    rows: ProcessInstance[],
+    options: ListInstancesPageOptions,
+  ): ListInstancesPage {
+    let results = this.applyPageBaseFilters(rows, options);
+    if (options.displayStatus !== undefined) {
+      results = results.filter((i) => getWorkflowStatus(i).displayStatus === options.displayStatus);
+    }
+    results.sort((a, b) => {
+      if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? 1 : -1;
+      return a.id < b.id ? 1 : -1;
+    });
+    if (options.cursor !== undefined) {
+      const after = decodeProcessInstanceCursor(options.cursor);
+      if (after !== null) {
+        results = results.filter(
+          (i) => i.createdAt < after.createdAt || (i.createdAt === after.createdAt && i.id < after.id),
+        );
+      }
+    }
+    const hasMore = results.length > options.limit;
+    const pageRows = hasMore ? results.slice(0, options.limit) : results;
+    const last = pageRows[pageRows.length - 1];
+    if (hasMore && last !== undefined) {
+      return {
+        items: pageRows.map((i) => ({ ...i })),
+        nextCursor: encodeProcessInstanceCursor(last.createdAt, last.id),
+      };
+    }
+    return { items: pageRows.map((i) => ({ ...i })) };
+  }
+
+  async countByDisplayStatus(
+    options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
+  ): Promise<WorkflowDisplayStatusCounts> {
+    return this.countByDisplayStatusImpl(this.applyPageBaseFilters([...this.instances.values()], options));
+  }
+
+  async countByDisplayStatusInNamespaces(
+    allowed: readonly string[],
+    options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
+  ): Promise<WorkflowDisplayStatusCounts> {
+    const inScope = [...this.instances.values()].filter((i) => allowed.includes(i.namespace ?? ''));
+    return this.countByDisplayStatusImpl(this.applyPageBaseFilters(inScope, options));
+  }
+
+  private countByDisplayStatusImpl(rows: ProcessInstance[]): WorkflowDisplayStatusCounts {
+    const counts: WorkflowDisplayStatusCounts = {
+      in_progress: 0,
+      waiting_for_human: 0,
+      error: 0,
+      cancelled: 0,
+      completed: 0,
+    };
+    for (const instance of rows) {
+      counts[getWorkflowStatus(instance).displayStatus]++;
+    }
+    return counts;
+  }
+
+  private applyPageBaseFilters(
+    rows: ProcessInstance[],
+    options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
+  ): ProcessInstance[] {
+    let results = rows.filter((i) => i.deleted !== true);
+    if (options.namespace !== undefined) {
+      results = results.filter((i) => i.namespace === options.namespace);
+    }
+    if (options.definitionName !== undefined) {
+      results = results.filter((i) => i.definitionName === options.definitionName);
+    }
+    if (options.dryRun !== undefined) {
+      results = results.filter((i) => (i.dryRun === true) === options.dryRun);
+    }
+    if (options.archived !== true) {
+      results = results.filter((i) => i.archived !== true);
+    }
+    return results;
   }
 
   async listDefinitionNames(namespace: string): Promise<RunNameEntry[]> {

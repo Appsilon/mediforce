@@ -72,6 +72,10 @@ class StubProcessInstanceRepository implements ProcessInstanceRepository {
   async updateStepExecution(): Promise<void> { throw new Error('stub'); }
   async getIdsByDefinitionName(): Promise<string[]> { throw new Error('stub'); }
   async setDeletedByDefinitionName(): Promise<void> { throw new Error('stub'); }
+  async listPage(): Promise<never> { throw new Error('stub'); }
+  async listPageInNamespaces(): Promise<never> { throw new Error('stub'); }
+  async countByDisplayStatus(): Promise<never> { throw new Error('stub'); }
+  async countByDisplayStatusInNamespaces(): Promise<never> { throw new Error('stub'); }
 }
 
 function runFor(
@@ -304,6 +308,101 @@ function contract(
           status: 'bogus',
         } as unknown as AgentRun),
       ).rejects.toThrow();
+    });
+
+    it('list filters by status and by processInstanceIds', async () => {
+      const instanceA = randomUUID();
+      const instanceB = randomUUID();
+      await registerInstance(instanceA, 'ws-1');
+      await registerInstance(instanceB, 'ws-1');
+      const running = await repo.create(runFor(instanceA, { status: 'running' }));
+      await repo.create(runFor(instanceA, { status: 'completed' }));
+      await repo.create(runFor(instanceB, { status: 'running' }));
+
+      const byStatus = await repo.list({ namespace: 'ws-1', limit: 50, status: 'running' });
+      expect(byStatus.items.map((r) => r.id).sort()).not.toContain(
+        (await repo.list({ namespace: 'ws-1', limit: 50, status: 'completed' })).items[0]?.id,
+      );
+      expect(byStatus.items.every((r) => r.status === 'running')).toBe(true);
+
+      const byInstance = await repo.list({
+        namespace: 'ws-1',
+        limit: 50,
+        processInstanceIds: [instanceA],
+      });
+      expect(byInstance.items.map((r) => r.id).sort()).toEqual(
+        [running.id, byInstance.items.find((r) => r.status === 'completed')?.id].sort(),
+      );
+      expect(byInstance.items.every((r) => r.processInstanceId === instanceA)).toBe(true);
+    });
+
+    // Exhaustive parity check: the SQL cardStatus filter/aggregation
+    // (hand-ported cardStatusConditions() in
+    // platform-infra/postgres/repositories/agent-run-repository.ts) must
+    // bucket every real (status, fallbackReason) combination identically
+    // to agents-tab.tsx's own CARD_DEFS predicates.
+    const CARD_STATUS_FIXTURES: Array<{
+      label: string;
+      overrides: Partial<AgentRun>;
+      expectedBucket: 'running' | 'completed' | 'error' | 'flagged' | null;
+    }> = [
+      { label: 'running', overrides: { status: 'running' }, expectedBucket: 'running' },
+      { label: 'completed', overrides: { status: 'completed' }, expectedBucket: 'completed' },
+      {
+        label: 'paused/fallbackReason=error',
+        overrides: { status: 'paused', fallbackReason: 'error' },
+        expectedBucket: 'error',
+      },
+      {
+        label: 'paused/fallbackReason=timeout',
+        overrides: { status: 'paused', fallbackReason: 'timeout' },
+        expectedBucket: 'error',
+      },
+      { label: 'escalated', overrides: { status: 'escalated' }, expectedBucket: 'flagged' },
+      { label: 'flagged', overrides: { status: 'flagged' }, expectedBucket: 'flagged' },
+      { label: 'paused/no fallbackReason', overrides: { status: 'paused' }, expectedBucket: null },
+      { label: 'interrupted', overrides: { status: 'interrupted' }, expectedBucket: null },
+    ];
+
+    it.each(CARD_STATUS_FIXTURES)(
+      'list cardStatus filter matches the KPI card predicate for $label',
+      async ({ overrides, expectedBucket }) => {
+        const instanceId = randomUUID();
+        await registerInstance(instanceId, 'ws-1');
+        const run = await repo.create(runFor(instanceId, overrides));
+
+        const ALL: Array<'running' | 'completed' | 'error' | 'flagged'> = [
+          'running',
+          'completed',
+          'error',
+          'flagged',
+        ];
+        for (const bucket of ALL) {
+          const page = await repo.list({ namespace: 'ws-1', limit: 50, cardStatus: bucket });
+          const ids = page.items.map((r) => r.id);
+          if (bucket === expectedBucket) {
+            expect(ids).toContain(run.id);
+          } else {
+            expect(ids).not.toContain(run.id);
+          }
+        }
+      },
+    );
+
+    it('countByCardStatus tallies total + each bucket in one grouped query', async () => {
+      await registerInstance('ws-2-inst', 'ws-2');
+      for (const { overrides } of CARD_STATUS_FIXTURES) {
+        await repo.create(runFor('ws-2-inst', overrides));
+      }
+
+      const counts = await repo.countByCardStatus({ namespace: 'ws-2' });
+      expect(counts).toEqual({
+        total: CARD_STATUS_FIXTURES.length,
+        running: 1,
+        completed: 1,
+        error: 2,
+        flagged: 2,
+      });
     });
   });
 }

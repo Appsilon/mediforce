@@ -4,75 +4,60 @@ import { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AgentRunListTable } from '@/components/agents/agent-run-list-table';
-import type { AgentRun } from '@mediforce/platform-core';
-
-interface Props {
-  runs: AgentRun[];
-  loading: boolean;
-  processNameMap: Map<string, string>;
-}
+import { useAgentRunsPage, useAgentRunCardStatusCounts } from '@/hooks/use-agent-runs-page';
+import { useProcessNameMap } from '@/hooks/use-agent-runs';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import type { AgentRunStatus, AgentRunCardStatus } from '@mediforce/platform-core';
 
 // Only statuses the AgentRunner ever actually assigns — see the comment on
 // STATUS_STYLES in agent-run-list-table.tsx. AgentRunStatusSchema also
 // declares `timed_out` / `low_confidence` / `error`, but those are never
 // written to a real AgentRun (that detail lives on `fallbackReason`), so
 // they're excluded here rather than offered as a filter that never matches.
-const ALL_STATUSES = [
+const ALL_STATUSES: AgentRunStatus[] = [
   'running',
   'completed',
   'escalated',
   'flagged',
   'paused',
   'interrupted',
-] as const;
-
-type CardKey = 'running' | 'completed' | 'error' | 'flagged';
+];
 
 // Same click-to-filter + hover pattern as the Workflows tab's KPI cards
 // (workflows-tab.tsx) — pill colors match the corresponding status badges
 // AgentRunListTable already renders, so a card and its filtered rows read
 // as the same category.
-const CARD_DEFS: Array<{ key: CardKey; label: string; pillClass: string; match: (run: AgentRun) => boolean }> = [
+const CARD_DEFS: Array<{ key: AgentRunCardStatus; label: string; pillClass: string }> = [
   {
     key: 'running',
     label: 'Running',
     pillClass: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-    match: (r) => r.status === 'running',
   },
   {
     key: 'completed',
     label: 'Completed',
     pillClass: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-    match: (r) => r.status === 'completed',
   },
   {
     key: 'error',
     label: 'Errors',
     pillClass: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-    // 'error'/'timed_out' are never real AgentRun.status values (see
-    // agent-run-list-table.tsx) — that detail lives on fallbackReason.
-    match: (r) => r.fallbackReason === 'error' || r.fallbackReason === 'timeout',
   },
   {
     key: 'flagged',
     label: 'Flagged / escalated',
     pillClass: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
-    match: (r) => r.status === 'escalated' || r.status === 'flagged',
   },
 ];
 
 const TOTAL_PILL_CLASS = 'bg-gray-100 text-gray-700 dark:bg-gray-800/60 dark:text-gray-400';
 
-export function AgentsTab({ runs, loading, processNameMap }: Props) {
+export function AgentsTab() {
+  const handle = useHandleFromPath();
+  const processNameMap = useProcessNameMap(handle);
   const [processFilter, setProcessFilter] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [cardFilter, setCardFilter] = useState<CardKey | null>(null);
-
-  const counts = useMemo(() => {
-    const result: Record<CardKey, number> = { running: 0, completed: 0, error: 0, flagged: 0 };
-    for (const def of CARD_DEFS) result[def.key] = runs.filter(def.match).length;
-    return result;
-  }, [runs]);
+  const [statusFilter, setStatusFilter] = useState<AgentRunStatus | null>(null);
+  const [cardFilter, setCardFilter] = useState<AgentRunCardStatus | null>(null);
 
   const processNames = useMemo(() => {
     // Drop empty / undefined definitionNames so the <select> doesn't end up
@@ -86,20 +71,30 @@ export function AgentsTab({ runs, loading, processNameMap }: Props) {
     return Array.from(names).sort();
   }, [processNameMap]);
 
-  const filteredRuns = useMemo(() => {
-    return runs.filter((run) => {
-      if (processFilter) {
-        const name = processNameMap.get(run.processInstanceId);
-        if (name !== processFilter) return false;
-      }
-      if (statusFilter && run.status !== statusFilter) return false;
-      if (cardFilter) {
-        const def = CARD_DEFS.find((d) => d.key === cardFilter);
-        if (def && !def.match(run)) return false;
-      }
-      return true;
-    });
-  }, [runs, processFilter, statusFilter, cardFilter, processNameMap]);
+  // Workflow-name filter resolved client-side (from the already-fetched,
+  // lightweight id→name projection) into the matching instance ids, then
+  // pushed server-side — avoids a repository-level join.
+  const processInstanceIds = useMemo(() => {
+    if (!processFilter) return undefined;
+    const ids: string[] = [];
+    for (const [id, name] of processNameMap) {
+      if (name === processFilter) ids.push(id);
+    }
+    return ids;
+  }, [processFilter, processNameMap]);
+
+  const { counts, loading: countsLoading } = useAgentRunCardStatusCounts({
+    namespace: handle,
+    status: statusFilter ?? undefined,
+    processInstanceIds,
+  });
+
+  const { data: runs, loading, hasMore, loadingMore, loadMore } = useAgentRunsPage({
+    namespace: handle,
+    status: statusFilter ?? undefined,
+    cardStatus: cardFilter,
+    processInstanceIds,
+  });
 
   const cardFilterLabel = cardFilter ? CARD_DEFS.find((d) => d.key === cardFilter)?.label : null;
 
@@ -112,10 +107,10 @@ export function AgentsTab({ runs, loading, processNameMap }: Props) {
           onClick={() => setCardFilter(null)}
           className="rounded-lg border bg-card border-border p-4 space-y-1.5 text-left cursor-pointer transition-colors hover:border-primary/40"
         >
-          {loading ? (
+          {countsLoading ? (
             <div className="h-8 w-12 rounded bg-muted animate-pulse" />
           ) : (
-            <div className="text-3xl font-bold font-headline">{runs.length}</div>
+            <div className="text-3xl font-bold font-headline">{counts.total}</div>
           )}
           <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', TOTAL_PILL_CLASS)}>
             Total runs
@@ -128,7 +123,7 @@ export function AgentsTab({ runs, loading, processNameMap }: Props) {
             onClick={() => setCardFilter((prev) => (prev === def.key ? null : def.key))}
             className="rounded-lg border bg-card border-border p-4 space-y-1.5 text-left cursor-pointer transition-colors hover:border-primary/40"
           >
-            {loading ? (
+            {countsLoading ? (
               <div className="h-8 w-12 rounded bg-muted animate-pulse" />
             ) : (
               <div className="text-3xl font-bold font-headline">{counts[def.key]}</div>
@@ -171,7 +166,7 @@ export function AgentsTab({ runs, loading, processNameMap }: Props) {
 
           <select
             value={statusFilter ?? ''}
-            onChange={(e) => setStatusFilter(e.target.value || null)}
+            onChange={(e) => setStatusFilter((e.target.value || null) as AgentRunStatus | null)}
             className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
           >
             <option key="__all" value="">All Statuses</option>
@@ -183,16 +178,17 @@ export function AgentsTab({ runs, loading, processNameMap }: Props) {
           </select>
 
           <span className="text-sm text-muted-foreground">
-            {processFilter || statusFilter || cardFilter
-              ? `${filteredRuns.length} of ${runs.length} runs`
-              : `${runs.length} runs`}
+            {countsLoading ? `${runs.length} runs` : `${runs.length} of ${counts.total} runs`}
           </span>
         </div>
 
         <AgentRunListTable
-          runs={filteredRuns}
+          runs={runs}
           loading={loading}
           processNameMap={processNameMap}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={loadMore}
         />
       </section>
     </div>

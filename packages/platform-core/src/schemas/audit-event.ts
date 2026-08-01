@@ -1,6 +1,16 @@
 import { z } from 'zod';
 
 export const AuditEventSchema = z.object({
+  /**
+   * Storage-generated unique id (Postgres `audit_events.id`, a random
+   * uuid). Optional because it's assigned by the repository at write time,
+   * never supplied by a caller — `append()`'s input naturally omits it
+   * (the base type stays optional so no interface signature change is
+   * needed). Exists solely as the keyset-cursor tie-breaker for
+   * `getByNamespacePage`: `timestamp` alone can collide when multiple
+   * events land in the same request (millisecond-resolution ISO strings).
+   */
+  id: z.string().optional(),
   // --- Attributable: WHO did it ---
   actorId: z.string().min(1),
   actorType: z.enum(['user', 'agent', 'system']),

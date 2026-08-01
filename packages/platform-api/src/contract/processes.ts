@@ -63,15 +63,27 @@ export const ListAuditEventsOutputSchema = z.object({
 export type ListAuditEventsInput = z.infer<typeof ListAuditEventsInputSchema>;
 export type ListAuditEventsOutput = z.infer<typeof ListAuditEventsOutputSchema>;
 
-// Workspace-wide audit trail (Monitoring → Users tab) — every event for
-// every user in one namespace, not scoped to a single run.
+// Workspace-wide audit trail (Monitoring → Users / Tasks tabs) — events for
+// one namespace, keyset-paginated and server-side filtered so a 20-row page
+// reflects the true filtered set under the caller's current selections
+// instead of a client-side slice of an over-fetched, unfiltered read.
 export const ListNamespaceAuditEventsInputSchema = z.object({
   namespace: z.string().min(1),
-  limit: z.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  cursor: z.string().min(1).optional(),
+  /** Restrict to these `action` values — Users tab passes the
+   *  user-activity set, Tasks tab the task-activity set. Repeated query
+   *  param (`?action=user.signed_in&action=instance.started`). */
+  actions: z.array(z.string().min(1)).optional(),
+  actorId: z.string().min(1).optional(),
+  /** Inclusive `YYYY-MM-DD` date bounds, as produced by `<input type="date">`. */
+  fromDate: z.string().min(1).optional(),
+  toDate: z.string().min(1).optional(),
 });
 
 export const ListNamespaceAuditEventsOutputSchema = z.object({
   events: z.array(AuditEventSchema),
+  nextCursor: z.string().optional(),
 });
 
 export type ListNamespaceAuditEventsInput = z.infer<typeof ListNamespaceAuditEventsInputSchema>;

@@ -20,7 +20,7 @@ vi.mock('../use-collection', () => ({
   useCollection: () => ({ data: [], loading: false, error: null }),
 }));
 
-const { useAgentRuns, useAgentRunsForStep, useAgentRun } = await import('../use-agent-runs');
+const { useAgentRunsForStep, useAgentRun } = await import('../use-agent-runs');
 
 beforeEach(() => {
   listMock.mockReset();
@@ -29,36 +29,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-});
-
-describe('useAgentRuns', () => {
-  it('GETs /api/agent-runs with namespace filter + unbounded UI limit', async () => {
-    listMock.mockResolvedValue({ runs: [buildAgentRun({ id: 'r-1' })] });
-    const { wrapper } = createQueryWrapper();
-    const { result } = renderHook(() => useAgentRuns('team-alpha'), { wrapper });
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    // The UI hook fetches the whole workspace in one bounded request so
-    // the JS-side filters on Run History keep working. CLI / server-actor
-    // callers continue to walk the cursor pagination.
-    expect(listMock).toHaveBeenCalledWith({ namespace: 'team-alpha', limit: 10_000 });
-    expect(result.current.data.map((r) => r.id)).toEqual(['r-1']);
-  });
-
-  it('surfaces a 4xx ApiError without retrying or staying stuck loading', async () => {
-    const err = new ApiErrorMock(403);
-    listMock.mockRejectedValue(err);
-    const { wrapper } = createQueryWrapper();
-    const { result } = renderHook(() => useAgentRuns('team-alpha'), { wrapper });
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.error).toBe(err);
-    expect(listMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not fire while handle is empty (page still resolving URL params)', () => {
-    const { wrapper } = createQueryWrapper();
-    renderHook(() => useAgentRuns(''), { wrapper });
-    expect(listMock).not.toHaveBeenCalled();
-  });
 });
 
 describe('useAgentRunsForStep', () => {

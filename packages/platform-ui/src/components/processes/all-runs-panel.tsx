@@ -2,11 +2,11 @@
 
 import * as React from 'react';
 import { Archive, FlaskConical, X } from 'lucide-react';
-import { useProcessInstances } from '@/hooks/use-process-instances';
+import { useProcessInstancesPage } from '@/hooks/use-process-instances-page';
 import { useMyActionableTasks } from '@/hooks/use-tasks';
 import { RunsTable } from './runs-table';
 import { STATUS_LABELS } from './process-status-badge';
-import { getWorkflowStatus, type WorkflowDisplayStatus } from '@/lib/workflow-status';
+import type { WorkflowDisplayStatus } from '@/lib/workflow-status';
 import { formatStepName } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -18,11 +18,17 @@ import { cn } from '@/lib/utils';
  * workflow catalog's "Show all runs" cards) and Monitoring → Workflows
  * (always unscoped).
  */
+type DryRunFilter = 'all' | 'production' | 'dry-run';
+
 export function AllRunsPanel({
   handle,
   workflowFilter,
   displayStatusFilter,
   onClearDisplayStatusFilter,
+  dryRunFilter: controlledDryRunFilter,
+  onDryRunFilterChange,
+  showArchivedRuns: controlledShowArchivedRuns,
+  onShowArchivedRunsChange,
 }: {
   handle: string;
   workflowFilter?: string | null;
@@ -32,16 +38,33 @@ export function AllRunsPanel({
   /** Shows a "Filtered by: <status> · Clear" chip when displayStatusFilter
    *  is set, so clearing doesn't require scrolling back up to the card. */
   onClearDisplayStatusFilter?: () => void;
+  /**
+   * Controlled/uncontrolled pair, same convention for both toggles: pass
+   * both the value and its setter to lift state to the parent (Monitoring
+   * → Workflows mirrors these into its KPI-count query, so a card's number
+   * matches what the table's own toggles are currently showing); omit both
+   * to keep this panel's own internal state (the standalone `/runs` page,
+   * which has no KPI cards to keep in sync).
+   */
+  dryRunFilter?: DryRunFilter;
+  onDryRunFilterChange?: (value: DryRunFilter) => void;
+  showArchivedRuns?: boolean;
+  onShowArchivedRunsChange?: (value: boolean) => void;
 }) {
-  const [showArchivedRuns, setShowArchivedRuns] = React.useState(false);
-  const [dryRunFilter, setDryRunFilter] = React.useState<'all' | 'production' | 'dry-run'>('all');
+  const [internalShowArchivedRuns, setInternalShowArchivedRuns] = React.useState(false);
+  const [internalDryRunFilter, setInternalDryRunFilter] = React.useState<DryRunFilter>('all');
+  const showArchivedRuns = controlledShowArchivedRuns ?? internalShowArchivedRuns;
+  const setShowArchivedRuns = onShowArchivedRunsChange ?? setInternalShowArchivedRuns;
+  const dryRunFilter = controlledDryRunFilter ?? internalDryRunFilter;
+  const setDryRunFilter = onDryRunFilterChange ?? setInternalDryRunFilter;
 
-  const { data: allInstances, loading } = useProcessInstances(
-    'all',
-    workflowFilter ?? undefined,
-    showArchivedRuns,
-    handle,
-  );
+  const { data: sorted, loading, hasMore, loadingMore, loadMore } = useProcessInstancesPage({
+    namespace: handle,
+    workflowFilter: workflowFilter ?? undefined,
+    dryRun: dryRunFilter === 'all' ? undefined : dryRunFilter === 'dry-run',
+    archived: showArchivedRuns,
+    displayStatus: displayStatusFilter,
+  });
   const { data: activeTasks } = useMyActionableTasks();
 
   const activeTaskByInstance = React.useMemo(() => {
@@ -53,25 +76,6 @@ export function AllRunsPanel({
     }
     return map;
   }, [activeTasks]);
-
-  const filtered = React.useMemo(() => {
-    let result = allInstances;
-    if (dryRunFilter === 'dry-run') result = result.filter((i) => i.dryRun === true);
-    else if (dryRunFilter === 'production') result = result.filter((i) => !i.dryRun);
-    if (displayStatusFilter) {
-      result = result.filter((i) => getWorkflowStatus(i).displayStatus === displayStatusFilter);
-    }
-    return result;
-  }, [allInstances, dryRunFilter, displayStatusFilter]);
-
-  const sorted = React.useMemo(
-    () =>
-      [...filtered].sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      ),
-    [filtered],
-  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -114,7 +118,7 @@ export function AllRunsPanel({
           ))}
         </div>
         <button
-          onClick={() => setShowArchivedRuns((v) => !v)}
+          onClick={() => setShowArchivedRuns(!showArchivedRuns)}
           className={cn(
             'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
             showArchivedRuns
@@ -137,6 +141,9 @@ export function AllRunsPanel({
             ? `No runs found for "${formatStepName(workflowFilter)}".`
             : 'No runs found.'
         }
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        onLoadMore={loadMore}
       />
     </div>
   );

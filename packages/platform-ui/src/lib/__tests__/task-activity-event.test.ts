@@ -1,30 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import { buildAuditEvent } from '@mediforce/platform-core/testing';
 import {
-  isTaskActivityEvent,
+  TASK_ACTIVITY_ACTIONS,
   formatTaskEventName,
   taskIdFromEvent,
   taskTitleFromEvent,
-  filterTaskActivity,
 } from '../task-activity-event';
 
-describe('isTaskActivityEvent', () => {
-  it('[DATA] accepts the five known task actions', () => {
-    for (const action of [
+describe('TASK_ACTIVITY_ACTIONS', () => {
+  it('[DATA] is the five known task actions, passed server-side as the actions filter', () => {
+    expect([...TASK_ACTIVITY_ACTIONS]).toEqual([
       'task.viewed',
       'task.claimed',
       'task.completed',
       'task.attachment_added',
       'task.attachment_deleted',
-    ]) {
-      expect(isTaskActivityEvent(buildAuditEvent({ action }))).toBe(true);
-    }
-  });
-
-  it('[DATA] rejects task.created (system-generated) and everything else', () => {
-    expect(isTaskActivityEvent(buildAuditEvent({ action: 'task.created' }))).toBe(false);
-    expect(isTaskActivityEvent(buildAuditEvent({ action: 'process.resumed_after_task' }))).toBe(false);
-    expect(isTaskActivityEvent(buildAuditEvent({ action: 'user.signed_in' }))).toBe(false);
+    ]);
   });
 });
 
@@ -67,35 +58,5 @@ describe('taskTitleFromEvent', () => {
       inputSnapshot: { taskId: 'task-1', name: 'report.pdf', sizeBytes: 1024 },
     });
     expect(taskTitleFromEvent(event)).toBe('Task');
-  });
-});
-
-describe('filterTaskActivity', () => {
-  const events = [
-    buildAuditEvent({ actorId: 'u-1', action: 'task.claimed', timestamp: '2026-01-10T10:00:00.000Z' }),
-    buildAuditEvent({ actorId: 'u-2', action: 'task.completed', timestamp: '2026-01-15T10:00:00.000Z' }),
-  ];
-
-  it('[DATA] filters by actor', () => {
-    const result = filterTaskActivity(events, { actorId: 'u-1', action: null, fromDate: null, toDate: null });
-    expect(result).toHaveLength(1);
-    expect(result[0]!.actorId).toBe('u-1');
-  });
-
-  it('[DATA] filters by action', () => {
-    const result = filterTaskActivity(events, { actorId: null, action: 'task.completed', fromDate: null, toDate: null });
-    expect(result).toHaveLength(1);
-    expect(result[0]!.action).toBe('task.completed');
-  });
-
-  it('[DATA] filters by inclusive date range', () => {
-    const result = filterTaskActivity(events, {
-      actorId: null,
-      action: null,
-      fromDate: '2026-01-12',
-      toDate: '2026-01-20',
-    });
-    expect(result).toHaveLength(1);
-    expect(result[0]!.actorId).toBe('u-2');
   });
 });

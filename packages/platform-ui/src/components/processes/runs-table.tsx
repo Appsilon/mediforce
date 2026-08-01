@@ -14,6 +14,7 @@ import { ApiError } from '@/lib/mediforce';
 import type { BulkRunOutput } from '@mediforce/platform-api/contract';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 import { formatCostUsd } from '@/lib/format';
+import { LoadMoreFooter } from '@/components/load-more-footer';
 import { useToast } from '@/components/command-palette/toast-provider';
 import {
   useArchiveRun,
@@ -31,6 +32,12 @@ interface RunsTableProps {
   emptyMessage?: string;
   /** Map of instanceId → active task ID for direct task links. */
   activeTaskByInstance?: Map<string, string>;
+  /** True when the server has more rows beyond `runs` — shows the "Load
+   *  more" footer. Omit (or false) to hide it entirely (e.g. a fully-loaded
+   *  small table with no pagination source). */
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 type SortField = 'cost' | 'started' | null;
@@ -69,6 +76,9 @@ export function RunsTable({
   runHref,
   emptyMessage = 'No runs found.',
   activeTaskByInstance,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }: RunsTableProps) {
   const handle = useHandleFromPath();
   const { toast } = useToast();
@@ -420,6 +430,7 @@ export function RunsTable({
           })}
         </tbody>
       </table>
+      <LoadMoreFooter hasMore={hasMore} loadingMore={loadingMore} onLoadMore={onLoadMore} />
     </div>
   );
 }

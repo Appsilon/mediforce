@@ -1,20 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { buildAuditEvent } from '@mediforce/platform-core/testing';
 import {
-  isUserActivityEvent,
+  USER_ACTIVITY_ACTIONS,
   formatEventName,
   formatEventDetails,
 } from '../user-activity-event';
 
-describe('isUserActivityEvent', () => {
-  it('[DATA] accepts the four known actions', () => {
-    for (const action of ['user.signed_in', 'instance.started', 'instance.cancelled', 'task.completed']) {
-      expect(isUserActivityEvent(buildAuditEvent({ action }))).toBe(true);
-    }
-  });
-
-  it('[DATA] rejects everything else', () => {
-    expect(isUserActivityEvent(buildAuditEvent({ action: 'agent.created' }))).toBe(false);
+describe('USER_ACTIVITY_ACTIONS', () => {
+  it('[DATA] is the four known actions, passed server-side as the actions filter', () => {
+    expect([...USER_ACTIVITY_ACTIONS]).toEqual([
+      'user.signed_in',
+      'instance.started',
+      'instance.cancelled',
+      'task.completed',
+    ]);
   });
 });
 

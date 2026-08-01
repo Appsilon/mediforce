@@ -83,6 +83,8 @@ export {
 } from './triggers/manage-triggers';
 
 export { listRuns } from './runs/list-runs';
+export { listRunsPage } from './runs/list-runs-page';
+export { getWorkflowStatusCounts } from './runs/get-workflow-status-counts';
 export { listRunNames } from './runs/list-run-names';
 export { getRun } from './runs/get-run';
 export { startRun } from './runs/start-run';
@@ -132,6 +134,7 @@ export { updateToolCatalogEntry } from './tool-catalog/update-entry';
 export { deleteToolCatalogEntry } from './tool-catalog/delete-entry';
 
 export { listAgentRuns } from './agent-runs/list-agent-runs';
+export { getAgentRunCardStatusCounts } from './agent-runs/get-agent-run-card-status-counts';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 
 export { getConfig, getConfigByPrefix } from './config/index';
