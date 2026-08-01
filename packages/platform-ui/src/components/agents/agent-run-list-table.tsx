@@ -15,6 +15,7 @@ import { routes } from '@/lib/routes';
 import { formatAgentRunCost } from '@/lib/agent-cost';
 import { formatAgentRunContainer } from '@/lib/agent-container';
 import { useStepAllowedTools } from '@/hooks/use-step-permissions';
+import { LoadMoreFooter } from '@/components/load-more-footer';
 import type { LucideIcon } from 'lucide-react';
 
 function getPluginDisplay(pluginId: string): { Icon: LucideIcon; colorClass: string; label: string } {
@@ -184,17 +185,7 @@ export function AgentRunListTable({
               })}
           </tbody>
         </table>
-        {hasMore && (
-          <div className="flex justify-center border-t py-3">
-            <button
-              onClick={onLoadMore}
-              disabled={loadingMore}
-              className="rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loadingMore ? 'Loading…' : 'Load more'}
-            </button>
-          </div>
-        )}
+        <LoadMoreFooter hasMore={hasMore} loadingMore={loadingMore} onLoadMore={onLoadMore} />
       </div>
       <AgentLogPanel run={selectedRun} onClose={() => setSelectedRun(null)} />
     </>

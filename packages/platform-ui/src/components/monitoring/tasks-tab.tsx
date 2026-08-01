@@ -9,6 +9,7 @@ import { useNamespaceAuditEventsPage, useNamespaceMemberNames } from '@/hooks/us
 import { useProcessNameMap } from '@/hooks/use-agent-runs';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
+import { LoadMoreFooter } from '@/components/load-more-footer';
 import {
   TASK_ACTIVITY_ACTIONS,
   formatTaskEventName,
@@ -205,17 +206,7 @@ export function TasksTab({ data }: Props) {
                 })}
             </tbody>
           </table>
-          {hasMore && (
-            <div className="flex justify-center border-t py-3">
-              <button
-                onClick={loadMore}
-                disabled={loadingMore}
-                className="rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loadingMore ? 'Loading…' : 'Load more'}
-              </button>
-            </div>
-          )}
+          <LoadMoreFooter hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
         </div>
       </div>
 

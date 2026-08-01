@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useNamespaceAuditEventsPage, useNamespaceMemberNames } from '@/hooks/use-namespace-audit-events';
 import { useProcessNameMap } from '@/hooks/use-agent-runs';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { LoadMoreFooter } from '@/components/load-more-footer';
 import { USER_ACTIVITY_ACTIONS, formatEventName, formatEventDetails } from '@/lib/user-activity-event';
 import type { AuditEvent } from '@mediforce/platform-core';
 
@@ -153,17 +154,7 @@ export function UsersTab() {
               ))}
           </tbody>
         </table>
-        {hasMore && (
-          <div className="flex justify-center border-t py-3">
-            <button
-              onClick={loadMore}
-              disabled={loadingMore}
-              className="rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loadingMore ? 'Loading…' : 'Load more'}
-            </button>
-          </div>
-        )}
+        <LoadMoreFooter hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
       </div>
     </div>
   );
