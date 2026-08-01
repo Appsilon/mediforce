@@ -752,6 +752,37 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
   };
 
+  // 21 dry runs for monitoring.journey.ts's Workflows-tab Load More
+  // coverage. No pre-existing fixture in this file sets `dryRun: true` (nor
+  // does any UI journey create one live), so the Workflows tab's "Dry Runs"
+  // filter is otherwise completely empty — an exact isolation mechanism,
+  // unlike the tab's KPI-bucket clicks (which have no equivalent guarantee
+  // against collision with other journeys' runs in the same status bucket).
+  // PAGE_SIZE=20, so 21 rows makes Load More deterministic: 20 -> 21 ->
+  // button gone. Minute-spaced `createdAt`, newest first (i=1 newest).
+  const WORKFLOWS_LOADMORE_DRY_RUN_COUNT = 21;
+  for (let i = 1; i <= WORKFLOWS_LOADMORE_DRY_RUN_COUNT; i++) {
+    const id = `proc-workflows-loadmore-dryrun-${i}`;
+    processInstances[id] = {
+      id,
+      namespace: 'test',
+      definitionName: 'Workflows LoadMore Dry Run Workflow',
+      definitionVersion: '1.0.0',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      dryRun: true,
+      createdAt: minutesAgo(i),
+      updatedAt: minutesAgo(i),
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+    };
+  }
+
   const MONITORING_LOADMORE_AGENT_RUN_COUNT = 21;
   // 21 agent runs, all `running` with `fallbackReason: null` — avoids the
   // running/error double-count landmine noted below (`error` bucket keys

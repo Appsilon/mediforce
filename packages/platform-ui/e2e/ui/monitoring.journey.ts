@@ -310,4 +310,30 @@ test.describe('Monitoring Journey', () => {
     await expect(page.getByText('21 of 21 runs')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
   });
+
+  test('Workflows tab: KPI cards report the true DB count, and Load More grows the table from 20 to 21 rows', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/monitoring`);
+
+    // 21 dedicated dry runs (seed-data.ts's "Workflows LoadMore Dry Run
+    // Workflow" batch) — the Workflows tab has no per-workflow filter of its
+    // own, but no other fixture or journey creates a dry run, so the "Dry
+    // Runs" toggle isolates exactly these 21 rows, an exact filter rather
+    // than a KPI-bucket lower bound.
+    await page.getByRole('button', { name: 'Dry Runs' }).click();
+
+    // KPI cards report the real DB count of the filtered set, not a tally
+    // of the ≤20 rows rendered in the table below them — all 21 fixtures
+    // are seeded `status: 'completed'`.
+    await expect(page.getByText('21', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
+
+    const rows = page.locator('tbody tr');
+    await expect(rows).toHaveCount(20, { timeout: 10_000 });
+    const loadMoreButton = page.getByRole('button', { name: 'Load more' });
+    await expect(loadMoreButton).toBeVisible();
+
+    await loadMoreButton.click();
+    await expect(rows).toHaveCount(21);
+    await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
+  });
 });
