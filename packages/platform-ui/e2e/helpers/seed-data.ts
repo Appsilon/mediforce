@@ -759,7 +759,15 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   // unlike the tab's KPI-bucket clicks (which have no equivalent guarantee
   // against collision with other journeys' runs in the same status bucket).
   // PAGE_SIZE=20, so 21 rows makes Load More deterministic: 20 -> 21 ->
-  // button gone. Minute-spaced `createdAt`, newest first (i=1 newest).
+  // button gone. Minute-spaced `createdAt`, newest first (i=1 newest) —
+  // offset by 50,000 minutes (~34 days), same convention as
+  // `monitoringLoadMoreAgentRuns` below: isolation for our own test comes
+  // from the "Dry Runs" filter, not from recency, so these must NOT be the
+  // most-recent rows in the file — an earlier version used `minutesAgo(i)`
+  // (1-21 minutes ago), which made this batch the 21 *newest* rows in the
+  // entire dataset and crowded other tests' fixtures off the Workflows
+  // tab's default *unfiltered* top-20 view (archive-from-runs-list.journey.ts,
+  // workflow-home.journey.ts, workflow-status-badges.journey.ts all broke).
   const WORKFLOWS_LOADMORE_DRY_RUN_COUNT = 21;
   for (let i = 1; i <= WORKFLOWS_LOADMORE_DRY_RUN_COUNT; i++) {
     const id = `proc-workflows-loadmore-dryrun-${i}`;
@@ -774,8 +782,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       triggerType: 'manual',
       triggerPayload: {},
       dryRun: true,
-      createdAt: minutesAgo(i),
-      updatedAt: minutesAgo(i),
+      createdAt: minutesAgo(50_000 + i),
+      updatedAt: minutesAgo(50_000 + i),
       createdBy: 'system',
       pauseReason: null,
       error: null,
