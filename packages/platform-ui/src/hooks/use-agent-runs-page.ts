@@ -1,12 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import type { AgentRun, AgentRunStatus, AgentRunCardStatus } from '@mediforce/platform-core';
+import { useQuery } from '@tanstack/react-query';
+import type { AgentRunStatus, AgentRunCardStatus } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 import { STANDARD_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
+import { usePaginatedQuery } from './use-paginated-query';
 
 const PAGE_SIZE = 20;
 
@@ -33,43 +33,24 @@ export function useAgentRunsPage(params: {
   const { namespace, status, cardStatus, processInstanceIds } = params;
   const enabled = namespace.length > 0;
 
-  const query = useInfiniteQuery({
+  return usePaginatedQuery({
     queryKey: queryKeys.agentRuns.page(namespace, {
       status,
       cardStatus: cardStatus ?? undefined,
       processInstanceIds,
     }),
-    queryFn: async ({ pageParam }) =>
+    queryFn: (cursor) =>
       mediforce.agentRuns.list({
         namespace,
         status,
         cardStatus: cardStatus ?? undefined,
         processInstanceIds,
-        cursor: pageParam,
+        cursor,
         limit: PAGE_SIZE,
       }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    selectItems: (page) => page.runs,
     enabled,
-    retry: stopRetryOn4xx,
-    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
   });
-
-  const items = useMemo<AgentRun[]>(
-    () => query.data?.pages.flatMap((p) => p.runs) ?? [],
-    [query.data],
-  );
-
-  return {
-    data: items,
-    loading: enabled && query.isPending,
-    error: (query.error as Error | null) ?? null,
-    hasMore: query.hasNextPage,
-    loadingMore: query.isFetchingNextPage,
-    loadMore: () => {
-      void query.fetchNextPage();
-    },
-  };
 }
 
 /**

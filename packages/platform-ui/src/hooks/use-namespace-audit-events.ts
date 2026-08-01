@@ -1,12 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import type { AuditEvent } from '@mediforce/platform-core';
+import { useQuery } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
-import { STANDARD_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
+import { usePaginatedQuery } from './use-paginated-query';
 
 const PAGE_SIZE = 20;
 
@@ -37,44 +36,26 @@ export function useNamespaceAuditEventsPage(params: {
   const { namespace, actions, actorId, fromDate, toDate } = params;
   const enabled = namespace.length > 0;
 
-  const query = useInfiniteQuery({
+  return usePaginatedQuery({
     queryKey: queryKeys.namespaceAuditEvents(namespace, {
       actions,
       actorId: actorId ?? undefined,
       fromDate: fromDate ?? undefined,
       toDate: toDate ?? undefined,
     }),
-    queryFn: async ({ pageParam }) =>
+    queryFn: (cursor) =>
       mediforce.processes.listNamespaceAuditEvents({
         namespace,
         actions,
         actorId: actorId ?? undefined,
         fromDate: fromDate ?? undefined,
         toDate: toDate ?? undefined,
-        cursor: pageParam,
+        cursor,
         limit: PAGE_SIZE,
       }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    selectItems: (page) => page.events,
     enabled,
-    retry: stopRetryOn4xx,
-    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
   });
-
-  const items = useMemo<AuditEvent[]>(
-    () => query.data?.pages.flatMap((p) => p.events) ?? [],
-    [query.data],
-  );
-
-  return {
-    data: items,
-    loading: enabled && query.isPending,
-    hasMore: query.hasNextPage,
-    loadingMore: query.isFetchingNextPage,
-    loadMore: () => {
-      void query.fetchNextPage();
-    },
-  };
 }
 
 /**
