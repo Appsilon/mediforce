@@ -19,7 +19,9 @@ import {
   StartRunOutputSchema,
   ListRunsInputSchema,
   ListRunsOutputSchema,
+  ListRunsPageClientInputSchema,
   ListRunsPageOutputSchema,
+  GetWorkflowStatusCountsClientInputSchema,
   GetWorkflowStatusCountsOutputSchema,
   ListRunNamesInputSchema,
   ListRunNamesOutputSchema,
@@ -1445,15 +1447,13 @@ export class Mediforce {
       },
       listPage: async (input) => {
         // NOT `ListRunsPageInputSchema.parse(input)`: that schema's
-        // `dryRun`/`archived` fields are `z.enum(['true','false'])` —
-        // wire-format strings for the ROUTE ADAPTER's query-string parsing.
-        // The caller's `input` (from `useProcessInstancesPage`) carries real
-        // JS booleans, which fail that enum's runtime validation and throw
-        // before any request is sent. `ListRunsPageInput`'s TYPE looks
-        // boolean-shaped (post-`.transform()`), which is why this type-checks
-        // despite always throwing at runtime — the default `limit` is applied
-        // manually below instead of relying on the schema's `.default(20)`.
-        const validated: Partial<ListRunsPageInput> = input ?? {};
+        // `dryRun`/`archived` fields are `z.enum(['true','false'])` — wire-
+        // format strings for the ROUTE ADAPTER's query-string parsing. The
+        // caller's `input` (from `useProcessInstancesPage`) carries real JS
+        // booleans, which fail that enum's runtime validation and throw
+        // before any request is sent. `ListRunsPageClientInputSchema` is the
+        // real-boolean counterpart, validated here instead.
+        const validated = ListRunsPageClientInputSchema.parse(input ?? {});
         const qs = toSearchParams({
           workflow: validated.workflow,
           namespace: validated.namespace,
@@ -1468,9 +1468,9 @@ export class Mediforce {
         return ListRunsPageOutputSchema.parse(body);
       },
       statusCounts: async (input) => {
-        // Same reasoning as `listPage` above — `GetWorkflowStatusCountsInputSchema`
-        // is the wire-format schema, not a client-input validator.
-        const validated: Partial<GetWorkflowStatusCountsInput> = input ?? {};
+        // Same reasoning as `listPage` above — `GetWorkflowStatusCountsClientInputSchema`
+        // is the real-boolean counterpart to the wire-format input schema.
+        const validated = GetWorkflowStatusCountsClientInputSchema.parse(input ?? {});
         const qs = toSearchParams({
           workflow: validated.workflow,
           namespace: validated.namespace,

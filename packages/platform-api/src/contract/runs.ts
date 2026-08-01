@@ -132,6 +132,24 @@ export type ListRunsPageInput = z.infer<typeof ListRunsPageInputSchema>;
 export type ListRunsPageOutput = z.infer<typeof ListRunsPageOutputSchema>;
 
 /**
+ * Client-side counterpart to `ListRunsPageInputSchema` — same field names,
+ * but `dryRun`/`archived` are real `boolean`s, not the wire-format
+ * `'true' | 'false'` strings the route adapter parses off the query string.
+ * `mediforce.runs.listPage` validates its caller's input against THIS
+ * schema, never the wire one — the wire schema's `z.enum(['true','false'])`
+ * rejects an actual boolean and throws before any request is sent.
+ */
+export const ListRunsPageClientInputSchema = z.object({
+  namespace: z.string().min(1).optional(),
+  workflow: z.string().min(1).optional(),
+  dryRun: z.boolean().optional(),
+  archived: z.boolean().optional(),
+  displayStatus: WorkflowDisplayStatusSchema.optional(),
+  cursor: z.string().min(1).optional(),
+  limit: z.number().int().positive().max(100).optional(),
+});
+
+/**
  * Contract for `GET /api/runs/status-counts` — grouped `WorkflowDisplayStatus`
  * counts for the Workflows tab's KPI cards, computed in Postgres (not by
  * fetching rows and tallying in JS). Accepts the same
@@ -145,6 +163,15 @@ export const GetWorkflowStatusCountsInputSchema = z.object({
   workflow: z.string().min(1).optional(),
   dryRun: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
   archived: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+});
+
+/** Client-side counterpart to `GetWorkflowStatusCountsInputSchema` — see
+ *  `ListRunsPageClientInputSchema`'s docstring for why this exists. */
+export const GetWorkflowStatusCountsClientInputSchema = z.object({
+  namespace: z.string().min(1).optional(),
+  workflow: z.string().min(1).optional(),
+  dryRun: z.boolean().optional(),
+  archived: z.boolean().optional(),
 });
 
 export const WorkflowDisplayStatusCountsSchema = z.object({
