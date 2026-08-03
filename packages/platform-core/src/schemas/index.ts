@@ -58,9 +58,11 @@ export {
   InstanceStatusSchema,
   ProcessInstanceSchema,
   RunNameEntrySchema,
+  WorkflowDisplayStatusSchema,
   type InstanceStatus,
   type ProcessInstance,
   type RunNameEntry,
+  type WorkflowDisplayStatus,
 } from './process-instance';
 
 export {
@@ -97,8 +99,10 @@ export {
 export {
   AgentRunStatusSchema,
   AgentRunSchema,
+  AgentRunCardStatusSchema,
   type AgentRunStatus,
   type AgentRun,
+  type AgentRunCardStatus,
 } from './agent-run';
 
 export {

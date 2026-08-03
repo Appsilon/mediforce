@@ -7,6 +7,7 @@ import {
   findPasswordCredentialByEmail,
   createDatabaseSession,
   recordSignIn,
+  recordSignInAuditEvent,
   SESSION_TTL_MS,
 } from '@mediforce/platform-infra';
 import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist';
@@ -45,6 +46,15 @@ function passwordAuthEnabled(): boolean {
   // sign-in, and this keeps the invite / first-password flow working without an
   // extra env flip. Set ENABLE_PASSWORD_AUTH=false for a Google/OIDC-only estate.
   return process.env.ENABLE_PASSWORD_AUTH !== 'false';
+}
+
+/** `x-forwarded-for` may carry a client,proxy1,proxy2 chain behind a load
+ *  balancer — the first entry is the original client. Falls back to
+ *  `x-real-ip` for proxies that set that instead. */
+function clientIpFrom(request: Request): string | null {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) return forwardedFor.split(',')[0]!.trim();
+  return request.headers.get('x-real-ip');
 }
 
 /** Whether this deployment offers password sign-in — the login page gates its
@@ -99,6 +109,17 @@ export async function POST(request: Request): Promise<NextResponse> {
   const expires = new Date(Date.now() + SESSION_TTL_MS);
   await createDatabaseSession(db, { sessionToken, userId: user.id, expires });
   await recordSignIn(db, user.id);
+  // Fire-and-forget: this is Monitoring telemetry, not part of the sign-in
+  // contract — the session cookie is already valid at this point, and a
+  // transient DB hiccup on the audit write must not fail the login response.
+  void recordSignInAuditEvent(db, {
+    uid: user.id,
+    method: {
+      kind: 'password',
+      ipAddress: clientIpFrom(request),
+      userAgent: request.headers.get('user-agent'),
+    },
+  }).catch(() => {});
 
   const secure = isSecureRequest(request);
   const response = NextResponse.json({ ok: true });

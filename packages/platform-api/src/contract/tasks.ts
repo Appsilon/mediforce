@@ -34,6 +34,10 @@ export const ListTasksInputSchema = z
     role: z.string().min(1).optional(),
     stepId: z.string().min(1).optional(),
     status: z.array(HumanTaskStatusSchema).min(1).optional(),
+    // Narrows the `role` / caller-scope axes to one workspace. Intersection
+    // semantics like `runs.list` — a namespace the caller isn't a member of
+    // yields an empty list, not a 403.
+    namespace: z.string().min(1).optional(),
   })
   .refine(
     (val) => !(val.instanceId !== undefined && val.role !== undefined),
@@ -53,6 +57,7 @@ export const ACTIONABLE_STATUSES: readonly HumanTaskStatus[] = ['pending', 'clai
 interface ListTasksFilters {
   stepId?: string;
   status?: HumanTaskStatus[];
+  namespace?: string;
 }
 
 /**
@@ -103,6 +108,25 @@ export const ClaimTaskOutputSchema = z.object({
 
 export type ClaimTaskInput = z.infer<typeof ClaimTaskInputSchema>;
 export type ClaimTaskOutput = z.infer<typeof ClaimTaskOutputSchema>;
+
+/**
+ * Contract for `POST /api/tasks/:taskId/viewed`.
+ *
+ * Fire-and-forget instrumentation — records that the caller opened the task
+ * view, so Monitoring → Tasks can show a real `task.viewed` audit trail
+ * instead of having no signal for "someone looked at this". Same
+ * path-derived-taskId shape as `claim`; no state change on the task itself.
+ */
+export const RecordTaskViewedInputSchema = z.object({
+  taskId: z.string().min(1),
+});
+
+export const RecordTaskViewedOutputSchema = z.object({
+  recorded: z.literal(true),
+});
+
+export type RecordTaskViewedInput = z.infer<typeof RecordTaskViewedInputSchema>;
+export type RecordTaskViewedOutput = z.infer<typeof RecordTaskViewedOutputSchema>;
 
 // Payload schemas live in platform-core so workflow-engine can import them
 // without an upward dep on platform-api.

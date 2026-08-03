@@ -106,6 +106,7 @@ export async function getProcessSteps(
       input: stepInput,
       output: stepOutput,
       executions: stepExecs,
+      allowedTools: executorType === 'agent' ? step.agent?.allowedTools : undefined,
     });
   }
 

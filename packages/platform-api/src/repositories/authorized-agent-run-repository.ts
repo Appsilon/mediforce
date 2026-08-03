@@ -3,6 +3,7 @@ import type {
   AgentRunRepository,
   ListAgentRunsOptions,
   ListAgentRunsPage,
+  AgentRunCardStatusCounts,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
 import { AuthorizedScope } from './authorized-repository';
@@ -47,4 +48,25 @@ export class AuthorizedAgentRunRepository extends AuthorizedScope {
   getByInstanceId = async (instanceId: string): Promise<AgentRun[]> =>
     this.raw.getByInstanceId(instanceId);
   list = async (opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> => this.raw.list(opts);
+
+  /**
+   * Keyset-paginated list — unlike the legacy `list` above (see header:
+   * #588's documented, not-yet-restored gating gap), this is new surface
+   * built with real namespace-scoped routing from the start, matching
+   * every other Authorized*Repository wrapper's `isSystemActor ? *All :
+   * *InNamespaces` convention.
+   */
+  listPage = async (opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> =>
+    this.caller.isSystemActor
+      ? this.raw.list(opts)
+      : this.raw.listInNamespaces([...this.caller.namespaces], opts);
+
+  /** Grouped `AgentRunCardStatus` counts for the Agents tab's KPI cards —
+   *  same namespace-scoped routing as `listPage`. */
+  countByCardStatus = async (
+    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status'>,
+  ): Promise<AgentRunCardStatusCounts> =>
+    this.caller.isSystemActor
+      ? this.raw.countByCardStatus(opts)
+      : this.raw.countByCardStatusInNamespaces([...this.caller.namespaces], opts);
 }

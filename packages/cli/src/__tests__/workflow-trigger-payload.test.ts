@@ -30,7 +30,7 @@ function cronRow(payload?: Record<string, unknown>) {
   };
 }
 
-function sentBody(call: [unknown, RequestInit | undefined]): Record<string, unknown> {
+function sentBody(call: [unknown, RequestInit?]): Record<string, unknown> {
   return JSON.parse(String(call[1]?.body)) as Record<string, unknown>;
 }
 

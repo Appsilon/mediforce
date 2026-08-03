@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
 import {
   AgentRunSchema,
   parseRow,
@@ -6,6 +6,8 @@ import {
   encodeAgentRunCursor,
   type AgentRun,
   type AgentRunRepository,
+  type AgentRunCardStatus,
+  type AgentRunCardStatusCounts,
   type ListAgentRunsOptions,
   type ListAgentRunsPage,
   type ProcessInstanceRepository,
@@ -206,11 +208,11 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
     return this.listImpl(opts, [...allowed]);
   }
 
-  private async listImpl(
-    opts: ListAgentRunsOptions,
+  private baseConditions(
+    opts: Pick<ListAgentRunsOptions, 'namespace' | 'runId' | 'stepId' | 'status' | 'processInstanceIds'>,
     allowed: readonly string[] | undefined,
-  ): Promise<ListAgentRunsPage> {
-    const conditions = [];
+  ): SQL[] {
+    const conditions: SQL[] = [];
     if (allowed !== undefined) {
       conditions.push(inArray(agentRuns.workspace, [...allowed]));
     }
@@ -223,6 +225,23 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
     if (opts.stepId !== undefined) {
       conditions.push(eq(agentRuns.stepId, opts.stepId));
     }
+    if (opts.status !== undefined) {
+      conditions.push(eq(agentRuns.status, opts.status));
+    }
+    if (opts.processInstanceIds !== undefined) {
+      conditions.push(inArray(agentRuns.processInstanceId, [...opts.processInstanceIds]));
+    }
+    return conditions;
+  }
+
+  private async listImpl(
+    opts: ListAgentRunsOptions,
+    allowed: readonly string[] | undefined,
+  ): Promise<ListAgentRunsPage> {
+    const conditions = this.baseConditions(opts, allowed);
+    if (opts.cardStatus !== undefined) {
+      conditions.push(cardStatusConditions()[opts.cardStatus]);
+    }
     if (opts.cursor !== undefined) {
       const after = decodeAgentRunCursor(opts.cursor);
       if (after !== null) {
@@ -234,7 +253,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
               eq(agentRuns.startedAt, new Date(after.startedAt)),
               sql`${agentRuns.id} < ${after.id}`,
             ),
-          ),
+          )!,
         );
       }
     }
@@ -257,6 +276,56 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
     }
     return { items };
   }
+
+  async countByCardStatus(
+    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status'>,
+  ): Promise<AgentRunCardStatusCounts> {
+    return this.countByCardStatusImpl(opts, undefined);
+  }
+
+  async countByCardStatusInNamespaces(
+    allowed: readonly string[],
+    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status'>,
+  ): Promise<AgentRunCardStatusCounts> {
+    if (allowed.length === 0) {
+      return { total: 0, running: 0, completed: 0, error: 0, flagged: 0 };
+    }
+    return this.countByCardStatusImpl(opts, [...allowed]);
+  }
+
+  private async countByCardStatusImpl(
+    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status'>,
+    allowed: readonly string[] | undefined,
+  ): Promise<AgentRunCardStatusCounts> {
+    const conditions = this.baseConditions(opts, allowed);
+    const buckets = cardStatusConditions();
+    const [row] = await this.db
+      .select({
+        total: sql<number>`count(*)`.mapWith(Number),
+        running: sql<number>`count(*) filter (where ${buckets.running})`.mapWith(Number),
+        completed: sql<number>`count(*) filter (where ${buckets.completed})`.mapWith(Number),
+        error: sql<number>`count(*) filter (where ${buckets.error})`.mapWith(Number),
+        flagged: sql<number>`count(*) filter (where ${buckets.flagged})`.mapWith(Number),
+      })
+      .from(agentRuns)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    return row ?? { total: 0, running: 0, completed: 0, error: 0, flagged: 0 };
+  }
+}
+
+// Mirrors CARD_DEFS's `match` predicates in
+// packages/platform-ui/src/components/monitoring/agents-tab.tsx — hand-
+// ported, kept in sync manually. `error` reads `fallback_reason`, never
+// `status` directly: AgentRunStatusSchema declares `error`/`timed_out` but
+// no real row is ever written with those statuses (see that file's own
+// comment on `agent-run-list-table.tsx`'s `STATUS_STYLES`).
+function cardStatusConditions(): Record<AgentRunCardStatus, SQL> {
+  return {
+    running: eq(agentRuns.status, 'running'),
+    completed: eq(agentRuns.status, 'completed'),
+    error: inArray(agentRuns.fallbackReason, ['error', 'timeout']),
+    flagged: inArray(agentRuns.status, ['escalated', 'flagged']),
+  };
 }
 
 interface ExtractedEnvelopeColumns {

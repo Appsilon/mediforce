@@ -1,10 +1,13 @@
 export type { AgentEventRepository } from './agent-event-repository';
-export type { AuditRepository } from './audit-repository';
+export type { AuditRepository, GetByNamespaceOptions, GetByNamespacePage } from './audit-repository';
 export type { AuthService, AuthUser } from './auth-service';
 export type { ProcessRepository, WorkflowDefinitionListResult, WorkflowDefinitionGroup } from './process-repository';
 export type {
   ProcessInstanceRepository,
   ListInstancesOptions,
+  ListInstancesPageOptions,
+  ListInstancesPage,
+  WorkflowDisplayStatusCounts,
   WorkflowRunSummaryResult,
 } from './process-instance-repository';
 export type { HumanTaskRepository } from './human-task-repository';
@@ -18,6 +21,7 @@ export type {
   AgentRunRepository,
   ListAgentRunsOptions,
   ListAgentRunsPage,
+  AgentRunCardStatusCounts,
 } from './agent-run-repository';
 export type { CoworkSessionRepository } from './cowork-session-repository';
 export type { TriggerRepository, TriggerUpdate } from './trigger-repository';

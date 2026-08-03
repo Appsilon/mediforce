@@ -329,6 +329,58 @@ describe('getProcessSteps handler', () => {
     expect(result.steps.find((s) => s.stepId === 'wait')?.status).toBe('completed');
   });
 
+  it('returns the agent step config allowedTools beyond the default set', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'with-tools',
+        version: 1,
+        namespace: 'team-alpha',
+        steps: [
+          {
+            id: 'fetch',
+            name: 'Fetch',
+            type: 'creation',
+            executor: 'agent',
+            agent: { allowedTools: ['WebFetch', 'WebSearch'] },
+          },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+      }),
+    );
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-tools',
+        definitionName: 'with-tools',
+        definitionVersion: '1',
+        namespace: 'team-alpha',
+        currentStepId: 'fetch',
+      }),
+    );
+
+    const scope = createTestScope({ instanceRepo, processRepo });
+    const result = await getProcessSteps({ instanceId: 'inst-tools' }, scope);
+
+    expect(result.steps.find((s) => s.stepId === 'fetch')?.allowedTools).toEqual(['WebFetch', 'WebSearch']);
+  });
+
+  it('leaves allowedTools undefined for a human step and an agent step with none configured', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-1',
+        definitionName: 'demo',
+        definitionVersion: '1',
+        namespace: 'team-alpha',
+        currentStepId: 's1',
+      }),
+    );
+
+    const scope = createTestScope({ instanceRepo, processRepo });
+    const result = await getProcessSteps({ instanceId: 'inst-1' }, scope);
+
+    expect(result.steps.find((s) => s.stepId === 's1')?.allowedTools).toBeUndefined();
+    expect(result.steps.find((s) => s.stepId === 's2')?.allowedTools).toBeUndefined();
+  });
+
   it('returns the steps for in-namespace user callers', async () => {
     await instanceRepo.create(
       buildProcessInstance({

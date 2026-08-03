@@ -5,13 +5,22 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { InMemoryProcessInstanceRepository } from '@mediforce/platform-core';
+import { InMemoryProcessInstanceRepository, getWorkflowStatus } from '@mediforce/platform-core';
 import type {
   AgentEvent,
   ProcessInstance,
   ProcessInstanceRepository,
   StepExecution,
+  WorkflowDisplayStatus,
 } from '@mediforce/platform-core';
+
+const ALL_DISPLAY_STATUSES: readonly WorkflowDisplayStatus[] = [
+  'in_progress',
+  'waiting_for_human',
+  'error',
+  'cancelled',
+  'completed',
+];
 import { PostgresProcessInstanceRepository } from '../repositories/process-instance-repository';
 import { PostgresNamespaceRepository } from '../repositories/namespace-repository';
 import * as schema from '../schema/index';
@@ -443,6 +452,158 @@ function contract(
           status: 'bogus' as unknown as ProcessInstance['status'],
         }),
       ).rejects.toThrow();
+    });
+
+    it('listPage returns newest-first pages with a working cursor', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      const created = [];
+      for (let i = 0; i < 3; i++) {
+        created.push(
+          await repo.create(
+            instanceFor('ws-1', { createdAt: `2026-01-0${i + 1}T00:00:00.000Z` }),
+          ),
+        );
+      }
+
+      const page1 = await repo.listPage({ namespace: 'ws-1', limit: 2 });
+      expect(page1.items.map((r) => r.id)).toEqual([created[2].id, created[1].id]);
+      expect(page1.nextCursor).toBeDefined();
+
+      const page2 = await repo.listPage({
+        namespace: 'ws-1',
+        limit: 2,
+        cursor: page1.nextCursor,
+      });
+      expect(page2.items.map((r) => r.id)).toEqual([created[0].id]);
+      expect(page2.nextCursor).toBeUndefined();
+    });
+
+    it('listPage excludes archived by default, includes with archived: true', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      const active = await repo.create(instanceFor('ws-1', { archived: false }));
+      const archived = await repo.create(instanceFor('ws-1', { archived: true }));
+
+      const withoutArchived = await repo.listPage({ namespace: 'ws-1', limit: 20 });
+      expect(withoutArchived.items.map((r) => r.id)).toEqual([active.id]);
+
+      const withArchived = await repo.listPage({ namespace: 'ws-1', limit: 20, archived: true });
+      expect(withArchived.items.map((r) => r.id).sort()).toEqual(
+        [active.id, archived.id].sort(),
+      );
+    });
+
+    // Exhaustive parity check: for every real (status, pauseReason, error)
+    // combination getWorkflowStatus branches on, the SQL `displayStatus`
+    // filter/aggregation (hand-ported in process-instance-repository.ts's
+    // displayStatusConditions) must bucket it identically to the JS
+    // function. This is the test that actually catches drift between the
+    // two — everything else here just exercises pagination mechanics.
+    const DISPLAY_STATUS_FIXTURES: Array<{
+      label: string;
+      overrides: Partial<ProcessInstance>;
+    }> = [
+      { label: 'completed', overrides: { status: 'completed' } },
+      { label: 'running', overrides: { status: 'running' } },
+      { label: 'created', overrides: { status: 'created' } },
+      {
+        label: 'paused/waiting_for_timer',
+        overrides: { status: 'paused', pauseReason: 'waiting_for_timer' },
+      },
+      {
+        label: 'paused/waiting_for_human',
+        overrides: { status: 'paused', pauseReason: 'waiting_for_human' },
+      },
+      {
+        label: 'paused/awaiting_agent_approval',
+        overrides: { status: 'paused', pauseReason: 'awaiting_agent_approval' },
+      },
+      {
+        label: 'paused/cowork_in_progress',
+        overrides: { status: 'paused', pauseReason: 'cowork_in_progress' },
+      },
+      {
+        label: 'paused/agent_escalated',
+        overrides: { status: 'paused', pauseReason: 'agent_escalated' },
+      },
+      {
+        label: 'paused/agent_paused',
+        overrides: { status: 'paused', pauseReason: 'agent_paused' },
+      },
+      {
+        label: 'paused/missing_env',
+        overrides: { status: 'paused', pauseReason: 'missing_env' },
+      },
+      {
+        label: 'paused/step_failure',
+        overrides: { status: 'paused', pauseReason: 'step_failure' },
+      },
+      {
+        label: 'paused/routing_error',
+        overrides: { status: 'paused', pauseReason: 'routing_error' },
+      },
+      {
+        label: 'paused/max_iterations_exceeded',
+        overrides: { status: 'paused', pauseReason: 'max_iterations_exceeded' },
+      },
+      { label: 'paused/null-reason', overrides: { status: 'paused', pauseReason: null } },
+      {
+        label: 'paused/unrecognized-reason',
+        overrides: { status: 'paused', pauseReason: 'some_future_reason' },
+      },
+      {
+        label: 'failed/cancelled',
+        overrides: { status: 'failed', error: 'Cancelled by user' },
+      },
+      { label: 'failed/other-error', overrides: { status: 'failed', error: 'Boom' } },
+      { label: 'failed/null-error', overrides: { status: 'failed', error: null } },
+    ];
+
+    it.each(DISPLAY_STATUS_FIXTURES)(
+      'listPage displayStatus filter matches getWorkflowStatus for $label',
+      async ({ overrides }) => {
+        const { repo, registerWorkspace } = await factory();
+        await registerWorkspace('ws-1');
+        const instance = await repo.create(instanceFor('ws-1', overrides));
+        const expectedBucket = getWorkflowStatus(instance).displayStatus;
+
+        const matching = await repo.listPage({
+          namespace: 'ws-1',
+          limit: 20,
+          displayStatus: expectedBucket,
+        });
+        expect(matching.items.map((r) => r.id)).toContain(instance.id);
+
+        for (const bucket of ALL_DISPLAY_STATUSES) {
+          if (bucket === expectedBucket) continue;
+          const nonMatching = await repo.listPage({
+            namespace: 'ws-1',
+            limit: 20,
+            displayStatus: bucket,
+          });
+          expect(nonMatching.items.map((r) => r.id)).not.toContain(instance.id);
+        }
+      },
+    );
+
+    it('countByDisplayStatus tallies each bucket to match getWorkflowStatus, in one grouped query', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      const expected: Record<string, number> = {
+        in_progress: 0,
+        waiting_for_human: 0,
+        error: 0,
+        cancelled: 0,
+        completed: 0,
+      };
+      for (const { overrides } of DISPLAY_STATUS_FIXTURES) {
+        const instance = await repo.create(instanceFor('ws-1', overrides));
+        expected[getWorkflowStatus(instance).displayStatus]++;
+      }
+
+      const counts = await repo.countByDisplayStatus({ namespace: 'ws-1' });
+      expect(counts).toEqual(expected);
     });
   });
 }

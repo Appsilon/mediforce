@@ -206,6 +206,51 @@ describe('listTasks handler', () => {
     });
   });
 
+  describe('namespace filter', () => {
+    beforeEach(async () => {
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }));
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-b', namespace: 'team-beta' }));
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 't-alpha', processInstanceId: 'inst-a', assignedRole: 'reviewer' }),
+      );
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 't-beta', processInstanceId: 'inst-b', assignedRole: 'reviewer' }),
+      );
+    });
+
+    it('narrows the role axis to one workspace for api-key callers', async () => {
+      const scope = createTestScope({ humanTaskRepo, instanceRepo });
+      const result = await listTasks({ role: 'reviewer', namespace: 'team-alpha' }, scope);
+      expect(result.tasks.map((t) => t.id)).toEqual(['t-alpha']);
+    });
+
+    it('narrows the caller-scope axis to one workspace for api-key callers', async () => {
+      const scope = createTestScope({ humanTaskRepo, instanceRepo });
+      const result = await listTasks({ namespace: 'team-beta' }, scope);
+      expect(result.tasks.map((t) => t.id)).toEqual(['t-beta']);
+    });
+
+    it('intersects with a user caller’s own namespaces — member workspace', async () => {
+      const scope = createTestScope({
+        humanTaskRepo,
+        instanceRepo,
+        caller: userCaller('u-1', ['team-alpha', 'team-beta']),
+      });
+      const result = await listTasks({ namespace: 'team-alpha' }, scope);
+      expect(result.tasks.map((t) => t.id)).toEqual(['t-alpha']);
+    });
+
+    it('returns empty for a user caller requesting a namespace they are not a member of', async () => {
+      const scope = createTestScope({
+        humanTaskRepo,
+        instanceRepo,
+        caller: userCaller('u-2', ['team-beta']),
+      });
+      const result = await listTasks({ namespace: 'team-alpha' }, scope);
+      expect(result.tasks).toEqual([]);
+    });
+  });
+
   /**
    * GitHub-like default: bare endpoint with no axis returns the caller's
    * workspace-visible queue. System actors see everything; user callers see

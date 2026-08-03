@@ -25,10 +25,15 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
       ? this.raw.getById(taskId)
       : this.raw.getByIdInNamespaces(taskId, [...this.caller.namespaces]);
 
-  getByRole = async (role: string): Promise<HumanTask[]> =>
-    this.caller.isSystemActor
+  getByRole = async (role: string, namespace?: string): Promise<HumanTask[]> => {
+    if (namespace !== undefined) {
+      if (!this.caller.isSystemActor && !this.caller.namespaces.has(namespace)) return [];
+      return this.raw.getByRoleInNamespaces(role, [namespace]);
+    }
+    return this.caller.isSystemActor
       ? this.raw.getByRoleAll(role)
       : this.raw.getByRoleInNamespaces(role, [...this.caller.namespaces]);
+  };
 
   getByInstanceId = async (instanceId: string): Promise<HumanTask[]> =>
     this.caller.isSystemActor
@@ -45,10 +50,15 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
    * roles + instances. System actors see the whole store; user callers see
    * tasks whose parent run belongs to one of their namespaces.
    */
-  listForCaller = async (): Promise<HumanTask[]> =>
-    this.caller.isSystemActor
+  listForCaller = async (namespace?: string): Promise<HumanTask[]> => {
+    if (namespace !== undefined) {
+      if (!this.caller.isSystemActor && !this.caller.namespaces.has(namespace)) return [];
+      return this.raw.listInNamespaces([namespace]);
+    }
+    return this.caller.isSystemActor
       ? this.raw.listAll()
       : this.raw.listInNamespaces([...this.caller.namespaces]);
+  };
 
   claim = async (taskId: string, userId: string): Promise<HumanTask> => {
     await this.assertCanMutate(taskId);

@@ -265,11 +265,17 @@ _Avoid_: Conflating with Plugin — Plugin is the runtime; Skill is data.
 
 **Agent**:
 A reusable agent the platform can run — Claude Code / OpenCode /
-cowork-chat / voice-realtime / future runtimes. Bundles system prompt,
-foundation model, MCP server bindings, skills (and, in the future, tools).
-Referenced by a Workflow Step via `agentId`; the same Agent powers many
-Steps across many Workflows. Single mutable document — **not versioned
-today** (the agent IS the spec, one row per agent).
+cowork-chat / voice-realtime / future runtimes. Bundles a system prompt
+and MCP server bindings. Referenced by a Workflow Step via `agentId`; the
+same Agent powers many Steps across many Workflows. Single mutable
+document — **not versioned today** (the agent IS the spec, one row per
+agent).
+_Not yet wired:_ the schema also carries `foundationModel` (plus a
+form-level model picker), but no runtime path reads either — model
+selection is only ever `step.agent.model`, set independently at the step/
+plugin level. There is no `skills` field on the schema at all; skills are
+step-level (`step.agent.skillsDir`), not part of the Agent. Treat both as
+aspirational, not current behaviour.
 _Future:_ if we introduce versioning, an **Agent Definition** would emerge
 as one versioned spec of an Agent (parallel to Workflow / Workflow Definition).
 _Code:_ user-facing surface (UI, URL `/api/agents/*`, CLI `agent-*`) uses
