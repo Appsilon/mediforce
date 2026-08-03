@@ -26,7 +26,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
-import { normalizeRepoUrls, toHttpsWithToken } from '../plugins/container-plugin';
+import { normalizeRepoUrls, toHttpsWithToken } from '@mediforce/platform-core';
 import { bareRepoPathFor, defaultDataDir, runBranchName, worktreePathFor, type WorkflowIdentity } from './workspace-paths';
 
 export type { WorkflowIdentity } from './workspace-paths';

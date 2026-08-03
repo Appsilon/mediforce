@@ -13,7 +13,7 @@ function makeTmpDir(): string {
 
 async function importFresh() {
   vi.resetModules();
-  return import('../container-plugin');
+  return import('../git-clone');
 }
 
 beforeEach(() => {
@@ -55,14 +55,13 @@ describe('prepareDeployKeyPath', () => {
     expect(statSync(result).mode & 0o777).toBe(0o600);
   });
 
-  it('returns source path unchanged when source is a directory (EISDIR guard)', async () => {
+  it('rejects a directory configured as the deploy key source', async () => {
     const sourceDir = makeTmpDir();
     process.env.DEPLOY_KEY_PATH = sourceDir;
 
     const { prepareDeployKeyPath } = await importFresh();
-    const result = prepareDeployKeyPath();
 
-    expect(result).toBe(sourceDir);
+    expect(() => prepareDeployKeyPath()).toThrow(/deploy key.*regular file/i);
   });
 
   it('re-copies when cached path is replaced by a directory', async () => {

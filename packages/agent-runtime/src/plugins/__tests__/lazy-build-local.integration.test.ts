@@ -74,6 +74,7 @@ describe.skipIf(!dockerAvailable())('LocalDockerSpawnStrategy with lazy image bu
         imageBuild: {
           image,
           repoUrl: repo.repoPath,
+          repoRef: repo.repoPath,
           commit: repo.commitSha,
         },
       });
