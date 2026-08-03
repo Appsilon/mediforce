@@ -15,6 +15,7 @@ import { routes } from '@/lib/routes';
 import { formatAgentRunCost } from '@/lib/agent-cost';
 import { formatAgentRunContainer } from '@/lib/agent-container';
 import { useStepAllowedTools } from '@/hooks/use-step-permissions';
+import { LoadMoreFooter } from '@/components/load-more-footer';
 import type { LucideIcon } from 'lucide-react';
 
 function getPluginDisplay(pluginId: string): { Icon: LucideIcon; colorClass: string; label: string } {
@@ -74,10 +75,16 @@ export function AgentRunListTable({
   runs,
   loading,
   processNameMap,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }: {
   runs: AgentRun[];
   loading: boolean;
   processNameMap?: Map<string, string>;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }) {
   const handle = useHandleFromPath();
   const modelPricing = useModelPricing();
@@ -178,6 +185,7 @@ export function AgentRunListTable({
               })}
           </tbody>
         </table>
+        <LoadMoreFooter hasMore={hasMore} loadingMore={loadingMore} onLoadMore={onLoadMore} />
       </div>
       <AgentLogPanel run={selectedRun} onClose={() => setSelectedRun(null)} />
     </>

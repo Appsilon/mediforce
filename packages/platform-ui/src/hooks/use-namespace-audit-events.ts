@@ -2,37 +2,60 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { AuditEvent } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
-import { STANDARD_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
+import { usePaginatedQuery } from './use-paginated-query';
+
+const PAGE_SIZE = 20;
 
 /**
- * Every audit event for a workspace (Monitoring → Users tab) — sign-ins,
- * workflow triggers/cancels, task completions, across every user. STANDARD
- * LIVE per ADR-0006 §4, matching the other list-style monitoring reads.
+ * Keyset-paginated audit events for a workspace (Monitoring → Users / Tasks
+ * tabs) — sign-ins, workflow triggers/cancels, task activity, across every
+ * user. `actions` restricts server-side to the calling tab's own event set
+ * (Users vs. Tasks each pass a different slice) so a 20-row page reflects
+ * what that tab actually shows, not an arbitrary slice of the whole
+ * namespace-wide log. `actorId`/`fromDate`/`toDate` are the User/date-range
+ * filter controls, also pushed server-side.
+ *
+ * Replaces the old unbounded `useNamespaceAuditEvents(handle)` — no `limit`
+ * meant "fetch the entire namespace audit log," the worst offender behind
+ * the Monitoring page's real-data slowness (thousands of rows, one
+ * unfiltered request, every 5s poll).
+ *
+ * STANDARD LIVE polling refetches every already-loaded page in cursor
+ * order — "Load more" state survives a poll tick.
  */
-export function useNamespaceAuditEvents(handle: string): {
-  data: AuditEvent[];
-  loading: boolean;
-} {
-  const enabled = handle.length > 0;
-  const query = useQuery({
-    queryKey: enabled ? queryKeys.namespaceAuditEvents(handle) : queryKeys.namespaceAuditEvents('__noop__'),
-    queryFn: async () => {
-      const result = await mediforce.processes.listNamespaceAuditEvents({ namespace: handle });
-      return result.events;
-    },
-    enabled,
-    retry: stopRetryOn4xx,
-    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
-  });
+export function useNamespaceAuditEventsPage(params: {
+  namespace: string;
+  actions: string[];
+  actorId?: string | null;
+  fromDate?: string | null;
+  toDate?: string | null;
+}) {
+  const { namespace, actions, actorId, fromDate, toDate } = params;
+  const enabled = namespace.length > 0;
 
-  return {
-    data: query.data ?? [],
-    loading: enabled && query.isLoading,
-  };
+  return usePaginatedQuery({
+    queryKey: queryKeys.namespaceAuditEvents(namespace, {
+      actions,
+      actorId: actorId ?? undefined,
+      fromDate: fromDate ?? undefined,
+      toDate: toDate ?? undefined,
+    }),
+    queryFn: (cursor) =>
+      mediforce.processes.listNamespaceAuditEvents({
+        namespace,
+        actions,
+        actorId: actorId ?? undefined,
+        fromDate: fromDate ?? undefined,
+        toDate: toDate ?? undefined,
+        cursor,
+        limit: PAGE_SIZE,
+      }),
+    selectItems: (page) => page.events,
+    enabled,
+  });
 }
 
 /**

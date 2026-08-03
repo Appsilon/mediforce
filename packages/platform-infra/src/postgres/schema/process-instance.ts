@@ -105,6 +105,16 @@ export const processInstances = pgTable(
         table.updatedAt.desc(),
       )
       .where(sql`${table.deletedAt} is null and ${table.archivedAt} is null`),
+    // Backs `listPage`/`countByDisplayStatus`'s keyset scan when no raw
+    // `status` filter narrows the table — Monitoring → Workflows' default
+    // "All statuses" view. `workspaceStatusIdx` above can't serve
+    // `ORDER BY created_at DESC` once `status` is unconstrained (the index
+    // is only created_at-sorted *within* each status value). Partial on
+    // `deleted_at` only, not `archived_at`, since the archived-runs toggle
+    // still needs an index-assisted scan.
+    workspaceCreatedIdx: index('process_instances_workspace_created_idx')
+      .on(table.workspace, table.createdAt.desc(), table.id.desc())
+      .where(sql`${table.deletedAt} is null`),
   }),
 );
 

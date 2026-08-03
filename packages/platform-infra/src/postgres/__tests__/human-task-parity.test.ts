@@ -71,6 +71,10 @@ class StubProcessInstanceRepository implements ProcessInstanceRepository {
   async updateStepExecution(): Promise<void> { throw new Error('stub'); }
   async getIdsByDefinitionName(): Promise<string[]> { throw new Error('stub'); }
   async setDeletedByDefinitionName(): Promise<void> { throw new Error('stub'); }
+  async listPage(): Promise<never> { throw new Error('stub'); }
+  async listPageInNamespaces(): Promise<never> { throw new Error('stub'); }
+  async countByDisplayStatus(): Promise<never> { throw new Error('stub'); }
+  async countByDisplayStatusInNamespaces(): Promise<never> { throw new Error('stub'); }
 }
 
 function taskFor(

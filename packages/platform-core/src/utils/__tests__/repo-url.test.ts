@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveRepoCloneTargets } from '../repo-url';
+import { redactRepoCredentials, resolveRepoCloneTargets } from '../repo-url';
 
 describe('resolveRepoCloneTargets', () => {
   it('[DATA] clones a git@ ref over SSH as given, never converting to HTTPS', () => {
@@ -12,6 +12,27 @@ describe('resolveRepoCloneTargets', () => {
     expect(resolveRepoCloneTargets('/path/to/bare.git')).toEqual([
       { cloneUrl: '/path/to/bare.git', useSsh: false },
     ]);
+  });
+
+  it('[DATA] keeps an absolute local path local when a token is provided', () => {
+    expect(resolveRepoCloneTargets('/path/to/bare.git', 'TOK')).toEqual([
+      { cloneUrl: '/path/to/bare.git', useSsh: false },
+    ]);
+  });
+
+  it('[DATA] keeps a relative local path local when a token is provided', () => {
+    expect(resolveRepoCloneTargets('./path/to/bare.git', 'TOK')).toEqual([
+      { cloneUrl: './path/to/bare.git', useSsh: false },
+    ]);
+  });
+
+  it('[DATA] redacts tokens and URL credentials from clone errors', () => {
+    expect(
+      redactRepoCredentials(
+        'fatal: https://x-access-token:SECRET@github.com/owner/repo.git',
+        'SECRET',
+      ),
+    ).toBe('fatal: https://[REDACTED]@github.com/owner/repo.git');
   });
 
   it('[DATA] tries anonymous HTTPS first for an owner/repo shorthand, then the deploy key', () => {

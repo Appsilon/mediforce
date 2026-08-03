@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useMonitoringData } from '@/hooks/use-monitoring';
-import { useAgentRuns, useProcessNameMap } from '@/hooks/use-agent-runs';
 import { UsersTab } from '@/components/monitoring/users-tab';
 import { AgentsTab } from '@/components/monitoring/agents-tab';
 import { WorkflowsTab } from '@/components/monitoring/workflows-tab';
@@ -23,8 +22,6 @@ export default function MonitoringPage() {
   const { handle } = useParams<{ handle: string }>();
   const [activeTab, setActiveTab] = useState<string>('workflows');
   const monitoringData = useMonitoringData(handle);
-  const { data: agentRuns, loading: agentRunsLoading } = useAgentRuns(handle);
-  const processNameMap = useProcessNameMap(handle);
 
   return (
     <div className="p-6 space-y-6">
@@ -46,14 +43,10 @@ export default function MonitoringPage() {
             <UsersTab />
           </Tabs.Content>
           <Tabs.Content value="agents">
-            <AgentsTab
-              runs={agentRuns}
-              loading={agentRunsLoading}
-              processNameMap={processNameMap}
-            />
+            <AgentsTab />
           </Tabs.Content>
           <Tabs.Content value="workflows">
-            <WorkflowsTab data={monitoringData} />
+            <WorkflowsTab />
           </Tabs.Content>
           <Tabs.Content value="tasks">
             <TasksTab data={monitoringData} />

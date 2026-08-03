@@ -19,6 +19,10 @@ import {
   StartRunOutputSchema,
   ListRunsInputSchema,
   ListRunsOutputSchema,
+  ListRunsPageClientInputSchema,
+  ListRunsPageOutputSchema,
+  GetWorkflowStatusCountsClientInputSchema,
+  GetWorkflowStatusCountsOutputSchema,
   ListRunNamesInputSchema,
   ListRunNamesOutputSchema,
   ListRunOutputFilesInputSchema,
@@ -312,6 +316,10 @@ import {
   type StartRunOutput,
   type ListRunsInput,
   type ListRunsOutput,
+  type ListRunsPageInput,
+  type ListRunsPageOutput,
+  type GetWorkflowStatusCountsInput,
+  type GetWorkflowStatusCountsOutput,
   type ListRunNamesInput,
   type ListRunNamesOutput,
   type ListRunOutputFilesInput,
@@ -413,10 +421,14 @@ import {
   ListAgentRunsOutputSchema,
   GetAgentRunInputSchema,
   GetAgentRunOutputSchema,
+  GetAgentRunCardStatusCountsInputSchema,
+  GetAgentRunCardStatusCountsOutputSchema,
   type ListAgentRunsInput,
   type ListAgentRunsOutput,
   type GetAgentRunInput,
   type GetAgentRunOutput,
+  type GetAgentRunCardStatusCountsInput,
+  type GetAgentRunCardStatusCountsOutput,
   MonitoringSummaryInputSchema,
   GetMonitoringSummaryOutputSchema,
   type MonitoringSummaryInput,
@@ -615,6 +627,8 @@ export class Mediforce {
 
   readonly runs: {
     list: (input?: ListRunsInput) => Promise<ListRunsOutput>;
+    listPage: (input?: ListRunsPageInput) => Promise<ListRunsPageOutput>;
+    statusCounts: (input?: GetWorkflowStatusCountsInput) => Promise<GetWorkflowStatusCountsOutput>;
     listNames: (input: ListRunNamesInput) => Promise<ListRunNamesOutput>;
     get: (input: GetRunInput) => Promise<GetRunOutput>;
     listOutputFiles: (input: ListRunOutputFilesInput) => Promise<ListRunOutputFilesOutput>;
@@ -731,6 +745,9 @@ export class Mediforce {
   readonly agentRuns: {
     list: (input?: ListAgentRunsInput) => Promise<ListAgentRunsOutput>;
     get: (input: GetAgentRunInput) => Promise<GetAgentRunOutput>;
+    cardStatusCounts: (
+      input?: GetAgentRunCardStatusCountsInput,
+    ) => Promise<GetAgentRunCardStatusCountsOutput>;
   };
 
   readonly monitoring: {
@@ -900,6 +917,11 @@ export class Mediforce {
         const qs = toSearchParams({
           namespace: validated.namespace,
           limit: validated.limit !== undefined ? String(validated.limit) : undefined,
+          cursor: validated.cursor,
+          action: validated.actions,
+          actorId: validated.actorId,
+          fromDate: validated.fromDate,
+          toDate: validated.toDate,
         });
         const res = await this.request(`/api/audit-events${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.processes.listNamespaceAuditEvents');
@@ -1423,6 +1445,42 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.runs.list');
         return ListRunsOutputSchema.parse(body);
       },
+      listPage: async (input) => {
+        // NOT `ListRunsPageInputSchema.parse(input)`: that schema's
+        // `dryRun`/`archived` fields are `z.enum(['true','false'])` — wire-
+        // format strings for the ROUTE ADAPTER's query-string parsing. The
+        // caller's `input` (from `useProcessInstancesPage`) carries real JS
+        // booleans, which fail that enum's runtime validation and throw
+        // before any request is sent. `ListRunsPageClientInputSchema` is the
+        // real-boolean counterpart, validated here instead.
+        const validated = ListRunsPageClientInputSchema.parse(input ?? {});
+        const qs = toSearchParams({
+          workflow: validated.workflow,
+          namespace: validated.namespace,
+          dryRun: validated.dryRun !== undefined ? String(validated.dryRun) : undefined,
+          archived: validated.archived !== undefined ? String(validated.archived) : undefined,
+          displayStatus: validated.displayStatus,
+          cursor: validated.cursor,
+          limit: String(validated.limit ?? 20),
+        });
+        const res = await this.request(`/api/runs/page${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.runs.listPage');
+        return ListRunsPageOutputSchema.parse(body);
+      },
+      statusCounts: async (input) => {
+        // Same reasoning as `listPage` above — `GetWorkflowStatusCountsClientInputSchema`
+        // is the real-boolean counterpart to the wire-format input schema.
+        const validated = GetWorkflowStatusCountsClientInputSchema.parse(input ?? {});
+        const qs = toSearchParams({
+          workflow: validated.workflow,
+          namespace: validated.namespace,
+          dryRun: validated.dryRun !== undefined ? String(validated.dryRun) : undefined,
+          archived: validated.archived !== undefined ? String(validated.archived) : undefined,
+        });
+        const res = await this.request(`/api/runs/status-counts${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.runs.statusCounts');
+        return GetWorkflowStatusCountsOutputSchema.parse(body);
+      },
       listNames: async (input) => {
         const validated = ListRunNamesInputSchema.parse(input);
         const qs = toSearchParams({ namespace: validated.namespace });
@@ -1810,6 +1868,9 @@ export class Mediforce {
           stepId: validated.stepId,
           limit: validated.limit !== undefined ? String(validated.limit) : undefined,
           cursor: validated.cursor,
+          status: validated.status,
+          cardStatus: validated.cardStatus,
+          processInstanceId: validated.processInstanceIds,
         });
         const res = await this.request(`/api/agent-runs${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.list');
@@ -1822,6 +1883,17 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.get');
         return GetAgentRunOutputSchema.parse(body);
+      },
+      cardStatusCounts: async (input) => {
+        const validated = GetAgentRunCardStatusCountsInputSchema.parse(input ?? {});
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          status: validated.status,
+          processInstanceId: validated.processInstanceIds,
+        });
+        const res = await this.request(`/api/agent-runs/card-status-counts${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.cardStatusCounts');
+        return GetAgentRunCardStatusCountsOutputSchema.parse(body);
       },
     };
 

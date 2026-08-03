@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
+  execFileSync: vi.fn(),
   spawn: vi.fn(),
 }));
 
@@ -10,7 +11,7 @@ vi.mock('node:fs/promises', () => ({
   rm: vi.fn(),
 }));
 
-import { execSync, spawn } from 'node:child_process';
+import { execFileSync, execSync, spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import {
   imageExistsLocally,
@@ -20,6 +21,7 @@ import {
 } from '../docker-image-builder';
 
 const execSyncMock = vi.mocked(execSync);
+const execFileSyncMock = vi.mocked(execFileSync);
 const mkdtempMock = vi.mocked(mkdtemp);
 const rmMock = vi.mocked(rm);
 
@@ -27,11 +29,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   mkdtempMock.mockResolvedValue('/tmp/mediforce-build-abc');
   rmMock.mockResolvedValue(undefined);
+  execFileSyncMock.mockReturnValue(Buffer.from(''));
 });
 
 /** git fetch invocations in call order — one per attempted clone transport. */
-function fetchCalls(): Parameters<typeof execSync>[] {
-  return execSyncMock.mock.calls.filter(([command]) => String(command).includes(' fetch '));
+function fetchCalls(): Parameters<typeof execFileSync>[] {
+  return execFileSyncMock.mock.calls.filter(
+    ([command, args]) => command === 'git' && args?.includes('fetch'),
+  );
 }
 
 describe('imageExistsLocally', () => {
@@ -78,7 +83,7 @@ describe('getImageBuildCommit', () => {
 
 describe('buildImageFromRepo', () => {
   it('clones repo at specific commit and runs docker build', async () => {
-    // All execSync calls succeed
+    // All Docker and Git calls succeed
     execSyncMock.mockReturnValue(Buffer.from(''));
 
     await buildImageFromRepo({
@@ -88,11 +93,20 @@ describe('buildImageFromRepo', () => {
     });
 
     const calls = execSyncMock.mock.calls.map(([cmd]) => String(cmd));
+    const gitCalls = execFileSyncMock.mock.calls;
 
-    // Should init, fetch the commit from the clone URL, checkout (uses git -C <dir> syntax)
-    expect(calls.some((cmd) => cmd.includes('git init'))).toBe(true);
-    expect(calls.some((cmd) => cmd.includes('fetch "/tmp/test-repo.git" "abc123"'))).toBe(true);
-    expect(calls.some((cmd) => cmd.includes('checkout FETCH_HEAD'))).toBe(true);
+    // Should init, fetch the commit from the clone URL, and checkout without shell interpolation.
+    expect(gitCalls).toContainEqual(['git', ['init', '/tmp/mediforce-build-abc'], expect.anything()]);
+    expect(gitCalls).toContainEqual([
+      'git',
+      ['-C', '/tmp/mediforce-build-abc', 'fetch', '/tmp/test-repo.git', 'abc123', '--depth', '1'],
+      expect.anything(),
+    ]);
+    expect(gitCalls).toContainEqual([
+      'git',
+      ['-C', '/tmp/mediforce-build-abc', 'checkout', 'FETCH_HEAD'],
+      expect.anything(),
+    ]);
 
     // Should docker build with label
     expect(calls.some((cmd) =>
@@ -149,10 +163,12 @@ describe('buildImageFromRepo', () => {
       commit: 'abc123',
     });
 
-    const [command, options] = fetchCalls()[0];
+    const [command, args, options] = fetchCalls()[0];
     // Anonymous HTTPS — no token, no SSH.
-    expect(String(command)).toContain('https://github.com/owner/repo');
-    expect(String(command)).not.toContain('git@github.com');
+    expect(command).toBe('git');
+    expect(args).toEqual([
+      '-C', '/tmp/mediforce-build-abc', 'fetch', 'https://github.com/owner/repo', 'abc123', '--depth', '1',
+    ]);
     // No GIT_SSH_COMMAND for an anonymous HTTPS clone — the deploy key is never referenced.
     expect(options?.env?.GIT_SSH_COMMAND).toBeUndefined();
   });
@@ -167,14 +183,15 @@ describe('buildImageFromRepo', () => {
       commit: 'abc123',
     });
 
-    const [command, options] = fetchCalls()[0];
-    expect(String(command)).toContain('git@github.com:owner/repo.git');
+    const [command, args, options] = fetchCalls()[0];
+    expect(command).toBe('git');
+    expect(args).toContain('git@github.com:owner/repo.git');
     expect(options?.env?.GIT_SSH_COMMAND).toContain('ssh -i');
   });
 
   it('falls back to the SSH deploy key when anonymous HTTPS cannot see a private owner/repo', async () => {
-    execSyncMock.mockImplementation((command) => {
-      if (String(command).includes('fetch "https://github.com/owner/private"')) {
+    execFileSyncMock.mockImplementation((_command, args) => {
+      if (args?.includes('https://github.com/owner/private')) {
         throw new Error('remote: Repository not found');
       }
       return Buffer.from('');
@@ -189,9 +206,42 @@ describe('buildImageFromRepo', () => {
 
     const fetches = fetchCalls();
     expect(fetches).toHaveLength(2);
-    const [command, options] = fetches[1];
-    expect(String(command)).toContain('git@github.com:owner/private.git');
+    const [command, args, options] = fetches[1];
+    expect(command).toBe('git');
+    expect(args).toContain('git@github.com:owner/private.git');
     expect(options?.env?.GIT_SSH_COMMAND).toContain('ssh -i');
+  });
+
+  it('redacts repository tokens from clone errors and warnings', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    execFileSyncMock.mockImplementation((_command, args) => {
+      if (args?.includes('fetch')) {
+        throw new Error('fatal: https://x-access-token:SECRET@github.com/owner/private.git');
+      }
+      return Buffer.from('');
+    });
+
+    try {
+      let caughtError: unknown;
+      try {
+        await buildImageFromRepo({
+          image: 'test-image',
+          repoUrl: 'git@github.com:owner/private.git',
+          repoRef: 'owner/private',
+          commit: 'abc123',
+          repoToken: 'SECRET',
+        });
+      } catch (error) {
+        caughtError = error;
+      }
+
+      expect(caughtError).toBeInstanceOf(Error);
+      expect((caughtError as Error).message).toContain('Failed to fetch');
+      expect((caughtError as Error).message).not.toContain('SECRET');
+      expect(warning.mock.calls.flat().join(' ')).not.toContain('SECRET');
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   it('cleans up temp dir even on build failure', async () => {

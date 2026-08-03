@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AgentRunSchema } from '@mediforce/platform-core';
+import { AgentRunSchema, AgentRunStatusSchema, AgentRunCardStatusSchema } from '@mediforce/platform-core';
 
 /**
  * Contract for `GET /api/agent-runs` and `GET /api/agent-runs/:agentRunId`.
@@ -33,6 +33,18 @@ export const ListAgentRunsInputSchema = z
     stepId: z.string().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(10_000).optional(),
     cursor: z.string().min(1).optional(),
+    /** Raw status filter — the Monitoring → Agents tab's "All Statuses" dropdown. */
+    status: AgentRunStatusSchema.optional(),
+    /** KPI-card bucket filter — see `AgentRunCardStatusSchema`'s docstring.
+     *  Composable with `status`. */
+    cardStatus: AgentRunCardStatusSchema.optional(),
+    /**
+     * Workflow-name filter, pre-resolved client-side into the matching
+     * process instance ids (via the already-fetched processInstanceId →
+     * definitionName map) — avoids a repository-level join. Repeated query
+     * param (`?processInstanceId=a&processInstanceId=b`).
+     */
+    processInstanceIds: z.array(z.string().min(1)).optional(),
   })
   .refine((v) => v.stepId === undefined || v.runId !== undefined, {
     message: 'stepId requires runId',
@@ -46,6 +58,34 @@ export const ListAgentRunsOutputSchema = z.object({
 
 export type ListAgentRunsInput = z.infer<typeof ListAgentRunsInputSchema>;
 export type ListAgentRunsOutput = z.infer<typeof ListAgentRunsOutputSchema>;
+
+/**
+ * Contract for `GET /api/agent-runs/card-status-counts` — grouped
+ * `AgentRunCardStatus` counts for the Agents tab's KPI cards, a real
+ * Postgres aggregation rather than a client-side tally over a fetched row
+ * set. Same `namespace`/`processInstanceIds`/`status` filters as
+ * `ListAgentRunsInputSchema` (minus `cardStatus` itself and pagination).
+ */
+export const GetAgentRunCardStatusCountsInputSchema = z.object({
+  namespace: z.string().min(1).optional(),
+  status: AgentRunStatusSchema.optional(),
+  processInstanceIds: z.array(z.string().min(1)).optional(),
+});
+
+export const AgentRunCardStatusCountsSchema = z.object({
+  total: z.number().int().nonnegative(),
+  running: z.number().int().nonnegative(),
+  completed: z.number().int().nonnegative(),
+  error: z.number().int().nonnegative(),
+  flagged: z.number().int().nonnegative(),
+});
+
+export const GetAgentRunCardStatusCountsOutputSchema = z.object({
+  counts: AgentRunCardStatusCountsSchema,
+});
+
+export type GetAgentRunCardStatusCountsInput = z.infer<typeof GetAgentRunCardStatusCountsInputSchema>;
+export type GetAgentRunCardStatusCountsOutput = z.infer<typeof GetAgentRunCardStatusCountsOutputSchema>;
 
 /**
  * Contract for `GET /api/agent-runs/:agentRunId`. Single-resource read; the

@@ -2,11 +2,11 @@
  * Shallow clone of a repo at one commit, shared by the skills fetch and the
  * lazy image build so both pick the same transport and the same deploy key.
  */
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, mkdtempSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
-import { resolveRepoCloneTargets } from '@mediforce/platform-core';
+import { redactRepoCredentials, resolveRepoCloneTargets } from '@mediforce/platform-core';
 
 let preparedDeployKeyPath: string | null = null;
 
@@ -52,7 +52,7 @@ export function cloneRepoAtCommit(
   const targets = resolveRepoCloneTargets(repoRef, repoToken);
   let lastError: unknown;
 
-  execSync(`git init "${targetDir}"`, { stdio: 'pipe' });
+  execFileSync('git', ['init', targetDir], { stdio: 'pipe' });
 
   for (const { cloneUrl, useSsh } of targets) {
     try {
@@ -67,21 +67,21 @@ export function cloneRepoAtCommit(
           : { ...process.env, GIT_TERMINAL_PROMPT: '0' },
       };
 
-      execSync(`git -C "${targetDir}" fetch "${cloneUrl}" "${commit}" --depth 1`, execOpts);
-      execSync(`git -C "${targetDir}" checkout FETCH_HEAD`, execOpts);
+      execFileSync('git', ['-C', targetDir, 'fetch', cloneUrl, commit, '--depth', '1'], execOpts);
+      execFileSync('git', ['-C', targetDir, 'checkout', 'FETCH_HEAD'], execOpts);
       return;
     } catch (error) {
       lastError = error;
       console.warn(
-        `[git-clone] ${useSsh ? 'SSH' : 'HTTPS'} fetch of ${repoRef}@${commit.slice(0, 8)} failed`,
+        `[git-clone] ${useSsh ? 'SSH' : 'HTTPS'} fetch of ${redactRepoCredentials(repoRef, repoToken)}@${commit.slice(0, 8)} failed`,
       );
     }
   }
 
   const transports = targets.map(({ useSsh }) => (useSsh ? 'SSH' : 'HTTPS')).join(' then ');
+  const safeRepoRef = redactRepoCredentials(repoRef, repoToken);
+  const lastErrorMessage = lastError instanceof Error ? lastError.message : String(lastError);
   throw new Error(
-    `Failed to fetch ${repoRef}@${commit.slice(0, 8)} over ${transports}: ${
-      lastError instanceof Error ? lastError.message : String(lastError)
-    }`,
+    `Failed to fetch ${safeRepoRef}@${commit.slice(0, 8)} over ${transports}: ${redactRepoCredentials(lastErrorMessage, repoToken)}`,
   );
 }

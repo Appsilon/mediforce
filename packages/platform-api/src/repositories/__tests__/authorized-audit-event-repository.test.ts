@@ -91,10 +91,10 @@ describe('AuthorizedAuditEventRepository', () => {
     it('returns events for a system-actor caller regardless of namespace', async () => {
       const wrapper = new AuthorizedAuditEventRepository(apiKeyCaller, raw);
 
-      const events = await wrapper.getByNamespace('team-alpha');
+      const page = await wrapper.getByNamespace('team-alpha');
 
-      expect(events).toHaveLength(1);
-      expect(events[0]?.entityId).toBe('task-1');
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0]?.entityId).toBe('task-1');
     });
 
     it('returns events for an in-scope user caller', async () => {
@@ -103,10 +103,10 @@ describe('AuthorizedAuditEventRepository', () => {
         raw,
       );
 
-      const events = await wrapper.getByNamespace('team-alpha');
+      const page = await wrapper.getByNamespace('team-alpha');
 
-      expect(events).toHaveLength(1);
-      expect(events[0]?.entityId).toBe('task-1');
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0]?.entityId).toBe('task-1');
     });
 
     it('returns empty for an out-of-scope user caller (anti-enum)', async () => {
@@ -115,9 +115,9 @@ describe('AuthorizedAuditEventRepository', () => {
         raw,
       );
 
-      const events = await wrapper.getByNamespace('team-beta');
+      const page = await wrapper.getByNamespace('team-beta');
 
-      expect(events).toEqual([]);
+      expect(page.items).toEqual([]);
     });
   });
 });

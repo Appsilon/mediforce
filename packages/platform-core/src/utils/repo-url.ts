@@ -44,6 +44,12 @@ export function toHttpsWithToken(sshUrl: string, token: string): string {
   return sshUrl.replace('https://', `https://x-access-token:${token}@`);
 }
 
+/** Remove repository credentials from messages that may be surfaced to users. */
+export function redactRepoCredentials(value: string, repoToken?: string): string {
+  const tokenRedacted = repoToken ? value.split(repoToken).join('[REDACTED]') : value;
+  return tokenRedacted.replace(/(https?:\/\/)[^/\s@]+@/g, '$1[REDACTED]@');
+}
+
 /**
  * Clone attempts for a repo reference, in the order they should be tried. The
  * first entry is the transport the reference asks for; a second entry only
@@ -60,6 +66,9 @@ export function toHttpsWithToken(sshUrl: string, token: string): string {
  *                      answers 404 there, so SSH with the deploy key follows.
  */
 export function resolveRepoCloneTargets(repoRef: string, repoToken?: string): RepoCloneTarget[] {
+  if (repoRef.startsWith('/') || repoRef.startsWith('.')) {
+    return [{ cloneUrl: repoRef, useSsh: false }];
+  }
   if (repoToken) {
     const tokenUrl = toHttpsWithToken(normalizeRepoUrls(repoRef).gitUrl, repoToken);
     return tokenUrl.startsWith('https://')
@@ -69,10 +78,6 @@ export function resolveRepoCloneTargets(repoRef: string, repoToken?: string): Re
   if (repoRef.startsWith('git@')) {
     return [{ cloneUrl: repoRef, useSsh: true }];
   }
-  if (repoRef.startsWith('/') || repoRef.startsWith('.')) {
-    return [{ cloneUrl: repoRef, useSsh: false }];
-  }
-
   const { gitUrl, httpsUrl } = normalizeRepoUrls(repoRef);
   const targets: RepoCloneTarget[] = [
     { cloneUrl: repoRef.startsWith('https://') ? repoRef : httpsUrl, useSsh: false },
