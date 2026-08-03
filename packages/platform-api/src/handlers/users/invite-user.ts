@@ -17,17 +17,11 @@ import { actorFromCaller, resolveConfiguredBaseUrl } from '../_helpers';
  *      roles in one transaction. No temp password is issued; `isExisting` is
  *      `true` when the account already existed (idempotent on email collision).
  *   3. If the invite is still pending (never activated) AND password auth is
- *      enabled on this deployment (`scope.system.passwordAuthEnabled`), gate
- *      the invitee into the create-password flow (`setMustChangePassword`)
- *      and send a best-effort activation email — a one-time 7-day sign-in
- *      link that lands them on the create-password page. A pending invitee on
- *      a Google/OIDC-only or magic-link-only deployment (password auth off)
- *      gets the plain workspace-notification email instead — they sign in via
- *      their configured provider, and forcing a password they cannot use
- *      (plus a `/change-password` dead-end) is wrong. An already-active user
- *      re-added to the workspace also keeps the plain workspace-notification
- *      path — they already have a session/password. Email failures don't fail
- *      the response — `emailSent` flips to `false`.
+ *      enabled, gate the invitee into the create-password flow
+ *      (`setMustChangePassword`) and send a best-effort activation email — a
+ *      one-time 7-day sign-in link. Otherwise the plain workspace-notification
+ *      email goes out instead (see the branch below for why). Email failures
+ *      don't fail the response — `emailSent` flips to `false`.
  *   4. Append `invitation.created` to the audit log.
  *
  * `scope.system.inviteService === null` → `PreconditionFailedError` (the
@@ -82,22 +76,17 @@ export async function inviteUser(
         typeof input.inviterName === 'string' && input.inviterName.trim() !== ''
           ? input.inviterName.trim()
           : workspaceName;
+      const payload = {
+        toEmail: email,
+        inviterName,
+        workspaceName,
+        workspaceHandle: input.namespaceHandle,
+        ...(baseUrl !== undefined ? { baseUrl } : {}),
+      };
       if (forcePasswordSetup) {
-        await notify.sendActivationEmail({
-          toEmail: email,
-          inviterName,
-          workspaceName,
-          workspaceHandle: input.namespaceHandle,
-          ...(baseUrl !== undefined ? { baseUrl } : {}),
-        });
+        await notify.sendActivationEmail(payload);
       } else {
-        await notify.sendWorkspaceNotificationEmail({
-          toEmail: email,
-          inviterName,
-          workspaceName,
-          workspaceHandle: input.namespaceHandle,
-          ...(baseUrl !== undefined ? { baseUrl } : {}),
-        });
+        await notify.sendWorkspaceNotificationEmail(payload);
       }
       emailSent = true;
     } catch (emailErr) {

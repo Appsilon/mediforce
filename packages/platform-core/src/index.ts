@@ -449,6 +449,7 @@ export { formatBytes } from './utils/format';
 export { compact, parseRow } from './utils/compact';
 export { normaliseModelId } from './utils/normalise-model-id';
 export { emailLayout, escapeHtml } from './utils/email-layout';
+export { isPasswordAuthEnabled } from './utils/auth-env';
 export {
   normalizeRepoUrls,
   toHttpsWithToken,

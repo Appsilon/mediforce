@@ -1,3 +1,4 @@
+import { isPasswordAuthEnabled } from '@mediforce/platform-core';
 import { parseAllowedDomains, ALLOW_ANY_DOMAIN } from '@/lib/email-allowlist';
 
 // Node-only: contains process.exit, kept out of the Edge module graph so
@@ -44,9 +45,7 @@ export function validateEnv(): void {
 
     // --- At least one auth provider (ADR-0002 §4) ---
     const googleEnabled = typeof process.env.GOOGLE_CLIENT_ID === 'string' && process.env.GOOGLE_CLIENT_ID !== '';
-    // Password sign-in is on by default (see password-login route); only an
-    // explicit ENABLE_PASSWORD_AUTH=false turns it off.
-    const passwordEnabled = process.env.ENABLE_PASSWORD_AUTH !== 'false';
+    const passwordEnabled = isPasswordAuthEnabled(process.env.ENABLE_PASSWORD_AUTH);
     const oidcEnabled = typeof process.env.OIDC_ISSUER === 'string' && process.env.OIDC_ISSUER !== '';
     // A magic-link-only deployment is a valid provider set. `ENABLE_MAGIC_LINK`
     // with email disabled/unconfigured is caught at auth-config build (auth.ts),

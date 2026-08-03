@@ -120,9 +120,9 @@ describe('POST /api/users/resend-invite', () => {
     expect(mockSetMustChangePassword).toHaveBeenCalledWith('uid-target', true);
     expect(mockSendActivationEmail).toHaveBeenCalledWith({
       toEmail: 'pending@example.test',
-      inviterName: 'alpha',
       workspaceName: 'alpha',
       workspaceHandle: 'alpha',
+      passwordSetupEnabled: true,
     });
     expect(mockSendWorkspaceEmail).not.toHaveBeenCalled();
   });

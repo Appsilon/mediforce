@@ -30,11 +30,8 @@ export async function getMe(input: GetMeInput, scope: CallerScope): Promise<GetM
   ]);
   const email = metadata?.email ?? null;
   const displayName = metadata?.displayName ?? null;
-  // A create-password gate nobody can satisfy is worse than no gate: with
-  // password auth off, `/change-password` posts to a `password-login` route that
-  // 404s, so a flag written by an earlier invite — or before the deployment
-  // disabled password auth — traps the user on that page forever once they sign
-  // in with their provider. Project it away instead of clearing the row, so
+  // A gate nobody can satisfy traps the user on `/change-password` forever, so
+  // with password auth off the flag is projected away — not cleared, so
   // re-enabling password auth restores the gate.
   const mustChangePassword =
     scope.system.passwordAuthEnabled === true && profile?.mustChangePassword === true;

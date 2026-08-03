@@ -70,7 +70,10 @@ describe('POST /api/auth/resend-setup-link', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
     expect(mockSetMustChangePassword).toHaveBeenCalledWith('uid-pending', true);
-    expect(mockSendActivationEmail).toHaveBeenCalledWith({ toEmail: 'pending@example.test' });
+    expect(mockSendActivationEmail).toHaveBeenCalledWith({
+      toEmail: 'pending@example.test',
+      passwordSetupEnabled: true,
+    });
   });
 
   it('[BASEURL] passes the configured platform.baseUrl (normalized) to the activation email', async () => {
@@ -82,6 +85,7 @@ describe('POST /api/auth/resend-setup-link', () => {
     expect(mockSendActivationEmail).toHaveBeenCalledWith({
       toEmail: 'pending@example.test',
       baseUrl: 'https://phuse.mediforce.ai',
+      passwordSetupEnabled: true,
     });
   });
 
@@ -92,7 +96,12 @@ describe('POST /api/auth/resend-setup-link', () => {
 
     expect(res.status).toBe(200);
     expect(mockSetMustChangePassword).not.toHaveBeenCalled();
-    expect(mockSendActivationEmail).toHaveBeenCalledWith({ toEmail: 'pending@example.test' });
+    // The link still works — the copy and its landing page just stop promising
+    // a password this deployment cannot set.
+    expect(mockSendActivationEmail).toHaveBeenCalledWith({
+      toEmail: 'pending@example.test',
+      passwordSetupEnabled: false,
+    });
   });
 
   it('[ENUM] unknown email → no send, same generic 200', async () => {

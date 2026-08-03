@@ -83,7 +83,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       // be set. On a magic-link-only deployment the emailed link is purely a
       // sign-in link, and flagging the profile would strand the invitee on a
       // `/change-password` page whose `password-login` endpoint 404s.
-      if (services.passwordAuthEnabled === true) {
+      const passwordSetupEnabled = services.passwordAuthEnabled === true;
+      if (passwordSetupEnabled) {
         await services.userProfileRepo.setMustChangePassword(user.id, true);
       }
       // Prefer the deployment's configured `platform.baseUrl` setting (same as
@@ -97,6 +98,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       await services.inviteNotificationService.sendActivationEmail({
         toEmail: email,
         ...(baseUrl !== undefined ? { baseUrl } : {}),
+        passwordSetupEnabled,
       });
     } catch (err) {
       // An email/delivery failure must never 500 or leak — log and still return

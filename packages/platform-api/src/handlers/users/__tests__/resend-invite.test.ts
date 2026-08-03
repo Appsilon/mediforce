@@ -93,15 +93,15 @@ describe('resendInvite handler', () => {
     expect(notifier.sendActivationCalls).toEqual([
       {
         toEmail: 'pending@example.test',
-        inviterName: 'alpha',
         workspaceName: 'alpha',
         workspaceHandle: 'alpha',
+        passwordSetupEnabled: true,
       },
     ]);
     expect(notifier.sendWorkspaceCalls).toHaveLength(0);
   });
 
-  it('does not re-arm the gate and sends the workspace notification when password auth is disabled', async () => {
+  it('does not re-arm the gate but still sends a working sign-in link when password auth is disabled', async () => {
     const inviteService = inviteServiceStub({
       email: 'pending@example.test',
       pending: true,
@@ -120,15 +120,17 @@ describe('resendInvite handler', () => {
 
     expect(result.emailSent).toBe(true);
     expect(await userProfileRepo.getProfile('uid-target')).toBeNull();
-    expect(notifier.sendActivationCalls).toHaveLength(0);
-    expect(notifier.sendWorkspaceCalls).toEqual([
+    // A pending invitee has no session, so the recovery must still carry a way
+    // in — only the create-password framing is dropped.
+    expect(notifier.sendActivationCalls).toEqual([
       {
         toEmail: 'pending@example.test',
-        inviterName: 'alpha',
         workspaceName: 'alpha',
         workspaceHandle: 'alpha',
+        passwordSetupEnabled: false,
       },
     ]);
+    expect(notifier.sendWorkspaceCalls).toHaveLength(0);
   });
 
   it('passes the configured platform.baseUrl through to the resent activation email', async () => {
@@ -151,10 +153,10 @@ describe('resendInvite handler', () => {
     expect(notifier.sendActivationCalls).toEqual([
       {
         toEmail: 'pending@example.test',
-        inviterName: 'alpha',
         workspaceName: 'alpha',
         workspaceHandle: 'alpha',
         baseUrl: 'https://phuse.mediforce.ai',
+        passwordSetupEnabled: true,
       },
     ]);
   });

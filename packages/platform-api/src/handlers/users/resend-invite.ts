@@ -14,13 +14,13 @@ import { actorFromCaller, resolveConfiguredBaseUrl } from '../_helpers';
  *   3. Refuse if the invite isn't pending anymore — `isInvitePending` returns
  *      `false` once the invitee has a session or has set a password. This guard
  *      stops an admin from re-notifying a colleague who is already active.
- *   4. When password auth is enabled (`scope.system.passwordAuthEnabled`),
- *      re-arm the create-password gate (`setMustChangePassword`) and send a
- *      fresh activation email with a new one-time 7-day sign-in link
- *      (best-effort) via `scope.system.inviteNotificationService`. Otherwise no
- *      gate is armed and the plain workspace-notification email goes out
- *      instead — the invitee signs in with their configured provider. Email
- *      failures don't fail the response — `emailSent` flips to `false`.
+ *   4. Always send a fresh one-time 7-day sign-in link (best-effort) via
+ *      `scope.system.inviteNotificationService` — the invitee has no session
+ *      by definition. Only when password auth is enabled
+ *      (`scope.system.passwordAuthEnabled`) is the create-password gate
+ *      re-armed (`setMustChangePassword`) and the link framed as account
+ *      setup. Email failures don't fail the response — `emailSent` flips to
+ *      `false`.
  *   5. Append `invitation.resent` to the audit log.
  *
  * `scope.system.inviteService === null` → `PreconditionFailedError` — same
@@ -51,11 +51,10 @@ export async function resendInvite(
 
   // Same gate as `inviteUser`: the create-password flow is only the right
   // recovery when password auth is the intended first-credential method. On a
-  // Google/OIDC-only or magic-link-only deployment the activation link lands the
-  // invitee on a `/change-password` page they cannot complete, so the resend
-  // falls back to the plain workspace notification — sign in with the provider.
-  const resendPasswordSetup = scope.system.passwordAuthEnabled === true;
-  if (resendPasswordSetup) {
+  // Google/OIDC-only or magic-link-only deployment it would land the invitee on
+  // a `/change-password` page they cannot complete.
+  const passwordSetupEnabled = scope.system.passwordAuthEnabled === true;
+  if (passwordSetupEnabled) {
     // Re-arm the create-password gate — cheap insurance the flag is set even for
     // a pending row seeded before the gate existed.
     await scope.userProfiles.setMustChangePassword(input.uid, true);
@@ -68,18 +67,17 @@ export async function resendInvite(
       const baseUrl = await resolveConfiguredBaseUrl(scope);
       const namespace = await scope.workspaces.getNamespace(input.namespaceHandle);
       const workspaceName = namespace?.displayName ?? input.namespaceHandle;
-      const payload = {
+      // A pending invitee has no session yet, so the recovery must always carry
+      // a way in — a one-time sign-in link, same as the self-service
+      // `/api/auth/resend-setup-link` path. With password auth off the link
+      // simply signs them in instead of landing on create-password.
+      await notify.sendActivationEmail({
         toEmail: email,
-        inviterName: workspaceName,
         workspaceName,
         workspaceHandle: input.namespaceHandle,
         ...(baseUrl !== undefined ? { baseUrl } : {}),
-      };
-      if (resendPasswordSetup) {
-        await notify.sendActivationEmail(payload);
-      } else {
-        await notify.sendWorkspaceNotificationEmail(payload);
-      }
+        passwordSetupEnabled,
+      });
       emailSent = true;
     } catch (emailErr) {
       console.error('[resend-invite] Failed to send email:', emailErr);
