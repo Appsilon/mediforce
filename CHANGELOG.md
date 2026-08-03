@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-08-02]
+
 ### Security
 - Workspace members list no longer exposes each member's email or last-sign-in timestamp to plain members: `listNamespaceMembers` now returns `email: null` and `lastSignInTime: null` for non-admin callers (owner/admin/apiKey still see them), and the settings page hides the "Email" and "Last sign in" columns for non-managers. The roster — name, avatar, role and join date — stays visible to all members. `getNamespace` now returns an `adminContact` field (the primary owner's name + email) so the run-start preflight "contact your admin" hint still works for a blocked non-admin — the one member email a plain member may see.
 
