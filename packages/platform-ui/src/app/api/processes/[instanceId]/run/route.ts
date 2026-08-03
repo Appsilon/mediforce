@@ -570,10 +570,17 @@ export async function POST(
             if (currentStep.action.kind === 'wait') {
               const preResolved = instance.variables[instance.currentStepId] as Record<string, unknown> | undefined;
               if (preResolved?.resumeReason) {
-                console.log(`[auto-runner] Wait step '${instance.currentStepId}' already resolved (${preResolved.resumeReason}) — advancing`);
-                await engine.advanceStep(instanceId, preResolved, { id: 'auto-runner', role: 'system' });
-                stepsExecuted++;
-                continue;
+                const waitExecutions = await instanceRepo.getStepExecutions(instanceId);
+                const latestWaitExecution = waitExecutions
+                  .filter((execution) => execution.stepId === instance.currentStepId)
+                  .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
+
+                if (latestWaitExecution?.status === 'paused') {
+                  console.log(`[auto-runner] Wait step '${instance.currentStepId}' already resolved (${preResolved.resumeReason}) — advancing`);
+                  await engine.advanceStep(instanceId, preResolved, { id: 'auto-runner', role: 'system' });
+                  stepsExecuted++;
+                  continue;
+                }
               }
             }
 

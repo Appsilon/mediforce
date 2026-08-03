@@ -15,10 +15,12 @@
 
 import { createTestUser } from '../e2e/helpers/emulator';
 import { seedPostgresNamespace } from '../e2e/helpers/postgres-seed';
-
-const TEST_EMAIL = 'test@mediforce.dev';
-const TEST_PASSWORD = 'test123456';
-const TEST_DISPLAY_NAME = 'Test User';
+import {
+  TEST_USER_DISPLAY_NAME,
+  TEST_USER_EMAIL,
+  TEST_USER_ID,
+  TEST_USER_PASSWORD,
+} from '../e2e/helpers/constants';
 
 async function main() {
   console.log('\nSeeding development data...\n');
@@ -26,7 +28,14 @@ async function main() {
   try {
     // 1. Upsert the `auth_users` row with a bcrypt password hash so
     // `/api/auth/password-login` (`ENABLE_PASSWORD_AUTH=true`) can sign in.
-    const testUserId = await createTestUser(TEST_EMAIL, TEST_PASSWORD, TEST_DISPLAY_NAME);
+    // Pinned to `TEST_USER_ID` — the same email under a random uuid would
+    // collide with the E2E fixture's stable id on `auth_users_email_unique`.
+    const testUserId = await createTestUser(
+      TEST_USER_EMAIL,
+      TEST_USER_PASSWORD,
+      TEST_USER_DISPLAY_NAME,
+      TEST_USER_ID,
+    );
     console.log(`  User created: ${testUserId}\n`);
 
     // 2. Seed the full fixture into Postgres (the server-side data layer).
@@ -36,8 +45,8 @@ async function main() {
 
     console.log('\nDevelopment data seeded successfully!\n');
     console.log('Demo credentials:');
-    console.log(`  Email: ${TEST_EMAIL}`);
-    console.log(`  Password: ${TEST_PASSWORD}`);
+    console.log(`  Email: ${TEST_USER_EMAIL}`);
+    console.log(`  Password: ${TEST_USER_PASSWORD}`);
     console.log('');
   } catch (error) {
     console.error('\nFailed to seed data:', error);

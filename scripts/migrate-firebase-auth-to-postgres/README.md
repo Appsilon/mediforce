@@ -150,10 +150,10 @@ python3 scripts/migrate-firebase-auth-to-postgres/migrate-to-nextauth.py \
   --project mediforce-cdisc \
   --database-url postgresql://mediforce:$POSTGRES_PASSWORD@postgres:5432/mediforce \
   --allowed-domains cdisc.org \
-  --allow-unlisted-env --acknowledge-locked-out --apply
+  --acknowledge-locked-out --apply
 ```
 
-Add the cdisc Firebase project id to `KNOWN_STAGING_PROJECTS` in the script once
-it is a recognised environment, so `--allow-unlisted-env` is no longer needed for
-it. See `--help` for every flag (`--repo-dir`, `--network`,
+`mediforce-cdisc` is a recognised environment in `KNOWN_STAGING_PROJECTS`, so
+`--allow-unlisted-env` is not needed for it. See `--help` for every flag
+(`--repo-dir`, `--network`,
 `--postgres-container`, `--min-users`, `--export-file`).

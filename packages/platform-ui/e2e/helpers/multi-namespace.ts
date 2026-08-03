@@ -14,12 +14,15 @@
  * NOTHING` so re-running across journeys (each spec shares one database) is
  * safe.
  */
-import { TEST_ORG_HANDLE, TEST_USER_ID } from './constants';
+import {
+  TEST_ORG_HANDLE,
+  TEST_USER_DISPLAY_NAME,
+  TEST_USER_EMAIL,
+  TEST_USER_ID,
+  TEST_USER_PASSWORD,
+} from './constants';
 import { createTestUser, signInAndGetSessionCookie } from './emulator';
 import { seedPostgresPersonalNamespace } from './postgres-seed';
-
-export const TEST_USER_EMAIL = 'test@mediforce.dev';
-export const TEST_USER_PASSWORD = 'test123456';
 
 export const OUTSIDER_EMAIL = 'outsider@mediforce.dev';
 export const OUTSIDER_PASSWORD = 'outsider123456';
@@ -48,7 +51,15 @@ export interface MultiNamespaceFixture {
 export async function setupMultiNamespaceCallers(): Promise<MultiNamespaceFixture> {
   // The shared test user is seeded by auth-setup; ensure a password + session
   // exist here too so this fixture also works when the api project runs alone.
-  const memberUid = await createTestUser(TEST_USER_EMAIL, TEST_USER_PASSWORD, 'Test User');
+  // Pinned to `TEST_USER_ID` — running alone, a random uuid would both miss the
+  // `test` membership rows auth-setup keys to that id and collide with it on
+  // `auth_users_email_unique` the next time auth-setup runs.
+  const memberUid = await createTestUser(
+    TEST_USER_EMAIL,
+    TEST_USER_PASSWORD,
+    TEST_USER_DISPLAY_NAME,
+    TEST_USER_ID,
+  );
   const memberCookie = await signInAndGetSessionCookie(TEST_USER_EMAIL, TEST_USER_PASSWORD);
 
   const outsiderUid = await createTestUser(OUTSIDER_EMAIL, OUTSIDER_PASSWORD, 'Outsider');
@@ -75,4 +86,4 @@ export function apiKeyHeaders(): Record<string, string> {
   return { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' };
 }
 
-export { TEST_ORG_HANDLE, TEST_USER_ID };
+export { TEST_ORG_HANDLE, TEST_USER_EMAIL, TEST_USER_ID, TEST_USER_PASSWORD };

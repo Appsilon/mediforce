@@ -52,7 +52,6 @@ test.describe('POST /api/tasks/[taskId]/complete — verdict variant', () => {
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'review', to: 'done' }],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     const createWdRes = await request.post(
       `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,

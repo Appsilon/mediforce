@@ -643,7 +643,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
         stepId: 'design',
         outputSchema: expect.objectContaining({
           type: 'object',
-          required: expect.arrayContaining(['name', 'steps', 'transitions', 'triggers']),
+          required: expect.arrayContaining(['name', 'steps', 'transitions']),
           properties: expect.objectContaining({
             name: expect.objectContaining({ type: 'string' }),
             steps: expect.objectContaining({ type: 'array' }),
@@ -903,6 +903,84 @@ describe('POST /api/processes/[instanceId]/run', () => {
       );
 
       // Paused, not advanced — the wait step stays current until resume.
+      expect(mockAdvanceStep).not.toHaveBeenCalled();
+    });
+
+    it('[DATA] re-dispatches a wait after a previous wait cycle resolved', async () => {
+      const rearmedWaitWorkflow = {
+        name: 'ci-poll',
+        version: 1,
+        namespace: 'test-ns',
+        steps: [
+          {
+            id: 'wait-ci',
+            name: 'Wait for CI',
+            type: 'creation',
+            executor: 'action',
+            action: { kind: 'wait', config: { deadline: '${steps.arm-timer.deadline}' } },
+          },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'wait-ci', to: 'done' }],
+      };
+      const waitSentinel = {
+        __wait: {
+          stepId: 'wait-ci',
+          resumeAt: '2026-06-01T14:00:00.000Z',
+          pausedAt: '2026-06-01T13:00:00.000Z',
+          mode: 'deadline',
+        },
+      };
+      let getByIdCalls = 0;
+
+      mockInstanceGetById.mockImplementation(() => {
+        getByIdCalls += 1;
+        const runningInstance = {
+          id: 'inst-1',
+          namespace: 'test-ns',
+          definitionName: 'ci-poll',
+          definitionVersion: '1',
+          status: 'running',
+          currentStepId: 'wait-ci',
+          configName: undefined,
+          variables: {
+            'arm-timer': { deadline: '2026-06-01T14:00:00.000Z' },
+            'wait-ci': { resumeReason: 'deadline_reached', waitedSeconds: 900 },
+          },
+          triggerPayload: {},
+        };
+        if (getByIdCalls <= 2) return Promise.resolve(runningInstance);
+        return Promise.resolve({
+          ...runningInstance,
+          status: 'paused',
+          pauseReason: 'waiting_for_timer',
+        });
+      });
+      mockGetWorkflowDefinition.mockResolvedValue(rearmedWaitWorkflow);
+      mockGetStepExecutions.mockResolvedValue([
+        {
+          id: 'wait-execution-0',
+          stepId: 'wait-ci',
+          status: 'completed',
+          startedAt: '2026-06-01T12:00:00.000Z',
+        },
+      ]);
+      mockActionDispatch.mockResolvedValue(waitSentinel);
+
+      const res = await POST(makeRequest(), { params: makeParams('inst-1') });
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
+
+      expect(mockActionDispatch).toHaveBeenCalledWith(
+        rearmedWaitWorkflow.steps[0].action,
+        expect.objectContaining({ stepId: 'wait-ci' }),
+      );
+      expect(mockInstanceUpdateStepExecution).toHaveBeenCalledWith(
+        'inst-1',
+        expect.any(String),
+        expect.objectContaining({ status: 'paused', output: null }),
+      );
       expect(mockAdvanceStep).not.toHaveBeenCalled();
     });
   });

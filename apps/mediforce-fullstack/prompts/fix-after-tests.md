@@ -29,7 +29,7 @@ tell us if you got it. This is a bounded loop; make each round count.
    cd /tmp/cifix && git fetch --depth 50 origin <publish.branch> && git checkout <publish.branch>
    ```
 3. **Fix the reported failures** following repo conventions (`AGENTS.md`,
-   `docs/CONTEXT.md`): no `any` (Zod + `z.infer`), explicit boolean comparisons,
+   `CONTEXT.md`): no `any` (Zod + `z.infer`), explicit boolean comparisons,
    English, self-documenting code, no docstrings/comments on code you did not
    change. Address the CI errors specifically — a typecheck error names the file
    and position; a failing test names the spec. Keep the fix minimal and on-topic
@@ -50,6 +50,13 @@ the loop will hand it to a human once the round budget is spent.
 - `ciRound` = (`fix-after-tests.ciRound` from the input, or 0) **+ 1**.
 - `ciFixLog` = the prior `fix-after-tests.ciFixLog` (or `[]`) **with your new
   round appended** — one line: `round <n>: fixed <what> (<checks addressed>)`.
+
+## Completion criteria
+
+Finish once each actionable reported CI failure is fixed and pushed, or a
+non-actionable failure is explicitly logged. Fetch more detail only when the
+reported error cannot support a correct fix; do not diagnose unrelated checks or
+broaden the branch beyond the reported failures.
 
 ## Output Contract (MANDATORY)
 

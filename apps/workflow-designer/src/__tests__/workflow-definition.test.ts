@@ -41,7 +41,7 @@ describe('workflow-designer', () => {
       expect(result.data.name).toBe('workflow-designer');
       expect(result.data.steps).toHaveLength(7);
       expect(result.data.transitions).toHaveLength(7);
-      expect(result.data.triggers).toHaveLength(1);
+      expect((result.data as Record<string, unknown>).triggers).toBeUndefined();
     });
 
     it('resolves the live schema when the design session is created', () => {
@@ -210,7 +210,6 @@ describe('workflow-designer', () => {
           { id: 'end', name: 'End', type: 'terminal', executor: 'human' },
         ],
         transitions: [{ from: 'start', to: 'end' }],
-        triggers: [{ type: 'manual', name: 'manual' }],
       };
       expect(parseWorkflowTemplate(candidate).success).toBe(true);
       expect(parseWorkflowTemplate({ ...candidate, namespace: 'x' }).success).toBe(false);

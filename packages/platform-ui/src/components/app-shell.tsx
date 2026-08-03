@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench, Database } from 'lucide-react';
+import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench, Database } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import { BrandTheme } from './brand-theme';
 import { WorkspaceAvatar } from './workspace-avatar';
@@ -20,7 +20,6 @@ import { workspaceSwitchHref } from '@/lib/workspace-switch';
 
 const NAV_ITEMS = [
   { href: '', label: 'Workflows', icon: GitBranch, badge: null, exact: true },
-  { href: '/runs', label: 'All runs', icon: Play, badge: null, exact: false },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null, exact: false },
   { href: '/tools', label: 'Tools', icon: Wrench, badge: null, exact: false },
   { href: '/tasks', label: 'Human actions', icon: User, badge: null, exact: false },

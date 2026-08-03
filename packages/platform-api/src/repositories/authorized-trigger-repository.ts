@@ -69,4 +69,14 @@ export class AuthorizedTriggerRepository extends AuthorizedScope {
     this.assertNamespaceWrite(namespace);
     return this.raw.deleteByWorkflow(namespace, workflowName);
   };
+
+  transferWorkflowNamespace = async (
+    sourceNamespace: string,
+    workflowName: string,
+    targetNamespace: string,
+  ): Promise<void> => {
+    this.assertNamespaceWrite(sourceNamespace);
+    this.assertNamespaceWrite(targetNamespace);
+    return this.raw.transferWorkflowNamespace(sourceNamespace, workflowName, targetNamespace);
+  };
 }

@@ -2,9 +2,6 @@
   "name": "tutorial-validation-gate",
   "title": "Validation Gate",
   "description": "Script validates data, then conditional routing passes or loops back for fixes. Demonstrates the validation gate pattern: a script step outputs {valid: true/false, errors: [...]}, transitions branch on output.valid, and the fix step feeds corrections back.",
-  "triggers": [
-    { "type": "manual", "name": "manual" }
-  ],
   "roles": ["submitter", "reviewer"],
   "steps": [
     {

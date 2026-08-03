@@ -70,7 +70,6 @@ function makeWorkflow(
       agent: { image: img },
     })),
     transitions: [],
-    triggers: [{ type: 'manual' }],
     ...overrides,
   } as WorkflowDefinition;
 }

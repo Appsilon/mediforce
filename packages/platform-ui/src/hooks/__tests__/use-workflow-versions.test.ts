@@ -15,7 +15,6 @@ function summary(version: number, overrides: Partial<WorkflowVersionSummary> = {
     version,
     archived: false,
     stepCount: 1,
-    triggerCount: 0,
     ...overrides,
   };
 }

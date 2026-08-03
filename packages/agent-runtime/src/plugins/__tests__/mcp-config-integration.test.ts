@@ -61,7 +61,6 @@ function buildMockWorkflowAgentContext(
     visibility: 'private',
     steps: [step],
     transitions: [],
-    triggers: [{ type: 'manual', name: 'start' }],
   };
 
   return {

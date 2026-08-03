@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function TestLoginPage() {
-  const { signInWithEmail, user, loading, emailAuthEnabled } = useAuth();
+  const { signInWithEmail, user, loading, passwordAuthEnabled } = useAuth();
   const router = useRouter();
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
@@ -19,7 +19,7 @@ export default function TestLoginPage() {
   // Password auth is the dev / E2E / air-gapped path (ADR-0002 §4). This page
   // posts to `/api/auth/password-login`, which only answers when password auth
   // is enabled (`ENABLE_PASSWORD_AUTH=true`).
-  if (emailAuthEnabled === false) {
+  if (passwordAuthEnabled === false) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <p className="text-sm text-muted-foreground">

@@ -116,7 +116,6 @@ test.describe('Docker-backed workspace E2E', () => {
         { from: 'step-1', to: 'step-2' },
         { from: 'step-2', to: 'done' },
       ],
-      triggers: [{ type: 'manual', name: 'start' }],
       workspace: {},
     };
 

@@ -1,6 +1,13 @@
 import postgres from 'postgres';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { TEST_ORG_HANDLE } from './constants';
-import { buildSeedData } from './seed-data';
+import { buildSeedData, AGENT_LOG_FILENAME, AGENT_LOG_FIXTURE_CONTENT } from './seed-data';
+
+// Matches LOGS_DIR in packages/platform-ui/src/app/api/step-logs/route.ts —
+// the AgentLogViewer pipeline reads step logs from this local tmp directory.
+const STEP_LOGS_DIR = join(tmpdir(), 'mediforce-step-logs');
 
 /**
  * Postgres seed for the full E2E fixture (ADR-0001 §5.2 #9), invoked
@@ -37,9 +44,10 @@ export async function seedPostgresNamespace(
 
     // ── 0. Wipe prior fixture rows ──────────────────────────────────────────
     // Delete only the workspace handles that e2e tests own. Every child table
-    // (workspace_members, workflow_definitions, workflow_meta, process_instances,
-    // step_executions, human_tasks, agent_runs, audit_events, cowork_sessions,
-    // cowork_turns, agents, tool_catalog_entries, oauth_providers) carries
+    // (workspace_members, workflow_definitions, workflow_meta, triggers,
+    // process_instances, step_executions, human_tasks, agent_runs, audit_events,
+    // cowork_sessions, cowork_turns, agents, tool_catalog_entries, oauth_providers)
+    // carries
     // "FOREIGN KEY (workspace) REFERENCES workspaces(handle) ON DELETE CASCADE",
     // so one DELETE cascades the full fixture tree without touching workspaces
     // that belong to the developer (e.g. their personal namespace + registered
@@ -133,7 +141,7 @@ export async function seedPostgresNamespace(
       await sql`
         INSERT INTO workflow_definitions (
           workspace, name, version, title, description, visibility,
-          steps, transitions, triggers, trigger_input, roles, env,
+          steps, transitions, trigger_input, roles, env,
           notifications, git_workspace, metadata, created_at
         ) VALUES (
           ${wd.namespace as string},
@@ -144,7 +152,6 @@ export async function seedPostgresNamespace(
           ${(wd.visibility as string | undefined) ?? 'private'},
           ${sql.json(wd.steps as unknown)},
           ${sql.json(wd.transitions as unknown)},
-          ${sql.json(wd.triggers as unknown)},
           ${wd.triggerInput ? sql.json(wd.triggerInput as unknown) : null},
           ${wd.roles ? sql.json(wd.roles as unknown) : null},
           ${wd.env ? sql.json(wd.env as unknown) : null},
@@ -157,6 +164,34 @@ export async function seedPostgresNamespace(
       `;
     }
 
+    // ── 3b. manual trigger singletons ───────────────────────────────────────
+    // Production seeds one enabled `manual` trigger row per workflow on register
+    // (seedManualTrigger, ADR-0011 / Issue #930). Hand-start is gated on that
+    // row, so a workflow seeded straight into Postgres without it has a
+    // permanently disabled Start Run button. Mirror the invariant: one enabled
+    // `manual` row per unique `(namespace, name)`. Cron/webhook triggers are
+    // independent table resources (Issue #932) — seed them explicitly per test
+    // when a schedule/endpoint is under exercise.
+    const seededManualWorkflows = new Set<string>();
+    for (const wd of Object.values(data.workflowDefinitions)) {
+      const namespace = wd.namespace as string;
+      const name = wd.name as string;
+      const key = `${namespace}\u0000${name}`;
+      if (seededManualWorkflows.has(key)) continue;
+      seededManualWorkflows.add(key);
+      const seededAt = (wd.createdAt as string | undefined) ?? new Date().toISOString();
+      await sql`
+        INSERT INTO triggers (
+          namespace, workflow_name, trigger_name, type, enabled, config,
+          last_triggered_at, created_at, updated_at
+        ) VALUES (
+          ${namespace}, ${name}, 'manual', 'manual', true, ${sql.json({})},
+          ${null}, ${seededAt}, ${seededAt}
+        )
+        ON CONFLICT (namespace, workflow_name, trigger_name) DO NOTHING
+      `;
+    }
+
     // ── 4. process_instances ────────────────────────────────────────────────
     for (const proc of Object.values(data.processInstances)) {
       await sql`
@@ -164,7 +199,7 @@ export async function seedPostgresNamespace(
           id, workspace, definition_name, definition_version, status,
           current_step_id, variables, trigger_type, trigger_payload,
           pause_reason, error, assigned_roles, created_by, created_at, updated_at,
-          deleted_at
+          deleted_at, dry_run
         ) VALUES (
           ${proc.id as string},
           ${proc.namespace as string},
@@ -181,7 +216,8 @@ export async function seedPostgresNamespace(
           ${(proc.createdBy as string | null) ?? null},
           ${proc.createdAt as string},
           ${proc.updatedAt as string},
-          ${(proc.deletedAt as string | null) ?? null}
+          ${(proc.deletedAt as string | null) ?? null},
+          ${(proc.dryRun as boolean | undefined) ?? false}
         )
         ON CONFLICT (id) DO NOTHING
       `;
@@ -486,6 +522,29 @@ export async function seedPostgresNamespace(
         ON CONFLICT (workspace, id) DO NOTHING
       `;
     }
+
+    // ── 14. agent_events (+ the log file they point at) ─────────────────────
+    // Real AgentLogViewer pipeline, not a mocked UI: the event announces a
+    // log file path exactly like a live run does, and /api/step-logs reads
+    // the file from disk at request time — so it has to actually exist here.
+    for (const [id, event] of Object.entries(data.agentEvents)) {
+      await sql`
+        INSERT INTO agent_events (
+          id, process_instance_id, step_id, type, payload, sequence, timestamp
+        ) VALUES (
+          ${id},
+          ${event.processInstanceId as string},
+          ${event.stepId as string},
+          ${event.type as string},
+          ${sql.json(event.payload as unknown)},
+          ${event.sequence as number},
+          ${event.timestamp as string}
+        )
+        ON CONFLICT (id) DO NOTHING
+      `;
+    }
+    await mkdir(STEP_LOGS_DIR, { recursive: true });
+    await writeFile(join(STEP_LOGS_DIR, AGENT_LOG_FILENAME), AGENT_LOG_FIXTURE_CONTENT, 'utf-8');
   } finally {
     await sql.end({ timeout: 5 });
   }

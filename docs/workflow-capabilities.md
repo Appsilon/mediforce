@@ -236,11 +236,18 @@ apps — the session output is itself a validated WorkflowDefinition.
 
 ## Triggers & trigger input
 
-Trigger shapes are `TriggerSchema`
-([`process-definition.ts`](../packages/platform-core/src/schemas/process-definition.ts));
-webhook config is narrowed by `WebhookTriggerConfigSchema`
+Triggers are **not** declared on the definition. They are independent, mutable
+resources on the unified `triggers` table (shaped by `TriggerResourceSchema` in
+[`trigger.ts`](../packages/platform-core/src/schemas/trigger.ts)), attached to a
+workflow out-of-band and managed via
+`mediforce workflow trigger-add|trigger-list|trigger-update|trigger-start|trigger-stop|trigger-remove`,
+the UI **Triggers** tab, or `POST /api/workflow-definitions/:name/triggers`. The
+`manual` trigger is a per-workflow singleton auto-seeded on register (hand-start
+works by default). Webhook config is narrowed by `WebhookTriggerConfigSchema`
 ([`workflow-definition.ts`](../packages/platform-core/src/schemas/workflow-definition.ts)).
-Worked example: [`workflow-examples/07-trigger-varieties.wd.json`](workflow-examples/07-trigger-varieties.wd.json).
+See [ADR-0011](adr/0011-triggers-detached-unified-resource.md).
+
+The three types are routed the same way regardless of how they are attached:
 
 | `type` | Routed by | Notes |
 |--------|-----------|-------|
@@ -256,7 +263,7 @@ a `type` of `string` / `number` / `boolean` / `date` / `datetime` / `select` /
 
 ## Workflow-level fields (the envelope)
 
-Beyond `steps` / `transitions` / `triggers`, the workflow envelope carries config
+Beyond `steps` / `transitions`, the workflow envelope carries config
 that applies to the whole definition. All on `WorkflowDefinitionBaseSchema` in
 [`workflow-definition.ts`](../packages/platform-core/src/schemas/workflow-definition.ts).
 

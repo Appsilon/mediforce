@@ -186,7 +186,6 @@ function buildWorkflowContext(stepId: string): WorkflowAgentContext {
     visibility: 'private',
     steps: [step],
     transitions: [],
-    triggers: [{ type: 'manual', name: 'start' }],
     workspace: {},
   };
   return {

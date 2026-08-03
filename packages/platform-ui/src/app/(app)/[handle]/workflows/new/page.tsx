@@ -128,7 +128,6 @@ export default function NewWorkflowPage() {
           description: description.trim() || undefined,
           steps,
           transitions: mergedTransitions,
-          triggers: [{ type: 'manual', name: 'start' }],
         },
         { namespace: effectiveNamespace },
       );
@@ -159,7 +158,6 @@ export default function NewWorkflowPage() {
     name: toWorkflowId(workflowName) || 'my-workflow',
     namespace: effectiveNamespace || undefined,
     description: description || undefined,
-    triggers: [{ type: 'manual', name: 'start' }],
   };
 
   const canPublish = saveState.status !== 'saving' && !!toWorkflowId(workflowName) && !!description.trim();

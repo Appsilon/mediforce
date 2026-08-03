@@ -12,8 +12,14 @@ import {
   authVerificationTokens,
   getUserRoles,
   recordSignIn,
+  recordSignInAuditEvent,
+  resolveEmailSenderFromEnv,
+  findPasswordCredentialByEmail,
 } from '@mediforce/platform-infra';
+import type { Database } from '@mediforce/platform-infra';
 import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist';
+import { buildMagicLinkEmail } from '@/lib/magic-link-email';
+import { shouldSendMagicLink } from '@/lib/magic-link-gate';
 
 /**
  * NextAuth (Auth.js v5) — the single source of truth for authentication after
@@ -40,7 +46,9 @@ function buildAdapter(): Adapter {
   });
 }
 
-function buildProviders(): Provider[] {
+/** Exported for unit tests that exercise the magic-link `sendVerificationRequest`
+ *  glue (gate + email build + send) without a live Auth.js request. */
+export function buildProviders(db: Database): Provider[] {
   const providers: Provider[] = [];
 
   if (process.env.GOOGLE_CLIENT_ID) {
@@ -60,7 +68,53 @@ function buildProviders(): Provider[] {
   // Password sign-in lives in `/api/auth/password-login`, not here — see the
   // module docblock.
 
-  // Magic-link (Email) provider is DEFERRED for the MVP (ADR-0002 §4).
+  // Email (verification-token) provider (ADR-0002 §4). This is the shared
+  // Auth.js infra powering BOTH invite-activation links and (optionally) login
+  // magic-links: registering it mounts `/api/auth/callback/email` and the
+  // verification-token machinery the invite flow mints against. Whether the
+  // login PAGE offers "Email me a sign-in link" is a separate display concern
+  // (`ENABLE_MAGIC_LINK`, surfaced by `/api/auth/magic-link-login`) — it does
+  // NOT gate registration here.
+  //
+  // Fully compatible with database sessions: it mints the same `auth_sessions`
+  // row + cookie as Google. After signing in the user sets a first password via
+  // `POST /api/users/set-password`.
+  //
+  // `resolveEmailSenderFromEnv()` returns `null` when email is disabled
+  // (`MEDIFORCE_DISABLE_EMAIL`) — a deployment with no email simply gets no
+  // Email provider (invites and magic-links both need email to work). A
+  // misconfiguration throws from within the resolver (loud, on purpose).
+  const resolvedEmail = resolveEmailSenderFromEnv();
+  if (resolvedEmail !== null) {
+    providers.push({
+      id: 'email',
+      type: 'email',
+      name: 'Email',
+      from: resolvedEmail.from,
+      // 15-minute link validity.
+      maxAge: 60 * 15,
+      async sendVerificationRequest(params: { identifier: string; url: string }) {
+        const { identifier, url } = params;
+        // Account-creation gate (ADR-0002 §4). The Email provider would
+        // otherwise let ANY address request a link, and the adapter would
+        // self-register a new `auth_users` row on callback. Only send when the
+        // address already belongs to a user AND its domain is allowlisted; the
+        // adapter can never create a user because no link was ever minted.
+        // On a miss we return WITHOUT sending and WITHOUT throwing, so the UI
+        // shows the same "check your email" either way (anti-enumeration).
+        const credential = await findPasswordCredentialByEmail(db, identifier);
+        const domainAllowed = isEmailDomainAllowed(
+          identifier,
+          parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS),
+        );
+        if (!shouldSendMagicLink({ userExists: credential !== null, domainAllowed })) {
+          return;
+        }
+        const { subject, text, html } = buildMagicLinkEmail(url, resolvedEmail.senderName);
+        await resolvedEmail.send({ to: [identifier], subject, text, html });
+      },
+    } as Provider);
+  }
 
   if (process.env.OIDC_ISSUER) {
     providers.push({
@@ -87,8 +141,11 @@ export function buildAuthConfig(): NextAuthConfig {
     adapter: buildAdapter(),
     session: { strategy: 'database' },
     trustHost: true,
-    pages: { signIn: '/login' },
-    providers: buildProviders(),
+    // Route Auth.js's built-in error page (e.g. an expired/used magic link,
+    // `?error=Verification`) back to our styled login page instead of the
+    // unstyled default; `friendlyOAuthError` renders the message on-brand.
+    pages: { signIn: '/login', error: '/login' },
+    providers: buildProviders(db),
     callbacks: {
       async signIn({ user }) {
         // ADR-0002 §4a: reject a sign-in whose email domain is not allowlisted.
@@ -107,8 +164,19 @@ export function buildAuthConfig(): NextAuthConfig {
     events: {
       // Fires once per sign-in, unlike the `session` callback which runs on
       // every session read — see `recordSignIn`.
-      async signIn({ user }) {
-        if (typeof user.id === 'string') await recordSignIn(db, user.id);
+      async signIn({ user, account }) {
+        if (typeof user.id !== 'string') return;
+        await recordSignIn(db, user.id);
+        // Auth.js v5's signIn event never receives the request object, so
+        // IP/user-agent aren't capturable here — the provider name (real,
+        // not guessed) is what stands in for "how" on the Users tab.
+        // Fire-and-forget: this is Monitoring telemetry, not part of the
+        // sign-in contract — a transient DB hiccup here must not fail an
+        // otherwise-successful login.
+        void recordSignInAuditEvent(db, {
+          uid: user.id,
+          method: { kind: 'oauth', provider: account?.provider ?? 'unknown' },
+        }).catch(() => {});
       },
     },
   };

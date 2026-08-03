@@ -2,9 +2,6 @@
   "name": "tutorial-review-loop",
   "title": "Review Loop",
   "description": "Agent generates content, human reviews it. Approve advances to done; revise sends it back to the agent. Demonstrates agent steps, autonomyLevel, review verdicts, and the approve/revise loop pattern.",
-  "triggers": [
-    { "type": "manual", "name": "manual" }
-  ],
   "roles": ["author", "reviewer"],
   "steps": [
     {

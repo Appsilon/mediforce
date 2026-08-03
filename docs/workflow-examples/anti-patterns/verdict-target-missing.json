@@ -6,7 +6,6 @@
   "expectedError": "does not match any step",
   "definition": {
     "name": "anti-verdict-bad-target",
-    "triggers": [{ "type": "manual", "name": "manual" }],
     "steps": [
       { "id": "create", "name": "Create", "type": "creation", "executor": "human" },
       {

@@ -6,7 +6,6 @@
   "expectedError": "agent config is not allowed on script steps",
   "definition": {
     "name": "anti-script-in-agent",
-    "triggers": [{ "type": "manual", "name": "manual" }],
     "steps": [
       {
         "id": "run-script",

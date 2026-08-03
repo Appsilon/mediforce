@@ -2,15 +2,24 @@ import { test, expect } from '../helpers/test-fixtures';
 import { createTestUser } from '../helpers/emulator';
 import { seedPostgresOrganizationNamespace } from '../helpers/postgres-seed';
 import { trackPageErrors } from '../helpers/page-errors';
-
-const TEST_EMAIL = 'test@mediforce.dev';
-const TEST_PASSWORD = 'test123456';
-const TEST_DISPLAY_NAME = 'Test User';
+import {
+  TEST_USER_DISPLAY_NAME,
+  TEST_USER_EMAIL,
+  TEST_USER_ID,
+  TEST_USER_PASSWORD,
+} from '../helpers/constants';
 
 test.describe('Workspace Selection Journey', () => {
   test.beforeAll(async () => {
-    // createTestUser signs in if the user already exists (auth-setup creates them)
-    const uid = await createTestUser(TEST_EMAIL, TEST_PASSWORD, TEST_DISPLAY_NAME);
+    // createTestUser signs in if the user already exists (auth-setup creates
+    // them); `TEST_USER_ID` pins the id so a run without auth-setup does not
+    // mint a second id for this email.
+    const uid = await createTestUser(
+      TEST_USER_EMAIL,
+      TEST_USER_PASSWORD,
+      TEST_USER_DISPLAY_NAME,
+      TEST_USER_ID,
+    );
 
     // Give the test user a second, org-kind workspace they own. The picker
     // then shows their personal "My workspace" alongside "Acme Labs". Org

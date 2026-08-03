@@ -5,7 +5,6 @@ import {
   normalizeSelection,
   StepSchema,
   TransitionSchema,
-  TriggerSchema,
   VerdictSchema,
 } from '../process-definition';
 
@@ -20,17 +19,11 @@ const minimalTransition = {
   to: 'step-2',
 };
 
-const minimalTrigger = {
-  type: 'manual' as const,
-  name: 'Start Process',
-};
-
 const minimalDefinition = {
   name: 'test-process',
   version: '1.0',
   steps: [minimalStep],
   transitions: [minimalTransition],
-  triggers: [minimalTrigger],
 };
 
 describe('VerdictSchema', () => {
@@ -299,51 +292,6 @@ describe('TransitionSchema', () => {
   });
 });
 
-describe('TriggerSchema', () => {
-  it('should parse a minimal trigger', () => {
-    const result = TriggerSchema.safeParse(minimalTrigger);
-    expect(result.success).toBe(true);
-  });
-
-  it('should parse a trigger with config', () => {
-    const result = TriggerSchema.safeParse({
-      type: 'webhook',
-      name: 'External Trigger',
-      config: { url: 'https://example.com', method: 'POST' },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('should accept all valid trigger types', () => {
-    for (const type of ['manual', 'webhook', 'event']) {
-      const result = TriggerSchema.safeParse({ type, name: 'test' });
-      expect(result.success).toBe(true);
-    }
-  });
-
-  it('should accept a cron trigger type', () => {
-    const result = TriggerSchema.safeParse({
-      type: 'cron',
-      name: 'Cron Trigger',
-      schedule: '0 8 * * 1-5',
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('should reject a trigger with unknown type', () => {
-    const result = TriggerSchema.safeParse({
-      type: 'scheduled',
-      name: 'Unknown Trigger',
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('should reject a trigger with empty name', () => {
-    const result = TriggerSchema.safeParse({ type: 'manual', name: '' });
-    expect(result.success).toBe(false);
-  });
-});
-
 describe('ProcessDefinitionSchema', () => {
   it('should parse a minimal valid process definition', () => {
     const result = ProcessDefinitionSchema.safeParse(minimalDefinition);
@@ -353,7 +301,6 @@ describe('ProcessDefinitionSchema', () => {
       expect(result.data.version).toBe('1.0');
       expect(result.data.steps).toHaveLength(1);
       expect(result.data.transitions).toHaveLength(1);
-      expect(result.data.triggers).toHaveLength(1);
     }
   });
 
@@ -380,21 +327,12 @@ describe('ProcessDefinitionSchema', () => {
       transitions: [
         { from: 'collect-data', to: 'review', when: 'data-complete' },
       ],
-      triggers: [
-        { type: 'manual', name: 'Start Supply Chain Review' },
-        {
-          type: 'webhook',
-          name: 'External Signal',
-          config: { endpoint: '/webhook/supply-discrepancy' },
-        },
-      ],
       metadata: { domain: 'supply-chain', priority: 'high' },
     };
     const result = ProcessDefinitionSchema.safeParse(fullDefinition);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.steps).toHaveLength(4);
-      expect(result.data.triggers).toHaveLength(2);
       expect(result.data.metadata?.domain).toBe('supply-chain');
     }
   });
@@ -418,20 +356,6 @@ describe('ProcessDefinitionSchema', () => {
     const result = ProcessDefinitionSchema.safeParse({
       ...minimalDefinition,
       steps: [],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('should reject a definition with missing triggers', () => {
-    const { triggers: _, ...noTriggers } = minimalDefinition;
-    const result = ProcessDefinitionSchema.safeParse(noTriggers);
-    expect(result.success).toBe(false);
-  });
-
-  it('should reject a definition with empty triggers array', () => {
-    const result = ProcessDefinitionSchema.safeParse({
-      ...minimalDefinition,
-      triggers: [],
     });
     expect(result.success).toBe(false);
   });

@@ -24,6 +24,16 @@ export async function transferWorkflowNamespace(
     input.targetNamespace,
   );
 
+  // ADR-0011: trigger rows are independently namespaced, so move them with the
+  // definition. Left behind, the source heartbeat can no longer resolve the
+  // moved workflow and the destination has no schedule — scheduled automation
+  // would silently stop.
+  await scope.triggers.transferWorkflowNamespace(
+    input.sourceNamespace,
+    input.name,
+    input.targetNamespace,
+  );
+
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,

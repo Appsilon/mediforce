@@ -22,7 +22,6 @@ test.describe('WD.workspace API journey', () => {
         { id: 'noop', name: 'No-op Human Step', type: 'creation', executor: 'human' },
       ],
       transitions: [],
-      triggers: [{ type: 'manual', name: 'start' }],
       workspace: {
         remote: 'Appsilon/workspace-roundtrip-fixture',
         remoteAuth: 'GITHUB_TOKEN',
@@ -61,7 +60,6 @@ test.describe('WD.workspace API journey', () => {
         { id: 'noop', name: 'No-op', type: 'creation', executor: 'human' },
       ],
       transitions: [],
-      triggers: [{ type: 'manual', name: 'start' }],
     };
 
     const createRes = await request.post(

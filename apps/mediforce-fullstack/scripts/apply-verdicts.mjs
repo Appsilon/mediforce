@@ -2,10 +2,13 @@
 //
 // For each verdict, reconcile the issue's `fullstack:` labels to the desired
 // { suitability, priority } and (once, on the transition INTO manual) post a
-// gracious decline comment. An `obsolete` verdict is closed here in the same
-// batch pass: label + a comment to the author with triage's evidence + a
-// reversible close. Best-effort per issue: a failed write logs and continues,
-// leaving that issue unclassified for the next tick to re-triage.
+// gracious decline comment. A `needs-approval` verdict also persists triage's
+// `blockers` as a marker comment, because the issue is usually selected several
+// ticks later, long after triage's step output is gone. An `obsolete` verdict is
+// closed here in the same batch pass: label + a comment to the author with
+// triage's evidence + a reversible close. Best-effort per issue: a failed write
+// logs and continues, leaving that issue unclassified for the next tick to
+// re-triage.
 //
 // TRIAGE-ONLY passthrough: this step re-reads TRIAGE_ONLY and echoes it into its
 // output as `triageOnly` so the apply-verdicts -> select transition can route to
@@ -66,6 +69,23 @@ export function reconcile(currentLabels, verdict) {
   return { add, remove, newlyManual, restampManual };
 }
 
+/** Marker on the bot comment that carries triage's blockers. `select` greps for
+ *  the same literal to feed them to `draft-plan` — triage's own step output is
+ *  long gone by then (the issue is usually selected several ticks later). */
+export const BLOCKERS_MARKER = '<!-- fullstack:blockers';
+
+/** Render triage's blockers as a human-readable comment with a machine-readable
+ *  tail. `select.parseBlockersComment` is the reader — keep the shapes in sync
+ *  (round-tripped in tests). Pure. */
+export function blockersComment(blockers) {
+  const list = (blockers || []).map((b) => `- \`${b.kind}\` — ${b.question}`).join('\n');
+  return '🤖 **mediforce-fullstack**: this one is queued for a plan. Open questions from triage:\n\n' +
+    `${list || '- (none recorded)'}\n\n` +
+    'I resolve the `missing-context` and `scope` ones myself against the code; only ' +
+    '`decision` ones reach a human.\n\n' +
+    `${BLOCKERS_MARKER} ${JSON.stringify(blockers || [])} -->`;
+}
+
 function declineComment(verdict) {
   const reason = verdict.reason || 'this needs product/domain judgement an autonomous agent should not make.';
   return `🤖 **mediforce-fullstack**: leaving this one for a human — ${reason}\n\n` +
@@ -120,6 +140,27 @@ async function applyOne(verdict) {
     });
   }
 
+  // Persist the blockers so `draft-plan` can work them on a later tick. Update in
+  // place rather than appending, so a re-triage (FULLSTACK_REASSIGN) replaces the
+  // stale list instead of leaving two contradicting comments on the issue.
+  let blockersPosted = false;
+  if (verdict.suitability === 'needs-approval') {
+    const body = blockersComment(verdict.blockers);
+    const comments = await gh(`/repos/${REPO}/issues/${verdict.issueNumber}/comments?per_page=100`);
+    const existing = (comments || []).find((c) => (c.body || '').includes(BLOCKERS_MARKER));
+    await gh(
+      existing
+        ? `/repos/${REPO}/issues/comments/${existing.id}`
+        : `/repos/${REPO}/issues/${verdict.issueNumber}/comments`,
+      {
+        method: existing ? 'PATCH' : 'POST',
+        headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
+      },
+    );
+    blockersPosted = true;
+  }
+
   let closed = false;
   if (verdict.suitability === 'obsolete') {
     const author = (issue.user && issue.user.login) || null;
@@ -135,7 +176,7 @@ async function applyOne(verdict) {
     });
     closed = true;
   }
-  return { issueNumber: verdict.issueNumber, add, remove, newlyManual, restampManual, closed };
+  return { issueNumber: verdict.issueNumber, add, remove, newlyManual, restampManual, blockersPosted, closed };
 }
 
 async function main() {

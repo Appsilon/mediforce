@@ -319,7 +319,6 @@ describe('ClaudeCodeAgentPlugin', () => {
           visibility: 'private',
           steps: [],
           transitions: [],
-          triggers: [],
         },
         step: {
           id: 'extract',
@@ -906,7 +905,6 @@ describe('ClaudeCodeAgentPlugin', () => {
           visibility: 'private',
           steps: [],
           transitions: [],
-          triggers: [],
         },
         step: {
           id: 'triage',

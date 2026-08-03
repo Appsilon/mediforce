@@ -26,7 +26,6 @@ const linearDef: ProcessDefinition = {
     { from: 'start', to: 'process' },
     { from: 'process', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start Process' }],
 };
 
 const branchingDef: ProcessDefinition = {
@@ -44,7 +43,6 @@ const branchingDef: ProcessDefinition = {
     { from: 'path-a', to: 'done' },
     { from: 'path-b', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start Branching' }],
 };
 
 const actor: StepActor = { id: 'user-1', role: 'operator' };

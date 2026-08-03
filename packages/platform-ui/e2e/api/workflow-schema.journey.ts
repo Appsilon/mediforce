@@ -22,7 +22,8 @@ test.describe('Workflow definition JSON Schema API', () => {
     expect(properties.steps?.type).toBe('array');
     expect(properties.steps?.items).toBeDefined();
     expect(properties.transitions?.type).toBe('array');
-    expect(properties.triggers?.type).toBe('array');
+    // Definitions are trigger-free (Issue #932) — triggers are table resources.
+    expect(properties).not.toHaveProperty('triggers');
 
     expect(properties).not.toHaveProperty('namespace');
     expect(properties).not.toHaveProperty('version');

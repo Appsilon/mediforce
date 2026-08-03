@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Triggers are detached resources in a unified table; the Workflow Definition is trigger-free
@@ -10,7 +10,9 @@ table** discriminated by `type`, and attached to a Workflow independently of its
 immutable versioned Definition. Triggers are managed from CLI and UI and are
 portable across instances via an importable/exportable trigger-config file. The
 end state of the triggers-detachment epic is that **the Workflow Definition no
-longer declares triggers at all**.
+longer declares triggers at all** — reached by Issue #932 (see *Rollout status*
+below): the `triggers` array is gone from the schema and its DB column is dropped
+by migration `0039`.
 
 This ADR records the *target model* and lands the data layer (schema, repo,
 Postgres table, authorized wrapper) as pure plumbing. The behavioural flip —
@@ -58,10 +60,33 @@ detached resources a workflow uses, not fields embedded in the immutable spec.
 - `triggers.min(1)` and the triggers array will leave the Definition schema when
   the Definition becomes trigger-free; register / import / validate stop reading
   them and existing definitions' declared triggers migrate into the table.
-- The persisted resource schema is named `TriggerResource*` for now because the
-  embedded `TriggerSchema` in `process-definition.ts` still owns the `Trigger` /
-  `TriggerSchema` names; the rename-back happens when the embedded declaration is
-  removed. See CONTEXT.md "Trigger".
+  **Done in Issue #932:** the array is removed from the schema and migration
+  `0039` drops the DB column; register / import / validate no longer read it.
+- The persisted resource schema is named `TriggerResource*` because the embedded
+  `TriggerSchema` in `process-definition.ts` originally owned the `Trigger` /
+  `TriggerSchema` names. With Issue #932 the embedded declaration is gone; the
+  resource schema now lives on its own in
+  `packages/platform-core/src/schemas/trigger.ts`. See CONTEXT.md "Trigger".
 - `listEnabledByType('cron')` is the cross-namespace read the heartbeat will use;
   it runs as a system actor via `scope.system.triggers`. Workspace-scoped callers
   go through `scope.triggers` (the authorized wrapper).
+
+## Rollout status
+
+The epic landed across several issues; the target model above is now fully in
+place:
+
+- **#929 / #930 / #931 (PR #1009)** re-homed `cron`, `manual`, and `webhook`
+  onto the unified `triggers` table with backfill migrations. The heartbeat,
+  `ManualTrigger`, and `WebhookRouter` read the table instead of `def.triggers`.
+  The per-workflow `manual` trigger is auto-seeded on register (the hand-start
+  gate).
+- **#932 (this ADR's final step)** dropped the embedded field entirely: the
+  `triggers` array is removed from the `WorkflowDefinition` / `ProcessDefinition`
+  schemas, migration `0039` drops the DB column, and register / import / validate
+  no longer read or write a definition-level `triggers` field. **Definitions are
+  now trigger-free.**
+
+Triggers live solely on the `triggers` table and are managed via
+`mediforce workflow trigger-add|trigger-list|trigger-update|trigger-start|trigger-stop|trigger-remove`,
+the UI **Triggers** tab, or `POST /api/workflow-definitions/:name/triggers`.

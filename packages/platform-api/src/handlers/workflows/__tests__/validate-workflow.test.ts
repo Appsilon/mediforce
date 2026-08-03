@@ -11,7 +11,6 @@ const validTemplate = {
     { id: 'end', name: 'End', type: 'terminal', executor: 'human' },
   ],
   transitions: [{ from: 'start', to: 'end' }],
-  triggers: [{ type: 'manual', name: 'manual' }],
 };
 
 describe('validateWorkflow handler', () => {

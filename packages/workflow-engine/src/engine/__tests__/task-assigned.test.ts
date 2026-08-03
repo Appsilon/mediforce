@@ -73,7 +73,6 @@ const humanProcessDef: WorkflowDefinition = {
     { from: 'start', to: 'review' },
     { from: 'review', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start Human Process' }],
   notifications: [{ event: 'task_assigned', roles: ['reviewer'] }],
 };
 

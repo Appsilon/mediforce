@@ -11,7 +11,6 @@ describe('renderWorkflowDiagram', () => {
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'start', to: 'done' }],
-      triggers: [{ type: 'manual', name: 'manual' }],
     },
   };
 

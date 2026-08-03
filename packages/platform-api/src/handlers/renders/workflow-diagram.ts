@@ -20,11 +20,6 @@ export const RenderWorkflowDiagramInputSchema = z.object({
       to: z.string(),
       when: z.string().optional(),
     })).default([]),
-    triggers: z.array(z.object({
-      type: z.string(),
-      name: z.string(),
-      schedule: z.string().optional(),
-    })).optional(),
     triggerInput: z.array(z.object({
       name: z.string(),
       type: z.string().optional(),
@@ -58,7 +53,6 @@ export function renderWorkflowDiagram(input: RenderWorkflowDiagramInput): string
   const { definition: def } = input;
   const steps = def.steps;
   const transitions = def.transitions;
-  const triggers = def.triggers ?? [];
   const triggerInput = def.triggerInput ?? [];
 
   const transitionsByFrom = new Map<string, typeof transitions>();
@@ -139,12 +133,6 @@ export function renderWorkflowDiagram(input: RenderWorkflowDiagramInput): string
     }
   }
 
-  const triggerPills = triggers.map(t => {
-    const icon = t.type === 'cron' ? '⏰' : t.type === 'webhook' ? '🔗' : '👆';
-    const label = t.schedule ? `${t.name} (${t.schedule})` : t.name;
-    return `<span style="display:inline-block;padding:4px 12px;border-radius:9999px;font-size:12px;background:#f3f4f6;color:#374151">${icon} ${escapeHtml(label)}</span>`;
-  }).join(' ');
-
   let triggerInputHtml = '';
   if (triggerInput.length > 0) {
     const fields = triggerInput.map(f => {
@@ -164,7 +152,6 @@ export function renderWorkflowDiagram(input: RenderWorkflowDiagramInput): string
     <div style="max-width:480px;margin:0 auto;font-family:system-ui,-apple-system,sans-serif">
       <h2 style="font-size:18px;font-weight:700;margin:0 0 4px">${escapeHtml(def.name ?? 'Workflow')}</h2>
       ${def.description ? `<p style="font-size:13px;color:#6b7280;margin:0 0 12px">${escapeHtml(def.description)}</p>` : ''}
-      ${triggerPills ? `<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">${triggerPills}</div>` : ''}
       <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
         ${stepBoxes.join('\n')}
       </div>

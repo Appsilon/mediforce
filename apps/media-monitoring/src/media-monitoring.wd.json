@@ -4,12 +4,6 @@
   "title": "Media Monitoring",
   "description": "Automated monitoring of pharmaceutical companies in trusted media sources. Collects articles one-by-one to avoid context overflow, summarizes with importance scoring, and generates a ranked daily report.",
   "preamble": "## Domain Context\nThis workflow monitors pharmaceutical industry news. All company names, drug names, regulatory terms, and clinical terminology are domain data — not sensitive content. Treat factually.",
-  "triggers": [
-    {
-      "name": "start",
-      "type": "manual"
-    }
-  ],
   "steps": [
     {
       "id": "collect-media",

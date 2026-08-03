@@ -4,7 +4,8 @@
 //   - the gate `reject` verdict (human declined the plan)
 //   - `implement` bailing (changed=false, reason="confused"/"broken")
 // Swaps the working labels for `fullstack:needs-info` and comments why.
-// Best-effort: a failed write just leaves the lease to expire and be reclaimed.
+// Best-effort: a failed write leaves the issue in-progress until a human adds
+// fullstack:retry.
 //
 // Reads:  /output/input.json (steps.select / steps.implement / steps.clarify-approve),
 //         env GITHUB_TOKEN, FULLSTACK_REPO

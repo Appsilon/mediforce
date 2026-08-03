@@ -47,6 +47,16 @@ function memberCaller(handle = 'alpha') {
   };
 }
 
+function adminCaller(handle = 'alpha') {
+  return {
+    kind: 'user' as const,
+    uid: 'uid-admin',
+    namespaces: new Set([handle]),
+    namespaceRoles: new Map([[handle, 'admin' as const]]),
+    isSystemActor: false as const,
+  };
+}
+
 const apiKeyCaller = { kind: 'apiKey' as const, isSystemActor: true as const };
 
 function makeGetRequest(query: Record<string, string> = {}): NextRequest {
@@ -94,6 +104,35 @@ describe('GET /api/users/members', () => {
     const res = await GET(makeGetRequest({ namespace: 'alpha' }));
 
     expect(res.status).toBe(200);
+  });
+
+  it('[AUTHZ] member caller does not receive email or lastSignInTime (gated to admins)', async () => {
+    mockResolveCallerIdentity.mockResolvedValue(memberCaller('alpha'));
+
+    const res = await GET(makeGetRequest({ namespace: 'alpha' }));
+    const json = (await res.json()) as {
+      members: Array<{ uid: string; role: string; email: string | null; lastSignInTime: string | null }>;
+    };
+
+    expect(res.status).toBe(200);
+    expect(json.members).toHaveLength(1);
+    // Roster (uid/role) stays; manager fields are stripped.
+    expect(json.members[0]).toMatchObject({ uid: 'uid-member', role: 'member' });
+    expect(json.members[0]?.email).toBeNull();
+    expect(json.members[0]?.lastSignInTime).toBeNull();
+  });
+
+  it('[AUTHZ] admin caller does receive email and lastSignInTime', async () => {
+    mockResolveCallerIdentity.mockResolvedValue(adminCaller('alpha'));
+
+    const res = await GET(makeGetRequest({ namespace: 'alpha' }));
+    const json = (await res.json()) as {
+      members: Array<{ email: string | null; lastSignInTime: string | null }>;
+    };
+
+    expect(res.status).toBe(200);
+    expect(json.members[0]?.email).toBe('member@alpha.test');
+    expect(json.members[0]?.lastSignInTime).toBe('2026-05-01T00:00:00.000Z');
   });
 
   it('[AUTHZ] non-member gets 404 (anti-enum bug fix)', async () => {

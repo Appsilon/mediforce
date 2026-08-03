@@ -13,7 +13,6 @@ export {
   normalizeSelection,
   StepSchema,
   TransitionSchema,
-  TriggerSchema,
   ProcessDefinitionSchema,
   ReviewConstraintsSchema,
   AgentConfigSchema,
@@ -28,6 +27,7 @@ export {
   InstanceStatusSchema,
   ProcessInstanceSchema,
   RunNameEntrySchema,
+  WorkflowDisplayStatusSchema,
   StepExecutionStatusSchema,
   GateResultSchema,
   ReviewVerdictSchema,
@@ -41,6 +41,7 @@ export {
   AgentEventSchema,
   AgentRunStatusSchema,
   AgentRunSchema,
+  AgentRunCardStatusSchema,
   HumanTaskStatusSchema,
   HumanTaskSchema,
   HandoffStatusSchema,
@@ -79,7 +80,7 @@ export {
   WaitActionConfigSchema,
   ActionConfigSchema,
   validateInputForNextRun,
-  validateExecutorAndTriggers,
+  validateSteps,
   validateTriggerInput,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
@@ -102,7 +103,6 @@ export {
   HANDLE_MAX_LENGTH,
   WorkflowSecretsSchema,
   NamespaceSecretsSchema,
-  CronTriggerStateSchema,
   TriggerTypeSchema,
   TriggerResourceSchema,
   CronTriggerResourceSchema,
@@ -110,6 +110,9 @@ export {
   ManualTriggerResourceSchema,
   CronTriggerConfigSchema,
   ManualTriggerConfigSchema,
+  PortableTriggerSchema,
+  TriggerConfigFileSchema,
+  toPortableTrigger,
   McpServerConfigSchema,
   AgentMcpBindingSchema,
   AgentMcpBindingMapSchema,
@@ -141,7 +144,6 @@ export type {
   Selection,
   Step,
   Transition,
-  Trigger,
   ProcessDefinition,
   ReviewConstraints,
   AgentConfig,
@@ -154,6 +156,7 @@ export type {
   InstanceStatus,
   ProcessInstance,
   RunNameEntry,
+  WorkflowDisplayStatus,
   StepExecutionStatus,
   GateResult,
   ReviewVerdict,
@@ -168,6 +171,7 @@ export type {
   AgentEvent,
   AgentRunStatus,
   AgentRun,
+  AgentRunCardStatus,
 } from './types/index';
 
 export type {
@@ -213,13 +217,14 @@ export type {
   NamespaceMembership,
   WorkflowSecrets,
   NamespaceSecrets,
-  CronTriggerState,
   TriggerType,
   TriggerResource,
   CronTriggerResource,
   WebhookTriggerResource,
   ManualTriggerResource,
   TriggerConfig,
+  PortableTrigger,
+  TriggerConfigFile,
   McpServerConfig,
   AgentMcpBinding,
   AgentMcpBindingMap,
@@ -249,6 +254,8 @@ export {
 export type {
   AgentEventRepository,
   AuditRepository,
+  GetByNamespaceOptions,
+  GetByNamespacePage,
   AuthService,
   AuthUser,
   ProcessRepository,
@@ -256,6 +263,9 @@ export type {
   WorkflowDefinitionGroup,
   ProcessInstanceRepository,
   ListInstancesOptions,
+  ListInstancesPageOptions,
+  ListInstancesPage,
+  WorkflowDisplayStatusCounts,
   WorkflowRunSummaryResult,
   HumanTaskRepository,
   TaskAttachmentRepository,
@@ -269,8 +279,8 @@ export type {
   AgentRunRepository,
   ListAgentRunsOptions,
   ListAgentRunsPage,
+  AgentRunCardStatusCounts,
   CoworkSessionRepository,
-  CronTriggerStateRepository,
   TriggerRepository,
   TriggerUpdate,
   ToolCatalogRepository,
@@ -293,6 +303,16 @@ export {
   decodeAgentRunCursor,
 } from './cursors/agent-run-cursor';
 export type { AgentRunCursorPayload } from './cursors/agent-run-cursor';
+export {
+  encodeProcessInstanceCursor,
+  decodeProcessInstanceCursor,
+} from './cursors/process-instance-cursor';
+export type { ProcessInstanceCursorPayload } from './cursors/process-instance-cursor';
+export {
+  encodeAuditEventCursor,
+  decodeAuditEventCursor,
+} from './cursors/audit-event-cursor';
+export type { AuditEventCursorPayload } from './cursors/audit-event-cursor';
 
 // Agent definition schema + repository interface
 export {
@@ -370,7 +390,6 @@ export {
   InMemoryHandoffRepository,
   NoopNotificationService,
   InMemoryCoworkSessionRepository,
-  InMemoryCronTriggerStateRepository,
   InMemoryTriggerRepository,
   InMemoryOAuthProviderRepository,
   InMemoryAgentOAuthTokenRepository,
@@ -429,6 +448,15 @@ export { calculateEstimatedCost } from './utils/cost';
 export { formatBytes } from './utils/format';
 export { compact, parseRow } from './utils/compact';
 export { normaliseModelId } from './utils/normalise-model-id';
+export { emailLayout, escapeHtml } from './utils/email-layout';
+export {
+  normalizeRepoUrls,
+  toHttpsWithToken,
+  resolveRepoCloneTargets,
+  redactRepoCredentials,
+} from './utils/repo-url';
+export type { RepoCloneTarget } from './utils/repo-url';
+export { getWorkflowStatus, type WorkflowStatus } from './utils/workflow-status';
 
 // Workflow examples — shared loader for MCP tool, tests, and build scripts.
 // Uses Node.js fs/path so NOT exported from this barrel (breaks browser bundles).

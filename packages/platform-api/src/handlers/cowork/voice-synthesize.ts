@@ -189,7 +189,6 @@ const SYNTHESIS_SYSTEM_PROMPT = `You are an expert Mediforce workflow synthesize
   "name": "kebab-case-name",
   "version": 1,
   "description": "What this workflow does",
-  "triggers": [{ "type": "manual", "name": "Start" }],
   "roles": ["role1", "role2"],
   "steps": [
     {
@@ -227,6 +226,7 @@ const SYNTHESIS_SYSTEM_PROMPT = `You are an expert Mediforce workflow synthesize
 8. If a step has multiple outgoing transitions, each MUST have a "when" expression
 9. Infer roles from the conversation context — who is performing each step?
 10. Be specific in descriptions — don't leave them vague
+11. Do not include triggers in the definition. Manual, webhook, and cron triggers are detached resources managed after registration.
 
 ## What to infer when the conversation is vague
 
@@ -234,4 +234,4 @@ const SYNTHESIS_SYSTEM_PROMPT = `You are an expert Mediforce workflow synthesize
 - If "review" or "approval" → human step or agent with L2/L3
 - If "AI does X" or "automatically" → agent step with appropriate autonomy
 - If "send notification" or "webhook" → script step
-- Default trigger: manual, unless they mention scheduling or webhooks`;
+- When the user mentions scheduling or webhooks, capture that requirement separately; do not add it to the definition`;

@@ -77,7 +77,6 @@ describe('validateStepGraph', () => {
         { id: 'b', name: 'B', type: 'creation' },
       ],
       transitions: [{ from: 'a', to: 'b' }],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     const result = validateStepGraph(definition);
     expect(result.valid).toBe(false);
@@ -94,7 +93,6 @@ describe('validateStepGraph', () => {
         { id: 'done', name: 'Done', type: 'terminal' },
       ],
       transitions: [{ from: 'start', to: 'stuck' }],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     const result = validateStepGraph(definition);
     expect(result.valid).toBe(false);
@@ -123,7 +121,6 @@ describe('validateStepGraph', () => {
         { from: 'review', to: 'nonexistent' },
         { from: 'review', to: 'done' },
       ],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     const result = validateStepGraph(definition);
     expect(result.valid).toBe(false);
@@ -143,7 +140,6 @@ describe('validateStepGraph', () => {
         { from: 'start', to: 'done' },
         { from: 'island', to: 'done' },
       ],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     const result = validateStepGraph(definition);
     expect(result.valid).toBe(false);
@@ -172,7 +168,6 @@ describe('validateStepGraph', () => {
         { from: 'start', to: 'review' },
         { from: 'review', to: 'done' },
       ],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     const result = validateStepGraph(definition);
     expect(result.valid).toBe(true);
@@ -201,7 +196,6 @@ describe('validateStepGraph', () => {
         { from: 'start', to: 'review' },
         { from: 'review', to: 'done' },
       ],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     const result = validateStepGraph(definition);
     expect(result.valid).toBe(true);
@@ -217,7 +211,6 @@ describe('validateStepGraph', () => {
         { id: 'done', name: 'Done', type: 'terminal' },
       ],
       transitions: [{ from: 'start', to: 'done' }],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     const result = validateStepGraph(definition);
     expect(result.valid).toBe(false);
@@ -246,7 +239,6 @@ describe('validateStepGraph', () => {
         { from: 'start', to: 'review' },
         { from: 'review', to: 'done' },
       ],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     const result = validateStepGraph(definition);
     expect(result.valid).toBe(false);
@@ -267,7 +259,6 @@ describe('validateStepGraph', () => {
         { from: 'ghost', to: 'done' },
         { from: 'island', to: 'done' },
       ],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     const result = validateStepGraph(definition);
     expect(result.valid).toBe(false);

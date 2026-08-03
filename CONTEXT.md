@@ -39,7 +39,8 @@ for one execution (= Workflow Run).
 
 **Workflow Definition**:
 One versioned spec of a Workflow — the JSON content with steps, transitions,
-triggers, declared roles, env, optional git workspace. Versioned (integer),
+declared roles, env, optional git workspace. **Trigger-free** (ADR-0011,
+Issue #932): the Definition no longer declares triggers. Versioned (integer),
 immutable once created. Belongs to one Namespace. Has
 `visibility: public | private` on the parent Workflow — `public` discoverable
 read-only across Namespaces, `private` members-only. The runnable artifact:
@@ -64,17 +65,25 @@ What causes a Workflow to run, or makes it hand-startable. Three live kinds:
 `manual` (a person starts a Run), `webhook` (an inbound HTTP call starts a Run),
 `cron` (a schedule starts Runs). `event` is a reserved fourth kind with no
 runtime yet. A Trigger is a **first-class mutable** resource keyed by
-`(Namespace, Workflow, trigger name)`, attached to a Workflow **independently of
-its immutable Workflow Definition** and managed like a Secret — added, toggled,
-retimed, and imported/exported without registering a new Definition version.
-_Code:_ the persisted resource is `TriggerResource*` **only transitionally** —
-the name `Trigger` / `TriggerSchema` is still held by the legacy trigger
-*declaration* embedded in `process-definition.ts`; when the triggers-detachment
-epic makes the Definition trigger-free, `TriggerResource` renames back to
-`Trigger`.
-_Avoid_: conflating the detached Trigger resource with the embedded Definition
-trigger declaration (legacy, being removed), or with the **Trigger Payload** on
-a Workflow Run (the data a firing hands the Run).
+`(Namespace, Workflow, trigger name)`, stored on the unified `triggers` table
+and attached to a Workflow **independently of its immutable Workflow Definition**
+— managed like a Secret: added, toggled, retimed, and imported/exported without
+registering a new Definition version. The Definition carries no triggers
+(Issue #932).
+_Code:_ the persisted resource schema is `TriggerResource*` in
+`packages/platform-core/src/schemas/trigger.ts`. This is the permanent name —
+the old embedded trigger *declaration* (`TriggerSchema` / the `triggers` array on
+`process-definition.ts` / `workflow-definition.ts`) and its DB column are removed
+(migration `0039`).
+_Status:_ all three live kinds — `cron`, `manual`, `webhook` — are wired on the
+unified `triggers` table (managed from CLI / UI / API); the heartbeat fires
+row-driven from `listEnabledByType('cron')`, hand-start gates on an enabled
+`manual` row, and the webhook router resolves an enabled `webhook` row. The old
+`cron_trigger_state` overlay is retired (#929/#930/#931), and the Definition
+`triggers` field is gone (#932).
+_Avoid_: treating a Trigger as part of the Workflow Definition (it isn't — they
+are detached resources), or conflating it with the **Trigger Payload** on a
+Workflow Run (the data a firing hands the Run).
 
 **Workflow Step** *(config; static)*:
 A node in a Workflow Definition's DAG. Defines `executor: human | agent |
@@ -207,11 +216,17 @@ _Avoid_: Conflating with Plugin — Plugin is the runtime; Skill is data.
 
 **Agent**:
 A reusable agent the platform can run — Claude Code / OpenCode /
-cowork-chat / voice-realtime / future runtimes. Bundles system prompt,
-foundation model, MCP server bindings, skills (and, in the future, tools).
-Referenced by a Workflow Step via `agentId`; the same Agent powers many
-Steps across many Workflows. Single mutable document — **not versioned
-today** (the agent IS the spec, one row per agent).
+cowork-chat / voice-realtime / future runtimes. Bundles a system prompt
+and MCP server bindings. Referenced by a Workflow Step via `agentId`; the
+same Agent powers many Steps across many Workflows. Single mutable
+document — **not versioned today** (the agent IS the spec, one row per
+agent).
+_Not yet wired:_ the schema also carries `foundationModel` (plus a
+form-level model picker), but no runtime path reads either — model
+selection is only ever `step.agent.model`, set independently at the step/
+plugin level. There is no `skills` field on the schema at all; skills are
+step-level (`step.agent.skillsDir`), not part of the Agent. Treat both as
+aspirational, not current behaviour.
 _Future:_ if we introduce versioning, an **Agent Definition** would emerge
 as one versioned spec of an Agent (parallel to Workflow / Workflow Definition).
 _Code:_ user-facing surface (UI, URL `/api/agents/*`, CLI `agent-*`) uses

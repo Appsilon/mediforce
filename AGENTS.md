@@ -13,7 +13,7 @@ complexity estimates because of medical vocabulary.
 packages/
   platform-core/    Zod schemas, repo interfaces, in-memory test doubles
   platform-api/     Contract + framework-free handlers
-  platform-infra/   Postgres, Firebase Auth, email (Mailgun/SMTP)
+  platform-infra/   Postgres, NextAuth session store, email (Mailgun/SMTP)
   platform-ui/      Next.js 15 App Router (dev :9003, e2e :9007)
   workflow-engine/  Engine, transitions, expression DSL
   agent-runtime/    PluginRegistry, AgentRunner, Docker spawn
@@ -157,6 +157,21 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
     or get explicit user acceptance with a tracked follow-up. `/code-review`
     checklist §3a enforces this; treat it as a SHIP gate.
 
+11. **Safe defaults — new features ship deployable.** Every new env var /
+    feature gets a safe default or degrades gracefully, so deploying new code
+    needs no per-deployment config change and never breaks an environment that
+    hasn't set it. Pick the default that keeps the common deployment working (a
+    login method on by default, `false` only for the rare estate that opts
+    out); **derive, don't require** (`APP_BASE_URL` from `NEXT_PUBLIC_APP_URL`);
+    an unconfigured feature degrades to "not offered," never a crash. **Wire the
+    whole path:** an env var read in code must also be forwarded in
+    `docker-compose.prod.yml` (and any other runtime), or it silently never
+    arrives — a `${VAR:-}` line missing there is why a "set it in `.env`"
+    toggle does nothing. Fail loud (boot-fail) **only** when silent behaviour
+    would actively harm users (e.g. emailing dead `localhost` login links) —
+    and even then keep a default so a normal deploy never trips it. Complements
+    §10: §10 protects existing surface, this protects new-feature rollout.
+
 ## Skills
 
 Claude auto-loads every skill under `.claude/skills/` at session start —
@@ -191,6 +206,9 @@ Slash commands like `/new-test` mean "read and follow
     replaced read / write / endpoint / hook. Silent `.limit()` caps, silent
     default flips, missing parity branches all count. Word them
     "regression", never "risk".
+11. Safe defaults — a new env var/feature has a safe default or degrades
+    gracefully; deploy needs no config change; wire the whole path (code +
+    `docker-compose.prod.yml`); fail loud only on user-harming silence.
 
 See `README.md` for one-time env setup (Node, pnpm, Firebase CLI, `.env.local`).
 For the day-to-day dev loop (which `pnpm dev*` to run, test levels, CLI,

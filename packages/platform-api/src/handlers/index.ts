@@ -1,5 +1,6 @@
 export { listTasks } from './tasks/list-tasks';
 export { claimTask } from './tasks/claim-task';
+export { recordTaskViewed } from './tasks/record-task-viewed';
 export { completeTask } from './tasks/complete-task';
 export { listAttachments } from './tasks/attachments/list';
 export { uploadAttachment } from './tasks/attachments/upload';
@@ -16,6 +17,7 @@ export { validateModels, type ValidateModelsDeps } from './models/validate-model
 
 export { listAgentEvents } from './processes/list-agent-events';
 export { listAuditEvents } from './processes/list-audit-events';
+export { listNamespaceAuditEvents } from './processes/list-namespace-audit-events';
 export { getProcessSteps } from './processes/get-process-steps';
 export { cancelRun } from './processes/cancel-run';
 export { resumeRun } from './processes/resume-run';
@@ -70,7 +72,19 @@ export { listPlugins } from './plugins/list-plugins';
 
 export { heartbeat as cronHeartbeat } from './cron/heartbeat';
 
+export {
+  listTriggers,
+  createTrigger,
+  updateTrigger,
+  setTriggerEnabled,
+  deleteTrigger,
+  exportTriggers,
+  importTriggers,
+} from './triggers/manage-triggers';
+
 export { listRuns } from './runs/list-runs';
+export { listRunsPage } from './runs/list-runs-page';
+export { getWorkflowStatusCounts } from './runs/get-workflow-status-counts';
 export { listRunNames } from './runs/list-run-names';
 export { getRun } from './runs/get-run';
 export { startRun } from './runs/start-run';
@@ -120,6 +134,7 @@ export { updateToolCatalogEntry } from './tool-catalog/update-entry';
 export { deleteToolCatalogEntry } from './tool-catalog/delete-entry';
 
 export { listAgentRuns } from './agent-runs/list-agent-runs';
+export { getAgentRunCardStatusCounts } from './agent-runs/get-agent-run-card-status-counts';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 
 export { getConfig, getConfigByPrefix } from './config/index';

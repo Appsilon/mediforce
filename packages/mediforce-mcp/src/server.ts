@@ -67,7 +67,7 @@ server.registerTool(
   {
     description:
       'Render a WorkflowDefinition as an HTML diagram. Pass the full definition object ' +
-      '(with steps, transitions, triggers). Returns HTML that can be used with update_presentation.',
+      '(with steps and transitions). Triggers are managed separately. Returns HTML that can be used with update_presentation.',
     inputSchema: { definition: defSchema },
   },
   async (args) => {
@@ -88,7 +88,7 @@ server.registerTool(
       'Pass the complete WorkflowDefinition as `definition`, the `namespace` (workspace handle), and optional `triggerInput` for trigger payload.',
     inputSchema: {
       definition: z.record(z.string(), z.unknown()).describe(
-        'Complete WorkflowDefinition object (name, version, steps, transitions, triggers)',
+        'Complete WorkflowDefinition object (name, version, steps, transitions)',
       ),
       namespace: z.string().optional().describe(
         'Workspace namespace/handle (auto-detected from session context if omitted)',

@@ -66,7 +66,7 @@ describe('listWorkflowVersions handler', () => {
     expect(result.defaultVersion).toBe(1);
   });
 
-  it('preserves the archived flag per version and counts steps / triggers', async () => {
+  it('preserves the archived flag per version and counts steps', async () => {
     await processRepo.saveWorkflowDefinition(
       buildWorkflowDefinition({
         name: 'flow-a',
@@ -100,9 +100,8 @@ describe('listWorkflowVersions handler', () => {
         archived: true,
         title: 'My Flow',
         description: 'first version',
-        // buildWorkflowDefinition seeds 3 steps + 1 trigger.
+        // buildWorkflowDefinition seeds 3 steps.
         stepCount: 3,
-        triggerCount: 1,
       }),
     );
     expect(v2?.archived).toBe(false);
