@@ -126,7 +126,8 @@ Steps that read `${triggerContext.*}` knowingly re-couple to a Trigger kind.
 _Code:_ `ProcessInstance.triggerContext` (column `process_instances.trigger_context`,
 migration `0040`), exposed to interpolation via `InterpolationSources` in
 `packages/platform-core/src/interpolation.ts`; webhook header filtering lives in
-`packages/platform-ui/src/app/api/triggers/webhook/[...path]/route.ts`. Populated
+`stripCredentialHeaders` in
+`packages/workflow-engine/src/triggers/webhook-router.ts`. Populated
 by each trigger adapter; a manual start and spawned child start leave it empty.
 Bare identifiers deliberately do **not** fall through to it — re-coupling must
 be spelled out.

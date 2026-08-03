@@ -6,6 +6,7 @@ import type {
   WorkflowDefinition,
 } from '@mediforce/platform-core';
 import {
+  isJsonObject,
   resolveRunnableVersion,
   toWorkflowVersionSource,
   validatePayload,
@@ -232,9 +233,8 @@ function mapBodyToPayload(body: unknown, definition: WorkflowDefinition): Mapped
   // webhook fired with no body is the normal ping case, so it maps to the empty
   // payload and only fails if the contract demands something.
   const isAbsent = body === undefined || body === null;
-  const isJsonObject = typeof body === 'object' && Array.isArray(body) === false && body !== null;
 
-  if (isAbsent === false && isJsonObject === false) {
+  if (isAbsent === false && isJsonObject(body) === false) {
     return {
       ok: false,
       rejection: {

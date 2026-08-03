@@ -5,6 +5,12 @@ export interface PayloadValidationError {
   message: string;
 }
 
+/** A non-null, non-array JSON object — the acceptance rule every trigger path
+ *  applies to an `object` field and to a webhook body (ADR-0012). */
+export function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && Array.isArray(value) === false;
+}
+
 export interface PayloadValidationResult {
   valid: boolean;
   errors: PayloadValidationError[];
@@ -138,7 +144,7 @@ function validateFieldType(
       // lands here" and nothing about its contents. Arrays are rejected so
       // `${triggerPayload.<name>.<key>}` always has something to walk; an
       // opaque array nests under an object field instead.
-      if (typeof value !== 'object' || Array.isArray(value)) {
+      if (isJsonObject(value) === false) {
         return { field: name, message: `'${name}' must be a JSON object` };
       }
       return null;

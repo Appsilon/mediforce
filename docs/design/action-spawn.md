@@ -176,7 +176,7 @@ export function createSpawnActionHandler(
 2. **Resolve namespace.** Read from `ActionContext.namespace` (requires extending `ActionContext`).
 3. **For each target:**
    - Interpolate `payload` against standard sources. In `forEach` mode, add `item` to sources so `${item.field}` resolves.
-   - Resolve `definitionVersion`: if omitted, call `processRepo.getLatestWorkflowVersion(namespace, definitionName)`.
+   - Resolve `definitionVersion`: if omitted, call `resolveRunnableVersion(...)` — the same default-pointer policy every unpinned firing uses.
    - Load that definition version and validate the interpolated payload against
      the child's `triggerInput`; an undeclared, missing, or mistyped field is a
      spawn error.

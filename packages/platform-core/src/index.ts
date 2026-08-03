@@ -395,7 +395,7 @@ export {
 // Validation
 export { validateProcessConfig } from './validation/config-validator';
 export type { ConfigValidationResult } from './validation/config-validator';
-export { validatePayload } from './validation/payload-validator';
+export { isJsonObject, validatePayload } from './validation/payload-validator';
 export type { PayloadValidationError, PayloadValidationResult } from './validation/payload-validator';
 
 // Version resolution — the one policy every unpinned firing resolves through

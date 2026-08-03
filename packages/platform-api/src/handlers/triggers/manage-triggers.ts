@@ -1,6 +1,7 @@
 import type {
   CronTriggerResource,
   ManualTriggerResource,
+  RunnableVersion,
   TriggerResource,
   WebhookTriggerResource,
 } from '@mediforce/platform-core';
@@ -59,17 +60,11 @@ function assertValidSchedule(schedule: string): void {
  * archived versions), so an unresolvable target skips the check and leaves the
  * verdict to fire time.
  */
-async function assertPayloadMatchesContract(
-  scope: CallerScope,
-  namespace: string,
+function assertPayloadMatchesContract(
+  resolution: RunnableVersion,
   definitionName: string,
   payload: Record<string, unknown>,
-): Promise<void> {
-  const resolution = await resolveRunnableVersion(
-    scope.workflowDefinitions,
-    namespace,
-    definitionName,
-  );
+): void {
   if (!resolution.ok) return;
 
   const validation = validatePayload(payload, resolution.def.triggerInput ?? []);
@@ -140,11 +135,11 @@ function webhookUrlFor(trigger: WebhookTriggerResource): string {
 // a fully-archived workflow still exists and still owns its trigger rows (rows
 // outlive versions), so it keeps taking edits and exports — the verdict on
 // whether it can fire is left to fire time.
-async function assertWorkflowExists(
+async function resolveWorkflowOr404(
   scope: CallerScope,
   namespace: string,
   definitionName: string,
-): Promise<void> {
+): Promise<RunnableVersion> {
   const resolution = await resolveRunnableVersion(
     scope.workflowDefinitions,
     namespace,
@@ -153,6 +148,7 @@ async function assertWorkflowExists(
   if (!resolution.ok && resolution.reason !== RUNNABLE_VERSION_REASONS.noLiveVersion) {
     throw new NotFoundError(`Workflow '${definitionName}' not found in '${namespace}'`);
   }
+  return resolution;
 }
 
 async function loadTrigger(
@@ -190,7 +186,7 @@ export async function createTrigger(
   input: CreateTriggerInput,
   scope: CallerScope,
 ): Promise<CreateTriggerOutput> {
-  await assertWorkflowExists(scope, input.namespace, input.definitionName);
+  const target = await resolveWorkflowOr404(scope, input.namespace, input.definitionName);
 
   const workflowTriggers = await scope.triggers.listByWorkflow(
     input.namespace,
@@ -230,12 +226,7 @@ export async function createTrigger(
       throw new ValidationError('A cron trigger does not take a method or path');
     }
     assertValidSchedule(input.schedule as string);
-    await assertPayloadMatchesContract(
-      scope,
-      input.namespace,
-      input.definitionName,
-      input.payload ?? {},
-    );
+    assertPayloadMatchesContract(target, input.definitionName, input.payload ?? {});
     const cron: CronTriggerResource = {
       type: 'cron',
       namespace: input.namespace,
@@ -384,12 +375,8 @@ export async function updateTrigger(
     );
   }
   if (input.payload !== undefined) {
-    await assertPayloadMatchesContract(
-      scope,
-      input.namespace,
-      input.definitionName,
-      input.payload,
-    );
+    const target = await resolveWorkflowOr404(scope, input.namespace, input.definitionName);
+    assertPayloadMatchesContract(target, input.definitionName, input.payload);
   }
 
   const schedule = input.schedule ?? current.config.schedule;
@@ -501,7 +488,7 @@ export async function exportTriggers(
   input: ExportTriggersInput,
   scope: CallerScope,
 ): Promise<ExportTriggersOutput> {
-  await assertWorkflowExists(scope, input.namespace, input.definitionName);
+  await resolveWorkflowOr404(scope, input.namespace, input.definitionName);
   const triggers = await scope.triggers.listByWorkflow(input.namespace, input.definitionName);
   return { triggers: triggers.map(toPortableTrigger) };
 }
@@ -568,7 +555,7 @@ export async function importTriggers(
   input: ImportTriggersInput,
   scope: CallerScope,
 ): Promise<ImportTriggersOutput> {
-  await assertWorkflowExists(scope, input.namespace, input.definitionName);
+  const target = await resolveWorkflowOr404(scope, input.namespace, input.definitionName);
   for (const entry of input.triggers) {
     if (entry.type === 'cron') {
       assertValidSchedule(entry.schedule);
@@ -576,12 +563,7 @@ export async function importTriggers(
       // one's contract rejects. Pre-checked here for the same reason as the
       // schedule: import is non-transactional, so a failure discovered halfway
       // through leaves the earlier entries behind as a partial write.
-      await assertPayloadMatchesContract(
-        scope,
-        input.namespace,
-        input.definitionName,
-        entry.payload ?? {},
-      );
+      assertPayloadMatchesContract(target, input.definitionName, entry.payload ?? {});
     }
     if (entry.type === 'webhook' && entry.method !== 'POST') {
       throw new ValidationError(

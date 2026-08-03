@@ -1,10 +1,10 @@
-import type { TriggerInputField } from '@mediforce/platform-core';
+import { isJsonObject, type TriggerInputField } from '@mediforce/platform-core';
 
 /**
  * A trigger-input field of type `object` carries an opaque JSON body (ADR-0012).
- * The form holds it as text, so the client applies the same acceptance rule the
- * server does in `payload-validator`'s `case 'object'`: it must parse, and the
- * result must be a non-null, non-array object.
+ * The form holds it as text, so the client applies the server's own acceptance
+ * rule — `isJsonObject` from `platform-core`, the predicate `payload-validator`'s
+ * `case 'object'` uses — to text it first has to parse.
  */
 export function parseJsonObjectText(text: string): Record<string, unknown> | null {
   try {
@@ -13,10 +13,6 @@ export function parseJsonObjectText(text: string): Record<string, unknown> | nul
   } catch {
     return null;
   }
-}
-
-export function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && Array.isArray(value) === false;
 }
 
 /**

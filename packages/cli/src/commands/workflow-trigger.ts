@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { TriggerConfigFileSchema, type TriggerConfigFile } from '@mediforce/platform-core';
+import { isJsonObject, TriggerConfigFileSchema, type TriggerConfigFile } from '@mediforce/platform-core';
 import { defineCommand } from '../define-command';
 import { printJson, printError } from '../output';
 
@@ -55,10 +55,10 @@ function parsePayload(raw: unknown): { payload?: Record<string, unknown> } | { e
   } catch (err) {
     return { error: `--payload is not valid JSON: ${String(err)}` };
   }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+  if (isJsonObject(parsed) === false) {
     return { error: '--payload must be a JSON object whose keys are triggerInput field names' };
   }
-  return { payload: parsed as Record<string, unknown> };
+  return { payload: parsed };
 }
 
 /** One-line rendering of a trigger's config. Cron rows include their static

@@ -798,12 +798,13 @@ function CronTriggerRow({
   const [error, setError] = React.useState<string>('');
 
   const draftPayload = parseCronPayloadText(payloadDraft);
-  // Only send `payload` when the user actually edited it. Resending an
+  // Only send a field when the user actually edited it. Resending an
   // unchanged one re-runs attach-time validation, so a row whose payload has
   // drifted behind a newer contract — which ADR-0012 says should skip at fire
   // time, not block edits — could not even be retimed. It also keeps the
   // `cron.trigger.updated` audit entry honest about what changed.
   const payloadEdited = payloadDraft !== payloadToText(trigger.config.payload);
+  const scheduleEdited = scheduleDraft.trim() !== trigger.config.schedule;
 
   const isEnabled = trigger.enabled === true;
 
@@ -889,7 +890,7 @@ function CronTriggerRow({
                       definitionName,
                       namespace: handle,
                       triggerName: trigger.name,
-                      schedule: scheduleDraft.trim(),
+                      ...(scheduleEdited ? { schedule: scheduleDraft.trim() } : {}),
                       ...(payloadEdited && draftPayload !== null
                         ? { payload: draftPayload }
                         : {}),
@@ -897,7 +898,12 @@ function CronTriggerRow({
                     .then(() => setEditing(false)),
                 )
               }
-              disabled={busy || scheduleDraft.trim().length === 0 || draftPayload === null}
+              disabled={
+                busy ||
+                scheduleDraft.trim().length === 0 ||
+                draftPayload === null ||
+                (scheduleEdited === false && payloadEdited === false)
+              }
               title="Save schedule and payload"
               className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
             >
