@@ -755,6 +755,7 @@ export function WorkflowEditorCanvas({
                     assistantSettingsOpen ? 'text-foreground bg-muted' : 'text-muted-foreground hover:text-foreground',
                   )}
                   title="Assistant settings"
+                  aria-label="Assistant settings"
                 >
                   <Settings className="h-4 w-4" />
                 </button>
@@ -762,6 +763,7 @@ export function WorkflowEditorCanvas({
                   onClick={() => setAiPaneOpen(false)}
                   className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   title="Collapse AI Assistant"
+                  aria-label="Collapse AI Assistant"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
@@ -775,6 +777,7 @@ export function WorkflowEditorCanvas({
                   onChange={setAssistantModel}
                   defaultModel={WORKFLOW_ASSISTANT_DEFAULT_MODEL}
                   requireToolSupport
+                  minContextTokens={32000}
                   className={selectBase}
                 />
               </div>
@@ -856,6 +859,7 @@ export function WorkflowEditorCanvas({
                   onClick={() => void sendAssistantMessage()}
                   disabled={assistantLoading || !namespace || assistantInput.trim().length === 0}
                   className="shrink-0 pb-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Send message to the assistant"
                 >
                   <Send className="h-4 w-4" />
                 </button>
@@ -867,6 +871,7 @@ export function WorkflowEditorCanvas({
             onClick={() => setAiPaneOpen(true)}
             className="w-10 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col items-center justify-between py-4 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             title="Expand AI Assistant"
+            aria-label="Expand AI Assistant"
           >
             <Sparkles className="h-4 w-4 shrink-0" />
             <span className="text-[11px] font-semibold tracking-wide [writing-mode:vertical-rl] rotate-180 select-none">

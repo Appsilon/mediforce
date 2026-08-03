@@ -12,6 +12,13 @@ interface ModelPickerProps {
   defaultModel?: string;
   className?: string;
   requireToolSupport?: boolean;
+  /**
+   * Hide models whose context window is smaller than this. The workflow
+   * assistant sends its full system prompt (embedded authoring docs) + the
+   * canvas + history + a completion budget each turn, so a small-context model
+   * would truncate and fail — filter those out rather than let the user pick one.
+   */
+  minContextTokens?: number;
 }
 
 function formatContext(tokens: number): string {
@@ -28,11 +35,18 @@ function formatPrice(perToken: number): string {
 
 const TOP_PICKS_COUNT = 20;
 
-export function ModelPicker({ value, onChange, defaultModel, className, requireToolSupport }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, defaultModel, className, requireToolSupport, minContextTokens }: ModelPickerProps) {
   const [allModels, setModels] = useState<ModelRegistryEntry[]>([]);
   const models = useMemo(
-    () => (requireToolSupport ? allModels.filter((m) => m.supportsTools) : allModels),
-    [allModels, requireToolSupport],
+    () => allModels
+      .filter((m) => (requireToolSupport ? m.supportsTools : true))
+      .filter((m) => (minContextTokens !== undefined ? m.contextLength >= minContextTokens : true)),
+    [allModels, requireToolSupport, minContextTokens],
+  );
+  const hiddenForContext = useMemo(
+    () => (minContextTokens === undefined ? 0
+      : allModels.filter((m) => (requireToolSupport ? m.supportsTools : true) && m.contextLength < minContextTokens).length),
+    [allModels, requireToolSupport, minContextTokens],
   );
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -141,8 +155,18 @@ export function ModelPicker({ value, onChange, defaultModel, className, requireT
       {loadError && (
         <p className="text-xs text-red-500">Couldn&apos;t load the model registry: {loadError}</p>
       )}
-      {!loading && !loadError && models.length === 0 && (
+      {!loading && !loadError && models.length === 0 && minContextTokens !== undefined && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          No model has enough context ({formatContext(minContextTokens)}+) for the assistant. Add a larger-context model to the registry.
+        </p>
+      )}
+      {!loading && !loadError && models.length === 0 && minContextTokens === undefined && (
         <p className="text-xs text-muted-foreground">No models in the registry yet. Enter a custom model ID instead.</p>
+      )}
+      {!loading && hiddenForContext > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {hiddenForContext} model{hiddenForContext === 1 ? '' : 's'} hidden — context window below {formatContext(minContextTokens!)} (too small for the assistant prompt).
+        </p>
       )}
       {(selectedModel ?? (value === '' || value === undefined ? defaultModelMeta(models, defaultModel) : null)) && (
         <ModelMeta model={(selectedModel ?? defaultModelMeta(models, defaultModel))!} />
