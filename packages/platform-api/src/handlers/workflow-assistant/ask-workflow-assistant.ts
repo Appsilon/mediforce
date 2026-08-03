@@ -10,6 +10,7 @@ import {
   mergeVerdictTransitions,
   ensureEntryStepFirst,
   validateStepReferences,
+  parseWorkflowTemplate,
   applyWorkflowAssistantToolCalls,
   type WorkflowAssistantToolName,
   type WorkflowStep,
@@ -120,7 +121,7 @@ function parseMutationToolCall(toolName: string, parsedArguments: unknown): Pars
 
 type Transitions = WorkflowDefinition['transitions'];
 
-function validateResultingGraph(
+export function validateResultingGraph(
   currentDefinition: { steps: WorkflowStep[]; transitions: Transitions },
   toolCalls: WorkflowAssistantToolCall[],
   namespace: string,
@@ -144,9 +145,25 @@ function validateResultingGraph(
     .filter((i) => i.severity === 'error')
     .map((i) => i.message);
   const graphErrors = result.valid ? [] : result.errors;
-  if (graphErrors.length === 0 && referenceErrors.length === 0) return { valid: true };
+  // Reducer-level errors (e.g. remove_step on an unknown id) must fail the gate
+  // even when the *unchanged* graph is still valid — otherwise a rejected call
+  // is reported to the UI as applied. Read outcomes before the early return.
   const outcomeErrors = applied.outcomes.flatMap((o) => (o.error ? [o.error] : []));
-  return { valid: false, errors: [...graphErrors, ...referenceErrors, ...outcomeErrors] };
+  // Canonical cross-field validation (same gate register uses): catches rules the
+  // graph/reference checks don't — e.g. an `action` executor with no action config,
+  // a wait action with neither duration nor deadline. Templates carry no namespace.
+  const templateParse = parseWorkflowTemplate({
+    name: 'simulated',
+    steps: orderedSteps,
+    transitions: mergedTransitions,
+  });
+  const schemaErrors = templateParse.success
+    ? []
+    : templateParse.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`);
+  if (graphErrors.length === 0 && referenceErrors.length === 0 && outcomeErrors.length === 0 && schemaErrors.length === 0) {
+    return { valid: true };
+  }
+  return { valid: false, errors: [...graphErrors, ...referenceErrors, ...outcomeErrors, ...schemaErrors] };
 }
 
 export async function askWorkflowAssistant(

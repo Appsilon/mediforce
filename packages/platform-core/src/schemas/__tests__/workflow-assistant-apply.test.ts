@@ -16,6 +16,15 @@ function baseCanvas(): { steps: WorkflowStep[]; transitions: Transitions } {
 }
 
 describe('applyWorkflowAssistantToolCalls', () => {
+  it('defaults an agent step to L3 (matching the assistant prompt), not L2', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'add_step', arguments: { type: 'creation', executor: 'agent', name: 'AI Draft' } },
+    ];
+    const { steps } = applyWorkflowAssistantToolCalls(baseCanvas().steps, baseCanvas().transitions, calls);
+    const added = steps.find((s) => s.id === 'ai-draft');
+    expect(added?.autonomyLevel).toBe('L3');
+  });
+
   it('assigns a new step the slugified id of its name, not its clientId', () => {
     const calls: WorkflowAssistantToolCall[] = [
       { tool: 'add_step', arguments: { type: 'creation', executor: 'action', name: 'Send Results Email', clientId: 'email' } },

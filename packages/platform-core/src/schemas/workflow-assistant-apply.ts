@@ -63,7 +63,7 @@ export function applyWorkflowAssistantToolCalls(
         id: newId,
         name: payload.name || `New Step ${String(stepCounter)}`,
         ...(payload.verdicts ? { verdicts: resolveVerdicts(payload.verdicts) } : {}),
-        ...(payload.executor === 'agent' ? { plugin: 'opencode-agent', autonomyLevel: payload.autonomyLevel ?? 'L2' } : {}),
+        ...(payload.executor === 'agent' ? { plugin: 'opencode-agent', autonomyLevel: payload.autonomyLevel ?? 'L3' } : {}),
         ...(payload.executor === 'script' ? { plugin: 'script-container' } : {}),
         ...(payload.executor === 'cowork' ? { cowork: payload.cowork ?? { agent: 'chat' as const } } : {}),
       } as WorkflowStep;
