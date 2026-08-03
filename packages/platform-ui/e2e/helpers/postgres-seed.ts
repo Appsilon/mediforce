@@ -652,6 +652,52 @@ export async function readPostgresWorkspace(
 }
 
 /**
+ * Move a cron trigger's fire cursor into the past so the next heartbeat sees the
+ * tick as due.
+ *
+ * `isDue` scans 15-minute boundaries in `(lastTriggeredAt, now]`, and a freshly
+ * attached row has no cursor yet — it falls back to the definition's
+ * `createdAt`, which is seconds old inside a test, so no boundary falls in the
+ * window and every tick reads "Not due" until the next quarter hour. Nothing on
+ * the API surface writes the cursor (only a successful fire does), so a journey
+ * that needs a *firing* heartbeat has to set it here or be green four minutes an
+ * hour.
+ *
+ * Throws when the update matches no row: a mistyped key would otherwise leave
+ * the trigger "Not due" and turn the assertion it supports into a silent pass.
+ */
+export async function backdatePostgresTriggerCursor(
+  namespace: string,
+  workflowName: string,
+  triggerName: string,
+  lastTriggeredAt: Date,
+): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to backdate a trigger cursor for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    const updated = await sql`
+      UPDATE triggers
+      SET last_triggered_at = ${lastTriggeredAt.toISOString()}
+      WHERE namespace = ${namespace}
+        AND workflow_name = ${workflowName}
+        AND trigger_name = ${triggerName}
+      RETURNING trigger_name
+    `;
+    if (updated.length !== 1) {
+      throw new Error(
+        `Expected to backdate 1 trigger, updated ${String(updated.length)} ` +
+          `(${namespace}/${workflowName}/${triggerName})`,
+      );
+    }
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
  * Delete a single `agent_oauth_tokens` row (workspace, agent_id, server_name).
  * Replaces the former Firestore `deleteDocument` of the per-agent OAuth token
  * doc. Missing rows are a no-op, so the OAuth journey can call it to stay
