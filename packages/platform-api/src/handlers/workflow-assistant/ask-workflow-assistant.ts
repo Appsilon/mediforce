@@ -85,7 +85,7 @@ function getValueAtPath(input: unknown, path: readonly PropertyKey[]): unknown {
   return current;
 }
 
-function parseMutationToolCall(toolName: string, parsedArguments: unknown): ParsedMutationCall {
+export function parseMutationToolCall(toolName: string, parsedArguments: unknown): ParsedMutationCall {
   const schema = toolName === 'add_step' ? AddStepToolSchema
     : toolName === 'update_step' ? UpdateStepToolSchema
     : toolName === 'remove_step' ? RemoveStepToolSchema
@@ -98,9 +98,6 @@ function parseMutationToolCall(toolName: string, parsedArguments: unknown): Pars
     const issues = result.error.issues.map((i) => {
       const path = i.path.join('.') || '(root)';
       const field = i.path[i.path.length - 1];
-      const hint = i.code === 'invalid_type' && i.expected === 'object' && field === 'action'
-        ? ` — must be a nested object like { kind: "email", config: { ... } }, not a plain string`
-        : '';
       let received = getValueAtPath(parsedArguments, i.path);
       let describedPath = path;
       if (received === undefined && i.path.length > 0) {
@@ -111,6 +108,11 @@ function parseMutationToolCall(toolName: string, parsedArguments: unknown): Pars
           describedPath = parentPath.join('.') || '(root)';
         }
       }
+      const hint = i.code === 'invalid_type' && i.expected === 'object' && field === 'action'
+        ? ` — must be a nested object like { kind: "email", config: { ... } }, not a plain string`
+        : field === 'type' && received === 'terminal'
+          ? ` — terminal steps are not added or edited through these tools; the canvas keeps exactly one terminal automatically. To end a path, point that step's transition (or a verdict target) at the existing terminal step's id from the current canvas state instead.`
+          : '';
       const gotSuffix = received !== undefined ? ` (you sent for '${describedPath}': ${JSON.stringify(received)})` : '';
       return `${path}: ${i.message}${hint}${gotSuffix}`;
     }).join('; ');

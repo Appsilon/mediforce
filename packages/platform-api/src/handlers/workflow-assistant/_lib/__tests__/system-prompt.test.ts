@@ -59,6 +59,11 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/blank "what should/i);
   });
 
+  it('tells the model it cannot add or retype a step to terminal — the canvas manages the single terminal', () => {
+    expect(prompt).toMatch(/cannot add or change a step to `type: "terminal"`/);
+    expect(prompt).toMatch(/point that step's transition \(or a verdict target\) at the existing terminal/);
+  });
+
   it('requires the decision type for verdict steps and treats review as deprecated', () => {
     expect(prompt).toMatch(/type.*must be.*decision.*with a `verdicts` map/);
     expect(prompt).toMatch(/review.*is a deprecated type/i);
