@@ -449,6 +449,13 @@ export { formatBytes } from './utils/format';
 export { compact, parseRow } from './utils/compact';
 export { normaliseModelId } from './utils/normalise-model-id';
 export { emailLayout, escapeHtml } from './utils/email-layout';
+export {
+  normalizeRepoUrls,
+  toHttpsWithToken,
+  resolveRepoCloneTargets,
+  redactRepoCredentials,
+} from './utils/repo-url';
+export type { RepoCloneTarget } from './utils/repo-url';
 export { getWorkflowStatus, type WorkflowStatus } from './utils/workflow-status';
 
 // Workflow examples — shared loader for MCP tool, tests, and build scripts.
