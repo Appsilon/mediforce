@@ -89,7 +89,7 @@ async function main() {
     });
   }
 
-  // Swap the lease for the done-state label, then comment the link.
+  // Swap the ownership marker for the done-state label, then comment the link.
   await gh(`/repos/${REPO}/issues/${issueNumber}/labels`, {
     method: 'POST',
     headers: { ...ghHeaders(), 'Content-Type': 'application/json' },

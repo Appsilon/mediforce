@@ -50,17 +50,44 @@ export interface SendWorkspaceNotificationEmailInput {
   /**
    * Overrides the adapter's construction-time app URL when the deployment has
    * configured a `platform.baseUrl` setting. Absent → the adapter falls back to
-   * `NEXT_PUBLIC_PLATFORM_URL` → localhost.
+   * `APP_BASE_URL`/`NEXT_PUBLIC_APP_URL` → localhost.
+   */
+  readonly baseUrl?: string;
+}
+
+/**
+ * Sent to a PENDING invitee (never activated). Carries a one-time 7-day
+ * sign-in link that logs the invitee in and lands them on the create-password
+ * page. Active users who are re-added instead get
+ * `sendWorkspaceNotificationEmail` — they already have a session/password.
+ *
+ * The workspace/inviter fields are OPTIONAL: the admin-driven invite flow
+ * supplies them ("<inviter> invited you to <workspace>"), while the
+ * self-service "resend my setup link" recovery (`/api/auth/resend-setup-link`)
+ * has no workspace context and sends the generic account-setup copy.
+ */
+export interface SendActivationEmailInput {
+  readonly toEmail: string;
+  readonly inviterName?: string;
+  readonly workspaceName?: string;
+  readonly workspaceHandle?: string;
+  /**
+   * Overrides the adapter's construction-time app URL when the deployment has
+   * configured a `platform.baseUrl` setting — same semantics as
+   * `SendWorkspaceNotificationEmailInput`. Absent → the adapter falls back to
+   * `APP_BASE_URL`/`NEXT_PUBLIC_APP_URL` → localhost.
    */
   readonly baseUrl?: string;
 }
 
 /**
  * `null` in `SystemServices` when Mailgun/SMTP env vars are unset — handlers
- * detect that and skip email delivery while still seeding the invite. There is
- * no temporary-password email in the seed-based model (PLAN-0002 §3.1); the
- * only invite email is the workspace-notification.
+ * detect that and skip email delivery while still seeding the invite. A pending
+ * invitee gets `sendActivationEmail` (one-time 7-day sign-in link → create
+ * password); an already-active user re-added to a workspace gets
+ * `sendWorkspaceNotificationEmail`.
  */
 export interface InviteNotificationService {
   sendWorkspaceNotificationEmail(input: SendWorkspaceNotificationEmailInput): Promise<void>;
+  sendActivationEmail(input: SendActivationEmailInput): Promise<void>;
 }

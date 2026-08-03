@@ -1,8 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { Clock, Play, Square, Trash2, Pencil, Plus, Check, X, MousePointerClick, Webhook } from 'lucide-react';
+import { Clock, Play, Square, Trash2, Pencil, Plus, Check, X, MousePointerClick, Webhook, Download, Upload } from 'lucide-react';
 import { mediforce, ApiError } from '@/lib/mediforce';
+import { saveBlobToDevice } from '@/lib/save-blob';
+import { TriggerConfigFileSchema } from '@mediforce/platform-core';
 import {
   useWorkflowTriggers,
   type CronTrigger,
@@ -109,6 +111,8 @@ export function TriggersPanel({
     <div className="space-y-8">
       {loadError && <p className="text-sm text-destructive">{loadError}</p>}
 
+      <PortTriggersToolbar handle={handle} definitionName={definitionName} onImported={invalidate} />
+
       <section className="space-y-3">
         <div>
           <h2 className="text-sm font-semibold">Manual</h2>
@@ -176,6 +180,120 @@ export function TriggersPanel({
           />
         )}
       </section>
+    </div>
+  );
+}
+
+/**
+ * Export/import of the portable trigger-config file (Issue #933). Export
+ * downloads the workflow's triggers as instance-free JSON; import reads a file,
+ * validates it against the shared schema, and materializes rows in this
+ * namespace — webhook URLs re-derive for this host, cron cursors anchor to now.
+ * Import is seed-if-absent by default; the checkbox opts into overwriting names
+ * that already exist.
+ */
+function PortTriggersToolbar({
+  handle,
+  definitionName,
+  onImported,
+}: {
+  handle: string;
+  definitionName: string;
+  onImported: () => Promise<void>;
+}) {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [replace, setReplace] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string>('');
+  const [status, setStatus] = React.useState<string>('');
+
+  async function exportTriggers() {
+    setBusy(true);
+    setError('');
+    setStatus('');
+    try {
+      const { triggers } = await mediforce.triggers.export({ definitionName, namespace: handle });
+      const blob = new Blob([`${JSON.stringify(triggers, null, 2)}\n`], {
+        type: 'application/json',
+      });
+      saveBlobToDevice(blob, `${definitionName}.triggers.json`);
+      setStatus(`Exported ${String(triggers.length)} trigger(s).`);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function importFromFile(file: File) {
+    setBusy(true);
+    setError('');
+    setStatus('');
+    try {
+      const parsed = TriggerConfigFileSchema.safeParse(JSON.parse(await file.text()));
+      if (!parsed.success) {
+        setError('That file is not a valid trigger-config file.');
+        return;
+      }
+      const { results } = await mediforce.triggers.import({
+        definitionName,
+        namespace: handle,
+        triggers: parsed.data,
+        replace,
+      });
+      const counts = { created: 0, replaced: 0, skipped: 0 };
+      for (const r of results) counts[r.outcome] += 1;
+      setStatus(
+        `Imported: ${String(counts.created)} created, ${String(counts.replaced)} replaced, ${String(counts.skipped)} skipped.`,
+      );
+      await onImported();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 p-3">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void importFromFile(file);
+        }}
+      />
+      <button
+        onClick={() => void exportTriggers()}
+        disabled={busy}
+        className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Download className="h-4 w-4" />
+        Export
+      </button>
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={busy}
+        className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Upload className="h-4 w-4" />
+        Import
+      </button>
+      <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={replace}
+          onChange={(e) => setReplace(e.target.checked)}
+          disabled={busy}
+        />
+        Overwrite existing on import
+      </label>
+      {status && <span className="text-xs text-muted-foreground">{status}</span>}
+      {error && <span className="text-xs text-destructive">{error}</span>}
     </div>
   );
 }

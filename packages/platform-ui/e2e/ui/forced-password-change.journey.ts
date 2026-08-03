@@ -42,7 +42,10 @@ test.describe('Forced Password Change Journey', () => {
 
     // After sign-in the (app) layout detects mustChangePassword and redirects to /change-password
     await page.waitForURL('**/change-password', { timeout: 30_000 });
-    await expect(page.getByRole('heading', { name: 'Set your password' })).toBeVisible({ timeout: 10_000 });
+    // This account has an existing (temp) password, so the page frames it as a
+    // replacement — "Change your password" — not the first-time "Create your new
+    // password". See change-password/page.tsx (branches on hasPassword).
+    await expect(page.getByRole('heading', { name: 'Change your password' })).toBeVisible({ timeout: 10_000 });
 
     // This account was seeded WITH a temp password, so the change is a
     // replacement, not a first-time set: the form asks for the current

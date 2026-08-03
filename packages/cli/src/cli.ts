@@ -40,6 +40,8 @@ import {
   workflowTriggerStartCommand,
   workflowTriggerStopCommand,
   workflowTriggerRemoveCommand,
+  workflowTriggerExportCommand,
+  workflowTriggerImportCommand,
 } from './commands/workflow-trigger';
 import {
   systemStatusCommand,
@@ -127,6 +129,8 @@ export const TREE: Record<string, BranchEntry> = {
       'trigger-start': { description: 'Start (enable) a trigger', fn: workflowTriggerStartCommand },
       'trigger-stop': { description: 'Stop (disable) a trigger', fn: workflowTriggerStopCommand },
       'trigger-remove': { description: 'Delete a trigger', fn: workflowTriggerRemoveCommand },
+      'trigger-export': { description: 'Export a workflow\'s triggers to a portable file', fn: workflowTriggerExportCommand },
+      'trigger-import': { description: 'Import triggers from a portable file (--replace to overwrite)', fn: workflowTriggerImportCommand },
     },
   },
   run: {

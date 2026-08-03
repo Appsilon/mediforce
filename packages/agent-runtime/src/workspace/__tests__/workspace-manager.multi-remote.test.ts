@@ -22,8 +22,8 @@ import { createHash } from 'node:crypto';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { WorkspaceManager } from '../workspace-manager';
 import { createTestRepo, addCommitToTestRepo } from '../../plugins/__tests__/helpers/create-test-repo';
-import { normalizeRepoUrls } from '../../plugins/container-plugin';
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
+import { normalizeRepoUrls } from '@mediforce/platform-core';
 
 function git(args: string[], cwd: string): string {
   return execFileSync('git', args, { cwd, encoding: 'utf-8' }).toString();

@@ -16,11 +16,12 @@ import { actorFromCaller, resolveConfiguredBaseUrl } from '../_helpers';
  *      writes the `auth_users` row + the workspace membership + any global
  *      roles in one transaction. No temp password is issued; `isExisting` is
  *      `true` when the account already existed (idempotent on email collision).
- *   3. Best-effort workspace-notification email via
- *      `scope.system.inviteNotificationService`. The invitee signs in later via
- *      Google (verified-email auto-link) or by setting a password — there is no
- *      credentials email. Email failures don't fail the response — `emailSent`
- *      flips to `false`.
+ *   3. If the invite is still pending (never activated), gate the invitee into
+ *      the create-password flow (`setMustChangePassword`) and send a best-effort
+ *      activation email — a one-time 7-day sign-in link that lands them on the
+ *      create-password page. An already-active user re-added to the workspace
+ *      gets the plain workspace-notification email instead. Email failures don't
+ *      fail the response — `emailSent` flips to `false`.
  *   4. Append `invitation.created` to the audit log.
  *
  * `scope.system.inviteService === null` → `PreconditionFailedError` (the
@@ -51,6 +52,15 @@ export async function inviteUser(
     roles: [],
   });
 
+  // A pending invitee (never activated) gets an activation email with a
+  // one-time 7-day sign-in link and is gated into the create-password flow. An
+  // already-active user re-added to the workspace keeps the plain
+  // workspace-notification path — they already have a session/password.
+  const pending = await invite.isInvitePending(uid);
+  if (pending) {
+    await scope.userProfiles.setMustChangePassword(uid, true);
+  }
+
   let emailSent = false;
   const notify = scope.system.inviteNotificationService;
   if (notify !== null) {
@@ -62,13 +72,23 @@ export async function inviteUser(
         typeof input.inviterName === 'string' && input.inviterName.trim() !== ''
           ? input.inviterName.trim()
           : workspaceName;
-      await notify.sendWorkspaceNotificationEmail({
-        toEmail: email,
-        inviterName,
-        workspaceName,
-        workspaceHandle: input.namespaceHandle,
-        ...(baseUrl !== undefined ? { baseUrl } : {}),
-      });
+      if (pending) {
+        await notify.sendActivationEmail({
+          toEmail: email,
+          inviterName,
+          workspaceName,
+          workspaceHandle: input.namespaceHandle,
+          ...(baseUrl !== undefined ? { baseUrl } : {}),
+        });
+      } else {
+        await notify.sendWorkspaceNotificationEmail({
+          toEmail: email,
+          inviterName,
+          workspaceName,
+          workspaceHandle: input.namespaceHandle,
+          ...(baseUrl !== undefined ? { baseUrl } : {}),
+        });
+      }
       emailSent = true;
     } catch (emailErr) {
       console.error('[invite-user] Failed to send email:', emailErr);

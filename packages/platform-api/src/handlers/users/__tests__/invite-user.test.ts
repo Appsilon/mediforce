@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   InMemoryAuditRepository,
   InMemoryPlatformSettingsRepository,
+  InMemoryUserProfileRepository,
 } from '@mediforce/platform-core/testing';
 import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
 import { inviteUser } from '../invite-user';
@@ -10,25 +11,32 @@ import type {
   InviteNotificationService,
   InviteService,
   InvitedUser,
+  SendActivationEmailInput,
   SendWorkspaceNotificationEmailInput,
 } from '../../../services/invite-notification';
 
-function inviteServiceReturning(result: InvitedUser): InviteService {
+function inviteServiceReturning(result: InvitedUser, pending = true): InviteService {
   return {
     seedInvite: vi.fn(async () => result),
     getUserEmail: vi.fn(async () => null),
-    isInvitePending: vi.fn(async () => true),
+    isInvitePending: vi.fn(async () => pending),
   };
 }
 
 function recordingNotifier(): InviteNotificationService & {
   sendWorkspaceCalls: SendWorkspaceNotificationEmailInput[];
+  sendActivationCalls: SendActivationEmailInput[];
 } {
   const sendWorkspaceCalls: SendWorkspaceNotificationEmailInput[] = [];
+  const sendActivationCalls: SendActivationEmailInput[] = [];
   return {
     sendWorkspaceCalls,
+    sendActivationCalls,
     async sendWorkspaceNotificationEmail(input) {
       sendWorkspaceCalls.push(input);
+    },
+    async sendActivationEmail(input) {
+      sendActivationCalls.push(input);
     },
   };
 }
@@ -52,14 +60,16 @@ describe('inviteUser handler', () => {
     auditRepo = new InMemoryAuditRepository();
   });
 
-  it('seeds a brand-new user for an apiKey caller and sends the workspace-notification email', async () => {
+  it('seeds a brand-new (pending) user, gates the create-password flow, and sends the activation email', async () => {
     const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const notifier = recordingNotifier();
+    const userProfileRepo = new InMemoryUserProfileRepository();
     const scope = createTestScope({
       namespaceRepo,
       auditRepo,
       inviteService,
       inviteNotificationService: notifier,
+      userProfileRepo,
     });
 
     const result = await inviteUser(baseInput, scope);
@@ -76,11 +86,49 @@ describe('inviteUser handler', () => {
       membership: 'member',
       roles: [],
     });
-    expect(notifier.sendWorkspaceCalls).toEqual([
+    expect((await userProfileRepo.getProfile('uid-new'))?.mustChangePassword).toBe(true);
+    expect(notifier.sendActivationCalls).toEqual([
       {
         toEmail: 'newbie@example.test',
         inviterName: 'alpha',
         workspaceName: 'alpha',
+        workspaceHandle: 'alpha',
+      },
+    ]);
+    expect(notifier.sendWorkspaceCalls).toHaveLength(0);
+  });
+
+  it('sends the plain workspace-notification email and sets no flag for an already-active re-added user', async () => {
+    namespaceRepo.seedNamespace({
+      handle: 'alpha',
+      type: 'organization',
+      displayName: 'Alpha Workspace',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    const inviteService = inviteServiceReturning(
+      { uid: 'uid-active', isExisting: true },
+      false,
+    );
+    const notifier = recordingNotifier();
+    const userProfileRepo = new InMemoryUserProfileRepository();
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      inviteService,
+      inviteNotificationService: notifier,
+      userProfileRepo,
+    });
+
+    const result = await inviteUser({ ...baseInput, inviterName: 'Marek' }, scope);
+
+    expect(result.isExisting).toBe(true);
+    expect(await userProfileRepo.getProfile('uid-active')).toBeNull();
+    expect(notifier.sendActivationCalls).toHaveLength(0);
+    expect(notifier.sendWorkspaceCalls).toEqual([
+      {
+        toEmail: 'newbie@example.test',
+        inviterName: 'Marek',
+        workspaceName: 'Alpha Workspace',
         workspaceHandle: 'alpha',
       },
     ]);
@@ -184,38 +232,9 @@ describe('inviteUser handler', () => {
     );
   });
 
-  it('sends the workspace-notification email with the resolved workspace name for an existing user', async () => {
-    namespaceRepo.seedNamespace({
-      handle: 'alpha',
-      type: 'organization',
-      displayName: 'Alpha Workspace',
-      createdAt: '2026-01-01T00:00:00.000Z',
-    });
-    const inviteService = inviteServiceReturning({ uid: 'uid-existing', isExisting: true });
-    const notifier = recordingNotifier();
-    const scope = createTestScope({
-      namespaceRepo,
-      auditRepo,
-      inviteService,
-      inviteNotificationService: notifier,
-    });
-
-    const result = await inviteUser({ ...baseInput, inviterName: 'Marek' }, scope);
-
-    expect(result.isExisting).toBe(true);
-    expect(notifier.sendWorkspaceCalls).toEqual([
-      {
-        toEmail: 'newbie@example.test',
-        inviterName: 'Marek',
-        workspaceName: 'Alpha Workspace',
-        workspaceHandle: 'alpha',
-      },
-    ]);
-  });
-
   it('falls back to the namespace handle when the namespace has no displayName', async () => {
     // No namespace doc seeded → fallback path.
-    const inviteService = inviteServiceReturning({ uid: 'uid-existing', isExisting: true });
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const notifier = recordingNotifier();
     const scope = createTestScope({
       namespaceRepo,
@@ -226,7 +245,7 @@ describe('inviteUser handler', () => {
 
     await inviteUser(baseInput, scope);
 
-    expect(notifier.sendWorkspaceCalls[0]).toMatchObject({
+    expect(notifier.sendActivationCalls[0]).toMatchObject({
       workspaceName: 'alpha',
       inviterName: 'alpha',
     });
@@ -236,6 +255,9 @@ describe('inviteUser handler', () => {
     const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const notifier: InviteNotificationService = {
       async sendWorkspaceNotificationEmail() {
+        throw new Error('mailgun down');
+      },
+      async sendActivationEmail() {
         throw new Error('mailgun down');
       },
     };
@@ -254,13 +276,15 @@ describe('inviteUser handler', () => {
     consoleError.mockRestore();
   });
 
-  it('returns emailSent=false when inviteNotificationService is null', async () => {
+  it('still gates the create-password flow when inviteNotificationService is null', async () => {
     const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
+    const userProfileRepo = new InMemoryUserProfileRepository();
     const scope = createTestScope({
       namespaceRepo,
       auditRepo,
       inviteService,
       inviteNotificationService: null,
+      userProfileRepo,
     });
 
     const result = await inviteUser(baseInput, scope);
@@ -268,9 +292,10 @@ describe('inviteUser handler', () => {
     expect(result.emailSent).toBe(false);
     expect(result.uid).toBe('uid-new');
     expect(inviteService.seedInvite).toHaveBeenCalledTimes(1);
+    expect((await userProfileRepo.getProfile('uid-new'))?.mustChangePassword).toBe(true);
   });
 
-  it('passes the configured platform.baseUrl through to the workspace-notification email', async () => {
+  it('passes the configured platform.baseUrl through to the activation email', async () => {
     const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
     await platformSettingsRepo.set('platform.baseUrl', 'https://phuse.mediforce.ai');
     const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
@@ -285,7 +310,7 @@ describe('inviteUser handler', () => {
 
     await inviteUser(baseInput, scope);
 
-    expect(notifier.sendWorkspaceCalls).toEqual([
+    expect(notifier.sendActivationCalls).toEqual([
       {
         toEmail: 'newbie@example.test',
         inviterName: 'alpha',
@@ -296,13 +321,10 @@ describe('inviteUser handler', () => {
     ]);
   });
 
-  it('passes the configured platform.baseUrl through to the workspace-notification email (trailing slash trimmed)', async () => {
+  it('passes the configured platform.baseUrl through to the activation email (trailing slash trimmed)', async () => {
     const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
     await platformSettingsRepo.set('platform.baseUrl', 'https://phuse.mediforce.ai/');
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-existing',
-      isExisting: true,
-    });
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const notifier = recordingNotifier();
     const scope = createTestScope({
       namespaceRepo,
@@ -314,7 +336,7 @@ describe('inviteUser handler', () => {
 
     await inviteUser({ ...baseInput, inviterName: 'Marek' }, scope);
 
-    expect(notifier.sendWorkspaceCalls[0]).toMatchObject({
+    expect(notifier.sendActivationCalls[0]).toMatchObject({
       baseUrl: 'https://phuse.mediforce.ai',
     });
   });
@@ -331,7 +353,7 @@ describe('inviteUser handler', () => {
 
     await inviteUser(baseInput, scope);
 
-    expect(notifier.sendWorkspaceCalls[0].baseUrl).toBeUndefined();
+    expect(notifier.sendActivationCalls[0].baseUrl).toBeUndefined();
   });
 
   it('omits baseUrl when platform.baseUrl is cleared to whitespace (falls back, never an empty URL)', async () => {
@@ -349,7 +371,7 @@ describe('inviteUser handler', () => {
 
     await inviteUser(baseInput, scope);
 
-    expect(notifier.sendWorkspaceCalls[0].baseUrl).toBeUndefined();
+    expect(notifier.sendActivationCalls[0].baseUrl).toBeUndefined();
   });
 
   it('writes an invitation.created audit event attributed to the caller', async () => {

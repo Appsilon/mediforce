@@ -289,6 +289,45 @@ before `platform-ui` starts. `platform-ui` waits via
 Idempotent (drizzle's `__drizzle_migrations` ledger). No separate
 migration step in the deploy pipeline.
 
+### Environment variables — what each deployment needs
+
+[`.env.example`](.env.example) is the annotated source of truth for every
+variable. The summary below is what to actually set per environment; anything
+not listed has a safe default.
+
+**Required (every deployment):**
+
+| Var | Notes |
+| --- | --- |
+| `POSTGRES_PASSWORD` | No default. `POSTGRES_USER` / `POSTGRES_DB` default to `mediforce`. |
+| `AUTH_SECRET` | Session signing. `openssl rand -hex 32`. |
+| `NEXT_PUBLIC_APP_URL` | Public origin of this deployment (e.g. `https://app.example.com`). `APP_BASE_URL` **auto-derives from it** in compose — set only this one. |
+| `ALLOWED_EMAIL_DOMAINS` | Comma-separated domain allowlist. With any OAuth/OIDC provider on it is mandatory (boot-fails if empty) — otherwise any account at the IdP could sign in. |
+
+**Auth providers — enable at least one:**
+
+| Var | Default | Notes |
+| --- | --- | --- |
+| `ENABLE_PASSWORD_AUTH` | **on** | Email + password sign-in. Set `false` only for a Google/OIDC-only estate (also hides the invite "resend setup link" recovery form). |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | off | "Sign in with Google". |
+| `ENABLE_MAGIC_LINK` | off | Passwordless sign-in; needs email configured. Second first-password / recovery path. |
+| `OIDC_ISSUER` (+ client id/secret) | off | Customer SSO, one IdP per deployment. |
+
+**Email — required to send invites / magic-links** (choose one provider; the
+`*_FROM_EMAIL` must be on a **verified** sender domain or mail bounces / spams):
+
+- Mailgun: `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_FROM_EMAIL` (+ optional `MAILGUN_SENDER_NAME`).
+- SMTP: `SMTP_HOST`, `SMTP_FROM_EMAIL` (+ `SMTP_USER` / `SMTP_PASS` / `SMTP_PORT` / `SMTP_SECURE`).
+- Or `MEDIFORCE_DISABLE_EMAIL=true` to run without email (no invites / magic-links).
+
+In **production**, boot fails if email is enabled but `NEXT_PUBLIC_APP_URL` /
+`APP_BASE_URL` is unset or `localhost` — otherwise activation / magic-link
+emails would ship a dead `http://localhost` link.
+
+> **Inviting users to set a first password requires `ENABLE_PASSWORD_AUTH` (on
+> by default) and a configured email provider.** Existing Google users just sign
+> in with Google after their account is seeded — no invite, no password.
+
 
 ## Deep Dives
 

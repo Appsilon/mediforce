@@ -9,11 +9,13 @@ import { execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { prepareDeployKeyPath, toHttpsWithToken } from './container-plugin';
+import { cloneRepoAtCommit } from './git-clone';
 
 export interface BuildImageOptions {
   image: string;
   repoUrl: string;
+  /** Pre-normalization repo reference used to pick the clone transport. Defaults to `repoUrl`. */
+  repoRef?: string;
   commit: string;
   dockerfile?: string;
   repoToken?: string;
@@ -22,6 +24,7 @@ export interface BuildImageOptions {
 export interface EnsureImageOptions {
   image: string;
   repoUrl?: string;
+  repoRef?: string;
   commit?: string;
   dockerfile?: string;
   repoToken?: string;
@@ -31,10 +34,6 @@ const BUILD_COMMIT_LABEL = 'mediforce.build.commit';
 
 /** In-process mutex to avoid concurrent builds of the same image. */
 const buildLocks = new Map<string, Promise<void>>();
-
-function getGitSshCommand(): string {
-  return `ssh -i ${prepareDeployKeyPath()} -o StrictHostKeyChecking=no -o IdentitiesOnly=yes`;
-}
 
 export async function imageExistsLocally(image: string): Promise<boolean> {
   try {
@@ -62,17 +61,8 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
   const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-build-'));
 
   try {
-    const cloneUrl = repoToken ? toHttpsWithToken(repoUrl, repoToken) : repoUrl;
-    const execOpts = {
-      stdio: 'pipe' as const,
-      env: { ...process.env, GIT_SSH_COMMAND: getGitSshCommand() },
-    };
-
     // Clone repo at specific commit (sparse — fetch only what we need)
-    execSync(`git init "${buildDir}"`, execOpts);
-    execSync(`git -C "${buildDir}" remote add origin "${cloneUrl}"`, execOpts);
-    execSync(`git -C "${buildDir}" fetch origin "${commit}" --depth 1`, execOpts);
-    execSync(`git -C "${buildDir}" checkout FETCH_HEAD`, execOpts);
+    cloneRepoAtCommit(buildDir, options.repoRef ?? repoUrl, commit, repoToken);
 
     // Build image — use the Dockerfile's directory as build context so COPY paths work naturally
     const dockerfilePath = join(buildDir, dockerfile);
@@ -89,7 +79,7 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
 }
 
 export async function ensureImage(options: EnsureImageOptions): Promise<void> {
-  const { image, repoUrl, commit, dockerfile, repoToken } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile, repoToken } = options;
 
   // If repo+commit not provided, just check existence
   if (!repoUrl || !commit) {
@@ -120,7 +110,7 @@ export async function ensureImage(options: EnsureImageOptions): Promise<void> {
         console.log(`[docker-image-builder] Image "${image}" stale (${currentCommit?.slice(0, 8)} → ${commit.slice(0, 8)}), rebuilding`);
       }
 
-      await buildImageFromRepo({ image, repoUrl, commit, dockerfile, repoToken });
+      await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, repoToken });
     } finally {
       buildLocks.delete(image);
     }

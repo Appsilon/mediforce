@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { trackPageErrors } from '../helpers/page-errors';
@@ -68,5 +69,66 @@ test.describe('Workflow Triggers Journey', () => {
     await cronRow.getByRole('button', { name: 'Delete' }).click();
     await expect(page.getByText(/no cron triggers yet/i)).toBeVisible({ timeout: 15_000 });
     await expect(cronRow).toHaveCount(0);
+  });
+
+  test('export downloads a portable file and importing it back round-trips (Issue #933)', async ({
+    page,
+  }) => {
+    trackPageErrors(page);
+
+    const cronName = 'e2e-port-cron';
+
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review`);
+    await expect(page.getByRole('tab', { name: /runs/i })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('tab', { name: 'Triggers' }).click();
+    await expect(page.getByRole('heading', { name: 'Manual' })).toBeVisible({ timeout: 10_000 });
+
+    // Start clean: a prior attempt may have left the cron row behind.
+    const cronRow = page.locator('li', { hasText: cronName });
+    if ((await cronRow.count()) > 0) {
+      page.once('dialog', (dialog) => dialog.accept());
+      await cronRow.getByRole('button', { name: 'Delete' }).click();
+      await expect(cronRow).toHaveCount(0, { timeout: 10_000 });
+    }
+
+    // Give the export something beyond the seeded manual singleton.
+    await page.getByPlaceholder('nightly-refresh').fill(cronName);
+    await page.getByPlaceholder('0 6 * * *').fill('0 3 * * *');
+    await page.getByRole('button', { name: 'Add cron trigger' }).click();
+    await expect(cronRow).toBeVisible({ timeout: 15_000 });
+
+    try {
+      // Export → a JSON file downloads; assert it carries portable config only.
+      const downloadPromise = page.waitForEvent('download');
+      await page.getByRole('button', { name: 'Export' }).click();
+      const download = await downloadPromise;
+      const bytes = await readFile(await download.path());
+      const parsed = JSON.parse(bytes.toString('utf8')) as Array<Record<string, unknown>>;
+      expect(parsed.some((t) => t.name === cronName && t.schedule === '0 3 * * *')).toBe(true);
+      expect(parsed.some((t) => t.type === 'manual')).toBe(true);
+      for (const t of parsed) {
+        expect(t).not.toHaveProperty('namespace');
+        expect(t).not.toHaveProperty('lastTriggeredAt');
+      }
+      await expect(page.getByText(/Exported \d+ trigger/i)).toBeVisible({ timeout: 10_000 });
+
+      // Import the same file back with "Overwrite" OFF → every name already
+      // exists, so seed-if-absent skips them all (non-destructive round-trip).
+      await page.locator('input[type="file"]').setInputFiles({
+        name: 'data-quality-review.triggers.json',
+        mimeType: 'application/json',
+        buffer: bytes,
+      });
+      await expect(page.getByText(/Imported: 0 created, 0 replaced, \d+ skipped/i)).toBeVisible({
+        timeout: 15_000,
+      });
+    } finally {
+      // Clean up the cron row we added so the shared seed data is left intact.
+      const row = page.locator('li', { hasText: cronName });
+      if ((await row.count()) > 0) {
+        page.once('dialog', (dialog) => dialog.accept());
+        await row.getByRole('button', { name: 'Delete' }).click();
+      }
+    }
   });
 });

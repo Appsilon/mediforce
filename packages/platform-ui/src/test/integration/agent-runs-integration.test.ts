@@ -155,17 +155,16 @@ describe('Mediforce client ↔ route-adapter ↔ agentRuns handlers (user caller
     });
   });
 
-  // PR2 keeps parity with the pre-PR2 Firestore subscription, which had
-  // no per-row workspace gating on agent-runs. Real gating + filter
-  // pushdown returns once the storage migrates to Postgres with a
-  // denormalised `namespace` column (#588).
+  // #588 resolved: agent-runs now live in Postgres with a denormalised
+  // `namespace` column, so listAgentRuns (via listPage) properly gates by
+  // the caller's allowed namespaces instead of no-opping to the full list.
   it('user caller still sees their own workspace runs without an explicit filter', async () => {
     const { runs } = await mediforce.agentRuns.list({});
     expect(runs.map((r) => r.id)).toEqual(['ar-1']);
   });
 
-  it('explicit cross-workspace ?namespace= currently no-ops to the full list (#588)', async () => {
+  it('explicit ?namespace= outside the caller\'s allowed set returns empty (anti-enumeration)', async () => {
     const { runs } = await mediforce.agentRuns.list({ namespace: 'team-beta' });
-    expect(runs.map((r) => r.id)).toEqual(['ar-1']);
+    expect(runs.map((r) => r.id)).toEqual([]);
   });
 });

@@ -1,6 +1,8 @@
 import type {
   AuditEvent,
   AuditRepository,
+  GetByNamespaceOptions,
+  GetByNamespacePage,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
 import { AuthorizedScope } from './authorized-repository';
@@ -23,4 +25,12 @@ export class AuthorizedAuditEventRepository extends AuthorizedScope {
     this.caller.isSystemActor
       ? this.raw.getByProcess(processInstanceId)
       : this.raw.getByProcessInNamespaces(processInstanceId, [...this.caller.namespaces]);
+
+  getByNamespace = async (
+    namespace: string,
+    options?: GetByNamespaceOptions,
+  ): Promise<GetByNamespacePage> => {
+    if (!this.caller.isSystemActor && !this.caller.namespaces.has(namespace)) return { items: [] };
+    return this.raw.getByNamespace(namespace, options);
+  };
 }

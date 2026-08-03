@@ -414,6 +414,7 @@ export default function WorkspaceConfigPage() {
   const [error, setError] = useState<string | null>(null);
   const [resendingUid, setResendingUid] = useState<string | null>(null);
   const [resendResult, setResendResult] = useState<ResendResult | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
 
   async function handleInvite(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -458,6 +459,7 @@ export default function WorkspaceConfigPage() {
 
   async function handleResendInvite(memberUid: string) {
     setResendResult(null);
+    setResendError(null);
     setResendingUid(memberUid);
     try {
       const data = await mediforce.users.resendInvite({
@@ -470,7 +472,13 @@ export default function WorkspaceConfigPage() {
       });
       void fetchLastSignIn();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to resend invite.');
+      // The button is hidden once a member has signed in, but a member who set
+      // a password without ever signing in still isn't pending, so the handler
+      // throws PreconditionFailed. Surface it here — the shared `error` banner
+      // only renders inside the (closed) invite form, so it would be silent.
+      setResendError(
+        err instanceof Error ? err.message : 'Failed to resend invite.',
+      );
     } finally {
       setResendingUid(null);
     }
@@ -848,6 +856,23 @@ export default function WorkspaceConfigPage() {
             </div>
           )}
 
+          {/* Resend error card */}
+          {resendError !== null && (
+            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-4">
+              <div className="flex items-start gap-2">
+                <p className="text-sm font-medium text-destructive">{resendError}</p>
+                <button
+                  type="button"
+                  onClick={() => setResendError(null)}
+                  className="ml-auto text-destructive/60 hover:text-destructive transition-colors text-lg leading-none"
+                  aria-label="Dismiss"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Invite result card */}
           {inviteResult !== null && (
             <div className="mb-4 rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30 px-4 py-4">
@@ -905,10 +930,14 @@ export default function WorkspaceConfigPage() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">User</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Email</th>
+                    {canManageMembers && (
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Email</th>
+                    )}
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Role</th>
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Joined</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Last sign in</th>
+                    {canManageMembers && (
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Last sign in</th>
+                    )}
                     <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap sr-only">Actions</th>
                   </tr>
                 </thead>
@@ -943,10 +972,12 @@ export default function WorkspaceConfigPage() {
                           </UserProfileLink>
                         </td>
 
-                        {/* Email */}
-                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                          {member.email ?? '—'}
-                        </td>
+                        {/* Email — owner/admin only; server returns null for members */}
+                        {canManageMembers && (
+                          <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                            {member.email ?? '—'}
+                          </td>
+                        )}
 
                         {/* Role */}
                         <td className="px-4 py-3 whitespace-nowrap">
@@ -969,28 +1000,36 @@ export default function WorkspaceConfigPage() {
                           {formatDate(member.joinedAt)}
                         </td>
 
-                        {/* Last sign in */}
-                        <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
-                          {member.lastSignInTime === null || member.lastSignInTime === undefined
-                            ? <span className="text-muted-foreground/50">Never</span>
-                            : formatLastSignIn(member.lastSignInTime)}
-                        </td>
+                        {/* Last sign in — owner/admin only; server returns null for members */}
+                        {canManageMembers && (
+                          <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
+                            {member.lastSignInTime === null || member.lastSignInTime === undefined
+                              ? <span className="text-muted-foreground/50">Never</span>
+                              : formatLastSignIn(member.lastSignInTime)}
+                          </td>
+                        )}
 
                         {/* Actions */}
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1">
                             {canManageMembers && member.role !== 'owner' && member.uid !== user?.id ? (
                               <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleResendInvite(member.uid)}
-                                  disabled={resendingUid === member.uid}
-                                  title="Resend invite"
-                                  className="rounded p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
-                                  aria-label={`Resend invite to ${name}`}
-                                >
-                                  <MailIcon className="h-3.5 w-3.5" />
-                                </button>
+                                {/* Resend only makes sense while the invite is
+                                    still pending. Once the member has signed in
+                                    the backend refuses the resend, so hide it
+                                    rather than surface a confusing error. */}
+                                {(member.lastSignInTime === null || member.lastSignInTime === undefined) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleResendInvite(member.uid)}
+                                    disabled={resendingUid === member.uid}
+                                    title="Resend invite"
+                                    className="rounded p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
+                                    aria-label={`Resend invite to ${name}`}
+                                  >
+                                    <MailIcon className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveMember(member.uid)}

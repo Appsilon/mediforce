@@ -5,6 +5,9 @@ import type {
   StepExecution,
   InstanceStatus,
   WorkflowRunSummaryResult,
+  ListInstancesPageOptions,
+  ListInstancesPage,
+  WorkflowDisplayStatusCounts,
 } from '@mediforce/platform-core';
 import type { ListInstancesOptions } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
@@ -40,6 +43,22 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
     this.caller.isSystemActor
       ? this.raw.listAll(options)
       : this.raw.listInNamespaces([...this.caller.namespaces], options);
+
+  /** Keyset-paginated list — see `ListInstancesPageOptions`. Same
+   *  system-actor/namespace-scoped routing as `list`. */
+  listPage = async (options: ListInstancesPageOptions): Promise<ListInstancesPage> =>
+    this.caller.isSystemActor
+      ? this.raw.listPage(options)
+      : this.raw.listPageInNamespaces([...this.caller.namespaces], options);
+
+  /** Grouped `WorkflowDisplayStatus` counts for the Workflows tab's KPI
+   *  cards — same filters, same system-actor/namespace-scoped routing. */
+  countByDisplayStatus = async (
+    options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
+  ): Promise<WorkflowDisplayStatusCounts> =>
+    this.caller.isSystemActor
+      ? this.raw.countByDisplayStatus(options)
+      : this.raw.countByDisplayStatusInNamespaces([...this.caller.namespaces], options);
 
   /**
    * Projected `id → definitionName` slice for the named workspace. Gated on

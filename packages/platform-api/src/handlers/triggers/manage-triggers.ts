@@ -6,11 +6,18 @@ import type {
 } from '@mediforce/platform-core';
 import { WebhookTriggerConfigSchema } from '@mediforce/platform-core';
 import { validateCronSchedule } from '@mediforce/workflow-engine';
+import { toPortableTrigger } from '@mediforce/platform-core';
+import type { PortableTrigger } from '@mediforce/platform-core';
 import type {
   CreateTriggerInput,
   CreateTriggerOutput,
   DeleteTriggerInput,
   DeleteTriggerOutput,
+  ExportTriggersInput,
+  ExportTriggersOutput,
+  ImportedTriggerResult,
+  ImportTriggersInput,
+  ImportTriggersOutput,
   ListTriggersInput,
   ListTriggersOutput,
   SetTriggerEnabledInput,
@@ -33,6 +40,32 @@ function assertValidSchedule(schedule: string): void {
   if (!validation.valid) {
     throw new ValidationError(`Invalid cron schedule: ${validation.error}`);
   }
+}
+
+/** Append the `<type>.trigger.deleted` audit event for a removed row. Shared by
+ *  `deleteTrigger` and the import/replace path, which drops rows through the
+ *  repo directly (bypassing `deleteTrigger`) and so must audit the removal
+ *  itself rather than leave it off the trail. */
+async function auditTriggerDeleted(
+  scope: CallerScope,
+  namespace: string,
+  definitionName: string,
+  trigger: TriggerResource,
+  basis: string,
+): Promise<void> {
+  const actor = actorFromCaller(scope);
+  await scope.system.audit.append({
+    ...actor,
+    action: `${trigger.type}.trigger.deleted`,
+    description: `${labelFor(trigger.type)} trigger '${trigger.name}' deleted for '${definitionName}'`,
+    timestamp: new Date().toISOString(),
+    inputSnapshot: { namespace, definitionName, triggerName: trigger.name },
+    outputSnapshot: { deleted: true },
+    basis,
+    entityType: 'trigger',
+    entityId: `${definitionName}/${trigger.name}`,
+    namespace,
+  });
 }
 
 /** The relative endpoint a webhook trigger listens on. Matches the catch-all
@@ -326,6 +359,130 @@ export async function setTriggerEnabled(
   return { trigger };
 }
 
+/**
+ * Export a workflow's triggers to the portable, instance-free file shape
+ * (Issue #933). Strips every runtime/instance field — namespace, workflowName,
+ * the cron fire cursor, the derived callable URL — so the result carries only
+ * config that transfers between instances.
+ */
+export async function exportTriggers(
+  input: ExportTriggersInput,
+  scope: CallerScope,
+): Promise<ExportTriggersOutput> {
+  await assertWorkflowExists(scope, input.namespace, input.definitionName);
+  const triggers = await scope.triggers.listByWorkflow(input.namespace, input.definitionName);
+  return { triggers: triggers.map(toPortableTrigger) };
+}
+
+/** Map a portable entry onto the create-trigger input for the target workflow. */
+function createInputFor(input: ImportTriggersInput, entry: PortableTrigger): CreateTriggerInput {
+  const common = {
+    namespace: input.namespace,
+    definitionName: input.definitionName,
+    triggerName: entry.name,
+    enabled: entry.enabled,
+  };
+  if (entry.type === 'cron') {
+    return { ...common, type: 'cron', schedule: entry.schedule };
+  }
+  if (entry.type === 'webhook') {
+    return { ...common, type: 'webhook', method: entry.method, path: entry.path };
+  }
+  return { ...common, type: 'manual' };
+}
+
+/** Every existing row a portable entry collides with. A same-name row is one
+ *  collision; `manual` and `webhook` are also per-workflow singletons, so a
+ *  *differently*-named row of the same type is a second, independent collision.
+ *  `createTrigger` would 409 on either, so `replace` must reconcile against ALL
+ *  of them — returning a single conflict silently deletes one and then 409s on
+ *  the other, a partial import. The two can point at different rows (e.g. a
+ *  webhook entry named `manual` collides by name with the manual singleton and
+ *  by type with the existing webhook). */
+function conflictsFor(existing: TriggerResource[], entry: PortableTrigger): TriggerResource[] {
+  const conflicts: TriggerResource[] = [];
+  const byName = existing.find((t) => t.name === entry.name);
+  if (byName !== undefined) conflicts.push(byName);
+  if (entry.type === 'manual' || entry.type === 'webhook') {
+    const singleton = existing.find((t) => t.type === entry.type && t.name !== entry.name);
+    if (singleton !== undefined) conflicts.push(singleton);
+  }
+  return conflicts;
+}
+
+/**
+ * Import a portable trigger-config file into a workflow (Issue #933),
+ * materializing rows in the target namespace. Reuses `createTrigger` per entry
+ * so import inherits its resolution for free: webhook URLs are re-derived for
+ * the target host, cron cursors anchor to `now` (no back-fire), config is
+ * validated, and each create is audited. Conflict policy is seed-if-absent —
+ * a colliding trigger is skipped unless `replace` is set, which drops the
+ * existing row first and recreates it from the file.
+ *
+ * Validate every entry before writing anything: import is non-transactional, so
+ * any rule `createTrigger` enforces but the file schema can't must reject the
+ * whole file up front rather than leave the already-created entries behind as a
+ * partial write. Two such rules exist — cron schedule alignment, and webhook
+ * POST-only (`PortableWebhookTriggerSchema` accepts every `HttpMethodSchema`
+ * verb, so a backfilled/hand-authored file can carry a non-POST webhook that
+ * only fails deep in `createTrigger`).
+ */
+export async function importTriggers(
+  input: ImportTriggersInput,
+  scope: CallerScope,
+): Promise<ImportTriggersOutput> {
+  await assertWorkflowExists(scope, input.namespace, input.definitionName);
+  for (const entry of input.triggers) {
+    if (entry.type === 'cron') assertValidSchedule(entry.schedule);
+    if (entry.type === 'webhook' && entry.method !== 'POST') {
+      throw new ValidationError(
+        `A webhook trigger only accepts POST (the endpoint dispatches POST only), got ${entry.method}`,
+      );
+    }
+  }
+
+  let existing = await scope.triggers.listByWorkflow(input.namespace, input.definitionName);
+
+  const results: ImportedTriggerResult[] = [];
+  for (const entry of input.triggers) {
+    const conflicts = conflictsFor(existing, entry);
+    // The mandatory manual singleton (Issue #930) is never removable. A
+    // non-manual entry that collides with it by name can't free the name
+    // without destroying that invariant, so replace can't apply — skip the
+    // entry rather than delete the manual row and then 409 anyway.
+    const blockedByManual = conflicts.some((c) => c.type === 'manual' && entry.type !== 'manual');
+    if (conflicts.length > 0 && (!input.replace || blockedByManual)) {
+      results.push({ name: entry.name, type: entry.type, outcome: 'skipped', webhookUrl: null });
+      continue;
+    }
+    // Replace: drop every colliding row directly (bypassing deleteTrigger's
+    // manual guard) so the entry is recreated fresh from the file with a clean
+    // cursor. The direct repo delete skips the handler's audit append, so emit
+    // it here — a replaced row must still show on the trail.
+    for (const conflict of conflicts) {
+      await scope.triggers.delete(input.namespace, input.definitionName, conflict.name);
+      await auditTriggerDeleted(
+        scope,
+        input.namespace,
+        input.definitionName,
+        conflict,
+        'Trigger replaced during import',
+      );
+      existing = existing.filter((t) => t.name !== conflict.name);
+    }
+    const created = await createTrigger(createInputFor(input, entry), scope);
+    results.push({
+      name: entry.name,
+      type: entry.type,
+      outcome: conflicts.length > 0 ? 'replaced' : 'created',
+      webhookUrl: created.webhookUrl,
+    });
+    existing = [...existing, created.trigger];
+  }
+
+  return { results };
+}
+
 export async function deleteTrigger(
   input: DeleteTriggerInput,
   scope: CallerScope,
@@ -346,24 +503,13 @@ export async function deleteTrigger(
   }
 
   await scope.triggers.delete(input.namespace, input.definitionName, input.triggerName);
-
-  const actor = actorFromCaller(scope);
-  await scope.system.audit.append({
-    ...actor,
-    action: `${current.type}.trigger.deleted`,
-    description: `${labelFor(current.type)} trigger '${input.triggerName}' deleted for '${input.definitionName}'`,
-    timestamp: new Date().toISOString(),
-    inputSnapshot: {
-      namespace: input.namespace,
-      definitionName: input.definitionName,
-      triggerName: input.triggerName,
-    },
-    outputSnapshot: { deleted: true },
-    basis: 'Trigger deleted via API',
-    entityType: 'trigger',
-    entityId: `${input.definitionName}/${input.triggerName}`,
-    namespace: input.namespace,
-  });
+  await auditTriggerDeleted(
+    scope,
+    input.namespace,
+    input.definitionName,
+    current,
+    'Trigger deleted via API',
+  );
 
   return { success: true as const };
 }
