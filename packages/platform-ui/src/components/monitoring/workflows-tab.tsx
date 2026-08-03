@@ -7,12 +7,11 @@ import { STATUS_LABELS, STATUS_STYLES } from '@/components/processes/process-sta
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useWorkflowStatusCounts } from '@/hooks/use-workflow-status-counts';
 import { AllRunsPanel } from '@/components/processes/all-runs-panel';
+import { type DryRunFilter, dryRunFilterToQuery } from '@/components/processes/dry-run-filter';
 
 // Only 4 of the 5 WorkflowDisplayStatus values get a KPI card — "cancelled"
 // is deliberately left out per spec. Same order as the cards.
 const CARD_STATUSES: WorkflowDisplayStatus[] = ['in_progress', 'waiting_for_human', 'error', 'completed'];
-
-type DryRunFilter = 'all' | 'production' | 'dry-run';
 
 export function WorkflowsTab() {
   const handle = useHandleFromPath();
@@ -27,7 +26,7 @@ export function WorkflowsTab() {
   // fetched row set — see useWorkflowStatusCounts.
   const { counts, loading } = useWorkflowStatusCounts({
     namespace: handle,
-    dryRun: dryRunFilter === 'all' ? undefined : dryRunFilter === 'dry-run',
+    dryRun: dryRunFilterToQuery(dryRunFilter),
     archived: showArchivedRuns,
   });
 

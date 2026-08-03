@@ -9,6 +9,7 @@ import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-ve
 import { useWorkflowTriggers } from '@/hooks/use-workflow-triggers';
 import { useWorkflowStatusCounts } from '@/hooks/use-workflow-status-counts';
 import { AllRunsPanel } from '@/components/processes/all-runs-panel';
+import { type DryRunFilter, dryRunFilterToQuery } from '@/components/processes/dry-run-filter';
 import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { mediforce, ApiError } from '@/lib/mediforce';
@@ -24,8 +25,6 @@ import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useWorkflowDefinitionApi } from '@/hooks/use-workflows-api';
 import { WorkflowSecretsEditor } from '@/components/workflows/workflow-secrets-editor';
 import { TriggersPanel } from './TriggersPanel';
-
-type DryRunFilter = 'all' | 'production' | 'dry-run';
 
 export default function ProcessDefinitionPage() {
   const { name, handle } = useParams<{ name: string; handle: string }>();
@@ -201,16 +200,11 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   // Live trigger rows (enabled/schedule) drive the header summary, so stopping
   // a cron trigger in the Triggers tab immediately updates the header.
   const { cronTriggers, triggers, loading: triggersLoading } = useWorkflowTriggers(decodedName, handle);
-  // Total run count comes from the same server-side `COUNT(*) FILTER`
-  // aggregation the Monitoring → Workflows KPI cards use — summing every
-  // WorkflowDisplayStatus bucket yields the full filtered total without an
-  // unbounded row fetch (every run maps to exactly one bucket). Mirrors the
-  // dry-run/archived toggles the Runs tab's AllRunsPanel applies, so the
-  // header/tab count tracks the table's current filters.
+  // Summing all five WorkflowDisplayStatus buckets = full filtered total (every run maps to exactly one), mirroring AllRunsPanel's dry-run/archived toggles.
   const { counts: runStatusCounts } = useWorkflowStatusCounts({
     namespace: handle,
     workflowFilter: decodedName,
-    dryRun: dryRunFilter === 'all' ? undefined : dryRunFilter === 'dry-run',
+    dryRun: dryRunFilterToQuery(dryRunFilter),
     archived: showArchivedRuns,
   });
   const runsCount =

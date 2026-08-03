@@ -6,6 +6,7 @@ import { useProcessInstancesPage } from '@/hooks/use-process-instances-page';
 import { useMyActionableTasks } from '@/hooks/use-tasks';
 import { RunsTable } from './runs-table';
 import { STATUS_LABELS } from './process-status-badge';
+import { type DryRunFilter, dryRunFilterToQuery } from './dry-run-filter';
 import type { WorkflowDisplayStatus } from '@/lib/workflow-status';
 import { formatStepName } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -18,8 +19,6 @@ import { cn } from '@/lib/utils';
  * workflow catalog's "Show all runs" cards) and Monitoring → Workflows
  * (always unscoped).
  */
-type DryRunFilter = 'all' | 'production' | 'dry-run';
-
 export function AllRunsPanel({
   handle,
   workflowFilter,
@@ -61,7 +60,7 @@ export function AllRunsPanel({
   const { data: sorted, loading, hasMore, loadingMore, loadMore } = useProcessInstancesPage({
     namespace: handle,
     workflowFilter: workflowFilter ?? undefined,
-    dryRun: dryRunFilter === 'all' ? undefined : dryRunFilter === 'dry-run',
+    dryRun: dryRunFilterToQuery(dryRunFilter),
     archived: showArchivedRuns,
     displayStatus: displayStatusFilter,
   });
