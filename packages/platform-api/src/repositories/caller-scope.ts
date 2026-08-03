@@ -158,4 +158,13 @@ export interface SystemServices {
   readonly userDirectory: UserDirectoryService | null;
   readonly platformSettings: PlatformSettingsRepository;
   readonly emailProviderInfo: EmailProviderInfo | null;
+  /**
+   * Whether password authentication is enabled on this deployment
+   * (`ENABLE_PASSWORD_AUTH !== 'false'`, on by default). Invite flows gate
+   * the create-password activation path on this: a Google/OIDC-only or
+   * magic-link-only deployment sends the plain workspace-notification email
+   * instead of forcing a password the invitee cannot use. Resolved once at
+   * wiring time so the framework-free handler never reads `process.env`.
+   */
+  readonly passwordAuthEnabled: boolean;
 }

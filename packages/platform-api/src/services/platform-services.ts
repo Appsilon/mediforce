@@ -151,6 +151,13 @@ export interface PlatformServices {
    * consume via `scope.system.userDirectory`.
    */
   userDirectory: UserDirectoryService;
+  /**
+   * Whether password auth is enabled (`ENABLE_PASSWORD_AUTH !== 'false'`).
+   * Surfaced via `scope.system.passwordAuthEnabled` so framework-free
+   * handlers (invite flow) gate the create-password path without reading
+   * `process.env` directly.
+   */
+  passwordAuthEnabled: boolean;
 }
 
 /** Invite-activation links live for 7 days — long enough for a colleague to
@@ -307,6 +314,12 @@ export function getPlatformServices(): PlatformServices {
   // `recordSignIn` on every successful sign-in.
   const userDirectoryService: UserDirectoryService = new PostgresUserDirectoryService(pg);
 
+  // `ENABLE_PASSWORD_AUTH` defaults on; an explicit `false` opts a
+  // Google/OIDC/magic-link-only estate out of password sign-in. Mirrors the
+  // gate in `/api/auth/password-login` and `instrumentation-node.ts` so the
+  // invite flow shares one source of truth.
+  const passwordAuthEnabled = process.env.ENABLE_PASSWORD_AUTH !== 'false';
+
   const engine = new WorkflowEngine(
     processRepo,
     instanceRepo,
@@ -416,6 +429,7 @@ export function getPlatformServices(): PlatformServices {
     emailProviderInfo,
     dockerImages,
     userDirectory: userDirectoryService,
+    passwordAuthEnabled,
   };
 
   if (!seedingStarted) {

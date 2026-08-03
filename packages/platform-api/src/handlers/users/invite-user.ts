@@ -16,12 +16,18 @@ import { actorFromCaller, resolveConfiguredBaseUrl } from '../_helpers';
  *      writes the `auth_users` row + the workspace membership + any global
  *      roles in one transaction. No temp password is issued; `isExisting` is
  *      `true` when the account already existed (idempotent on email collision).
- *   3. If the invite is still pending (never activated), gate the invitee into
- *      the create-password flow (`setMustChangePassword`) and send a best-effort
- *      activation email — a one-time 7-day sign-in link that lands them on the
- *      create-password page. An already-active user re-added to the workspace
- *      gets the plain workspace-notification email instead. Email failures don't
- *      fail the response — `emailSent` flips to `false`.
+ *   3. If the invite is still pending (never activated) AND password auth is
+ *      enabled on this deployment (`scope.system.passwordAuthEnabled`), gate
+ *      the invitee into the create-password flow (`setMustChangePassword`)
+ *      and send a best-effort activation email — a one-time 7-day sign-in
+ *      link that lands them on the create-password page. A pending invitee on
+ *      a Google/OIDC-only or magic-link-only deployment (password auth off)
+ *      gets the plain workspace-notification email instead — they sign in via
+ *      their configured provider, and forcing a password they cannot use
+ *      (plus a `/change-password` dead-end) is wrong. An already-active user
+ *      re-added to the workspace also keeps the plain workspace-notification
+ *      path — they already have a session/password. Email failures don't fail
+ *      the response — `emailSent` flips to `false`.
  *   4. Append `invitation.created` to the audit log.
  *
  * `scope.system.inviteService === null` → `PreconditionFailedError` (the
@@ -52,12 +58,16 @@ export async function inviteUser(
     roles: [],
   });
 
-  // A pending invitee (never activated) gets an activation email with a
-  // one-time 7-day sign-in link and is gated into the create-password flow. An
-  // already-active user re-added to the workspace keeps the plain
-  // workspace-notification path — they already have a session/password.
+  // A pending invitee (never activated) is gated into the create-password flow
+  // only when password auth is the intended first-credential method. On a
+  // Google/OIDC-only or magic-link-only deployment, forcing a password (and the
+  // activation-link → /change-password path) strands the invitee: they set a
+  // password they cannot use and could simply have signed in with their
+  // provider. An already-active user re-added to the workspace always keeps the
+  // plain workspace-notification path — they already have a session/password.
   const pending = await invite.isInvitePending(uid);
-  if (pending) {
+  const forcePasswordSetup = pending === true && scope.system.passwordAuthEnabled === true;
+  if (forcePasswordSetup) {
     await scope.userProfiles.setMustChangePassword(uid, true);
   }
 
@@ -72,7 +82,7 @@ export async function inviteUser(
         typeof input.inviterName === 'string' && input.inviterName.trim() !== ''
           ? input.inviterName.trim()
           : workspaceName;
-      if (pending) {
+      if (forcePasswordSetup) {
         await notify.sendActivationEmail({
           toEmail: email,
           inviterName,
