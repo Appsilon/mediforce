@@ -7,7 +7,11 @@
  * `handlers/system/get-openrouter-credits.ts` tracked in #529.
  */
 
-const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
+// Base URL is overridable via OPENROUTER_BASE_URL so tests (and self-hosted
+// proxies) can point at a mock; defaults to the real OpenRouter endpoint so a
+// normal deploy needs no config.
+const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
+const OPENROUTER_CHAT_COMPLETIONS_URL = `${OPENROUTER_BASE_URL.replace(/\/$/, '')}/chat/completions`;
 
 export interface OpenRouterToolCall {
   id: string;
