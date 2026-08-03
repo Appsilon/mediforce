@@ -21,6 +21,7 @@ const mockPlatformSettingsGet = vi.fn();
 let inviteNotificationService: { sendActivationEmail: typeof mockSendActivationEmail } | null = {
   sendActivationEmail: mockSendActivationEmail,
 };
+let passwordAuthEnabled = true;
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
@@ -28,6 +29,7 @@ vi.mock('@/lib/platform-services', () => ({
     userProfileRepo: { setMustChangePassword: mockSetMustChangePassword },
     platformSettingsRepo: { get: mockPlatformSettingsGet },
     inviteNotificationService,
+    passwordAuthEnabled,
   }),
 }));
 
@@ -54,6 +56,7 @@ describe('POST /api/auth/resend-setup-link', () => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
     inviteNotificationService = { sendActivationEmail: mockSendActivationEmail };
+    passwordAuthEnabled = true;
     mockFindPasswordCredentialByEmail.mockResolvedValue(pendingUser);
     mockIsInvitePending.mockResolvedValue(true);
     mockSetMustChangePassword.mockResolvedValue(undefined);
@@ -80,6 +83,16 @@ describe('POST /api/auth/resend-setup-link', () => {
       toEmail: 'pending@example.test',
       baseUrl: 'https://phuse.mediforce.ai',
     });
+  });
+
+  it('[PASSWORD-OFF] still delivers the sign-in link but arms no create-password gate', async () => {
+    passwordAuthEnabled = false;
+
+    const res = await POST(makeJsonRequest({ email: 'pending@example.test' }));
+
+    expect(res.status).toBe(200);
+    expect(mockSetMustChangePassword).not.toHaveBeenCalled();
+    expect(mockSendActivationEmail).toHaveBeenCalledWith({ toEmail: 'pending@example.test' });
   });
 
   it('[ENUM] unknown email → no send, same generic 200', async () => {

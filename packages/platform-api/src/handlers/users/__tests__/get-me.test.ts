@@ -251,6 +251,27 @@ describe('getMe handler', () => {
     expect(result.user.mustChangePassword).toBe(true);
   });
 
+  it('projects mustChangePassword: false for a stale flag when password auth is disabled', async () => {
+    const { InMemoryUserProfileRepository } = await import('@mediforce/platform-core/testing');
+    const userProfileRepo = new InMemoryUserProfileRepository();
+    await userProfileRepo.setMustChangePassword('uid-marek', true);
+    const directory = directoryWith('uid-marek', { email: 'marek@example.test', displayName: 'Marek' });
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      userProfileRepo,
+      userDirectory: directory,
+      caller: userCaller('uid-marek', []),
+      passwordAuthEnabled: false,
+    });
+
+    const result = await getMe({}, scope);
+
+    expect(result.user.mustChangePassword).toBe(false);
+    // The row is left intact — re-enabling password auth restores the gate.
+    expect((await userProfileRepo.getProfile('uid-marek'))?.mustChangePassword).toBe(true);
+  });
+
   it('projects hasPassword from the credentials port', async () => {
     const { InMemoryCredentialsRepository } = await import('@mediforce/platform-core/testing');
     const directory = directoryWith('uid-marek', { email: 'marek@example.test', displayName: 'Marek' });

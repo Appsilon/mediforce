@@ -101,6 +101,36 @@ describe('resendInvite handler', () => {
     expect(notifier.sendWorkspaceCalls).toHaveLength(0);
   });
 
+  it('does not re-arm the gate and sends the workspace notification when password auth is disabled', async () => {
+    const inviteService = inviteServiceStub({
+      email: 'pending@example.test',
+      pending: true,
+    });
+    const notifier = recordingNotifier();
+    const userProfileRepo = new InMemoryUserProfileRepository();
+    const scope = createTestScope({
+      auditRepo,
+      inviteService,
+      inviteNotificationService: notifier,
+      userProfileRepo,
+      passwordAuthEnabled: false,
+    });
+
+    const result = await resendInvite(baseInput, scope);
+
+    expect(result.emailSent).toBe(true);
+    expect(await userProfileRepo.getProfile('uid-target')).toBeNull();
+    expect(notifier.sendActivationCalls).toHaveLength(0);
+    expect(notifier.sendWorkspaceCalls).toEqual([
+      {
+        toEmail: 'pending@example.test',
+        inviterName: 'alpha',
+        workspaceName: 'alpha',
+        workspaceHandle: 'alpha',
+      },
+    ]);
+  });
+
   it('passes the configured platform.baseUrl through to the resent activation email', async () => {
     const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
     await platformSettingsRepo.set('platform.baseUrl', 'https://phuse.mediforce.ai');

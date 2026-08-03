@@ -79,7 +79,13 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   if (services.inviteNotificationService !== null) {
     try {
-      await services.userProfileRepo.setMustChangePassword(user.id, true);
+      // The create-password gate only makes sense where a password can actually
+      // be set. On a magic-link-only deployment the emailed link is purely a
+      // sign-in link, and flagging the profile would strand the invitee on a
+      // `/change-password` page whose `password-login` endpoint 404s.
+      if (services.passwordAuthEnabled === true) {
+        await services.userProfileRepo.setMustChangePassword(user.id, true);
+      }
       // Prefer the deployment's configured `platform.baseUrl` setting (same as
       // the admin invite/resend handlers) so a deployment that set only the DB
       // setting — not the env var — still links to the real host rather than the

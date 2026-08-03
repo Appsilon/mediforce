@@ -30,7 +30,14 @@ export async function getMe(input: GetMeInput, scope: CallerScope): Promise<GetM
   ]);
   const email = metadata?.email ?? null;
   const displayName = metadata?.displayName ?? null;
-  const mustChangePassword = profile?.mustChangePassword ?? false;
+  // A create-password gate nobody can satisfy is worse than no gate: with
+  // password auth off, `/change-password` posts to a `password-login` route that
+  // 404s, so a flag written by an earlier invite — or before the deployment
+  // disabled password auth — traps the user on that page forever once they sign
+  // in with their provider. Project it away instead of clearing the row, so
+  // re-enabling password auth restores the gate.
+  const mustChangePassword =
+    scope.system.passwordAuthEnabled === true && profile?.mustChangePassword === true;
   const hasPassword = passwordHash !== null;
 
   let namespaces = await scope.workspaces.getNamespacesByUser(uid);

@@ -38,6 +38,7 @@ vi.mock('@/lib/platform-services', () => ({
     secretsRepo: {},
     namespaceSecretsRepo: {},
     userDirectory: null,
+    passwordAuthEnabled: true,
   }),
   getAppBaseUrl: () => 'http://localhost:3000',
 }));
