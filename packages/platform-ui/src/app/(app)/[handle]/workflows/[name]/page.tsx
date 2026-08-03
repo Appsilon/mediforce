@@ -7,9 +7,8 @@ import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, Mo
 import * as Tabs from '@radix-ui/react-tabs';
 import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
 import { useWorkflowTriggers } from '@/hooks/use-workflow-triggers';
-import { useProcessInstances } from '@/hooks/use-process-instances';
-import { useMyActionableTasks } from '@/hooks/use-tasks';
-import { RunsTable } from '@/components/processes/runs-table';
+import { useWorkflowStatusCounts } from '@/hooks/use-workflow-status-counts';
+import { AllRunsPanel } from '@/components/processes/all-runs-panel';
 import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { mediforce, ApiError } from '@/lib/mediforce';
@@ -26,6 +25,7 @@ import { useWorkflowDefinitionApi } from '@/hooks/use-workflows-api';
 import { WorkflowSecretsEditor } from '@/components/workflows/workflow-secrets-editor';
 import { TriggersPanel } from './TriggersPanel';
 
+type DryRunFilter = 'all' | 'production' | 'dry-run';
 
 export default function ProcessDefinitionPage() {
   const { name, handle } = useParams<{ name: string; handle: string }>();
@@ -186,7 +186,11 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
     tabParam === 'secrets' || tabParam === 'triggers' ? tabParam : 'runs';
   const setupKeys = searchParams.get('setup')?.split(',').filter(Boolean) ?? [];
   const [activeTab, setActiveTab] = React.useState(initialTab);
+  // Lifted out of AllRunsPanel (controlled props) so the header/tab run count
+  // below can mirror them — the count must match what the table's own
+  // toggles are currently showing, not a fixed unfiltered total.
   const [showArchivedRuns, setShowArchivedRuns] = React.useState(false);
+  const [dryRunFilter, setDryRunFilter] = React.useState<DryRunFilter>('all');
 
   const { versions, loading: versionsLoading } = useWorkflowVersions(decodedName, handle);
   // The page header reads the full latest definition (visibility, steps[], repo,
@@ -197,18 +201,24 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   // Live trigger rows (enabled/schedule) drive the header summary, so stopping
   // a cron trigger in the Triggers tab immediately updates the header.
   const { cronTriggers, triggers, loading: triggersLoading } = useWorkflowTriggers(decodedName, handle);
-  const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName, showArchivedRuns, handle);
-  const { data: activeTasks } = useMyActionableTasks();
-
-  const activeTaskByInstance = React.useMemo(() => {
-    const map = new Map<string, string>();
-    for (const task of activeTasks) {
-      if (!map.has(task.processInstanceId)) {
-        map.set(task.processInstanceId, task.id);
-      }
-    }
-    return map;
-  }, [activeTasks]);
+  // Total run count comes from the same server-side `COUNT(*) FILTER`
+  // aggregation the Monitoring → Workflows KPI cards use — summing every
+  // WorkflowDisplayStatus bucket yields the full filtered total without an
+  // unbounded row fetch (every run maps to exactly one bucket). Mirrors the
+  // dry-run/archived toggles the Runs tab's AllRunsPanel applies, so the
+  // header/tab count tracks the table's current filters.
+  const { counts: runStatusCounts } = useWorkflowStatusCounts({
+    namespace: handle,
+    workflowFilter: decodedName,
+    dryRun: dryRunFilter === 'all' ? undefined : dryRunFilter === 'dry-run',
+    archived: showArchivedRuns,
+  });
+  const runsCount =
+    runStatusCounts.in_progress +
+    runStatusCounts.waiting_for_human +
+    runStatusCounts.error +
+    runStatusCounts.cancelled +
+    runStatusCounts.completed;
 
   const { user, loading: authLoading } = useAuth();
   const { namespaces } = useAllUserNamespaces(user?.id);
@@ -324,7 +334,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 <Layers className="h-3 w-3" />
                 {latest?.steps.length} steps
               </span>
-              <span>{runs.length} runs</span>
+              <span>{runsCount} runs</span>
               {triggers
                 .filter((trigger) => trigger.type !== 'cron')
                 .map((trigger) => (
@@ -513,7 +523,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
               )}
             >
               {tab === 'runs'
-                ? `Runs${runs.length > 0 ? ` (${runs.length})` : ''}`
+                ? `Runs${runsCount > 0 ? ` (${runsCount})` : ''}`
                 : tab === 'secrets'
                   ? <><KeyRound className="h-3.5 w-3.5" />Secrets</>
                   : tab === 'triggers'
@@ -525,20 +535,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
 
         {/* Runs tab */}
         <Tabs.Content value="runs" className="flex-1 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => setShowArchivedRuns((v) => !v)}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
-                showArchivedRuns
-                  ? 'border-primary text-primary bg-primary/5'
-                  : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
-              )}
-            >
-              {showArchivedRuns
-                ? <><EyeOff className="h-3.5 w-3.5" />Hide archived</>
-                : <><Eye className="h-3.5 w-3.5" />Show archived</>}
-            </button>
+          <div className="flex items-center justify-end mb-4">
             <StartRunButton
               workflowName={decodedName}
               showVersionPicker
@@ -547,11 +544,13 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
             />
           </div>
 
-          <RunsTable
-            runs={runs}
-            loading={runsLoading}
-            activeTaskByInstance={activeTaskByInstance}
-            emptyMessage="No runs yet for this workflow."
+          <AllRunsPanel
+            handle={handle}
+            workflowFilter={decodedName}
+            dryRunFilter={dryRunFilter}
+            onDryRunFilterChange={setDryRunFilter}
+            showArchivedRuns={showArchivedRuns}
+            onShowArchivedRunsChange={setShowArchivedRuns}
           />
         </Tabs.Content>
 
