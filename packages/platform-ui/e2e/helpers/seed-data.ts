@@ -213,6 +213,23 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   };
 
   const processInstances: Record<string, Record<string, unknown>> = {
+    'proc-entry-trigger-input': {
+      id: 'proc-entry-trigger-input',
+      namespace: 'test',
+      definitionName: 'Entry Trigger Input',
+      definitionVersion: '1',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: { studyId: 'STUDY-ENTRY-001', priority: 'high', dryRun: true },
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: testUserId,
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+    },
     'proc-running-1': {
       id: 'proc-running-1',
       namespace: 'test',
@@ -1222,6 +1239,21 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   };
 
   const stepExecutions: Record<string, Record<string, unknown>> = {
+    'exec-entry-trigger-input': {
+      id: 'exec-entry-trigger-input',
+      instanceId: 'proc-entry-trigger-input',
+      stepId: 'process',
+      status: 'completed',
+      input: {},
+      output: { accepted: true },
+      verdict: null,
+      executedBy: 'auto-runner',
+      startedAt: oneHourAgo,
+      completedAt: now,
+      iterationNumber: 0,
+      gateResult: { next: 'done', reason: 'input accepted' },
+      error: null,
+    },
     'exec-intake': {
       id: 'exec-intake',
       instanceId: 'proc-running-1',
@@ -2115,6 +2147,25 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       { name: 'studyId', type: 'string', required: true, description: 'Study identifier' },
       { name: 'priority', type: 'select', required: false, options: ['low', 'normal', 'high'], default: 'normal', description: 'Run priority' },
       { name: 'dryRun', type: 'boolean', required: false, default: false, description: 'Dry run mode' },
+    ],
+    createdAt: twoDaysAgo,
+  };
+
+  workflowDefinitions['test:Entry Trigger Input:1'] = {
+    name: 'Entry Trigger Input',
+    namespace: 'test',
+    version: 1,
+    title: 'Workflow with an executed entry step',
+    description: 'Fixture for showing a run payload on its entry step',
+    steps: [
+      { id: 'process', name: 'Process Data', type: 'creation', executor: 'script' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'process', to: 'done' }],
+    triggerInput: [
+      { name: 'studyId', type: 'string', required: true },
+      { name: 'priority', type: 'select', required: false, options: ['low', 'normal', 'high'] },
+      { name: 'dryRun', type: 'boolean', required: false },
     ],
     createdAt: twoDaysAgo,
   };
