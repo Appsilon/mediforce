@@ -27,11 +27,35 @@ services:
   redis:
     image: redis:8-alpine
     restart: unless-stopped
-    mem_limit: ${REDIS_MEM_LIMIT:-256m}
+    # Redis cannot see the cgroup cap, so without a ceiling of its own it grows
+    # until the kernel SIGKILLs it (exit 137) and then crash-loops reloading an
+    # RDB it has no room for. maxmemory bounds the dataset while mem_limit
+    # bounds RSS, and RSS additionally carries allocator fragmentation, the
+    # bundled-module baseline, client output buffers and copy-on-write during
+    # BGSAVE — hence maxmemory at half of mem_limit, not just "below" it.
+    # noeviction is required by BullMQ: jobs must never be evicted out from
+    # under a run, so hitting the ceiling fails writes loudly instead of
+    # silently losing queue state.
+    #
+    # Keep the whole command here. Compose REPLACES `command` rather than
+    # merging it, so an overlay that redefines it (docker-compose.staging.yml
+    # once did, to add --requirepass) silently drops every flag below.
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:-}
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-512mb}
+      - --maxmemory-policy
+      - noeviction
+    mem_limit: ${REDIS_MEM_LIMIT:-1g}
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # `redis-cli ping` exits 0 even on NOAUTH, which would report healthy
+      # while every command fails auth — grep the reply instead of trusting
+      # the exit code. Works with auth on and off (empty password).
+      test: ["CMD-SHELL", "redis-cli -a \"${REDIS_PASSWORD:-}\" --no-auth-warning ping | grep -q PONG"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -88,7 +112,7 @@ services:
     expose:
       - "3000"
     environment:
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379
       # ADR-0001 — Postgres is the only storage backend. Migrations run in
       # the `migrate` init container before this service starts
       # (depends_on: { migrate: { condition: service_completed_successfully } }).
@@ -174,7 +198,7 @@ services:
     expose:
       - "3001"
     environment:
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379
       - WORKER_HTTP_PORT=3001
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

@@ -1236,7 +1236,7 @@ def _render_compose_env(ctx: Context) -> str:
         "# to override.",
         f"POSTGRES_PASSWORD={ctx.collected.get('POSTGRES_PASSWORD', '')}",
         "",
-        "# Redis — staging overlay uses --requirepass; without this Redis crashes.",
+        "# Redis — docker-compose.prod.yml passes this to --requirepass on every host.",
         f"REDIS_PASSWORD={ctx.collected.get('REDIS_PASSWORD', '')}",
         "",
         "# Caddy — site block matcher (real domain → Let's Encrypt cert, IP → self-signed)",
@@ -1350,7 +1350,7 @@ def _ensure_api_keys(ctx: Context) -> None:
         ok("POSTGRES_PASSWORD auto-generated (32 bytes url-safe) — back this up; losing it locks you out of the Postgres data volume")
 
     if not ctx.collected.get("REDIS_PASSWORD"):
-        # Staging overlay requires --requirepass; without this Redis crashes.
+        # docker-compose.prod.yml passes this to --requirepass on every host.
         ctx.collected["REDIS_PASSWORD"] = secrets.token_urlsafe(24)
         ok("REDIS_PASSWORD auto-generated (24 bytes url-safe)")
 
