@@ -6,7 +6,9 @@
  *    (catch-all webhook POST, auto-runner POST, runs GET).
  *  - Validates the WorkflowTemplate loader — JSON file without namespace,
  *    namespace injected at registration.
- *  - Validates http action interpolation against `triggerPayload.body`.
+ *  - Validates http action interpolation against the workflow's declared
+ *    `triggerInput` field (`triggerPayload.summary`, an `object`-typed field) —
+ *    the webhook body's top-level keys ARE the contract (ADR-0012).
  *  - Validates the echo round-trip via a real local Node HTTP server (no
  *    httpbin, no network).
  *
@@ -238,7 +240,11 @@ afterEach(() => {
 
 describe('execution-summaries-api: webhook → http action → polling → echo round-trip', () => {
   it('completes a webhook-driven workflow end-to-end with echoed payload', async () => {
-    const payload = { hello: 'world', greeting: 'caveman' };
+    // The WD declares `summary` as a required `object` field, so the sender
+     // nests its opaque blob under that key — the webhook maps top-level body
+     // keys 1:1 onto triggerInput (ADR-0012).
+    const summary = { hello: 'world', greeting: 'caveman' };
+    const payload = { summary };
     const webhookReq = new NextRequest(
       'http://localhost/api/triggers/webhook/examples/execution-summaries-api/execution-summaries',
       {
@@ -306,7 +312,9 @@ describe('execution-summaries-api: webhook → http action → polling → echo 
     // The echo server returns { method, json, headers, ... }; the http
     // action wraps that under body.json. So the original payload is at
     // finalOutput.body.json.json.
-    expect(finalOutput.body.json.json).toEqual(payload);
+    // The step interpolates `${triggerPayload.summary}`, so the echo server
+    // receives the unwrapped blob, not the whole payload envelope.
+    expect(finalOutput.body.json.json).toEqual(summary);
   });
 
   it('returns 500 when PLATFORM_API_KEY is missing instead of silently dropping the run', async () => {
@@ -318,7 +326,7 @@ describe('execution-summaries-api: webhook → http action → polling → echo 
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ hello: 'world' }),
+          body: JSON.stringify({ summary: { hello: 'world' } }),
         },
       );
 

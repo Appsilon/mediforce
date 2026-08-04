@@ -38,7 +38,8 @@ export const GetRunOutputSchema = z.object({
 export type GetRunInput = z.infer<typeof GetRunInputSchema>;
 export type GetRunOutput = z.infer<typeof GetRunOutputSchema>;
 
-// Server picks latest version when definitionVersion omitted.
+// Server picks the runnable version when definitionVersion omitted — the
+// default version when it is live, else the newest live one (ADR-0011).
 export const StartRunInputSchema = z.object({
   namespace: z.string().min(1).optional(),
   definitionName: z.string().min(1),

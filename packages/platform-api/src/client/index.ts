@@ -1226,6 +1226,7 @@ export class Mediforce {
             triggerName: v.triggerName,
             type: v.type,
             schedule: v.schedule,
+            payload: v.payload,
             method: v.method,
             path: v.path,
             enabled: v.enabled,
@@ -1239,7 +1240,7 @@ export class Mediforce {
         return this.sendJson(
           'PATCH',
           `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/triggers/${encodeURIComponent(v.triggerName)}`,
-          { namespace: v.namespace, schedule: v.schedule },
+          { namespace: v.namespace, schedule: v.schedule, payload: v.payload },
           UpdateTriggerOutputSchema,
           'mediforce.triggers.update',
         );

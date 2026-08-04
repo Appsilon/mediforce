@@ -8,8 +8,9 @@ import type { WorkflowStep, HumanTask } from '@mediforce/platform-core';
 import { ACTIONABLE_STATUSES } from '@mediforce/platform-api/contract';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { useStepExecutions } from '@/hooks/use-step-executions';
-import { ApiError, mediforce } from '@/lib/mediforce';
+import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
+import { useWorkflowVersion } from '@/hooks/use-workflow-versions';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
@@ -47,26 +48,11 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
 
   const definitionVersion = instance ? Number.parseInt(instance.definitionVersion, 10) : NaN;
   const definitionName = instance?.definitionName ?? '';
-  const defQuery = useQuery({
-    queryKey: queryKeys.workflow(
-      handle,
-      definitionName,
-      Number.isFinite(definitionVersion) ? definitionVersion : undefined,
-    ),
-    queryFn: () =>
-      mediforce.workflows.get({
-        name: definitionName,
-        namespace: handle,
-        ...(Number.isFinite(definitionVersion) ? { version: definitionVersion } : {}),
-      }),
-    enabled: instance !== null && definitionName.length > 0,
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
-  });
-  const definition = defQuery.data?.definition ?? null;
-  const defLoading = defQuery.isLoading && instance !== null;
+  const { definition, loading: defLoading } = useWorkflowVersion(
+    definitionName,
+    handle,
+    Number.isFinite(definitionVersion) ? definitionVersion : null,
+  );
 
   const nextTasksQuery = useQuery({
     queryKey: queryKeys.tasks.byInstance(processInstanceId, {

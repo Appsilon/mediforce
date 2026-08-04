@@ -292,6 +292,260 @@ describe('trigger handlers (cron on the unified table, ADR-0011)', () => {
     );
   });
 
+  // ADR-0012: a cron tick has no caller, so its input lives on the row and is
+  // validated against the workflow's contract at attach time (fail-fast) as well
+  // as at fire time (the heartbeat's drift check).
+  describe('cron static payload', () => {
+    beforeEach(async () => {
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({
+          name: 'regional',
+          version: 1,
+          namespace: 'team-alpha',
+          triggerInput: [
+            { name: 'region', type: 'string', required: true },
+            { name: 'dryRun', type: 'boolean', required: false },
+          ],
+        }),
+      );
+    });
+
+    const regional = {
+      namespace: 'team-alpha',
+      definitionName: 'regional',
+      triggerName: 'nightly-us',
+      type: 'cron' as const,
+    };
+
+    it('stores a valid payload on the row', async () => {
+      const scope = buildScope();
+      const result = await createTrigger(
+        { ...regional, schedule: '0 3 * * *', enabled: true, payload: { region: 'us' } },
+        scope,
+      );
+      expect(result.trigger.type === 'cron' && result.trigger.config.payload).toEqual({
+        region: 'us',
+      });
+    });
+
+    it('lets two rows on one workflow carry distinct payloads', async () => {
+      const scope = buildScope();
+      await createTrigger(
+        { ...regional, schedule: '0 3 * * *', enabled: true, payload: { region: 'us' } },
+        scope,
+      );
+      await createTrigger(
+        {
+          ...regional,
+          triggerName: 'nightly-eu',
+          schedule: '0 4 * * *',
+          enabled: true,
+          payload: { region: 'eu' },
+        },
+        scope,
+      );
+
+      const rows = await triggerRepo.listByWorkflow('team-alpha', 'regional');
+      const payloads = rows
+        .filter((r) => r.type === 'cron')
+        .map((r) => (r.type === 'cron' ? r.config.payload : null));
+      expect(payloads).toEqual(
+        expect.arrayContaining([{ region: 'us' }, { region: 'eu' }]),
+      );
+    });
+
+    it('rejects a payload missing a required field at attach time', async () => {
+      const scope = buildScope();
+      await expect(
+        createTrigger({ ...regional, schedule: '0 3 * * *', enabled: true, payload: {} }, scope),
+      ).rejects.toBeInstanceOf(ValidationError);
+      expect(await triggerRepo.listByWorkflow('team-alpha', 'regional')).toHaveLength(0);
+    });
+
+    it('rejects a payload carrying an undeclared field', async () => {
+      const scope = buildScope();
+      await expect(
+        createTrigger(
+          {
+            ...regional,
+            schedule: '0 3 * * *',
+            enabled: true,
+            payload: { region: 'us', typo: 1 },
+          },
+          scope,
+        ),
+      ).rejects.toBeInstanceOf(ValidationError);
+    });
+
+    it('rejects a payload on a non-cron trigger', async () => {
+      const scope = buildScope();
+      await expect(
+        createTrigger(
+          {
+            namespace: 'team-alpha',
+            definitionName: 'regional',
+            triggerName: 'hook',
+            type: 'webhook',
+            path: '/x',
+            enabled: true,
+            payload: { region: 'us' },
+          },
+          scope,
+        ),
+      ).rejects.toBeInstanceOf(ValidationError);
+    });
+
+    it('updates the payload alone, carrying the schedule over', async () => {
+      const scope = buildScope();
+      await createTrigger(
+        { ...regional, schedule: '0 3 * * *', enabled: true, payload: { region: 'us' } },
+        scope,
+      );
+
+      const result = await updateTrigger(
+        {
+          namespace: 'team-alpha',
+          definitionName: 'regional',
+          triggerName: 'nightly-us',
+          payload: { region: 'eu' },
+        },
+        scope,
+      );
+      expect(result.trigger.type === 'cron' && result.trigger.config).toEqual({
+        schedule: '0 3 * * *',
+        payload: { region: 'eu' },
+      });
+    });
+
+    it('clears the payload when passed an empty object', async () => {
+      // Clearing is only legal where the empty payload still satisfies the
+      // contract, so this uses an all-optional workflow. On `regional` (which
+      // requires `region`) the same call is rejected by the test below —
+      // attach-time validation is fail-fast, not deferred to fire time.
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({
+          name: 'optional-input',
+          version: 1,
+          namespace: 'team-alpha',
+          triggerInput: [{ name: 'region', type: 'string', required: false }],
+        }),
+      );
+      const scope = buildScope();
+      const key = {
+        namespace: 'team-alpha',
+        definitionName: 'optional-input',
+        triggerName: 'nightly',
+      };
+      await createTrigger(
+        { ...key, type: 'cron', schedule: '0 3 * * *', enabled: true, payload: { region: 'us' } },
+        scope,
+      );
+
+      const result = await updateTrigger({ ...key, payload: {} }, scope);
+      // The key is dropped entirely, so a cleared row is identical to one that
+      // never had a payload — including in the portable export.
+      expect(result.trigger.type === 'cron' && result.trigger.config).toEqual({
+        schedule: '0 3 * * *',
+      });
+    });
+
+    it('creates without a payload key when passed an empty object', async () => {
+      // Create and update must read `{}` the same way — the CLI documents
+      // `--payload '{}'` as "clear the payload". Create used to test only for
+      // `undefined`, so a row created this way persisted `payload: {}` and the
+      // portable export carried it, unlike the identical updated row.
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({
+          name: 'optional-input',
+          version: 1,
+          namespace: 'team-alpha',
+          triggerInput: [{ name: 'region', type: 'string', required: false }],
+        }),
+      );
+      const scope = buildScope();
+
+      const result = await createTrigger(
+        {
+          namespace: 'team-alpha',
+          definitionName: 'optional-input',
+          triggerName: 'nightly',
+          type: 'cron',
+          schedule: '0 3 * * *',
+          enabled: true,
+          payload: {},
+        },
+        scope,
+      );
+
+      expect(result.trigger.type === 'cron' && result.trigger.config).toEqual({
+        schedule: '0 3 * * *',
+      });
+    });
+
+    it('rejects clearing a payload the contract still requires', async () => {
+      const scope = buildScope();
+      await createTrigger(
+        { ...regional, schedule: '0 3 * * *', enabled: true, payload: { region: 'us' } },
+        scope,
+      );
+      await expect(
+        updateTrigger(
+          {
+            namespace: 'team-alpha',
+            definitionName: 'regional',
+            triggerName: 'nightly-us',
+            payload: {},
+          },
+          scope,
+        ),
+      ).rejects.toBeInstanceOf(ValidationError);
+    });
+
+    it('rejects an update carrying neither schedule nor payload', async () => {
+      const scope = buildScope();
+      await createTrigger(
+        { ...regional, schedule: '0 3 * * *', enabled: true, payload: { region: 'us' } },
+        scope,
+      );
+      await expect(
+        updateTrigger(
+          {
+            namespace: 'team-alpha',
+            definitionName: 'regional',
+            triggerName: 'nightly-us',
+          },
+          scope,
+        ),
+      ).rejects.toBeInstanceOf(ValidationError);
+    });
+
+    it('refuses to stamp a schedule onto a non-cron row', async () => {
+      const scope = buildScope();
+      await createTrigger(
+        {
+          namespace: 'team-alpha',
+          definitionName: 'regional',
+          triggerName: 'hook',
+          type: 'webhook',
+          path: '/x',
+          enabled: true,
+        },
+        scope,
+      );
+      await expect(
+        updateTrigger(
+          {
+            namespace: 'team-alpha',
+            definitionName: 'regional',
+            triggerName: 'hook',
+            schedule: '0 5 * * *',
+          },
+          scope,
+        ),
+      ).rejects.toBeInstanceOf(ValidationError);
+    });
+  });
+
   it('stops and starts a trigger via setEnabled with distinct audit actions', async () => {
     const scope = buildScope();
     await createTrigger({ ...cron, schedule: '0 3 * * *', enabled: true }, scope);

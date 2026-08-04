@@ -133,6 +133,7 @@ export class PostgresProcessInstanceRepository
         variables: parsed.variables,
         triggerType: parsed.triggerType,
         triggerPayload: parsed.triggerPayload,
+        triggerContext: parsed.triggerContext ?? null,
         pauseReason: parsed.pauseReason,
         error: parsed.error,
         assignedRoles: parsed.assignedRoles,
@@ -722,6 +723,11 @@ function toInstance(row: typeof processInstances.$inferSelect): ProcessInstance 
     variables: (row.variables ?? {}) as Record<string, unknown>,
     triggerType: row.triggerType,
     triggerPayload: (row.triggerPayload ?? {}) as Record<string, unknown>,
+    // Left `undefined` (not `{}`) when the column is null so a manual start and
+    // a pre-ADR-0012 run both read as "this firing had no transport metadata".
+    ...(row.triggerContext === null || row.triggerContext === undefined
+      ? {}
+      : { triggerContext: row.triggerContext as Record<string, unknown> }),
     pauseReason: row.pauseReason,
     error: row.error,
     assignedRoles: row.assignedRoles ?? [],

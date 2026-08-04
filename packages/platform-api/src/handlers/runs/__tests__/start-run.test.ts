@@ -86,6 +86,146 @@ describe('startRun handler', () => {
     ]);
   });
 
+  it('fires with a declared default for an optional field the caller omitted', async () => {
+    // The `default` belongs to the contract, not to the Start Run form: an API
+    // start that omits the field must land on the same value the prefilled form
+    // would have sent (ADR-0012).
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'defaulted',
+        namespace: 'team-alpha',
+        version: 1,
+        triggerInput: [
+          { name: 'studyId', type: 'string', required: true },
+          { name: 'region', type: 'string', required: false, default: 'global' },
+        ],
+      }),
+    );
+    await instanceRepo.create(
+      buildProcessInstance({ id: 'inst-defaulted', namespace: 'team-alpha' }),
+    );
+
+    const fireWorkflow = vi.fn().mockResolvedValue({
+      instanceId: 'inst-defaulted',
+      status: 'created' as const,
+    });
+    const scope = createTestScope({
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+    Object.assign(scope.system, { manualTrigger: { fireWorkflow } });
+
+    await startRun(
+      {
+        namespace: 'team-alpha',
+        definitionName: 'defaulted',
+        triggerName: 'manual',
+        triggeredBy: 'u-1',
+        payload: { studyId: 'S-1' },
+      },
+      scope,
+    );
+
+    expect(fireWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: { studyId: 'S-1', region: 'global' } }),
+    );
+  });
+
+  // An unpinned start resolves through the same shared policy as the cron
+  // heartbeat and spawn (ADR-0011), so a manual firing and a cron firing of the
+  // same workflow land on the same version — and therefore on the same
+  // `triggerInput` contract (ADR-0012). The old `getLatestVersion` read was
+  // archived-inclusive.
+  describe('version resolution', () => {
+    async function saveFlow(version: number, extra: Record<string, unknown> = {}): Promise<void> {
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({ name: 'flow', namespace: 'team-alpha', version, ...extra }),
+      );
+    }
+
+    function scopeWithTrigger(fireWorkflow: ReturnType<typeof vi.fn>) {
+      const scope = createTestScope({
+        processRepo,
+        instanceRepo,
+        auditRepo,
+        caller: userCaller('u-1', ['team-alpha']),
+      });
+      Object.assign(scope.system, { manualTrigger: { fireWorkflow } });
+      return scope;
+    }
+
+    it('skips an archived head and starts the newest live version', async () => {
+      await saveFlow(1);
+      await saveFlow(2, { archived: true });
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-live', namespace: 'team-alpha' }));
+      const fireWorkflow = vi
+        .fn()
+        .mockResolvedValue({ instanceId: 'inst-live', status: 'created' as const });
+
+      await startRun(
+        {
+          namespace: 'team-alpha',
+          definitionName: 'flow',
+          triggerName: 'manual',
+          triggeredBy: 'u-1',
+        },
+        scopeWithTrigger(fireWorkflow),
+      );
+
+      expect(fireWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({ definitionVersion: 1 }),
+      );
+    });
+
+    it('throws NotFoundError when every version is archived', async () => {
+      await saveFlow(1, { archived: true });
+      const fireWorkflow = vi.fn();
+
+      await expect(
+        startRun(
+          {
+            namespace: 'team-alpha',
+            definitionName: 'flow',
+            triggerName: 'manual',
+            triggeredBy: 'u-1',
+          },
+          scopeWithTrigger(fireWorkflow),
+        ),
+      ).rejects.toBeInstanceOf(NotFoundError);
+      expect(fireWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('still starts an explicitly pinned archived version', async () => {
+      // Pinning a version is a deliberate act — resolution is what the pin
+      // replaces, so an archived pin keeps working exactly as before.
+      await saveFlow(1);
+      await saveFlow(2, { archived: true });
+      await instanceRepo.create(
+        buildProcessInstance({ id: 'inst-pinned', namespace: 'team-alpha' }),
+      );
+      const fireWorkflow = vi
+        .fn()
+        .mockResolvedValue({ instanceId: 'inst-pinned', status: 'created' as const });
+
+      await startRun(
+        {
+          namespace: 'team-alpha',
+          definitionName: 'flow',
+          definitionVersion: 2,
+          triggerName: 'manual',
+          triggeredBy: 'u-1',
+        },
+        scopeWithTrigger(fireWorkflow),
+      );
+
+      expect(fireWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({ definitionVersion: 2 }),
+      );
+    });
+  });
+
   it('throws NotFoundError when the definition name is unknown', async () => {
     const fireWorkflow = vi.fn();
     const scope = createTestScope({
@@ -143,6 +283,41 @@ describe('startRun handler', () => {
 
     expect(err).toBeInstanceOf(HandlerError);
     expect((err as HandlerError).code).toBe('validation');
+    expect(fireWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-empty payload when the WD declares no triggerInput', async () => {
+    // The contract is total (ADR-0012): an empty/absent triggerInput means the
+    // workflow takes no input, so validation runs unconditionally. The old
+    // `triggerInput.length > 0` guard let this through, which is what allowed
+    // each trigger to invent its own payload shape.
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'no-input', namespace: 'team-alpha', version: 1 }),
+    );
+
+    const fireWorkflow = vi.fn();
+    const scope = createTestScope({
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+    Object.assign(scope.system, { manualTrigger: { fireWorkflow } });
+
+    const err = await startRun(
+      {
+        namespace: 'team-alpha',
+        definitionName: 'no-input',
+        triggerName: 'manual',
+        triggeredBy: 'u-1',
+        payload: { stray: 'field' },
+      },
+      scope,
+    ).catch((e) => e);
+
+    expect(err).toBeInstanceOf(HandlerError);
+    expect((err as HandlerError).code).toBe('validation');
+    expect((err as HandlerError).details).toMatchObject([{ field: 'stray' }]);
     expect(fireWorkflow).not.toHaveBeenCalled();
   });
 

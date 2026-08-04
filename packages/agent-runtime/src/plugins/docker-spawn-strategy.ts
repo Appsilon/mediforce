@@ -89,6 +89,12 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
       await ensureImage(request.imageBuild);
     }
 
+    // Remove any stale container holding this name (crashed/killed/retried
+    // attempt). `docker run --rm` only cleans up on a clean exit, so without this
+    // a retry hits `Conflict. The container name "…" is already in use` (exit 125).
+    const { removeStaleContainer } = await import('@mediforce/container-worker');
+    await removeStaleContainer(request.containerName);
+
     const { logFile } = request;
     let logDirReady: Promise<void> | null = null;
     if (logFile) {

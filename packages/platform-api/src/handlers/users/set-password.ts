@@ -32,11 +32,22 @@ const BCRYPT_COST = 12;
  *
  * Clearing `mustChangePassword` stays a separate call — the change-password
  * page makes it after this one succeeds.
+ *
+ * Refuses outright when password auth is disabled on the deployment — no
+ * caller kind (UI, CLI, apiKey) may write a credential the sign-in route will
+ * not accept.
  */
 export async function setPassword(
   input: SetPasswordInput,
   scope: CallerScope,
 ): Promise<SetPasswordOutput> {
+  // A hash nobody can sign in with is worse than no hash: with password auth
+  // off, `/api/auth/password-login` 404s, so the write would succeed silently
+  // and leave the user believing they have a working credential.
+  if (scope.system.passwordAuthEnabled !== true) {
+    throw new PreconditionFailedError('Password authentication is disabled on this deployment');
+  }
+
   const uid = resolveUid(input, scope);
 
   await assertReauthenticated(input, scope, uid);

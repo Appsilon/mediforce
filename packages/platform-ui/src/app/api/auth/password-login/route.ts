@@ -10,6 +10,7 @@ import {
   recordSignInAuditEvent,
   SESSION_TTL_MS,
 } from '@mediforce/platform-infra';
+import { isPasswordAuthEnabled } from '@mediforce/platform-core';
 import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist';
 import { sessionCookieName, isSecureRequest } from '@/lib/session-cookie';
 
@@ -42,10 +43,7 @@ const INVALID_CREDENTIALS = { error: 'Incorrect email or password.' } as const;
 const DUMMY_HASH = '$2b$12$C6UzMDM.H6dfI/f/IKcEe.4nJmXQXbYCiL5C1xCtBHqAFwUeXPuLW';
 
 function passwordAuthEnabled(): boolean {
-  // On by default — a self-hosted deployment almost always wants password
-  // sign-in, and this keeps the invite / first-password flow working without an
-  // extra env flip. Set ENABLE_PASSWORD_AUTH=false for a Google/OIDC-only estate.
-  return process.env.ENABLE_PASSWORD_AUTH !== 'false';
+  return isPasswordAuthEnabled(process.env.ENABLE_PASSWORD_AUTH);
 }
 
 /** `x-forwarded-for` may carry a client,proxy1,proxy2 chain behind a load

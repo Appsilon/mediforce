@@ -21,15 +21,22 @@ const mockPlatformSettingsGet = vi.fn();
 let inviteNotificationService: { sendActivationEmail: typeof mockSendActivationEmail } | null = {
   sendActivationEmail: mockSendActivationEmail,
 };
+let passwordAuthEnabled = true;
 
-vi.mock('@/lib/platform-services', () => ({
-  getPlatformServices: () => ({
-    inviteService: { isInvitePending: mockIsInvitePending },
-    userProfileRepo: { setMustChangePassword: mockSetMustChangePassword },
-    platformSettingsRepo: { get: mockPlatformSettingsGet },
-    inviteNotificationService,
-  }),
-}));
+vi.mock('@/lib/platform-services', async () => {
+  const { mockPlatformServices } = await import('@/test/platform-services-mock');
+  return {
+    getPlatformServices: () =>
+      mockPlatformServices({
+        inviteService: { isInvitePending: mockIsInvitePending },
+        userProfileRepo: { setMustChangePassword: mockSetMustChangePassword },
+        platformSettingsRepo: { get: mockPlatformSettingsGet },
+        inviteNotificationService,
+        // Explicit on purpose: this suite drives both sides of the flag.
+        passwordAuthEnabled,
+      }),
+  };
+});
 
 import { POST } from '../route';
 
@@ -54,6 +61,7 @@ describe('POST /api/auth/resend-setup-link', () => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
     inviteNotificationService = { sendActivationEmail: mockSendActivationEmail };
+    passwordAuthEnabled = true;
     mockFindPasswordCredentialByEmail.mockResolvedValue(pendingUser);
     mockIsInvitePending.mockResolvedValue(true);
     mockSetMustChangePassword.mockResolvedValue(undefined);
@@ -67,7 +75,10 @@ describe('POST /api/auth/resend-setup-link', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
     expect(mockSetMustChangePassword).toHaveBeenCalledWith('uid-pending', true);
-    expect(mockSendActivationEmail).toHaveBeenCalledWith({ toEmail: 'pending@example.test' });
+    expect(mockSendActivationEmail).toHaveBeenCalledWith({
+      toEmail: 'pending@example.test',
+      passwordSetupEnabled: true,
+    });
   });
 
   it('[BASEURL] passes the configured platform.baseUrl (normalized) to the activation email', async () => {
@@ -79,6 +90,22 @@ describe('POST /api/auth/resend-setup-link', () => {
     expect(mockSendActivationEmail).toHaveBeenCalledWith({
       toEmail: 'pending@example.test',
       baseUrl: 'https://phuse.mediforce.ai',
+      passwordSetupEnabled: true,
+    });
+  });
+
+  it('[PASSWORD-OFF] still delivers the sign-in link but arms no create-password gate', async () => {
+    passwordAuthEnabled = false;
+
+    const res = await POST(makeJsonRequest({ email: 'pending@example.test' }));
+
+    expect(res.status).toBe(200);
+    expect(mockSetMustChangePassword).not.toHaveBeenCalled();
+    // The link still works — the copy and its landing page just stop promising
+    // a password this deployment cannot set.
+    expect(mockSendActivationEmail).toHaveBeenCalledWith({
+      toEmail: 'pending@example.test',
+      passwordSetupEnabled: false,
     });
   });
 

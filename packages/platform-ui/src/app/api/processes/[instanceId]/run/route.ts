@@ -456,6 +456,7 @@ export async function POST(
             if (currentStep.assignedTo !== undefined) {
               const resolved = interpolate(currentStep.assignedTo, {
                 triggerPayload: (instance.triggerPayload as Record<string, unknown>) ?? {},
+                triggerContext: (instance.triggerContext as Record<string, unknown>) ?? {},
                 steps: instance.variables,
                 variables: instance.variables,
                 // Secrets are deliberately withheld: the resolved value is persisted
@@ -647,6 +648,7 @@ export async function POST(
                 ...(instance.dryRun ? { dryRun: true } : {}),
                 sources: {
                   triggerPayload: (instance.triggerPayload as Record<string, unknown>) ?? {},
+                  triggerContext: (instance.triggerContext as Record<string, unknown>) ?? {},
                   steps: instance.variables,
                   variables: instance.variables,
                   secrets: workflowSecrets,
