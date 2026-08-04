@@ -135,6 +135,12 @@ const TIP = {
   databricksTimeoutMinutes:'Step timeout in minutes — the run is cancelled when exceeded. Default 30.',
 
   allowedRoles:            'Roles that can claim this task, comma-separated. Leave empty to allow any signed-in user.',
+  assignedTo:              'Pre-assign this human task to a specific user. Accepts a user id or an interpolated value like ${triggerPayload.userId}. Human steps only.',
+  continueOnError:         'When on, a failure of this step is logged as a warning and the workflow advances anyway instead of failing the whole run. Use for non-critical side-effects (e.g. a notification), never for a step later steps depend on.',
+  uiComponent:             'Custom task body. "File upload" collects files; "Assignment table" and "Table editor" render their own views (configure their columns in the source editor). Default is the params form.',
+  uiAcceptedTypes:         'Accepted file types, comma-separated — MIME types and/or extensions (e.g. text/csv, .csv, application/pdf). If empty, only PDFs are accepted.',
+  uiMinFiles:              'Minimum number of files the user must upload to complete the task.',
+  uiMaxFiles:              'Maximum number of files the user can upload.',
 
   reviewType:              'Who performs the review: human (creates a task), agent (auto-evaluates), or none (skips review).',
   reviewPlugin:            'Plugin used when review.type is agent.',
@@ -271,6 +277,16 @@ export function StepEditor({
   function updateReview(patch: Partial<NonNullable<WorkflowStep['review']>>) {
     onChange({ review: { ...step.review, ...patch } });
   }
+  function setUiComponent(component: string) {
+    if (!component) { onChange({ ui: undefined }); return; }
+    onChange({ ui: { ...step.ui, component } });
+  }
+  function updateUiConfig(key: string, value: unknown) {
+    const component = step.ui?.component ?? 'file-upload';
+    const config = { ...step.ui?.config, [key]: value };
+    if (value === undefined) delete config[key];
+    onChange({ ui: { component, config: Object.keys(config).length > 0 ? config : undefined } });
+  }
   function updateSelection(newMin: number | undefined, newMax: number | undefined) {
     if (newMin === undefined && newMax === undefined) { onChange({ selection: undefined }); return; }
     onChange({ selection: { min: newMin ?? 1, max: newMax ?? 1 } });
@@ -354,6 +370,18 @@ export function StepEditor({
             {STEP_TYPE_LABELS[step.type] ?? step.type}
           </span>
         </FieldRow>
+        {!isTerminal && (
+          <FieldRow label="continueOnError" tooltip={TIP.continueOnError}>
+            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground py-0.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={step.continueOnError ?? false}
+                onChange={(e) => onChange({ continueOnError: e.target.checked || undefined })}
+              />
+              Advance the run even if this step fails
+            </label>
+          </FieldRow>
+        )}
       </FieldGroup>
 
       {/* ── Agent config ─────────────────────────────────────────── */}
@@ -750,7 +778,69 @@ export function StepEditor({
               className={ri}
             />
           </FieldRow>
+          <FieldRow label="assignedTo" tooltip={TIP.assignedTo}>
+            <input
+              value={step.assignedTo ?? ''}
+              onChange={(e) => onChange({ assignedTo: e.target.value || undefined })}
+              placeholder="user id or ${triggerPayload.userId}"
+              className={riMono}
+            />
+          </FieldRow>
         </FieldGroup>
+      )}
+
+      {/* ── Task UI (custom body) ────────────────────────────────── */}
+      {isHuman && (
+        <Section title="Task UI">
+          <FieldGroup>
+            <FieldRow label="component" tooltip={TIP.uiComponent}>
+              <select
+                value={step.ui?.component ?? ''}
+                onChange={(e) => setUiComponent(e.target.value)}
+                className={rs}
+              >
+                <option value="">Params form (default)</option>
+                <option value="file-upload">File upload</option>
+                <option value="assignment-table">Assignment table</option>
+                <option value="table-editor">Table editor</option>
+              </select>
+            </FieldRow>
+            {step.ui?.component === 'file-upload' && (<>
+              <FieldRow label="acceptedTypes" tooltip={TIP.uiAcceptedTypes}>
+                <input
+                  value={(step.ui.config?.acceptedTypes as string[] | undefined)?.join(', ') ?? ''}
+                  onChange={(e) => {
+                    const list = e.target.value.split(',').map((t) => t.trim()).filter(Boolean);
+                    updateUiConfig('acceptedTypes', list.length > 0 ? list : undefined);
+                  }}
+                  placeholder="text/csv, .csv, application/pdf"
+                  className={riMono}
+                />
+              </FieldRow>
+              <FieldRow label="minFiles" tooltip={TIP.uiMinFiles}>
+                <input
+                  type="number"
+                  min={0}
+                  value={(step.ui.config?.minFiles as number | undefined) ?? ''}
+                  onChange={(e) => updateUiConfig('minFiles', e.target.value === '' ? undefined : Number(e.target.value))}
+                  className={ri}
+                />
+              </FieldRow>
+              <FieldRow label="maxFiles" tooltip={TIP.uiMaxFiles}>
+                <input
+                  type="number"
+                  min={1}
+                  value={(step.ui.config?.maxFiles as number | undefined) ?? ''}
+                  onChange={(e) => updateUiConfig('maxFiles', e.target.value === '' ? undefined : Number(e.target.value))}
+                  className={ri}
+                />
+              </FieldRow>
+            </>)}
+            {(step.ui?.component === 'assignment-table' || step.ui?.component === 'table-editor') && (
+              <p className="text-xs text-muted-foreground px-0.5">Configure this component&apos;s columns in the source editor.</p>
+            )}
+          </FieldGroup>
+        </Section>
       )}
 
       {/* ── Review config ────────────────────────────────────────── */}
