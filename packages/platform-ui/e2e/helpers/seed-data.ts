@@ -1147,7 +1147,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     'audit-signin-password': {
       actorId: MONITORING_ACTIVITY_ACTOR_ID,
       actorType: 'user',
-      actorRole: 'owner',
+      actorRole: 'member',
       action: 'user.signed_in',
       description: 'Signed in with email and password',
       timestamp: oneHourAgo,
@@ -1160,7 +1160,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     'audit-signin-oauth': {
       actorId: MONITORING_ACTIVITY_ACTOR_ID,
       actorType: 'user',
-      actorRole: 'owner',
+      actorRole: 'member',
       action: 'user.signed_in',
       description: 'Signed in via google (SSO)',
       timestamp: twoDaysAgo,
@@ -1173,7 +1173,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     'audit-workflow-triggered': {
       actorId: MONITORING_ACTIVITY_ACTOR_ID,
       actorType: 'user',
-      actorRole: 'owner',
+      actorRole: 'member',
       action: 'instance.started',
       description: `Started instance 'proc-running-1'`,
       timestamp: oneHourAgo,
@@ -1188,7 +1188,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     'audit-workflow-cancelled': {
       actorId: MONITORING_ACTIVITY_ACTOR_ID,
       actorType: 'user',
-      actorRole: 'owner',
+      actorRole: 'member',
       action: 'instance.cancelled',
       description: `Run cancelled by operator (was running at step 'data-quality')`,
       timestamp: twoDaysAgo,
@@ -1203,7 +1203,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     'audit-task-completed': {
       actorId: MONITORING_ACTIVITY_ACTOR_ID,
       actorType: 'user',
-      actorRole: 'owner',
+      actorRole: 'member',
       action: 'task.completed',
       description: `Task resolved for step 'manager-approval'`,
       timestamp: now,
@@ -1218,7 +1218,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     'audit-task-claimed': {
       actorId: MONITORING_ACTIVITY_ACTOR_ID,
       actorType: 'user',
-      actorRole: 'owner',
+      actorRole: 'member',
       action: 'task.claimed',
       description: `User '${MONITORING_ACTIVITY_ACTOR_ID}' claimed task 'task-claimed-1' for step 'approve-report'`,
       timestamp: oneHourAgo,
