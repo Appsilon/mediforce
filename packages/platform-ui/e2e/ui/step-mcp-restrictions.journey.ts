@@ -29,6 +29,9 @@ test.describe('Step MCP Restrictions Journey', () => {
     // /api/agents/mcp-test-agent/mcp-servers. Section titles in the
     // step editor render as styled <p> labels, not semantic headings.
     const sidePanel = page.locator('[data-testid="step-editor"]');
+    // The step editor is a single-open accordion; MCP Restrictions lives in the
+    // "Advanced" card, collapsed by default — open it before asserting.
+    await sidePanel.getByRole('button', { name: 'Advanced' }).click();
     await expect(sidePanel.getByText('MCP Restrictions', { exact: true })).toBeVisible({ timeout: 10_000 });
     // The binding list hydrates after an API call to
     // /api/agents/mcp-test-agent/mcp-servers. On cold compile this

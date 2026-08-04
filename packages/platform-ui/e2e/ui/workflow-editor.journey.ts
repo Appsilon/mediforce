@@ -558,6 +558,9 @@ test.describe('Workflow Editor Journey', () => {
 
     // Click the new step to open the step editor
     await page.locator('.react-flow__node').filter({ hasText: /New Step/i }).click();
+    // The editor is a single-open accordion; cowork config lives in the
+    // "Collaboration" card, collapsed by default — open it first.
+    await page.locator('[data-testid="step-editor"]').getByRole('button', { name: 'Collaboration' }).click();
     // Step editor opens with the cowork explainer for a new step
     await expect(page.getByText(/What is a Cowork step/i)).toBeVisible({ timeout: 3_000 });
 
@@ -597,6 +600,9 @@ test.describe('Workflow Editor Journey', () => {
 
     // Open the new step editor
     await page.locator('.react-flow__node').filter({ hasText: /New Step/i }).click();
+    // Cowork config (incl. the MCP server editor) is in the collapsed
+    // "Collaboration" card — open it first.
+    await page.locator('[data-testid="step-editor"]').getByRole('button', { name: 'Collaboration' }).click();
     await expect(page.getByText(/What is a Cowork step/i)).toBeVisible({ timeout: 3_000 });
 
     // Scope MCP edits to the step editor side panel.
