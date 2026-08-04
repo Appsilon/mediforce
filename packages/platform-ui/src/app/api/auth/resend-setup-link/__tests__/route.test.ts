@@ -23,15 +23,20 @@ let inviteNotificationService: { sendActivationEmail: typeof mockSendActivationE
 };
 let passwordAuthEnabled = true;
 
-vi.mock('@/lib/platform-services', () => ({
-  getPlatformServices: () => ({
-    inviteService: { isInvitePending: mockIsInvitePending },
-    userProfileRepo: { setMustChangePassword: mockSetMustChangePassword },
-    platformSettingsRepo: { get: mockPlatformSettingsGet },
-    inviteNotificationService,
-    passwordAuthEnabled,
-  }),
-}));
+vi.mock('@/lib/platform-services', async () => {
+  const { mockPlatformServices } = await import('@/test/platform-services-mock');
+  return {
+    getPlatformServices: () =>
+      mockPlatformServices({
+        inviteService: { isInvitePending: mockIsInvitePending },
+        userProfileRepo: { setMustChangePassword: mockSetMustChangePassword },
+        platformSettingsRepo: { get: mockPlatformSettingsGet },
+        inviteNotificationService,
+        // Explicit on purpose: this suite drives both sides of the flag.
+        passwordAuthEnabled,
+      }),
+  };
+});
 
 import { POST } from '../route';
 

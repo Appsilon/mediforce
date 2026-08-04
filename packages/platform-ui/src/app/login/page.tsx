@@ -18,7 +18,7 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const { signInWithGoogle, signInWithEmail, signInWithMagicLink, user, loading, mustChangePassword, passwordAuthEnabled, googleAuthEnabled, magicLinkEnabled } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signInWithMagicLink, user, loading, mustChangePassword, passwordAuthEnabled, googleAuthEnabled, magicLinkEnabled, emailDeliveryEnabled } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -127,9 +127,14 @@ function LoginForm() {
     }
   }
 
-  // Some email-based method exists whenever password or magic-link login is on;
-  // a deployment with no email at all can't deliver a setup link, so hide it.
-  const emailBasedMethodEnabled = passwordAuthEnabled === true || magicLinkEnabled === true;
+  // The resend recovery mints a one-time sign-in link through the Email
+  // provider, which is registered whenever email is configured — independent of
+  // which sign-in methods this deployment offers. Gating it on the password /
+  // magic-link display flags hid the only recovery path on a Google/OIDC-only
+  // deployment, where an expired activation link was then a dead end (#1109).
+  // A deployment with no email at all still can't deliver one, so it stays
+  // hidden there.
+  const canResendSetupLink = emailDeliveryEnabled === true;
 
   function backToMain() {
     setError(null);
@@ -302,7 +307,7 @@ function LoginForm() {
               </button>
             )}
 
-            {emailBasedMethodEnabled && (
+            {canResendSetupLink && (
               <p className="pt-4 text-center">
                 <button
                   type="button"

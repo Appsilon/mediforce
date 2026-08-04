@@ -15,40 +15,43 @@ const mockSendActivationEmail = vi.fn();
 const mockSetMustChangePassword = vi.fn();
 const mockAuditAppend = vi.fn();
 
-vi.mock('@/lib/platform-services', () => ({
-  getPlatformServices: () => ({
-    namespaceRepo: {
-      getNamespace: mockGetNamespace,
-      addMember: vi.fn(),
-      getMembers: vi.fn(),
-      getMembershipsForUser: vi.fn().mockResolvedValue([]),
-    },
-    inviteService: {
-      seedInvite: vi.fn(),
-      getUserEmail: mockGetUserEmail,
-      isInvitePending: mockIsInvitePending,
-    },
-    userProfileRepo: {
-      setMustChangePassword: mockSetMustChangePassword,
-    },
-    inviteNotificationService: {
-      sendWorkspaceNotificationEmail: mockSendWorkspaceEmail,
-      sendActivationEmail: mockSendActivationEmail,
-    },
-    instanceRepo: { getById: vi.fn() },
-    auditRepo: { append: mockAuditAppend },
-    platformSettingsRepo: { get: vi.fn().mockResolvedValue(null) },
-    toolCatalogRepo: {},
-    oauthProviderRepo: {},
-    agentOAuthTokenRepo: {},
-    modelRegistryRepo: {},
-    secretsRepo: {},
-    namespaceSecretsRepo: {},
-    userDirectory: null,
-    passwordAuthEnabled: true,
-  }),
-  getAppBaseUrl: () => 'http://localhost:3000',
-}));
+vi.mock('@/lib/platform-services', async () => {
+  const { mockPlatformServices } = await import('@/test/platform-services-mock');
+  return {
+    getPlatformServices: () =>
+      mockPlatformServices({
+        namespaceRepo: {
+          getNamespace: mockGetNamespace,
+          addMember: vi.fn(),
+          getMembers: vi.fn(),
+          getMembershipsForUser: vi.fn().mockResolvedValue([]),
+        },
+        inviteService: {
+          seedInvite: vi.fn(),
+          getUserEmail: mockGetUserEmail,
+          isInvitePending: mockIsInvitePending,
+        },
+        userProfileRepo: {
+          setMustChangePassword: mockSetMustChangePassword,
+        },
+        inviteNotificationService: {
+          sendWorkspaceNotificationEmail: mockSendWorkspaceEmail,
+          sendActivationEmail: mockSendActivationEmail,
+        },
+        instanceRepo: { getById: vi.fn() },
+        auditRepo: { append: mockAuditAppend },
+        platformSettingsRepo: { get: vi.fn().mockResolvedValue(null) },
+        toolCatalogRepo: {},
+        oauthProviderRepo: {},
+        agentOAuthTokenRepo: {},
+        modelRegistryRepo: {},
+        secretsRepo: {},
+        namespaceSecretsRepo: {},
+        userDirectory: null,
+      }),
+    getAppBaseUrl: () => 'http://localhost:3000',
+  };
+});
 
 const mockResolveCallerIdentity = vi.fn();
 
