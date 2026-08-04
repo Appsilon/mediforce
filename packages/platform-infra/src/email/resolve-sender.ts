@@ -165,3 +165,26 @@ export function resolveEmailSenderFromEnv(
     'Set MAILGUN_* or SMTP_* env vars, or set MEDIFORCE_DISABLE_EMAIL=true to start without email.',
   );
 }
+
+/**
+ * Whether this deployment can deliver an email at all — the precondition for
+ * every one-time link the invite flow mints (activation, resend-setup-link).
+ *
+ * Distinct from `ENABLE_PASSWORD_AUTH` / `ENABLE_MAGIC_LINK`, which say which
+ * sign-in methods the login page *offers*: the Email provider is registered
+ * whenever email is configured, so a Google-only deployment still delivers
+ * invite links. The login page's "Expected a setup link? Resend" recovery gates
+ * on this, not on those display flags (#1109).
+ *
+ * Never throws — a misconfigured deployment reads as "cannot deliver", so a
+ * public GET degrades to hiding the affordance instead of 500ing. The loud
+ * failure stays where it belongs: `resolveEmailSenderFromEnv` at boot, when
+ * `auth.ts` builds the provider list.
+ */
+export function isEmailDeliveryConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  try {
+    return resolveEmailSenderFromEnv(env) !== null;
+  } catch {
+    return false;
+  }
+}

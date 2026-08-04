@@ -6,7 +6,12 @@ import {
   InMemoryNamespaceRepository,
 } from '@mediforce/platform-core/testing';
 import { setPassword } from '../set-password';
-import { ForbiddenError, NotFoundError, ValidationError } from '../../../errors';
+import {
+  ForbiddenError,
+  NotFoundError,
+  PreconditionFailedError,
+  ValidationError,
+} from '../../../errors';
 import { SetPasswordInputSchema } from '../../../contract/users';
 import type { CallerIdentity } from '../../../auth';
 import {
@@ -91,6 +96,21 @@ describe('setPassword handler', () => {
       setPassword({ newPassword: 'correct-horse', uid: 'uid-other' }, scope),
     ).rejects.toBeInstanceOf(ForbiddenError);
     expect(await credentialsRepo.getPasswordHash('uid-other')).toBeNull();
+  });
+
+  it('refuses the write when password auth is disabled on the deployment', async () => {
+    const scope = createTestScope({
+      credentialsRepo,
+      auditRepo,
+      namespaceRepo,
+      caller: userCaller('uid-marek', []),
+      passwordAuthEnabled: false,
+    });
+
+    await expect(
+      setPassword({ newPassword: 'correct-horse' }, scope),
+    ).rejects.toBeInstanceOf(PreconditionFailedError);
+    expect(await credentialsRepo.getPasswordHash('uid-marek')).toBeNull();
   });
 
   it('apiKey caller must pass uid explicitly', async () => {

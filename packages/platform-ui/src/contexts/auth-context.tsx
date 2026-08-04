@@ -20,6 +20,10 @@ interface AuthContextValue {
   passwordAuthEnabled: boolean | null; // null = provider list not loaded yet
   googleAuthEnabled: boolean | null; // null = provider list not loaded yet
   magicLinkEnabled: boolean | null; // null = provider list not loaded yet
+  /** Whether the deployment can email a one-time link — the precondition for the
+   *  login page's "Expected a setup link? Resend" recovery. Independent of which
+   *  sign-in methods are offered. `null` = provider list not loaded yet. */
+  emailDeliveryEnabled: boolean | null;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signInWithMagicLink: (email: string) => Promise<void>;
@@ -43,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [passwordAuthEnabled, setPasswordAuthEnabled] = React.useState<boolean | null>(null);
   const [googleAuthEnabled, setGoogleAuthEnabled] = React.useState<boolean | null>(null);
   const [magicLinkEnabled, setMagicLinkEnabled] = React.useState<boolean | null>(null);
+  const [emailDeliveryEnabled, setEmailDeliveryEnabled] = React.useState<boolean | null>(null);
   const qc = useQueryClient();
 
   const user = session?.user ?? null;
@@ -76,11 +81,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     fetch(MAGIC_LINK_LOGIN_PATH)
       .then((res) => res.json())
-      .then((body: { enabled?: boolean }) => {
-        if (active) setMagicLinkEnabled(body.enabled === true);
+      .then((body: { enabled?: boolean; emailDeliveryEnabled?: boolean }) => {
+        if (active) {
+          setMagicLinkEnabled(body.enabled === true);
+          setEmailDeliveryEnabled(body.emailDeliveryEnabled === true);
+        }
       })
       .catch(() => {
-        if (active) setMagicLinkEnabled(false);
+        if (active) {
+          setMagicLinkEnabled(false);
+          setEmailDeliveryEnabled(false);
+        }
       });
     return () => {
       active = false;
@@ -167,6 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         passwordAuthEnabled,
         googleAuthEnabled,
         magicLinkEnabled,
+        emailDeliveryEnabled,
         signInWithGoogle,
         signInWithEmail,
         signInWithMagicLink,

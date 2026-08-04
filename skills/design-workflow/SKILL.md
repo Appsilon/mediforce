@@ -63,7 +63,7 @@ Load on demand, only when the design touches them:
 - `packages/core-actions/src/handlers/` — the real action handlers (`http`,
   `reshape`, `email`, `spawn`, `wait`), when you need an action's exact config.
 - `packages/platform-core/src/interpolation.ts` — `${...}` template roots
-  (`steps`, `item`, `triggerPayload`, `variables`, `secrets`), and
+  (`steps`, `item`, `triggerPayload`, `triggerContext`, `variables`, `secrets`), and
   `packages/workflow-engine/src/expressions/expression-evaluator.ts` — the
   separate transition `when` language. Open these before claiming a value can't
   be referenced.
@@ -138,8 +138,11 @@ script **file** from the package unless it is baked into the image or mounted at
 Walk the design tree and resolve, per step where relevant: goal and trigger;
 actors; the work each step does; executor and control mode (CM0/CM2/CM3/CM4 —
 never create a new CM1/L2 step); review steps and their explicit verdicts;
-branching and loops; triggers and data contracts (`triggerInput`,
-`triggerPayload`, human `params`, `/output/result.json`); env and secrets;
+branching and loops; triggers and data contracts (`triggerInput` — the total
+input contract every trigger and spawned child firing validates against, read at
+runtime as `${triggerPayload.<field>}` whichever one fired; transport-only
+`${triggerContext.*}`; human `params`;
+`/output/result.json`); env and secrets;
 whether a step needs a custom container or runs on `mediforce-golden-image`; and
 any MCPs, skills, or agents needed (flag platform setup as MANUAL).
 

@@ -18,6 +18,7 @@ import { resolveStepView } from '@/components/tasks/resolve-step-view';
 import { HumanStepView } from '@/components/tasks/human-step-view';
 import { AgentOutputDisplay } from '@/components/agents/agent-output-display';
 import { agentOutputFromEnvelope } from './agent-output-from-envelope';
+import { isEntryStep } from './step-input';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
 import { downloadViaApiFetch } from '@/lib/save-blob';
 import { formatBytes, formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
@@ -80,6 +81,7 @@ export default function StepDetailPage() {
     const prevStep = definition?.steps?.find((s) => s.id === incoming.from);
     return prevStep?.name ?? formatStepName(incoming.from);
   }, [definition, decodedStepId]);
+  const isCurrentStepEntry = isEntryStep(definition, decodedStepId);
 
   // Resolve the execution: pin to executionId from the URL when present (so
   // each row in the history links to a different view), otherwise fall back
@@ -164,7 +166,9 @@ export default function StepDetailPage() {
         <InputColumn
           execution={execution}
           previousStepName={previousStepName}
+          isEntryStep={isCurrentStepEntry}
           promptEvent={promptEvent}
+          triggerPayload={instance.triggerPayload}
         />
         <OutputColumn execution={execution} />
       </div>
@@ -242,7 +246,9 @@ export default function StepDetailPage() {
                 <InputColumn
                   execution={execution}
                   previousStepName={previousStepName}
+                  isEntryStep={isCurrentStepEntry}
                   promptEvent={promptEvent}
+                  triggerPayload={instance.triggerPayload}
                 />
                 <OutputColumn execution={execution} executorType={executorType} />
               </div>
@@ -253,7 +259,9 @@ export default function StepDetailPage() {
             <InputColumn
               execution={execution}
               previousStepName={previousStepName}
+              isEntryStep={isCurrentStepEntry}
               promptEvent={promptEvent}
+              triggerPayload={instance.triggerPayload}
             />
             <OutputColumn execution={execution} executorType={executorType} />
           </div>
@@ -269,12 +277,14 @@ export default function StepDetailPage() {
 
 // ── Input Column ────────────────────────────────────────────────────────────
 
-function InputColumn({ execution, previousStepName, promptEvent }: {
+function InputColumn({ execution, previousStepName, isEntryStep, promptEvent, triggerPayload }: {
   execution: StepExecution;
   previousStepName: string | null;
+  isEntryStep: boolean;
   promptEvent: AgentEvent | null;
+  triggerPayload: Record<string, unknown>;
 }) {
-  const input = execution.input;
+  const input = isEntryStep ? triggerPayload : execution.input;
   const hasInput = Object.keys(input).length > 0;
   const isAgent = execution.agentOutput !== undefined;
 
@@ -303,7 +313,7 @@ function InputColumn({ execution, previousStepName, promptEvent }: {
 
         {!hasInput && !promptEvent && (
           <div className="p-6 text-center text-sm text-muted-foreground">
-            {previousStepName === null ? 'Entry point — no input data' : 'No input data'}
+            {isEntryStep ? 'Entry point — no input data' : 'No input data'}
           </div>
         )}
       </div>

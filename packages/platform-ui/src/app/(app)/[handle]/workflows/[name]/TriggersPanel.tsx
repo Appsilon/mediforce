@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Clock, Play, Square, Trash2, Pencil, Plus, Check, X, MousePointerClick, Webhook, Download, Upload } from 'lucide-react';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { saveBlobToDevice } from '@/lib/save-blob';
-import { TriggerConfigFileSchema } from '@mediforce/platform-core';
+import { TriggerConfigFileSchema, type TriggerInputField } from '@mediforce/platform-core';
 import {
   useWorkflowTriggers,
   type CronTrigger,
@@ -12,6 +12,7 @@ import {
   type WebhookTrigger,
 } from '@/hooks/use-workflow-triggers';
 import { formatCron } from '@/lib/format-cron';
+import { parseCronPayloadText } from '@/lib/trigger-input-payload';
 import { cn } from '@/lib/utils';
 
 const SCHEDULE_HELPER_TEXT =
@@ -54,16 +55,56 @@ function useOrigin(): string {
   return origin;
 }
 
+/** A placeholder value for each `triggerInput` type, so the generated example
+ *  body is valid against the contract rather than merely well-shaped. */
+function exampleValueFor(field: TriggerInputField): unknown {
+  switch (field.type) {
+    case 'number':
+      return 0;
+    case 'boolean':
+      return true;
+    case 'date':
+    case 'datetime':
+      return new Date().toISOString();
+    case 'select':
+      return field.options?.[0] ?? 'option';
+    case 'multiselect':
+      return field.options?.slice(0, 1) ?? ['option'];
+    case 'object':
+      return {};
+    default:
+      return `<${field.name}>`;
+  }
+}
+
+/** The exact body this webhook accepts, built from the workflow's `triggerInput`.
+ *  Under ADR-0012 the body's top-level keys *are* the declared fields, so the
+ *  example is derivable rather than guessed. */
+function exampleBodyFor(triggerInput: TriggerInputField[]): string {
+  const body = Object.fromEntries(
+    triggerInput.map((field) => [field.name, exampleValueFor(field)]),
+  );
+  return JSON.stringify(body);
+}
+
 /** A ready-to-run curl example so callers know exactly how to fire the webhook —
- *  includes the auth header the endpoint requires and a JSON body, so it works
- *  as-is once the API key is filled in. */
-function WebhookUsageExample({ url }: { url: string }) {
+ *  includes the auth header the endpoint requires and a body matching the
+ *  workflow's declared input, so it works as-is once the API key is filled in. */
+function WebhookUsageExample({
+  url,
+  triggerInput,
+  contractLoading,
+}: {
+  url: string;
+  triggerInput: TriggerInputField[];
+  contractLoading: boolean;
+}) {
   const origin = useOrigin();
   const command = [
     `curl -X ${WEBHOOK_METHOD} ${origin}${url} \\`,
     `  -H 'Content-Type: application/json' \\`,
     `  -H 'X-Api-Key: <your-api-key>' \\`,
-    `  -d '{"order": 42}'`,
+    `  -d '${exampleBodyFor(triggerInput)}'`,
   ].join('\n');
   return (
     <div className="mt-3">
@@ -71,12 +112,28 @@ function WebhookUsageExample({ url }: { url: string }) {
       <pre className="overflow-x-auto whitespace-pre rounded bg-muted px-3 py-2 font-mono text-xs">
         {command}
       </pre>
-      <p className="mt-1 text-xs text-muted-foreground">
-        The JSON body is passed to the workflow as{' '}
-        <code className="font-mono">triggerPayload.body</code> — its shape is up to
-        this workflow; check what its steps read from{' '}
-        <code className="font-mono">triggerPayload.body</code>.
-      </p>
+      {contractLoading ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Loading this workflow&rsquo;s input contract&hellip;
+        </p>
+      ) : triggerInput.length === 0 ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          This workflow declares no trigger input, so the body must be empty — a
+          request carrying any field is rejected with 400. Declare fields under{' '}
+          <code className="font-mono">triggerInput</code> in the workflow
+          definition to accept input here.
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-muted-foreground">
+          The body&rsquo;s top-level keys are this workflow&rsquo;s{' '}
+          <code className="font-mono">triggerInput</code> fields, and steps read
+          them as <code className="font-mono">{'${triggerPayload.<field>}'}</code>.
+          A body with a missing, mistyped, or undeclared field is rejected with
+          400. HTTP headers and query params are not input — they are available
+          separately as{' '}
+          <code className="font-mono">{'${triggerContext.*}'}</code>.
+        </p>
+      )}
     </div>
   );
 }
@@ -87,12 +144,80 @@ function errorMessage(err: unknown): string {
   return 'Unknown error';
 }
 
+/** A cron tick has no caller, so the input it hands the Run is edited here, per
+ *  row (ADR-0012). The server validates against `triggerInput`; this only catches
+ *  "that isn't JSON" so the user isn't round-tripping for a typo. Raw JSON rather
+ *  than a generated per-field form: an `object`-typed field's arbitrary nesting
+ *  fits no flat form, and a cron payload is authored once and rarely touched. */
+function CronPayloadEditor({
+  value,
+  onChange,
+  triggerInput,
+  contractLoading,
+  disabled,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  triggerInput: TriggerInputField[];
+  contractLoading: boolean;
+  disabled: boolean;
+}) {
+  const malformed = value.trim().length > 0 && parseCronPayloadText(value) === null;
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium">Payload</label>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        rows={triggerInput.length > 0 ? 3 : 2}
+        placeholder={contractLoading ? '' : exampleBodyFor(triggerInput)}
+        className={cn(
+          'w-full rounded-md border bg-background px-3 py-1.5 font-mono text-sm outline-none',
+          'focus:ring-1 focus:ring-ring focus:border-ring',
+          malformed && 'border-destructive',
+        )}
+      />
+      <p className="mt-1 text-xs text-muted-foreground">
+        {contractLoading
+          ? "Loading this workflow's input contract…"
+          : triggerInput.length === 0
+            ? 'This workflow declares no triggerInput, so leave this empty.'
+            : `JSON object matching this workflow's triggerInput: ${triggerInput
+                .map(
+                  (field) =>
+                    `${field.name}: ${field.type ?? 'string'}${field.required === true ? ' (required)' : ''}`,
+                )
+                .join(', ')}.`}
+      </p>
+      {malformed && <p className="mt-1 text-xs text-destructive">Not valid JSON.</p>}
+    </div>
+  );
+}
+
+/** Render a stored payload back into editor text. An absent or empty payload
+ *  shows as an empty box, not `{}`, so "no input" reads as nothing to fill in. */
+function payloadToText(payload: Record<string, unknown> | undefined): string {
+  if (payload === undefined || Object.keys(payload).length === 0) return '';
+  return JSON.stringify(payload, null, 2);
+}
+
 export function TriggersPanel({
   handle,
   definitionName,
+  triggerInput,
+  contractLoading,
 }: {
   handle: string;
   definitionName: string;
+  /** The input contract of the version a firing resolves (ADR-0012). Every
+   *  trigger on this panel validates against it, so it drives both the webhook's
+   *  example body and the cron rows' static payload editor. */
+  triggerInput: TriggerInputField[];
+  /** True until that definition has loaded. An unloaded contract is
+   *  indistinguishable from an empty one, and the empty-contract copy tells the
+   *  user their body must be empty — advice the server would then reject. */
+  contractLoading: boolean;
 }) {
   const { cronTriggers, manualTriggers, webhookTriggers, loading, error, invalidate } =
     useWorkflowTriggers(definitionName, handle);
@@ -149,12 +274,20 @@ export function TriggersPanel({
                 handle={handle}
                 definitionName={definitionName}
                 trigger={trigger}
+                triggerInput={triggerInput}
+                contractLoading={contractLoading}
                 onChanged={invalidate}
               />
             ))}
           </ul>
         )}
-        <AddCronTriggerForm handle={handle} definitionName={definitionName} onCreated={invalidate} />
+        <AddCronTriggerForm
+          handle={handle}
+          definitionName={definitionName}
+          triggerInput={triggerInput}
+          contractLoading={contractLoading}
+          onCreated={invalidate}
+        />
       </section>
 
       <section className="space-y-3">
@@ -170,12 +303,16 @@ export function TriggersPanel({
             handle={handle}
             definitionName={definitionName}
             trigger={webhookTriggers[0]}
+            triggerInput={triggerInput}
+            contractLoading={contractLoading}
             onChanged={invalidate}
           />
         ) : (
           <AddWebhookTriggerForm
             handle={handle}
             definitionName={definitionName}
+            triggerInput={triggerInput}
+            contractLoading={contractLoading}
             onCreated={invalidate}
           />
         )}
@@ -453,11 +590,15 @@ function WebhookTriggerRow({
   handle,
   definitionName,
   trigger,
+  triggerInput,
+  contractLoading,
   onChanged,
 }: {
   handle: string;
   definitionName: string;
   trigger: WebhookTrigger;
+  triggerInput: TriggerInputField[];
+  contractLoading: boolean;
   onChanged: () => Promise<void>;
 }) {
   const [busy, setBusy] = React.useState(false);
@@ -533,7 +674,7 @@ function WebhookTriggerRow({
         />
       </div>
 
-      <WebhookUsageExample url={url} />
+      <WebhookUsageExample url={url} triggerInput={triggerInput} contractLoading={contractLoading} />
 
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
     </div>
@@ -543,10 +684,14 @@ function WebhookTriggerRow({
 function AddWebhookTriggerForm({
   handle,
   definitionName,
+  triggerInput,
+  contractLoading,
   onCreated,
 }: {
   handle: string;
   definitionName: string;
+  triggerInput: TriggerInputField[];
+  contractLoading: boolean;
   onCreated: () => Promise<void>;
 }) {
   const [path, setPath] = React.useState('');
@@ -608,7 +753,11 @@ function AddWebhookTriggerForm({
         </p>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">{WEBHOOK_PATH_HELPER_TEXT}</p>
-      <WebhookUsageExample url={previewUrl} />
+      <WebhookUsageExample
+        url={previewUrl}
+        triggerInput={triggerInput}
+        contractLoading={contractLoading}
+      />
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
       <div className="mt-3 flex justify-end">
         <button
@@ -631,17 +780,31 @@ function CronTriggerRow({
   handle,
   definitionName,
   trigger,
+  triggerInput,
+  contractLoading,
   onChanged,
 }: {
   handle: string;
   definitionName: string;
   trigger: CronTrigger;
+  triggerInput: TriggerInputField[];
+  contractLoading: boolean;
   onChanged: () => Promise<void>;
 }) {
   const [editing, setEditing] = React.useState(false);
   const [scheduleDraft, setScheduleDraft] = React.useState(trigger.config.schedule);
+  const [payloadDraft, setPayloadDraft] = React.useState(payloadToText(trigger.config.payload));
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string>('');
+
+  const draftPayload = parseCronPayloadText(payloadDraft);
+  // Only send a field when the user actually edited it. Resending an
+  // unchanged one re-runs attach-time validation, so a row whose payload has
+  // drifted behind a newer contract — which ADR-0012 says should skip at fire
+  // time, not block edits — could not even be retimed. It also keeps the
+  // `cron.trigger.updated` audit entry honest about what changed.
+  const payloadEdited = payloadDraft !== payloadToText(trigger.config.payload);
+  const scheduleEdited = scheduleDraft.trim() !== trigger.config.schedule;
 
   const isEnabled = trigger.enabled === true;
 
@@ -692,13 +855,27 @@ function CronTriggerRow({
                 )}
               />
               <p className="text-xs text-muted-foreground">{SCHEDULE_HELPER_TEXT}</p>
+              <CronPayloadEditor
+                value={payloadDraft}
+                onChange={setPayloadDraft}
+                triggerInput={triggerInput}
+                contractLoading={contractLoading}
+                disabled={busy}
+              />
             </div>
           ) : (
-            <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-              <span>{formatCron(trigger.config.schedule)}</span>
-              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                {trigger.config.schedule}
-              </span>
+            <div className="mt-1 space-y-1 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <span>{formatCron(trigger.config.schedule)}</span>
+                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                  {trigger.config.schedule}
+                </span>
+              </div>
+              {payloadToText(trigger.config.payload).length > 0 && (
+                <pre className="overflow-x-auto whitespace-pre rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                  {JSON.stringify(trigger.config.payload)}
+                </pre>
+              )}
             </div>
           )}
         </div>
@@ -713,13 +890,21 @@ function CronTriggerRow({
                       definitionName,
                       namespace: handle,
                       triggerName: trigger.name,
-                      schedule: scheduleDraft.trim(),
+                      ...(scheduleEdited ? { schedule: scheduleDraft.trim() } : {}),
+                      ...(payloadEdited && draftPayload !== null
+                        ? { payload: draftPayload }
+                        : {}),
                     })
                     .then(() => setEditing(false)),
                 )
               }
-              disabled={busy || scheduleDraft.trim().length === 0}
-              title="Save schedule"
+              disabled={
+                busy ||
+                scheduleDraft.trim().length === 0 ||
+                draftPayload === null ||
+                (scheduleEdited === false && payloadEdited === false)
+              }
+              title="Save schedule and payload"
               className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
             >
               <Check className="h-4 w-4" />
@@ -727,6 +912,7 @@ function CronTriggerRow({
             <button
               onClick={() => {
                 setScheduleDraft(trigger.config.schedule);
+                setPayloadDraft(payloadToText(trigger.config.payload));
                 setError('');
                 setEditing(false);
               }}
@@ -767,11 +953,12 @@ function CronTriggerRow({
             <button
               onClick={() => {
                 setScheduleDraft(trigger.config.schedule);
+                setPayloadDraft(payloadToText(trigger.config.payload));
                 setError('');
                 setEditing(true);
               }}
               disabled={busy}
-              title="Edit schedule"
+              title="Edit schedule and payload"
               className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
             >
               <Pencil className="h-4 w-4" />
@@ -788,18 +975,28 @@ function CronTriggerRow({
 function AddCronTriggerForm({
   handle,
   definitionName,
+  triggerInput,
+  contractLoading,
   onCreated,
 }: {
   handle: string;
   definitionName: string;
+  triggerInput: TriggerInputField[];
+  contractLoading: boolean;
   onCreated: () => Promise<void>;
 }) {
   const [triggerName, setTriggerName] = React.useState('');
   const [schedule, setSchedule] = React.useState('');
+  const [payload, setPayload] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string>('');
 
-  const canSubmit = triggerName.trim().length > 0 && schedule.trim().length > 0 && !busy;
+  const parsedPayload = parseCronPayloadText(payload);
+  const canSubmit =
+    triggerName.trim().length > 0 &&
+    schedule.trim().length > 0 &&
+    parsedPayload !== null &&
+    !busy;
 
   async function submit() {
     if (!canSubmit) return;
@@ -812,10 +1009,14 @@ function AddCronTriggerForm({
         triggerName: triggerName.trim(),
         type: 'cron',
         schedule: schedule.trim(),
+        ...(parsedPayload === null || Object.keys(parsedPayload).length === 0
+          ? {}
+          : { payload: parsedPayload }),
         enabled: true,
       });
       setTriggerName('');
       setSchedule('');
+      setPayload('');
       await onCreated();
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
@@ -866,6 +1067,15 @@ function AddCronTriggerForm({
         </div>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">{SCHEDULE_HELPER_TEXT}</p>
+      <div className="mt-3">
+        <CronPayloadEditor
+          value={payload}
+          onChange={setPayload}
+          triggerInput={triggerInput}
+          contractLoading={contractLoading}
+          disabled={busy}
+        />
+      </div>
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
       <div className="mt-3 flex justify-end">
         <button

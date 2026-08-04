@@ -46,7 +46,7 @@ export type {
   WebhookRouteInput,
   WebhookRouteResult,
 } from './triggers/webhook-router';
-export type { TriggerResult, WorkflowTriggerContext } from './triggers/trigger-types';
+export type { TriggerResult, WorkflowFiring } from './triggers/trigger-types';
 export {
   TriggerNotFoundError,
   ManualTriggerNotDeclaredError,

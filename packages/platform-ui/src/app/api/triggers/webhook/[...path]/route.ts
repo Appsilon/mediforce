@@ -9,6 +9,10 @@ import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
  * so this handler only owns URL parsing, delegating to WebhookRouter, and
  * fire-and-forget kicking the auto-runner. Decision B5: full async — the
  * caller polls /api/runs/<runId> for completion.
+ *
+ * Headers are forwarded raw; WebhookRouter strips credential headers before
+ * they reach the Run's `triggerContext` (ADR-0012), so the guarantee holds for
+ * every caller of the adapter rather than for this route alone.
  */
 export async function POST(
   req: NextRequest,
@@ -64,7 +68,16 @@ export async function POST(
   });
 
   if (result.status !== 202) {
-    return NextResponse.json({ error: result.error }, { status: result.status });
+    // `details` carries the per-field `triggerInput` errors on a 400 so a sender
+    // whose body missed the contract sees exactly which fields were wrong —
+    // same information `start-run` returns for a rejected manual payload
+    // (ADR-0012). Added alongside the existing flat `error` string rather than
+    // replacing it, so 404/405 consumers read unchanged.
+    const details = 'details' in result ? result.details : undefined;
+    return NextResponse.json(
+      { error: result.error, ...(details === undefined ? {} : { details }) },
+      { status: result.status },
+    );
   }
 
   // Fire-and-forget: kick the auto-runner so the workflow actually executes.

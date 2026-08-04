@@ -1,6 +1,6 @@
 import type { ProcessRepository, TriggerRepository } from '@mediforce/platform-core';
 import type { WorkflowEngine } from '../engine/workflow-engine';
-import type { TriggerResult, WorkflowTriggerContext } from './trigger-types';
+import type { TriggerResult, WorkflowFiring } from './trigger-types';
 import { ManualTriggerNotDeclaredError } from './trigger-errors';
 
 /**
@@ -29,39 +29,39 @@ export class ManualTrigger {
    * enabled `manual` trigger row. The engine error for "definition not found"
    * propagates unchanged.
    */
-  async fireWorkflow(context: WorkflowTriggerContext): Promise<TriggerResult> {
+  async fireWorkflow(firing: WorkflowFiring): Promise<TriggerResult> {
     const definition = await this.processRepository.getWorkflowDefinition(
-      context.namespace,
-      context.definitionName,
-      context.definitionVersion,
+      firing.namespace,
+      firing.definitionName,
+      firing.definitionVersion,
     );
     if (!definition) {
       throw new Error(
-        `Workflow definition '${context.definitionName}' version '${context.definitionVersion}' not found`,
+        `Workflow definition '${firing.definitionName}' version '${firing.definitionVersion}' not found`,
       );
     }
     const triggers = await this.triggerRepository.listByWorkflow(
-      context.namespace,
-      context.definitionName,
+      firing.namespace,
+      firing.definitionName,
     );
     const hasEnabledManualTrigger = triggers.some(
       (trigger) => trigger.type === 'manual' && trigger.enabled,
     );
     if (!hasEnabledManualTrigger) {
       throw new ManualTriggerNotDeclaredError(
-        context.definitionName,
-        context.definitionVersion,
+        firing.definitionName,
+        firing.definitionVersion,
       );
     }
 
     const instance = await this.engine.createInstance(
-      context.namespace,
-      context.definitionName,
-      context.definitionVersion,
-      context.triggeredBy,
+      firing.namespace,
+      firing.definitionName,
+      firing.definitionVersion,
+      firing.triggeredBy,
       'manual',
-      context.payload,
-      { parentInstanceId: context.parentInstanceId, parentDefinitionName: context.parentDefinitionName, dryRun: context.dryRun },
+      firing.payload,
+      { parentInstanceId: firing.parentInstanceId, parentDefinitionName: firing.parentDefinitionName, dryRun: firing.dryRun },
     );
 
     await this.engine.startInstance(instance.id);

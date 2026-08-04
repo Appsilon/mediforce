@@ -62,6 +62,8 @@ export const processInstances = pgTable(
 
     triggerType: text('trigger_type').notNull(), // manual | webhook | cron
     triggerPayload: jsonb('trigger_payload'),
+    // Transport metadata of the firing (ADR-0012) — never declared input.
+    triggerContext: jsonb('trigger_context'),
 
     pauseReason: text('pause_reason'),
     error: text('error'),
