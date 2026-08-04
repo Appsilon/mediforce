@@ -2,10 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { getPath, interpolate } from '../interpolation';
 import type { InterpolationSources } from '../types';
 
+// `entry` is an `object`-typed triggerInput field and `label` a string one —
+// the validated, trigger-agnostic shape a firing hands the run. The HTTP
+// envelope lives on triggerContext, never on the payload (ADR-0012).
 const sources: InterpolationSources = {
   triggerPayload: {
-    body: { hello: 'world', items: [{ id: 1 }, { id: 2 }] },
+    entry: { hello: 'world', items: [{ id: 1 }, { id: 2 }] },
+    label: 'nightly',
+  },
+  triggerContext: {
     method: 'POST',
+    headers: { 'x-trace': 'abc' },
+    query: { page: '2' },
   },
   steps: {
     fetch: { body: { json: { token: 'abc' } } },
@@ -52,25 +60,25 @@ describe('interpolate', () => {
   });
 
   it('resolves a sole placeholder to its raw value (preserves objects)', () => {
-    const result = interpolate('${triggerPayload.body}', sources);
+    const result = interpolate('${triggerPayload.entry}', sources);
     expect(result).toEqual({ hello: 'world', items: [{ id: 1 }, { id: 2 }] });
   });
 
   it('concatenates multi-placeholder templates as strings', () => {
     expect(
-      interpolate('${variables.greeting}, ${triggerPayload.body.hello}!', sources),
+      interpolate('${variables.greeting}, ${triggerPayload.entry.hello}!', sources),
     ).toBe('hi, world!');
   });
 
   it('walks array index inside multi-placeholder', () => {
     expect(
-      interpolate('first=${triggerPayload.body.items.0.id}', sources),
+      interpolate('first=${triggerPayload.entry.items.0.id}', sources),
     ).toBe('first=1');
   });
 
   it('JSON-stringifies non-string values inside multi-placeholder', () => {
     expect(
-      interpolate('payload=${triggerPayload.body}', sources),
+      interpolate('payload=${triggerPayload.entry}', sources),
     ).toBe('payload={"hello":"world","items":[{"id":1},{"id":2}]}');
   });
 
@@ -80,14 +88,14 @@ describe('interpolate', () => {
 
   it('walks deep into objects and interpolates each leaf', () => {
     const out = interpolate(
-      { url: '${triggerPayload.method}', token: '${steps.fetch.body.json.token}' },
+      { url: '${triggerContext.method}', token: '${steps.fetch.body.json.token}' },
       sources,
     );
     expect(out).toEqual({ url: 'POST', token: 'abc' });
   });
 
   it('walks into arrays', () => {
-    const out = interpolate(['${triggerPayload.body.hello}', 'static'], sources);
+    const out = interpolate(['${triggerPayload.entry.hello}', 'static'], sources);
     expect(out).toEqual(['world', 'static']);
   });
 
@@ -100,6 +108,30 @@ describe('interpolate', () => {
     };
     expect(interpolate('${x}', local)).toBe(1);
     expect(interpolate('${y}', local)).toBe(2);
+  });
+
+  // ADR-0012: transport metadata is reachable, but only by name. A step doing
+  // so has knowingly coupled itself to one trigger kind.
+  it('resolves ${triggerContext.*} to transport metadata', () => {
+    expect(interpolate('${triggerContext.method}', sources)).toBe('POST');
+    expect(interpolate('${triggerContext.headers.x-trace}', sources)).toBe('abc');
+    expect(interpolate('${triggerContext.query.page}', sources)).toBe('2');
+  });
+
+  it('renders ${triggerContext.*} empty when the firing had no transport', () => {
+    const manual: InterpolationSources = {
+      triggerPayload: { label: 'x' },
+      steps: {},
+      variables: {},
+      secrets: {},
+    };
+    expect(interpolate('m=${triggerContext.method}', manual)).toBe('m=');
+  });
+
+  it('does NOT resolve bare identifiers against triggerContext', () => {
+    // Re-coupling must be spelled out — a bare `${method}` must not silently
+    // pick up the webhook's HTTP verb.
+    expect(interpolate('m=${method}', sources)).toBe('m=');
   });
 
   it('resolves ${secrets.NAME} to the secret value', () => {

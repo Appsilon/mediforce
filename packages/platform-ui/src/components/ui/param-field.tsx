@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
+import { parseJsonObjectText } from '@/lib/trigger-input-payload';
 
 export interface ParamFieldDef {
   name: string;
@@ -217,6 +218,30 @@ function renderInput(
         rows={4}
         className={cn(classes, 'resize-y min-h-[96px]')}
       />
+    );
+  }
+
+  if (type === 'object') {
+    const text = typeof value === 'string'
+      ? value
+      : value === undefined || value === null
+        ? ''
+        : JSON.stringify(value, null, 2);
+    const trimmed = text.trim();
+    const rejected = trimmed !== '' && parseJsonObjectText(trimmed) === null;
+    return (
+      <div className="space-y-1">
+        <textarea
+          value={text}
+          onChange={(event) => onChange(event.target.value)}
+          disabled={disabled}
+          rows={4}
+          className={cn(classes, 'resize-y min-h-[96px] font-mono')}
+        />
+        {rejected && (
+          <p className="text-xs text-destructive">Must be a JSON object</p>
+        )}
+      </div>
     );
   }
 

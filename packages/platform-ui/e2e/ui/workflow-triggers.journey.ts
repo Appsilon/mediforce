@@ -13,6 +13,11 @@ import { trackPageErrors } from '../helpers/page-errors';
  */
 
 test.describe('Workflow Triggers Journey', () => {
+  // Both tests attach cron rows to the same seeded workflow, and the first one
+  // asserts the empty state. Under `fullyParallel` they land in separate workers
+  // and the second's row makes the first's "no cron triggers yet" fail.
+  test.describe.configure({ mode: 'serial' });
+
   test('manual section is present; add, stop, and delete a cron trigger', async ({ page }) => {
     trackPageErrors(page);
 

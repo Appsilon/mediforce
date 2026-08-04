@@ -3,6 +3,14 @@
   "title": "Execution Summaries API",
   "description": "Echo webhook payload through HTTP. Reference template for webhook + single http action.",
   "preamble": "## Domain Context\nReference workflow. Validates webhook trigger -> http action -> polling round-trip against a local echo server.",
+  "triggerInput": [
+    {
+      "name": "summary",
+      "type": "object",
+      "required": true,
+      "description": "The summary blob to echo. Declared as `object` because callers send arbitrary JSON — they POST {\"summary\": {...}} and it is forwarded verbatim."
+    }
+  ],
   "steps": [
     {
       "id": "echo",
@@ -14,7 +22,7 @@
         "config": {
           "method": "POST",
           "url": "http://localhost:9099/anything",
-          "body": "${triggerPayload.body}"
+          "body": "${triggerPayload.summary}"
         }
       }
     },

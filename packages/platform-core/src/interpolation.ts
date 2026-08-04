@@ -1,5 +1,12 @@
 /** Sources available to interpolation in action configs.
- *  - `triggerPayload` is the raw webhook body / cron tick / manual payload.
+ *  - `triggerPayload` is the **validated, trigger-agnostic** input of the firing
+ *    that started the run — it conforms to the definition's `triggerInput`
+ *    contract, so `${triggerPayload.<field>}` reads the same whether a manual,
+ *    webhook, or cron trigger fired (ADR-0012).
+ *  - `triggerContext` is the transport metadata of that firing (webhook
+ *    `headers`/`query`/`method`/`path`, cron `firedAt`/`schedule`). It carries no
+ *    declared input; a step reading `${triggerContext.*}` knowingly re-couples
+ *    itself to one trigger kind.
  *  - `steps` is the variables map keyed by previous stepId — read with dot
  *    notation (e.g. `${steps.fetch.body.id}`).
  *  - `variables` is the merged workflow scratch space (alias of `steps` today;
@@ -12,6 +19,9 @@
  */
 export interface InterpolationSources {
   triggerPayload: Record<string, unknown>;
+  /** Optional so the many call sites that never read transport metadata (agent
+   *  plugins, spawned children) don't have to synthesise an empty one. */
+  triggerContext?: Record<string, unknown>;
   steps: Record<string, unknown>;
   variables: Record<string, unknown>;
   secrets: Record<string, string>;
@@ -95,8 +105,9 @@ const PLACEHOLDER_RE = /\$\{([^}]+)\}/g;
  *
  * Non-string values are JSON-stringified when concatenated into a wider
  * template, but a sole `${path}` returning a non-string is preserved as-is
- * (so `body: '${triggerPayload.body}'` returns the raw body object, not a
- * string). This matches n8n's "single expression returns the value" rule.
+ * (so `body: '${triggerPayload.order}'` on an `object`-typed field returns the
+ * object, not a string). This matches n8n's "single expression returns the
+ * value" rule.
  */
 export function interpolate(
   template: unknown,
@@ -157,6 +168,9 @@ function resolvePath(rawPath: string, sources: InterpolationSources): unknown {
   let resolved: unknown;
   if (root === 'triggerPayload') {
     resolved = rest.length === 0 ? sources.triggerPayload : getPath(sources.triggerPayload, rest);
+  } else if (root === 'triggerContext') {
+    const context = sources.triggerContext ?? {};
+    resolved = rest.length === 0 ? context : getPath(context, rest);
   } else if (root === 'steps') {
     resolved = rest.length === 0 ? sources.steps : getPath(sources.steps, rest);
   } else if (root === 'variables') {
@@ -169,7 +183,9 @@ function resolvePath(rawPath: string, sources: InterpolationSources): unknown {
     resolved = rest.length === 0 ? undefined : getPath(sources.secrets, rest);
   } else {
     // Bare identifiers fall through to triggerPayload for n8n-style ergonomics.
-    // Deliberately NOT searching `secrets` here — secret access must be explicit.
+    // Deliberately NOT searching `secrets` (secret access must be explicit) nor
+    // `triggerContext` (re-coupling a step to one trigger kind must be spelled
+    // out, never something a bare name lands on by accident).
     resolved = getPath(sources.triggerPayload, path)
       ?? getPath(sources.steps, path)
       ?? getPath(sources.variables, path);
