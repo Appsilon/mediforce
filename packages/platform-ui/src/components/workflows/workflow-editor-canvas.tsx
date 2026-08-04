@@ -30,14 +30,18 @@ import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
+import { useToast } from '@/components/command-palette';
 import { applyWorkflowAssistantToolCalls, type WorkflowAssistantToolCall } from '@mediforce/platform-core';
 
 interface AssistantMessage {
   role: 'user' | 'assistant';
   content: string;
   changes?: string;
-  error?: string;
 }
+
+// Rotating status shown while the assistant works — the request is a single
+// non-streaming call, so these are indicative phases, not live server progress.
+const ASSISTANT_PHASES = ['Thinking…', 'Planning the workflow…', 'Building steps…', 'Wiring transitions…', 'Validating…'] as const;
 
 function JsonCodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -406,8 +410,9 @@ export function WorkflowEditorCanvas({
   const [assistantModel, setAssistantModel] = useState<string | undefined>(undefined);
   const [assistantSettingsOpen, setAssistantSettingsOpen] = useState(false);
   const [assistantLoading, setAssistantLoading] = useState(false);
-  const [assistantError, setAssistantError] = useState<string | null>(null);
+  const [assistantPhase, setAssistantPhase] = useState(0);
   const assistantInputRef = useRef<HTMLTextAreaElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const el = assistantInputRef.current;
@@ -415,6 +420,17 @@ export function WorkflowEditorCanvas({
     el.style.height = 'auto';
     el.style.height = `${String(el.scrollHeight)}px`;
   }, [assistantInput]);
+
+  // Advance the status label while loading; hold on the last phase (a big build
+  // can run for a while). Reset to the first phase each time a request starts.
+  useEffect(() => {
+    if (!assistantLoading) return;
+    setAssistantPhase(0);
+    const timer = setInterval(() => {
+      setAssistantPhase((p) => Math.min(p + 1, ASSISTANT_PHASES.length - 1));
+    }, 2500);
+    return () => clearInterval(timer);
+  }, [assistantLoading]);
 
   // Applies the whole batch through the shared reducer in one atomic state
   // update. Returns a success summary and any tool-call errors separately so the
@@ -449,7 +465,6 @@ export function WorkflowEditorCanvas({
     const nextMessages: AssistantMessage[] = [...assistantMessages, { role: 'user', content }];
     setAssistantMessages(nextMessages);
     setAssistantInput('');
-    setAssistantError(null);
     setAssistantLoading(true);
 
     try {
@@ -467,8 +482,10 @@ export function WorkflowEditorCanvas({
         role: 'assistant',
         content: replyText,
         ...(applied.summary ? { changes: applied.summary } : {}),
-        ...(applied.error ? { error: applied.error } : {}),
       }]);
+      if (applied.error) {
+        toast({ variant: 'error', title: "Couldn't apply every change", description: applied.error });
+      }
       if (result.toolCalls) {
         // editedStepsRef only settles one macrotask after the state update commits.
         setTimeout(() => {
@@ -479,11 +496,12 @@ export function WorkflowEditorCanvas({
         }, 0);
       }
     } catch (err) {
-      setAssistantError(err instanceof ApiError || err instanceof Error ? err.message : 'Failed to reach the assistant');
+      const description = err instanceof ApiError || err instanceof Error ? err.message : 'Failed to reach the assistant';
+      toast({ variant: 'error', title: 'Assistant error', description });
     } finally {
       setAssistantLoading(false);
     }
-  }, [assistantInput, assistantLoading, assistantMessages, assistantModel, namespace, editedSteps, editedTransitions, applyAssistantToolCalls]);
+  }, [assistantInput, assistantLoading, assistantMessages, assistantModel, namespace, editedSteps, editedTransitions, applyAssistantToolCalls, toast]);
 
   const moveStep = useCallback((stepId: string, direction: 'up' | 'down') => {
     saveSnapshot();
@@ -818,12 +836,6 @@ export function WorkflowEditorCanvas({
                           <span>{message.changes}</span>
                         </div>
                       )}
-                      {message.error && (
-                        <div className="inline-flex items-start gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-xs text-red-700 dark:text-red-400">
-                          <X className="h-3.5 w-3.5 shrink-0 mt-px" />
-                          <span>{message.error}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
                 ))
@@ -831,11 +843,8 @@ export function WorkflowEditorCanvas({
               {assistantLoading && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Thinking…
+                  {ASSISTANT_PHASES[assistantPhase]}
                 </div>
-              )}
-              {assistantError && (
-                <p className="text-sm text-destructive">{assistantError}</p>
               )}
             </div>
             <div className="shrink-0 border-t p-3">
