@@ -1046,6 +1046,15 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   };
 
   const MONITORING_LOADMORE_ACTOR_ID = 'monitoring-loadmore-actor';
+  // Dedicated actor for monitoring.journey.ts's Users/Tasks-tab activity
+  // assertions (`audit-signin-*`, `audit-workflow-*`, `audit-task-*`). Same
+  // isolation contract as the Load-More batch below: a unique `actorId` +
+  // the matching `namespaceMembers` entry lets the tab's own "User" filter
+  // <select> select it, so these six assertion rows are pinned to page 1
+  // regardless of how many fresh audit events other parallel journeys write
+  // to the shared `test` namespace. Isolation comes from the actor filter,
+  // not from recency.
+  const MONITORING_ACTIVITY_ACTOR_ID = 'monitoring-activity-actor';
   const MONITORING_LOADMORE_EVENT_COUNT = 21;
   // 21 audit events, one PAGE_SIZE(20) over the limit, shared by
   // monitoring.journey.ts's Users AND Tasks tab Load-More tests —
@@ -1126,11 +1135,17 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       processInstanceId: 'proc-completed-1',
       processDefinitionVersion: '2.1.0',
     },
-    // Monitoring → Users tab fixtures. No processInstanceId, so
-    // postgres-seed.ts's workspace resolution falls back to TEST_ORG_HANDLE
-    // — same behaviour as a real sign-in event with no parent run.
+    // Monitoring → Users/Tasks-tab activity assertions. All six are pinned
+    // to a dedicated `actorId` (MONITORING_ACTIVITY_ACTOR_ID) so the tab's
+    // own "User" filter selects exactly this set regardless of how busy
+    // the shared `test` namespace gets during a full suite run. Row content
+    // is joined off `inputSnapshot` / `processInstanceId`, not the actor, so
+    // the Task/Workflow link assertions are unaffected by the actor change.
+    // No processInstanceId here, so postgres-seed.ts's workspace resolution
+    // falls back to TEST_ORG_HANDLE — same behaviour as a real sign-in event
+    // with no parent run.
     'audit-signin-password': {
-      actorId: testUserId,
+      actorId: MONITORING_ACTIVITY_ACTOR_ID,
       actorType: 'user',
       actorRole: 'owner',
       action: 'user.signed_in',
@@ -1140,10 +1155,10 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       outputSnapshot: {},
       basis: 'Password credential verified',
       entityType: 'user',
-      entityId: testUserId,
+      entityId: MONITORING_ACTIVITY_ACTOR_ID,
     },
     'audit-signin-oauth': {
-      actorId: testUserId,
+      actorId: MONITORING_ACTIVITY_ACTOR_ID,
       actorType: 'user',
       actorRole: 'owner',
       action: 'user.signed_in',
@@ -1153,10 +1168,10 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       outputSnapshot: {},
       basis: "OAuth provider 'google' verified the identity",
       entityType: 'user',
-      entityId: testUserId,
+      entityId: MONITORING_ACTIVITY_ACTOR_ID,
     },
     'audit-workflow-triggered': {
-      actorId: testUserId,
+      actorId: MONITORING_ACTIVITY_ACTOR_ID,
       actorType: 'user',
       actorRole: 'owner',
       action: 'instance.started',
@@ -1171,7 +1186,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       processDefinitionVersion: '1',
     },
     'audit-workflow-cancelled': {
-      actorId: testUserId,
+      actorId: MONITORING_ACTIVITY_ACTOR_ID,
       actorType: 'user',
       actorRole: 'owner',
       action: 'instance.cancelled',
@@ -1186,7 +1201,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       processDefinitionVersion: '2.1.0',
     },
     'audit-task-completed': {
-      actorId: testUserId,
+      actorId: MONITORING_ACTIVITY_ACTOR_ID,
       actorType: 'user',
       actorRole: 'owner',
       action: 'task.completed',
@@ -1201,14 +1216,14 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       stepId: 'manager-approval',
     },
     'audit-task-claimed': {
-      actorId: testUserId,
+      actorId: MONITORING_ACTIVITY_ACTOR_ID,
       actorType: 'user',
       actorRole: 'owner',
       action: 'task.claimed',
-      description: `User '${testUserId}' claimed task 'task-claimed-1' for step 'approve-report'`,
+      description: `User '${MONITORING_ACTIVITY_ACTOR_ID}' claimed task 'task-claimed-1' for step 'approve-report'`,
       timestamp: oneHourAgo,
-      inputSnapshot: { taskId: 'task-claimed-1', userId: testUserId, stepId: 'approve-report' },
-      outputSnapshot: { status: 'claimed', assignedUserId: testUserId },
+      inputSnapshot: { taskId: 'task-claimed-1', userId: MONITORING_ACTIVITY_ACTOR_ID, stepId: 'approve-report' },
+      outputSnapshot: { status: 'claimed', assignedUserId: MONITORING_ACTIVITY_ACTOR_ID },
       basis: 'User claimed task via UI',
       entityType: 'humanTask',
       entityId: 'task-claimed-1',
@@ -1853,6 +1868,17 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     [MONITORING_LOADMORE_ACTOR_ID]: {
       id: MONITORING_LOADMORE_ACTOR_ID,
       uid: MONITORING_LOADMORE_ACTOR_ID,
+      role: 'member',
+      joinedAt: threeDaysAgo,
+    },
+    // Synthetic member for monitoring.journey.ts's Users/Tasks-tab activity
+    // assertions — same shape as the Load-More member above: no real auth
+    // account, exists only to make MONITORING_ACTIVITY_ACTOR_ID selectable
+    // in the tabs' "User" filter <select> so those tests can actor-scope the
+    // table before asserting on rows.
+    [MONITORING_ACTIVITY_ACTOR_ID]: {
+      id: MONITORING_ACTIVITY_ACTOR_ID,
+      uid: MONITORING_ACTIVITY_ACTOR_ID,
       role: 'member',
       joinedAt: threeDaysAgo,
     },
