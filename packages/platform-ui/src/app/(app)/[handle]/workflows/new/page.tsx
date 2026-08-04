@@ -213,7 +213,7 @@ export default function NewWorkflowPage() {
               </span>
             )}
             {saveState.status === 'error' && (
-              <span className="text-sm text-red-600 dark:text-red-400 max-w-md whitespace-normal break-words text-right" title={saveState.message}>
+              <span className="text-sm text-red-600 dark:text-red-400 max-w-md whitespace-normal break-words text-right">
                 {saveState.message}
               </span>
             )}

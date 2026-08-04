@@ -43,4 +43,14 @@ describe('formatSaveErrorMessage', () => {
     const err = new Error('Step {name} is required');
     expect(formatSaveErrorMessage(err, false)).toBe('Step {name} is required');
   });
+
+  it('passes a human message containing "too small" through unchanged', () => {
+    const err = new Error('The batch window is too small to fit the requested runs.');
+    expect(formatSaveErrorMessage(err, false)).toBe(err.message);
+  });
+
+  it('passes prose with lowercase "expected ... received" through unchanged', () => {
+    const err = new Error('We expected the report, but received nothing from the upstream service.');
+    expect(formatSaveErrorMessage(err, false)).toBe(err.message);
+  });
 });

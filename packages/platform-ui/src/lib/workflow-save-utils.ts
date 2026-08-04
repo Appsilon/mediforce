@@ -51,7 +51,10 @@ function friendlySaveErrorMessage(message: string): string {
   if (/invalid enum value/i.test(trimmed)) {
     return 'A field has an invalid value.';
   }
-  if (/must contain at least|too small|expected .*, received/i.test(trimmed)) {
+  if (/must contain at least/i.test(trimmed)) {
+    return 'A required field is empty or missing.';
+  }
+  if (/(?:^|[.;]\s)Expected .*, received/.test(trimmed)) {
     return 'A required field is empty or missing.';
   }
   return trimmed;
