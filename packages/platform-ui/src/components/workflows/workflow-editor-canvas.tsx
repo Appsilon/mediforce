@@ -317,7 +317,7 @@ export function WorkflowEditorCanvas({
       ...payload,
       id: newId,
       name: payload.name || `New Step ${stepNum}`,
-      ...(payload.executor === 'agent' ? { plugin: payload.plugin ?? 'opencode-agent', autonomyLevel: payload.autonomyLevel ?? 'L2' } : {}),
+      ...(payload.executor === 'agent' ? { plugin: payload.plugin ?? 'opencode-agent', autonomyLevel: payload.autonomyLevel ?? 'L3' } : {}),
       ...(payload.executor === 'script' ? { plugin: payload.plugin ?? 'script-container' } : {}),
       ...(payload.executor === 'cowork' ? { cowork: payload.cowork ?? { agent: 'chat' as const } } : {}),
     };
