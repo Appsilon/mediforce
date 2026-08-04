@@ -48,14 +48,14 @@ function friendlySaveErrorMessage(message: string): string {
   if (looksLikeSerializedJson(trimmed)) {
     return 'The workflow could not be saved. Please check your inputs and try again.';
   }
-  if (/invalid enum value/i.test(trimmed)) {
+  if (/^Invalid enum value/.test(trimmed)) {
     return 'A field has an invalid value.';
   }
-  if (/must contain at least/i.test(trimmed)) {
+  if (/^(String|Array) must contain at least/.test(trimmed)) {
     return 'A required field is empty or missing.';
   }
   if (/(?:^|[.;]\s)Expected .*, received/.test(trimmed)) {
-    return 'A required field is empty or missing.';
+    return 'A field has an invalid value.';
   }
   return trimmed;
 }

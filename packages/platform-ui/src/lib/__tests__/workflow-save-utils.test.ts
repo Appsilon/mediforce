@@ -18,6 +18,21 @@ describe('formatSaveErrorMessage', () => {
     expect(formatSaveErrorMessage(err, false)).toBe('A field has an invalid value.');
   });
 
+  it('translates a standalone Zod type-mismatch message to plain English', () => {
+    const err = new Error('Expected number, received string');
+    expect(formatSaveErrorMessage(err, false)).toBe('A field has an invalid value.');
+  });
+
+  it('passes prose that merely contains "must contain at least" through unchanged', () => {
+    const err = new Error('The selected roles must contain at least one admin.');
+    expect(formatSaveErrorMessage(err, false)).toBe(err.message);
+  });
+
+  it('passes prose that merely contains "invalid enum value" through unchanged', () => {
+    const err = new Error('The submitted payload had an invalid enum value in the type field.');
+    expect(formatSaveErrorMessage(err, false)).toBe(err.message);
+  });
+
   it('replaces a raw JSON envelope with a friendly message', () => {
     const err = new Error('{"error":{"code":"validation","message":"Invalid input"}}');
     expect(formatSaveErrorMessage(err, false)).toBe(
