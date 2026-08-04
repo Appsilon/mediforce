@@ -98,6 +98,39 @@ describe('inviteUser handler', () => {
     expect(notifier.sendWorkspaceCalls).toHaveLength(0);
   });
 
+  it('does not force password-setup for a pending invitee when password auth is disabled (Google-only deployment)', async () => {
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
+    const notifier = recordingNotifier();
+    const userProfileRepo = new InMemoryUserProfileRepository();
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      inviteService,
+      inviteNotificationService: notifier,
+      userProfileRepo,
+      passwordAuthEnabled: false,
+    });
+
+    const result = await inviteUser(baseInput, scope);
+
+    expect(result).toEqual({
+      uid: 'uid-new',
+      email: 'newbie@example.test',
+      emailSent: true,
+      isExisting: false,
+    });
+    expect(await userProfileRepo.getProfile('uid-new')).toBeNull();
+    expect(notifier.sendActivationCalls).toHaveLength(0);
+    expect(notifier.sendWorkspaceCalls).toEqual([
+      {
+        toEmail: 'newbie@example.test',
+        inviterName: 'alpha',
+        workspaceName: 'alpha',
+        workspaceHandle: 'alpha',
+      },
+    ]);
+  });
+
   it('sends the plain workspace-notification email and sets no flag for an already-active re-added user', async () => {
     namespaceRepo.seedNamespace({
       handle: 'alpha',

@@ -8,6 +8,7 @@
     "build": "rm -rf .next && next build",
     "build:e2e": "NEXT_PUBLIC_APP_URL=http://localhost:${E2E_PORT:-9007} next build && python3 scripts/e2e_build_gate.py stamp",
     "start:e2e": "python3 scripts/e2e_build_gate.py ensure && MOCK_AGENT=true ALLOW_LOCAL_AGENTS=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${E2E_PORT:-9007} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 next start -p ${E2E_PORT:-9007}",
+    "start:e2e:password-off": "MOCK_AGENT=true ALLOW_LOCAL_AGENTS=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${E2E_PASSWORD_OFF_PORT:-9008} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 next start -p ${E2E_PASSWORD_OFF_PORT:-9008}",
     "start": "next start -p ${PORT:-3000}",
     "typecheck": "tsc --noEmit",
     "test:external": "vitest run --config vitest.config.external.ts",

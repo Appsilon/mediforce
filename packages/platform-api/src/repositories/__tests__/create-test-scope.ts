@@ -195,6 +195,7 @@ export interface TestScopeOverrides {
   readonly userDirectory?: UserDirectoryService | null;
   readonly platformSettingsRepo?: PlatformSettingsRepository;
   readonly emailProviderInfo?: EmailProviderInfo | null;
+  readonly passwordAuthEnabled?: boolean;
 }
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
@@ -252,6 +253,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     dockerImages: overrides.dockerImages ?? null,
     userDirectory: overrides.userDirectory ?? null,
     emailProviderInfo: overrides.emailProviderInfo ?? null,
+    passwordAuthEnabled: overrides.passwordAuthEnabled ?? true,
   };
   return createCallerScope(services, caller);
 }

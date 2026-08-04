@@ -93,6 +93,7 @@ export interface CallerScopeServices {
   readonly userDirectory: UserDirectoryService | null;
   readonly platformSettingsRepo: PlatformSettingsRepository;
   readonly emailProviderInfo: EmailProviderInfo | null;
+  readonly passwordAuthEnabled: boolean;
 }
 
 /**
@@ -165,6 +166,7 @@ export function createCallerScope(
       userDirectory: services.userDirectory,
       platformSettings: services.platformSettingsRepo,
       emailProviderInfo: services.emailProviderInfo,
+      passwordAuthEnabled: services.passwordAuthEnabled,
     },
   };
 }
