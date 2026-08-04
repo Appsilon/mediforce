@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, X } from 'lucide-react';
+import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, X, ChevronDown } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
 import { useAuth } from '@/contexts/auth-context';
@@ -203,6 +203,53 @@ function StepIdField({ currentId, onChange, error }: { currentId: string; onChan
 }
 
 // ---------------------------------------------------------------------------
+// CollapsibleCard — independent, self-contained collapsible section card
+// ---------------------------------------------------------------------------
+
+function CollapsibleCard({
+  title,
+  titleNode,
+  headerAction,
+  open,
+  onToggle,
+  children,
+}: {
+  title?: string;
+  titleNode?: React.ReactNode;
+  headerAction?: React.ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  const titleContent = titleNode ?? (
+    <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">{title}</span>
+  );
+  return (
+    <div className={cn('rounded-xl border shadow-lg overflow-hidden bg-white dark:bg-background flex flex-col', open && 'flex-1 min-h-0')}>
+      <div className="flex items-center gap-2 px-4 py-3 shrink-0">
+        <button type="button" onClick={onToggle} className="flex flex-1 min-w-0 items-center gap-2 text-left cursor-pointer">
+          {titleContent}
+        </button>
+        {headerAction}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={open ? 'Collapse section' : 'Expand section'}
+          className="shrink-0 rounded-md p-1 text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+        >
+          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', !open && '-rotate-90')} strokeWidth={2} />
+        </button>
+      </div>
+      {open && (
+        <div className="border-t px-4 pt-3.5 pb-4 space-y-4 flex-1 overflow-y-auto min-h-0">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // StepEditor
 // ---------------------------------------------------------------------------
 
@@ -211,6 +258,7 @@ export function StepEditor({
   allSteps,
   workflowName,
   onChange,
+  onClose,
   errors,
   imageWarning,
   dockerImages,
@@ -219,6 +267,7 @@ export function StepEditor({
   allSteps: WorkflowStep[];
   workflowName?: string;
   onChange: (patch: Partial<WorkflowStep>) => void;
+  onClose?: () => void;
   errors?: Record<string, string>;
   imageWarning?: string;
   dockerImages?: DockerImageInfo[];
@@ -297,34 +346,180 @@ export function StepEditor({
   const typeStyle = STEP_TYPE_ICON[step.type] ?? STEP_TYPE_ICON.creation;
   const TypeIcon = typeStyle.icon;
 
-  return (
-    <div className="space-y-4" data-testid="step-editor">
+  // ── Accordion sections ─────────────────────────────────────────────────
+  const hasPrimarySection = isAgent || isScript || isHuman || isAction || isReview || isCowork;
+  const paramsInPrimary = isHuman;
+  const paramsInAdvanced = !isTerminal && !isHuman;
 
-      {/* ── Review deprecation warning ───────────────────────────── */}
+  const primaryTitle = isAgent
+    ? 'Prompt & model'
+    : isScript
+      ? 'Script'
+      : isCowork
+        ? 'Collaboration'
+        : isAction
+          ? 'Action'
+          : isHuman
+            ? 'Task setup'
+            : isReview
+              ? 'Review'
+              : 'Configuration';
+
+  // Default open: Basics + Primary; Routing + Advanced closed. Any combination
+  // of cards may be open — toggling one never closes the others.
+  const defaultOpenCards = { basics: true, primary: false, routing: false, advanced: false };
+  const [openCards, setOpenCards] = useState<Record<string, boolean>>(defaultOpenCards);
+  useEffect(() => {
+    setOpenCards({ basics: true, primary: false, routing: false, advanced: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.id, step.executor, isDecision, hasPrimarySection]);
+  // Single-open: opening a card closes the others; clicking the open one collapses it.
+  const toggleCard = (id: string) => setOpenCards((prev) => ({
+    basics: false, primary: false, routing: false, advanced: false, [id]: !prev[id],
+  }));
+
+  const parametersSection = !isTerminal ? (
+        <Section title="Parameters">
+          <div className="space-y-3">
+            {(step.params ?? []).map((param, idx) => (
+              <div key={idx} className="rounded-xl border border-border/60 p-3 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground">Parameter {idx + 1}</span>
+                  <button
+                    onClick={() => {
+                      const next = (step.params ?? []).filter((_, i) => i !== idx);
+                      onChange({ params: next.length > 0 ? next : undefined });
+                    }}
+                    className="rounded-md p-0.5 text-muted-foreground/50 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                    aria-label="Remove parameter"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <FieldGroup>
+                <FieldRow label="name" tooltip={TIP.paramName}>
+                  <input
+                    value={param.name}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], name: e.target.value };
+                      onChange({ params: next });
+                    }}
+                    className={riMono}
+                  />
+                </FieldRow>
+                <FieldRow label="type" tooltip={TIP.paramType}>
+                  <select
+                    value={param.type ?? 'string'}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], type: e.target.value as 'string' | 'number' | 'boolean' | 'date' };
+                      onChange({ params: next });
+                    }}
+                    className={rs}
+                  >
+                    {(['string', 'number', 'boolean', 'date'] as const).map((t) => (
+                      <option key={t} value={t}>{humanizeToken(t)}</option>
+                    ))}
+                  </select>
+                </FieldRow>
+                <FieldRow label="required" tooltip={TIP.paramRequired}>
+                  <input
+                    type="checkbox"
+                    checked={param.required ?? false}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], required: e.target.checked };
+                      onChange({ params: next });
+                    }}
+                    className="w-3.5 h-3.5 accent-primary cursor-pointer"
+                  />
+                </FieldRow>
+                <FieldRow label="description" tooltip={TIP.paramDescription}>
+                  <input
+                    value={param.description ?? ''}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], description: e.target.value || undefined };
+                      onChange({ params: next });
+                    }}
+                    className={ri}
+                  />
+                </FieldRow>
+                <FieldRow label="default" tooltip={TIP.paramDefault}>
+                  <input
+                    value={param.default !== undefined ? String(param.default) : ''}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], default: e.target.value || undefined };
+                      onChange({ params: next });
+                    }}
+                    className={riMono}
+                  />
+                </FieldRow>
+                <FieldRow label="options" tooltip={TIP.paramOptions}>
+                  <input
+                    value={param.options?.join(', ') ?? ''}
+                    onChange={(e) => {
+                      const opts = e.target.value.split(',').map((o) => o.trim()).filter(Boolean);
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], options: opts.length > 0 ? opts : undefined };
+                      onChange({ params: next });
+                    }}
+                    className={ri}
+                  />
+                </FieldRow>
+                </FieldGroup>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => onChange({ params: [...(step.params ?? []), { name: '', type: 'string', required: false }] })}
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >+ Add parameter</button>
+        </Section>
+  ) : null;
+
+  return (
+    <div className="flex flex-col gap-3 h-full min-h-0" data-testid="step-editor">
+
+      {/* ── Basics (carries the step identity header) ────────────── */}
+      <CollapsibleCard
+        open={openCards.basics}
+        onToggle={() => toggleCard('basics')}
+        headerAction={onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close step editor"
+            className="shrink-0 rounded-md p-1 text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : undefined}
+        titleNode={
+          <div className="flex flex-1 min-w-0 items-center gap-3">
+            <div className={cn('flex items-center justify-center h-9 w-9 rounded-lg shrink-0', execStyle.bg)}>
+              <ExecIcon className={cn('h-5 w-5', execStyle.color)} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-tight truncate">{step.name || 'Unnamed step'}</p>
+              {/* executor · type, matching the canvas node badge order (type last). */}
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-[10px] text-muted-foreground">{execStyle.label}</span>
+                <span className="text-[10px] text-muted-foreground/30">·</span>
+                <TypeIcon className={cn('h-3 w-3 shrink-0', typeStyle.color)} strokeWidth={1.5} />
+                <span className="text-[10px] text-muted-foreground">{typeStyle.label}</span>
+              </div>
+            </div>
+          </div>
+        }
+      >
       {step.type === 'review' && (
         <div className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
           <strong>Review steps are deprecated.</strong> They will be replaced by Decision steps — where a human explicitly decides if the previous work is satisfactory. You can continue using this step; it will keep working. To migrate, replace it with a Decision step.
         </div>
       )}
-
-      {/* ── Step type header ─────────────────────────────────────── */}
-      <div className="flex items-center gap-3 pb-3 border-b border-border/40">
-        <div className={cn('flex items-center justify-center h-9 w-9 rounded-lg shrink-0', execStyle.bg)}>
-          <ExecIcon className={cn('h-5 w-5', execStyle.color)} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold leading-tight truncate">{step.name || 'Unnamed step'}</p>
-          {/* executor · type, matching the canvas node badge order (type last). */}
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-[10px] text-muted-foreground">{execStyle.label}</span>
-            <span className="text-[10px] text-muted-foreground/30">·</span>
-            <TypeIcon className={cn('h-3 w-3 shrink-0', typeStyle.color)} strokeWidth={1.5} />
-            <span className="text-[10px] text-muted-foreground">{typeStyle.label}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Identity ─────────────────────────────────────────────── */}
       <FieldGroup>
         <FieldRow label="name" tooltip={TIP.name} error={errors?.name ? friendlyFieldError(errors.name) : undefined}>
           <input
@@ -336,10 +531,6 @@ export function StepEditor({
             }}
             className={cn(ri, errors?.name && 'border-red-400 focus:border-red-500')}
           />
-        </FieldRow>
-
-        <FieldRow label="id" tooltip={TIP.id} error={errors?.id ? friendlyFieldError(errors.id) : undefined}>
-          <StepIdField currentId={step.id} onChange={(v) => onChange({ id: v })} error={errors?.id} />
         </FieldRow>
 
         <FieldRow label="description" tooltip={TIP.description} alignStart>
@@ -370,19 +561,12 @@ export function StepEditor({
             {STEP_TYPE_LABELS[step.type] ?? step.type}
           </span>
         </FieldRow>
-        {!isTerminal && (
-          <FieldRow label="continueOnError" tooltip={TIP.continueOnError}>
-            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground py-0.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={step.continueOnError ?? false}
-                onChange={(e) => onChange({ continueOnError: e.target.checked || undefined })}
-              />
-              Advance the run even if this step fails
-            </label>
-          </FieldRow>
-        )}
       </FieldGroup>
+      </CollapsibleCard>
+
+      {/* ── Primary config ───────────────────────────────────────── */}
+      {hasPrimarySection && (
+        <CollapsibleCard title={primaryTitle} open={openCards.primary} onToggle={() => toggleCard('primary')}>
 
       {/* ── Agent config ─────────────────────────────────────────── */}
       {isAgent && (<>
@@ -766,29 +950,6 @@ export function StepEditor({
         )}
       </>)}
 
-      {/* ── Human config ─────────────────────────────────────────── */}
-      {isHuman && (
-        <FieldGroup>
-          <FieldRow label="allowedRoles" tooltip={TIP.allowedRoles}>
-            <input
-              value={step.allowedRoles?.join(', ') ?? ''}
-              onChange={(e) => onChange({
-                allowedRoles: e.target.value ? e.target.value.split(',').map((r) => r.trim()).filter(Boolean) : undefined,
-              })}
-              className={ri}
-            />
-          </FieldRow>
-          <FieldRow label="assignedTo" tooltip={TIP.assignedTo}>
-            <input
-              value={step.assignedTo ?? ''}
-              onChange={(e) => onChange({ assignedTo: e.target.value || undefined })}
-              placeholder="user id or ${triggerPayload.userId}"
-              className={riMono}
-            />
-          </FieldRow>
-        </FieldGroup>
-      )}
-
       {/* ── Task UI (custom body) ────────────────────────────────── */}
       {isHuman && (
         <Section title="Task UI">
@@ -1100,8 +1261,16 @@ export function StepEditor({
       {/* ── Cowork ───────────────────────────────────────────────── */}
       {isCowork && <CoworkSection step={step} onChange={onChange} isNewStep={isNewStep} />}
 
-      {/* ── Verdicts ─────────────────────────────────────────────── */}
+      {/* ── Parameters (human task setup) ────────────────────────── */}
+      {paramsInPrimary && parametersSection}
+
+        </CollapsibleCard>
+      )}
+
+      {/* ── Routing ──────────────────────────────────────────────── */}
       {hasVerdicts && (
+        <CollapsibleCard title="Routing" open={openCards.routing} onToggle={() => toggleCard('routing')}>
+      {/* ── Verdicts ─────────────────────────────────────────────── */}
         <Section title="Verdicts">
           <FieldGroup>
             {Object.entries(step.verdicts ?? {}).map(([verdictName, verdict]) => (
@@ -1148,110 +1317,56 @@ export function StepEditor({
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >+ Add verdict</button>
         </Section>
+        </CollapsibleCard>
       )}
 
-      {/* ── Parameters ───────────────────────────────────────────── */}
-      {!isTerminal && (
-        <Section title="Parameters">
-          <div className="space-y-3">
-            {(step.params ?? []).map((param, idx) => (
-              <div key={idx} className="rounded-xl border border-border/60 p-3 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground">Parameter {idx + 1}</span>
-                  <button
-                    onClick={() => {
-                      const next = (step.params ?? []).filter((_, i) => i !== idx);
-                      onChange({ params: next.length > 0 ? next : undefined });
-                    }}
-                    className="rounded-md p-0.5 text-muted-foreground/50 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                    aria-label="Remove parameter"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <FieldGroup>
-                <FieldRow label="name" tooltip={TIP.paramName}>
-                  <input
-                    value={param.name}
-                    onChange={(e) => {
-                      const next = [...(step.params ?? [])];
-                      next[idx] = { ...next[idx], name: e.target.value };
-                      onChange({ params: next });
-                    }}
-                    className={riMono}
-                  />
-                </FieldRow>
-                <FieldRow label="type" tooltip={TIP.paramType}>
-                  <select
-                    value={param.type ?? 'string'}
-                    onChange={(e) => {
-                      const next = [...(step.params ?? [])];
-                      next[idx] = { ...next[idx], type: e.target.value as 'string' | 'number' | 'boolean' | 'date' };
-                      onChange({ params: next });
-                    }}
-                    className={rs}
-                  >
-                    {(['string', 'number', 'boolean', 'date'] as const).map((t) => (
-                      <option key={t} value={t}>{humanizeToken(t)}</option>
-                    ))}
-                  </select>
-                </FieldRow>
-                <FieldRow label="required" tooltip={TIP.paramRequired}>
-                  <input
-                    type="checkbox"
-                    checked={param.required ?? false}
-                    onChange={(e) => {
-                      const next = [...(step.params ?? [])];
-                      next[idx] = { ...next[idx], required: e.target.checked };
-                      onChange({ params: next });
-                    }}
-                    className="w-3.5 h-3.5 accent-primary cursor-pointer"
-                  />
-                </FieldRow>
-                <FieldRow label="description" tooltip={TIP.paramDescription}>
-                  <input
-                    value={param.description ?? ''}
-                    onChange={(e) => {
-                      const next = [...(step.params ?? [])];
-                      next[idx] = { ...next[idx], description: e.target.value || undefined };
-                      onChange({ params: next });
-                    }}
-                    className={ri}
-                  />
-                </FieldRow>
-                <FieldRow label="default" tooltip={TIP.paramDefault}>
-                  <input
-                    value={param.default !== undefined ? String(param.default) : ''}
-                    onChange={(e) => {
-                      const next = [...(step.params ?? [])];
-                      next[idx] = { ...next[idx], default: e.target.value || undefined };
-                      onChange({ params: next });
-                    }}
-                    className={riMono}
-                  />
-                </FieldRow>
-                <FieldRow label="options" tooltip={TIP.paramOptions}>
-                  <input
-                    value={param.options?.join(', ') ?? ''}
-                    onChange={(e) => {
-                      const opts = e.target.value.split(',').map((o) => o.trim()).filter(Boolean);
-                      const next = [...(step.params ?? [])];
-                      next[idx] = { ...next[idx], options: opts.length > 0 ? opts : undefined };
-                      onChange({ params: next });
-                    }}
-                    className={ri}
-                  />
-                </FieldRow>
-                </FieldGroup>
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={() => onChange({ params: [...(step.params ?? []), { name: '', type: 'string', required: false }] })}
-            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-          >+ Add parameter</button>
-        </Section>
+      {/* ── Advanced ─────────────────────────────────────────────── */}
+      <CollapsibleCard title="Advanced" open={openCards.advanced} onToggle={() => toggleCard('advanced')}>
+
+      {/* ── Identity & failure handling ──────────────────────────── */}
+      <FieldGroup>
+        <FieldRow label="id" tooltip={TIP.id} error={errors?.id ? friendlyFieldError(errors.id) : undefined}>
+          <StepIdField currentId={step.id} onChange={(v) => onChange({ id: v })} error={errors?.id} />
+        </FieldRow>
+        {!isTerminal && (
+          <FieldRow label="continueOnError" tooltip={TIP.continueOnError}>
+            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground py-0.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={step.continueOnError ?? false}
+                onChange={(e) => onChange({ continueOnError: e.target.checked || undefined })}
+              />
+              Advance the run even if this step fails
+            </label>
+          </FieldRow>
+        )}
+      </FieldGroup>
+
+      {/* ── Human roles ──────────────────────────────────────────── */}
+      {isHuman && (
+        <FieldGroup>
+          <FieldRow label="allowedRoles" tooltip={TIP.allowedRoles}>
+            <input
+              value={step.allowedRoles?.join(', ') ?? ''}
+              onChange={(e) => onChange({
+                allowedRoles: e.target.value ? e.target.value.split(',').map((r) => r.trim()).filter(Boolean) : undefined,
+              })}
+              className={ri}
+            />
+          </FieldRow>
+          <FieldRow label="assignedTo" tooltip={TIP.assignedTo}>
+            <input
+              value={step.assignedTo ?? ''}
+              onChange={(e) => onChange({ assignedTo: e.target.value || undefined })}
+              placeholder="user id or ${triggerPayload.userId}"
+              className={riMono}
+            />
+          </FieldRow>
+        </FieldGroup>
       )}
+
+      {/* ── Parameters (non-human) ───────────────────────────────── */}
+      {paramsInAdvanced && parametersSection}
 
       {/* ── MCP restrictions ─────────────────────────────────────── */}
       {isAgent && step.agentId !== undefined && step.agentId !== '' && (
@@ -1321,6 +1436,8 @@ export function StepEditor({
           >+ Add variable</button>
         </Section>
       )}
+
+      </CollapsibleCard>
 
     </div>
   );

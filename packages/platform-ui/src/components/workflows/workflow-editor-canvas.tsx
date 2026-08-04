@@ -707,54 +707,43 @@ export function WorkflowEditorCanvas({
           />
         </div>
 
-        {(selectedStep || rightPanelView === 'add-block') && (
+        {selectedStep && (
+          <div className="w-80 shrink-0 my-3 mr-3 px-1 min-h-0 flex flex-col">
+            <StepEditor
+              step={selectedStep}
+              allSteps={editedSteps}
+              workflowName={workflowName}
+              onChange={(patch) => updateStep(selectedStep.id, patch)}
+              onClose={() => setSelectedStepId(null)}
+              errors={stepErrors?.[selectedStep.id]}
+              imageWarning={warningStepIds?.get(selectedStep.id)}
+              dockerImages={dockerImages}
+            />
+          </div>
+        )}
+
+        {rightPanelView === 'add-block' && (
           <div className="w-80 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col min-h-0">
-            {selectedStep ? (
-              <>
-                <div className="shrink-0 flex justify-end px-2 pt-2">
-                  <button
-                    onClick={() => setSelectedStepId(null)}
-                    className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
-                  <StepEditor
-                    step={selectedStep}
-                    allSteps={editedSteps}
-                    workflowName={workflowName}
-                    onChange={(patch) => updateStep(selectedStep.id, patch)}
-                    errors={stepErrors?.[selectedStep.id]}
-                    imageWarning={warningStepIds?.get(selectedStep.id)}
-                    dockerImages={dockerImages}
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b">
-                  <div className="flex items-center gap-2">
-                    <Plus className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-semibold">
-                      {addBlockContext ? 'Insert step' : 'Add block'}
-                    </span>
-                    {addBlockContext && (
-                      <span className="text-[10px] text-muted-foreground font-normal">on edge</span>
-                    )}
-                  </div>
-                  <button
-                    onClick={closeAddBlock}
-                    className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto">
-                  <BlockPicker onAdd={handleBlockAdd} />
-                </div>
-              </>
-            )}
+            <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b">
+              <div className="flex items-center gap-2">
+                <Plus className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold">
+                  {addBlockContext ? 'Insert step' : 'Add block'}
+                </span>
+                {addBlockContext && (
+                  <span className="text-[10px] text-muted-foreground font-normal">on edge</span>
+                )}
+              </div>
+              <button
+                onClick={closeAddBlock}
+                className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <BlockPicker onAdd={handleBlockAdd} />
+            </div>
           </div>
         )}
 

@@ -52,16 +52,19 @@ export async function registerWorkflow(
     throw new ValidationError(retired.message.replace('Cannot run', 'Cannot save'));
   }
 
-  if (!isLocalAgentMode()) {
-    for (const step of parsed.data.steps) {
-      if (step.executor !== 'agent') continue;
-      const cfg = step.agent;
-      const hasImage = typeof cfg?.image === 'string' && cfg.image.length > 0;
-      const hasBuildSource = typeof cfg?.repo === 'string' && cfg.repo.length > 0
-        && typeof cfg?.commit === 'string' && cfg.commit.length > 0;
-      if (hasImage || hasBuildSource) continue;
-      step.agent = { ...cfg, image: DEFAULT_AGENT_IMAGE };
-    }
+  // Every agent step must carry an image so the persisted definition is
+  // deployable — default to the shared golden image when the author gave neither
+  // an image nor a build source. Applied in every mode: local-agent mode ignores
+  // the image at run time, but the saved definition still needs it to run in a
+  // real (container-worker) deployment.
+  for (const step of parsed.data.steps) {
+    if (step.executor !== 'agent') continue;
+    const cfg = step.agent;
+    const hasImage = typeof cfg?.image === 'string' && cfg.image.length > 0;
+    const hasBuildSource = typeof cfg?.repo === 'string' && cfg.repo.length > 0
+      && typeof cfg?.commit === 'string' && cfg.commit.length > 0;
+    if (hasImage || hasBuildSource) continue;
+    step.agent = { ...cfg, image: DEFAULT_AGENT_IMAGE };
   }
 
   const latestVersion = await scope.workflowDefinitions.getLatestVersion(
