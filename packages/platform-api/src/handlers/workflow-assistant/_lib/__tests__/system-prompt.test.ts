@@ -59,6 +59,12 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/blank "what should/i);
   });
 
+  it('tells the model a large build may span several turns and cut-off steps are kept', () => {
+    expect(prompt).toMatch(/built across several turns/i);
+    expect(prompt).toMatch(/cut off/i);
+    expect(prompt).toMatch(/don't cram or cut a build short/i);
+  });
+
   it('tells the model it cannot add or retype a step to terminal — the canvas manages the single terminal', () => {
     expect(prompt).toMatch(/cannot add or change a step to `type: "terminal"`/);
     expect(prompt).toMatch(/point that step's transition \(or a verdict target\) at the existing terminal/);

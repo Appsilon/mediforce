@@ -34,7 +34,17 @@ interface AskScopedInput extends AskWorkflowAssistantInput {
 
 const LIST_MODELS_TOOL_NAME = 'list_models';
 
-const MAX_TOOL_LOOP_ITERATIONS = 5;
+// A large build spans several turns: each turn produces as many steps as fit in
+// the output budget, then a length-cutoff is treated as a chunk boundary and the
+// model continues (see the loop below). The cap bounds a genuinely runaway loop;
+// every turn must apply at least one step to keep going, so it can't spin.
+const MAX_TOOL_LOOP_ITERATIONS = 12;
+
+// Per-turn output budget. Kept comfortably under the 32k-context floor the model
+// picker enforces, so a large embedded system prompt still leaves room. Bigger
+// means fewer chunks (each chunk re-sends the prompt), but truncation is
+// recoverable, so this is a throughput knob, not a correctness one.
+const ASSISTANT_MAX_OUTPUT_TOKENS = 8000;
 
 function buildToolDefinitions(): OpenRouterToolDefinition[] {
   const mutationTools = (
@@ -216,13 +226,29 @@ export async function askWorkflowAssistant(
   const accumulatedToolCalls: WorkflowAssistantToolCall[] = [];
 
   for (let iteration = 0; iteration < MAX_TOOL_LOOP_ITERATIONS; iteration++) {
-    const response = await callOpenRouter({ model, messages, apiKey, tools });
-
-    if (response.finishReason === 'length') {
-      throw new HandlerError('validation', 'Assistant response was truncated — try a shorter request.');
-    }
+    const response = await callOpenRouter({ model, messages, apiKey, tools, maxTokens: ASSISTANT_MAX_OUTPUT_TOKENS });
+    const truncated = response.finishReason === 'length';
 
     if (response.toolCalls.length === 0) {
+      // The model stopped calling tools. If it was cut off mid-sentence with no
+      // salvageable step, that's a genuine failure — surface it.
+      if (truncated) {
+        throw new HandlerError('validation', 'Assistant response was truncated — try a shorter request.');
+      }
+      // Terminal completeness gate: a build that spanned several turns ends here.
+      // Never hand back a graph the user then can't save — re-prompt to finish it.
+      if (accumulatedToolCalls.length > 0) {
+        const finalCheck = validateResultingGraph(input.workflowDefinition, accumulatedToolCalls, input.namespace);
+        if (!finalCheck.valid) {
+          lastErrors = finalCheck.errors;
+          messages.push({ role: 'assistant', content: response.content });
+          messages.push({
+            role: 'user',
+            content: `The workflow isn't finished — it's structurally incomplete: ${finalCheck.errors.join('; ')}. Connect the remaining steps with update_step's insertAfterId/insertBeforeId (referencing real ids from canvas state), then write your short reply.`,
+          });
+          continue;
+        }
+      }
       return accumulatedToolCalls.length > 0
         ? { reply: response.content, toolCalls: accumulatedToolCalls }
         : { reply: response.content };
@@ -243,6 +269,32 @@ export async function askWorkflowAssistant(
         ? { call, kind: 'mutation' as const, toolCall: parsed.toolCall }
         : { call, kind: 'error' as const, error: parsed.error };
     });
+
+    if (truncated) {
+      // Cut off mid-stream: apply the leading run of cleanly-parsed mutations,
+      // drop the truncated tail, and ask the model to continue from the applied
+      // state. The completeness gate runs only when it finally stops, so this
+      // intermediate graph is allowed to be incomplete.
+      const salvaged: WorkflowAssistantToolCall[] = [];
+      for (const r of resolved) {
+        if (r.kind === 'mutation') salvaged.push(r.toolCall);
+        else break;
+      }
+      if (salvaged.length === 0) {
+        throw new HandlerError('validation', 'Assistant response was truncated — try a shorter request.');
+      }
+      accumulatedToolCalls.push(...salvaged);
+      const salvagedCalls = response.toolCalls.slice(0, salvaged.length);
+      messages.push({ role: 'assistant', content: response.content, tool_calls: salvagedCalls });
+      for (const call of salvagedCalls) {
+        messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify({ applied: true }) });
+      }
+      messages.push({
+        role: 'user',
+        content: `Your previous turn was cut off before you finished — the ${String(salvaged.length)} step${salvaged.length === 1 ? '' : 's'} above ${salvaged.length === 1 ? 'was' : 'were'} applied. Continue building the rest of the workflow from the current state; do not repeat steps you already added.`,
+      });
+      continue;
+    }
 
     if (resolved.every((r) => r.kind === 'mutation')) {
       accumulatedToolCalls.push(...resolved.map((r) => r.toolCall));

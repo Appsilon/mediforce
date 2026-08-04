@@ -606,7 +606,7 @@ describe('askWorkflowAssistant handler', () => {
 
     await expect(askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope))
       .rejects.toThrow(HandlerError);
-    expect(fetchSpy).toHaveBeenCalledTimes(5);
+    expect(fetchSpy).toHaveBeenCalledTimes(12);
   });
 
   it('throws HandlerError when OPENROUTER_API_KEY is missing', async () => {
@@ -627,5 +627,71 @@ describe('askWorkflowAssistant handler', () => {
 
     await expect(askWorkflowAssistant({ ...baseInput, namespace: '' }, scope))
       .rejects.toThrow(ValidationError);
+  });
+
+  it('recovers from a length-truncated turn: applies the steps that landed and continues on the next turn', async () => {
+    // Turn 1 is cut off mid-response (finish_reason 'length'): the first add_step
+    // parsed cleanly, the second is truncated JSON. The salvaged step must be
+    // applied and the model asked to continue — not thrown away as a hard error.
+    fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{
+          finish_reason: 'length',
+          message: {
+            content: '',
+            tool_calls: [
+              {
+                id: 'call_1',
+                type: 'function',
+                function: { name: 'add_step', arguments: JSON.stringify({ type: 'creation', executor: 'human', name: 'Extra', insertAfterId: 'review', insertBeforeId: 'done' }) },
+              },
+              {
+                id: 'call_2',
+                type: 'function',
+                function: { name: 'add_step', arguments: '{"type":"creation","executor":"human","name":"Trunc' },
+              },
+            ],
+          },
+        }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{ finish_reason: 'stop', message: { content: 'Built the pipeline.', tool_calls: [] } }],
+      }), { status: 200 }));
+
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    const result = await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(result.reply).toBe('Built the pipeline.');
+    expect(result.toolCalls).toHaveLength(1);
+    expect(result.toolCalls?.[0]).toMatchObject({ tool: 'add_step', arguments: { name: 'Extra' } });
+  });
+
+  it('still errors when a turn truncates before even one tool call is complete', async () => {
+    fetchSpy = mockOpenRouterResponse({
+      choices: [{
+        finish_reason: 'length',
+        message: {
+          content: '',
+          tool_calls: [{
+            id: 'call_1',
+            type: 'function',
+            function: { name: 'add_step', arguments: '{"type":"creat' },
+          }],
+        },
+      }],
+    });
+
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    await expect(askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope))
+      .rejects.toThrow(/truncated/i);
   });
 });
