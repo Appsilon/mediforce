@@ -791,6 +791,34 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     };
   }
 
+  // 21 old Supply Chain dry runs with costs 1–21 make cursor-spanning cost
+  // ordering deterministic. Costs rise as rows get older: client-only sorting
+  // of the initial newest-first page puts $20.00 first and never sees $21.00,
+  // while cursor-backed sorting puts $21.00 on page one and $1.00 on page two.
+  const WORKFLOW_RUNS_PAGINATION_COUNT = 21;
+  for (let runIndex = 1; runIndex <= WORKFLOW_RUNS_PAGINATION_COUNT; runIndex++) {
+    const id = `proc-workflow-runs-pagination-${runIndex}`;
+    processInstances[id] = {
+      id,
+      namespace: 'test',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      dryRun: true,
+      totalCostUsd: runIndex,
+      createdAt: minutesAgo(60_000 + runIndex),
+      updatedAt: minutesAgo(60_000 + runIndex),
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+    };
+  }
+
   const MONITORING_LOADMORE_AGENT_RUN_COUNT = 21;
   // 21 agent runs, all `running` with `fallbackReason: null` — avoids the
   // running/error double-count landmine noted below (`error` bucket keys

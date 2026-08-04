@@ -22,6 +22,8 @@ import {
   useBulkCancelRuns,
 } from '@/hooks/use-run-mutations';
 
+export type RunSortField = 'cost' | 'started';
+
 interface RunsTableProps {
   runs: ProcessInstance[];
   loading: boolean;
@@ -38,25 +40,9 @@ interface RunsTableProps {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
-}
-
-type SortField = 'cost' | 'started' | null;
-
-/** Nulls (unknown cost) always sort last regardless of direction — a
- *  reasonable convention, and avoids "no data" jumping to the top on desc. */
-function compareRuns(a: ProcessInstance, b: ProcessInstance, field: SortField, dir: 1 | -1): number {
-  if (field === 'cost') {
-    const av = a.totalCostUsd;
-    const bv = b.totalCostUsd;
-    if (av == null && bv == null) return 0;
-    if (av == null) return 1;
-    if (bv == null) return -1;
-    return (av - bv) * dir;
-  }
-  if (field === 'started') {
-    return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
-  }
-  return 0;
+  sortField: RunSortField;
+  sortDirection: 'asc' | 'desc';
+  onSort: (field: RunSortField, direction: 'asc' | 'desc') => void;
 }
 
 function isCancellable(run: ProcessInstance): boolean {
@@ -79,6 +65,9 @@ export function RunsTable({
   hasMore = false,
   loadingMore = false,
   onLoadMore,
+  sortField,
+  sortDirection,
+  onSort,
 }: RunsTableProps) {
   const handle = useHandleFromPath();
   const { toast } = useToast();
@@ -88,8 +77,6 @@ export function RunsTable({
   const bulkArchiveMutation = useBulkArchiveRuns();
   const [archivingIds, setArchivingIds] = React.useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
-  const [sortField, setSortField] = React.useState<SortField>(null);
-  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
   const bulkCancelling = bulkCancelMutation.isPending;
   const bulkArchiving = bulkArchiveMutation.isPending;
   const selectAllRef = React.useRef<HTMLInputElement>(null);
@@ -119,18 +106,11 @@ export function RunsTable({
     selectAllRef.current.indeterminate = someSelected && !allSelected;
   }, [selectedIds, runs]);
 
-  const sortedRuns = React.useMemo(() => {
-    if (sortField === null) return runs;
-    const dir = sortDirection === 'asc' ? 1 : -1;
-    return [...runs].sort((a, b) => compareRuns(a, b, sortField, dir));
-  }, [runs, sortField, sortDirection]);
-
-  function handleSort(field: 'cost' | 'started') {
+  function handleSort(field: RunSortField) {
     if (sortField === field) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+      onSort(field, sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      setSortField(field);
-      setSortDirection('desc');
+      onSort(field, 'desc');
     }
   }
 
@@ -213,7 +193,7 @@ export function RunsTable({
     `/${handle}/workflows/${encodeURIComponent(run.definitionName)}/runs/${run.id}`
   );
 
-  const dataHeaders: Array<{ label: string; sortField?: 'cost' | 'started' }> = [
+  const dataHeaders: Array<{ label: string; sortField?: RunSortField }> = [
     ...(showProcess ? [{ label: 'Workflow' }] : []),
     { label: 'Version' },
     { label: 'Status' },
@@ -317,7 +297,7 @@ export function RunsTable({
           </tr>
         </thead>
         <tbody>
-          {sortedRuns.map((run) => {
+          {runs.map((run) => {
             const isSelected = selectedIds.has(run.id);
             return (
               <tr

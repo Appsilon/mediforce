@@ -97,9 +97,10 @@ export type ListRunsInput = z.infer<typeof ListRunsInputSchema>;
 export type ListRunsOutput = z.infer<typeof ListRunsOutputSchema>;
 
 /**
- * Contract for `GET /api/runs/page` — keyset-paginated, newest-first list
- * backing Monitoring → Workflows and the standalone `/runs` page (via
- * `AllRunsPanel`). Separate from `ListRunsInputSchema`/`runs.list` (kept
+ * Contract for `GET /api/runs/page` — keyset-paginated run list (newest-first
+ * by default; selectable Started/Cost ordering) backing Monitoring →
+ * Workflows and the standalone `/runs` page (via `AllRunsPanel`). Separate
+ * from `ListRunsInputSchema`/`runs.list` (kept
  * unbounded-by-cursor for the CLI's `run-list` command and
  * `getMonitoringSummary`'s internal read) rather than overloading it, so
  * neither existing consumer's contract shifts under it.
@@ -117,6 +118,10 @@ export const ListRunsPageInputSchema = z.object({
    *  than the raw `status` column, since it's what the table's badges and
    *  the KPI cards themselves actually show. */
   displayStatus: WorkflowDisplayStatusSchema.optional(),
+  /** Server-side ordering for cursor-paginated rows. `started` maps to
+   *  `createdAt`; `cost` keeps unknown costs last in either direction. */
+  sort: z.enum(['started', 'cost']).optional(),
+  direction: z.enum(['asc', 'desc']).optional(),
   /** Opaque keyset cursor from a previous page's `nextCursor` — omit for
    *  page 1. */
   cursor: z.string().min(1).optional(),
@@ -145,6 +150,8 @@ export const ListRunsPageClientInputSchema = z.object({
   dryRun: z.boolean().optional(),
   archived: z.boolean().optional(),
   displayStatus: WorkflowDisplayStatusSchema.optional(),
+  sort: z.enum(['started', 'cost']).optional(),
+  direction: z.enum(['asc', 'desc']).optional(),
   cursor: z.string().min(1).optional(),
   limit: z.number().int().positive().max(100).optional(),
 });

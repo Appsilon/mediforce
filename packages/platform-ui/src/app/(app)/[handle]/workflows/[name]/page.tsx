@@ -545,6 +545,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
             onDryRunFilterChange={setDryRunFilter}
             showArchivedRuns={showArchivedRuns}
             onShowArchivedRunsChange={setShowArchivedRuns}
+            emptyMessage="No runs yet for this workflow."
           />
         </Tabs.Content>
 

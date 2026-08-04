@@ -33,6 +33,7 @@ const RUN_IN_PROGRESS = 'proc-runs-page-journey-2';
 const RUN_WAITING = 'proc-runs-page-journey-3';
 const RUN_CANCELLED = 'proc-runs-page-journey-4';
 const RUN_ERROR = 'proc-runs-page-journey-5'; // newest
+const PAGINATION_RUN_COUNT = 21;
 
 function runsPageUrl(params: Record<string, string>): string {
   const search = new URLSearchParams({ namespace: TEST_ORG_HANDLE, workflow: WORKFLOW_NAME, ...params });
@@ -95,6 +96,38 @@ test.describe('GET /api/runs/page — API E2E', () => {
 
     const seenIds = [...page1.runs, ...page2.runs, ...page3.runs].map((run) => run.id);
     expect(new Set(seenIds).size).toBe(seenIds.length);
+  });
+
+  test('cost sorting remains global across cursor pages', async ({ request }) => {
+    const page1Res = await request.get(runsPageUrl({
+      workflow: 'Supply Chain Review',
+      dryRun: 'true',
+      sort: 'cost',
+      direction: 'desc',
+      limit: '20',
+    }), { headers: apiKeyHeaders() });
+    expect(page1Res.status(), await page1Res.text()).toBe(200);
+    const page1 = (await page1Res.json()) as {
+      runs: Array<{ id: string; totalCostUsd?: number }>;
+      nextCursor?: string;
+    };
+    expect(page1.runs.map((run) => run.totalCostUsd)).toEqual(
+      Array.from({ length: 20 }, (_, index) => PAGINATION_RUN_COUNT - index),
+    );
+    expect(page1.nextCursor).toBeDefined();
+
+    const page2Res = await request.get(runsPageUrl({
+      workflow: 'Supply Chain Review',
+      dryRun: 'true',
+      sort: 'cost',
+      direction: 'desc',
+      limit: '20',
+      cursor: page1.nextCursor!,
+    }), { headers: apiKeyHeaders() });
+    expect(page2Res.status(), await page2Res.text()).toBe(200);
+    const page2 = (await page2Res.json()) as { runs: Array<{ totalCostUsd?: number }>; nextCursor?: string };
+    expect(page2.runs.map((run) => run.totalCostUsd)).toEqual([1]);
+    expect(page2.nextCursor).toBeUndefined();
   });
 
   test('displayStatus filter narrows to the matching bucket only', async ({ request }) => {

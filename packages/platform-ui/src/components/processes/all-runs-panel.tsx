@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Archive, FlaskConical, X } from 'lucide-react';
 import { useProcessInstancesPage } from '@/hooks/use-process-instances-page';
 import { useMyActionableTasks } from '@/hooks/use-tasks';
-import { RunsTable } from './runs-table';
+import { RunsTable, type RunSortField } from './runs-table';
 import { STATUS_LABELS } from './process-status-badge';
 import { type DryRunFilter, dryRunFilterToQuery } from './dry-run-filter';
 import type { WorkflowDisplayStatus } from '@/lib/workflow-status';
@@ -28,6 +28,7 @@ export function AllRunsPanel({
   onDryRunFilterChange,
   showArchivedRuns: controlledShowArchivedRuns,
   onShowArchivedRunsChange,
+  emptyMessage,
 }: {
   handle: string;
   workflowFilter?: string | null;
@@ -49,20 +50,25 @@ export function AllRunsPanel({
   onDryRunFilterChange?: (value: DryRunFilter) => void;
   showArchivedRuns?: boolean;
   onShowArchivedRunsChange?: (value: boolean) => void;
+  emptyMessage?: string;
 }) {
   const [internalShowArchivedRuns, setInternalShowArchivedRuns] = React.useState(false);
   const [internalDryRunFilter, setInternalDryRunFilter] = React.useState<DryRunFilter>('all');
+  const [sortField, setSortField] = React.useState<RunSortField>('started');
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
   const showArchivedRuns = controlledShowArchivedRuns ?? internalShowArchivedRuns;
   const setShowArchivedRuns = onShowArchivedRunsChange ?? setInternalShowArchivedRuns;
   const dryRunFilter = controlledDryRunFilter ?? internalDryRunFilter;
   const setDryRunFilter = onDryRunFilterChange ?? setInternalDryRunFilter;
 
-  const { data: sorted, loading, hasMore, loadingMore, loadMore } = useProcessInstancesPage({
+  const { data: runs, loading, hasMore, loadingMore, loadMore } = useProcessInstancesPage({
     namespace: handle,
     workflowFilter: workflowFilter ?? undefined,
     dryRun: dryRunFilterToQuery(dryRunFilter),
     archived: showArchivedRuns,
     displayStatus: displayStatusFilter,
+    sort: sortField,
+    direction: sortDirection,
   });
   const { data: activeTasks } = useMyActionableTasks();
 
@@ -131,18 +137,24 @@ export function AllRunsPanel({
       </div>
 
       <RunsTable
-        runs={sorted}
+        runs={runs}
         loading={loading}
         showProcess={!workflowFilter}
         activeTaskByInstance={activeTaskByInstance}
-        emptyMessage={
+        emptyMessage={emptyMessage ?? (
           workflowFilter
             ? `No runs found for "${formatStepName(workflowFilter)}".`
             : 'No runs found.'
-        }
+        )}
         hasMore={hasMore}
         loadingMore={loadingMore}
         onLoadMore={loadMore}
+        sortField={sortField}
+        sortDirection={sortDirection}
+        onSort={(field, direction) => {
+          setSortField(field);
+          setSortDirection(direction);
+        }}
       />
     </div>
   );

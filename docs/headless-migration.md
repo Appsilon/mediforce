@@ -1175,7 +1175,7 @@ key on `status !== 'completed' && status !== 'failed' && status !==
 |---|---|
 | `[handle]/tasks/page.tsx`, `[handle]/page.tsx` (home), `runs/page.tsx`, `workflows/[name]/page.tsx`, `agents/page.tsx` | new tasks / runs appear from agents; operator wants to see them without refresh |
 
-Pollers: `useMyTasks`, `useProcessInstances`, `useAgentRuns`.
+Pollers: `useMyTasks`, `useProcessInstancesPage`, `useAgentRunsPage`.
 
 **NICE LIVE (polling 30s or focus-refetch only)** — dashboards:
 

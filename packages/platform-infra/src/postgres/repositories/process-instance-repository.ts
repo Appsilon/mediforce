@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, isNull, lt, ne, notInArray, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import {
   ProcessInstanceSchema,
   StepExecutionSchema,
@@ -262,35 +262,79 @@ export class PostgresProcessInstanceRepository
     if (options.displayStatus !== undefined) {
       conditions.push(displayStatusConditions()[options.displayStatus]);
     }
+    const sort = options.sort ?? 'createdAt';
+    const direction = options.direction ?? 'desc';
     if (options.cursor !== undefined) {
       const after = decodeProcessInstanceCursor(options.cursor);
-      if (after !== null) {
-        // Keyset (createdAt, id) DESC: emit rows strictly past the cursor.
-        conditions.push(
-          or(
-            lt(processInstances.createdAt, new Date(after.createdAt)),
-            and(
-              eq(processInstances.createdAt, new Date(after.createdAt)),
-              sql`${processInstances.id} < ${after.id}`,
-            ),
-          )!,
-        );
+      if (after !== null && after.sort === sort && after.direction === direction) {
+        const tieBreaker = or(
+          lt(processInstances.createdAt, new Date(after.createdAt)),
+          and(
+            eq(processInstances.createdAt, new Date(after.createdAt)),
+            sql`${processInstances.id} < ${after.id}`,
+          ),
+        )!;
+        if (sort === 'createdAt') {
+          conditions.push(
+            direction === 'asc'
+              ? or(
+                gt(processInstances.createdAt, new Date(after.createdAt)),
+                and(
+                  eq(processInstances.createdAt, new Date(after.createdAt)),
+                  sql`${processInstances.id} < ${after.id}`,
+                ),
+              )!
+              : tieBreaker,
+          );
+        } else if (after.totalCostUsd === null || after.totalCostUsd === undefined) {
+          conditions.push(and(isNull(processInstances.totalCostUsd), tieBreaker)!);
+        } else {
+          const cursorCost = String(after.totalCostUsd);
+          conditions.push(
+            or(
+              direction === 'asc'
+                ? gt(processInstances.totalCostUsd, cursorCost)
+                : lt(processInstances.totalCostUsd, cursorCost),
+              and(eq(processInstances.totalCostUsd, cursorCost), tieBreaker),
+              isNull(processInstances.totalCostUsd),
+            )!,
+          );
+        }
       }
     }
     const rows = await this.db
       .select()
       .from(processInstances)
       .where(and(...conditions))
-      .orderBy(desc(processInstances.createdAt), desc(processInstances.id))
+      .orderBy(
+        ...(sort === 'cost'
+          ? [
+            direction === 'asc'
+              ? sql`${processInstances.totalCostUsd} ASC NULLS LAST`
+              : sql`${processInstances.totalCostUsd} DESC NULLS LAST`,
+            desc(processInstances.createdAt),
+            desc(processInstances.id),
+          ]
+          : [
+            direction === 'asc' ? asc(processInstances.createdAt) : desc(processInstances.createdAt),
+            desc(processInstances.id),
+          ]),
+      )
       .limit(options.limit + 1);
     const hasMore = rows.length > options.limit;
     const pageRows = hasMore ? rows.slice(0, options.limit) : rows;
     const items = pageRows.map((r) => toInstance(r));
-    const last = pageRows[pageRows.length - 1];
+    const last = items[items.length - 1];
     if (hasMore && last !== undefined) {
       return {
         items,
-        nextCursor: encodeProcessInstanceCursor(last.createdAt.toISOString(), last.id),
+        nextCursor: encodeProcessInstanceCursor({
+          sort,
+          direction,
+          createdAt: last.createdAt,
+          id: last.id,
+          totalCostUsd: last.totalCostUsd ?? null,
+        }),
       };
     }
     return { items };
@@ -735,4 +779,3 @@ function toAgentEvent(
     timestamp: row.timestamp.toISOString(),
   };
 }
-
