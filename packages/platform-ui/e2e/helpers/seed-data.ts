@@ -770,11 +770,9 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   };
 
   // 21 dry runs for monitoring.journey.ts's Workflows-tab Load More
-  // coverage. No pre-existing fixture in this file sets `dryRun: true` (nor
-  // does any UI journey create one live), so the Workflows tab's "Dry Runs"
-  // filter is otherwise completely empty — an exact isolation mechanism,
-  // unlike the tab's KPI-bucket clicks (which have no equivalent guarantee
-  // against collision with other journeys' runs in the same status bucket).
+  // coverage. "Dry Runs" plus the Errors KPI card isolates exactly these
+  // rows. Other dry-run fixtures exercise cost pagination, so Dry Runs alone
+  // is not a stable boundary for this journey.
   // PAGE_SIZE=20, so 21 rows makes Load More deterministic: 20 -> 21 ->
   // button gone. Minute-spaced `createdAt`, newest first (i=1 newest) —
   // offset by 50,000 minutes (~34 days), same convention as
@@ -793,7 +791,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       namespace: 'test',
       definitionName: 'Workflows LoadMore Dry Run Workflow',
       definitionVersion: '1.0.0',
-      status: 'completed',
+      status: 'failed',
       currentStepId: null,
       variables: {},
       triggerType: 'manual',
@@ -803,7 +801,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       updatedAt: minutesAgo(50_000 + i),
       createdBy: 'system',
       pauseReason: null,
-      error: null,
+      error: 'Monitoring Load More fixture failure',
       assignedRoles: [],
     };
   }
