@@ -140,11 +140,43 @@ describe('AddStepToolSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('omits fields not exposed anywhere in the human-facing step editor', () => {
+  it('omits only machine-managed fields (id/plugin/metadata/stepParams)', () => {
     const shape = AddStepToolSchema.shape;
-    for (const field of ['plugin', 'metadata', 'stepParams', 'assignedTo', 'continueOnError', 'ui'] as const) {
+    for (const field of ['plugin', 'metadata', 'stepParams'] as const) {
       expect(field in shape).toBe(false);
     }
+  });
+
+  it('exposes the user-authorable fields the assistant previously lacked, for parity with hand-editing', () => {
+    const shape = AddStepToolSchema.shape;
+    for (const field of ['ui', 'assignedTo', 'continueOnError'] as const) {
+      expect(field in shape).toBe(true);
+    }
+  });
+
+  it('accepts a file-upload human step (ui.component + config)', () => {
+    const result = AddStepToolSchema.safeParse({
+      type: 'creation', executor: 'human', name: 'Upload dataframe',
+      ui: { component: 'file-upload', config: { minFiles: 1, maxFiles: 1 } },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts ui passed as a JSON string (models sometimes stringify nested objects)', () => {
+    const result = AddStepToolSchema.safeParse({
+      type: 'creation', executor: 'human', name: 'Upload',
+      ui: '{"component":"file-upload","config":{"maxFiles":3}}',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.ui).toEqual({ component: 'file-upload', config: { maxFiles: 3 } });
+  });
+
+  it('accepts assignedTo and continueOnError', () => {
+    const result = AddStepToolSchema.safeParse({
+      type: 'creation', executor: 'human', name: 'Approve', assignedTo: '${triggerPayload.userId}',
+      continueOnError: true,
+    });
+    expect(result.success).toBe(true);
   });
 });
 

@@ -59,6 +59,13 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/blank "what should/i);
   });
 
+  it('teaches the file-upload task body for file inputs, plus assignedTo and continueOnError', () => {
+    expect(prompt).toMatch(/component: "file-upload"/);
+    expect(prompt).toMatch(/\$\{steps\.<id>\.files\}/);
+    expect(prompt).toMatch(/assignedTo/);
+    expect(prompt).toMatch(/continueOnError/);
+  });
+
   it('tells the model a large build may span several turns and cut-off steps are kept', () => {
     expect(prompt).toMatch(/built across several turns/i);
     expect(prompt).toMatch(/cut off/i);

@@ -27,14 +27,16 @@ function preprocessJsonStringObject(val: unknown): unknown {
   }
 }
 
+// Omit only machine-managed fields (`id` is canvas-assigned; `metadata` is
+// display/internal; `stepParams` is an opaque legacy bag) and `plugin`, which
+// the reducer derives from the executor. Everything a user can author in the UI
+// — including `ui` (custom task bodies like file-upload), `assignedTo`, and
+// `continueOnError` — is exposed so the assistant has parity with hand-editing.
 const StepConfigSchema = WorkflowStepSchema.omit({
   id: true,
   plugin: true,
   metadata: true,
   stepParams: true,
-  assignedTo: true,
-  continueOnError: true,
-  ui: true,
 }).extend({
   type: WorkflowStepSchema.shape.type.unwrap().exclude(['terminal']),
   agent: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.agent),
@@ -42,6 +44,7 @@ const StepConfigSchema = WorkflowStepSchema.omit({
   databricks: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.databricks),
   review: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.review),
   cowork: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.cowork),
+  ui: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.ui),
   action: z.preprocess(
     (val) => {
       const unwrapped = preprocessJsonStringObject(val);

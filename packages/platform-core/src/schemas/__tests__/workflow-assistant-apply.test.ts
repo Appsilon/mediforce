@@ -25,6 +25,22 @@ describe('applyWorkflowAssistantToolCalls', () => {
     expect(added?.autonomyLevel).toBe('L3');
   });
 
+  it('passes ui / assignedTo / continueOnError through to the created step (parity with hand-editing)', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'add_step', arguments: {
+        type: 'creation', executor: 'human', name: 'Upload Dataframe',
+        ui: { component: 'file-upload', config: { minFiles: 1, maxFiles: 1 } },
+        assignedTo: '${triggerPayload.userId}',
+        continueOnError: true,
+      } },
+    ];
+    const { steps } = applyWorkflowAssistantToolCalls(baseCanvas().steps, baseCanvas().transitions, calls);
+    const added = steps.find((s) => s.id === 'upload-dataframe');
+    expect(added?.ui).toEqual({ component: 'file-upload', config: { minFiles: 1, maxFiles: 1 } });
+    expect(added?.assignedTo).toBe('${triggerPayload.userId}');
+    expect(added?.continueOnError).toBe(true);
+  });
+
   it('assigns a new step the slugified id of its name, not its clientId', () => {
     const calls: WorkflowAssistantToolCall[] = [
       { tool: 'add_step', arguments: { type: 'creation', executor: 'action', name: 'Send Results Email', clientId: 'email' } },
