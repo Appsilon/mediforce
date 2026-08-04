@@ -288,6 +288,13 @@
       "when": 1784720152307,
       "tag": "0040_monitoring_pagination_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1784720152308,
+      "tag": "0041_process_instance_trigger_context",
+      "breakpoints": true
     }
   ]
 }

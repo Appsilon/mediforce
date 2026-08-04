@@ -20,6 +20,7 @@ import { useNamespaceAdminContact } from '@/hooks/use-namespace-admin-contact';
 import { useModelValidation } from '@/hooks/use-model-validation';
 import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
 import { ParamField } from '@/components/ui/param-field';
+import { buildTriggerPayload, hasInvalidObjectInput } from '@/lib/trigger-input-payload';
 import type { TriggerInputField } from '@mediforce/platform-core';
 
 interface StartRunButtonProps {
@@ -151,7 +152,7 @@ export function StartRunButton({
     setDropdownOpen(false);
     setDialogOpen(false);
 
-    const payload = hasTriggerInput ? buildPayload() : undefined;
+    const payload = hasTriggerInput ? buildTriggerPayload(triggerInput, inputValues) : undefined;
 
     try {
       const result = await startMutation.mutateAsync({
@@ -184,23 +185,10 @@ export function StartRunButton({
     return false;
   });
 
-  function buildPayload(): Record<string, unknown> {
-    const payload: Record<string, unknown> = {};
-    for (const field of triggerInput) {
-      const raw = inputValues[field.name];
-      if (raw === '' || raw === undefined) continue;
-      if (Array.isArray(raw) && raw.length === 0) continue;
-      if (field.type === 'number') {
-        const num = parseFloat(String(raw));
-        if (!isNaN(num)) {
-          payload[field.name] = num;
-        }
-      } else {
-        payload[field.name] = raw;
-      }
-    }
-    return payload;
-  }
+  // An `object` field holding text the payload validator would reject (ADR-0012)
+  // guarantees a 400, so block the submit the same way a missing required field does.
+  const inputBlocked = hasTriggerInput
+    && (requiredInputMissing || hasInvalidObjectInput(triggerInput, inputValues));
 
   function handleStart(v?: number) {
     const versionChanged = v !== undefined && v !== effectiveVersion;
@@ -347,10 +335,10 @@ export function StartRunButton({
             </Dialog.Close>
             <button
               onClick={() => executeStart(pendingVersion, true)}
-              disabled={hasTriggerInput && requiredInputMissing}
+              disabled={inputBlocked}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 hover:bg-violet-100 dark:border-violet-700 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 px-3 py-1.5 text-sm font-medium text-violet-700 dark:text-violet-300 transition-colors',
-                hasTriggerInput && requiredInputMissing && 'opacity-50 cursor-not-allowed',
+                inputBlocked && 'opacity-50 cursor-not-allowed',
               )}
             >
               <FlaskConical className="h-3.5 w-3.5" />
@@ -358,10 +346,10 @@ export function StartRunButton({
             </button>
             <button
               onClick={() => executeStart(pendingVersion)}
-              disabled={hasTriggerInput && requiredInputMissing}
+              disabled={inputBlocked}
               className={cn(
                 'rounded-md bg-primary hover:bg-primary/90 px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors',
-                hasTriggerInput && requiredInputMissing && 'opacity-50 cursor-not-allowed',
+                inputBlocked && 'opacity-50 cursor-not-allowed',
               )}
             >
               {startButtonLabel}

@@ -7,9 +7,9 @@ const baseCtx: ActionContext = {
   processInstanceId: 'inst-1',
   sources: {
     triggerPayload: {
-      body: { id: 42, hello: 'world' },
-      method: 'POST',
+      entry: { id: 42, hello: 'world' },
     },
+    triggerContext: { method: 'POST' },
     steps: {
       fetch: { body: { json: { user: { name: 'Alice', age: 30 } } } },
     },
@@ -23,7 +23,7 @@ describe('reshapeActionHandler', () => {
     const out = await reshapeActionHandler(
       {
         values: {
-          greeting: 'hello ${triggerPayload.body.hello}',
+          greeting: 'hello ${triggerPayload.entry.hello}',
           path: '/api/users/${steps.fetch.body.json.user.name}',
         },
       },
@@ -39,7 +39,7 @@ describe('reshapeActionHandler', () => {
     const out = await reshapeActionHandler(
       {
         values: {
-          payload: '${triggerPayload.body}',
+          payload: '${triggerPayload.entry}',
           age: '${steps.fetch.body.json.user.age}',
         },
       },
@@ -68,7 +68,7 @@ describe('reshapeActionHandler', () => {
       {
         values: {
           user: {
-            id: '${triggerPayload.body.id}',
+            id: '${triggerPayload.entry.id}',
             profile: { name: '${steps.fetch.body.json.user.name}' },
           },
         },
@@ -84,7 +84,7 @@ describe('reshapeActionHandler', () => {
     const out = await reshapeActionHandler(
       {
         values: {
-          ids: ['${triggerPayload.body.id}', 'static', 99],
+          ids: ['${triggerPayload.entry.id}', 'static', 99],
           users: [{ name: '${steps.fetch.body.json.user.name}' }],
         },
       },
@@ -100,7 +100,7 @@ describe('reshapeActionHandler', () => {
     const out = await reshapeActionHandler(
       {
         values: {
-          combo: '${triggerPayload.body.hello}-${steps.fetch.body.json.user.name}-${variables.workflowId}',
+          combo: '${triggerPayload.entry.hello}-${steps.fetch.body.json.user.name}-${variables.workflowId}',
         },
       },
       baseCtx,

@@ -60,7 +60,10 @@ Handler nuances not visible in the schema (in
 [`core-actions/src/handlers/`](../packages/core-actions/src/handlers/)):
 - `spawn` fan-out is **capped at 50 children per step execution**
   ([`spawn.ts`](../packages/core-actions/src/handlers/spawn.ts)); `continueOnSpawnError`
-  (default `true`) decides whether one failed child aborts the action.
+  (default `true`) decides whether one failed child aborts the action. Each
+  interpolated child payload is validated against that child's `triggerInput`
+  contract before firing; a mismatch is reported in `errors[]` (or aborts when
+  `continueOnSpawnError: false`).
 - `email` supports `cc` / `bcc` / `replyTo` / `html` and is **rate-limited**
   (default 50/run, 30/minute) in [`email.ts`](../packages/core-actions/src/handlers/email.ts).
 - `http` never throws on a non-2xx response — it returns `{ status, headers, body }`;
@@ -73,11 +76,17 @@ Handler nuances not visible in the schema (in
 | Use site | Syntax | Roots available | Source |
 |----------|--------|-----------------|--------|
 | Transition `when` | bare, no `${}`: `verdict == "x"`, `output.f > 1`, `&&`, `\|\|`, `!` | `output`, `variables`, `verdict` | [`expression-evaluator.ts`](../packages/workflow-engine/src/expressions/expression-evaluator.ts) |
-| Action configs, `spawn` payloads, `assignedTo`, step `env`, http body | `${...}` templates with dot/index paths | `steps`, `item` (in `forEach`), `triggerPayload`, `variables`, `secrets` | [`interpolation.ts`](../packages/platform-core/src/interpolation.ts) |
+| Action configs, `spawn` payloads, `assignedTo`, step `env`, http body | `${...}` templates with dot/index paths | `steps`, `item` (in `forEach`), `triggerPayload`, `triggerContext`, `variables`, `secrets` | [`interpolation.ts`](../packages/platform-core/src/interpolation.ts) |
 
 Notes that trip people up:
-- A manual trigger's `triggerInput` form values arrive at runtime as
-  `${triggerPayload.*}`, not `${triggerInput.*}`.
+- `triggerInput` is the workflow's **total input contract**, and every trigger
+  validates against it (ADR-0012). Its values arrive at runtime as
+  `${triggerPayload.*}`, not `${triggerInput.*}` — identically whether a manual
+  form, a webhook body, or a cron row's static payload supplied them.
+- `${triggerContext.*}` is the transport escape hatch (webhook
+  `headers`/`query`/`method`/`path`, cron `firedAt`/`schedule`). It carries no
+  declared input, and bare identifiers deliberately do **not** fall through to
+  it — a step reading it has knowingly coupled itself to one trigger kind.
 - `${steps.<id>.<path>}` reads a previous step's output; `getPath` supports
   `a.b`, `a.0.x`, and `a[0].x`, and returns empty for missing paths.
 - `${secrets.NAME}` resolves in any action config field (never in transition
@@ -244,22 +253,41 @@ workflow out-of-band and managed via
 the UI **Triggers** tab, or `POST /api/workflow-definitions/:name/triggers`. The
 `manual` trigger is a per-workflow singleton auto-seeded on register (hand-start
 works by default). Webhook config is narrowed by `WebhookTriggerConfigSchema`
-([`workflow-definition.ts`](../packages/platform-core/src/schemas/workflow-definition.ts)).
+([`trigger.ts`](../packages/platform-core/src/schemas/trigger.ts)). A cron
+payload can be supplied with `--payload '<json object>'` on `trigger-add` or
+`trigger-update`; it must satisfy the workflow's `triggerInput` contract.
 See [ADR-0011](adr/0011-triggers-detached-unified-resource.md).
 
 The three types are routed the same way regardless of how they are attached:
 
 | `type` | Routed by | Notes |
 |--------|-----------|-------|
-| `manual` | [`manual-trigger.ts`](../packages/workflow-engine/src/triggers/manual-trigger.ts) | form values come from `triggerInput`; arrive at runtime as `${triggerPayload.*}` |
-| `webhook` | [`webhook-router.ts`](../packages/workflow-engine/src/triggers/webhook-router.ts) | typed `method` + `path` (exact match, no globbing); payload is `{ body, headers, query, method, path }` |
-| `cron` | [`cron-trigger.ts`](../packages/workflow-engine/src/triggers/cron-trigger.ts) | `schedule` cron string; scheduler is deployment-side |
+| `manual` | [`manual-trigger.ts`](../packages/workflow-engine/src/triggers/manual-trigger.ts) | form values come from `triggerInput`; no transport, so `triggerContext` is empty |
+| `webhook` | [`webhook-router.ts`](../packages/workflow-engine/src/triggers/webhook-router.ts) | typed `method` + `path` (exact match, no globbing); the JSON body's **top-level keys map 1:1 onto `triggerInput`** and are validated (400 + per-field `details` on mismatch); the remaining HTTP envelope goes to `triggerContext` — credential headers are stripped |
+| `cron` | [`cron-trigger.ts`](../packages/workflow-engine/src/triggers/cron-trigger.ts) | `schedule` cron string; scheduler is deployment-side. An optional static `config.payload` per row is the tick's input, validated at attach time and again at fire time (drift skips the tick with a reason); `schedule`/`firedAt` go to `triggerContext` |
 | `event` | — | **in the enum but has no router** ([`triggers/`](../packages/workflow-engine/src/triggers/) has only manual/webhook/cron) — treat as not yet implemented |
 
-Manual-start form fields are `triggerInput` (`TriggerInputFieldSchema`): each has
-a `type` of `string` / `number` / `boolean` / `date` / `datetime` / `select` /
-`multiselect` / `textarea`, plus `options` / `default` / `required` (it extends
-`StepParamSchema`).
+`triggerInput` (`TriggerInputFieldSchema`) is the contract every trigger
+validates against, and doubles as the manual-start form. Spawned child runs use
+the same contract before their manual-style firing. Each field has a `type`
+of `string` / `number` / `boolean` / `date` / `datetime` / `select` /
+`multiselect` / `textarea` / `object`, plus `options` / `default` / `required`
+(it extends `StepParamSchema`). `object` holds an opaque JSON object whose
+contents the definition does not enumerate — the way a proxied third-party body
+enters a run; the Start Run form renders it as a JSON textarea and blocks
+submission while the text is not a JSON object. Validation is **total and always
+on**: undeclared fields are a hard error, and an empty/absent `triggerInput`
+means the payload must be empty.
+
+A field's `default` belongs to the contract, not to the form: `validatePayload`
+fills it in for every field a firing left out (`undefined` or `null` — a supplied
+`false` / `0` / `''` is a value and survives) and returns the resolved payload
+that the manual, webhook, cron and `spawn` paths all fire with. So a `required`
+field with a `default` is satisfiable by a cron row carrying no payload, and the
+default is type-checked like any other value. See
+[`payload-validator.ts`](../packages/platform-core/src/validation/payload-validator.ts)
+and the field-by-field tour in
+[`07-trigger-varieties.wd.json`](workflow-examples/07-trigger-varieties.wd.json).
 
 ## Workflow-level fields (the envelope)
 
