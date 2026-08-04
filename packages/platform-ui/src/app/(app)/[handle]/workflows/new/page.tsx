@@ -8,7 +8,7 @@ import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { mediforce, ApiError } from '@/lib/mediforce';
-import { parseStepErrors, validateSteps, mergeVerdictTransitions, toastRegistrationWarnings } from '@/lib/workflow-save-utils';
+import { parseStepErrors, validateSteps, mergeVerdictTransitions, toastRegistrationWarnings, formatSaveErrorMessage } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
@@ -142,13 +142,9 @@ export default function NewWorkflowPage() {
         : [];
       const parsed = parseStepErrors(issues, steps);
       setStepErrors(parsed);
-      const message = err instanceof ApiError ? err.message
-        : err instanceof Error ? err.message : 'Unknown error';
       setSaveState({
         status: 'error',
-        message: Object.keys(parsed).length > 0
-          ? 'Some steps have errors — check the highlighted steps in the diagram.'
-          : message,
+        message: formatSaveErrorMessage(err, Object.keys(parsed).length > 0),
       });
     }
   }, [workflowName, effectiveNamespace, description, handle, router]);
@@ -217,7 +213,7 @@ export default function NewWorkflowPage() {
               </span>
             )}
             {saveState.status === 'error' && (
-              <span className="text-sm text-red-600 dark:text-red-400 max-w-xs truncate" title={saveState.message}>
+              <span className="text-sm text-red-600 dark:text-red-400 max-w-md whitespace-normal break-words text-right" title={saveState.message}>
                 {saveState.message}
               </span>
             )}

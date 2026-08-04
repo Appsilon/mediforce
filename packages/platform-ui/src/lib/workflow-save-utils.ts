@@ -27,6 +27,48 @@ export function parseStepErrors(
 }
 
 /**
+ * Builds the user-facing message shown in the save header after a failed save.
+ * Step-scoped issues are already rendered inline on the diagram, so we only
+ * point the user there; everything else is translated from raw server text
+ * (Zod jargon, stray JSON envelopes) into plain English so the toast is
+ * readable without inspecting the DOM.
+ */
+export function formatSaveErrorMessage(err: unknown, hasStepErrors: boolean): string {
+  if (hasStepErrors) {
+    return 'Some steps have errors — check the highlighted steps in the diagram.';
+  }
+  return friendlySaveErrorMessage(err instanceof Error ? err.message : '');
+}
+
+function friendlySaveErrorMessage(message: string): string {
+  const trimmed = message.trim();
+  if (trimmed === '') {
+    return 'Unable to save the workflow. Please try again.';
+  }
+  if (looksLikeSerializedJson(trimmed)) {
+    return 'The workflow could not be saved. Please check your inputs and try again.';
+  }
+  if (/invalid enum value/i.test(trimmed)) {
+    return 'A field has an invalid value.';
+  }
+  if (/must contain at least|too small|expected .*, received/i.test(trimmed)) {
+    return 'A required field is empty or missing.';
+  }
+  return trimmed;
+}
+
+function looksLikeSerializedJson(text: string): boolean {
+  const first = text[0];
+  if (first !== '{' && first !== '[') return false;
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return typeof parsed === 'object' && parsed !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Validates steps for known structural errors before saving.
  * Returns an error message string on failure, or null when valid.
  */
