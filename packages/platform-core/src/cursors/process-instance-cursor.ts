@@ -5,19 +5,22 @@ import { encodeCursor, decodeCursor } from './cursor';
  * Cursor payload for `ProcessInstanceRepository.listPage` /
  * `.listPageInNamespaces`.
  *
- * Keyset tuple `(createdAt, id)` — the natural tie-breaker for the repo's
- * sort order (createdAt DESC, id DESC). Same shape as `AgentRunCursorPayload`
- * (see `agent-run-cursor.ts`), just keyed on a different timestamp column.
+ * Carries the active order and its complete keyset tuple. `createdAt`/`id`
+ * remain deterministic tie-breakers for cost ordering; unknown costs sort
+ * after known costs regardless of direction.
  */
 const ProcessInstanceCursorPayloadSchema = z.object({
+  sort: z.enum(['createdAt', 'cost']).default('createdAt'),
+  direction: z.enum(['asc', 'desc']).default('desc'),
   createdAt: z.string().min(1),
   id: z.string().min(1),
+  totalCostUsd: z.number().nullable().optional(),
 });
 
 export type ProcessInstanceCursorPayload = z.infer<typeof ProcessInstanceCursorPayloadSchema>;
 
-export function encodeProcessInstanceCursor(createdAt: string, id: string): string {
-  return encodeCursor<ProcessInstanceCursorPayload>({ createdAt, id });
+export function encodeProcessInstanceCursor(payload: ProcessInstanceCursorPayload): string {
+  return encodeCursor<ProcessInstanceCursorPayload>(payload);
 }
 
 export function decodeProcessInstanceCursor(cursor: string): ProcessInstanceCursorPayload | null {

@@ -1,4 +1,4 @@
-import type { HumanTaskStatus, InstanceStatus } from '@mediforce/platform-core';
+import type { HumanTaskStatus } from '@mediforce/platform-core';
 
 /**
  * Cache key factories per ADR-0006 §2.
@@ -41,20 +41,21 @@ export const queryKeys = {
      *  the name-map projection). Intentional: any run-set change should
      *  refresh display-name lookups in the next tick. */
     all: () => ['runs'] as const,
-    /** Runs scoped to a workspace handle, optionally narrowed by workflow + status. */
-    byHandle: (
-      handle: string,
-      filters?: { workflow?: string; status?: InstanceStatus; limit?: number },
-    ) => ['runs', handle, { ...filters }] as const,
     /** Workspace-scoped `id → definitionName` map. Lives under the `runs`
      *  prefix so mutation-driven invalidations refresh labels without per-site
      *  wiring; keyed by handle so two workspaces don't share a cache entry. */
     nameMap: (handle: string) => ['runs', 'name-map', handle] as const,
-    /** Keyset-paginated run list (Monitoring → Workflows, `/runs`) — distinct
-     *  from `byHandle` (the unbounded legacy read) since the two coexist. */
+    /** Keyset-paginated run list (Monitoring → Workflows, `/runs`). */
     page: (
       handle: string,
-      filters: { workflow?: string; dryRun?: boolean; archived?: boolean; displayStatus?: string },
+      filters: {
+        workflow?: string;
+        dryRun?: boolean;
+        archived?: boolean;
+        displayStatus?: string;
+        sort?: 'started' | 'cost';
+        direction?: 'asc' | 'desc';
+      },
     ) => ['runs', 'page', handle, { ...filters }] as const,
     /** Grouped WorkflowDisplayStatus counts backing the Workflows tab's KPI
      *  cards — same filter shape as `page` minus `displayStatus` itself. */

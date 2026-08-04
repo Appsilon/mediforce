@@ -51,7 +51,7 @@ export interface MonitoringData {
  * reads.
  *
  * Deliberately does NOT fetch process instances here — the Workflows tab
- * used to (`useProcessInstances('all', ...)`, up to 10k rows, on every
+ * used to use an unbounded run list (up to 10k rows, on every
  * Monitoring page load regardless of active tab) purely to JS-count KPI
  * cards; it now reads `mediforce.runs.statusCounts` (a real SQL
  * aggregation) and `AllRunsPanel` paginates its own row-level fetch. See

@@ -315,17 +315,18 @@ test.describe('Monitoring Journey', () => {
     trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/monitoring`);
 
-    // 21 dedicated dry runs (seed-data.ts's "Workflows LoadMore Dry Run
-    // Workflow" batch) — the Workflows tab has no per-workflow filter of its
-    // own, but no other fixture or journey creates a dry run, so the "Dry
-    // Runs" toggle isolates exactly these 21 rows, an exact filter rather
-    // than a KPI-bucket lower bound.
+    // 21 dedicated failed dry runs (seed-data.ts's "Workflows LoadMore Dry
+    // Run Workflow" batch). The Workflows tab has no per-workflow filter, so
+    // use the exact Dry Runs + Errors intersection — other fixtures also use
+    // dry runs for cost-pagination coverage.
     await page.getByRole('button', { name: 'Dry Runs' }).click();
 
     // KPI cards report the real DB count of the filtered set, not a tally
-    // of the ≤20 rows rendered in the table below them — all 21 fixtures
-    // are seeded `status: 'completed'`.
-    await expect(page.getByText('21', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
+    // of the ≤20 rows rendered in the table below them.
+    const errorsCard = page.getByRole('button', { name: /Error$/ });
+    await expect(errorsCard).toContainText('21', { timeout: 10_000 });
+    await errorsCard.click();
+    await expect(page.getByText('Filtered by: Error')).toBeVisible();
 
     const rows = page.locator('tbody tr');
     await expect(rows).toHaveCount(20, { timeout: 10_000 });

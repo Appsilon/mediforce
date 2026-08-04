@@ -1461,6 +1461,8 @@ export class Mediforce {
           dryRun: validated.dryRun !== undefined ? String(validated.dryRun) : undefined,
           archived: validated.archived !== undefined ? String(validated.archived) : undefined,
           displayStatus: validated.displayStatus,
+          sort: validated.sort,
+          direction: validated.direction,
           cursor: validated.cursor,
           limit: String(validated.limit ?? 20),
         });
