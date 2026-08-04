@@ -19,7 +19,7 @@
     "seed:dev": "pnpm exec tsx scripts/seed-dev-data.ts"
   },
   "dependencies": {
-    "@auth/drizzle-adapter": "1.11.2",
+    "@auth/drizzle-adapter": "1.11.3",
     "@codemirror/lang-javascript": "^6.2.5",
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/lang-yaml": "^6.1.3",
