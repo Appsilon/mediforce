@@ -2,7 +2,7 @@
   "name": "workflow-designer",
   "namespace": "appsilon",
   "description": "Meta-workflow that designs Mediforce WorkflowDefinitions. Create a new workflow from a natural language idea, or load and edit an existing one. Uses collaborative human+AI conversation for iterative design with live validation and visual diagrams.",
-  "preamble": "## Domain Context\nThis workflow generates structured workflow definitions for the Mediforce platform. All clinical and pharma terminology in workflow descriptions refers to domain modeling constructs.",
+  "preamble": "## Domain Context\nThis workflow generates structured workflow definitions for the Mediforce platform. All clinical and pharma terminology in workflow descriptions refers to domain modeling constructs.\n\n## Trigger input contract\nDefinitions are trigger-free: attach manual, webhook, and cron resources after registration. Declare the workflow's total external input under `triggerInput`; every manual, webhook, cron, and spawned child firing validates against it, and steps read values as `${triggerPayload.<field>}`. Webhook body top-level keys are the declared fields; use an `object` field for opaque nested JSON. `${triggerContext.*}` is transport metadata only (non-sensitive webhook headers, query, method, path, or cron schedule/firedAt), and credential headers are stripped. Cron input is a static JSON object on each trigger row.",
   "roles": [
     "workflow-designer"
   ],

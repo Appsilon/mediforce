@@ -50,7 +50,8 @@ Definition), conflating with the parent Workflow.
 
 **Workflow Run** *(today's `ProcessInstance` — rename to `WorkflowRun` proposed)*:
 One execution of a Workflow Definition. Tracks current step, status,
-accumulated variables, trigger payload, total cost, deleted/archived flags.
+accumulated variables, trigger payload and trigger context, total cost,
+deleted/archived flags.
 **"Run" is the canonical term** — used everywhere in the UI, URLs
 (`/workflows/{name}/runs/{runId}`), API routes (`/api/runs/{runId}`), schema
 comments ("new runs", "archived runs", git branch `run/<runId>`), and
@@ -84,6 +85,54 @@ row-driven from `listEnabledByType('cron')`, hand-start gates on an enabled
 _Avoid_: treating a Trigger as part of the Workflow Definition (it isn't — they
 are detached resources), or conflating it with the **Trigger Payload** on a
 Workflow Run (the data a firing hands the Run).
+
+**Trigger Input** *(contract; on the Workflow Definition — `triggerInput`)*:
+The **total, trigger-agnostic input contract** a Workflow declares — the named,
+typed fields a firing must supply, regardless of which Trigger kind fires. Every
+firing is validated against it: declared fields are required/typed, undeclared
+fields are **rejected** (strict), and an empty/absent contract means the payload
+must be **empty**. Opaque un-enumerable input (a proxied third-party JSON body)
+is declared as a single field of `object` type. A field's `default` is part of
+the contract, not of the manual form: it is filled in for every firing that
+omitted the field, on every path, so a `required` field with a `default` is
+satisfiable by a payload-less cron row.
+_Code:_ `TriggerInputFieldSchema` in
+`packages/platform-core/src/schemas/workflow-definition.ts`; enforced by
+`validatePayload` (`validation/payload-validator.ts`) on every firing path —
+`start-run` (manual/API), `WebhookRouter` (body top-level keys → fields, 400 on
+mismatch), the cron heartbeat (the row's static `config.payload`, also checked
+at attach time by `createTrigger` / `updateTrigger`), and the `spawn` action
+before it fires a child workflow (`packages/core-actions/src/handlers/spawn.ts`).
+_Status:_ unified across manual + webhook + cron + spawned child runs, with the
+`object` type, as of Issue #1020. An opaque top-level **array** has no dedicated
+type — it nests under an `object` field.
+_Avoid_: treating `triggerInput` as webhook-body-only or manual-only; using
+**Trigger Context** to carry declared input.
+
+**Trigger Payload** *(runtime; on a Workflow Run)*:
+The **validated, trigger-agnostic** input a firing hands the Run — the caller's
+fields plus the contract's defaults for the ones they omitted. It conforms to
+the Workflow's **Trigger Input** contract and is read by Steps as
+`${triggerPayload.<field>}` no matter which Trigger fired.
+_Avoid_: putting transport metadata (HTTP headers, cron `firedAt`) on it — that
+belongs on **Trigger Context**.
+
+**Trigger Context** *(runtime; on a Workflow Run)*:
+A reserved, **trigger-specific** escape hatch holding the transport metadata of
+a firing (webhook `headers`/`query`/`method`/`path`, cron `firedAt`/`schedule`).
+Webhook credential headers — `authorization`, `proxy-authorization`, `cookie`,
+and `x-api-key` — are stripped before the remaining headers are persisted.
+Steps that read `${triggerContext.*}` knowingly re-couple to a Trigger kind.
+_Code:_ `ProcessInstance.triggerContext` (column `process_instances.trigger_context`,
+migration `0040`), exposed to interpolation via `InterpolationSources` in
+`packages/platform-core/src/interpolation.ts`; webhook header filtering lives in
+`stripCredentialHeaders` in
+`packages/workflow-engine/src/triggers/webhook-router.ts`. Populated
+by each trigger adapter; a manual start and spawned child start leave it empty.
+Bare identifiers deliberately do **not** fall through to it — re-coupling must
+be spelled out.
+_Avoid_: routing declared workflow input through it — declared input is **Trigger
+Payload**.
 
 **Workflow Step** *(config; static)*:
 A node in a Workflow Definition's DAG. Defines `executor: human | agent |

@@ -22,7 +22,7 @@ map of capabilities to the source files that define them, see
 | `04b-script-r-clinical.wd.json` | R runtime script step |
 | `05-action-steps.wd.json` | `http`, `reshape`, `email` actions |
 | `06-env-secrets-databricks.wd.json` | `env`, secrets, Databricks job step |
-| `07-trigger-varieties.wd.json` | `triggerInput` fields (triggers themselves are table resources, not declared on the definition — see ADR-0011) |
+| `07-trigger-varieties.wd.json` | The unified `triggerInput` contract — every field type (`string` / `number` / `boolean` / `date` / `datetime` / `select` / `multiselect` / `textarea` / `object`) with `required` / `options` / `default`, read as `${triggerPayload.*}` whichever trigger fires, plus the `${triggerContext.*}` transport hatch (ADR-0012). Triggers themselves are table resources, not declared on the definition (ADR-0011) |
 | `08-selection-review.wd.json` | `selection` + human review |
 | `09-cowork-step.wd.json` | `cowork` live collaboration step |
 | `10-validation-gate.wd.json` | Validation gate with verdicts |

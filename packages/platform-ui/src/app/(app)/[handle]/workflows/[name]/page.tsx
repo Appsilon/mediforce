@@ -14,7 +14,7 @@ import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { apiFetch } from '@/lib/api-fetch';
-import type { WorkflowDefinition } from '@mediforce/platform-core';
+import { pickRunnableVersion, type WorkflowDefinition } from '@mediforce/platform-core';
 import { VersionLabel } from '@/components/ui/version-label';
 import { DeleteWorkflowDialog } from '@/components/workflows/delete-workflow-dialog';
 import { formatCron } from '@/lib/format-cron';
@@ -188,12 +188,37 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const [activeTab, setActiveTab] = React.useState(initialTab);
   const [showArchivedRuns, setShowArchivedRuns] = React.useState(false);
 
-  const { versions, loading: versionsLoading } = useWorkflowVersions(decodedName, handle);
+  const {
+    versions,
+    defaultVersion,
+    loading: versionsLoading,
+  } = useWorkflowVersions(decodedName, handle);
   // The page header reads the full latest definition (visibility, steps[], repo,
   // url, copiedFrom) which the metadata summary does not carry. Fetch it once
   // per workflow.
   const latestVersionNumber = versions[0]?.version ?? null;
   const { definition: latest } = useWorkflowVersion(decodedName, handle, latestVersionNumber);
+  // The Triggers tab needs the contract a *firing* will be validated against,
+  // which is the version a trigger resolves — so the selection runs through the
+  // very function the server's `resolveRunnableVersion` delegates to, not a
+  // second copy of the rule. Reading the latest version instead would label the
+  // cron payload editor with fields the server then rejects, whenever the
+  // default is pinned behind the head.
+  //
+  // The deleted gate stays here: deletion is per *name*, not per version, so the
+  // server checks it before it ever filters versions. The version summaries
+  // carry `archived` but not `deleted`; a soft delete flags every version of the
+  // name at once and the name can never be re-registered, so the fetched
+  // definition's `deleted` is that same name-level gate.
+  const runnableVersionNumber =
+    latest?.deleted === true
+      ? null
+      : (pickRunnableVersion(versions, defaultVersion)?.version ?? null);
+  const { definition: runnable, loading: runnableLoading } = useWorkflowVersion(
+    decodedName,
+    handle,
+    runnableVersionNumber,
+  );
   // Live trigger rows (enabled/schedule) drive the header summary, so stopping
   // a cron trigger in the Triggers tab immediately updates the header.
   const { cronTriggers, triggers, loading: triggersLoading } = useWorkflowTriggers(decodedName, handle);
@@ -565,7 +590,12 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
         {/* Triggers tab */}
         <Tabs.Content value="triggers" className="flex-1 p-6">
           <div className="max-w-2xl">
-            <TriggersPanel handle={handle} definitionName={decodedName} />
+            <TriggersPanel
+              handle={handle}
+              definitionName={decodedName}
+              triggerInput={runnable?.triggerInput ?? []}
+              contractLoading={versionsLoading || runnableLoading}
+            />
           </div>
         </Tabs.Content>
 

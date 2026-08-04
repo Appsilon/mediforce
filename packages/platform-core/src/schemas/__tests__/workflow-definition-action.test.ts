@@ -20,7 +20,7 @@ const baseTemplate = {
         config: {
           method: 'POST',
           url: 'http://localhost:9099/anything',
-          body: '${triggerPayload.body}',
+          body: '${triggerPayload.entry}',
         },
       },
     },
@@ -131,7 +131,7 @@ describe('workflow-definition action executor', () => {
             kind: 'reshape',
             config: {
               values: {
-                id: '${triggerPayload.body.id}',
+                id: '${triggerPayload.entry.id}',
                 source: 'webhook',
                 count: 1,
               },

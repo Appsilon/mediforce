@@ -75,6 +75,23 @@ anti-patterns). They are deliberately small and are **not** production packages.
 For an end-to-end production-style package, read
 [`apps/golden-standard-workflow`](../apps/golden-standard-workflow).
 
+## Define the input contract
+
+Declare the workflow's complete external input under `triggerInput` in the
+`.wd.json`. It is a strict, trigger-agnostic contract: manual forms, webhook
+bodies, cron payloads, and spawned child runs all validate against it. Steps read
+validated values as `${triggerPayload.<field>}` regardless of how the Run was
+started.
+
+For webhooks, the JSON body's top-level keys must be the declared field names;
+undeclared, missing, or mistyped fields are rejected with `400`. Use an
+`object`-typed field when a third-party body is opaque, and nest that body under
+the field name. An empty or absent `triggerInput` accepts only an empty payload.
+
+Transport metadata is separate: webhook method, path, query, and non-sensitive
+headers, plus cron schedule and `firedAt`, are available as
+`${triggerContext.*}`. Credential headers are never copied into the Run.
+
 ## Attach triggers (not part of the definition)
 
 Definitions are **trigger-free** — do not declare a `triggers` array in the
@@ -84,6 +101,25 @@ out-of-band after registering with `mediforce workflow trigger-add` (or the UI
 **Triggers** tab); manage them with `trigger-list` / `trigger-update` /
 `trigger-start` / `trigger-stop` / `trigger-remove`. See
 [ADR-0011](adr/0011-triggers-detached-unified-resource.md).
+
+Cron triggers can carry a different static input per row. Supply it as a JSON
+object whose keys satisfy `triggerInput`; the server validates it when the row
+is added or updated and skips a due tick if a later workflow version makes the
+stored payload invalid:
+
+```bash
+pnpm exec mediforce workflow trigger-add my-workflow \
+  --trigger hourly-eu \
+  --type cron \
+  --schedule '0 * * * *' \
+  --payload '{"region":"eu"}' \
+  --namespace docs
+
+pnpm exec mediforce workflow trigger-update my-workflow \
+  --trigger hourly-eu \
+  --payload '{"region":"us"}' \
+  --namespace docs
+```
 
 ## Import from git
 

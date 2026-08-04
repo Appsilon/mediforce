@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 const pageErrors = new WeakMap<Page, string[]>();
+const allowedPatterns = new WeakMap<Page, (string | RegExp)[]>();
 
 /**
  * Track page errors (React violations, unhandled exceptions, console errors)
@@ -18,7 +19,24 @@ export function trackPageErrors(page: Page): void {
   });
 }
 
-/** Get page errors collected during the test. Empty array = no errors. */
+/**
+ * Declare page errors this test expects, so they stop counting as failures.
+ * A journey that deliberately provokes a rejection asserts on the message the
+ * UI renders, but the browser also logs the failed request to the console —
+ * without this, covering a negative path would mean giving up error tracking
+ * for the whole test.
+ */
+export function allowPageErrors(page: Page, patterns: (string | RegExp)[]): void {
+  allowedPatterns.set(page, [...(allowedPatterns.get(page) ?? []), ...patterns]);
+}
+
+/** Get page errors collected during the test, minus the expected ones. */
 export function getPageErrors(page: Page): string[] {
-  return pageErrors.get(page) ?? [];
+  const allowed = allowedPatterns.get(page) ?? [];
+  return (pageErrors.get(page) ?? []).filter(
+    (error) =>
+      !allowed.some((pattern) =>
+        typeof pattern === 'string' ? error.includes(pattern) : pattern.test(error),
+      ),
+  );
 }

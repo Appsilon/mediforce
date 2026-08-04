@@ -40,6 +40,10 @@ export const CreateTriggerInputSchema = z.object({
   type: TriggerTypeSchema.default('cron'),
   // Cron-only: required for `cron`, forbidden otherwise. Enforced in the handler.
   schedule: z.string().min(1).optional(),
+  // Cron-only: the static input every tick of this row hands the Run (ADR-0012).
+  // Validated against the target workflow's `triggerInput` in the handler, so a
+  // row whose payload violates the contract can't be saved at all.
+  payload: z.record(z.string(), z.unknown()).optional(),
   // Webhook-only: `path` required for `webhook`, forbidden otherwise. `method`
   // defaults to POST in the handler and only POST is accepted (the endpoint is
   // POST-only). Path format is validated via `WebhookTriggerConfigSchema`.
@@ -55,9 +59,14 @@ export const CreateTriggerOutputSchema = z.object({
   webhookUrl: z.string().nullable(),
 });
 
+/** Edit a cron row's config. Both fields are optional so a caller can retime a
+ *  schedule without restating its payload, but omitting both is a no-op write
+ *  that would still bump `updatedAt` and emit an audit event, so the handler
+ *  rejects it. `payload: {}` *clears* the static input, distinct from omission. */
 export const UpdateTriggerInputSchema = z.object({
   ...key,
-  schedule: z.string().min(1),
+  schedule: z.string().min(1).optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
 });
 export const UpdateTriggerOutputSchema = z.object({
   trigger: TriggerResourceSchema,
