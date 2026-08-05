@@ -79,6 +79,7 @@ import { agentRunListCommand } from './commands/agent-run-list';
 import { agentRunGetCommand } from './commands/agent-run-get';
 import { namespaceUpdateCommand } from './commands/namespace-update';
 import { namespaceDeleteCommand } from './commands/namespace-delete';
+import { namespaceResetCommand } from './commands/namespace-reset';
 import { namespaceLeaveCommand } from './commands/namespace-leave';
 import { namespaceRemoveMemberCommand } from './commands/namespace-remove-member';
 import { namespaceSetMemberRoleCommand } from './commands/namespace-set-member-role';
@@ -215,12 +216,13 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   namespace: {
-    description: 'Workspaces (get, create, update, delete, leave, members)',
+    description: 'Workspaces (get, create, update, delete, reset, leave, members)',
     leaves: {
       get: { description: 'Fetch a namespace + member list', fn: namespaceGetCommand },
       create: { description: 'Create an organization namespace', fn: namespaceCreateCommand },
       update: { description: 'Edit display name / bio / icon', fn: namespaceUpdateCommand },
-      delete: { description: 'Delete a workspace (owner only, cascades members)', fn: namespaceDeleteCommand },
+      delete: { description: 'Delete a workspace (owner only, cascades members; not personal)', fn: namespaceDeleteCommand },
+      reset: { description: 'Delete every workflow in a workspace, keep the workspace', fn: namespaceResetCommand },
       leave: { description: 'Leave a workspace (self-remove)', fn: namespaceLeaveCommand },
       'remove-member': { description: 'Remove a member from a workspace', fn: namespaceRemoveMemberCommand },
       'set-member-role': { description: 'Flip a member to admin|member', fn: namespaceSetMemberRoleCommand },

@@ -12,6 +12,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Fixed
+- "Delete workspace" no longer behaves like a reset on a personal workspace. `DELETE /api/namespaces/:handle` now rejects a personal workspace with 409 (`getMe` re-bootstraps one on the next request, so the delete only ever destroyed the contents), and the settings danger zone offers **Reset workspace** there instead — a new `POST /api/namespaces/:handle/reset` (`mediforce namespace reset`) that deletes every workflow with its runs and tasks while the workspace, members, secrets and audit trail survive. Both the delete and the reset now confirm twice, typing the handle and the number of workflows about to be destroyed, matching the delete-workflow dialog. Deleting an organization workspace also clears the two workspace-scoped tables the FK cascade never reached — `tool_catalog_entries` (no FK) and private `agents` rows keyed on the handle (`ON DELETE SET NULL` left the `namespace` mirror pointing at a re-claimable handle) [#1044](https://github.com/Appsilon/mediforce/issues/1044).
+- Deleting a workflow no longer soft-deletes same-named runs in other workspaces: `getIdsByDefinitionName` / `setDeletedByDefinitionName` now match on (`namespace`, `definitionName`) instead of the name alone, which was global even though workflow names are only unique per workspace. Surfaced while adding workspace reset, which runs that cascade for every workflow in a workspace [#1044](https://github.com/Appsilon/mediforce/issues/1044).
 - Parallel E2E runs no longer hide Monitoring activity or workflow-status fixtures behind first-page pagination [#1134](https://github.com/Appsilon/mediforce/issues/1134).
 
 ## [2026-08-02]

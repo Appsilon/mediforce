@@ -122,6 +122,7 @@ export { createNamespace } from './namespaces/create-namespace';
 export {
   updateNamespace,
   deleteNamespace,
+  resetNamespace,
   leaveNamespace,
   removeNamespaceMember,
   updateNamespaceMemberRole,

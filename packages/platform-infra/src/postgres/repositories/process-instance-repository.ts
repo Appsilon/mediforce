@@ -610,22 +610,33 @@ export class PostgresProcessInstanceRepository
       );
   }
 
-  async getIdsByDefinitionName(name: string): Promise<string[]> {
+  async getIdsByDefinitionName(namespace: string, name: string): Promise<string[]> {
     const rows = await this.db
       .select({ id: processInstances.id })
       .from(processInstances)
-      .where(eq(processInstances.definitionName, name));
+      .where(
+        and(
+          eq(processInstances.workspace, namespace),
+          eq(processInstances.definitionName, name),
+        ),
+      );
     return rows.map((r) => r.id);
   }
 
   async setDeletedByDefinitionName(
+    namespace: string,
     name: string,
     deleted: boolean,
   ): Promise<void> {
     await this.db
       .update(processInstances)
       .set({ deletedAt: deleted ? new Date() : null })
-      .where(eq(processInstances.definitionName, name));
+      .where(
+        and(
+          eq(processInstances.workspace, namespace),
+          eq(processInstances.definitionName, name),
+        ),
+      );
   }
 
   async summarizeRunsByWorkflow(
