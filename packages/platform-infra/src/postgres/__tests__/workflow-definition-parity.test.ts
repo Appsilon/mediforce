@@ -120,29 +120,32 @@ function contract(
       expect(supplyAll?.versions.map((v) => v.version).sort()).toEqual([1, 2]);
     });
 
-    it('listWorkflowDefinitionsVisibleTo honours visibility + allowed', async () => {
+    it('listWorkflowDefinitionsInNamespaces excludes foreign public workflows', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-public');
-      await registerWorkspace('ws-private');
       await registerWorkspace('ws-allowed');
       await repo.saveWorkflowDefinition(
         definitionFor('ws-public', { name: 'public-wf', visibility: 'public' }),
       );
       await repo.saveWorkflowDefinition(
-        definitionFor('ws-private', { name: 'private-wf', visibility: 'private' }),
-      );
-      await repo.saveWorkflowDefinition(
         definitionFor('ws-allowed', { name: 'allowed-wf', visibility: 'private' }),
       );
 
-      const result = await repo.listWorkflowDefinitionsVisibleTo(
-        ['ws-allowed'],
-        false,
+      const result = await repo.listWorkflowDefinitionsInNamespaces(['ws-allowed'], false);
+
+      expect(result.definitions.map((definition) => definition.name)).toEqual(['allowed-wf']);
+    });
+
+    it('listWorkflowDefinitionsInNamespaces returns no workflows for an empty scope', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-public');
+      await repo.saveWorkflowDefinition(
+        definitionFor('ws-public', { name: 'public-wf', visibility: 'public' }),
       );
-      const names = result.definitions.map((d) => d.name);
-      expect(names).toContain('public-wf');
-      expect(names).toContain('allowed-wf');
-      expect(names).not.toContain('private-wf');
+
+      const result = await repo.listWorkflowDefinitionsInNamespaces([], false);
+
+      expect(result.definitions).toEqual([]);
     });
 
     it('getLatestWorkflowVersion returns 0 when no versions exist', async () => {
@@ -296,7 +299,7 @@ function contract(
       ).toBeUndefined();
     });
 
-    it('listWorkflowDefinitionsVisibleTo excludes soft-deleted workflows', async () => {
+    it('listWorkflowDefinitionsInNamespaces excludes soft-deleted workflows', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');
       await repo.saveWorkflowDefinition(
@@ -304,7 +307,7 @@ function contract(
       );
       await repo.setWorkflowDeleted('ws-1', 'supply-chain-review', true);
 
-      const visible = await repo.listWorkflowDefinitionsVisibleTo(['ws-1'], false);
+      const visible = await repo.listWorkflowDefinitionsInNamespaces(['ws-1'], false);
       expect(
         visible.definitions.find((d) => d.name === 'supply-chain-review'),
       ).toBeUndefined();

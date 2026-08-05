@@ -50,16 +50,11 @@ export class InMemoryProcessRepository implements ProcessRepository {
     return this.buildListResult(includeArchived, () => true);
   }
 
-  async listWorkflowDefinitionsVisibleTo(
-    allowed: readonly string[],
+  async listWorkflowDefinitionsInNamespaces(
+    namespaces: readonly string[],
     includeArchived: boolean,
   ): Promise<WorkflowDefinitionListResult> {
-    return this.buildListResult(includeArchived, (group) => {
-      const latest = group.versions.find((v) => v.version === group.latestVersion);
-      if (latest === undefined) return false;
-      if (latest.visibility === 'public') return true;
-      return allowed.includes(latest.namespace);
-    });
+    return this.buildListResult(includeArchived, (group) => namespaces.includes(group.namespace));
   }
 
   private buildListResult(

@@ -1781,6 +1781,18 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       ],
       createdAt: twoDaysAgo,
     },
+    'test:Share by Link Test:1': {
+      name: 'Share by Link Test',
+      namespace: 'test',
+      version: 1,
+      description: 'Dedicated workflow for the share-by-link journey.',
+      steps: [
+        { id: 'start', name: 'Start', type: 'creation', executor: 'human' },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'start', to: 'done' }],
+      createdAt: twoDaysAgo,
+    },
     'test:Data Quality Review:2': {
       name: 'Data Quality Review',
       namespace: 'test',

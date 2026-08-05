@@ -123,7 +123,7 @@ describe('listWorkflows handler', () => {
       ]);
     });
 
-    it('user callers see public + their-namespace workflows', async () => {
+    it('user callers only see workflows in their namespaces', async () => {
       const scope = createTestScope({
         processRepo,
         caller: userCaller('u-1', ['team-alpha']),
@@ -131,13 +131,10 @@ describe('listWorkflows handler', () => {
 
       const result = await listWorkflows({ includeCompletedRuns: true, includeArchived: false }, scope);
 
-      expect(result.definitions.map((d) => d.name).sort()).toEqual([
-        'alpha-private',
-        'beta-public',
-      ]);
+      expect(result.definitions.map((d) => d.name)).toEqual(['alpha-private']);
     });
 
-    it('user callers without namespace overlap only see public workflows', async () => {
+    it('user callers without namespace overlap see no workflows', async () => {
       const scope = createTestScope({
         processRepo,
         caller: userCaller('u-2', ['team-gamma']),
@@ -145,10 +142,10 @@ describe('listWorkflows handler', () => {
 
       const result = await listWorkflows({ includeCompletedRuns: true, includeArchived: false }, scope);
 
-      expect(result.definitions.map((d) => d.name)).toEqual(['beta-public']);
+      expect(result.definitions).toEqual([]);
     });
 
-    it('respects the optional namespace filter while honouring visibility', async () => {
+    it('does not grant access when filtering to a foreign namespace', async () => {
       const scope = createTestScope({
         processRepo,
         caller: userCaller('u-1', ['team-alpha']),
@@ -159,8 +156,7 @@ describe('listWorkflows handler', () => {
         scope,
       );
 
-      // team-alpha user can see team-beta's public workflow, scoped via filter.
-      expect(result.definitions.map((d) => d.name)).toEqual(['beta-public']);
+      expect(result.definitions).toEqual([]);
     });
 
     it('namespace filter applies for api-key callers too', async () => {
