@@ -5,7 +5,7 @@ import {
 } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
-import { buildRawUrl, fetchJsonOrThrow, resolveCommitSha } from './_github';
+import { buildRawUrl, fetchJsonOrThrow, resolveGitHubSource } from './_github';
 import { registerWorkflow } from './register-workflow';
 
 export async function importWorkflow(
@@ -15,8 +15,8 @@ export async function importWorkflow(
   // Resolve the requested ref to an immutable SHA first, then fetch the file at
   // that SHA — this pins the imported content to the commit we record, so a
   // moving branch can't desync the file from its provenance.
-  const commit = await resolveCommitSha(input.repo, input.ref);
-  const rawUrl = buildRawUrl(input.repo, commit, input.path);
+  const source = await resolveGitHubSource(input.repo, input.ref);
+  const rawUrl = buildRawUrl(source.repo, source.commit, input.path, source.pathPrefix);
 
   const json = await fetchJsonOrThrow(rawUrl, 'workflow definition');
 
@@ -36,7 +36,7 @@ export async function importWorkflow(
     {
       ...parsed.data,
       namespace: input.namespace,
-      source: { url: input.repo, path: input.path, commit },
+      source: { url: input.repo, path: input.path, commit: source.commit },
     },
     scope,
   );

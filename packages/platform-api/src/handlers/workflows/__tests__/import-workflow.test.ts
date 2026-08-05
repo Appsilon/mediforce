@@ -110,6 +110,28 @@ describe('importWorkflow handler', () => {
     expect(stored?.source?.commit).toBe(SHA);
   });
 
+  it('imports from a tree URL with a slash-containing branch ref', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: false, status: 404 } as Response)
+      .mockResolvedValueOnce({ ok: false, status: 404 } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200, text: () => Promise.resolve(`${SHA}\n`) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(VALID_TEMPLATE) } as Response);
+    const { scope } = buildScope();
+
+    await importWorkflow(
+      {
+        repo: 'https://github.com/Appsilon/mediforce/tree/feat/workflow-import-examples-default/docs/workflow-examples',
+        path: '01-linear-pipeline.wd.json',
+        namespace: 'test-ns',
+      },
+      scope,
+    );
+
+    expect(vi.mocked(fetch).mock.calls[3][0]).toBe(
+      `https://raw.githubusercontent.com/Appsilon/mediforce/${SHA}/docs/workflow-examples/01-linear-pipeline.wd.json`,
+    );
+  });
+
   it('imports cleanly when the .wd.json declares a namespace (target wins)', async () => {
     mockFetchOk({ ...VALID_TEMPLATE, namespace: 'should-be-ignored' });
     const { scope, processRepo } = buildScope();

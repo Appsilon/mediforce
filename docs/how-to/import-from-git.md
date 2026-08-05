@@ -36,9 +36,8 @@ stored — the moving ref is not.
 
 - **Public GitHub repos**, one `.wd.json` per import.
 - Browse via an `index.json` manifest at the repository root or at the end of a
-  GitHub `/tree/<single-segment-ref>/<directory>` URL, or import a single file
-  by path. For refs containing `/`, use the repository URL and enter the ref
-  separately.
+  GitHub `/tree/<ref>/<directory>` URL, including refs containing `/`, or
+  import a single file by path.
 - Files that declare a top-level `namespace` — it is ignored; the import target
   namespace wins (parity with `workflow register`).
 - Any step the schema accepts: `human`, `agent` (`claude-code-agent`), `script`

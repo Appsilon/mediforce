@@ -83,6 +83,24 @@ describe('getManifest handler', () => {
     );
   });
 
+  it('supports a tree source whose branch name contains slashes', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(VALID_MANIFEST),
+    } as Response);
+    const scope = buildScope();
+
+    await getManifest(
+      { repo: 'https://github.com/Appsilon/mediforce/tree/feat/workflow-import-examples-default/docs/workflow-examples' },
+      scope,
+    );
+
+    const fetchedUrls = vi.mocked(fetch).mock.calls.map(([url]) => url);
+    expect(fetchedUrls.at(-1)).toBe(
+      'https://raw.githubusercontent.com/Appsilon/mediforce/feat/workflow-import-examples-default/docs/workflow-examples/index.json',
+    );
+  });
+
   it('throws ValidationError when fetch fails', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false, status: 404, statusText: 'Not Found' } as Response);
     const scope = buildScope();
