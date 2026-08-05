@@ -13,6 +13,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Changed
 - Public workflow sharing now explains that it is link-based, shows a persistent shared state, and offers a canonical link to copy [#1141](https://github.com/Appsilon/mediforce/pull/1141).
+- Import from git now defaults to the current workflow examples under `docs/workflow-examples` and supports browsing GitHub tree-scoped sources.
 
 ### Fixed
 - User workflow-definition lists now return only definitions in their member workspaces, including hiding foreign public workflows [#1047](https://github.com/Appsilon/mediforce/issues/1047).

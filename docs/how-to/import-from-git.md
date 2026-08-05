@@ -27,14 +27,18 @@ Each imported definition stores a provenance record:
 }
 ```
 
-`--ref` (default `main`) selects *what* to import; it is resolved to an
-immutable commit SHA at import time, and the file is fetched at that SHA. Only
-the resolved `commit` is stored — the moving ref is not.
+`--ref` selects *what* to import; it is resolved to an immutable commit SHA at
+import time, and the file is fetched at that SHA. It defaults to the ref in a
+GitHub tree URL, or `main` for a repository URL. Only the resolved `commit` is
+stored — the moving ref is not.
 
 ## Supported
 
 - **Public GitHub repos**, one `.wd.json` per import.
-- Browse via a root `index.json` manifest, or import a single file by path.
+- Browse via an `index.json` manifest at the repository root or at the end of a
+  GitHub `/tree/<single-segment-ref>/<directory>` URL, or import a single file
+  by path. For refs containing `/`, use the repository URL and enter the ref
+  separately.
 - Files that declare a top-level `namespace` — it is ignored; the import target
   namespace wins (parity with `workflow register`).
 - Any step the schema accepts: `human`, `agent` (`claude-code-agent`), `script`
@@ -60,7 +64,8 @@ the resolved `commit` is stored — the moving ref is not.
 
 ## `index.json` manifest format
 
-To make a repo browsable in the UI, add an `index.json` at the repo root:
+To make a repo or repository subdirectory browsable in the UI, add an
+`index.json` at the selected source root:
 
 ```jsonc
 {

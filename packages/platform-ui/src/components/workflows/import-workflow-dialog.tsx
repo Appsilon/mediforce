@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import type { ManifestEntry } from '@mediforce/platform-api/contract';
 
-const DEFAULT_REPO = 'https://github.com/Appsilon/mediforce-workflows';
+export const DEFAULT_REPO = 'https://github.com/Appsilon/mediforce/tree/main/docs/workflow-examples';
 
 function extractErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof ApiError) return err.message;
@@ -183,7 +183,7 @@ export function ImportWorkflowDialog({
 
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground" htmlFor="import-ref">
-                  Branch, tag, or commit <span className="font-normal">(optional — defaults to main)</span>
+                  Branch, tag, or commit <span className="font-normal">(optional — defaults to the source URL ref, or main)</span>
                 </label>
                 <input
                   id="import-ref"

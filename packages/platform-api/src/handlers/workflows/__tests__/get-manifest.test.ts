@@ -66,6 +66,23 @@ describe('getManifest handler', () => {
     expect(vi.mocked(fetch).mock.calls[0][0]).toContain('/v2.0/');
   });
 
+  it('fetches a manifest from a tree-scoped source', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(VALID_MANIFEST),
+    } as Response);
+    const scope = buildScope();
+
+    await getManifest(
+      { repo: 'https://github.com/Appsilon/mediforce/tree/main/docs/workflow-examples' },
+      scope,
+    );
+
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
+      'https://raw.githubusercontent.com/Appsilon/mediforce/main/docs/workflow-examples/index.json',
+    );
+  });
+
   it('throws ValidationError when fetch fails', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false, status: 404, statusText: 'Not Found' } as Response);
     const scope = buildScope();

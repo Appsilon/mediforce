@@ -8,8 +8,7 @@ export async function getManifest(
   input: GetManifestInput,
   _scope: CallerScope,
 ): Promise<GetManifestOutput> {
-  const ref = input.ref ?? 'main';
-  const rawUrl = buildRawUrl(input.repo, ref, 'index.json');
+  const rawUrl = buildRawUrl(input.repo, input.ref, 'index.json');
 
   const json = await fetchJsonOrThrow(rawUrl, 'manifest');
 

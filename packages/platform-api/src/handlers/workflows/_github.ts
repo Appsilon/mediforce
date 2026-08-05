@@ -6,10 +6,16 @@ const GITHUB_HOST = 'github.com';
  *  SHAs) are resolved via the GitHub API. */
 const FULL_COMMIT_SHA = /^[a-f0-9]{40}$/;
 
-/** Parse a canonical `https://github.com/owner/repo` URL into its parts.
- *  Rejects non-GitHub hosts and any URL that is not exactly `/owner/repo`
- *  (e.g. `/org/repo/tree/main`, bare owner). */
-function parseGitHubRepo(repo: string): { owner: string; name: string } {
+/** Parse a GitHub repo or tree URL into its API identity and optional path.
+ *  Tree URLs scope raw-file requests to a directory within the repository.
+ *  Tree source refs must be a single URL path segment; use a repository URL
+ *  plus the separate ref input for refs containing `/`. */
+function parseGitHubRepo(repo: string): {
+  owner: string;
+  name: string;
+  pathPrefix: string;
+  sourceRef?: string;
+} {
   let url: URL;
   try {
     url = new URL(repo);
@@ -19,17 +25,28 @@ function parseGitHubRepo(repo: string): { owner: string; name: string } {
   if (url.hostname !== GITHUB_HOST) {
     throw new ValidationError(`Only GitHub repos are supported (got: ${url.hostname})`);
   }
-  // Expect exactly /owner/repo — reject sub-paths like /org/repo/tree/main
   const segments = url.pathname.replace(/\.git$/, '').split('/').filter(Boolean);
-  if (segments.length !== 2) {
-    throw new ValidationError(`Repo URL must be https://github.com/owner/repo (got: ${repo})`);
+  if (segments.length === 2) {
+    return { owner: segments[0], name: segments[1], pathPrefix: '' };
   }
-  return { owner: segments[0], name: segments[1] };
+  if (segments.length >= 5 && segments[2] === 'tree') {
+    return {
+      owner: segments[0],
+      name: segments[1],
+      pathPrefix: segments.slice(4).join('/'),
+      sourceRef: segments[3],
+    };
+  }
+  throw new ValidationError(
+    `Repo URL must be https://github.com/owner/repo or https://github.com/owner/repo/tree/ref/path (got: ${repo})`,
+  );
 }
 
-export function buildRawUrl(repo: string, ref: string, path: string): string {
-  const { owner, name } = parseGitHubRepo(repo);
-  return `https://raw.githubusercontent.com/${owner}/${name}/${ref}/${path}`;
+export function buildRawUrl(repo: string, ref: string | undefined, path: string): string {
+  const { owner, name, pathPrefix, sourceRef } = parseGitHubRepo(repo);
+  const resolvedRef = ref || sourceRef || 'main';
+  const scopedPath = [pathPrefix, path].filter(Boolean).join('/');
+  return `https://raw.githubusercontent.com/${owner}/${name}/${resolvedRef}/${scopedPath}`;
 }
 
 /**
@@ -63,36 +80,37 @@ export async function fetchJsonOrThrow(url: string, label: string): Promise<unkn
  * without it — with a message distinguishing "ref not found" from "rate
  * limited" so the user knows whether to fix the ref or simply retry.
  */
-export async function resolveCommitSha(repo: string, ref: string): Promise<string> {
-  if (FULL_COMMIT_SHA.test(ref)) return ref;
+export async function resolveCommitSha(repo: string, ref?: string): Promise<string> {
+  const { owner, name, sourceRef } = parseGitHubRepo(repo);
+  const resolvedRef = ref || sourceRef || 'main';
+  if (FULL_COMMIT_SHA.test(resolvedRef)) return resolvedRef;
 
-  const { owner, name } = parseGitHubRepo(repo);
-  const apiUrl = `https://api.github.com/repos/${owner}/${name}/commits/${encodeURIComponent(ref)}`;
+  const apiUrl = `https://api.github.com/repos/${owner}/${name}/commits/${encodeURIComponent(resolvedRef)}`;
 
   let res: Response;
   try {
     res = await fetch(apiUrl, { headers: { Accept: 'application/vnd.github.sha' } });
   } catch (err) {
-    throw new ValidationError(`Failed to resolve commit for ref '${ref}' in ${repo}: ${String(err)}`);
+    throw new ValidationError(`Failed to resolve commit for ref '${resolvedRef}' in ${repo}: ${String(err)}`);
   }
 
   if (res.status === 404) {
-    throw new ValidationError(`Ref '${ref}' not found in ${repo}`);
+    throw new ValidationError(`Ref '${resolvedRef}' not found in ${repo}`);
   }
   if (res.status === 403) {
     throw new ValidationError(
-      `GitHub rate limit reached while resolving ref '${ref}' — retry in a few minutes`,
+      `GitHub rate limit reached while resolving ref '${resolvedRef}' — retry in a few minutes`,
     );
   }
   if (!res.ok) {
     throw new ValidationError(
-      `Failed to resolve commit for ref '${ref}' in ${repo}: ${res.status} ${res.statusText}`,
+      `Failed to resolve commit for ref '${resolvedRef}' in ${repo}: ${res.status} ${res.statusText}`,
     );
   }
 
   const sha = (await res.text()).trim();
   if (!FULL_COMMIT_SHA.test(sha)) {
-    throw new ValidationError(`Unexpected commit-resolution response for ref '${ref}' in ${repo}`);
+    throw new ValidationError(`Unexpected commit-resolution response for ref '${resolvedRef}' in ${repo}`);
   }
   return sha;
 }

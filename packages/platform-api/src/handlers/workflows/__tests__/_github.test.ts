@@ -25,15 +25,37 @@ describe('buildRawUrl', () => {
     );
   });
 
+  it('supports a GitHub tree URL as a scoped source directory', () => {
+    const result = buildRawUrl(
+      'https://github.com/Appsilon/mediforce/tree/main/docs/workflow-examples',
+      'main',
+      '01-linear-pipeline.wd.json',
+    );
+    expect(result).toBe(
+      'https://raw.githubusercontent.com/Appsilon/mediforce/main/docs/workflow-examples/01-linear-pipeline.wd.json',
+    );
+  });
+
+  it('uses the ref embedded in a GitHub tree URL when no ref is supplied', () => {
+    const result = buildRawUrl(
+      'https://github.com/Appsilon/mediforce/tree/release/docs/workflow-examples',
+      undefined,
+      '01-linear-pipeline.wd.json',
+    );
+    expect(result).toBe(
+      'https://raw.githubusercontent.com/Appsilon/mediforce/release/docs/workflow-examples/01-linear-pipeline.wd.json',
+    );
+  });
+
   it('throws ValidationError for non-GitHub hosts', () => {
     expect(() => buildRawUrl('https://gitlab.com/org/repo', 'main', 'wf.wd.json')).toThrow(
       ValidationError,
     );
   });
 
-  it('throws ValidationError for repo URLs with sub-paths (e.g. /tree/main)', () => {
+  it('throws ValidationError for unsupported GitHub sub-paths', () => {
     expect(() =>
-      buildRawUrl('https://github.com/Appsilon/mediforce-workflows/tree/main', 'main', 'wf.wd.json'),
+      buildRawUrl('https://github.com/Appsilon/mediforce-workflows/blob/main/wf.wd.json', 'main', 'wf.wd.json'),
     ).toThrow(ValidationError);
   });
 
@@ -74,6 +96,22 @@ describe('resolveCommitSha', () => {
     expect(await resolveCommitSha(REPO, 'main')).toBe(SHA);
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
       'https://api.github.com/repos/Appsilon/mediforce-workflows/commits/main',
+    );
+  });
+
+  it('uses a tree URL ref for commit resolution when no ref is supplied', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve(`${SHA}\n`),
+    } as Response);
+
+    await resolveCommitSha(
+      'https://github.com/Appsilon/mediforce/tree/release/docs/workflow-examples',
+    );
+
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
+      'https://api.github.com/repos/Appsilon/mediforce/commits/release',
     );
   });
 

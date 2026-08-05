@@ -15,7 +15,7 @@ export async function importWorkflow(
   // Resolve the requested ref to an immutable SHA first, then fetch the file at
   // that SHA — this pins the imported content to the commit we record, so a
   // moving branch can't desync the file from its provenance.
-  const commit = await resolveCommitSha(input.repo, input.ref ?? 'main');
+  const commit = await resolveCommitSha(input.repo, input.ref);
   const rawUrl = buildRawUrl(input.repo, commit, input.path);
 
   const json = await fetchJsonOrThrow(rawUrl, 'workflow definition');
