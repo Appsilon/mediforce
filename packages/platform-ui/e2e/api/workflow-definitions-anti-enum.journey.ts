@@ -55,4 +55,29 @@ test.describe('GET /api/workflow-definitions/[name] — visibility 404', () => {
     );
     expect(res.status()).toBe(404);
   });
+
+  test('outsider user list excludes public workflows from other namespaces', async ({ request }) => {
+    const name = `public-list-isolation-${Date.now()}`;
+    const create = await request.post(
+      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
+      {
+        headers: apiKeyHeaders(),
+        data: {
+          name,
+          description: 'Public workflow used to verify list isolation.',
+          visibility: 'public',
+          steps: [{ id: 'start', name: 'Start', type: 'creation', executor: 'human' }],
+          transitions: [],
+        },
+      },
+    );
+    expect(create.status(), await create.text()).toBe(201);
+
+    const list = await request.get('/api/workflow-definitions', {
+      headers: sessionCookieHeaders(callers.outsider),
+    });
+    expect(list.status(), await list.text()).toBe(200);
+    const body = await list.json() as { definitions: Array<{ name: string }> };
+    expect(body.definitions.map((definition) => definition.name)).not.toContain(name);
+  });
 });

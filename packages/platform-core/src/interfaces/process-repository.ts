@@ -26,10 +26,9 @@ export interface ProcessRepository {
    *  them avoids spamming logs with safeParse failures on legacy data
    *  that nobody intends to fix. */
   listAllWorkflowDefinitions(includeArchived: boolean): Promise<WorkflowDefinitionListResult>;
-  /** Namespace + visibility-scoped variant. Returns groups whose latest
-   *  version is `visibility: 'public'` OR whose namespace is in `allowed`. */
-  listWorkflowDefinitionsVisibleTo(
-    allowed: readonly string[],
+  /** Namespace-scoped variant for ordinary user-facing lists. */
+  listWorkflowDefinitionsInNamespaces(
+    namespaces: readonly string[],
     includeArchived: boolean,
   ): Promise<WorkflowDefinitionListResult>;
   getLatestWorkflowVersion(namespace: string, name: string): Promise<number>;

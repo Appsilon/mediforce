@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Fixed
+- User workflow-definition lists now return only definitions in their member workspaces, including hiding foreign public workflows [#1047](https://github.com/Appsilon/mediforce/issues/1047).
 - Parallel E2E runs no longer hide Monitoring activity or workflow-status fixtures behind first-page pagination [#1134](https://github.com/Appsilon/mediforce/issues/1134).
 
 ## [2026-08-02]
