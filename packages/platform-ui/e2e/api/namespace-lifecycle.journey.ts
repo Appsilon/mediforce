@@ -1,5 +1,4 @@
 import { test, expect } from '../helpers/test-fixtures';
-import { TEST_USER_ID } from '../helpers/constants';
 import {
   seedPostgresOrganizationNamespace,
   seedPostgresPersonalNamespace,
@@ -17,6 +16,23 @@ import {
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
 const authHeaders = { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' };
 
+/**
+ * Owner of the fixtures below — deliberately NOT the shared `auth-setup` user.
+ * Two of these workspaces are meant to survive their test (a personal one
+ * cannot be deleted, and reset keeps the workspace), so hanging them off the
+ * test user would grow their workspace picker by two "My workspace" cards per
+ * run and break the L4 workspace-selection journey. The api-key caller
+ * bypasses membership, so these tests need no real signed-in owner.
+ *
+ * Handles are fixed rather than timestamped for the same reason: the seeds are
+ * `ON CONFLICT DO NOTHING`, so a re-run reuses the rows instead of leaving a
+ * new pair behind in the shared database.
+ */
+const FIXTURE_UID = 'ns-lifecycle-user';
+const PERSONAL_KEEP_HANDLE = 'ns-lifecycle-keep';
+const PERSONAL_RESET_HANDLE = 'ns-lifecycle-reset';
+const ORG_DELETE_HANDLE = 'ns-lifecycle-org';
+
 function workflowDefinition(name: string) {
   return {
     name,
@@ -30,8 +46,8 @@ function workflowDefinition(name: string) {
 
 test.describe('Workspace delete vs reset — API E2E', () => {
   test('a personal workspace refuses deletion and survives', async ({ request }) => {
-    const handle = `personal-keep-${Date.now()}`;
-    await seedPostgresPersonalNamespace(handle, TEST_USER_ID, 'Personal Keep');
+    const handle = PERSONAL_KEEP_HANDLE;
+    await seedPostgresPersonalNamespace(handle, FIXTURE_UID, 'Personal Keep');
 
     const deleteRes = await request.delete(`/api/namespaces/${handle}`, { headers: authHeaders });
     expect(deleteRes.status(), await deleteRes.text()).toBe(409);
@@ -43,8 +59,8 @@ test.describe('Workspace delete vs reset — API E2E', () => {
   });
 
   test('reset deletes the workflows and keeps the workspace and its members', async ({ request }) => {
-    const handle = `personal-reset-${Date.now()}`;
-    await seedPostgresPersonalNamespace(handle, TEST_USER_ID, 'Personal Reset');
+    const handle = PERSONAL_RESET_HANDLE;
+    await seedPostgresPersonalNamespace(handle, FIXTURE_UID, 'Personal Reset');
     const name = `reset-flow-${Date.now()}`;
 
     const register = await request.post(
@@ -70,12 +86,12 @@ test.describe('Workspace delete vs reset — API E2E', () => {
     expect(getRes.status(), await getRes.text()).toBe(200);
     const body = await getRes.json();
     expect(body.namespace.handle).toBe(handle);
-    expect(body.members.map((member: { uid: string }) => member.uid)).toContain(TEST_USER_ID);
+    expect(body.members.map((member: { uid: string }) => member.uid)).toContain(FIXTURE_UID);
   });
 
   test('an organization workspace deletes for real, along with its workflows', async ({ request }) => {
-    const handle = `org-delete-${Date.now()}`;
-    await seedPostgresOrganizationNamespace(handle, TEST_USER_ID, 'Org Delete');
+    const handle = ORG_DELETE_HANDLE;
+    await seedPostgresOrganizationNamespace(handle, FIXTURE_UID, 'Org Delete');
     const name = `deleted-flow-${Date.now()}`;
 
     const register = await request.post(
