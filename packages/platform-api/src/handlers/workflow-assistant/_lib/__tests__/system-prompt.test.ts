@@ -66,6 +66,12 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/continueOnError/);
   });
 
+  it('warns that the inline script runtime is stdlib-only and to prefer an agent step for third-party packages', () => {
+    expect(prompt).toMatch(/standard-library-only/i);
+    expect(prompt).toMatch(/ModuleNotFoundError/);
+    expect(prompt).toMatch(/Prefer an `agent` step for anything needing third-party packages/);
+  });
+
   it('tells the model a large build may span several turns and cut-off steps are kept', () => {
     expect(prompt).toMatch(/built across several turns/i);
     expect(prompt).toMatch(/cut off/i);
