@@ -2,21 +2,26 @@ import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { trackPageErrors } from '../helpers/page-errors';
 
+const STATUS_BADGES_WORKFLOW = 'Runs Page Journey Workflow';
+
 test.describe('Workflow Status Badges Journey', () => {
   test('process list shows all five semantic status badges', async ({ page }) => {
     trackPageErrors(page);
 
-    // The RunsTable (with status badges) lives at /runs, not /workflows
-    await page.goto(`/${TEST_ORG_HANDLE}/runs`);
-    await expect(page.getByText('All workflow runs across the platform.')).toBeVisible({ timeout: 30_000 });
+    // The five runs for this workflow are dedicated to display-status coverage,
+    // so the server-side workflow filter keeps parallel journeys from pushing
+    // the Cancelled fixture past the first page of the shared namespace.
+    await page.goto(`/${TEST_ORG_HANDLE}/runs?workflow=${encodeURIComponent(STATUS_BADGES_WORKFLOW)}`);
+    await expect(page.getByText('All runs for this workflow.')).toBeVisible({ timeout: 30_000 });
+    const rows = page.locator('tbody');
+    await expect(rows.locator('tr')).toHaveCount(5);
 
-    // Five display statuses visible in the list
-    await expect(page.getByText('In Progress').first()).toBeVisible();
-    await expect(page.getByText('Waiting for human').first()).toBeVisible();
-    await expect(page.getByText('Error').first()).toBeVisible();
-    await expect(page.getByText('Completed').first()).toBeVisible();
-    // proc-cancelled-1 is seeded as status=failed / error='Cancelled by user'
-    await expect(page.getByText('Cancelled').first()).toBeVisible();
+    // Five display statuses visible in the list.
+    await expect(rows.getByText('In Progress', { exact: true })).toBeVisible();
+    await expect(rows.getByText('Waiting for human', { exact: true })).toBeVisible();
+    await expect(rows.getByText('Error', { exact: true })).toBeVisible();
+    await expect(rows.getByText('Completed', { exact: true })).toBeVisible();
+    await expect(rows.getByText('Cancelled', { exact: true })).toBeVisible();
   });
 
   test('step_failure instance shows Error badge and error banner — no retry button', async ({ page }) => {

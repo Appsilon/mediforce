@@ -98,13 +98,19 @@ test.describe('Monitoring Journey', () => {
 
     // Scoped to the table body throughout — the filter dropdowns added below
     // also render options labelled "Sign in" / "Task completed" etc., which
-    // would otherwise collide with a page-wide getByText. `.first()`
-    // everywhere: this table is namespace-wide and unscoped to this test's
-    // own fixtures, so in the full CI suite other journeys running against
-    // the same shared `test` namespace add their own matching rows (e.g.
-    // other cancelled runs) — these assertions only need to prove the real
-    // shape shows up somewhere, not that it's the only occurrence.
+    // would otherwise collide with a page-wide getByText. `.first()` on
+    // 'Sign in' because both seeded sign-in events (password + OAuth) carry
+    // that label; the rest are unique within the actor-scoped set.
     const rows = page.locator('tbody');
+
+    // Actor-scope the table FIRST (first combobox = User filter) onto the
+    // dedicated MONITORING_ACTIVITY_ACTOR_ID fixtures (seed-data.ts). The
+    // Users tab is workspace-wide and server-paginated at 20 rows, newest
+    // first — without this filter, fresh audit events other parallel
+    // journeys write to the shared `test` namespace push these seeded rows
+    // off page 1 mid-suite. The actor filter isolates exactly this test's
+    // own seeded rows (5 here — `task.claimed` is a Tasks-tab action only).
+    await page.getByRole('combobox').nth(0).selectOption({ value: 'monitoring-activity-actor' });
 
     // All four event types the table understands, each backed by a real
     // seeded audit_events row (see seed-data.ts's audit-signin-*,
@@ -124,8 +130,10 @@ test.describe('Monitoring Journey', () => {
     await expect(rows.getByText('Manager Approval').first()).toBeVisible();
 
     // Event-type filter actually narrows the rendered table, not just the
-    // dropdown's own state. First combobox is the User filter, second is
-    // Event.
+    // dropdown's own state. Second combobox is Event (the User filter set
+    // above stays applied, so these `not.toBeVisible()` checks are sound:
+    // the table is already actor-scoped to our fixtures, leaving no room
+    // for a concurrent journey's row to satisfy them by accident).
     const eventFilter = page.getByRole('combobox').nth(1);
     await eventFilter.selectOption({ label: 'Task completed' });
     await expect(rows.getByText('Manager Approval')).toBeVisible();
@@ -149,13 +157,17 @@ test.describe('Monitoring Journey', () => {
 
     const rows = page.locator('tbody');
 
+    // Actor-scope the table FIRST (first combobox = User filter) onto the
+    // dedicated MONITORING_ACTIVITY_ACTOR_ID fixtures (seed-data.ts). The
+    // Tasks tab is workspace-wide and server-paginated at 20 rows, newest
+    // first — without this filter, fresh task audit events other parallel
+    // journeys write to the shared `test` namespace push these seeded rows
+    // off page 1 mid-suite. The actor filter isolates exactly our two rows.
+    await page.getByRole('combobox').nth(0).selectOption({ value: 'monitoring-activity-actor' });
+
     // Two action types, each backed by a real seeded audit_events row (see
-    // seed-data.ts's audit-task-claimed / audit-task-completed fixtures).
-    // `.first()` on 'Completed': with server-side pagination this table is
-    // namespace-wide and unscoped to this test's own fixtures, so the top-20
-    // default page can (and, once the Load-More fixture batch below exists,
-    // reliably does) contain more than one `task.completed` row — this only
-    // needs to prove the badge shows up somewhere, not that it's unique.
+    // seed-data.ts's audit-task-claimed / audit-task-completed fixtures),
+    // now actor-scoped to exactly this pair.
     await expect(rows.getByText('Claimed')).toBeVisible({ timeout: 10_000 });
     await expect(rows.getByText('Completed').first()).toBeVisible();
 
@@ -175,8 +187,10 @@ test.describe('Monitoring Journey', () => {
       `/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1`,
     );
 
-    // Action filter narrows the rendered table. First combobox is the User
-    // filter, second is Action.
+    // Action filter narrows the rendered table. Second combobox is Action
+    // (the User filter set above stays applied, keeping the `not.toBeVisible()`
+    // check sound: the table is already actor-scoped to our two rows, so a
+    // concurrent journey's 'Approve Report' row can't satisfy it by accident).
     const actionFilter = page.getByRole('combobox').nth(1);
     await actionFilter.selectOption({ label: 'Completed' });
     await expect(rows.getByText('Manager Approval')).toBeVisible();

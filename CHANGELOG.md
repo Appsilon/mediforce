@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Fixed
+- Parallel E2E runs no longer hide Monitoring activity or workflow-status fixtures behind first-page pagination [#1134](https://github.com/Appsilon/mediforce/issues/1134).
+
 ## [2026-08-02]
 
 ### Security
