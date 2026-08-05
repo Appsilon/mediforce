@@ -69,7 +69,7 @@ describe('DELETE /api/workflow-definitions/:name', () => {
     expect(res.status).toBe(200);
     expect(json).toEqual({ success: true, deletedRuns: 3 });
     expect(mockSetDeleted).toHaveBeenCalledWith('ns-1', 'wf-1', true);
-    expect(mockSoftDeleteByDefName).toHaveBeenCalledWith('wf-1', true);
+    expect(mockSoftDeleteByDefName).toHaveBeenCalledWith('ns-1', 'wf-1', true);
     expect(mockSetDeletedTasksByInstanceIds).toHaveBeenCalledWith(['r1', 'r2', 'r3'], true);
     expect(mockAuditAppend).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'workflow.delete' }),

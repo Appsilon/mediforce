@@ -31,14 +31,19 @@ vi.mock('@/contexts/auth-context', () => ({
   }),
 }));
 
+// Flipped per test — the danger zone offers a different action per workspace
+// type (personal resets, organization deletes).
+let namespaceType: 'organization' | 'personal' = 'organization';
+
 vi.mock('@/hooks/use-namespace', () => ({
   useNamespace: () => ({
     namespace: {
-      type: 'organization',
+      type: namespaceType,
       handle: 'acme',
       displayName: 'Acme Labs',
       bio: '',
       icon: 'Building2',
+      ...(namespaceType === 'personal' ? { linkedUserId: 'owner-uid' } : {}),
     },
     personalHandles: new Map<string, string>(),
     loading: false,
@@ -49,6 +54,7 @@ vi.mock('@/hooks/use-namespace-mutations', () => {
   const stub = () => ({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false });
   return {
     useDeleteNamespace: stub,
+    useResetNamespace: stub,
     useLeaveNamespace: stub,
     useRemoveMember: stub,
     useUpdateMemberRole: stub,
@@ -94,6 +100,7 @@ beforeEach(() => {
   listMembersMock.mockReset();
   resendInviteMock.mockReset();
   listMembersMock.mockResolvedValue({ members: [OWNER, PENDING, ACTIVATED] });
+  namespaceType = 'organization';
 });
 
 describe('WorkspaceConfigPage — resend invite', () => {
@@ -125,5 +132,22 @@ describe('WorkspaceConfigPage — resend invite', () => {
         screen.getByText('Cannot resend invite: user has already activated their account'),
       ).toBeInTheDocument(),
     );
+  });
+});
+
+describe('WorkspaceConfigPage — danger zone', () => {
+  it('[organization] offers Delete workspace to the owner', async () => {
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: 'Delete workspace' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reset workspace' })).not.toBeInTheDocument();
+  });
+
+  it('[personal] offers Reset workspace instead of Delete — a personal workspace cannot be deleted', async () => {
+    namespaceType = 'personal';
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: 'Reset workspace' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete workspace' })).not.toBeInTheDocument();
   });
 });

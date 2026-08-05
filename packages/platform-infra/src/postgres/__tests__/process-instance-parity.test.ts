@@ -391,6 +391,27 @@ function contract(
       expect(rows.map((r) => r.id)).toEqual([a.id]);
     });
 
+    it('getIdsByDefinitionName / setDeletedByDefinitionName stay inside one workspace', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-mine');
+      await registerWorkspace('ws-theirs');
+      const mine = await repo.create(
+        instanceFor('ws-mine', { definitionName: 'shared-name' }),
+      );
+      const theirs = await repo.create(
+        instanceFor('ws-theirs', { definitionName: 'shared-name' }),
+      );
+
+      expect(await repo.getIdsByDefinitionName('ws-mine', 'shared-name')).toEqual([mine.id]);
+
+      await repo.setDeletedByDefinitionName('ws-mine', 'shared-name', true);
+
+      // Workflow names are unique per workspace, not globally — the cascade
+      // behind a workflow delete must not tombstone a namesake elsewhere.
+      expect((await repo.getById(mine.id))?.deleted).toBe(true);
+      expect((await repo.getById(theirs.id))?.deleted).toBe(false);
+    });
+
     it('summarizeRunsByWorkflow counts active + scopes total/latest', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-sum');

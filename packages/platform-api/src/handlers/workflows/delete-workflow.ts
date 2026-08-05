@@ -47,8 +47,8 @@ export async function deleteWorkflow(
   await scope.triggers.deleteByWorkflow(input.namespace, input.name);
 
   if (actualRunCount > 0) {
-    const instanceIds = await scope.runs.getIdsByDefinitionName(input.name);
-    await scope.runs.softDeleteByDefinitionName(input.name);
+    const instanceIds = await scope.runs.getIdsByDefinitionName(input.namespace, input.name);
+    await scope.runs.softDeleteByDefinitionName(input.namespace, input.name);
     await scope.tasks.softDeleteByInstanceIds(instanceIds);
   }
 

@@ -276,4 +276,39 @@ describe.skipIf(skipPg)('PostgresNamespaceRepository (parity)', () => {
     expect(new Date(after.updated_at).getTime())
       .toBeGreaterThan(new Date(before.updated_at).getTime());
   });
+
+  // Postgres-specific: the two workspace-scoped tables the FK cascade does NOT
+  // reach. Handles are re-claimable, so rows left behind on the dead handle
+  // would show up inside the next workspace that claims it.
+  it('deleteNamespaceCascade clears tool catalog entries and private agents keyed on the handle', async () => {
+    await testClient.unsafe(
+      `TRUNCATE TABLE "${schemaName}"."workspace_members", "${schemaName}"."workspaces", "${schemaName}"."tool_catalog_entries", "${schemaName}"."agents" CASCADE`,
+    );
+    const db = drizzle(testClient, { schema });
+    const repo = new PostgresNamespaceRepository(db);
+    await repo.createNamespace(nsBase({ handle: 'doomed' }));
+    await testClient`
+      INSERT INTO tool_catalog_entries (workspace, id, command)
+      VALUES ('doomed', 'fetch', 'npx')
+    `;
+    await testClient`
+      INSERT INTO agents (id, workspace, namespace, visibility, name, icon_name, description,
+                          foundation_model, system_prompt, input_description, output_description)
+      VALUES ('private-agent', 'doomed', 'doomed', 'private', 'Private', 'Bot', 'd',
+              'model', 'p', 'in', 'out'),
+             ('public-agent', 'doomed', 'doomed', 'public', 'Public', 'Bot', 'd',
+              'model', 'p', 'in', 'out')
+    `;
+
+    await repo.deleteNamespaceCascade('doomed');
+
+    const catalog = await testClient`SELECT id FROM tool_catalog_entries WHERE workspace = 'doomed'`;
+    expect(catalog).toHaveLength(0);
+    const surviving = await testClient<{ id: string; namespace: string | null }[]>`
+      SELECT id, namespace FROM agents
+    `;
+    // The public agent survives (other workspaces may reference it) but loses
+    // the dead handle; the private one goes with its workspace.
+    expect(surviving).toEqual([{ id: 'public-agent', namespace: null }]);
+  });
 });

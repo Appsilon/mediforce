@@ -10,6 +10,8 @@ import {
 } from '@mediforce/platform-core';
 import type { Database } from '../client';
 import { workspaces, workspaceMembers } from '../schema/workspace';
+import { agents } from '../schema/agent-definition';
+import { toolCatalogEntries } from '../schema/tool-catalog';
 
 /**
  * Postgres-backed NamespaceRepository (ADR-0001).
@@ -187,8 +189,32 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       );
   }
 
+  /**
+   * Delete the workspace and everything it owns. Workflows, runs, tasks,
+   * triggers, secrets and audit rows carry an `ON DELETE CASCADE` FK to
+   * `workspaces.handle`, so dropping the row is enough for them. Two tables
+   * do not, and are cleared explicitly here — a handle is re-claimable
+   * (personal handles are derived from the email local part), so anything
+   * keyed on the dead handle would resurface inside whoever claims it next:
+   *
+   * - `tool_catalog_entries` has no FK at all (composite PK workspace + id).
+   * - `agents` uses `ON DELETE SET NULL` on `workspace` so public agents
+   *   other workspaces reference stay resolvable, but its `namespace` mirror
+   *   (the column the visibility filter actually reads) has no FK and keeps
+   *   pointing at the dead handle. Private agents die with their workspace;
+   *   public ones lose the namespace and stay globally visible, which is what
+   *   the SET NULL was for.
+   */
   async deleteNamespaceCascade(handle: string): Promise<void> {
     await this.db.transaction(async (tx) => {
+      await tx.delete(toolCatalogEntries).where(eq(toolCatalogEntries.workspace, handle));
+      await tx
+        .delete(agents)
+        .where(and(eq(agents.namespace, handle), eq(agents.visibility, 'private')));
+      await tx
+        .update(agents)
+        .set({ namespace: null })
+        .where(eq(agents.namespace, handle));
       await tx
         .delete(workspaceMembers)
         .where(eq(workspaceMembers.workspace, handle));

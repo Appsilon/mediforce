@@ -121,18 +121,25 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
    * `deleted` — soft-delete is a privileged tombstone, not a patch field.
    */
   /**
-   * Cascade delete companion for workflow-definition soft-delete. The raw
-   * methods don't scope by namespace; the handler gates the
-   * workflow-definition namespace before invoking this, so the same trust
-   * model as `scope.system.*` applies. See ADR-0004 §6 on system-actor
-   * cascades.
+   * Cascade delete companion for workflow-definition soft-delete, scoped to
+   * the workflow's own workspace — names are unique per workspace, so a
+   * name-only cascade would tombstone a stranger's runs. The write is gated
+   * like every other namespace write in this wrapper.
    */
-  getIdsByDefinitionName = async (definitionName: string): Promise<string[]> => {
-    return this.raw.getIdsByDefinitionName(definitionName);
+  getIdsByDefinitionName = async (
+    namespace: string,
+    definitionName: string,
+  ): Promise<string[]> => {
+    if (!this.canSeeNamespace(namespace)) return [];
+    return this.raw.getIdsByDefinitionName(namespace, definitionName);
   };
 
-  softDeleteByDefinitionName = async (definitionName: string): Promise<void> => {
-    await this.raw.setDeletedByDefinitionName(definitionName, true);
+  softDeleteByDefinitionName = async (
+    namespace: string,
+    definitionName: string,
+  ): Promise<void> => {
+    this.assertNamespaceWrite(namespace);
+    await this.raw.setDeletedByDefinitionName(namespace, definitionName, true);
   };
 
   /**

@@ -185,8 +185,17 @@ export interface ProcessInstanceRepository {
     updates: Partial<StepExecution>,
   ): Promise<void>;
 
-  getIdsByDefinitionName(name: string): Promise<string[]>;
-  setDeletedByDefinitionName(name: string, deleted: boolean): Promise<void>;
+  /**
+   * Cascade companions for workflow-definition soft-delete. Scoped by
+   * (`namespace`, `definitionName`): workflow names are unique per workspace,
+   * not globally, so a name-only match would tombstone a stranger's runs.
+   */
+  getIdsByDefinitionName(namespace: string, name: string): Promise<string[]>;
+  setDeletedByDefinitionName(
+    namespace: string,
+    name: string,
+    deleted: boolean,
+  ): Promise<void>;
 
   /**
    * Per-workflow run aggregate for the workspace home cards. Scoped by
