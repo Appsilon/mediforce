@@ -66,6 +66,12 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/continueOnError/);
   });
 
+  it('tells the model it cannot create triggers and to direct schedule/webhook requests to the Triggers tab', () => {
+    expect(prompt).toMatch(/can't create triggers/i);
+    expect(prompt).toMatch(/Triggers\*\* tab|Triggers tab|trigger-add/);
+    expect(prompt).toMatch(/\$\{triggerPayload\./);
+  });
+
   it('warns that the inline script runtime is stdlib-only and to prefer an agent step for third-party packages', () => {
     expect(prompt).toMatch(/standard-library-only/i);
     expect(prompt).toMatch(/ModuleNotFoundError/);
