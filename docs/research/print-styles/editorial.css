@@ -1,0 +1,161 @@
+:root {
+  color-scheme: light;
+  --ink: #151515;
+  --muted: #66645f;
+  --rule: #d8d5ce;
+  --soft: #f4f1ea;
+  --accent: #224e65;
+}
+
+@page {
+  size: A4;
+  margin: 17mm 17mm 18mm;
+}
+
+html {
+  font-size: 16px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body {
+  color: var(--ink);
+  column-gap: 10mm;
+  font-family: Baskerville, "Libre Baskerville", Georgia, serif;
+  font-size: 10.8pt;
+  line-height: 1.56;
+  margin: 0 auto;
+  max-width: 860px;
+  padding: 16px 4px 24px;
+}
+
+h1, h2, h3, h4 {
+  page-break-after: avoid;
+}
+
+h1 {
+  font-size: 25pt;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  margin: 0 0 1rem;
+}
+
+h2 {
+  border-top: 3px solid var(--accent);
+  font-family: "Gill Sans", "Avenir Next", Arial, sans-serif;
+  font-size: 15pt;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin: 2.4rem 0 1rem;
+  padding-top: 0.8rem;
+}
+
+h3 {
+  color: var(--accent);
+  font-family: "Gill Sans", "Avenir Next", Arial, sans-serif;
+  font-size: 11pt;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin: 1.5rem 0 0.45rem;
+  text-transform: uppercase;
+}
+
+p {
+  margin: 0.65rem 0;
+  orphans: 3;
+  widows: 3;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 1.6rem 0;
+}
+
+blockquote {
+  background: var(--soft);
+  border: 1px solid var(--rule);
+  margin: 1.2rem 0;
+  padding: 0.9rem 1rem;
+}
+
+code {
+  background: #ece8df;
+  border-radius: 3px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  padding: 0.12em 0.28em;
+}
+
+pre {
+  background: #fbfaf7;
+  border: 1px solid var(--rule);
+  font-size: 0.82em;
+  padding: 0.95rem 1rem;
+  white-space: pre-wrap;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  border-collapse: collapse;
+  font-size: 0.88em;
+  margin: 1rem 0 1.2rem;
+  width: 100%;
+}
+
+th, td {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.45rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--accent);
+  font-family: "Gill Sans", "Avenir Next", Arial, sans-serif;
+  font-size: 0.82em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+ul, ol {
+  padding-left: 1.3rem;
+}
+
+li {
+  margin: 0.15rem 0;
+}
+
+img, table, pre {
+  page-break-inside: avoid;
+}
+
+#TOC {
+  background: linear-gradient(to bottom, #f6f5f0, #efede6);
+  border: 1px solid var(--rule);
+  margin: 1.4rem 0 1.8rem;
+  padding: 0.9rem 1rem 1rem;
+}
+
+#TOC::before {
+  color: var(--accent);
+  content: "Contents";
+  display: block;
+  font-family: "Gill Sans", "Avenir Next", Arial, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+}
