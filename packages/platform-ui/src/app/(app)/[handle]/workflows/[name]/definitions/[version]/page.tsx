@@ -9,8 +9,8 @@ import { useWorkflowTriggers } from '@/hooks/use-workflow-triggers';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { StartRunButton } from '@/components/processes/start-run-button';
-import { mediforce, ApiError } from '@/lib/mediforce';
-import { parseStepErrors, validateSteps, mergeVerdictTransitions, toastRegistrationWarnings, formatSaveErrorMessage } from '@/lib/workflow-save-utils';
+import { mediforce } from '@/lib/mediforce';
+import { validateSteps, mergeVerdictTransitions, toastRegistrationWarnings, handleSaveFailure } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
@@ -118,15 +118,9 @@ export default function WorkflowDefinitionVersionPage() {
         router.push(`/${handle}/workflows/${name}/definitions/${result.version}`);
       }, 500);
     } catch (err) {
-      const issues = err instanceof ApiError && Array.isArray(err.details)
-        ? (err.details as Array<{ path: (string | number)[]; message: string }>)
-        : [];
-      const parsed = parseStepErrors(issues, steps);
-      setStepErrors(parsed);
-      setSaveState({
-        status: 'error',
-        message: formatSaveErrorMessage(err, Object.keys(parsed).length > 0),
-      });
+      const { stepErrors: failedSteps, message } = handleSaveFailure(err, steps);
+      setStepErrors(failedSteps);
+      setSaveState({ status: 'error', message });
     }
   }, [definition, editedDescription, name, handle, router]);
 

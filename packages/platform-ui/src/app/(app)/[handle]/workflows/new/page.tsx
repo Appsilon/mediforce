@@ -7,8 +7,8 @@ import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
-import { mediforce, ApiError } from '@/lib/mediforce';
-import { parseStepErrors, validateSteps, mergeVerdictTransitions, toastRegistrationWarnings, formatSaveErrorMessage } from '@/lib/workflow-save-utils';
+import { mediforce } from '@/lib/mediforce';
+import { validateSteps, mergeVerdictTransitions, toastRegistrationWarnings, handleSaveFailure } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
@@ -137,15 +137,9 @@ export default function NewWorkflowPage() {
         router.push(`/${handle}/workflows/${encodeURIComponent(result.name)}/definitions/${result.version}`);
       }, 500);
     } catch (err) {
-      const issues = err instanceof ApiError && Array.isArray(err.details)
-        ? (err.details as Array<{ path: (string | number)[]; message: string }>)
-        : [];
-      const parsed = parseStepErrors(issues, steps);
-      setStepErrors(parsed);
-      setSaveState({
-        status: 'error',
-        message: formatSaveErrorMessage(err, Object.keys(parsed).length > 0),
-      });
+      const { stepErrors: failedSteps, message } = handleSaveFailure(err, steps);
+      setStepErrors(failedSteps);
+      setSaveState({ status: 'error', message });
     }
   }, [workflowName, effectiveNamespace, description, handle, router]);
 
