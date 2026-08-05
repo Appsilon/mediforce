@@ -14,6 +14,8 @@ e2e/.auth/
 playwright-report/
 test-results/
 e2e/.emulator-data/
+# Written by e2e/global-setup.ts (mock OAuth server base URL), removed on teardown.
+e2e/.mock-oauth-url
 
 # Firebase
 .firebase/

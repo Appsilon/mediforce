@@ -93,9 +93,41 @@ describe('resendInvite handler', () => {
     expect(notifier.sendActivationCalls).toEqual([
       {
         toEmail: 'pending@example.test',
-        inviterName: 'alpha',
         workspaceName: 'alpha',
         workspaceHandle: 'alpha',
+        passwordSetupEnabled: true,
+      },
+    ]);
+    expect(notifier.sendWorkspaceCalls).toHaveLength(0);
+  });
+
+  it('does not re-arm the gate but still sends a working sign-in link when password auth is disabled', async () => {
+    const inviteService = inviteServiceStub({
+      email: 'pending@example.test',
+      pending: true,
+    });
+    const notifier = recordingNotifier();
+    const userProfileRepo = new InMemoryUserProfileRepository();
+    const scope = createTestScope({
+      auditRepo,
+      inviteService,
+      inviteNotificationService: notifier,
+      userProfileRepo,
+      passwordAuthEnabled: false,
+    });
+
+    const result = await resendInvite(baseInput, scope);
+
+    expect(result.emailSent).toBe(true);
+    expect(await userProfileRepo.getProfile('uid-target')).toBeNull();
+    // A pending invitee has no session, so the recovery must still carry a way
+    // in — only the create-password framing is dropped.
+    expect(notifier.sendActivationCalls).toEqual([
+      {
+        toEmail: 'pending@example.test',
+        workspaceName: 'alpha',
+        workspaceHandle: 'alpha',
+        passwordSetupEnabled: false,
       },
     ]);
     expect(notifier.sendWorkspaceCalls).toHaveLength(0);
@@ -121,10 +153,10 @@ describe('resendInvite handler', () => {
     expect(notifier.sendActivationCalls).toEqual([
       {
         toEmail: 'pending@example.test',
-        inviterName: 'alpha',
         workspaceName: 'alpha',
         workspaceHandle: 'alpha',
         baseUrl: 'https://phuse.mediforce.ai',
+        passwordSetupEnabled: true,
       },
     ]);
   });

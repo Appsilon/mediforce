@@ -24,6 +24,14 @@ vi.mock('node:child_process', async (importOriginal) => {
   return { ...actual, spawn: vi.fn() };
 });
 
+// LocalDockerSpawnStrategy clears a stale container by name before `docker run`
+// (via removeStaleContainer, its own internal `spawn`). Stub it out so tests
+// asserting on `spawnMock.mock.calls` keep seeing exactly the `docker run` call.
+vi.mock('@mediforce/container-worker', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@mediforce/container-worker')>();
+  return { ...actual, removeStaleContainer: vi.fn().mockResolvedValue(undefined) };
+});
+
 import { spawn } from 'node:child_process';
 const spawnMock = vi.mocked(spawn);
 
