@@ -44,10 +44,8 @@ export async function startRun(
     );
   }
 
-  if (!scope.caller.isSystemActor && definition.visibility !== 'public') {
-    if (!scope.caller.namespaces.has(definition.namespace)) {
-      throw new ForbiddenError();
-    }
+  if (!scope.caller.isSystemActor && !scope.caller.namespaces.has(definition.namespace)) {
+    throw new ForbiddenError();
   }
 
   // Unconditional (ADR-0012): `triggerInput` is the workflow's *total* input
