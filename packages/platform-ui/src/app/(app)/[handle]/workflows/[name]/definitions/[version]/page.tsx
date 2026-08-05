@@ -9,8 +9,8 @@ import { useWorkflowTriggers } from '@/hooks/use-workflow-triggers';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { StartRunButton } from '@/components/processes/start-run-button';
-import { mediforce, ApiError } from '@/lib/mediforce';
-import { parseStepErrors, validateSteps, mergeVerdictTransitions, toastRegistrationWarnings } from '@/lib/workflow-save-utils';
+import { mediforce } from '@/lib/mediforce';
+import { validateSteps, mergeVerdictTransitions, toastRegistrationWarnings, handleSaveFailure } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
@@ -118,19 +118,9 @@ export default function WorkflowDefinitionVersionPage() {
         router.push(`/${handle}/workflows/${name}/definitions/${result.version}`);
       }, 500);
     } catch (err) {
-      const issues = err instanceof ApiError && Array.isArray(err.details)
-        ? (err.details as Array<{ path: (string | number)[]; message: string }>)
-        : [];
-      const parsed = parseStepErrors(issues, steps);
-      setStepErrors(parsed);
-      const message = err instanceof ApiError ? err.message
-        : err instanceof Error ? err.message : 'Unknown error';
-      setSaveState({
-        status: 'error',
-        message: Object.keys(parsed).length > 0
-          ? 'Some steps have errors — check the highlighted steps in the diagram.'
-          : message,
-      });
+      const { stepErrors: failedSteps, message } = handleSaveFailure(err, steps);
+      setStepErrors(failedSteps);
+      setSaveState({ status: 'error', message });
     }
   }, [definition, editedDescription, name, handle, router]);
 
@@ -205,7 +195,7 @@ export default function WorkflowDefinitionVersionPage() {
               </span>
             )}
             {saveState.status === 'error' && (
-              <span className="text-sm text-red-600 dark:text-red-400 max-w-xs truncate" title={saveState.message}>
+              <span className="text-sm text-red-600 dark:text-red-400 max-w-md whitespace-normal break-words text-right">
                 {saveState.message}
               </span>
             )}

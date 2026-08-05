@@ -1,8 +1,47 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { trackPageErrors } from '../helpers/page-errors';
+import { allowPageErrors, trackPageErrors } from '../helpers/page-errors';
 
 const SUPPLY_CHAIN_DEFINITION_URL = `/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`;
+
+/**
+ * Serialized Zod issues as they arrive in the ADR-0005 error envelope's
+ * `details`. None of them is step-scoped, so the editor reports every field by
+ * name instead of collapsing to the "check the highlighted steps" summary.
+ */
+const REJECTED_SAVE_ISSUES = [
+  {
+    path: ['name'],
+    code: 'too_small',
+    origin: 'string',
+    minimum: 1,
+    message: 'Too small: expected string to have >=1 characters',
+  },
+  {
+    path: ['description'],
+    code: 'too_small',
+    origin: 'string',
+    minimum: 1,
+    message: 'Too small: expected string to have >=1 characters',
+  },
+  {
+    path: ['transitions', 0, 'from'],
+    code: 'invalid_type',
+    expected: 'string',
+    message: 'Invalid input: expected string, received number',
+  },
+  {
+    path: ['visibility'],
+    code: 'invalid_value',
+    values: ['public', 'private'],
+    message: 'Invalid option',
+  },
+];
+
+/** What `handleSaveFailure` builds from the issues above. */
+const REJECTED_SAVE_MESSAGE =
+  'name is required; description is required; transitions.0.from must be a string; '
+  + 'visibility must be one of: public, private.';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -347,6 +386,78 @@ test.describe('Workflow Editor Journey', () => {
 
     // Button must remain disabled — toWorkflowId('---') === ''
     await expect(saveButton).toBeDisabled();
+  });
+
+  // ── Save failure message ─────────────────────────────────────────────────
+
+  test('rejected save renders the whole error message unclipped in the header', async ({ page }) => {
+    trackPageErrors(page);
+    // The refused save is the point of this test: the browser logs the 400 and
+    // the editor logs the rejection it is about to render. Any other console
+    // error (React violation, unhandled exception) still fails the test.
+    allowPageErrors(page, [
+      /^Failed to load resource: the server responded with a status of 400 \(Bad Request\)/,
+      /^Workflow save failed/,
+    ]);
+
+    // Reject the registration with the ADR-0005 typed envelope so the editor
+    // receives the structured issues it builds the header message from.
+    await page.route(
+      (url) => url.pathname === '/api/workflow-definitions',
+      async (route) => {
+        if (route.request().method() !== 'POST') {
+          await route.fallback();
+          return;
+        }
+        await route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: {
+              code: 'validation',
+              message: 'Invalid workflow definition',
+              details: REJECTED_SAVE_ISSUES,
+            },
+          }),
+        });
+      },
+    );
+
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    // Drive the real save path: fill the form, confirm the version dialog.
+    await page.getByPlaceholder('Workflow name…').fill('e2e-rejected-workflow');
+    await page.getByPlaceholder('Add a description…').fill('Save is rejected by the server on purpose');
+
+    const saveButton = page.getByRole('button', { name: /publish workflow/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
+    await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('v1 — rejected');
+    // .last() is the dialog's confirm button; the first is the header button behind the overlay.
+    await page.getByRole('button', { name: /publish workflow/i }).last().click();
+
+    // The header reports every rejected field, in full.
+    const errorMessage = pageHeader(page).getByText(REJECTED_SAVE_MESSAGE);
+    await expect(errorMessage).toBeVisible({ timeout: 10_000 });
+    await expect(errorMessage).toHaveText(REJECTED_SAVE_MESSAGE);
+
+    // …and it is rendered, not clipped. `truncate` (the bug) would cut the
+    // message to one ellipsised line, so assert the element wraps instead:
+    // no truncate class, nothing overflowing its box in either axis, and a box
+    // taller than a single line — this message cannot fit on one.
+    const box = await errorMessage.evaluate((element) => ({
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+      lineHeight: parseFloat(getComputedStyle(element).lineHeight),
+    }));
+    expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth + 1);
+    expect(box.scrollHeight).toBeLessThanOrEqual(box.clientHeight + 1);
+    expect(box.clientHeight).toBeGreaterThan(box.lineHeight * 1.5);
+    await expect(errorMessage).not.toHaveClass(/truncate/);
   });
 
   // ── Pane click deselects step ─────────────────────────────────────────────
