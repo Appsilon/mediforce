@@ -60,6 +60,31 @@ describe('listWorkflows handler', () => {
     expect(result.definitions[0]?.definition?.version).toBe(3);
   });
 
+  describe('includeArchived', () => {
+    beforeEach(async () => {
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({ name: 'flow-active', version: 1 }),
+      );
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({ name: 'flow-archived', version: 1, archived: true }),
+      );
+    });
+
+    it('omits archived workflows by default', async () => {
+      const scope = createTestScope({ processRepo });
+      const result = await listWorkflows({ includeCompletedRuns: true, includeArchived: false }, scope);
+
+      expect(result.definitions.map((d) => d.name)).toEqual(['flow-active']);
+    });
+
+    it('includes archived workflows when asked — the destructive count the danger dialog reads', async () => {
+      const scope = createTestScope({ processRepo });
+      const result = await listWorkflows({ includeCompletedRuns: true, includeArchived: true }, scope);
+
+      expect(result.definitions.map((d) => d.name).sort()).toEqual(['flow-active', 'flow-archived']);
+    });
+  });
+
   describe('visibility + namespace filtering for user callers', () => {
     beforeEach(async () => {
       await processRepo.saveWorkflowDefinition(

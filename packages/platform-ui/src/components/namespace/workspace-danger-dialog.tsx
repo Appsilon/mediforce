@@ -28,6 +28,7 @@ const COPY: Record<WorkspaceDangerMode, {
   confirmLabel: string;
   workingLabel: string;
   describe: (handle: string) => React.ReactNode;
+  cascadeNote: string;
 }> = {
   delete: {
     title: 'Delete Workspace',
@@ -40,6 +41,9 @@ const COPY: Record<WorkspaceDangerMode, {
         be undone.
       </>
     ),
+    // The workspace row itself goes, and `agent_runs.workspace` is
+    // ON DELETE CASCADE — agent runs really do disappear with it.
+    cascadeNote: 'All runs, tasks, and agent runs in this workspace will be removed.',
   },
   reset: {
     title: 'Reset Workspace',
@@ -52,6 +56,12 @@ const COPY: Record<WorkspaceDangerMode, {
         be undone.
       </>
     ),
+    // Reset runs the per-workflow cascade, which soft-deletes definitions,
+    // runs and human tasks. `agent_runs` is keyed off the workspace, not the
+    // run's deleted flag, so that history survives — say so rather than
+    // promising a removal that never happens.
+    cascadeNote:
+      'All runs and tasks for those workflows will be removed. Agent run history for the workspace stays.',
   },
 };
 
@@ -81,7 +91,9 @@ export function WorkspaceDangerDialog({ mode, handle, open, onOpenChange, onDone
     setHandleInput('');
     setCountInput('');
     mediforce.workflows
-      .list({ namespace: handle, includeCompletedRuns: false })
+      // Archived workflows are destroyed too, so they have to be counted —
+      // the catalog's default view hides them.
+      .list({ namespace: handle, includeCompletedRuns: false, includeArchived: true })
       .then(({ definitions }) => setState({ step: 'confirm', workflowCount: definitions.length }))
       .catch(() =>
         setState({ step: 'error', message: 'Failed to load the workspace contents.', workflowCount: 0 }),
@@ -145,9 +157,7 @@ export function WorkspaceDangerDialog({ mode, handle, open, onOpenChange, onDone
                   <p className="font-medium text-destructive">
                     This will delete {workflowCount} workflow{workflowCount !== 1 ? 's' : ''}.
                   </p>
-                  <p className="text-muted-foreground mt-1">
-                    All process instances, tasks, and agent runs for those workflows will be removed.
-                  </p>
+                  <p className="text-muted-foreground mt-1">{copy.cascadeNote}</p>
                 </div>
               )}
 

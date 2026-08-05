@@ -31,6 +31,7 @@ const authHeaders = { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' }
 const FIXTURE_UID = 'ns-lifecycle-user';
 const PERSONAL_KEEP_HANDLE = 'ns-lifecycle-keep';
 const PERSONAL_RESET_HANDLE = 'ns-lifecycle-reset';
+const PERSONAL_ARCHIVED_HANDLE = 'ns-lifecycle-archived';
 const ORG_DELETE_HANDLE = 'ns-lifecycle-org';
 
 function workflowDefinition(name: string) {
@@ -87,6 +88,60 @@ test.describe('Workspace delete vs reset — API E2E', () => {
     const body = await getRes.json();
     expect(body.namespace.handle).toBe(handle);
     expect(body.members.map((member: { uid: string }) => member.uid)).toContain(FIXTURE_UID);
+  });
+
+  test('an archived workflow is counted by includeArchived and removed by reset', async ({ request }) => {
+    const handle = PERSONAL_ARCHIVED_HANDLE;
+    await seedPostgresPersonalNamespace(handle, FIXTURE_UID, 'Personal Archived');
+    const active = `active-flow-${Date.now()}`;
+    const archived = `archived-flow-${Date.now()}`;
+
+    for (const name of [active, archived]) {
+      const register = await request.post(
+        `/api/workflow-definitions?namespace=${handle}`,
+        { headers: authHeaders, data: workflowDefinition(name) },
+      );
+      expect(register.status(), await register.text()).toBe(201);
+    }
+    const archiveRes = await request.post(
+      `/api/workflow-definitions/${archived}/archive?namespace=${handle}`,
+      { headers: authHeaders, data: { archived: true } },
+    );
+    expect(archiveRes.status(), await archiveRes.text()).toBe(200);
+
+    // The catalog's default view hides the archived workflow, so the count the
+    // danger dialog makes the operator type has to opt in — otherwise it
+    // under-states the blast radius reset is about to deliver.
+    const defaultList = await request.get(
+      `/api/workflow-definitions?namespace=${handle}`,
+      { headers: authHeaders },
+    );
+    const defaultNames = ((await defaultList.json()) as { definitions: Array<{ name: string }> })
+      .definitions.map((definition) => definition.name);
+    expect(defaultNames).toContain(active);
+    expect(defaultNames).not.toContain(archived);
+
+    const fullList = await request.get(
+      `/api/workflow-definitions?namespace=${handle}&includeArchived=true`,
+      { headers: authHeaders },
+    );
+    const fullNames = ((await fullList.json()) as { definitions: Array<{ name: string }> })
+      .definitions.map((definition) => definition.name);
+    expect(fullNames).toContain(active);
+    expect(fullNames).toContain(archived);
+
+    const resetRes = await request.post(`/api/namespaces/${handle}/reset`, { headers: authHeaders });
+    expect(resetRes.status(), await resetRes.text()).toBe(200);
+    expect((await resetRes.json()).deletedWorkflows).toBe(fullNames.length);
+
+    const afterReset = await request.get(
+      `/api/workflow-definitions?namespace=${handle}&includeArchived=true`,
+      { headers: authHeaders },
+    );
+    const remaining = ((await afterReset.json()) as { definitions: Array<{ name: string }> })
+      .definitions.map((definition) => definition.name);
+    expect(remaining).not.toContain(active);
+    expect(remaining).not.toContain(archived);
   });
 
   test('an organization workspace deletes for real, along with its workflows', async ({ request }) => {

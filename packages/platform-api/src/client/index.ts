@@ -1074,6 +1074,9 @@ export class Mediforce {
               // Forward only when the caller turns "show completed" off; the
               // server defaults to true, so omitting keeps the common URL clean.
               includeCompletedRuns: validated.includeCompletedRuns ? undefined : 'false',
+              // Same shape, opposite default: the server omits archived unless
+              // asked, so only an explicit opt-in travels.
+              includeArchived: validated.includeArchived ? 'true' : undefined,
             })
           : '';
         const res = await this.request(`/api/workflow-definitions${qs}`);
