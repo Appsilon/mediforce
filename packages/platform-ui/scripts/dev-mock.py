@@ -29,6 +29,10 @@ DEMO_ENV: dict[str, str] = {
     "MOCK_AGENT": "true",
     "MEDIFORCE_DATA_DIR": "/tmp/mediforce-e2e-data",
     "NEXT_PUBLIC_APP_URL": f"http://localhost:{NEXT_PORT}",
+    # Server-side self-fetch base (attachment downloads, run-kicker). Without it
+    # those default to localhost:9003 while dev:mock serves :9007, so agent steps
+    # that read an uploaded file die "fetch failed".
+    "APP_BASE_URL": f"http://localhost:{NEXT_PORT}",
     "NO_PROXY": "localhost,127.0.0.1",
     "no_proxy": "localhost,127.0.0.1",
     "OPENROUTER_API_KEY": "fake-openrouter-key",
