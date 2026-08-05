@@ -8,7 +8,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { startRun } from '../start-run';
-import { HandlerError, NotFoundError } from '../../../errors';
+import { ForbiddenError, HandlerError, NotFoundError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
@@ -355,6 +355,40 @@ describe('startRun handler', () => {
         scope,
       ),
     ).rejects.toBeInstanceOf(NotFoundError);
+
+    expect(fireWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('forbids a non-member from starting a public foreign-namespace workflow', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'public-intake',
+        namespace: 'team-beta',
+        version: 1,
+        visibility: 'public',
+      }),
+    );
+
+    const fireWorkflow = vi.fn();
+    const scope = createTestScope({
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+    Object.assign(scope.system, { manualTrigger: { fireWorkflow } });
+
+    await expect(
+      startRun(
+        {
+          namespace: 'team-beta',
+          definitionName: 'public-intake',
+          triggerName: 'manual',
+          triggeredBy: 'u-1',
+        },
+        scope,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError);
 
     expect(fireWorkflow).not.toHaveBeenCalled();
   });

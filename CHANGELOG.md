@@ -11,9 +11,15 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Changed
+- Public workflow sharing now explains that it is link-based, shows a persistent shared state, and offers a canonical link to copy [#1141](https://github.com/Appsilon/mediforce/pull/1141).
+
 ### Fixed
 - User workflow-definition lists now return only definitions in their member workspaces, including hiding foreign public workflows [#1047](https://github.com/Appsilon/mediforce/issues/1047).
 - Parallel E2E runs no longer hide Monitoring activity or workflow-status fixtures behind first-page pagination [#1134](https://github.com/Appsilon/mediforce/issues/1134).
+
+### Security
+- Public workflow links are read/copy-only: non-members can no longer start runs in the owning workspace [#1141](https://github.com/Appsilon/mediforce/pull/1141).
 
 ## [2026-08-02]
 

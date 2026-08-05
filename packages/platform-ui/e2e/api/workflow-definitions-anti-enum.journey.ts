@@ -80,4 +80,35 @@ test.describe('GET /api/workflow-definitions/[name] — visibility 404', () => {
     const body = await list.json() as { definitions: Array<{ name: string }> };
     expect(body.definitions.map((definition) => definition.name)).not.toContain(name);
   });
+
+  test('outsider user cannot start a public workflow in another namespace', async ({ request }) => {
+    const name = `public-run-isolation-${Date.now()}`;
+    const create = await request.post(
+      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
+      {
+        headers: apiKeyHeaders(),
+        data: {
+          name,
+          description: 'Public workflow used to verify run isolation.',
+          visibility: 'public',
+          steps: [{ id: 'start', name: 'Start', type: 'creation', executor: 'human' }],
+          transitions: [],
+        },
+      },
+    );
+    expect(create.status(), await create.text()).toBe(201);
+
+    const start = await request.post('/api/processes', {
+      headers: sessionCookieHeaders(callers.outsider),
+      data: {
+        namespace: TEST_ORG_HANDLE,
+        definitionName: name,
+        triggerName: 'manual',
+        triggeredBy: callers.outsider.uid,
+      },
+    });
+    expect(start.status(), await start.text()).toBe(403);
+    const body = await start.json() as { error: { code: string } };
+    expect(body.error.code).toBe('forbidden');
+  });
 });
