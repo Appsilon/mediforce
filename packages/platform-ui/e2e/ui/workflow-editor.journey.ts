@@ -86,7 +86,9 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByRole('tab', { name: /definitions/i })).toBeVisible();
 
     // Runs tab is default
-    await expect(page.getByRole('tab', { name: /runs/i })).toHaveAttribute('data-state', 'active');
+    const runsTab = page.getByRole('tab', { name: /runs/i });
+    await expect(runsTab).toBeVisible({ timeout: 10_000 });
+    await expect(runsTab).toHaveAttribute('data-state', 'active');
 
     // Configurations tab does NOT exist
     await expect(page.getByRole('tab', { name: /configurations/i })).not.toBeVisible();
@@ -96,6 +98,27 @@ test.describe('Workflow Editor Journey', () => {
     await expect(
       page.locator('a[href*="/definitions/"]').or(page.locator('text=/No definitions|Create first/i')).first(),
     ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('workflow Runs tab scopes filters and keeps cost sorting global while loading more', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review`);
+
+    const runsTab = page.getByRole('tab', { name: /runs/i });
+    await expect(runsTab).toBeVisible({ timeout: 15_000 });
+    await expect(runsTab).toHaveAttribute('data-state', 'active');
+    await page.getByRole('button', { name: 'Dry Runs' }).click();
+
+    const rows = page.locator('tbody tr');
+    await expect(rows).toHaveCount(20, { timeout: 10_000 });
+
+    await page.getByRole('button', { name: /^Cost/ }).click();
+    await expect(rows.first()).toHaveAttribute('data-run-id', 'proc-workflow-runs-pagination-21');
+
+    await page.getByRole('button', { name: 'Load more' }).click();
+    await expect(rows).toHaveCount(21);
+    await expect(rows.last()).toHaveAttribute('data-run-id', 'proc-workflow-runs-pagination-1');
+    await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
   });
 
   // ── Definition version page ────────────────────────────────────────────────

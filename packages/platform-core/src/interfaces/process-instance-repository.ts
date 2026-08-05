@@ -44,6 +44,10 @@ export interface ListInstancesPageOptions {
    *  page 1. Malformed/unknown cursors are treated as "no cursor" (page 1),
    *  same robustness rule as `getById` returning `null` on missing. */
   cursor?: string;
+  /** `createdAt` preserves the default newest-first order; `cost` orders
+   *  known costs first and leaves unknown costs last. */
+  sort?: 'createdAt' | 'cost';
+  direction?: 'asc' | 'desc';
   limit: number;
 }
 
@@ -110,8 +114,8 @@ export interface ProcessInstanceRepository {
   listAll(options: ListInstancesOptions): Promise<ProcessInstance[]>;
   listInNamespaces(allowed: readonly string[], options: ListInstancesOptions): Promise<ProcessInstance[]>;
 
-  /** System-actor keyset-paginated list — newest first, `(createdAt, id)`
-   *  tie-break. See `ListInstancesPageOptions`. */
+  /** System-actor keyset-paginated list — newest first by default, with
+   *  selectable Started/Cost ordering. See `ListInstancesPageOptions`. */
   listPage(options: ListInstancesPageOptions): Promise<ListInstancesPage>;
   /** Namespace-scoped keyset-paginated list — items whose workspace is in
    *  `allowed`, further narrowed by `options.namespace` under intersection

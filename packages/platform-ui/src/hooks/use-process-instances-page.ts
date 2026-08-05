@@ -8,8 +8,8 @@ import { usePaginatedQuery } from './use-paginated-query';
 const PAGE_SIZE = 20;
 
 /**
- * Keyset-paginated, newest-first run list — replaces the old "fetch up to
- * 10k rows, filter client-side" approach (`useProcessInstances`) for the
+ * Keyset-paginated run list (newest-first by default) — replaces the old "fetch up to
+ * 10k rows, filter client-side" approach of the retired unbounded list hook for the
  * Monitoring → Workflows tab and the standalone `/runs` page, both of which
  * became unusably slow once a real workspace accumulated thousands of runs.
  *
@@ -27,8 +27,10 @@ export function useProcessInstancesPage(params: {
   dryRun?: boolean;
   archived: boolean;
   displayStatus?: WorkflowDisplayStatus | null;
+  sort: 'started' | 'cost';
+  direction: 'asc' | 'desc';
 }) {
-  const { namespace, workflowFilter, dryRun, archived, displayStatus } = params;
+  const { namespace, workflowFilter, dryRun, archived, displayStatus, sort, direction } = params;
   const enabled = namespace.length > 0;
 
   return usePaginatedQuery({
@@ -37,6 +39,8 @@ export function useProcessInstancesPage(params: {
       dryRun,
       archived,
       displayStatus: displayStatus ?? undefined,
+      sort,
+      direction,
     }),
     queryFn: (cursor) =>
       mediforce.runs.listPage({
@@ -45,6 +49,8 @@ export function useProcessInstancesPage(params: {
         dryRun,
         archived,
         displayStatus: displayStatus ?? undefined,
+        sort,
+        direction,
         cursor,
         limit: PAGE_SIZE,
       }),

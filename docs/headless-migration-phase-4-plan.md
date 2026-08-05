@@ -385,7 +385,7 @@ in [`docs/headless-migration.md`](./headless-migration.md)).
 
 | File | Tier | Endpoint(s) | Polling | Notes |
 |---|---|---|---|---|
-| `app/(app)/[handle]/page.tsx` (workspace home) | STANDARD LIVE | `useProcessInstances`, `useAllUserNamespaces` (selector), `mediforce.users.listMembers` (Phase 2.6 already exists) | 5 s for runs list | Multi-hook page — coordinate PR sequencing (PR3 + PR4 overlap; see PR sizing) |
+| `app/(app)/[handle]/page.tsx` (workspace home) | STANDARD LIVE | paginated run summary hook, `useAllUserNamespaces` (selector), `mediforce.users.listMembers` (Phase 2.6 already exists) | 5 s for runs list | Multi-hook page — coordinate PR sequencing (PR3 + PR4 overlap; see PR sizing) |
 | `app/(app)/[handle]/settings/page.tsx` | ONE-SHOT | `useNamespace`, `mediforce.users.listMembers` (Phase 2.6), `mediforce.users.invite/resend` (Phase 2.6) | 0 (focus-refetch on) | Drops remaining `onSnapshot` on `namespaces/{handle}/members` subcollection |
 | `app/(app)/[handle]/tasks/[taskId]/page.tsx` (task detail) | CRITICAL LIVE | `mediforce.tasks.get(taskId)` | 1–2 s while task non-terminal | Today does `onSnapshot(humanTasks/{taskId})` — replace with `useQuery` gated on task status |
 | `app/(app)/[handle]/cowork/[sessionId]/page.tsx` (cowork chat) | CRITICAL LIVE during active POST | `mediforce.cowork.getSession(sessionId)` | 1 s while `useSendMessage.isPending`, 5 s idle | See §"Cowork live-turn strategy" |

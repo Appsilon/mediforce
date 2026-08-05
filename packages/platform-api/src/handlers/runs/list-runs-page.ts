@@ -2,7 +2,8 @@ import type { ListRunsPageInput, ListRunsPageOutput } from '../../contract/runs'
 import type { CallerScope } from '../../repositories/index';
 
 /**
- * Keyset-paginated, newest-first list of workflow runs — see
+ * Keyset-paginated workflow run list (newest-first by default; Started/Cost
+ * ordering is selectable) — see
  * `ListRunsPageInputSchema`'s docstring for why this is separate from
  * `listRuns`. Workspace gating is enforced by the `scope.runs` wrapper,
  * same as `listRuns`.
@@ -17,6 +18,8 @@ export async function listRunsPage(
     dryRun: input.dryRun,
     archived: input.archived,
     displayStatus: input.displayStatus,
+    sort: input.sort === 'cost' ? 'cost' : 'createdAt',
+    direction: input.direction ?? 'desc',
     cursor: input.cursor,
     limit: input.limit,
   });

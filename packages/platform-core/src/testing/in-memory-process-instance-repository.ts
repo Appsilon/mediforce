@@ -4,6 +4,7 @@ import {
   getWorkflowStatus,
   encodeProcessInstanceCursor,
   decodeProcessInstanceCursor,
+  type ProcessInstanceCursorPayload,
   type ProcessInstanceRepository,
   type ProcessInstance,
   type InstanceStatus,
@@ -112,16 +113,13 @@ export class InMemoryProcessInstanceRepository
     if (options.displayStatus !== undefined) {
       results = results.filter((i) => getWorkflowStatus(i).displayStatus === options.displayStatus);
     }
-    results.sort((a, b) => {
-      if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? 1 : -1;
-      return a.id < b.id ? 1 : -1;
-    });
+    const sort = options.sort ?? 'createdAt';
+    const direction = options.direction ?? 'desc';
+    results.sort((left, right) => this.comparePageRows(left, right, sort, direction));
     if (options.cursor !== undefined) {
       const after = decodeProcessInstanceCursor(options.cursor);
-      if (after !== null) {
-        results = results.filter(
-          (i) => i.createdAt < after.createdAt || (i.createdAt === after.createdAt && i.id < after.id),
-        );
+      if (after !== null && after.sort === sort && after.direction === direction) {
+        results = results.filter((instance) => this.isAfterCursor(instance, after, sort, direction));
       }
     }
     const hasMore = results.length > options.limit;
@@ -130,10 +128,63 @@ export class InMemoryProcessInstanceRepository
     if (hasMore && last !== undefined) {
       return {
         items: pageRows.map((i) => ({ ...i })),
-        nextCursor: encodeProcessInstanceCursor(last.createdAt, last.id),
+        nextCursor: encodeProcessInstanceCursor({
+          sort,
+          direction,
+          createdAt: last.createdAt,
+          id: last.id,
+          totalCostUsd: last.totalCostUsd ?? null,
+        }),
       };
     }
     return { items: pageRows.map((i) => ({ ...i })) };
+  }
+
+  private comparePageRows(
+    left: ProcessInstance,
+    right: ProcessInstance,
+    sort: 'createdAt' | 'cost',
+    direction: 'asc' | 'desc',
+  ): number {
+    if (sort === 'cost') {
+      const leftCost = left.totalCostUsd;
+      const rightCost = right.totalCostUsd;
+      if (leftCost === undefined && rightCost !== undefined) return 1;
+      if (leftCost !== undefined && rightCost === undefined) return -1;
+      if (leftCost !== undefined && rightCost !== undefined && leftCost !== rightCost) {
+        return direction === 'asc' ? leftCost - rightCost : rightCost - leftCost;
+      }
+    } else if (left.createdAt !== right.createdAt) {
+      return direction === 'asc'
+        ? left.createdAt.localeCompare(right.createdAt)
+        : right.createdAt.localeCompare(left.createdAt);
+    }
+    if (left.createdAt !== right.createdAt) return right.createdAt.localeCompare(left.createdAt);
+    return right.id.localeCompare(left.id);
+  }
+
+  private isAfterCursor(
+    instance: ProcessInstance,
+    cursor: ProcessInstanceCursorPayload,
+    sort: 'createdAt' | 'cost',
+    direction: 'asc' | 'desc',
+  ): boolean {
+    const isLaterTieBreaker =
+      instance.createdAt < cursor.createdAt ||
+      (instance.createdAt === cursor.createdAt && instance.id < cursor.id);
+    if (sort === 'createdAt') {
+      return direction === 'asc'
+        ? instance.createdAt > cursor.createdAt || (instance.createdAt === cursor.createdAt && instance.id < cursor.id)
+        : isLaterTieBreaker;
+    }
+    const cursorCost = cursor.totalCostUsd;
+    const instanceCost = instance.totalCostUsd;
+    if (cursorCost === null || cursorCost === undefined) {
+      return instanceCost === undefined && isLaterTieBreaker;
+    }
+    if (instanceCost === undefined) return true;
+    if (instanceCost === cursorCost) return isLaterTieBreaker;
+    return direction === 'asc' ? instanceCost > cursorCost : instanceCost < cursorCost;
   }
 
   async countByDisplayStatus(

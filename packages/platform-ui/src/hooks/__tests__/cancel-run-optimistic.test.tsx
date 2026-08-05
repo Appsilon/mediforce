@@ -89,12 +89,9 @@ describe('useCancelRun — state-transition optimistic (ADR-0006 §6)', () => {
     expect(queryClient.getQueryData<ProcessInstance>(queryKeys.run('r-1'))).toEqual(original);
   });
 
-  it('invalidates `["runs"]` prefix on settle so list slices refetch', async () => {
+  it('invalidates the runs prefix on settle so list slices refetch', async () => {
     const { wrapper, queryClient } = createQueryWrapper();
     queryClient.setQueryData(queryKeys.run('r-1'), buildProcessInstance({ id: 'r-1', status: 'running' }));
-    queryClient.setQueryData(queryKeys.runs.byHandle('alpha'), [
-      buildProcessInstance({ id: 'r-1', status: 'running', namespace: 'alpha' }),
-    ]);
     cancelMock.mockResolvedValue({ run: buildProcessInstance({ id: 'r-1', status: 'failed', error: 'Cancelled by user' }) });
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
