@@ -15,7 +15,9 @@ test.describe('Admin Tool Catalog Journey', () => {
     await expect(page.getByText(/select an entry to edit|no catalog entries|add your first/i).first()).toBeVisible();
 
     // ── Create ────────────────────────────────────────────────────────────
-    await page.getByRole('button', { name: /new catalog entry|add entry|new entry/i }).first().click();
+    const newCatalogEntryButton = page.getByRole('button', { name: /new catalog entry|add entry|new entry/i });
+    await expect(newCatalogEntryButton).toHaveCount(1);
+    await newCatalogEntryButton.click();
 
     await expect(page.getByRole('heading', { name: /new catalog entry|create/i }).first()).toBeVisible();
     await page.getByLabel(/^id$/i).fill('test-mcp');
