@@ -6,7 +6,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { GitBranch, Plus, Layers, ExternalLink, SlidersHorizontal, Check, Settings } from 'lucide-react';
 import { ProcessInstanceRow } from '@/components/processes/process-run-section';
 import { StartRunButton } from '@/components/processes/start-run-button';
-import { formatStepName } from '@/lib/format';
+import { workflowDisplayName } from '@/lib/workflow-save-utils';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 import type { WorkflowRunSummary } from '@mediforce/platform-api/contract';
@@ -123,7 +123,7 @@ export function ProcessCard({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-base group-hover:text-primary transition-colors">
-                  {formatStepName(definition.name)}
+                  {workflowDisplayName(definition)}
                 </span>
                 {definition.namespace && (
                   <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-medium text-blue-600">

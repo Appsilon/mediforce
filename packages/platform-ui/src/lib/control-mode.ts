@@ -17,6 +17,10 @@
  * Note: executor: agent, autonomyLevel: L2 (old Ghost/Assist) maps to 'assist' for
  * display of existing steps, but is no longer creatable from the wizard.
  */
+import type { WorkflowStep } from '@mediforce/platform-core';
+
+/** Step executor — the canonical union from the WorkflowStep schema. */
+export type Executor = WorkflowStep['executor'];
 
 export type ControlMode =
   | 'no-agent'
@@ -107,11 +111,12 @@ export function controlModeToSchema(
   }
 }
 
-/** Payload for creating a new step from the wizard popover. */
-export type NewStepPayload = {
-  type: 'creation' | 'decision';
-  executor: string;
-  autonomyLevel?: string;
-  agentId?: string;
-  cowork?: { agent: 'chat' | 'voice-realtime' };
+/**
+ * Payload for creating a new step from the wizard popover. Widened to accept any
+ * WorkflowStep field (minus id) so the picker can seed plugin/cowork/agent config
+ * in one shot; `type` and `executor` are always required.
+ */
+export type NewStepPayload = Partial<Omit<WorkflowStep, 'id'>> & {
+  type: WorkflowStep['type'];
+  executor: Executor;
 };

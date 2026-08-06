@@ -1,33 +1,25 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle } from 'lucide-react';
+import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, X, ChevronDown } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
 import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 
+import { toSlug } from '@mediforce/platform-core';
 import type { WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
-  AGENT_CONTROL_MODES,
   STEP_TYPE_LABELS,
   FALLBACK_OPTIONS,
   RUNTIME_OPTIONS,
 } from './constants';
 import { CoworkSection } from './cowork-section';
-import { FieldRow, FieldGroup, Section, inputBase, inputBaseMono, selectBase, textareaBase } from './step-editor-fields';
+import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-export function toSlug(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
 
 function friendlyFieldError(message: string): string {
   if (/too small|>=1|at least 1/i.test(message)) return 'This field cannot be empty.';
@@ -143,6 +135,12 @@ const TIP = {
   databricksTimeoutMinutes:'Step timeout in minutes — the run is cancelled when exceeded. Default 30.',
 
   allowedRoles:            'Roles that can claim this task, comma-separated. Leave empty to allow any signed-in user.',
+  assignedTo:              'Pre-assign this human task to a specific user. Accepts a user id or an interpolated value like ${triggerPayload.userId}. Human steps only.',
+  continueOnError:         'When on, a failure of this step is logged as a warning and the workflow advances anyway instead of failing the whole run. Use for non-critical side-effects (e.g. a notification), never for a step later steps depend on.',
+  uiComponent:             'Custom task body. "File upload" collects files; "Assignment table" and "Table editor" render their own views (configure their columns in the source editor). Default is the params form.',
+  uiAcceptedTypes:         'Accepted file types, comma-separated — MIME types and/or extensions (e.g. text/csv, .csv, application/pdf). If empty, only PDFs are accepted.',
+  uiMinFiles:              'Minimum number of files the user must upload to complete the task.',
+  uiMaxFiles:              'Maximum number of files the user can upload.',
 
   reviewType:              'Who performs the review: human (creates a task), agent (auto-evaluates), or none (skips review).',
   reviewPlugin:            'Plugin used when review.type is agent.',
@@ -205,6 +203,53 @@ function StepIdField({ currentId, onChange, error }: { currentId: string; onChan
 }
 
 // ---------------------------------------------------------------------------
+// CollapsibleCard — independent, self-contained collapsible section card
+// ---------------------------------------------------------------------------
+
+function CollapsibleCard({
+  title,
+  titleNode,
+  headerAction,
+  open,
+  onToggle,
+  children,
+}: {
+  title?: string;
+  titleNode?: React.ReactNode;
+  headerAction?: React.ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  const titleContent = titleNode ?? (
+    <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">{title}</span>
+  );
+  return (
+    <div className={cn('rounded-xl border shadow-lg overflow-hidden bg-white dark:bg-background flex flex-col', open && 'flex-1 min-h-0')}>
+      <div className="flex items-center gap-2 px-4 py-3 shrink-0">
+        <button type="button" onClick={onToggle} className="flex flex-1 min-w-0 items-center gap-2 text-left cursor-pointer">
+          {titleContent}
+        </button>
+        {headerAction}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={open ? 'Collapse section' : 'Expand section'}
+          className="shrink-0 rounded-md p-1 text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+        >
+          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', !open && '-rotate-90')} strokeWidth={2} />
+        </button>
+      </div>
+      {open && (
+        <div className="border-t px-4 pt-3.5 pb-4 space-y-4 flex-1 overflow-y-auto min-h-0">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // StepEditor
 // ---------------------------------------------------------------------------
 
@@ -213,6 +258,7 @@ export function StepEditor({
   allSteps,
   workflowName,
   onChange,
+  onClose,
   errors,
   imageWarning,
   dockerImages,
@@ -221,6 +267,7 @@ export function StepEditor({
   allSteps: WorkflowStep[];
   workflowName?: string;
   onChange: (patch: Partial<WorkflowStep>) => void;
+  onClose?: () => void;
   errors?: Record<string, string>;
   imageWarning?: string;
   dockerImages?: DockerImageInfo[];
@@ -249,6 +296,8 @@ export function StepEditor({
   const isCowork = step.executor === 'cowork';
   const isAction = step.executor === 'action';
   const isReview = step.type === 'review';
+  const isDecision = step.type === 'decision';
+  const hasVerdicts = isReview || isDecision;
   const isTerminal = step.type === 'terminal';
 
   const httpAction    = step.action?.kind === 'http'    ? step.action : undefined;
@@ -277,6 +326,16 @@ export function StepEditor({
   function updateReview(patch: Partial<NonNullable<WorkflowStep['review']>>) {
     onChange({ review: { ...step.review, ...patch } });
   }
+  function setUiComponent(component: string) {
+    if (!component) { onChange({ ui: undefined }); return; }
+    onChange({ ui: { ...step.ui, component } });
+  }
+  function updateUiConfig(key: string, value: unknown) {
+    const component = step.ui?.component ?? 'file-upload';
+    const config = { ...step.ui?.config, [key]: value };
+    if (value === undefined) delete config[key];
+    onChange({ ui: { component, config: Object.keys(config).length > 0 ? config : undefined } });
+  }
   function updateSelection(newMin: number | undefined, newMax: number | undefined) {
     if (newMin === undefined && newMax === undefined) { onChange({ selection: undefined }); return; }
     onChange({ selection: { min: newMin ?? 1, max: newMax ?? 1 } });
@@ -287,33 +346,183 @@ export function StepEditor({
   const typeStyle = STEP_TYPE_ICON[step.type] ?? STEP_TYPE_ICON.creation;
   const TypeIcon = typeStyle.icon;
 
-  return (
-    <div className="space-y-4" data-testid="step-editor">
+  // ── Accordion sections ─────────────────────────────────────────────────
+  const hasPrimarySection = isAgent || isScript || isHuman || isAction || isReview || isCowork;
+  const paramsInPrimary = isHuman;
+  const paramsInAdvanced = !isTerminal && !isHuman;
 
-      {/* ── Review deprecation warning ───────────────────────────── */}
+  const primaryTitle = isAgent
+    ? 'Prompt & model'
+    : isScript
+      ? 'Script'
+      : isCowork
+        ? 'Collaboration'
+        : isAction
+          ? 'Action'
+          : isHuman
+            ? 'Task setup'
+            : isReview
+              ? 'Review'
+              : 'Configuration';
+
+  // Default open: Basics + Primary; Routing + Advanced closed. Any combination
+  // of cards may be open — toggling one never closes the others.
+  // Card ids + their default open state live here once; the reset effect and
+  // toggle derive from this rather than re-typing the literal.
+  const defaultOpenCards: Record<string, boolean> = { basics: true, primary: false, routing: false, advanced: false };
+  const [openCards, setOpenCards] = useState<Record<string, boolean>>(defaultOpenCards);
+  useEffect(() => {
+    setOpenCards(defaultOpenCards);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.id, step.executor, isDecision, hasPrimarySection]);
+  // Single-open: opening a card closes the others; clicking the open one collapses it.
+  const toggleCard = (id: string) => setOpenCards((prev) => {
+    const allClosed = Object.fromEntries(Object.keys(defaultOpenCards).map((k) => [k, false]));
+    return { ...allClosed, [id]: !prev[id] };
+  });
+
+  const parametersSection = !isTerminal ? (
+        <Section title="Parameters">
+          <div className="space-y-3">
+            {(step.params ?? []).map((param, idx) => (
+              <div key={idx} className="rounded-xl border border-border/60 p-3 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground">Parameter {idx + 1}</span>
+                  <button
+                    onClick={() => {
+                      const next = (step.params ?? []).filter((_, i) => i !== idx);
+                      onChange({ params: next.length > 0 ? next : undefined });
+                    }}
+                    className="rounded-md p-0.5 text-muted-foreground/50 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                    aria-label="Remove parameter"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <FieldGroup>
+                <FieldRow label="name" tooltip={TIP.paramName}>
+                  <input
+                    value={param.name}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], name: e.target.value };
+                      onChange({ params: next });
+                    }}
+                    className={riMono}
+                  />
+                </FieldRow>
+                <FieldRow label="type" tooltip={TIP.paramType}>
+                  <select
+                    value={param.type ?? 'string'}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], type: e.target.value as 'string' | 'number' | 'boolean' | 'date' };
+                      onChange({ params: next });
+                    }}
+                    className={rs}
+                  >
+                    {(['string', 'number', 'boolean', 'date'] as const).map((t) => (
+                      <option key={t} value={t}>{humanizeToken(t)}</option>
+                    ))}
+                  </select>
+                </FieldRow>
+                <FieldRow label="required" tooltip={TIP.paramRequired}>
+                  <input
+                    type="checkbox"
+                    checked={param.required ?? false}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], required: e.target.checked };
+                      onChange({ params: next });
+                    }}
+                    className="w-3.5 h-3.5 accent-primary cursor-pointer"
+                  />
+                </FieldRow>
+                <FieldRow label="description" tooltip={TIP.paramDescription}>
+                  <input
+                    value={param.description ?? ''}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], description: e.target.value || undefined };
+                      onChange({ params: next });
+                    }}
+                    className={ri}
+                  />
+                </FieldRow>
+                <FieldRow label="default" tooltip={TIP.paramDefault}>
+                  <input
+                    value={param.default !== undefined ? String(param.default) : ''}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], default: e.target.value || undefined };
+                      onChange({ params: next });
+                    }}
+                    className={riMono}
+                  />
+                </FieldRow>
+                <FieldRow label="options" tooltip={TIP.paramOptions}>
+                  <input
+                    value={param.options?.join(', ') ?? ''}
+                    onChange={(e) => {
+                      const opts = e.target.value.split(',').map((o) => o.trim()).filter(Boolean);
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], options: opts.length > 0 ? opts : undefined };
+                      onChange({ params: next });
+                    }}
+                    className={ri}
+                  />
+                </FieldRow>
+                </FieldGroup>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => onChange({ params: [...(step.params ?? []), { name: '', type: 'string', required: false }] })}
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >+ Add parameter</button>
+        </Section>
+  ) : null;
+
+  return (
+    <div className="flex flex-col gap-3 h-full min-h-0" data-testid="step-editor">
+
+      {/* ── Basics (carries the step identity header) ────────────── */}
+      <CollapsibleCard
+        open={openCards.basics}
+        onToggle={() => toggleCard('basics')}
+        headerAction={onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close step editor"
+            className="shrink-0 rounded-md p-1 text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : undefined}
+        titleNode={
+          <div className="flex flex-1 min-w-0 items-center gap-3">
+            <div className={cn('flex items-center justify-center h-9 w-9 rounded-lg shrink-0', execStyle.bg)}>
+              <ExecIcon className={cn('h-5 w-5', execStyle.color)} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-tight truncate">{step.name || 'Unnamed step'}</p>
+              {/* executor · type, matching the canvas node badge order (type last). */}
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-[10px] text-muted-foreground">{execStyle.label}</span>
+                <span className="text-[10px] text-muted-foreground/30">·</span>
+                <TypeIcon className={cn('h-3 w-3 shrink-0', typeStyle.color)} strokeWidth={1.5} />
+                <span className="text-[10px] text-muted-foreground">{typeStyle.label}</span>
+              </div>
+            </div>
+          </div>
+        }
+      >
       {step.type === 'review' && (
         <div className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
           <strong>Review steps are deprecated.</strong> They will be replaced by Decision steps — where a human explicitly decides if the previous work is satisfactory. You can continue using this step; it will keep working. To migrate, replace it with a Decision step.
         </div>
       )}
-
-      {/* ── Step type header ─────────────────────────────────────── */}
-      <div className="flex items-center gap-3 pb-3 border-b border-border/40">
-        <div className={cn('flex items-center justify-center h-9 w-9 rounded-lg shrink-0', execStyle.bg)}>
-          <ExecIcon className={cn('h-5 w-5', execStyle.color)} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold leading-tight truncate">{step.name || 'Unnamed step'}</p>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <TypeIcon className={cn('h-3 w-3 shrink-0', typeStyle.color)} strokeWidth={1.5} />
-            <span className="text-[10px] text-muted-foreground">{typeStyle.label}</span>
-            <span className="text-[10px] text-muted-foreground/30">·</span>
-            <span className="text-[10px] text-muted-foreground">{execStyle.label}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Identity ─────────────────────────────────────────────── */}
       <FieldGroup>
         <FieldRow label="name" tooltip={TIP.name} error={errors?.name ? friendlyFieldError(errors.name) : undefined}>
           <input
@@ -327,10 +536,6 @@ export function StepEditor({
           />
         </FieldRow>
 
-        <FieldRow label="id" tooltip={TIP.id} error={errors?.id ? friendlyFieldError(errors.id) : undefined}>
-          <StepIdField currentId={step.id} onChange={(v) => onChange({ id: v })} error={errors?.id} />
-        </FieldRow>
-
         <FieldRow label="description" tooltip={TIP.description} alignStart>
           <textarea
             value={step.description ?? ''}
@@ -339,6 +544,15 @@ export function StepEditor({
             rows={2}
             className={cn(rt, 'text-muted-foreground placeholder:italic placeholder:text-muted-foreground/40')}
           />
+        </FieldRow>
+
+        {/* Executor before type, matching the block picker / canvas node order
+            (executor -> type) so the two panels read consistently. */}
+        <FieldRow label="executor" tooltip={TIP.executor}>
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5" title="executor is set at creation. To change, remove this step and add a new one.">
+            <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
+            <span>{execStyle.label}</span>
+          </span>
         </FieldRow>
 
         <FieldRow label="type" tooltip={TIP.type}>
@@ -350,28 +564,26 @@ export function StepEditor({
             {STEP_TYPE_LABELS[step.type] ?? step.type}
           </span>
         </FieldRow>
-
-        <FieldRow label="executor" tooltip={TIP.executor}>
-          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5" title="executor is set at creation. To change, remove this step and add a new one.">
-            <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-            <span>{execStyle.label.toLowerCase()}</span>
-          </span>
-        </FieldRow>
       </FieldGroup>
+      </CollapsibleCard>
+
+      {/* ── Primary config ───────────────────────────────────────── */}
+      {hasPrimarySection && (
+        <CollapsibleCard title={primaryTitle} open={openCards.primary} onToggle={() => toggleCard('primary')}>
 
       {/* ── Agent config ─────────────────────────────────────────── */}
       {isAgent && (<>
         <FieldGroup>
           <FieldRow label="autonomy level" tooltip="Assist: agent draft, human approves. Human review: explicit approval required. Autonomous agent: executes without review.">
-            <select
-              value={step.autonomyLevel ?? 'L2'}
-              onChange={(e) => onChange({ autonomyLevel: (e.target.value || undefined) as WorkflowStep['autonomyLevel'] })}
-              className={rs}
-            >
-              {AGENT_CONTROL_MODES.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
+            <PillToggle
+              value={step.autonomyLevel ?? 'L3'}
+              onChange={(v) => onChange({ autonomyLevel: v as WorkflowStep['autonomyLevel'] })}
+              options={[
+                { value: 'L2', label: 'Assist', icon: Bot, activeClassName: 'border-lime-400 bg-lime-50 text-lime-700 dark:bg-lime-950/30 dark:text-lime-400' },
+                { value: 'L3', label: 'Human Review', icon: Users, activeClassName: 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-400' },
+                { value: 'L4', label: 'Autonomous', icon: Bot, activeClassName: 'border-violet-400 bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-400' },
+              ]}
+            />
           </FieldRow>
 
           <FieldRow label="plugin" tooltip={TIP.plugin}>
@@ -381,9 +593,9 @@ export function StepEditor({
               className={rs}
             >
               <option value="">None</option>
-              {plugins.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
+              {plugins.map((p) => <option key={p.name} value={p.name}>{humanizeToken(p.name)}</option>)}
               {step.plugin && !plugins.some((p) => p.name === step.plugin) && (
-                <option value={step.plugin}>{step.plugin}</option>
+                <option value={step.plugin}>{humanizeToken(step.plugin)}</option>
               )}
             </select>
           </FieldRow>
@@ -626,11 +838,11 @@ export function StepEditor({
           {(['notebookParams', 'jobParameters'] as const).map((field) => (
             <div key={field} className="px-3 py-1.5 border-b border-border/30 last:border-0">
               <div
-                className="text-[11px] text-muted-foreground mb-1"
+                className="text-xs font-medium text-muted-foreground mb-1"
                 title={field === 'notebookParams' ? TIP.databricksNotebookParams : TIP.databricksJobParameters}
-              >databricks.{field}</div>
+              >{humanizeToken(`databricks.${field}`)}</div>
               {Object.entries(step.databricks?.[field] ?? {}).map(([key, val], idx) => (
-                <div key={idx} className="grid grid-cols-[184px_1fr_auto] gap-x-3 py-1 items-center">
+                <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-x-2 py-1 items-center">
                   <input
                     value={key}
                     onChange={(e) => updateDatabricksParams(field, (params) => {
@@ -741,19 +953,58 @@ export function StepEditor({
         )}
       </>)}
 
-      {/* ── Human config ─────────────────────────────────────────── */}
+      {/* ── Task UI (custom body) ────────────────────────────────── */}
       {isHuman && (
-        <FieldGroup>
-          <FieldRow label="allowedRoles" tooltip={TIP.allowedRoles}>
-            <input
-              value={step.allowedRoles?.join(', ') ?? ''}
-              onChange={(e) => onChange({
-                allowedRoles: e.target.value ? e.target.value.split(',').map((r) => r.trim()).filter(Boolean) : undefined,
-              })}
-              className={ri}
-            />
-          </FieldRow>
-        </FieldGroup>
+        <Section title="Task UI">
+          <FieldGroup>
+            <FieldRow label="component" tooltip={TIP.uiComponent}>
+              <select
+                value={step.ui?.component ?? ''}
+                onChange={(e) => setUiComponent(e.target.value)}
+                className={rs}
+              >
+                <option value="">Params form (default)</option>
+                <option value="file-upload">File upload</option>
+                <option value="assignment-table">Assignment table</option>
+                <option value="table-editor">Table editor</option>
+              </select>
+            </FieldRow>
+            {step.ui?.component === 'file-upload' && (<>
+              <FieldRow label="acceptedTypes" tooltip={TIP.uiAcceptedTypes}>
+                <input
+                  value={(step.ui.config?.acceptedTypes as string[] | undefined)?.join(', ') ?? ''}
+                  onChange={(e) => {
+                    const list = e.target.value.split(',').map((t) => t.trim()).filter(Boolean);
+                    updateUiConfig('acceptedTypes', list.length > 0 ? list : undefined);
+                  }}
+                  placeholder="text/csv, .csv, application/pdf"
+                  className={riMono}
+                />
+              </FieldRow>
+              <FieldRow label="minFiles" tooltip={TIP.uiMinFiles}>
+                <input
+                  type="number"
+                  min={0}
+                  value={(step.ui.config?.minFiles as number | undefined) ?? ''}
+                  onChange={(e) => updateUiConfig('minFiles', e.target.value === '' ? undefined : Number(e.target.value))}
+                  className={ri}
+                />
+              </FieldRow>
+              <FieldRow label="maxFiles" tooltip={TIP.uiMaxFiles}>
+                <input
+                  type="number"
+                  min={1}
+                  value={(step.ui.config?.maxFiles as number | undefined) ?? ''}
+                  onChange={(e) => updateUiConfig('maxFiles', e.target.value === '' ? undefined : Number(e.target.value))}
+                  className={ri}
+                />
+              </FieldRow>
+            </>)}
+            {(step.ui?.component === 'assignment-table' || step.ui?.component === 'table-editor') && (
+              <p className="text-xs text-muted-foreground px-0.5">Configure this component&apos;s columns in the source editor.</p>
+            )}
+          </FieldGroup>
+        </Section>
       )}
 
       {/* ── Review config ────────────────────────────────────────── */}
@@ -766,9 +1017,9 @@ export function StepEditor({
               className={rs}
             >
               <option value="">Default</option>
-              <option value="human">human</option>
-              <option value="agent">agent</option>
-              <option value="none">none</option>
+              <option value="human">Human</option>
+              <option value="agent">Agent</option>
+              <option value="none">None</option>
             </select>
           </FieldRow>
 
@@ -827,7 +1078,7 @@ export function StepEditor({
             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5"
               title="Action kind is set at creation.">
               <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-              {step.action?.kind ?? '—'}
+              {step.action?.kind ? humanizeToken(step.action.kind) : '—'}
             </span>
           </FieldRow>
 
@@ -871,7 +1122,7 @@ export function StepEditor({
               {/* action.headers key-value rows */}
               <div className="border-t border-border/30">
                 {Object.entries(httpAction.config.headers ?? {}).map(([hKey, hVal], idx) => (
-                  <div key={idx} className="grid grid-cols-[184px_1fr] gap-x-3 px-3 py-1.5 border-b border-border/30 last:border-0 items-center">
+                  <div key={idx} className="grid grid-cols-[1fr_1fr] gap-x-2 px-3 py-1.5 border-b border-border/30 last:border-0 items-center">
                     <input
                       value={hKey}
                       onChange={(e) => {
@@ -1013,8 +1264,16 @@ export function StepEditor({
       {/* ── Cowork ───────────────────────────────────────────────── */}
       {isCowork && <CoworkSection step={step} onChange={onChange} isNewStep={isNewStep} />}
 
+      {/* ── Parameters (human task setup) ────────────────────────── */}
+      {paramsInPrimary && parametersSection}
+
+        </CollapsibleCard>
+      )}
+
+      {/* ── Routing ──────────────────────────────────────────────── */}
+      {hasVerdicts && (
+        <CollapsibleCard title="Routing" open={openCards.routing} onToggle={() => toggleCard('routing')}>
       {/* ── Verdicts ─────────────────────────────────────────────── */}
-      {isReview && (
         <Section title="Verdicts">
           <FieldGroup>
             {Object.entries(step.verdicts ?? {}).map(([verdictName, verdict]) => (
@@ -1061,104 +1320,56 @@ export function StepEditor({
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >+ Add verdict</button>
         </Section>
+        </CollapsibleCard>
       )}
 
-      {/* ── Parameters ───────────────────────────────────────────── */}
-      {!isTerminal && (
-        <Section title="Parameters">
-          <div className="space-y-2">
-            {(step.params ?? []).map((param, idx) => (
-              <FieldGroup key={idx}>
-                <FieldRow label="name" tooltip={TIP.paramName}>
-                  <div className="flex items-center gap-2">
-                    <input
-                      value={param.name}
-                      onChange={(e) => {
-                        const next = [...(step.params ?? [])];
-                        next[idx] = { ...next[idx], name: e.target.value };
-                        onChange({ params: next });
-                      }}
-                      className={cn(riMono, 'flex-1')}
-                    />
-                    <button
-                      onClick={() => {
-                        const next = (step.params ?? []).filter((_, i) => i !== idx);
-                        onChange({ params: next.length > 0 ? next : undefined });
-                      }}
-                      className="text-[10px] text-muted-foreground/30 hover:text-red-500 transition-colors shrink-0"
-                    >×</button>
-                  </div>
-                </FieldRow>
-                <FieldRow label="type" tooltip={TIP.paramType}>
-                  <select
-                    value={param.type ?? 'string'}
-                    onChange={(e) => {
-                      const next = [...(step.params ?? [])];
-                      next[idx] = { ...next[idx], type: e.target.value as 'string' | 'number' | 'boolean' | 'date' };
-                      onChange({ params: next });
-                    }}
-                    className={rs}
-                  >
-                    {(['string', 'number', 'boolean', 'date'] as const).map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </FieldRow>
-                <FieldRow label="required" tooltip={TIP.paramRequired}>
-                  <input
-                    type="checkbox"
-                    checked={param.required ?? false}
-                    onChange={(e) => {
-                      const next = [...(step.params ?? [])];
-                      next[idx] = { ...next[idx], required: e.target.checked };
-                      onChange({ params: next });
-                    }}
-                    className="w-3.5 h-3.5 accent-primary cursor-pointer"
-                  />
-                </FieldRow>
-                <FieldRow label="description" tooltip={TIP.paramDescription}>
-                  <input
-                    value={param.description ?? ''}
-                    onChange={(e) => {
-                      const next = [...(step.params ?? [])];
-                      next[idx] = { ...next[idx], description: e.target.value || undefined };
-                      onChange({ params: next });
-                    }}
-                    className={ri}
-                  />
-                </FieldRow>
-                <FieldRow label="default" tooltip={TIP.paramDefault}>
-                  <input
-                    value={param.default !== undefined ? String(param.default) : ''}
-                    onChange={(e) => {
-                      const next = [...(step.params ?? [])];
-                      next[idx] = { ...next[idx], default: e.target.value || undefined };
-                      onChange({ params: next });
-                    }}
-                    className={riMono}
-                  />
-                </FieldRow>
-                <FieldRow label="options" tooltip={TIP.paramOptions}>
-                  <input
-                    value={param.options?.join(', ') ?? ''}
-                    onChange={(e) => {
-                      const opts = e.target.value.split(',').map((o) => o.trim()).filter(Boolean);
-                      const next = [...(step.params ?? [])];
-                      next[idx] = { ...next[idx], options: opts.length > 0 ? opts : undefined };
-                      onChange({ params: next });
-                    }}
-                    className={ri}
-                  />
-                </FieldRow>
-              </FieldGroup>
-            ))}
-          </div>
-          <button
-            onClick={() => onChange({ params: [...(step.params ?? []), { name: '', type: 'string', required: false }] })}
-            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-          >+ Add parameter</button>
-        </Section>
+      {/* ── Advanced ─────────────────────────────────────────────── */}
+      <CollapsibleCard title="Advanced" open={openCards.advanced} onToggle={() => toggleCard('advanced')}>
+
+      {/* ── Identity & failure handling ──────────────────────────── */}
+      <FieldGroup>
+        <FieldRow label="id" tooltip={TIP.id} error={errors?.id ? friendlyFieldError(errors.id) : undefined}>
+          <StepIdField currentId={step.id} onChange={(v) => onChange({ id: v })} error={errors?.id} />
+        </FieldRow>
+        {!isTerminal && (
+          <FieldRow label="continueOnError" tooltip={TIP.continueOnError}>
+            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground py-0.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={step.continueOnError ?? false}
+                onChange={(e) => onChange({ continueOnError: e.target.checked || undefined })}
+              />
+              Advance the run even if this step fails
+            </label>
+          </FieldRow>
+        )}
+      </FieldGroup>
+
+      {/* ── Human roles ──────────────────────────────────────────── */}
+      {isHuman && (
+        <FieldGroup>
+          <FieldRow label="allowedRoles" tooltip={TIP.allowedRoles}>
+            <input
+              value={step.allowedRoles?.join(', ') ?? ''}
+              onChange={(e) => onChange({
+                allowedRoles: e.target.value ? e.target.value.split(',').map((r) => r.trim()).filter(Boolean) : undefined,
+              })}
+              className={ri}
+            />
+          </FieldRow>
+          <FieldRow label="assignedTo" tooltip={TIP.assignedTo}>
+            <input
+              value={step.assignedTo ?? ''}
+              onChange={(e) => onChange({ assignedTo: e.target.value || undefined })}
+              placeholder="user id or ${triggerPayload.userId}"
+              className={riMono}
+            />
+          </FieldRow>
+        </FieldGroup>
       )}
+
+      {/* ── Parameters (non-human) ───────────────────────────────── */}
+      {paramsInAdvanced && parametersSection}
 
       {/* ── MCP restrictions ─────────────────────────────────────── */}
       {isAgent && step.agentId !== undefined && step.agentId !== '' && (
@@ -1174,7 +1385,7 @@ export function StepEditor({
         <Section title="Environment">
           <FieldGroup>
             {Object.entries(step.env ?? {}).map(([key, val], idx) => (
-              <div key={idx} className="grid grid-cols-[184px_1fr] gap-x-3 px-3 py-1.5 border-b border-border/30 last:border-0 items-center">
+              <div key={idx} className="grid grid-cols-[1fr_1fr] gap-x-2 px-3 py-1.5 border-b border-border/30 last:border-0 items-center">
                 <input
                   value={key}
                   onChange={(e) => {
@@ -1228,6 +1439,8 @@ export function StepEditor({
           >+ Add variable</button>
         </Section>
       )}
+
+      </CollapsibleCard>
 
     </div>
   );

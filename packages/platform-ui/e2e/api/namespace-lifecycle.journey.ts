@@ -40,8 +40,9 @@ function workflowDefinition(name: string) {
     description: 'API journey test for the workspace danger zone',
     steps: [
       { id: 'noop', name: 'No-op Human Step', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
     ],
-    transitions: [],
+    transitions: [{ from: 'noop', to: 'done' }],
   };
 }
 

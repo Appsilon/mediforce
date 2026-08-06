@@ -73,4 +73,43 @@ describe('validateWorkflow handler', () => {
     expect(result.valid).toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
   });
+
+  it('rejects a structurally-invalid graph that passes the schema (unreachable step)', async () => {
+    const candidate = {
+      ...validTemplate,
+      steps: [
+        { id: 'start', name: 'Start', type: 'creation', executor: 'human' },
+        { id: 'orphan', name: 'Orphan', type: 'creation', executor: 'human' },
+        { id: 'end', name: 'End', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [
+        { from: 'start', to: 'end' },
+        { from: 'orphan', to: 'end' },
+      ],
+    };
+
+    const result = await validateWorkflow(candidate, scope);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => /unreachable/i.test(e.message))).toBe(true);
+  });
+
+  it('rejects a definition with a broken step reference (${steps.<nonexistent>})', async () => {
+    const candidate = {
+      ...validTemplate,
+      steps: [
+        {
+          id: 'start',
+          name: 'Start',
+          type: 'creation',
+          executor: 'human',
+          assignedTo: '${steps.ghost.value}',
+        },
+        { id: 'end', name: 'End', type: 'terminal', executor: 'human' },
+      ],
+    };
+
+    const result = await validateWorkflow(candidate, scope);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => /ghost/.test(e.message))).toBe(true);
+  });
 });

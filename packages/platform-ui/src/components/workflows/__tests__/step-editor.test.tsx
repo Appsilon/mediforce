@@ -39,6 +39,13 @@ function buildStep(overrides: Partial<WorkflowStep> = {}): WorkflowStep {
 
 const noop = () => {};
 
+// The step editor is a single-open accordion with only "Basics" open by default;
+// executor config lives in the (collapsed) primary/Advanced cards. Click a card
+// header to expand it before asserting its contents.
+function expandCard(name: string) {
+  fireEvent.click(screen.getByRole('button', { name }));
+}
+
 const dockerImages: DockerImageInfo[] = [
   { repository: 'mediforce/golden-image', tag: 'latest', id: 'abc', size: '1GB', created: '1d ago' },
 ];
@@ -212,11 +219,12 @@ describe('StepEditor', () => {
       />,
     );
 
-    // Agent-specific labels should be visible
-    expect(screen.getAllByText('autonomy level').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('agentId')).toBeInTheDocument();
-    expect(screen.getByText('agent.model')).toBeInTheDocument();
-    expect(screen.getByText('agent.prompt')).toBeInTheDocument();
+    expandCard('Prompt & model');
+    // Agent-specific labels should be visible (rendered via humanizeToken)
+    expect(screen.getAllByText('Autonomy Level').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Agent ID')).toBeInTheDocument();
+    expect(screen.getByText('Agent Model')).toBeInTheDocument();
+    expect(screen.getByText('Agent Prompt')).toBeInTheDocument();
   });
 
   it('[RENDER] script config fields are shown for script executor', () => {
@@ -228,9 +236,10 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('script.runtime')).toBeInTheDocument();
-    expect(screen.getByText('script.command')).toBeInTheDocument();
-    expect(screen.getByText('script.inlineScript')).toBeInTheDocument();
+    expandCard('Script');
+    expect(screen.getByText('Script Runtime')).toBeInTheDocument();
+    expect(screen.getByText('Script Command')).toBeInTheDocument();
+    expect(screen.getByText('Script Inline Script')).toBeInTheDocument();
   });
 
   it('[RENDER] human config shows allowedRoles field', () => {
@@ -242,7 +251,8 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('allowedRoles')).toBeInTheDocument();
+    expandCard('Advanced');
+    expect(screen.getByText('Allowed Roles')).toBeInTheDocument();
   });
 
   it('[RENDER] no placeholder text on regular inputs', () => {
@@ -273,6 +283,7 @@ describe('StepEditor', () => {
       />,
     );
 
+    expandCard('Prompt & model');
     fireEvent.change(screen.getByLabelText('Custom Docker image'), {
       target: { value: 'python:3.11-slim' },
     });
