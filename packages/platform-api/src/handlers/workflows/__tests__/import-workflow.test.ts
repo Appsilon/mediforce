@@ -112,11 +112,12 @@ describe('importWorkflow handler', () => {
 
   it('imports from a tree URL with a slash-containing branch ref', async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce({ ok: false, status: 404 } as Response)
-      .mockResolvedValueOnce({ ok: false, status: 404 } as Response)
+      // GitHub rejects slash-containing candidates with 422, not 404.
+      .mockResolvedValueOnce({ ok: false, status: 422 } as Response)
+      .mockResolvedValueOnce({ ok: false, status: 422 } as Response)
       .mockResolvedValueOnce({ ok: true, status: 200, text: () => Promise.resolve(`${SHA}\n`) } as Response)
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(VALID_TEMPLATE) } as Response);
-    const { scope } = buildScope();
+    const { scope, processRepo } = buildScope();
 
     await importWorkflow(
       {
@@ -130,6 +131,15 @@ describe('importWorkflow handler', () => {
     expect(vi.mocked(fetch).mock.calls[3][0]).toBe(
       `https://raw.githubusercontent.com/Appsilon/mediforce/${SHA}/docs/workflow-examples/01-linear-pipeline.wd.json`,
     );
+    // Provenance drops the tree URL's mutable ref and its directory-relative
+    // path: recording those would leave url + path + commit pointing nowhere once
+    // the branch moves.
+    const stored = await processRepo.getWorkflowDefinition('test-ns', 'imported-workflow', 1);
+    expect(stored?.source).toEqual({
+      url: 'https://github.com/Appsilon/mediforce',
+      path: 'docs/workflow-examples/01-linear-pipeline.wd.json',
+      commit: SHA,
+    });
   });
 
   it('imports cleanly when the .wd.json declares a namespace (target wins)', async () => {

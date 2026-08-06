@@ -60,7 +60,8 @@ export async function seedPostgresNamespace(
     //                bio-clear-owner, journey-user, bootstrap-journey,
     //                branding-personal
     //   patterns   – journey-org-* (create-workspace.journey, timestamp suffix),
-    //                branding-org-* (namespace-branding.journey, per-test org)
+    //                branding-org-* (namespace-branding.journey, per-test org),
+    //                import-org-* (workflow-import.journey, per-test org)
     //
     // Agents use ON DELETE SET NULL for workspace removal, and built-in agents
     // have no workspace FK at all, so reset the seeded IDs explicitly before
@@ -89,6 +90,7 @@ export async function seedPostgresNamespace(
       WHERE handle IN ${sql(fixtureHandles)}
          OR handle LIKE 'journey-org-%'
          OR handle LIKE 'branding-org-%'
+         OR handle LIKE 'import-org-%'
     `;
 
     // ── 1. workspaces ───────────────────────────────────────────────────────

@@ -43,7 +43,8 @@ What the skill does for you:
    all, and when substantial script code should move from inline to a pinned
    command. It ends with a written spec recap you confirm before any files are
    generated.
-4. **Generates the package.** The `.wd.json` plus `README.md`, `index.json`, and
+4. **Generates the package.** The `.wd.json` plus `README.md`, `workflows-index.json`,
+   and
    only the `Dockerfile` / `scripts/` / `skills/` / `setup/` the design actually
    needs, in the canonical repo layout. It is honest about three tiers:
    schema-validated (`.wd.json`), templated-but-not-runtime-verified (infra),
@@ -128,7 +129,7 @@ GitHub repos only. Re-import to create a new version. The recorded
 `source: { url, path, commit }` is provenance only — it does not drive runtime
 cloning, Docker builds, skills, or sync.
 
-Full reference, including the `index.json` manifest and CLI flags:
+Full reference, including the `workflows-index.json` manifest and CLI flags:
 [`how-to/import-from-git.md`](how-to/import-from-git.md).
 
 ## Validate before sharing

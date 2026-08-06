@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import type { ManifestEntry } from '@mediforce/platform-api/contract';
 
-export const DEFAULT_REPO = 'https://github.com/Appsilon/mediforce/tree/main/docs/workflow-examples';
+const DEFAULT_REPO = 'https://github.com/Appsilon/mediforce';
 
 function extractErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof ApiError) return err.message;
@@ -39,8 +39,9 @@ export function ImportWorkflowDialog({
   const [repo, setRepo] = React.useState(DEFAULT_REPO);
   const [step, setStep] = React.useState<Step>({ kind: 'idle' });
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
-  // 'browse' lists workflows from the repo's index.json manifest; 'path' imports
-  // a single .wd.json by its path (mirrors the CLI) for repos with no manifest.
+  // 'browse' lists workflows from the repo's workflows-index.json manifest; 'path'
+  // imports a single .wd.json by its path (mirrors the CLI) for repos with no
+  // manifest.
   const [mode, setMode] = React.useState<'browse' | 'path'>('browse');
   const [path, setPath] = React.useState('');
   // Branch, tag, or commit SHA to import from. Empty = default branch (main);
@@ -76,10 +77,10 @@ export function ImportWorkflowDialog({
       setStep({ kind: 'manifest', workflows: result.workflows });
     } catch (err) {
       const message = extractErrorMessage(err, 'Failed to fetch manifest.');
-      // No manifest (e.g. repo has no index.json) is not a dead end — drop into
-      // path mode so a single .wd.json can still be imported by its path.
+      // No manifest (e.g. repo has no workflows-index.json) is not a dead end —
+      // drop into path mode so a single .wd.json can still be imported by its path.
       setMode('path');
-      setIdleError(`${message} Add an index.json to enable browsing, or import a workflow by its path below.`);
+      setIdleError(`${message} Add a workflows-index.json to enable browsing, or import a workflow by its path below.`);
       setStep({ kind: 'idle' });
     }
   }

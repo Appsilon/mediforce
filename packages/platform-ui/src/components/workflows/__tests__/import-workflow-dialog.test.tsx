@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { DEFAULT_REPO, ImportWorkflowDialog } from '../import-workflow-dialog';
+import { ImportWorkflowDialog } from '../import-workflow-dialog';
 
 vi.mock('@/lib/mediforce', () => ({
   mediforce: {
@@ -13,7 +13,11 @@ vi.mock('@/lib/mediforce', () => ({
 }));
 
 describe('ImportWorkflowDialog', () => {
-  it('defaults to the current workflow examples source', () => {
+  // Spelled out rather than compared against the exported constant: importing
+  // DEFAULT_REPO from the component under test asserts nothing, so the default
+  // could revert to a tree URL — the shape whose ref and directory have to be
+  // guessed apart — with the test still green.
+  it('defaults to the Mediforce repository URL', () => {
     render(
       <ImportWorkflowDialog
         namespace="test"
@@ -22,7 +26,8 @@ describe('ImportWorkflowDialog', () => {
       />,
     );
 
-    expect(screen.getByLabelText('Repository URL')).toHaveValue(DEFAULT_REPO);
-    expect(screen.getByText(/defaults to the source URL ref, or main/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Repository URL')).toHaveValue(
+      'https://github.com/Appsilon/mediforce',
+    );
   });
 });

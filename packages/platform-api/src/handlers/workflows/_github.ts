@@ -6,17 +6,16 @@ const GITHUB_HOST = 'github.com';
  *  SHAs) are resolved via the GitHub API. */
 const FULL_COMMIT_SHA = /^[a-f0-9]{40}$/;
 
-interface ParsedGitHubRepo {
-  owner: string;
-  name: string;
-  pathPrefix: string;
-  sourceRef?: string;
-  treeSegments?: string[];
-}
+/** A GitHub source URL: either the repository itself, or a tree URL whose
+ *  segments still mix the ref with the directory it scopes to. Which one it is
+ *  decides whether a ref/directory boundary has to be resolved at all. */
+type ParsedGitHubRepo =
+  | { kind: 'repo'; owner: string; name: string }
+  | { kind: 'tree'; owner: string; name: string; treeSegments: string[] };
 
-/** Parse a GitHub repo or tree URL into its API identity and optional path.
- *  Tree URLs scope raw-file requests to a directory within the repository;
- *  slash-containing refs are disambiguated during commit resolution. */
+/** Parse a GitHub repo or tree URL into its API identity and, for a tree URL,
+ *  the undivided `<ref>/<directory>` segments — where the ref ends is only
+ *  knowable by probing, so the split happens during commit resolution. */
 function parseGitHubRepo(repo: string): ParsedGitHubRepo {
   let url: URL;
   try {
@@ -29,16 +28,16 @@ function parseGitHubRepo(repo: string): ParsedGitHubRepo {
   }
   const segments = url.pathname.replace(/\.git$/, '').split('/').filter(Boolean);
   if (segments.length === 2) {
-    return { owner: segments[0], name: segments[1], pathPrefix: '' };
+    return { kind: 'repo', owner: segments[0], name: segments[1] };
   }
-  if (segments.length >= 5 && segments[2] === 'tree') {
-    const treeSegments = segments.slice(3);
+  // Four segments is `owner/repo/tree/<ref>` — the URL GitHub shows for a branch
+  // with no subdirectory selected, which scopes to the repository root.
+  if (segments.length >= 4 && segments[2] === 'tree') {
     return {
+      kind: 'tree',
       owner: segments[0],
       name: segments[1],
-      pathPrefix: treeSegments.slice(1).join('/'),
-      sourceRef: treeSegments[0],
-      treeSegments,
+      treeSegments: segments.slice(3),
     };
   }
   throw new ValidationError(
@@ -46,81 +45,110 @@ function parseGitHubRepo(repo: string): ParsedGitHubRepo {
   );
 }
 
-export function buildRawUrl(
-  repo: string,
-  ref: string | undefined,
-  path: string,
-  pathPrefixOverride?: string,
-): string {
-  const { owner, name, pathPrefix, sourceRef } = parseGitHubRepo(repo);
-  const resolvedRef = ref || sourceRef || 'main';
-  const scopedPath = [pathPrefixOverride ?? pathPrefix, path].filter(Boolean).join('/');
-  return `https://raw.githubusercontent.com/${owner}/${name}/${resolvedRef}/${scopedPath}`;
-}
-
-/**
- * Fetch JSON from `url`, throwing a `ValidationError` whose message names
- * `label` (e.g. "manifest", "workflow definition") on any non-OK status or
- * network failure. An already-typed `HandlerError` from the request is
- * re-thrown unchanged so callers keep the original status.
- */
-export async function fetchJsonOrThrow(url: string, label: string): Promise<unknown> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new ValidationError(
-        `Failed to fetch ${label}: ${res.status} ${res.statusText} (${url})`,
-      );
-    }
-    return (await res.json()) as unknown;
-  } catch (err) {
-    if (err instanceof HandlerError) throw err;
-    throw new ValidationError(`Failed to fetch ${label}: ${String(err)}`);
+/** Build a raw.githubusercontent.com URL for `path` under `pathPrefix`. The
+ *  repo must be canonical (`https://github.com/owner/repo`) and the ref already
+ *  resolved: a tree URL still carries an unsplit ref/directory pair, so
+ *  accepting one here would silently pick a wrong prefix. */
+export function buildRawUrl(repo: string, ref: string, path: string, pathPrefix = ''): string {
+  const parsed = parseGitHubRepo(repo);
+  if (parsed.kind === 'tree') {
+    throw new ValidationError(
+      `Raw URLs must be built from a canonical repo URL, not a tree URL (got: ${repo})`,
+    );
   }
+  const scopedPath = [pathPrefix, path].filter(Boolean).join('/');
+  return `https://raw.githubusercontent.com/${parsed.owner}/${parsed.name}/${ref}/${scopedPath}`;
 }
 
 /**
- * Resolve a ref (branch, tag, or abbreviated/full SHA) to its immutable commit
- * SHA. A full 40-char SHA is returned as-is (no network call). Anything else is
- * resolved via the unauthenticated GitHub API; the `application/vnd.github.sha`
- * media type makes the endpoint return the bare SHA as plain text.
- *
- * Resolution failure is fatal — the caller cannot record reliable provenance
- * without it — with a message distinguishing "ref not found" from "rate
- * limited" so the user knows whether to fix the ref or simply retry.
+ * Fetch JSON from the first of `urls` that exists, throwing a `ValidationError`
+ * whose message names `label` (e.g. "manifest", "workflow definition") when none
+ * do. A 404 moves on to the next candidate — that is how an alternative file
+ * name is probed — while any other non-OK status or network failure throws
+ * immediately, so a rate limit is never mistaken for "not there". An
+ * already-typed `HandlerError` from the request is re-thrown unchanged so
+ * callers keep the original status.
  */
-async function resolveCanonicalCommitSha(repo: string, ref: string): Promise<string> {
-  const { owner, name } = parseGitHubRepo(repo);
-  const resolvedRef = ref;
-  if (FULL_COMMIT_SHA.test(resolvedRef)) return resolvedRef;
+export async function fetchFirstJson(urls: string[], label: string): Promise<unknown> {
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (res.status === 404) continue;
+      if (!res.ok) {
+        throw new ValidationError(
+          `Failed to fetch ${label}: ${res.status} ${res.statusText} (${url})`,
+        );
+      }
+      return (await res.json()) as unknown;
+    } catch (err) {
+      if (err instanceof HandlerError) throw err;
+      throw new ValidationError(`Failed to fetch ${label}: ${String(err)}`);
+    }
+  }
+  throw new ValidationError(`Failed to fetch ${label}: 404 Not Found (${urls[0]})`);
+}
 
-  const apiUrl = `https://api.github.com/repos/${owner}/${name}/commits/${encodeURIComponent(resolvedRef)}`;
+export async function fetchJsonOrThrow(url: string, label: string): Promise<unknown> {
+  return fetchFirstJson([url], label);
+}
+
+/** Statuses GitHub's get-commit endpoint uses for "no such ref": 404 for a ref
+ *  it looked up and missed, 422 ("No commit found for SHA") when the ref reads
+ *  as a SHA candidate — which is what a slash-containing tree candidate does. */
+const REF_MISS_STATUSES = new Set([404, 422]);
+
+/**
+ * Look a ref (branch, tag, or abbreviated/full SHA) up to its immutable commit
+ * SHA, returning `null` when the ref does not exist. A full 40-char SHA is
+ * returned as-is (no network call). Anything else is resolved via the
+ * unauthenticated GitHub API; the `application/vnd.github.sha` media type makes
+ * the endpoint return the bare SHA as plain text.
+ *
+ * A missing ref is a return value rather than an exception because probing tree
+ * candidates asks "does this ref exist?" on purpose; every other failure (rate
+ * limit, network, malformed response) still throws.
+ */
+async function findCommitSha(repo: string, ref: string): Promise<string | null> {
+  const { owner, name } = parseGitHubRepo(repo);
+  if (FULL_COMMIT_SHA.test(ref)) return ref;
+
+  const apiUrl = `https://api.github.com/repos/${owner}/${name}/commits/${encodeURIComponent(ref)}`;
 
   let res: Response;
   try {
     res = await fetch(apiUrl, { headers: { Accept: 'application/vnd.github.sha' } });
   } catch (err) {
-    throw new ValidationError(`Failed to resolve commit for ref '${resolvedRef}' in ${repo}: ${String(err)}`);
+    throw new ValidationError(`Failed to resolve commit for ref '${ref}' in ${repo}: ${String(err)}`);
   }
 
-  if (res.status === 404) {
-    throw new ValidationError(`Ref '${resolvedRef}' not found in ${repo}`);
-  }
+  if (REF_MISS_STATUSES.has(res.status)) return null;
   if (res.status === 403) {
     throw new ValidationError(
-      `GitHub rate limit reached while resolving ref '${resolvedRef}' — retry in a few minutes`,
+      `GitHub rate limit reached while resolving ref '${ref}' — retry in a few minutes`,
     );
   }
   if (!res.ok) {
     throw new ValidationError(
-      `Failed to resolve commit for ref '${resolvedRef}' in ${repo}: ${res.status} ${res.statusText}`,
+      `Failed to resolve commit for ref '${ref}' in ${repo}: ${res.status} ${res.statusText}`,
     );
   }
 
   const sha = (await res.text()).trim();
   if (!FULL_COMMIT_SHA.test(sha)) {
-    throw new ValidationError(`Unexpected commit-resolution response for ref '${resolvedRef}' in ${repo}`);
+    throw new ValidationError(`Unexpected commit-resolution response for ref '${ref}' in ${repo}`);
   }
+  return sha;
+}
+
+/**
+ * Resolve a ref the caller named explicitly. Failure is fatal — the caller
+ * cannot record reliable provenance without a commit — with a message
+ * distinguishing "ref not found" from "rate limited" so the user knows whether
+ * to fix the ref or simply retry.
+ */
+async function resolveCanonicalCommitSha(repo: string, ref: string): Promise<string> {
+  const sha = await findCommitSha(repo, ref);
+  if (sha === null) throw new ValidationError(`Ref '${ref}' not found in ${repo}`);
   return sha;
 }
 
@@ -135,46 +163,54 @@ function canonicalRepoUrl(parsed: ParsedGitHubRepo): string {
   return `https://${GITHUB_HOST}/${parsed.owner}/${parsed.name}`;
 }
 
+/** GitHub tree URLs do not delimit a slash-containing ref from the directory
+ *  path. Probe the longest candidate first so `tree/feat/topic/docs` resolves
+ *  `feat/topic` as the ref and `docs` as the directory. `null` means no prefix
+ *  of the tree segments names a ref that exists. */
+async function resolveTreeBoundary(
+  treeSegments: string[],
+  canonicalRepo: string,
+): Promise<Omit<ResolvedGitHubSource, 'repo'> | null> {
+  for (let candidateLength = treeSegments.length; candidateLength > 0; candidateLength--) {
+    const ref = treeSegments.slice(0, candidateLength).join('/');
+    const commit = await findCommitSha(canonicalRepo, ref);
+    if (commit !== null) {
+      return { ref, pathPrefix: treeSegments.slice(candidateLength).join('/'), commit };
+    }
+  }
+  return null;
+}
+
 async function resolveTreeSource(
-  parsed: ParsedGitHubRepo,
+  treeSegments: string[],
   canonicalRepo: string,
   requestedRef?: string,
 ): Promise<Omit<ResolvedGitHubSource, 'repo'>> {
-  const treeSegments = parsed.treeSegments!;
-  if (requestedRef !== undefined && requestedRef !== '') {
-    const requestedSegments = requestedRef.split('/');
-    const hasRefPrefix = requestedSegments.every(
-      (segment, index) => treeSegments[index] === segment,
-    );
-    const pathPrefix = treeSegments
-      .slice(hasRefPrefix ? requestedSegments.length : 1)
-      .join('/');
-    return {
-      ref: requestedRef,
-      pathPrefix,
-      commit: await resolveCanonicalCommitSha(canonicalRepo, requestedRef),
-    };
-  }
+  // Where the ref ends and the directory begins is a property of the URL, so it
+  // is resolved before any override is applied — otherwise overriding the ref of
+  // `tree/feat/topic/docs` would silently move the directory to `topic/docs`.
+  const boundary = await resolveTreeBoundary(treeSegments, canonicalRepo);
 
-  // GitHub tree URLs do not delimit a slash-containing ref from the directory
-  // path. Try the longest candidate first so `tree/feat/topic/docs` resolves
-  // `feat/topic` as the ref and `docs` as the directory.
-  for (let candidateLength = treeSegments.length; candidateLength > 0; candidateLength--) {
-    const candidateRef = treeSegments.slice(0, candidateLength).join('/');
-    try {
-      return {
-        ref: candidateRef,
-        pathPrefix: treeSegments.slice(candidateLength).join('/'),
-        commit: await resolveCanonicalCommitSha(canonicalRepo, candidateRef),
-      };
-    } catch (err) {
-      if (!(err instanceof ValidationError) || !/not found/i.test(err.message)) {
-        throw err;
-      }
+  if (requestedRef === undefined || requestedRef === '') {
+    if (boundary === null) {
+      throw new ValidationError(
+        `No branch, tag, or commit in ${canonicalRepo} matches '${treeSegments.join('/')}'`,
+      );
     }
+    return boundary;
   }
+  if (boundary?.ref === requestedRef) return boundary;
 
-  throw new ValidationError('Unable to resolve a ref from tree URL');
+  // No candidate resolved, so the URL's own ref is gone and its directory
+  // boundary is unknowable. Assume the common single-segment ref, which keeps an
+  // import working when the URL pins a deleted branch — but is a guess: for a
+  // deleted *slash-containing* ref it picks the wrong directory, and the fetch
+  // then 404s rather than importing the wrong file.
+  return {
+    ref: requestedRef,
+    pathPrefix: boundary?.pathPrefix ?? treeSegments.slice(1).join('/'),
+    commit: await resolveCanonicalCommitSha(canonicalRepo, requestedRef),
+  };
 }
 
 export async function resolveGitHubSource(
@@ -183,7 +219,7 @@ export async function resolveGitHubSource(
 ): Promise<ResolvedGitHubSource> {
   const parsed = parseGitHubRepo(repo);
   const canonicalRepo = canonicalRepoUrl(parsed);
-  if (parsed.treeSegments === undefined) {
+  if (parsed.kind === 'repo') {
     const ref = requestedRef || 'main';
     return {
       repo: canonicalRepo,
@@ -195,10 +231,6 @@ export async function resolveGitHubSource(
 
   return {
     repo: canonicalRepo,
-    ...(await resolveTreeSource(parsed, canonicalRepo, requestedRef)),
+    ...(await resolveTreeSource(parsed.treeSegments, canonicalRepo, requestedRef)),
   };
-}
-
-export async function resolveCommitSha(repo: string, ref?: string): Promise<string> {
-  return (await resolveGitHubSource(repo, ref)).commit;
 }
