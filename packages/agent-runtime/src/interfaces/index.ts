@@ -1,3 +1,5 @@
+export { StepTimeoutError } from './step-executor-plugin';
+
 export type {
   AutonomyLevel,
   LlmMessage,

@@ -813,6 +813,38 @@ export function resolveStepTimeoutMs(
 }
 
 /**
+ * Slice of the step timeout held back for post-run teardown — result
+ * extraction, deliverable upload, worktree commit — which runs after the agent
+ * process exits but still inside the PluginRunner race.
+ */
+export const AGENT_TEARDOWN_RESERVE_MS = 60_000;
+
+/**
+ * Floor for {@link resolveAgentTimeBudgetMs}. Setup slow enough to eat the
+ * whole timeout leaves the step doomed either way; a positive budget keeps a
+ * zero-or-negative timer (which reads as "kill immediately") out of the spawn
+ * strategies. Distinct from {@link AGENT_TEARDOWN_RESERVE_MS} — equal today,
+ * but they answer different questions.
+ */
+export const MIN_AGENT_BUDGET_MS = 60_000;
+
+/**
+ * Time an agent actually has to work, given a step timeout and the setup
+ * already spent on it (file downloads, image resolution, worktree creation,
+ * skills fetch, prompt build). The PluginRunner race covers setup + agent +
+ * teardown; the agent process only covers the middle, so promising it the raw
+ * {@link resolveStepTimeoutMs} would have the race kill it mid-task with the
+ * teardown — and any partial work — never running. Single source for both the
+ * prompt's stated budget and the container-kill timer so the two cannot drift.
+ */
+export function resolveAgentTimeBudgetMs(
+  stepTimeoutMs: number,
+  setupElapsedMs: number,
+): number {
+  return Math.max(stepTimeoutMs - setupElapsedMs - AGENT_TEARDOWN_RESERVE_MS, MIN_AGENT_BUDGET_MS);
+}
+
+/**
  * Grace added on top of a step's own timeout before a `running` instance is
  * treated as stranded. A live driver enforces the step timeout and then
  * advances/fails the step (refreshing `updatedAt`); this grace covers the gap

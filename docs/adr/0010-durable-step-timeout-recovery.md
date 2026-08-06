@@ -86,6 +86,27 @@ Make the timeout **durable** by treating "stranded past deadline" and
    own legacy last-resort default (`10 min`) is aligned to `30 min` for the same
    reason, so no plugin's fallback silently disagrees with the resolver default.
 
+   The container agent's *inner* budget is that timeout minus what setup already
+   spent and an `AGENT_TEARDOWN_RESERVE_MS = 60s` tail
+   (`resolveAgentTimeBudgetMs`). The race spans setup + agent + teardown while
+   the container spans only the middle, so handing the container the raw timeout
+   let the race fire first and discard the partial work teardown would have
+   committed. The prompt's stated "Time Budget" reads from the same resolver, so
+   what the agent is told and what kills it cannot drift.
+
+   Because that kill now lands *before* the race, the plugin reports it as
+   `StepTimeoutError` and `PluginRunner` classifies it `timeout` — keeping the
+   live-driver path and `reapAsTimeout` in agreement, as point 4 requires.
+
+   **Not covered:** the image build/pull and stale-container sweep run inside
+   `DockerSpawnStrategy.spawn`, after the budget is computed and before the
+   container timer is armed, so they are charged to the race but to neither
+   budget. A cold build longer than the 60s reserve still lets the race preempt
+   teardown. Closing it means passing an absolute deadline to the strategy and
+   deriving `timeoutMs` when the timer is armed, rather than a duration fixed
+   before the build — tracked in
+   [#1154](https://github.com/Appsilon/mediforce/issues/1154).
+
 ## Alternatives considered
 
 - **Sweep fires the fallback directly** (heartbeat transitions the step itself):

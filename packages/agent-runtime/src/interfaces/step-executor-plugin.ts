@@ -111,6 +111,17 @@ export interface WorkflowAgentContext {
 export type EmitPayload = Omit<AgentEvent, 'id' | 'sequence' | 'processInstanceId' | 'stepId'>;
 export type EmitFn = (event: EmitPayload) => Promise<void>;
 
+/**
+ * Thrown by a plugin that enforced its own time budget and killed the work.
+ * A plugin's budget is deliberately shorter than the `PluginRunner` race (it
+ * reserves room for teardown), so the plugin — not the race — is what usually
+ * ends an overrunning step. Without this signal the runner would read the kill
+ * as a generic failure and classify the step `error` instead of `timeout`.
+ */
+export class StepTimeoutError extends Error {
+  override name = 'StepTimeoutError';
+}
+
 export interface StepExecutorPlugin {
   metadata?: PluginCapabilityMetadata;
   initialize(context: AgentContext | WorkflowAgentContext): Promise<void>;

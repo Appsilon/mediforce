@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  AGENT_TEARDOWN_RESERVE_MS,
+  MIN_AGENT_BUDGET_MS,
   WorkflowDefinitionSchema,
+  resolveAgentTimeBudgetMs,
   resolveStepTimeoutMinutes,
   resolveStepTimeoutMs,
   resolveStrandedBudgetMs,
@@ -435,6 +438,20 @@ describe('resolveStepTimeoutMinutes', () => {
 
   it('defaults to 30 when no config carries a timeout', () => {
     expect(resolveStepTimeoutMinutes(baseStep)).toBe(30);
+  });
+});
+
+describe('resolveAgentTimeBudgetMs', () => {
+  it('subtracts setup elapsed and the teardown reserve from the step timeout', () => {
+    expect(resolveAgentTimeBudgetMs(30 * 60_000, 90_000)).toBe(30 * 60_000 - 90_000 - AGENT_TEARDOWN_RESERVE_MS);
+  });
+
+  it('subtracts only the teardown reserve when setup was instant', () => {
+    expect(resolveAgentTimeBudgetMs(30 * 60_000, 0)).toBe(29 * 60_000);
+  });
+
+  it('floors at MIN_AGENT_BUDGET_MS when setup already consumed the step timeout', () => {
+    expect(resolveAgentTimeBudgetMs(2 * 60_000, 5 * 60_000)).toBe(MIN_AGENT_BUDGET_MS);
   });
 });
 

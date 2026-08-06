@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatExitInfo, deriveBuildTag } from '../container-plugin';
+import { formatExitInfo, isBudgetExhaustedKill, deriveBuildTag } from '../container-plugin';
 
 describe('formatExitInfo', () => {
   it('[DATA] reports the exit code when the process exited normally', () => {
@@ -23,6 +23,33 @@ describe('formatExitInfo', () => {
 
   it('[DATA] does not annotate non-SIGTERM signals with a timeout hint', () => {
     expect(formatExitInfo({ exitCode: null, signal: 'SIGKILL' }, 10)).toBe('killed by SIGKILL');
+  });
+});
+
+// Issue #1158: the plugin kills the agent at its own budget, before the
+// PluginRunner race fires, so it must tell the runner that kill was a timeout.
+describe('isBudgetExhaustedKill', () => {
+  it('[DATA] treats a SIGTERM kill as budget exhaustion', () => {
+    expect(isBudgetExhaustedKill({ exitCode: null, signal: 'SIGTERM' })).toBe(true);
+  });
+
+  it('[DATA] does not treat a normal non-zero exit as budget exhaustion', () => {
+    expect(isBudgetExhaustedKill({ exitCode: 1, signal: null })).toBe(false);
+  });
+
+  it('[DATA] does not treat SIGKILL as budget exhaustion — that is an OOM or an external kill', () => {
+    expect(isBudgetExhaustedKill({ exitCode: null, signal: 'SIGKILL' })).toBe(false);
+  });
+
+  // A local budget timer escalates SIGTERM → SIGKILL after 5s, so a process that
+  // ignores SIGTERM dies by a signal that is otherwise indistinguishable from an
+  // OOM. Those timers report the kill directly rather than leaving it inferred.
+  it('[DATA] trusts an explicit killedByBudget over the signal', () => {
+    expect(isBudgetExhaustedKill({ exitCode: null, signal: 'SIGKILL', killedByBudget: true })).toBe(true);
+  });
+
+  it('[DATA] still infers from the signal when no flag is reported', () => {
+    expect(isBudgetExhaustedKill({ exitCode: null, signal: 'SIGTERM', killedByBudget: false })).toBe(true);
   });
 });
 

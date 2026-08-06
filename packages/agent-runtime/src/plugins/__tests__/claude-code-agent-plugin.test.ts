@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import type { AgentContext, EmitFn, EmitPayload, WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
+import { AGENT_TEARDOWN_RESERVE_MS } from '@mediforce/platform-core';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
@@ -889,6 +890,8 @@ describe('ClaudeCodeAgentPlugin', () => {
   // the PluginRunner Promise.race AND the container-kill timer. The emitted prompt's
   // "approximately N minutes" budget derives from the same timeoutMs the container
   // kill uses, so it is a faithful proxy for the effective timeout.
+  // Issue #1158: that budget is the step timeout minus run-setup overhead and the
+  // teardown reserve, so the agent is never promised time the outer race will take.
   describe('timeout single-source (issue #868)', () => {
     function buildWorkflowContext(agentOverrides: Record<string, unknown>): WorkflowAgentContext {
       return {
@@ -923,7 +926,9 @@ describe('ClaudeCodeAgentPlugin', () => {
       } as unknown as WorkflowAgentContext;
     }
 
-    async function captureBudgetMinutes(agentOverrides: Record<string, unknown>): Promise<string> {
+    async function captureSpawn(
+      agentOverrides: Record<string, unknown>,
+    ): Promise<{ prompt: string; timeoutMs: number }> {
       const context = buildWorkflowContext(agentOverrides);
       await plugin.initialize(context);
       mockReadSkill(plugin).mockResolvedValue('# Skill');
@@ -932,18 +937,27 @@ describe('ClaudeCodeAgentPlugin', () => {
       });
       const { emit } = buildEmitSpy();
       await plugin.run(emit);
-      const [prompt] = spawnSpy.mock.calls[0];
-      return prompt as string;
+      const [prompt, options] = spawnSpy.mock.calls[0];
+      return { prompt: prompt as string, timeoutMs: (options as { timeoutMs: number }).timeoutMs };
     }
 
-    it('[DATA] defaults an unconfigured step to resolveStepTimeoutMinutes (30), not DEFAULT_TIMEOUT_MS (20)', async () => {
-      const prompt = await captureBudgetMinutes({});
-      expect(prompt).toContain('approximately 30 minutes');
+    // Budgets are asserted as bounds, not exact minutes: the resolver subtracts
+    // real setup elapsed, so an exact figure would ride on how fast the box ran.
+    it('[DATA] defaults an unconfigured step to resolveStepTimeoutMinutes (30), less the teardown reserve', async () => {
+      const { timeoutMs } = await captureSpawn({});
+      expect(timeoutMs).toBeLessThanOrEqual(30 * 60_000 - AGENT_TEARDOWN_RESERVE_MS);
+      expect(timeoutMs).toBeGreaterThan(28 * 60_000);
     });
 
-    it('[DATA] honours an explicit step timeoutMinutes', async () => {
-      const prompt = await captureBudgetMinutes({ timeoutMinutes: 45 });
-      expect(prompt).toContain('approximately 45 minutes');
+    it('[DATA] honours an explicit step timeoutMinutes, less the teardown reserve', async () => {
+      const { timeoutMs } = await captureSpawn({ timeoutMinutes: 45 });
+      expect(timeoutMs).toBeLessThanOrEqual(45 * 60_000 - AGENT_TEARDOWN_RESERVE_MS);
+      expect(timeoutMs).toBeGreaterThan(43 * 60_000);
+    });
+
+    it('[DATA] spawns the CLI with the same budget the prompt promises', async () => {
+      const { prompt, timeoutMs } = await captureSpawn({ timeoutMinutes: 45 });
+      expect(prompt).toContain(`approximately ${Math.round(timeoutMs / 60_000)} minutes`);
     });
   });
 });

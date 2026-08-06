@@ -183,6 +183,27 @@ export function formatExitInfo(
   return `killed by ${result.signal}${timeoutHint}`;
 }
 
+/**
+ * Whether a finished container/process was killed by the plugin's own budget
+ * timer rather than failing on its own.
+ *
+ * A timer running in this process reports the kill directly via
+ * `killedByBudget` — it escalates SIGTERM → SIGKILL, and an escalated kill is
+ * otherwise indistinguishable from an OOM. Out-of-process timers (the BullMQ
+ * worker) can't say so, hence the SIGTERM fallback: stopping the *container*
+ * leaves the attached `docker run` client exiting normally with status 143 and
+ * no signal, so a signalled death is our own kill, a process-group signal on
+ * deploy, or an operator killing the client by hand.
+ *
+ * `exitCode` is unused but kept so callers can pass a spawn result whole,
+ * matching {@link formatExitInfo}, which renders the same distinction for humans.
+ */
+export function isBudgetExhaustedKill(
+  result: { exitCode: number | null; signal: string | null; killedByBudget?: boolean },
+): boolean {
+  return result.killedByBudget === true || result.signal === 'SIGTERM';
+}
+
 export interface CommitRunWorkspaceOptions {
   status?: 'success' | 'failed';
   /** Force the terminal marker (✓). Auto-detected from transitions when omitted. */

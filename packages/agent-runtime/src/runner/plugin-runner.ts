@@ -1,3 +1,4 @@
+import { StepTimeoutError } from '../interfaces/step-executor-plugin';
 import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitPayload } from '../interfaces/step-executor-plugin';
 import type { AgentEventLog } from './agent-event-log';
 
@@ -46,7 +47,9 @@ export class PluginRunner {
         errorMessage: null,
       };
     } catch (err) {
-      if (err instanceof PluginTimeoutError) {
+      // Either bound ending the step is a timeout: this race, or a plugin that
+      // enforced its own (shorter, teardown-reserving) budget and said so.
+      if (err instanceof PluginTimeoutError || err instanceof StepTimeoutError) {
         return { resultPayload: null, timedOut: true, errorMessage: null };
       }
       return {

@@ -2,11 +2,12 @@ import { readFile, mkdtemp, writeFile, rm, realpath, mkdir, appendFile, stat } f
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { StepTimeoutError } from '../interfaces/step-executor-plugin';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import type { AgentConfig, ScriptStepConfig, StepConfig, PluginCapabilityMetadata, Presentation } from '@mediforce/platform-core';
-import { resolveStepTimeoutMinutes } from '@mediforce/platform-core';
+import { resolveAgentTimeBudgetMs, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, isBudgetExhaustedKill, type ContainerPluginInit } from './container-plugin';
 import { isLocalExecutionAllowed } from './base-container-agent-plugin';
 
 // Last-resort for the legacy process-mode path only; the workflow path resolves
@@ -222,21 +223,27 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         await writeFile(scriptPath, this.inlineScript, 'utf-8');
       }
 
-      // Single source of truth (ADR-0010): the container-kill timer uses the
-      // same effective timeout as the PluginRunner Promise.race
+      // Single source of truth (ADR-0010): the container-kill timer derives from
+      // the same effective timeout as the PluginRunner Promise.race
       // (resolveStepTimeoutMinutes). The legacy process-mode path has no
       // WorkflowStep, so it falls back to its own timeoutMinutes / DEFAULT.
-      let timeoutMs: number;
+      let stepTimeoutMs: number;
       if (isWorkflowAgentContext(this.context)) {
-        timeoutMs = resolveStepTimeoutMinutes(this.context.step) * 60_000;
+        stepTimeoutMs = resolveStepTimeoutMinutes(this.context.step) * 60_000;
       } else {
         const legacyMinutes = this.context.config.stepConfigs.find(
           (sc: StepConfig) => sc.stepId === this.context.stepId,
         )?.agentConfig?.timeoutMinutes;
-        timeoutMs = typeof legacyMinutes === 'number' && legacyMinutes > 0
+        stepTimeoutMs = typeof legacyMinutes === 'number' && legacyMinutes > 0
           ? legacyMinutes * 60_000
           : DEFAULT_TIMEOUT_MS;
       }
+
+      // The race also covers the setup above (worktree, output dir, input and
+      // script writes) and the teardown below (result.json read, presentation,
+      // workspace commit), so leave room for both — otherwise the race kills the
+      // container first and the commit never runs (issue #1158).
+      const timeoutMs = resolveAgentTimeBudgetMs(stepTimeoutMs, Date.now() - startTime);
 
       const logsDir = join(tmpdir(), 'mediforce-step-logs');
       await mkdir(logsDir, { recursive: true });
@@ -266,7 +273,16 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         });
       };
 
-      let spawnResult: { stdout: string; stderr: string; exitCode: number | null; signal: string | null };
+      // `killedByBudget` is optional because only the local branch can report it:
+      // its timer runs here, the docker one runs in the spawn strategy (or another
+      // process entirely), where the kill is inferred from the signal instead.
+      let spawnResult: {
+        stdout: string;
+        stderr: string;
+        exitCode: number | null;
+        signal: string | null;
+        killedByBudget?: boolean;
+      };
 
       if (this.isLocalMode && this.inlineScript && this.runtime) {
         // Local execution: run the inline script as a child process. The
@@ -393,7 +409,8 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           timestamp: new Date().toISOString(),
         });
 
-        throw new Error(`Script container failed (${exitInfo}): ${detail}`);
+        const message = `Script container failed (${exitInfo}): ${detail}`;
+        throw isBudgetExhaustedKill(spawnResult) ? new StepTimeoutError(message) : new Error(message);
       }
 
       const containerOutput = spawnResult.stdout.trim();
@@ -493,15 +510,17 @@ export class ScriptContainerPlugin extends ContainerPlugin {
   /**
    * Spawn the script as a host child process (local mode). Live-streams
    * stdout/stderr via emitLine for parity with the docker spawn path.
-   * Resolves with the same shape as DockerSpawnStrategy so the caller
-   * doesn't branch.
+   * Resolves with a superset of the DockerSpawnStrategy shape: the budget timer
+   * runs in this process, so unlike the docker path it can report the kill as
+   * `killedByBudget` rather than leaving it inferred from the signal. The extra
+   * field is optional on the caller's side, so it still doesn't branch.
    */
   private spawnLocalScript(
     cmdArgs: string[],
     cwd: string,
     timeoutMs: number,
     emitLine: (text: string) => void,
-  ): Promise<{ stdout: string; stderr: string; exitCode: number | null; signal: string | null }> {
+  ): Promise<{ stdout: string; stderr: string; exitCode: number | null; signal: string | null; killedByBudget: boolean }> {
     return new Promise((resolve) => {
       const [cmd, ...args] = cmdArgs;
       const childEnv: NodeJS.ProcessEnv = {
@@ -529,6 +548,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       let stdoutBuf = '';
       let stderrBuf = '';
       let settled = false;
+      let killedByBudget = false;
 
       const flushLines = (buf: string, prefix: string): string => {
         const lines = buf.split('\n');
@@ -563,6 +583,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
 
       let killTimer: NodeJS.Timeout | null = null;
       const timer = setTimeout(() => {
+        killedByBudget = true;
         child.kill('SIGTERM');
         killTimer = setTimeout(() => {
           killTimer = null;
@@ -595,6 +616,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           stderr: stderr ? `${stderr}\n${msg}` : msg,
           exitCode: null,
           signal: null,
+          killedByBudget,
         });
       });
 
@@ -603,7 +625,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         settled = true;
         clearTimers();
         flushBuffers();
-        resolve({ stdout, stderr, exitCode, signal: signal ?? null });
+        resolve({ stdout, stderr, exitCode, signal: signal ?? null, killedByBudget });
       });
     });
   }

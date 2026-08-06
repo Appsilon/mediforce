@@ -11,10 +11,12 @@ afterEach(() => {
   else process.env.ALLOW_LOCAL_AGENTS = originalAllowLocal;
 });
 import type { ChildProcess } from 'node:child_process';
+import { StepTimeoutError } from '../../interfaces/step-executor-plugin';
 import type { AgentContext, WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { ScriptContainerPlugin } from '../script-container-plugin';
+import { isBudgetExhaustedKill } from '../container-plugin';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
 // Only mock `spawn` (used for docker run). Leave the rest of child_process
@@ -202,6 +204,101 @@ describe('ScriptContainerPlugin', () => {
       mockSpawnFailure(mockChild, 'Error: package not found');
 
       await expect(plugin.run(emit)).rejects.toThrow(/Script container failed/);
+    });
+
+    // Issue #1158: script steps carry the same setup (worktree, output dir,
+    // input write) and teardown (result read, workspace commit) inside the
+    // PluginRunner race, so their container timer reserves room the same way
+    // and reports its own kill as a timeout rather than a generic failure.
+    it('[ERROR] classifies a SIGTERM budget kill as StepTimeoutError', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      const mockChild = createMockChild();
+      spawnMock.mockImplementation(() => {
+        setTimeout(() => {
+          (mockChild.stdout as Readable).push(null);
+          (mockChild.stderr as Readable).push(null);
+          mockChild.emit('close', null, 'SIGTERM');
+        }, 10);
+        return mockChild;
+      });
+
+      await expect(plugin.run(emit)).rejects.toBeInstanceOf(StepTimeoutError);
+    });
+
+    // The local budget timer escalates SIGTERM → SIGKILL after 5s. A script that
+    // ignores SIGTERM therefore dies by a signal indistinguishable from an OOM,
+    // so the timer reports the kill via killedByBudget instead of leaving the
+    // throw site to infer it. Driving spawnLocalScript directly keeps the budget
+    // a parameter — through run() it floors at MIN_AGENT_BUDGET_MS, which needs
+    // fake timers that then fight the real fs I/O in run()'s setup.
+    it('[ERROR] reports killedByBudget when its own timer killed the script, whatever signal lands', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const mockChild = createMockChild();
+      spawnMock.mockImplementation(() => mockChild); // never exits on its own
+
+      const spawnLocal = (plugin as unknown as {
+        spawnLocalScript: (
+          cmdArgs: string[], cwd: string, timeoutMs: number, emitLine: (t: string) => void,
+        ) => Promise<{ exitCode: number | null; signal: string | null; killedByBudget: boolean }>;
+      }).spawnLocalScript.bind(plugin);
+
+      const resultPromise = spawnLocal(['sh', '-c', 'sleep 600'], '/tmp', 20, () => {});
+
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+
+      // Script ignored the SIGTERM and dies by the escalation instead.
+      (mockChild.stdout as Readable).push(null);
+      (mockChild.stderr as Readable).push(null);
+      mockChild.emit('close', null, 'SIGKILL');
+
+      const result = await resultPromise;
+      expect(result.signal).toBe('SIGKILL');
+      expect(result.killedByBudget).toBe(true);
+      expect(isBudgetExhaustedKill(result)).toBe(true);
+    });
+
+    it('[ERROR] leaves killedByBudget false when the script failed on its own', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const mockChild = createMockChild();
+      spawnMock.mockImplementation(() => {
+        setTimeout(() => {
+          (mockChild.stdout as Readable).push(null);
+          (mockChild.stderr as Readable).push(null);
+          mockChild.emit('close', 1, null);
+        }, 5);
+        return mockChild;
+      });
+
+      const spawnLocal = (plugin as unknown as {
+        spawnLocalScript: (
+          cmdArgs: string[], cwd: string, timeoutMs: number, emitLine: (t: string) => void,
+        ) => Promise<{ exitCode: number | null; signal: string | null; killedByBudget: boolean }>;
+      }).spawnLocalScript.bind(plugin);
+
+      const result = await spawnLocal(['sh', '-c', 'exit 1'], '/tmp', 60_000, () => {});
+      expect(result.killedByBudget).toBe(false);
+      expect(isBudgetExhaustedKill(result)).toBe(false);
+    });
+
+    it('[ERROR] leaves an ordinary non-zero exit as a plain error', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      const mockChild = createMockChild();
+      mockSpawnFailure(mockChild, 'Error: package not found');
+
+      const error = await plugin.run(emit).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(Error);
+      expect(error).not.toBeInstanceOf(StepTimeoutError);
     });
 
     it('[ERROR] empty stdout/stderr failure surfaces image, command, env keys, input size — and writes the diagnostic to the activity log', async () => {

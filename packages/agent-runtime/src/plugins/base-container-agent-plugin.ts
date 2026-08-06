@@ -7,10 +7,11 @@ import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/s
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, OutputSchemaShape } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, formatExitInfo, isBudgetExhaustedKill, type ContainerPluginInit } from './container-plugin';
+import { StepTimeoutError } from '../interfaces/step-executor-plugin';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { createLineStreamReader, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
+import { createLineStreamReader, resolveAgentTimeBudgetMs, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
  *  but the agent context carries no OAuth token entry for that server. The
@@ -35,10 +36,12 @@ const __filename_base = fileURLToPath(import.meta.url);
 const __dirname_base = dirname(__filename_base);
 
 // Last-resort container-kill timeout. Kept in lock-step with
-// resolveStepTimeoutMinutes' default (30) so an unconfigured step is never
-// SIGKILLed before the PluginRunner Promise.race classifies it as `timeout`
-// rather than `error` (ADR-0010). The workflow path never reaches this — it
-// resolves the timeout from the step via resolveStepTimeoutMinutes.
+// resolveStepTimeoutMinutes' default (30) so an unconfigured step's budget is
+// never derived from a different number than the race enforces (ADR-0010).
+// The kill now deliberately lands before the race — it reserves teardown time
+// and reports itself as StepTimeoutError, so the step still classifies as
+// `timeout` rather than `error`. The workflow path never reaches this constant;
+// it resolves the timeout from the step via resolveStepTimeoutMinutes.
 export const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 
 /** Container-side path for bind-mounted Claude Code plugin roots. */
@@ -831,7 +834,16 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         resolvedSkillsDir: this.agentConfig.skillsDir ? this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath) : null,
       });
 
-      const prompt = await this.buildPrompt(updatedInput, timeoutMs, outputDirForPrompt, dockerOutputDir, workingDirForPrompt);
+      // Everything above — downloads, image tag resolution, worktree, skills
+      // fetch — burned step budget the outer PluginRunner race is already
+      // counting. Hand the agent only what is left, minus the teardown reserve,
+      // so the number in the prompt is the number the container-kill timer
+      // enforces (issue #1158). Not counted: the image build/pull and stale
+      // container sweep, which the spawn strategy runs after this point and
+      // before it arms its own timer — a cold build still overruns the race.
+      const agentBudgetMs = resolveAgentTimeBudgetMs(timeoutMs, Date.now() - startTime);
+
+      const prompt = await this.buildPrompt(updatedInput, agentBudgetMs, outputDirForPrompt, dockerOutputDir, workingDirForPrompt);
 
       await emit({
         type: 'prompt',
@@ -839,7 +851,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         timestamp: new Date().toISOString(),
       });
 
-      const options: SpawnCliOptions = { timeoutMs, outputDir: dockerOutputDir };
+      const options: SpawnCliOptions = { timeoutMs: agentBudgetMs, outputDir: dockerOutputDir };
       if (this.agentConfig.model) options.model = this.agentConfig.model;
       if (tempDir) {
         options.addDirs = [tempDir];
@@ -1388,8 +1400,10 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       });
 
       let settled = false;
+      let killedByBudget = false;
       const timeoutHandle = setTimeout(() => {
         if (settled) return;
+        killedByBudget = true;
         console.error(`[${this.agentName}] Local process timeout (${Math.round(timeoutMs / 60_000)} min) — killing`);
         child.kill('SIGTERM');
         // Give the process a moment to clean up, then force kill
@@ -1438,11 +1452,14 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         const finalResult = this.parseAgentOutput(rawStdout);
 
         if (code !== 0) {
-          const exitInfo = signal
-            ? `killed by ${signal}${signal === 'SIGTERM' ? ` (likely timeout — ${timeoutMinutes} min limit)` : ''}`
-            : `exit code ${code}`;
+          const exitInfo = formatExitInfo({ exitCode: code, signal }, timeoutMinutes);
           const detail = this.extractErrorFromResult(finalResult) || stderr || 'no stderr output';
-          reject(new Error(`Local process failed (${exitInfo}): ${detail}`));
+          const message = `Local process failed (${exitInfo}): ${detail}`;
+          reject(
+            isBudgetExhaustedKill({ exitCode: code, signal, killedByBudget })
+              ? new StepTimeoutError(message)
+              : new Error(message),
+          );
           return;
         }
 
@@ -1631,6 +1648,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     if (spawnResult.exitCode !== 0) {
       const exitInfo = formatExitInfo(spawnResult, timeoutMinutes);
       const detail = this.extractErrorFromResult(finalResult) || spawnResult.stderr.trim() || 'no stderr output';
+      if (isBudgetExhaustedKill(spawnResult)) {
+        throw new StepTimeoutError(`Docker container failed (${exitInfo}): ${detail}`);
+      }
       const authHint = /not logged in|please run \/login/i.test(detail)
         ? ' — Hint: set ANTHROPIC_API_KEY (or OPENROUTER_API_KEY + ANTHROPIC_BASE_URL) in workflow env or secrets'
         : '';

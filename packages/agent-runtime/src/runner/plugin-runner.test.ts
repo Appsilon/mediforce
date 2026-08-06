@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { PluginRunner } from './plugin-runner';
 import { InMemoryAgentEventLog } from '../testing/index';
+import { StepTimeoutError } from '../interfaces/step-executor-plugin';
 import type { StepExecutorPlugin, AgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import { NoopLlmClient } from '../testing/index';
 import type { ProcessConfig, AgentOutputEnvelope } from '@mediforce/platform-core';
@@ -123,6 +124,24 @@ describe('PluginRunner', () => {
 
     expect(result.timedOut).toBe(false);
     expect(result.errorMessage).toBe('API key invalid');
+    expect(result.resultPayload).toBeNull();
+  });
+
+  // Issue #1158: a plugin that enforces its own time budget kills the agent
+  // before the race fires, so its exhaustion must still classify as `timeout` —
+  // otherwise the handoff text degrades from "Agent timed out" to "Agent escalated".
+  it('returns timedOut: true when the plugin throws StepTimeoutError', async () => {
+    const eventLog = new InMemoryAgentEventLog();
+    const runner = new PluginRunner(eventLog);
+    const plugin: StepExecutorPlugin = {
+      initialize: async () => {},
+      run: async () => { throw new StepTimeoutError('agent budget (29 min) exhausted'); },
+    };
+
+    const result = await runner.execute(plugin, makeContext(), 30_000);
+
+    expect(result.timedOut).toBe(true);
+    expect(result.errorMessage).toBeNull();
     expect(result.resultPayload).toBeNull();
   });
 
