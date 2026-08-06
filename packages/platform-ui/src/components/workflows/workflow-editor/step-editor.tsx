@@ -367,16 +367,19 @@ export function StepEditor({
 
   // Default open: Basics + Primary; Routing + Advanced closed. Any combination
   // of cards may be open — toggling one never closes the others.
-  const defaultOpenCards = { basics: true, primary: false, routing: false, advanced: false };
+  // Card ids + their default open state live here once; the reset effect and
+  // toggle derive from this rather than re-typing the literal.
+  const defaultOpenCards: Record<string, boolean> = { basics: true, primary: false, routing: false, advanced: false };
   const [openCards, setOpenCards] = useState<Record<string, boolean>>(defaultOpenCards);
   useEffect(() => {
-    setOpenCards({ basics: true, primary: false, routing: false, advanced: false });
+    setOpenCards(defaultOpenCards);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step.id, step.executor, isDecision, hasPrimarySection]);
   // Single-open: opening a card closes the others; clicking the open one collapses it.
-  const toggleCard = (id: string) => setOpenCards((prev) => ({
-    basics: false, primary: false, routing: false, advanced: false, [id]: !prev[id],
-  }));
+  const toggleCard = (id: string) => setOpenCards((prev) => {
+    const allClosed = Object.fromEntries(Object.keys(defaultOpenCards).map((k) => [k, false]));
+    return { ...allClosed, [id]: !prev[id] };
+  });
 
   const parametersSection = !isTerminal ? (
         <Section title="Parameters">
