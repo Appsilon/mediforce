@@ -36,7 +36,7 @@ interface ModelRegistryTableProps {
 export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
   const [search, setSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState('');
-  const [showTopPicks, setShowTopPicks] = useState(true);
+  const [showTopPicks, setShowTopPicks] = useState(false);
   const [toolsFilter, setToolsFilter] = useState(false);
   const [visionFilter, setVisionFilter] = useState(false);
   const [sortField, setSortField] = useState<SortField>('requestCount');

@@ -49,20 +49,20 @@ const models: ModelRegistryEntry[] = [
 ];
 
 describe('ModelRegistryTable', () => {
-  it('makes the default Top picks filter state explicit and toggles it accessibly', async () => {
+  it('leaves Top picks off by default and toggles it accessibly', async () => {
     const user = userEvent.setup();
     render(<ModelRegistryTable models={models} />);
 
     const topPicksButton = screen.getByRole('button', { name: /top picks/i });
-    expect(topPicksButton).toHaveAttribute('aria-pressed', 'true');
-    expect(topPicksButton).toHaveTextContent('On');
+    expect(topPicksButton).toHaveAttribute('aria-pressed', 'false');
+    expect(topPicksButton).toHaveTextContent('Off');
     expect(screen.getByText('Popular model')).toBeInTheDocument();
-    expect(screen.queryByText('Other model')).not.toBeInTheDocument();
+    expect(screen.getByText('Other model')).toBeInTheDocument();
 
     await user.click(topPicksButton);
 
-    expect(topPicksButton).toHaveAttribute('aria-pressed', 'false');
-    expect(topPicksButton).toHaveTextContent('Off');
-    expect(screen.getByText('Other model')).toBeInTheDocument();
+    expect(topPicksButton).toHaveAttribute('aria-pressed', 'true');
+    expect(topPicksButton).toHaveTextContent('On');
+    expect(screen.queryByText('Other model')).not.toBeInTheDocument();
   });
 });
