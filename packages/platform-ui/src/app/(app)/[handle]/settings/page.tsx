@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import * as Switch from '@radix-ui/react-switch';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
+import { routes } from '@/lib/routes';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -1152,7 +1153,7 @@ export default function WorkspaceConfigPage() {
               </Link>
               <div className="border-t" />
               <Link
-                href={`/${handle}/admin/tool-catalog`}
+                href={routes.adminToolCatalog(handle, { from: 'settings' })}
                 className="flex items-center justify-between group"
               >
                 <div>
@@ -1163,7 +1164,7 @@ export default function WorkspaceConfigPage() {
               </Link>
               <div className="border-t" />
               <Link
-                href={`/${handle}/admin/oauth-providers`}
+                href={routes.adminOAuthProviders(handle, { from: 'settings' })}
                 className="flex items-center justify-between group"
               >
                 <div>

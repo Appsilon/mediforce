@@ -8,6 +8,7 @@ import type { AgentDefinition, ToolCatalogEntry } from '@mediforce/platform-core
 import { apiFetch } from '@/lib/api-fetch';
 import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
+import { adminBackHref } from '@/lib/routes';
 import { CatalogList } from '@/components/admin/tool-catalog/catalog-list';
 import { CatalogForm } from '@/components/admin/tool-catalog/catalog-form';
 import { DeleteCatalogEntryDialog } from '@/components/admin/tool-catalog/delete-catalog-entry-dialog';
@@ -163,7 +164,7 @@ export default function AdminToolCatalogPage() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex items-center gap-3">
           <Link
-            href={`/${handle}`}
+            href={adminBackHref(handle, search.get('from'))}
             className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             aria-label="Back"
           >
