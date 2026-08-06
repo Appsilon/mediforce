@@ -1,18 +1,28 @@
 import { test, expect } from '../helpers/test-fixtures';
-import { TEST_ORG_HANDLE } from '../helpers/constants';
+import { TEST_USER_ID } from '../helpers/constants';
+import { seedPostgresOrganizationNamespace } from '../helpers/postgres-seed';
 import { trackPageErrors } from '../helpers/page-errors';
 
+const EMPTY_CATALOG_HANDLE = `tool-catalog-empty-${Date.now()}`;
+
 test.describe('Admin Tool Catalog Journey', () => {
+  test.beforeAll(async () => {
+    // The shared `test` namespace deliberately has seeded catalog entries for
+    // other journeys. Use a fresh owner namespace so this assertion exercises
+    // the actual empty-catalog render instead of the seeded list state.
+    await seedPostgresOrganizationNamespace(EMPTY_CATALOG_HANDLE, TEST_USER_ID, 'Tool Catalog Journey');
+  });
+
   test('admin creates, edits, and deletes a catalog entry', async ({ page }) => {
     trackPageErrors(page);
 
     // ── Land on admin page ────────────────────────────────────────────────
-    await page.goto(`/${TEST_ORG_HANDLE}/admin/tool-catalog`);
+    await page.goto(`/${EMPTY_CATALOG_HANDLE}/admin/tool-catalog`);
     await expect(page.getByRole('heading', { name: /tool catalog/i })).toBeVisible({ timeout: 30_000 });
 
-    // Seeded entries render in the list; the right pane shows the idle
-    // "select or create" state before any selection.
-    await expect(page.getByText(/select an entry to edit|no catalog entries|add your first/i).first()).toBeVisible();
+    // This namespace is intentionally empty. The page must expose exactly one
+    // create action: the header button, with no duplicate in the empty state.
+    await expect(page.getByText('No catalog entries yet.').first()).toBeVisible();
 
     // ── Create ────────────────────────────────────────────────────────────
     const newCatalogEntryButton = page.getByRole('button', { name: /new catalog entry|add entry|new entry/i });
@@ -53,7 +63,7 @@ test.describe('Admin Tool Catalog Journey', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: /^(delete|confirm)/i }).last().click();
 
-    // Entry removed from list — remaining seeded entries still visible
+    // Entry removed from the otherwise empty catalog.
     await expect(page.getByText('test-mcp')).not.toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/select an entry to edit|no catalog entries|add your first/i).first()).toBeVisible();
   });
