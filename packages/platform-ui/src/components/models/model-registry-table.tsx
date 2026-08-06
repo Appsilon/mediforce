@@ -36,7 +36,7 @@ interface ModelRegistryTableProps {
 export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
   const [search, setSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState('');
-  const [showTopPicks, setShowTopPicks] = useState(true);
+  const [showTopPicks, setShowTopPicks] = useState(false);
   const [toolsFilter, setToolsFilter] = useState(false);
   const [visionFilter, setVisionFilter] = useState(false);
   const [sortField, setSortField] = useState<SortField>('requestCount');
@@ -146,10 +146,18 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
           />
         </div>
         <button
+          type="button"
           onClick={() => setShowTopPicks(!showTopPicks)}
+          aria-pressed={showTopPicks}
           className={`rounded-md border px-3 py-2 text-sm transition-colors ${showTopPicks ? 'border-primary text-primary bg-primary/5' : 'hover:bg-accent'}`}
         >
           Top picks
+          <span
+            aria-hidden="true"
+            className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-medium ${showTopPicks ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+          >
+            {showTopPicks ? 'On' : 'Off'}
+          </span>
         </button>
         <select
           aria-label="Provider"
