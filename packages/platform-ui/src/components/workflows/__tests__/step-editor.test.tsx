@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import type { WorkflowStep } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 
@@ -300,13 +301,17 @@ describe('StepEditor', () => {
       { repository: 'mediforce-golden-image', tag: 'latest', id: 'g1', size: '1GB', created: '1d ago' },
     ];
 
-    function renderAgentStep(step: Partial<WorkflowStep> = {}) {
+    function renderAgentStep(
+      step: Partial<WorkflowStep> = {},
+      workflowExternalSkillsRepo?: { url: string; commit: string },
+    ) {
       render(
         <StepEditor
           step={buildStep({ executor: 'agent', ...step })}
           allSteps={[]}
           onChange={noop}
           dockerImages={mixedImages}
+          workflowExternalSkillsRepo={workflowExternalSkillsRepo}
         />,
       );
       expandCard('Prompt & model');
@@ -331,6 +336,24 @@ describe('StepEditor', () => {
       });
       expect(select.options[0].textContent).not.toContain('mediforce-golden-image');
       expect(select.options[0].textContent).toContain('agent.repo');
+    });
+
+    it('[RENDER] a workflow-level build source is reflected in the blank option', () => {
+      const select = renderAgentStep(
+        { agent: { dockerfile: 'Dockerfile' } },
+        { url: 'https://github.com/acme/wf.git', commit: 'abc1234' },
+      );
+      expect(select.options[0].textContent).not.toContain(DEFAULT_AGENT_IMAGE);
+      expect(select.options[0].textContent).toContain('workflow');
+    });
+
+    it('[REGRESSION] treats the untagged persisted default as the discovered latest image', () => {
+      const select = renderAgentStep({ agent: { image: DEFAULT_AGENT_IMAGE } });
+      const matchingOptions = Array.from(select.options).filter(
+        (option) => option.value === DEFAULT_AGENT_IMAGE || option.value === `${DEFAULT_AGENT_IMAGE}:latest`,
+      );
+      expect(matchingOptions).toHaveLength(1);
+      expect(select.value).toBe(DEFAULT_AGENT_IMAGE);
     });
 
     it('[RENDER] the script picker keeps a neutral blank option — no agent default applies', () => {

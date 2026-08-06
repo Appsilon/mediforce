@@ -9,7 +9,7 @@ import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 
 import { toSlug, DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
-import type { WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
+import type { WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
@@ -70,6 +70,10 @@ function imageRef(img: DockerImageInfo): string {
   return img.tag && img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.repository;
 }
 
+function pickerImageValue(image: string): string {
+  return image === `${DEFAULT_AGENT_IMAGE}:latest` ? DEFAULT_AGENT_IMAGE : image;
+}
+
 /**
  * Agent images sorted with the golden image first — it is the one image
  * guaranteed to carry an agent CLI, and every other discovered image (a bare
@@ -78,7 +82,8 @@ function imageRef(img: DockerImageInfo): string {
 function agentImageOptions(images: DockerImageInfo[]): Array<{ img: DockerImageInfo; label: string }> {
   return images
     .map((img) => {
-      const recommended = img.repository === DEFAULT_AGENT_IMAGE;
+      const value = pickerImageValue(imageRef(img));
+      const recommended = value === DEFAULT_AGENT_IMAGE;
       return { img, recommended, label: recommended ? `★ ${imageRef(img)}` : imageRef(img) };
     })
     .sort((a, b) => Number(b.recommended) - Number(a.recommended));
@@ -276,6 +281,7 @@ export function StepEditor({
   errors,
   imageWarning,
   dockerImages,
+  workflowExternalSkillsRepo,
 }: {
   step: WorkflowStep;
   allSteps: WorkflowStep[];
@@ -285,6 +291,7 @@ export function StepEditor({
   errors?: Record<string, string>;
   imageWarning?: string;
   dockerImages?: DockerImageInfo[];
+  workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
 }) {
   const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
@@ -327,9 +334,15 @@ export function StepEditor({
   const agentBuildsOwnImage =
     typeof step.agent?.repo === 'string' && step.agent.repo.length > 0
     && typeof step.agent?.commit === 'string' && step.agent.commit.length > 0;
+  const agentBuildsFromWorkflowSource =
+    typeof step.agent?.dockerfile === 'string' && step.agent.dockerfile.length > 0
+    && typeof workflowExternalSkillsRepo?.url === 'string' && workflowExternalSkillsRepo.url.length > 0
+    && typeof workflowExternalSkillsRepo.commit === 'string' && workflowExternalSkillsRepo.commit.length > 0;
   const agentBlankOptionLabel = agentBuildsOwnImage
     ? 'Built from agent.repo'
-    : `Default — ${DEFAULT_AGENT_IMAGE}`;
+    : agentBuildsFromWorkflowSource
+      ? 'Built from workflow source'
+      : `Default — ${DEFAULT_AGENT_IMAGE}`;
 
   function updateAgent(patch: Partial<NonNullable<WorkflowStep['agent']>>) {
     onChange({ agent: { ...step.agent, ...patch } });
@@ -724,15 +737,17 @@ export function StepEditor({
               <div className="grid gap-2 sm:grid-cols-2">
                 <select
                   aria-label="Known Docker image"
-                  value={step.agent?.image ?? ''}
+                  value={pickerImageValue(step.agent?.image ?? '')}
                   onChange={(e) => updateAgent({ image: e.target.value || undefined })}
                   className={rs}
                 >
                   <option value="">{agentBlankOptionLabel}</option>
                   {agentImageOptions(dockerImages).map(({ img, label }) => (
-                    <option key={img.id} value={imageRef(img)}>{label}</option>
+                    <option key={img.id} value={pickerImageValue(imageRef(img))}>{label}</option>
                   ))}
-                  {step.agent?.image && !dockerImages.some((img) => imageRef(img) === step.agent?.image) && (
+                  {step.agent?.image && !dockerImages.some(
+                    (img) => pickerImageValue(imageRef(img)) === pickerImageValue(step.agent?.image ?? ''),
+                  ) && (
                     <option value={step.agent.image}>{step.agent.image}</option>
                   )}
                 </select>
