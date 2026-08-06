@@ -452,13 +452,12 @@ test.describe('Workflow Editor Journey', () => {
     await page.getByPlaceholder('Add a Workflow Name…').fill('e2e-rejected-workflow');
     await page.getByPlaceholder('Add a workflow description…').fill('Save is rejected by the server on purpose');
 
-    const saveButton = page.getByRole('button', { name: /publish workflow/i });
+    const saveButton = page.getByRole('button', { name: 'Save', exact: true });
     await expect(saveButton).toBeEnabled();
     await saveButton.click();
     await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
     await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('v1 — rejected');
-    // .last() is the dialog's confirm button; the first is the header button behind the overlay.
-    await page.getByRole('button', { name: /publish workflow/i }).last().click();
+    await page.getByRole('button', { name: /publish workflow/i }).click();
 
     // The header reports every rejected field, in full.
     const errorMessage = pageHeader(page).getByText(REJECTED_SAVE_MESSAGE);
