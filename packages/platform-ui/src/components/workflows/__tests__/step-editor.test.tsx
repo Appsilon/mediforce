@@ -290,4 +290,61 @@ describe('StepEditor', () => {
 
     expect(onChange).toHaveBeenCalledWith({ agent: { image: 'python:3.11-slim' } });
   });
+
+  // Picking a minimal base image for an agent step fails at container start —
+  // it carries no agent CLI. The picker offers every discovered image equally,
+  // so it must at least say which one works and what leaving it blank does.
+  describe('agent image picker', () => {
+    const mixedImages: DockerImageInfo[] = [
+      { repository: 'alpine', tag: '3.24', id: 'a1', size: '8MB', created: '1d ago' },
+      { repository: 'mediforce-golden-image', tag: 'latest', id: 'g1', size: '1GB', created: '1d ago' },
+    ];
+
+    function renderAgentStep(step: Partial<WorkflowStep> = {}) {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'agent', ...step })}
+          allSteps={[]}
+          onChange={noop}
+          dockerImages={mixedImages}
+        />,
+      );
+      expandCard('Prompt & model');
+      return screen.getByLabelText('Known Docker image') as HTMLSelectElement;
+    }
+
+    it('[RENDER] the blank option names the image the platform falls back to', () => {
+      const select = renderAgentStep();
+      expect(select.options[0].textContent).toContain('mediforce-golden-image');
+    });
+
+    it('[RENDER] marks the golden image as recommended and lists it first', () => {
+      const select = renderAgentStep();
+      const listed = Array.from(select.options).slice(1).map((o) => o.textContent ?? '');
+      expect(listed[0]).toBe('★ mediforce-golden-image:latest');
+      expect(listed).toContain('alpine:3.24');
+    });
+
+    it('[RENDER] a build-mode step reports its build source instead of the default', () => {
+      const select = renderAgentStep({
+        agent: { repo: 'https://github.com/acme/wf.git', commit: 'abc1234', dockerfile: 'Dockerfile' },
+      });
+      expect(select.options[0].textContent).not.toContain('mediforce-golden-image');
+      expect(select.options[0].textContent).toContain('agent.repo');
+    });
+
+    it('[RENDER] the script picker keeps a neutral blank option — no agent default applies', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'script' })}
+          allSteps={[]}
+          onChange={noop}
+          dockerImages={mixedImages}
+        />,
+      );
+      expandCard('Script');
+      const select = screen.getByLabelText('Known Docker image') as HTMLSelectElement;
+      expect(select.options[0].textContent).not.toContain('mediforce-golden-image');
+    });
+  });
 });

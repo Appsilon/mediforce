@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 
-import { toSlug } from '@mediforce/platform-core';
+import { toSlug, DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import type { WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
@@ -68,6 +68,20 @@ const rt = textareaBase;
 
 function imageRef(img: DockerImageInfo): string {
   return img.tag && img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.repository;
+}
+
+/**
+ * Agent images sorted with the golden image first — it is the one image
+ * guaranteed to carry an agent CLI, and every other discovered image (a bare
+ * `alpine`, a language runtime) fails at container start for an agent step.
+ */
+function agentImageOptions(images: DockerImageInfo[]): Array<{ img: DockerImageInfo; label: string }> {
+  return images
+    .map((img) => {
+      const recommended = img.repository === DEFAULT_AGENT_IMAGE;
+      return { img, recommended, label: recommended ? `★ ${imageRef(img)}` : imageRef(img) };
+    })
+    .sort((a, b) => Number(b.recommended) - Number(a.recommended));
 }
 
 // ---------------------------------------------------------------------------
@@ -306,6 +320,16 @@ export function StepEditor({
 
   const selMin = typeof step.selection === 'number' ? step.selection : step.selection?.min;
   const selMax = typeof step.selection === 'number' ? step.selection : step.selection?.max;
+
+  // Leaving agent.image blank is not "unset" — registration fills in the golden
+  // image, unless the step builds its own from repo + commit. Say which, so the
+  // picker and the saved definition agree.
+  const agentBuildsOwnImage =
+    typeof step.agent?.repo === 'string' && step.agent.repo.length > 0
+    && typeof step.agent?.commit === 'string' && step.agent.commit.length > 0;
+  const agentBlankOptionLabel = agentBuildsOwnImage
+    ? 'Built from agent.repo'
+    : `Default — ${DEFAULT_AGENT_IMAGE}`;
 
   function updateAgent(patch: Partial<NonNullable<WorkflowStep['agent']>>) {
     onChange({ agent: { ...step.agent, ...patch } });
@@ -704,11 +728,10 @@ export function StepEditor({
                   onChange={(e) => updateAgent({ image: e.target.value || undefined })}
                   className={rs}
                 >
-                  <option value="">Select image…</option>
-                  {dockerImages.map((img) => {
-                    const ref = imageRef(img);
-                    return <option key={img.id} value={ref}>{ref}</option>;
-                  })}
+                  <option value="">{agentBlankOptionLabel}</option>
+                  {agentImageOptions(dockerImages).map(({ img, label }) => (
+                    <option key={img.id} value={imageRef(img)}>{label}</option>
+                  ))}
                   {step.agent?.image && !dockerImages.some((img) => imageRef(img) === step.agent?.image) && (
                     <option value={step.agent.image}>{step.agent.image}</option>
                   )}

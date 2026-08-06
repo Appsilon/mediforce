@@ -59,7 +59,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
-import { normalizeRepoUrls } from '@mediforce/platform-core';
+import { normalizeRepoUrls, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
 import { cloneRepoAtCommit } from './git-clone';
 import { writeFile } from 'node:fs/promises';
 import type { GitMetadata } from '@mediforce/platform-core';
@@ -181,6 +181,27 @@ export function formatExitInfo(
       ? ` (likely timeout — ${timeoutMinutes} min limit)`
       : '';
   return `killed by ${result.signal}${timeoutHint}`;
+}
+
+const MISSING_EXECUTABLE_RE = /exec: "([^"]+)": executable file not found/;
+
+/**
+ * Name the image and the executable behind runc's missing-entrypoint dump.
+ * Returns '' for anything else, so callers append it unconditionally.
+ */
+export function missingExecutableHint(detail: string, image: string | undefined): string {
+  const match = MISSING_EXECUTABLE_RE.exec(detail);
+  if (match === null) return '';
+  const executable = match[1];
+  const imageLabel = typeof image === 'string' && image.length > 0
+    ? `Image '${image}'`
+    : 'The configured image';
+  return (
+    ` — Hint: ${imageLabel} has no '${executable}' executable. Steps run their` +
+    ` command inside the image, so a minimal base image that ships neither a` +
+    ` shell nor an agent CLI cannot run one. Pick or build an image carrying` +
+    ` the tooling this step needs: ${DOCKER_IMAGE_SETUP_URL}`
+  );
 }
 
 export interface CommitRunWorkspaceOptions {
