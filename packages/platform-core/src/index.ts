@@ -132,6 +132,15 @@ export {
   AssignmentItemSchema,
   TableEditorRowSchema,
   CompleteHumanTaskPayloadSchema,
+  toProcessDefinition,
+  mergeVerdictTransitions,
+  ensureEntryStepFirst,
+  validateStepReferences,
+  type ReferenceIssue,
+  validateStepGraph,
+  validateWorkflowGraphAndReferences,
+  type ValidationResult,
+  type WorkflowGraphValidation,
 } from './schemas/index';
 
 export type { Handle } from './schemas/handle';
@@ -248,6 +257,24 @@ export {
   ATTACHMENT_MAX_BYTES,
   TaskAttachmentSchema,
   NewTaskAttachmentSchema,
+} from './schemas/index';
+export {
+  AddStepToolSchema,
+  UpdateStepToolSchema,
+  RemoveStepToolSchema,
+  ListModelsToolSchema,
+  WORKFLOW_ASSISTANT_TOOLS,
+  WORKFLOW_ASSISTANT_DEFAULT_MODEL,
+  WorkflowAssistantToolCallSchema,
+  applyWorkflowAssistantToolCalls,
+  type AddStepTool,
+  type UpdateStepTool,
+  type RemoveStepTool,
+  type ListModelsTool,
+  type WorkflowAssistantToolName,
+  type WorkflowAssistantToolCall,
+  type ToolCallOutcome,
+  type ApplyToolCallsResult,
 } from './schemas/index';
 
 // Interfaces (repository and service contracts)
@@ -472,6 +499,7 @@ export {
 } from './utils/repo-url';
 export type { RepoCloneTarget } from './utils/repo-url';
 export { getWorkflowStatus, type WorkflowStatus } from './utils/workflow-status';
+export { toSlug } from './utils/slug';
 
 // Workflow examples — shared loader for MCP tool, tests, and build scripts.
 // Uses Node.js fs/path so NOT exported from this barrel (breaks browser bundles).

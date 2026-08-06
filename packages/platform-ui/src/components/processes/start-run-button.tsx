@@ -29,6 +29,23 @@ interface StartRunButtonProps {
   showVersionPicker?: boolean;
   hasManualTrigger?: boolean;
   archived?: boolean;
+  label?: string;
+  disabled?: boolean;
+  onBeforeStart?: () => Promise<number | undefined>;
+  /**
+   * Whether to run workflow-scoped preflight fetches (versions, secrets, model
+   * validation). Set false when the workflow does not exist yet — e.g. the new
+   * workflow page, where `onBeforeStart` saves it first — so those fetches don't
+   * 404 against a not-yet-created workflow.
+   */
+  preflightEnabled?: boolean;
+  /**
+   * Fixes the run mode this button starts. When set, the button carries the
+   * intent (e.g. "Save & Dry Run" -> 'dry-run') so the preflight dialog no
+   * longer re-asks Dry Run vs Start — it shows a single confirm for this mode.
+   * Left undefined, the button is mode-agnostic and the dialog offers both.
+   */
+  mode?: 'production' | 'dry-run';
 }
 
 export function StartRunButton({
@@ -37,15 +54,24 @@ export function StartRunButton({
   showVersionPicker,
   hasManualTrigger = true,
   archived = false,
+  label,
+  disabled = false,
+  onBeforeStart,
+  preflightEnabled = true,
+  mode,
 }: StartRunButtonProps) {
   const router = useRouter();
   const handle = useHandleFromPath();
   const { user } = useAuth();
-  const { versions: definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowVersions(workflowName, handle);
+  // Empty name disables the workflow-scoped queries (see useWorkflowVersions),
+  // so a not-yet-created workflow never triggers a 404 preflight.
+  const preflightName = preflightEnabled ? workflowName : '';
+  const { versions: definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowVersions(preflightName, handle);
   const { images: dockerImages, isAvailable: dockerAvailable, isLoading: dockerLoading } = useDockerImages();
   const openRouterCredits = useOpenRouterCredits();
   const adminContact = useNamespaceAdminContact(handle);
   const [starting, setStarting] = React.useState(false);
+  const [runningBeforeStart, setRunningBeforeStart] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const startMutation = useStartRun();
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
@@ -58,7 +84,7 @@ export function StartRunButton({
   const effectiveVersion = version ?? hookEffectiveVersion;
   const preflightVersion = pendingVersion ?? effectiveVersion;
   const { definition: effectiveDefinition, loading: definitionLoading } = useWorkflowVersion(
-    workflowName,
+    preflightName,
     handle,
     preflightVersion,
   );
@@ -94,11 +120,11 @@ export function StartRunButton({
       setLocalSecretsLoading(false);
       return;
     }
-    if (!handle || !workflowName || !uid) return;
+    if (!handle || !preflightName || !uid) return;
     let cancelled = false;
     setLocalSecretsLoading(true);
     Promise.all([
-      mediforce.secrets.list({ namespace: handle, workflow: workflowName }),
+      mediforce.secrets.list({ namespace: handle, workflow: preflightName }),
       mediforce.secrets.list({ namespace: handle }),
     ])
       .then(([wf, ns]) => {
@@ -114,7 +140,7 @@ export function StartRunButton({
         setLocalSecretsLoading(false);
       });
     return () => { cancelled = true; };
-  }, [hasContext, handle, workflowName, uid]);
+  }, [hasContext, handle, preflightName, uid]);
 
   const secretKeys = hasContext ? secretKeysCtx.getKeys(workflowName) : localSecretKeys;
   const namespaceSecretKeys = hasContext ? secretKeysCtx.namespaceKeys : localNsSecretKeys;
@@ -139,7 +165,7 @@ export function StartRunButton({
     });
   }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.effectiveRemaining, handle, workflowName, adminContact.email, modelValidation.isLoading, modelValidation.unknown]);
 
-  const preflightLoading = definitionLoading || dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading;
+  const preflightLoading = preflightEnabled && (definitionLoading || dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading);
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
 
@@ -169,10 +195,6 @@ export function StartRunButton({
       console.error('[StartRunButton] Failed to start run:', err);
       setError(err instanceof Error ? err.message : 'Failed to start run');
     } finally {
-      // Reset on every code path — under the legacy Server Action the implicit
-      // revalidate-on-success remounted the component; the headless migration
-      // (PR #520) lost that side-effect, so success without unmount left the
-      // button stuck on "Starting...".
       setStarting(false);
     }
   }
@@ -190,13 +212,28 @@ export function StartRunButton({
   const inputBlocked = hasTriggerInput
     && (requiredInputMissing || hasInvalidObjectInput(triggerInput, inputValues));
 
-  function handleStart(v?: number) {
-    const versionChanged = v !== undefined && v !== effectiveVersion;
-    if (hasTriggerInput || hasWarnings || versionChanged) {
-      setPendingVersion(v);
+  async function handleStart(v?: number) {
+    let targetVersion = v;
+    if (onBeforeStart) {
+      setRunningBeforeStart(true);
+      setError(null);
+      try {
+        targetVersion = await onBeforeStart();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to save before starting');
+        setRunningBeforeStart(false);
+        return;
+      }
+      setRunningBeforeStart(false);
+      if (targetVersion === undefined) return;
+    }
+
+    const versionChanged = targetVersion !== undefined && targetVersion !== effectiveVersion;
+    if (hasTriggerInput || hasWarnings || (versionChanged && !onBeforeStart)) {
+      setPendingVersion(targetVersion);
       setDialogOpen(true);
     } else {
-      executeStart(v);
+      executeStart(targetVersion, mode === 'dry-run');
     }
   }
 
@@ -204,23 +241,28 @@ export function StartRunButton({
     ? 'Workflow is archived'
     : !hasManualTrigger
       ? 'Manual trigger is stopped — start it in the Triggers tab to run this workflow by hand'
-      : effectiveVersion === 0
+      : effectiveVersion === 0 && !onBeforeStart
         ? 'No workflow version available'
         : null;
-  const isDisabled = disabledReason !== null || starting || preflightLoading;
+  const isDisabled = disabledReason !== null || starting || preflightLoading || runningBeforeStart || disabled;
   const tooltip = preflightLoading ? 'Checking workflow readiness...' : (disabledReason ?? undefined);
 
   const errorBanner = error ? (
     <p className="mt-1 text-xs text-destructive max-w-xs truncate" title={error}>{error}</p>
   ) : null;
 
-  const buttonClasses = 'bg-primary text-primary-foreground hover:bg-primary/90';
+  const isDryRun = mode === 'dry-run';
+  const buttonClasses = isDryRun
+    ? 'border border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-700 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/40'
+    : 'bg-primary text-primary-foreground hover:bg-primary/90';
 
-  const buttonIcon = starting || preflightLoading
+  const buttonIcon = starting || preflightLoading || runningBeforeStart
     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-    : <Play className="h-3.5 w-3.5" />;
+    : isDryRun
+      ? <FlaskConical className="h-3.5 w-3.5" />
+      : <Play className="h-3.5 w-3.5" />;
 
-  const buttonLabel = starting ? 'Starting...' : preflightLoading ? 'Checking...' : 'Start Run';
+  const buttonLabel = starting ? 'Starting...' : runningBeforeStart ? 'Saving...' : preflightLoading ? 'Checking...' : (label ?? 'Start Run');
 
   const warningBadge = hasWarnings && !isDisabled ? (
     <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">
@@ -333,27 +375,31 @@ export function StartRunButton({
             <Dialog.Close className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors">
               Cancel
             </Dialog.Close>
-            <button
-              onClick={() => executeStart(pendingVersion, true)}
-              disabled={inputBlocked}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 hover:bg-violet-100 dark:border-violet-700 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 px-3 py-1.5 text-sm font-medium text-violet-700 dark:text-violet-300 transition-colors',
-                inputBlocked && 'opacity-50 cursor-not-allowed',
-              )}
-            >
-              <FlaskConical className="h-3.5 w-3.5" />
-              Dry Run
-            </button>
-            <button
-              onClick={() => executeStart(pendingVersion)}
-              disabled={inputBlocked}
-              className={cn(
-                'rounded-md bg-primary hover:bg-primary/90 px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors',
-                inputBlocked && 'opacity-50 cursor-not-allowed',
-              )}
-            >
-              {startButtonLabel}
-            </button>
+            {mode !== 'production' && (
+              <button
+                onClick={() => executeStart(pendingVersion, true)}
+                disabled={inputBlocked}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 hover:bg-violet-100 dark:border-violet-700 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 px-3 py-1.5 text-sm font-medium text-violet-700 dark:text-violet-300 transition-colors',
+                  inputBlocked && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                <FlaskConical className="h-3.5 w-3.5" />
+                Dry Run
+              </button>
+            )}
+            {mode !== 'dry-run' && (
+              <button
+                onClick={() => executeStart(pendingVersion)}
+                disabled={inputBlocked}
+                className={cn(
+                  'rounded-md bg-primary hover:bg-primary/90 px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors',
+                  inputBlocked && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                {startButtonLabel}
+              </button>
+            )}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

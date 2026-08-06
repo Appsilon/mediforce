@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { WorkflowStep, McpServerConfig } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
-import { FieldRow, FieldGroup, Section, inputBase, inputBaseMono, selectBase, textareaBase } from './step-editor-fields';
+import { FieldRow, FieldGroup, Section, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
 
 const VOICE_OPTIONS = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const;
 
@@ -103,7 +103,7 @@ export function CoworkSection({
                 className={rs}
               >
                 <option value="">Default</option>
-                {VOICE_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+                {VOICE_OPTIONS.map((v) => <option key={v} value={v}>{humanizeToken(v)}</option>)}
               </select>
             </FieldRow>
 
@@ -241,7 +241,7 @@ function McpServerEntry({
             className="text-[10px] text-muted-foreground hover:text-foreground transition-colors border border-border/60 rounded px-1.5 py-0.5 shrink-0"
             title={`Switch to ${transportMode === 'command' ? 'URL' : 'command'} transport`}
           >
-            {transportMode === 'command' ? 'stdio' : 'http'}
+            {transportMode === 'command' ? 'Stdio' : 'HTTP'}
           </button>
           <button
             onClick={onRemove}

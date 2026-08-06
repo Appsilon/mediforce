@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
-import { MockClaudeCodeAgentPlugin } from '../mock-claude-code-agent-plugin';
+import { MockAgentPlugin } from '../mock-agent-plugin';
 import type { EmitPayload, WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
 
-describe('MockClaudeCodeAgentPlugin', () => {
+describe('MockAgentPlugin', () => {
   it('[DATA] emits deterministic output without step.agent config', async () => {
-    const plugin = new MockClaudeCodeAgentPlugin();
+    const plugin = new MockAgentPlugin();
     const events: EmitPayload[] = [];
     const context = {
       stepId: 'verify-data-quality',
@@ -47,7 +47,7 @@ describe('MockClaudeCodeAgentPlugin', () => {
       type: 'result',
       payload: {
         confidence: 1,
-        model: 'mock-claude-code-agent',
+        model: 'mock-agent',
         result: {
           mock: true,
           summary: 'Mock output for step verify-data-quality',

@@ -59,7 +59,7 @@ describe('golden-standard-workflow package', () => {
   });
 
   it('declares import manifest path to the workflow definition', () => {
-    const manifest = readJson('index.json') as { workflows: Array<{ name: string; path: string }> };
+    const manifest = readJson('workflows-index.json') as { workflows: Array<{ name: string; path: string }> };
     expect(manifest.workflows).toContainEqual(
       expect.objectContaining({
         name: 'golden-standard-workflow',

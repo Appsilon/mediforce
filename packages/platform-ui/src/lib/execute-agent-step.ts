@@ -9,6 +9,7 @@ import {
   resolveOAuthToken,
   OAuthTokenUnavailableError,
   PluginNotFoundError,
+  MockAgentPlugin,
   type StepExecutorPlugin,
   type ResolvedOAuthBinding,
   type WorkflowAgentContext,
@@ -90,20 +91,27 @@ export async function executeAgentStep(
   // Resolve plugin: use workflowStep.plugin when set, fall back to stepId
   const pluginId = workflowStep.plugin ?? stepId;
   let plugin: StepExecutorPlugin;
-  try {
-    plugin = pluginRegistry.get(pluginId);
-  } catch (err) {
-    if (
-      process.env.MOCK_AGENT !== 'true'
-      || workflowStep.executor !== 'agent'
-      || !(err instanceof PluginNotFoundError)
-    ) {
-      throw err;
+  if (instance.dryRun) {
+    // Dry run: mock every agent/script step so testing a workflow never runs a
+    // real agent, spawns a container, or calls an external service — regardless
+    // of the step's plugin (claude / opencode / script-container / databricks-job).
+    plugin = new MockAgentPlugin();
+  } else {
+    try {
+      plugin = pluginRegistry.get(pluginId);
+    } catch (err) {
+      if (
+        process.env.MOCK_AGENT !== 'true'
+        || workflowStep.executor !== 'agent'
+        || !(err instanceof PluginNotFoundError)
+      ) {
+        throw err;
+      }
+      console.warn(
+        `[mock-agent] Plugin "${pluginId}" is not registered; using claude-code-agent mock runtime.`,
+      );
+      plugin = pluginRegistry.get('claude-code-agent');
     }
-    console.warn(
-      `[mock-agent] Plugin "${pluginId}" is not registered; using claude-code-agent mock runtime.`,
-    );
-    plugin = pluginRegistry.get('claude-code-agent');
   }
 
   // Resolve autonomy level from step (script steps are always L4)

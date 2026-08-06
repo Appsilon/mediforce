@@ -135,10 +135,14 @@ function hasFiles(input: Record<string, unknown>): input is Record<string, unkno
 
 /** Platform base URL for server-side self-fetch. Mirrors the run-kicker
  *  (`platform-services.ts`) so attachment downloads hit the same host the
- *  auto-runner already reaches. `||` (not `??`) treats an empty-string env
- *  as unset — Docker compose's `${VAR:-default}` can leave one behind. */
-function platformBaseUrl(): string {
-  return process.env.APP_BASE_URL || 'http://localhost:9003';
+ *  auto-runner already reaches. Falls back to `NEXT_PUBLIC_APP_URL` before
+ *  localhost — dev setups (e.g. `pnpm dev:mock` on :9007) set that and not
+ *  `APP_BASE_URL`, so without the fallback attachment downloads dialed a dead
+ *  `localhost:9003` and every file-consuming agent step died "fetch failed".
+ *  `||` (not `??`) treats an empty-string env as unset — Docker compose's
+ *  `${VAR:-default}` can leave one behind. */
+export function platformBaseUrl(): string {
+  return process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9003';
 }
 
 /** Resolve an attachment `downloadUrl` into an absolute URL + fetch headers.

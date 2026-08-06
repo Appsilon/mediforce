@@ -17,13 +17,7 @@ export interface StepActor {
   role: string;
 }
 
-/**
- * StepExecutor: execute a single step, resolve routing, emit audit event, update instance state.
- *
- * Routing priority:
- *  1. Review steps with verdicts → native verdict routing (step.verdicts[v].target)
- *  2. All other steps → when-expression evaluation on outgoing transitions
- */
+// `decision` and `review` steps with verdicts route via step.verdicts[v].target; other steps use when-expressions.
 export class StepExecutor {
   constructor(
     private readonly instanceRepository: ProcessInstanceRepository,
@@ -50,9 +44,8 @@ export class StepExecutor {
     let nextStepId: string;
     let routingResult: { next: string; reason: string } | null = null;
 
-    // --- Route: native verdict routing for review steps ---
     if (
-      currentStep.type === 'review' &&
+      (currentStep.type === 'review' || currentStep.type === 'decision') &&
       currentStep.verdicts &&
       typeof stepOutput.verdict === 'string'
     ) {
@@ -61,7 +54,7 @@ export class StepExecutor {
       if (!verdictConfig) {
         const error = new RoutingError(
           currentStepId,
-          `Unknown verdict '${verdictKey}' on review step '${currentStepId}'`,
+          `Unknown verdict '${verdictKey}' on ${currentStep.type} step '${currentStepId}'`,
         );
         await this.pauseOnRoutingError(
           instance, currentStepId, stepOutput, actor, definition.version, error,
@@ -71,7 +64,6 @@ export class StepExecutor {
       nextStepId = verdictConfig.target;
       routingResult = { next: nextStepId, reason: `Verdict: ${verdictKey}` };
     } else {
-      // --- Route: when-expression evaluation ---
       const outgoing = definition.transitions.filter(
         (t) => t.from === currentStepId,
       );
@@ -118,7 +110,6 @@ export class StepExecutor {
       }
     }
 
-    // Validate next step exists in definition
     const nextStep = definition.steps.find((s) => s.id === nextStepId);
     if (!nextStep) {
       const error = new RoutingError(
@@ -164,7 +155,6 @@ export class StepExecutor {
       });
     }
 
-    // Compute semantic input: previous step's output from instance variables
     const incomingTransition = definition.transitions.find(
       (t) => t.to === currentStepId,
     );
@@ -255,9 +245,7 @@ export class StepExecutor {
     const now = new Date().toISOString();
     const verdict = typeof stepOutput.verdict === 'string' ? stepOutput.verdict : null;
 
-    // Merge into existing execution if one exists (e.g. auto-runner already
-    // created a 'running' record before the agent ran). This prevents
-    // duplicate rows in the step history.
+    // Merge into an existing execution record if one exists, to avoid duplicate step-history rows.
     const allExecs = await this.instanceRepository.getStepExecutions(instance.id);
     const existing = allExecs
       .filter((e) => e.stepId === stepId)

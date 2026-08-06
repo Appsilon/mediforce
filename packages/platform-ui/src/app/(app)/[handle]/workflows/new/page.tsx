@@ -7,10 +7,13 @@ import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
+import { StartRunButton } from '@/components/processes/start-run-button';
 import { mediforce } from '@/lib/mediforce';
-import { validateSteps, mergeVerdictTransitions, toastRegistrationWarnings, handleSaveFailure } from '@/lib/workflow-save-utils';
+import { validateSteps, toastRegistrationWarnings, handleSaveFailure, DISPLAY_NAME_KEY } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
+import { routes } from '@/lib/routes';
+import { mergeVerdictTransitions, ensureEntryStepFirst } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -78,6 +81,7 @@ export default function NewWorkflowPage() {
   const currentStepsRef = useRef<WorkflowStep[]>(TEMPLATE_STEPS);
   const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>(TEMPLATE_TRANSITIONS);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startAfterSaveResolverRef = useRef<((version: number | undefined) => void) | null>(null);
 
   useEffect(() => () => { if (redirectTimerRef.current !== null) clearTimeout(redirectTimerRef.current); }, []);
 
@@ -92,33 +96,32 @@ export default function NewWorkflowPage() {
   // Auto-select first namespace when namespaces load
   const effectiveNamespace = namespace || namespaces[0]?.handle || '';
 
-  const handleSave = useCallback(async (versionTitle: string) => {
+  const registerCurrentCanvas = useCallback(async (versionTitle: string) => {
     const steps = currentStepsRef.current;
     const transitions = currentTransitionsRef.current;
     const workflowId = toWorkflowId(workflowName);
     if (!workflowId) {
-      setDialogOpen(false);
-      setSaveState({ status: 'error', message: 'Workflow name is required.' });
-      return;
+      const message = 'Workflow name is required.';
+      setSaveState({ status: 'error', message });
+      throw new Error(message);
     }
     if (!description.trim()) {
-      setDialogOpen(false);
-      setSaveState({ status: 'error', message: 'Description is required.' });
-      return;
+      const message = 'Description is required.';
+      setSaveState({ status: 'error', message });
+      throw new Error(message);
     }
 
     const validationError = validateSteps(steps);
     if (validationError !== null) {
-      setDialogOpen(false);
       setSaveState({ status: 'error', message: validationError });
-      return;
+      throw new Error(validationError);
     }
 
-    setDialogOpen(false);
     setStepErrors({});
     setSaveState({ status: 'saving' });
 
     const mergedTransitions = mergeVerdictTransitions(steps, transitions);
+    const orderedSteps = ensureEntryStepFirst(steps, mergedTransitions);
 
     try {
       const result = await mediforce.workflows.register(
@@ -126,53 +129,79 @@ export default function NewWorkflowPage() {
           name: workflowId,
           title: versionTitle || undefined,
           description: description.trim() || undefined,
-          steps,
+          metadata: { [DISPLAY_NAME_KEY]: workflowName.trim() },
+          steps: orderedSteps,
           transitions: mergedTransitions,
         },
         { namespace: effectiveNamespace },
       );
       setSaveState({ status: 'saved', name: result.name });
       toastRegistrationWarnings(result.warnings, toast);
-      redirectTimerRef.current = setTimeout(() => {
-        router.push(`/${handle}/workflows/${encodeURIComponent(result.name)}/definitions/${result.version}`);
-      }, 500);
+      return { name: result.name, version: result.version };
     } catch (err) {
-      const { stepErrors: failedSteps, message } = handleSaveFailure(err, steps);
+      const { stepErrors: failedSteps, message } = handleSaveFailure(err, orderedSteps);
       setStepErrors(failedSteps);
       setSaveState({ status: 'error', message });
+      toast({ title: 'Save failed', description: message, variant: 'error' });
+      throw err;
     }
-  }, [workflowName, effectiveNamespace, description, handle, router]);
+  }, [workflowName, effectiveNamespace, description, toast]);
 
+  const handleSave = useCallback(async (versionTitle: string) => {
+    setDialogOpen(false);
+    const startResolver = startAfterSaveResolverRef.current;
+    startAfterSaveResolverRef.current = null;
+    try {
+      const result = await registerCurrentCanvas(versionTitle);
+      if (startResolver) {
+        startResolver(result.version);
+      } else {
+        redirectTimerRef.current = setTimeout(() => {
+          router.push(routes.workflow(handle, result.name));
+        }, 500);
+      }
+    } catch {
+      if (startResolver) startResolver(undefined);
+    }
+  }, [registerCurrentCanvas, handle, router]);
 
-  const yamlFields: Record<string, unknown> = {
+  const handleDialogClose = useCallback(() => {
+    setDialogOpen(false);
+    if (startAfterSaveResolverRef.current) {
+      startAfterSaveResolverRef.current(undefined);
+      startAfterSaveResolverRef.current = null;
+    }
+  }, []);
+
+  const wdJsonFields: Record<string, unknown> = {
     name: toWorkflowId(workflowName) || 'my-workflow',
     namespace: effectiveNamespace || undefined,
     description: description || undefined,
   };
 
-  const canPublish = saveState.status !== 'saving' && !!toWorkflowId(workflowName) && !!description.trim();
+  const canSave = saveState.status !== 'saving' && !!toWorkflowId(workflowName) && !!description.trim();
 
   return (
-    <div className="flex h-full flex-col relative">
+    <div className="flex h-full flex-col relative bg-white dark:bg-background">
       {/* Header */}
-      <div className="border-b px-6 py-5 sticky top-0 z-30 bg-background">
+      <div className="border-b px-6 py-3 sticky top-0 z-30 bg-white dark:bg-background">
         <div className="flex items-start justify-between gap-6">
           {/* Left: workflow identity */}
           <div className="flex-1 min-w-0">
             <input
               value={workflowName}
               onChange={(e) => setWorkflowName(e.target.value)}
-              placeholder="Workflow name…"
-              className="w-full bg-transparent text-2xl font-bold tracking-tight text-foreground placeholder:text-muted-foreground/30 border-0 outline-none px-0 py-0"
+              placeholder="Add a Workflow Name…"
+              className="w-full bg-transparent text-xl font-bold tracking-tight text-foreground placeholder:text-muted-foreground/30 border-0 outline-none px-0 py-0"
             />
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add a description…"
-              className="mt-1 w-full bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
+              placeholder="Add a workflow description…"
+              className="w-full bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
             />
             {/* Secondary metadata row */}
-            <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground/60 flex-wrap">
+            <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground/60 flex-wrap">
               <span className="shrink-0">Namespace:</span>
               <select
                 value={effectiveNamespace}
@@ -211,22 +240,49 @@ export default function NewWorkflowPage() {
                 {saveState.message}
               </span>
             )}
-            <button
-              onClick={() => setDialogOpen(true)}
-              disabled={!canPublish}
+            <span
               title={
-                !toWorkflowId(workflowName) ? 'Enter a workflow name to publish' :
-                !description.trim() ? 'Add a description to publish' :
+                !toWorkflowId(workflowName) ? 'Enter a workflow name to save' :
+                !description.trim() ? 'Add a description to save' :
                 undefined
               }
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-                !canPublish && 'opacity-50 cursor-not-allowed',
-              )}
             >
-              <Save className="h-3.5 w-3.5" />
-              {saveState.status === 'saving' ? 'Publishing…' : 'Publish workflow'}
-            </button>
+              <button
+                onClick={() => setDialogOpen(true)}
+                disabled={!canSave}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors whitespace-nowrap',
+                  !canSave && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                <Save className="h-3.5 w-3.5" />
+                {saveState.status === 'saving' ? 'Saving…' : 'Save'}
+              </button>
+            </span>
+            <StartRunButton
+              workflowName={toWorkflowId(workflowName) || 'workflow'}
+              hasManualTrigger
+              label="Save & Dry Run"
+              mode="dry-run"
+              disabled={!canSave}
+              preflightEnabled={false}
+              onBeforeStart={() => new Promise<number | undefined>((resolve) => {
+                startAfterSaveResolverRef.current = resolve;
+                setDialogOpen(true);
+              })}
+            />
+            <StartRunButton
+              workflowName={toWorkflowId(workflowName) || 'workflow'}
+              hasManualTrigger
+              label="Save & Start Run"
+              mode="production"
+              disabled={!canSave}
+              preflightEnabled={false}
+              onBeforeStart={() => new Promise<number | undefined>((resolve) => {
+                startAfterSaveResolverRef.current = resolve;
+                setDialogOpen(true);
+              })}
+            />
           </div>
         </div>
       </div>
@@ -235,7 +291,8 @@ export default function NewWorkflowPage() {
       <WorkflowEditorCanvas
         initialSteps={TEMPLATE_STEPS}
         initialTransitions={TEMPLATE_TRANSITIONS}
-        yamlFields={yamlFields}
+        namespace={effectiveNamespace || undefined}
+        wdJsonFields={wdJsonFields}
         onChange={handleCanvasChange}
         stepErrors={stepErrors}
       />
@@ -244,7 +301,7 @@ export default function NewWorkflowPage() {
         open={dialogOpen}
         nextVersion={1}
         confirmLabel="Publish workflow"
-        onClose={() => setDialogOpen(false)}
+        onClose={handleDialogClose}
         onConfirm={handleSave}
       />
     </div>

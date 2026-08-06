@@ -26,7 +26,7 @@ is intentionally public. The canonical layout is
 
 ```text
 workflow-repo/
-  index.json
+  workflows-index.json
   README.md
   src/my-workflow.wd.json
   container/Dockerfile
@@ -41,12 +41,12 @@ registration/import steps, output contracts, and a known-good input.
 The layout above is the **single-workflow repo** case (package == repo root).
 For a repo holding **several** workflows, keep one subfolder per workflow
 (`<workflow-name>/README.md`, `<workflow-name>/src/<workflow-name>.wd.json`,
-`<workflow-name>/Dockerfile`, …) and hoist a single `index.json` to the repo
-root listing every workflow with repo-root-relative `path`s
+`<workflow-name>/Dockerfile`, …) and hoist a single `workflows-index.json` to the
+repo root listing every workflow with repo-root-relative `path`s
 (`<workflow-name>/src/…`).
 
-`index.json` SHOULD exist for standalone workflow repos that are imported via
-Git browse mode. Each `path` is relative to the repo root and must point at the
+`workflows-index.json` SHOULD exist for standalone workflow repos that are
+imported via Git browse mode. Each `path` is relative to the repo root and must point at the
 `.wd.json`:
 
 ```json

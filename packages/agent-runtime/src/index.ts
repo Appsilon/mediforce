@@ -20,7 +20,7 @@ export type {
 export { BaseContainerAgentPlugin, isLocalExecutionAllowed, OAuthTokenUnavailableError, validateOutputSchema } from './plugins/base-container-agent-plugin';
 export type { AgentCommandSpec, OutputSchema, SpawnCliOptions, SpawnDockerResult } from './plugins/base-container-agent-plugin';
 export { ClaudeCodeAgentPlugin } from './plugins/claude-code-agent-plugin';
-export { MockClaudeCodeAgentPlugin } from './plugins/mock-claude-code-agent-plugin';
+export { MockAgentPlugin } from './plugins/mock-agent-plugin';
 export { OpenCodeAgentPlugin } from './plugins/opencode-agent-plugin';
 export { ScriptContainerPlugin } from './plugins/script-container-plugin';
 export { DatabricksJobPlugin } from './plugins/databricks/databricks-job-plugin';

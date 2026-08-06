@@ -4,7 +4,7 @@ import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { checkRetiredModels } from '@mediforce/platform-api/handlers';
-import { resolveCoworkOutputSchema, resolveStepTimeoutMs, type WorkflowStep, type ProcessInstanceRepository } from '@mediforce/platform-core';
+import { resolveCoworkOutputSchema, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -498,6 +498,7 @@ export async function POST(
               }
             }
 
+            const resolvedVerdicts = buildTaskVerdicts(currentStep.verdicts);
             await humanTaskRepo.create({
               id: taskId,
               processInstanceId: instanceId,
@@ -514,6 +515,7 @@ export async function POST(
               ...(currentStep.ui ? { ui: currentStep.ui } : {}),
               ...(currentStep.params?.length ? { params: currentStep.params } : {}),
               ...(options ? { options } : {}),
+              ...(resolvedVerdicts ? { verdicts: resolvedVerdicts } : {}),
             });
 
             await auditRepo.append({

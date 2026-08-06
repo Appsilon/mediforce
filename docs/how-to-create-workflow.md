@@ -20,6 +20,31 @@ workflow MUST satisfy, see
 5. Register or import the workflow as a new version.
 6. Run a dry run with a known-good input.
 
+### AI Assistant (in the canvas)
+
+The Workflow Designer canvas has a built-in **AI Assistant** pane — describe the
+workflow in plain language and it edits the canvas for you, as an alternative to
+placing and wiring blocks by hand.
+
+- **When to use it.** Reach for it to scaffold a first draft or make a bulk edit
+  ("add a finance-approval decision before the report step"); keep using the
+  block picker + step editor for precise, one-field tweaks.
+- **Requirement.** It needs an `OPENROUTER_API_KEY` **workspace secret** — the
+  assistant calls a model via OpenRouter. Without it the pane reports the missing
+  key. Pick the model in the pane's settings (only tool-capable, sufficiently
+  large-context models are offered).
+- **What it can change.** Steps only: it adds, updates, and removes steps (and
+  their transitions/verdicts) on the canvas. It does not edit triggers, secrets,
+  or other workspace state — set those yourself (triggers are attached after
+  registration; see below).
+- **Validation & retry.** Every proposed change is validated against the same
+  graph, reference, and schema gates as registration before it is applied; if the
+  result would be invalid the assistant is told why and retries, so it does not
+  hand you a workflow that cannot be saved.
+- **You still save.** The assistant edits the *unsaved* canvas. Nothing is
+  persisted until you **Save** (or **Save & Start Run** / **Save & Dry Run**) —
+  review the diagram, then save a version like any other edit.
+
 ### Agent — the `/design-workflow` skill
 
 Run the [`design-workflow`](../skills/design-workflow/SKILL.md) skill. It is the
@@ -43,7 +68,8 @@ What the skill does for you:
    all, and when substantial script code should move from inline to a pinned
    command. It ends with a written spec recap you confirm before any files are
    generated.
-4. **Generates the package.** The `.wd.json` plus `README.md`, `index.json`, and
+4. **Generates the package.** The `.wd.json` plus `README.md`, `workflows-index.json`,
+   and
    only the `Dockerfile` / `scripts/` / `skills/` / `setup/` the design actually
    needs, in the canonical repo layout. It is honest about three tiers:
    schema-validated (`.wd.json`), templated-but-not-runtime-verified (infra),
@@ -128,7 +154,7 @@ GitHub repos only. Re-import to create a new version. The recorded
 `source: { url, path, commit }` is provenance only — it does not drive runtime
 cloning, Docker builds, skills, or sync.
 
-Full reference, including the `index.json` manifest and CLI flags:
+Full reference, including the `workflows-index.json` manifest and CLI flags:
 [`how-to/import-from-git.md`](how-to/import-from-git.md).
 
 ## Validate before sharing

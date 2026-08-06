@@ -66,8 +66,11 @@ test.describe('GET /api/workflow-definitions/[name] — visibility 404', () => {
           name,
           description: 'Public workflow used to verify list isolation.',
           visibility: 'public',
-          steps: [{ id: 'start', name: 'Start', type: 'creation', executor: 'human' }],
-          transitions: [],
+          steps: [
+            { id: 'start', name: 'Start', type: 'creation', executor: 'human' },
+            { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+          ],
+          transitions: [{ from: 'start', to: 'done' }],
         },
       },
     );
@@ -91,8 +94,11 @@ test.describe('GET /api/workflow-definitions/[name] — visibility 404', () => {
           name,
           description: 'Public workflow used to verify run isolation.',
           visibility: 'public',
-          steps: [{ id: 'start', name: 'Start', type: 'creation', executor: 'human' }],
-          transitions: [],
+          steps: [
+            { id: 'start', name: 'Start', type: 'creation', executor: 'human' },
+            { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+          ],
+          transitions: [{ from: 'start', to: 'done' }],
         },
       },
     );

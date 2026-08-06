@@ -84,7 +84,7 @@ import {
   PluginRegistry,
   OpenRouterLlmClient,
   ClaudeCodeAgentPlugin,
-  MockClaudeCodeAgentPlugin,
+  MockAgentPlugin,
   OpenCodeAgentPlugin,
   ScriptContainerPlugin,
   DatabricksJobPlugin,
@@ -272,11 +272,11 @@ export function getPlatformServices(): PlatformServices {
 
   const useMockAgent = process.env.MOCK_AGENT === 'true';
   if (useMockAgent) {
-    console.log('[platform-services] MOCK_AGENT=true — using MockClaudeCodeAgentPlugin');
+    console.log('[platform-services] MOCK_AGENT=true — using MockAgentPlugin');
   }
   pluginRegistry.register(
     'claude-code-agent',
-    useMockAgent ? new MockClaudeCodeAgentPlugin() : new ClaudeCodeAgentPlugin(),
+    useMockAgent ? new MockAgentPlugin() : new ClaudeCodeAgentPlugin(),
   );
 
   pluginRegistry.register('opencode-agent', new OpenCodeAgentPlugin());
@@ -350,7 +350,10 @@ export function getPlatformServices(): PlatformServices {
   actionRegistry.register('http', httpActionHandler);
   actionRegistry.register('reshape', reshapeActionHandler);
   const spawnRunKicker = createHttpSelfFetchRunKicker({
-    baseUrl: () => process.env.APP_BASE_URL ?? 'http://localhost:9003',
+    // APP_BASE_URL, then NEXT_PUBLIC_APP_URL (dev:mock / e2e set only that),
+    // then localhost — same chain as the attachment-download base URL, so a
+    // self-fetch never dials a dead port. `||` treats empty-string as unset.
+    baseUrl: () => process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9003',
     apiKey: () => process.env.PLATFORM_API_KEY ?? '',
   });
   actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo, spawnRunKicker));

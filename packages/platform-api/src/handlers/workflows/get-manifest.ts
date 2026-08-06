@@ -2,16 +2,28 @@ import type { GetManifestInput, GetManifestOutput } from '../../contract/workflo
 import { GetManifestOutputSchema } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
-import { buildRawUrl, fetchJsonOrThrow } from './_github';
+import { buildRawUrl, fetchFirstJson, resolveGitHubSource } from './_github';
+
+/** `workflows-index.json` is the canonical browse manifest; `index.json` is the
+ *  name repos published under before it and is still read when the canonical one
+ *  is absent, so an existing repo stays browsable without being republished. */
+const MANIFEST_FILENAMES = ['workflows-index.json', 'index.json'];
 
 export async function getManifest(
   input: GetManifestInput,
   _scope: CallerScope,
 ): Promise<GetManifestOutput> {
-  const ref = input.ref ?? 'main';
-  const rawUrl = buildRawUrl(input.repo, ref, 'index.json');
+  // Resolve through the same path as import so browsing lists the manifest the
+  // import will actually read — a tree URL's directory is only known once its
+  // ref boundary is resolved, which a bare raw-URL build cannot do.
+  const source = await resolveGitHubSource(input.repo, input.ref);
 
-  const json = await fetchJsonOrThrow(rawUrl, 'manifest');
+  const json = await fetchFirstJson(
+    MANIFEST_FILENAMES.map((file) =>
+      buildRawUrl(source.repo, source.commit, file, source.pathPrefix),
+    ),
+    'manifest',
+  );
 
   const parsed = GetManifestOutputSchema.safeParse(json);
   if (!parsed.success) {
