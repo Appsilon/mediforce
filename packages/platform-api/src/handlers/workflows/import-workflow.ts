@@ -5,7 +5,7 @@ import {
 } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
-import { buildRawUrl, fetchJsonOrThrow, resolveCommitSha } from './_github';
+import { buildRawUrl, fetchJsonOrThrow, resolveGitHubSource } from './_github';
 import { registerWorkflow } from './register-workflow';
 
 export async function importWorkflow(
@@ -15,8 +15,8 @@ export async function importWorkflow(
   // Resolve the requested ref to an immutable SHA first, then fetch the file at
   // that SHA — this pins the imported content to the commit we record, so a
   // moving branch can't desync the file from its provenance.
-  const commit = await resolveCommitSha(input.repo, input.ref ?? 'main');
-  const rawUrl = buildRawUrl(input.repo, commit, input.path);
+  const source = await resolveGitHubSource(input.repo, input.ref);
+  const rawUrl = buildRawUrl(source.repo, source.commit, input.path, source.pathPrefix);
 
   const json = await fetchJsonOrThrow(rawUrl, 'workflow definition');
 
@@ -36,7 +36,15 @@ export async function importWorkflow(
     {
       ...parsed.data,
       namespace: input.namespace,
-      source: { url: input.repo, path: input.path, commit },
+      // Provenance is recorded against the canonical repo and a repo-root-relative
+      // path, so `url` + `path` + `commit` locates the file forever — the tree URL
+      // the user pasted carries a mutable ref and a directory its `path` is
+      // relative to, neither of which survives the branch moving.
+      source: {
+        url: source.repo,
+        path: [source.pathPrefix, input.path].filter(Boolean).join('/'),
+        commit: source.commit,
+      },
     },
     scope,
   );

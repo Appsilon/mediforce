@@ -8,8 +8,8 @@ namespace and registers it as a normal versioned Workflow Definition. It is a
 Two entry points:
 
 - **UI** — workspace home → *Import from git*. Either **Browse** a repo's
-  `index.json` manifest and pick workflows, or **Import by path** by pasting the
-  path to a single `.wd.json`.
+  `workflows-index.json` manifest and pick workflows, or **Import by path** by
+  pasting the path to a single `.wd.json`.
 - **CLI** — `pnpm exec mediforce workflow import --repo <url> --path <file> --namespace <ns> [--ref <branch|tag|sha>]`.
 
 Both call the same handler as `mediforce workflow register`, so a file that
@@ -21,20 +21,28 @@ Each imported definition stores a provenance record:
 
 ```jsonc
 "source": {
-  "url":    "https://github.com/Appsilon/cdisc-workflows",
-  "path":   "smoke-test/src/smoke-test.wd.json",
-  "commit": "efe701d2e0a5f375c78872bb2f295edf98861d33"  // resolved SHA
+  "url":    "https://github.com/Appsilon/cdisc-workflows",  // canonical repo
+  "path":   "smoke-test/src/smoke-test.wd.json",            // repo-root-relative
+  "commit": "efe701d2e0a5f375c78872bb2f295edf98861d33"      // resolved SHA
 }
 ```
 
-`--ref` (default `main`) selects *what* to import; it is resolved to an
-immutable commit SHA at import time, and the file is fetched at that SHA. Only
-the resolved `commit` is stored — the moving ref is not.
+`--ref` selects *what* to import; it is resolved to an immutable commit SHA at
+import time, and the file is fetched at that SHA. It defaults to the ref in a
+GitHub tree URL, or `main` for a repository URL. Only the resolved `commit` is
+stored — the moving ref is not.
+
+Provenance is normalised: importing through a tree URL records the canonical
+repository and a repo-root-relative `path`, not the pasted URL and its
+directory-relative path. So `url` + `path` + `commit` locates the exact file
+forever, whatever shape was pasted.
 
 ## Supported
 
 - **Public GitHub repos**, one `.wd.json` per import.
-- Browse via a root `index.json` manifest, or import a single file by path.
+- Browse via a `workflows-index.json` manifest at the repository root or at the
+  end of a GitHub `/tree/<ref>/<directory>` URL, including refs containing `/`
+  and a branch-root `/tree/<ref>`, or import a single file by path.
 - Files that declare a top-level `namespace` — it is ignored; the import target
   namespace wins (parity with `workflow register`).
 - Any step the schema accepts: `human`, `agent` (`claude-code-agent`), `script`
@@ -58,9 +66,10 @@ the resolved `commit` is stored — the moving ref is not.
 - Deprecated fields (top-level `repo`, step-level `mcpServers`) are still parsed
   but will stop importing cleanly once removed.
 
-## `index.json` manifest format
+## `workflows-index.json` manifest format
 
-To make a repo browsable in the UI, add an `index.json` at the repo root:
+To make a repo or repository subdirectory browsable in the UI, add a
+`workflows-index.json` at the selected source root:
 
 ```jsonc
 {
@@ -76,5 +85,11 @@ To make a repo browsable in the UI, add an `index.json` at the repo root:
 }
 ```
 
-A repo without an `index.json` is still importable via **Import by path** (UI) or
-`--path` (CLI).
+`workflows-index.json` is the canonical name. `index.json` — the name manifests
+were published under before it — is still read when no `workflows-index.json`
+exists at the source root, so an existing repo stays browsable without being
+republished. Only a 404 falls back; a rate limit or server error is reported as
+itself.
+
+A repo with neither is still importable via **Import by path** (UI) or `--path`
+(CLI).

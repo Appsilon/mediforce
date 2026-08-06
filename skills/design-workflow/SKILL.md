@@ -174,11 +174,12 @@ root** (the git repo the package lives in), not a leaf directory — a repo can
 hold many workflows. The skill then creates a subfolder named after the workflow
 and puts everything for this workflow inside it.
 
-**Canonical layout — one subfolder per workflow, `index.json` at repo root:**
+**Canonical layout — one subfolder per workflow, `workflows-index.json` at repo
+root:**
 
 ```text
 <repo-root>/
-  index.json                       # REPO-LEVEL — lists ALL workflows; create or MERGE
+  workflows-index.json             # REPO-LEVEL — lists ALL workflows; create or MERGE
   <workflow-name>/
     README.md                      # env contract, secrets, agents, MCPs, images,
                                    #   register/import steps, output contracts, sample input (§1/§6)
@@ -192,15 +193,15 @@ and puts everything for this workflow inside it.
                                    #   ONLY if the workflow uses governable MCPs (§7)
 ```
 
-**Only `index.json` is repo-level.** Everything else for the workflow lives under
-`<workflow-name>/`. When `index.json` already exists at the repo root (a
+**Only `workflows-index.json` is repo-level.** Everything else for the workflow
+lives under `<workflow-name>/`. When it already exists at the repo root (a
 multi-workflow repo), **merge** this workflow's entry — do not overwrite. Each
 `path` is **repo-root-relative**: `<workflow-name>/src/<workflow-name>.wd.json`.
 
 > Golden-rules §1 and `apps/golden-standard-workflow` show the package *as* the
-> repo root (`index.json` and `README.md` at the package level). That is the
+> repo root (`workflows-index.json` and `README.md` at the package level). That is the
 > single-workflow-repo special case. For a repo that holds several workflows,
-> hoist `index.json` to the repo root and nest each workflow in its own subfolder,
+> hoist `workflows-index.json` to the repo root and nest each workflow in its own subfolder,
 > as above. If the user's repo holds exactly one workflow, the package-as-root
 > shape from §1 is fine.
 
@@ -240,8 +241,8 @@ Be honest about three tiers, and keep them separate in what you tell the user:
 
 The `README.md` MUST cover the env-contract table, secrets, agents, MCPs,
 images, registration/import steps, output contracts, and a known-good input
-(golden-rules §1, §6). The `index.json` follows the §1 shape so the package can
-be imported from git.
+(golden-rules §1, §6). The `workflows-index.json` follows the §1 shape so the
+package can be imported from git.
 
 ### Edit mode: edit in place, diff for regressions
 
@@ -449,7 +450,7 @@ with their values:
      --file <repo-root>/<workflow-name>/src/<workflow-name>.wd.json --namespace <ns>
    ```
 2. **Import from git** (push first; one-time copy, public GitHub only; `--path`
-   and `index.json` paths are **repo-root-relative**, `--ref` is HEAD/C2):
+   and `workflows-index.json` paths are **repo-root-relative**, `--ref` is HEAD/C2):
    ```bash
    pnpm exec mediforce workflow import \
      --repo <url> --path <workflow-name>/src/<workflow-name>.wd.json \
