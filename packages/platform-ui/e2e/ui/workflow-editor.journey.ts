@@ -412,7 +412,7 @@ test.describe('Workflow Editor Journey', () => {
 
   // ── Save failure message ─────────────────────────────────────────────────
 
-  test('rejected save renders the whole error message unclipped in the header', async ({ page }) => {
+  test('rejected save renders the whole error message unclipped in a toast', async ({ page }) => {
     trackPageErrors(page);
     // The refused save is the point of this test: the browser logs the 400 and
     // the editor logs the rejection it is about to render. Any other console
@@ -459,9 +459,11 @@ test.describe('Workflow Editor Journey', () => {
     await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('v1 — rejected');
     await page.getByRole('button', { name: /publish workflow/i }).click();
 
-    // The header reports every rejected field, in full.
-    const errorMessage = pageHeader(page).getByText(REJECTED_SAVE_MESSAGE);
-    await expect(errorMessage).toBeVisible({ timeout: 10_000 });
+    // The failure toast reports every rejected field, in full.
+    const toast = page.getByTestId('toast');
+    await expect(toast).toBeVisible({ timeout: 10_000 });
+    const errorMessage = toast.getByText(REJECTED_SAVE_MESSAGE);
+    await expect(errorMessage).toBeVisible();
     await expect(errorMessage).toHaveText(REJECTED_SAVE_MESSAGE);
 
     // …and it is rendered, not clipped. `truncate` (the bug) would cut the
