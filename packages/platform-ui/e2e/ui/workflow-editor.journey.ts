@@ -429,8 +429,8 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
 
     // Drive the real save path: fill the form, confirm the version dialog.
-    await page.getByPlaceholder('Workflow name…').fill('e2e-rejected-workflow');
-    await page.getByPlaceholder('Add a description…').fill('Save is rejected by the server on purpose');
+    await page.getByPlaceholder('Add a Workflow Name…').fill('e2e-rejected-workflow');
+    await page.getByPlaceholder('Add a workflow description…').fill('Save is rejected by the server on purpose');
 
     const saveButton = page.getByRole('button', { name: /publish workflow/i });
     await expect(saveButton).toBeEnabled();
