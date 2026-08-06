@@ -9,6 +9,7 @@ import { OAUTH_PROVIDER_PRESETS } from '@mediforce/platform-core';
 import { apiFetch } from '@/lib/api-fetch';
 import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
+import { adminBackHref } from '@/lib/routes';
 import { ProviderList } from '@/components/admin/oauth-providers/provider-list';
 import { ProviderForm } from '@/components/admin/oauth-providers/provider-form';
 import { DeleteProviderDialog } from '@/components/admin/oauth-providers/delete-provider-dialog';
@@ -179,7 +180,7 @@ export default function AdminOAuthProvidersPage() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex items-center gap-3">
           <Link
-            href={`/${handle}`}
+            href={adminBackHref(handle, search.get('from'))}
             className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             aria-label="Back"
           >

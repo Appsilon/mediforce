@@ -48,5 +48,11 @@ test.describe('Tool Catalog Journey', () => {
 
     await page.getByRole('link', { name: /back to tools/i }).click();
     await expect(page.getByRole('heading', { name: 'Tools' })).toBeVisible({ timeout: 10_000 });
+
+    // Manage catalog entered from Tools goes back to Tools, not to the workspace home.
+    await page.getByRole('link', { name: /manage catalog/i }).click();
+    await expect(page.getByRole('heading', { name: /tool catalog/i })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('link', { name: 'Back' }).click();
+    await expect(page.getByRole('heading', { name: 'Tools' })).toBeVisible({ timeout: 10_000 });
   });
 });

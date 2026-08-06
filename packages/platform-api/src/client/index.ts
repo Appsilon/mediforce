@@ -196,6 +196,8 @@ import {
   UpdateNamespaceOutputSchema,
   DeleteNamespaceInputSchema,
   DeleteNamespaceOutputSchema,
+  ResetNamespaceInputSchema,
+  ResetNamespaceOutputSchema,
   LeaveNamespaceInputSchema,
   LeaveNamespaceOutputSchema,
   RemoveNamespaceMemberInputSchema,
@@ -223,6 +225,8 @@ import {
   type UpdateNamespaceOutput,
   type DeleteNamespaceInput,
   type DeleteNamespaceOutput,
+  type ResetNamespaceInput,
+  type ResetNamespaceOutput,
   type LeaveNamespaceInput,
   type LeaveNamespaceOutput,
   type RemoveNamespaceMemberInput,
@@ -737,6 +741,7 @@ export class Mediforce {
     create: (input: CreateNamespaceInput) => Promise<CreateNamespaceOutput>;
     update: (input: UpdateNamespaceInput) => Promise<UpdateNamespaceOutput>;
     delete: (input: DeleteNamespaceInput) => Promise<DeleteNamespaceOutput>;
+    reset: (input: ResetNamespaceInput) => Promise<ResetNamespaceOutput>;
     leave: (input: LeaveNamespaceInput) => Promise<LeaveNamespaceOutput>;
     removeMember: (input: RemoveNamespaceMemberInput) => Promise<RemoveNamespaceMemberOutput>;
     updateMemberRole: (input: UpdateNamespaceMemberRoleInput) => Promise<UpdateNamespaceMemberRoleOutput>;
@@ -1069,6 +1074,9 @@ export class Mediforce {
               // Forward only when the caller turns "show completed" off; the
               // server defaults to true, so omitting keeps the common URL clean.
               includeCompletedRuns: validated.includeCompletedRuns ? undefined : 'false',
+              // Same shape, opposite default: the server omits archived unless
+              // asked, so only an explicit opt-in travels.
+              includeArchived: validated.includeArchived ? 'true' : undefined,
             })
           : '';
         const res = await this.request(`/api/workflow-definitions${qs}`);
@@ -2007,6 +2015,16 @@ export class Mediforce {
           undefined,
           DeleteNamespaceOutputSchema,
           'mediforce.namespaces.delete',
+        );
+      },
+      reset: async (input) => {
+        const validated = ResetNamespaceInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}/reset`,
+          undefined,
+          ResetNamespaceOutputSchema,
+          'mediforce.namespaces.reset',
         );
       },
       leave: async (input) => {

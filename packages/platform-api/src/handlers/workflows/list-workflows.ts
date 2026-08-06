@@ -15,7 +15,7 @@ export async function listWorkflows(
   input: ListWorkflowsInput,
   scope: CallerScope,
 ): Promise<ListWorkflowsOutput> {
-  const groups = await scope.workflowDefinitions.listGroups(false);
+  const groups = await scope.workflowDefinitions.listGroups(input.includeArchived);
 
   const inScope =
     input.namespace !== undefined

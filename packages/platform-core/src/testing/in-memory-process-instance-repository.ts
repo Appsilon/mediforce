@@ -353,12 +353,22 @@ export class InMemoryProcessInstanceRepository
     };
   }
 
-  async getIdsByDefinitionName(_name: string): Promise<string[]> {
-    return [];
+  async getIdsByDefinitionName(namespace: string, name: string): Promise<string[]> {
+    return [...this.instances.values()]
+      .filter((i) => i.namespace === namespace && i.definitionName === name)
+      .map((i) => i.id);
   }
 
-  async setDeletedByDefinitionName(_name: string, _deleted: boolean): Promise<void> {
-    // No-op in test double — Firestore uses untyped updateDoc for the `deleted` field
+  async setDeletedByDefinitionName(
+    namespace: string,
+    name: string,
+    deleted: boolean,
+  ): Promise<void> {
+    for (const [id, instance] of this.instances) {
+      if (instance.namespace !== namespace) continue;
+      if (instance.definitionName !== name) continue;
+      this.instances.set(id, { ...instance, deleted });
+    }
   }
 
   async summarizeRunsByWorkflow(

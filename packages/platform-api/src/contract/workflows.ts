@@ -125,6 +125,13 @@ export const ListWorkflowsInputSchema = z.object({
    * "show completed" toggle (default on). `active` is unaffected.
    */
   includeCompletedRuns: z.boolean().default(true),
+  /**
+   * When true, archived workflows are listed too. Off by default — the catalog
+   * hides them. The workspace danger dialog turns it on so the count it makes
+   * the operator type matches the set `resetNamespace` / the workspace cascade
+   * actually destroys, which includes archived workflows.
+   */
+  includeArchived: z.boolean().default(false),
 });
 
 export const ListWorkflowsOutputSchema = z.object({

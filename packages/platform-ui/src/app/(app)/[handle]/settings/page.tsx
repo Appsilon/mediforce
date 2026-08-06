@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import * as Switch from '@radix-ui/react-switch';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
+import { routes } from '@/lib/routes';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -12,6 +13,7 @@ import {
   ClipboardCopy,
   LogOut,
   MailIcon,
+  RotateCcw,
   Trash2,
   Upload,
   Users,
@@ -21,7 +23,6 @@ import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
 import { UserProfileLink } from '@/components/user-profile-link';
 import {
-  useDeleteNamespace,
   useLeaveNamespace,
   useRemoveMember,
   useUpdateMemberRole,
@@ -34,6 +35,7 @@ import { readableForegroundTriple } from '@/lib/brand-color';
 import { WorkspaceAvatar } from '@/components/workspace-avatar';
 import { cn } from '@/lib/utils';
 import { NamespaceSecretsEditor } from '@/components/namespace/namespace-secrets-editor';
+import { WorkspaceDangerDialog, type WorkspaceDangerMode } from '@/components/namespace/workspace-danger-dialog';
 
 type NamespaceMemberWithId = NamespaceMember & { id: string };
 
@@ -290,6 +292,13 @@ export default function WorkspaceConfigPage() {
 
   const canEditProfile = canManageMembers || isPersonalOwner;
 
+  // Which danger-zone action the workspace offers: a personal workspace can
+  // only be reset (the API refuses to delete one — issue #1044), an
+  // organization can be deleted. Personal ownership also counts as owner here
+  // for the legacy rows that predate the owner member doc.
+  const isPersonal = namespace?.type === 'personal';
+  const canDestroyWorkspace = isOwner || isPersonalOwner;
+
   // ── Workspace profile editing ──────────────────────────────────────────────
   const [profileDisplayName, setProfileDisplayName] = useState('');
   const [profileBio, setProfileBio] = useState('');
@@ -487,10 +496,10 @@ export default function WorkspaceConfigPage() {
   const removeMember = useRemoveMember(handle);
   const updateMemberRole = useUpdateMemberRole(handle);
   const leaveNamespace = useLeaveNamespace();
-  const deleteNamespace = useDeleteNamespace();
 
   // Surface fail-cases for every workspace-altering action via one banner —
-  // member removal, role flips, leave, delete. Optimistic snapshot rollback
+  // member removal, role flips, leave. (Delete and reset report inside their
+  // own dialog.) Optimistic snapshot rollback
   // hides the underlying error; without this banner an admin would see the
   // role un-flip and not know why.
   const [dangerError, setDangerError] = useState<string | null>(null);
@@ -517,21 +526,10 @@ export default function WorkspaceConfigPage() {
   }
 
   // ── Danger zone ────────────────────────────────────────────────────────────
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
-  async function handleDeleteWorkspace() {
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
-    setDangerError(null);
-    try {
-      await deleteNamespace.mutateAsync({ handle });
-      router.push('/workspace-selection');
-    } catch (err: unknown) {
-      setDangerError(err instanceof Error ? err.message : 'Failed to delete workspace.');
-    }
-  }
+  // A personal workspace cannot be deleted — `getMe` re-bootstraps one for
+  // every user, so the API rejects it (issue #1044). Reset is the destructive
+  // action it does offer.
+  const [dangerDialog, setDangerDialog] = useState<WorkspaceDangerMode | null>(null);
 
   async function handleLeaveWorkspace() {
     if (user === null) return;
@@ -548,7 +546,6 @@ export default function WorkspaceConfigPage() {
     }
   }
 
-  const deleting = deleteNamespace.isPending;
   const leaving = leaveNamespace.isPending;
 
   const loading = namespaceLoading || membersLoading;
@@ -1156,7 +1153,7 @@ export default function WorkspaceConfigPage() {
               </Link>
               <div className="border-t" />
               <Link
-                href={`/${handle}/admin/tool-catalog`}
+                href={routes.adminToolCatalog(handle, { from: 'settings' })}
                 className="flex items-center justify-between group"
               >
                 <div>
@@ -1167,7 +1164,7 @@ export default function WorkspaceConfigPage() {
               </Link>
               <div className="border-t" />
               <Link
-                href={`/${handle}/admin/oauth-providers`}
+                href={routes.adminOAuthProviders(handle, { from: 'settings' })}
                 className="flex items-center justify-between group"
               >
                 <div>
@@ -1216,43 +1213,51 @@ export default function WorkspaceConfigPage() {
           </div>
         )}
 
-        {isOwner && (
+        {canDestroyWorkspace && isPersonal === true && (
+          <div className="rounded-lg border border-destructive/30 bg-card px-4 py-5">
+            <h2 className="text-sm font-semibold mb-1 text-destructive">Reset workspace</h2>
+            <p className="text-xs text-muted-foreground mb-3">
+              This deletes every workflow in <span className="font-semibold">@{handle}</span> along with their runs and tasks, and cannot be undone. The workspace, its members and its secrets stay — a personal workspace cannot be deleted, because you always need one.
+            </p>
+            <button
+              type="button"
+              onClick={() => setDangerDialog('reset')}
+              className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset workspace
+            </button>
+          </div>
+        )}
+
+        {isOwner && isPersonal === false && (
           <div className="rounded-lg border border-destructive/30 bg-card px-4 py-5">
             <h2 className="text-sm font-semibold mb-1 text-destructive">Delete workspace</h2>
             <p className="text-xs text-muted-foreground mb-3">
-              This will permanently delete <span className="font-semibold">@{handle}</span>, remove all members, and cannot be undone.
+              This will permanently delete <span className="font-semibold">@{handle}</span>, remove all members, destroy every workflow, run, task and secret it holds, and cannot be undone.
             </p>
-            {confirmDelete ? (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleDeleteWorkspace}
-                  disabled={deleting}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  {deleting ? 'Deleting…' : 'Yes, delete permanently'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(false)}
-                  disabled={deleting}
-                  className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleDeleteWorkspace}
-                className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Delete workspace
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setDangerDialog('delete')}
+              className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete workspace
+            </button>
           </div>
+        )}
+
+        {dangerDialog !== null && (
+          <WorkspaceDangerDialog
+            mode={dangerDialog}
+            handle={handle}
+            open
+            onOpenChange={(value) => { if (!value) setDangerDialog(null); }}
+            onDone={() => {
+              setDangerDialog(null);
+              if (dangerDialog === 'delete') router.push('/workspace-selection');
+            }}
+          />
         )}
       </div>
     </div>

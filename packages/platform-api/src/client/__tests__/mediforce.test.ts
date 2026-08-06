@@ -521,6 +521,25 @@ describe('Mediforce', () => {
         `${TEST_BASE_URL}/api/workflow-definitions?namespace=team-alpha`,
       );
     });
+
+    it('omits includeArchived by default and forwards it when opted in', async () => {
+      // A fresh Response per call — a single mocked one has its body consumed
+      // by the first `list`.
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(async () => jsonResponse({ definitions: [] }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.workflows.list({ namespace: 'team-alpha' });
+      await mediforce.workflows.list({ namespace: 'team-alpha', includeArchived: true });
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/workflow-definitions?namespace=team-alpha`,
+      );
+      expect(fetchSpy.mock.calls[1]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/workflow-definitions?namespace=team-alpha&includeArchived=true`,
+      );
+    });
   });
 
   describe('cowork.getByInstance (input refine)', () => {
