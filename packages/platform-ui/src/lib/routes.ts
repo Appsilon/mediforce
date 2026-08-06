@@ -10,6 +10,20 @@ function encode(segment: string): string {
   return encodeURIComponent(segment);
 }
 
+/**
+ * Admin pages are reachable from more than one section, so their entry point
+ * travels in `?from=` and drives where the in-page back arrow returns to.
+ */
+export type AdminEntryPoint = 'tools' | 'settings';
+
+function withEntryPoint(path: string, from: AdminEntryPoint | undefined): string {
+  return from === undefined ? path : `${path}?from=${from}`;
+}
+
+export function adminBackHref(handle: string, from: string | null): string {
+  return from === 'tools' ? routes.tools(handle) : routes.settings(handle);
+}
+
 export const routes = {
   // ── Top-level ──────────────────────────────────────────────────
   home: (handle: string) => `/${handle}`,
@@ -80,6 +94,12 @@ export const routes = {
 
   // ── Settings ───────────────────────────────────────────────────
   settings: (handle: string) => `/${handle}/settings`,
+
+  // ── Admin ──────────────────────────────────────────────────────
+  adminToolCatalog: (handle: string, params?: { from?: AdminEntryPoint }) =>
+    withEntryPoint(`/${handle}/admin/tool-catalog`, params?.from),
+  adminOAuthProviders: (handle: string, params?: { from?: AdminEntryPoint }) =>
+    withEntryPoint(`/${handle}/admin/oauth-providers`, params?.from),
 
   // ── Orgs ───────────────────────────────────────────────────────
   orgs: () => '/orgs',
