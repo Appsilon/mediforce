@@ -5,6 +5,7 @@ import { useSession, signIn, signOut as nextAuthSignOut, getProviders } from 'ne
 import type { Session } from 'next-auth';
 import { useQueryClient } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
+import { apiFetch } from '@/lib/api-fetch';
 import { queryKeys } from '@/lib/query-keys';
 import { useUserMe } from '@/hooks/use-user-me';
 
@@ -71,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setGoogleAuthEnabled(false);
         }
       });
-    fetch(PASSWORD_LOGIN_PATH)
+    apiFetch(PASSWORD_LOGIN_PATH, { reportErrors: false })
       .then((res) => res.json())
       .then((body: { enabled?: boolean }) => {
         if (active) setPasswordAuthEnabled(body.enabled === true);
@@ -79,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {
         if (active) setPasswordAuthEnabled(false);
       });
-    fetch(MAGIC_LINK_LOGIN_PATH)
+    apiFetch(MAGIC_LINK_LOGIN_PATH, { reportErrors: false })
       .then((res) => res.json())
       .then((body: { enabled?: boolean; emailDeliveryEnabled?: boolean }) => {
         if (active) {
@@ -134,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Not `signIn('credentials', …)`: password auth is a plain route because
       // Auth.js forbids a Credentials provider under database sessions. The
       // route sets the same session cookie, so a session refetch picks it up.
-      const res = await fetch(PASSWORD_LOGIN_PATH, {
+      const res = await apiFetch(PASSWORD_LOGIN_PATH, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth, CredentialsSignInError } from '@/contexts/auth-context';
+import { apiFetch } from '@/lib/api-fetch';
 
 /**
  * `useSearchParams` (below, for the `?error=` bounce-back) opts the whole
@@ -112,7 +113,7 @@ function LoginForm() {
     setError(null);
     setPending(true);
     try {
-      await fetch('/api/auth/resend-setup-link', {
+      await apiFetch('/api/auth/resend-setup-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: resendEmail.trim() }),

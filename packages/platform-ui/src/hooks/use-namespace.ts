@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
-import { ApiError, mediforce } from '@/lib/mediforce';
+import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 
@@ -31,7 +31,6 @@ export function useNamespace(handle: string | undefined | null): UseNamespaceRes
   });
 
   const err = enabled ? (query.error as Error | null) ?? null : null;
-  const notFound = err instanceof ApiError && err.status === 404;
 
   const rawHandles = query.data?.personalHandles;
   const personalHandles = useMemo(() => {
@@ -44,6 +43,6 @@ export function useNamespace(handle: string | undefined | null): UseNamespaceRes
     members: enabled ? query.data?.members ?? [] : [],
     personalHandles,
     loading: query.isLoading && enabled,
-    error: notFound ? null : err,
+    error: err,
   };
 }

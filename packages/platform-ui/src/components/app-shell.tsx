@@ -17,6 +17,8 @@ import { ThemeToggle } from './theme-toggle';
 import { CommandPaletteTrigger } from './command-palette';
 import { cn } from '@/lib/utils';
 import { workspaceSwitchHref } from '@/lib/workspace-switch';
+import { useNamespace } from '@/hooks/use-namespace';
+import { WorkspaceAccessError } from './workspace-access-error';
 
 const NAV_ITEMS = [
   { href: '', label: 'Workflows', icon: GitBranch, badge: null, exact: true },
@@ -129,12 +131,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Extract handle from URL: /{handle}/workflows/... -> handle
   const handleFromPath = pathname.split('/')[1] ?? '';
+  const isWorkspaceRoute = handleFromPath !== '' && !pathname.startsWith('/workspaces/');
+  const { namespace: routeNamespace, loading: routeNamespaceLoading, error: routeNamespaceError } = useNamespace(
+    isWorkspaceRoute ? handleFromPath : null,
+  );
 
   // Find the active namespace by matching the handle from the URL
   const activeNamespace = namespaces.find((ns) => ns.handle === handleFromPath) ?? null;
-  const activeDisplayName = activeNamespace !== null
-    ? (activeNamespace.type === 'personal' ? 'My profile' : activeNamespace.displayName)
-    : handleFromPath;
+  const activeDisplayName = !isWorkspaceRoute
+    ? handleFromPath
+    : routeNamespaceLoading
+      ? 'Loading workspace…'
+      : routeNamespace !== null
+        ? (routeNamespace.type === 'personal' ? 'My profile' : routeNamespace.displayName)
+        : 'Workspace unavailable';
 
   // Build handle-prefixed href
   const handlePrefix = handleFromPath !== '' ? `/${handleFromPath}` : '';
@@ -145,6 +155,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [rankingsBannerDismissed, setRankingsBannerDismissed] = React.useState(false);
   const showRankingsBanner = canAdmin && !rankingsLoading && !rankingsBannerDismissed
     && (daysSinceUpdate === null || daysSinceUpdate > 21);
+
+  if (isWorkspaceRoute && routeNamespaceError !== null) {
+    return <WorkspaceAccessError handle={handleFromPath} />;
+  }
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">

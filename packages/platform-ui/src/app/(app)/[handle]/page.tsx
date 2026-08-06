@@ -24,6 +24,7 @@ import { WorkflowSecretKeysProvider } from '@/hooks/use-workflow-secret-keys';
 import { ImportWorkflowDialog } from '@/components/workflows/import-workflow-dialog';
 import { cn } from '@/lib/utils';
 import type { Namespace } from '@mediforce/platform-core';
+import { WorkspaceAccessError } from '@/components/workspace-access-error';
 
 // ---------------------------------------------------------------------------
 // Hooks
@@ -585,23 +586,7 @@ export default function ProfilePage() {
   }
 
   if (error !== null || namespace === null) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-          <span className="text-2xl text-muted-foreground">?</span>
-        </div>
-        <div className="text-center">
-          <h1 className="text-xl font-semibold">Profile not found</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {handle !== undefined && handle !== '' ? (
-              <>No profile exists for <span className="font-mono">@{handle}</span>.</>
-            ) : (
-              'The requested profile does not exist.'
-            )}
-          </p>
-        </div>
-      </div>
-    );
+    return <WorkspaceAccessError handle={handle ?? ''} />;
   }
 
   return (
