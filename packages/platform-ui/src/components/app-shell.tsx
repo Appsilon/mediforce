@@ -145,19 +145,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Extract handle from URL: /{handle}/workflows/... -> handle
   const handleFromPath = pathname.split('/')[1] ?? '';
   const isWorkspaceRoute = handleFromPath !== '' && !pathname.startsWith('/workspaces/');
-  const { namespace: routeNamespace, loading: routeNamespaceLoading, error: routeNamespaceError } = useNamespace(
-    isWorkspaceRoute ? handleFromPath : null,
-  );
+  const {
+    namespace: routeNamespace,
+    loading: routeNamespaceLoading,
+    accessDenied: routeNamespaceAccessDenied,
+  } = useNamespace(isWorkspaceRoute ? handleFromPath : null);
 
   // Find the active namespace by matching the handle from the URL
   const activeNamespace = namespaces.find((ns) => ns.handle === handleFromPath) ?? null;
   const activeDisplayName = !isWorkspaceRoute
     ? handleFromPath
-    : routeNamespaceLoading
-      ? 'Loading workspace…'
-      : routeNamespace !== null
-        ? (routeNamespace.type === 'personal' ? 'My profile' : routeNamespace.displayName)
-        : 'Workspace unavailable';
+    : routeNamespace !== null
+      ? (routeNamespace.type === 'personal' ? 'My profile' : routeNamespace.displayName)
+      : 'Workspace unavailable';
 
   // Build handle-prefixed href
   const handlePrefix = handleFromPath !== '' ? `/${handleFromPath}` : '';
@@ -170,8 +170,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     && process.env.NEXT_PUBLIC_USE_EMULATORS !== 'true'
     && (daysSinceUpdate === null || daysSinceUpdate > 21);
 
-  if (isWorkspaceRoute && routeNamespaceError !== null) {
+  if (isWorkspaceRoute && routeNamespaceAccessDenied) {
     return <WorkspaceAccessError handle={handleFromPath} />;
+  }
+
+  // Hold the workspace chrome (and the child page's own requests) until the
+  // access check settles, so an unauthorized handle never flashes a workspace
+  // the user cannot open.
+  if (isWorkspaceRoute && routeNamespaceLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center" data-testid="workspace-access-loading">
+        <div className="text-sm text-muted-foreground animate-pulse">Loading workspace…</div>
+      </div>
+    );
   }
 
   const SidebarContent = () => (

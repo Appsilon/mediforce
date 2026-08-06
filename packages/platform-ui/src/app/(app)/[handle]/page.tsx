@@ -572,7 +572,7 @@ export default function ProfilePage() {
   const rawHandle = params.handle;
   const handle = Array.isArray(rawHandle) ? rawHandle[0] : rawHandle;
 
-  const { namespace, loading, error } = useNamespace(handle ?? '');
+  const { namespace, loading, accessDenied } = useNamespace(handle ?? '');
   const { role: currentRole, canAdmin: canEdit, loading: roleLoading } = useNamespaceRole(handle ?? '');
   const isMember = currentRole !== null;
   const userProfiles = useUserProfiles(handle);
@@ -585,8 +585,18 @@ export default function ProfilePage() {
     );
   }
 
-  if (error !== null || namespace === null) {
+  if (accessDenied) {
     return <WorkspaceAccessError handle={handle ?? ''} />;
+  }
+
+  if (namespace === null) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6">
+        <p className="text-sm text-muted-foreground">
+          We couldn&apos;t load this workspace right now. Please try again in a moment.
+        </p>
+      </div>
+    );
   }
 
   return (

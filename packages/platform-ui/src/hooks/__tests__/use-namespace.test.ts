@@ -36,5 +36,36 @@ describe('useNamespace', () => {
 
     expect(result.current.error).toBe(error);
     expect(result.current.namespace).toBeNull();
+    expect(result.current.accessDenied).toBe(true);
+  });
+
+  it('flags a 403 as an access error', async () => {
+    getNamespaceMock.mockRejectedValue(new ApiError(403, 'Forbidden'));
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = renderHook(() => useNamespace('private-workspace'), { wrapper });
+
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.accessDenied).toBe(true);
+  });
+
+  it('does not call a backend outage an access error', async () => {
+    getNamespaceMock.mockRejectedValue(new ApiError(500, 'Internal Server Error'));
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = renderHook(() => useNamespace('my-workspace'), { wrapper });
+
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.accessDenied).toBe(false);
+  });
+
+  it('does not call a network failure an access error', async () => {
+    getNamespaceMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = renderHook(() => useNamespace('my-workspace'), { wrapper });
+
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.accessDenied).toBe(false);
   });
 });

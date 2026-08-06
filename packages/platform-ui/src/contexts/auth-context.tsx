@@ -135,10 +135,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Not `signIn('credentials', …)`: password auth is a plain route because
       // Auth.js forbids a Credentials provider under database sessions. The
       // route sets the same session cookie, so a session refetch picks it up.
+      // `reportErrors: false`: a wrong password is a locally handled 401 that
+      // the login form reports itself — the global "your session may have
+      // expired" toast would contradict it, on a page with no session.
       const res = await apiFetch(PASSWORD_LOGIN_PATH, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        reportErrors: false,
       });
       if (!res.ok) {
         throw new CredentialsSignInError();
