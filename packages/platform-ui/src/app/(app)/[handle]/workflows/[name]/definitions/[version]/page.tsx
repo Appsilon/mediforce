@@ -265,6 +265,7 @@ export default function WorkflowDefinitionVersionPage() {
         initialTransitions={definition.transitions}
         workflowName={decodedName}
         namespace={handle}
+        workflowExternalSkillsRepo={definition.externalSkillsRepo}
         wdJsonFields={{ ...definition, version: undefined, createdAt: undefined } as Record<string, unknown>}
         onChange={handleCanvasChange}
         stepErrors={stepErrors}

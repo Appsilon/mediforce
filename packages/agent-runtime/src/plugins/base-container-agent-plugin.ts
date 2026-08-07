@@ -7,7 +7,7 @@ import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/s
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, OutputSchemaShape } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
 import { createLineStreamReader, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
@@ -1634,7 +1634,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       const authHint = /not logged in|please run \/login/i.test(detail)
         ? ' — Hint: set ANTHROPIC_API_KEY (or OPENROUTER_API_KEY + ANTHROPIC_BASE_URL) in workflow env or secrets'
         : '';
-      throw new Error(`Docker container failed (${exitInfo}): ${detail}${authHint}`);
+      const imageHint = missingExecutableHint(detail, image);
+      throw new Error(`Docker container failed (${exitInfo}): ${detail}${authHint}${imageHint}`);
     }
 
     let cliOutput: string;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatExitInfo, deriveBuildTag } from '../container-plugin';
+import { formatExitInfo, deriveBuildTag, missingExecutableHint } from '../container-plugin';
 
 describe('formatExitInfo', () => {
   it('[DATA] reports the exit code when the process exited normally', () => {
@@ -60,5 +60,39 @@ describe('deriveBuildTag', () => {
     const withUndefined = deriveBuildTag('git@github.com:org/repo.git', 'abc1234', undefined);
     const withEmpty = deriveBuildTag('git@github.com:org/repo.git', 'abc1234', '');
     expect(withUndefined).toBe(withEmpty);
+  });
+});
+
+describe('missingExecutableHint', () => {
+  // Verbatim daemon output from picking a bare alpine image for an agent step:
+  // the one actionable fact — the image has no `bash` — is buried under four
+  // layers of OCI runtime framing.
+  const ALPINE_STDERR =
+    'docker: Error response from daemon: failed to create task for container: ' +
+    'failed to create shim task: OCI runtime create failed: runc create failed: ' +
+    'unable to start container process: error during container init: ' +
+    'exec: "bash": executable file not found in $PATH: unknown.';
+
+  it('[DATA] names the image and the missing executable', () => {
+    const hint = missingExecutableHint(ALPINE_STDERR, 'alpine:3.24');
+    expect(hint).toContain("'alpine:3.24'");
+    expect(hint).toContain("'bash'");
+  });
+
+  it('[DATA] points at the Docker image setup guide', () => {
+    expect(missingExecutableHint(ALPINE_STDERR, 'alpine:3.24')).toContain(
+      'docs/how-to/docker-image-setup.md',
+    );
+  });
+
+  it('[DATA] falls back to generic wording when the image is unknown', () => {
+    const hint = missingExecutableHint(ALPINE_STDERR, undefined);
+    expect(hint).toContain("'bash'");
+    expect(hint).toContain('The configured image');
+  });
+
+  it('[DATA] returns an empty hint for unrelated failures', () => {
+    expect(missingExecutableHint('Traceback (most recent call last): KeyError', 'python:3.12-slim')).toBe('');
+    expect(missingExecutableHint('', 'alpine:3.24')).toBe('');
   });
 });
