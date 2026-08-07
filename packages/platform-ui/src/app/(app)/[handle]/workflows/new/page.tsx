@@ -8,7 +8,7 @@ import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { StartRunButton } from '@/components/processes/start-run-button';
-import { mediforce } from '@/lib/mediforce';
+import { mediforceSilent } from '@/lib/mediforce';
 import { validateSteps, toastRegistrationWarnings, handleSaveFailure, DISPLAY_NAME_KEY } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
@@ -124,7 +124,7 @@ export default function NewWorkflowPage() {
     const orderedSteps = ensureEntryStepFirst(steps, mergedTransitions);
 
     try {
-      const result = await mediforce.workflows.register(
+      const result = await mediforceSilent.workflows.register(
         {
           name: workflowId,
           title: versionTitle || undefined,

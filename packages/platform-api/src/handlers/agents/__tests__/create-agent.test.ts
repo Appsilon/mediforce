@@ -49,4 +49,25 @@ describe('createAgent handler', () => {
     );
     expect(agent.name).toBe('Bob');
   });
+
+  it('rejects an agent with no namespace instead of half-writing it', async () => {
+    const scope = buildScope();
+    await expect(
+      createAgent(
+        {
+          kind: 'plugin',
+          name: 'Nobody',
+          iconName: 'Bot',
+          description: 'd',
+          foundationModel: 'm',
+          systemPrompt: 'p',
+          inputDescription: 'in',
+          outputDescription: 'out',
+          visibility: 'private',
+        },
+        scope,
+      ),
+    ).rejects.toThrow(/namespace/i);
+    expect(await agentDefinitionRepo.listAll()).toEqual([]);
+  });
 });

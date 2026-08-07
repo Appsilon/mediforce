@@ -17,6 +17,7 @@ function createTestEvent(
     basis: 'FDA 21 CFR Part 11',
     entityType: 'case',
     entityId: 'case-123',
+    namespace: 'acme',
     ...overrides,
   };
 }

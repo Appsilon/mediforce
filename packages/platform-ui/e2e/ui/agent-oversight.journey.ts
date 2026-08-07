@@ -72,7 +72,7 @@ test.describe('Agent Oversight Journey', () => {
     await expect(page.getByText('Multiple data inconsistencies in lab values')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('create a new agent and verify redirect', async ({ page }) => {
+  test('create a new agent with only a name and a model', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/agents`);
     await expect(page.getByText('Custom Agents')).toBeVisible({ timeout: 10_000 });
@@ -80,10 +80,21 @@ test.describe('Agent Oversight Journey', () => {
     await page.waitForURL(`**/${TEST_ORG_HANDLE}/agents/new`, { timeout: 20_000 });
     await expect(page.getByText('Register a new AI agent and configure its capabilities.')).toBeVisible({ timeout: 10_000 });
 
-    // Fill in agent details
-    await page.getByPlaceholder(/e\.g\. Risk Analysis Agent/i).fill('Test Audit Agent');
+    // Agents accumulate across runs against a shared database, so the name has
+    // to be unique or the catalog assertion matches an earlier run's card.
+    const agentName = `Test Audit Agent ${Date.now()}`;
 
-    // Verify form is interactive — save button exists (may be disabled until all fields filled)
-    await expect(page.getByRole('button', { name: /save new agent/i })).toBeVisible();
+    // Name and foundation model are the only required fields; everything else
+    // is left empty on purpose.
+    await page.getByPlaceholder(/e\.g\. Risk Analysis Agent/i).fill(agentName);
+    await page.getByRole('button', { name: /select a model/i }).click();
+    await page.getByRole('button', { name: /claude sonnet 4/i }).click();
+
+    await page.getByRole('button', { name: /save new agent/i }).click();
+
+    // The created agent is scoped to the current workspace, so it shows up in
+    // the catalog the user lands on.
+    await page.waitForURL(`**/${TEST_ORG_HANDLE}/agents`, { timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: agentName })).toBeVisible({ timeout: 10_000 });
   });
 });
