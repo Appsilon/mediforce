@@ -1,4 +1,4 @@
-import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
+import { parseWorkflowDefinitionForCreation, DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import { validateWorkflowGraphAndReferences } from '@mediforce/workflow-engine';
 import type {
   RegisterWorkflowInput,
@@ -20,8 +20,6 @@ import { isLocalAgentMode, fetchFromContainerWorker, fetchFromLocalDocker } from
 interface RegisterScopedInput extends RegisterWorkflowInput {
   namespace: string;
 }
-
-const DEFAULT_AGENT_IMAGE = 'mediforce-golden-image';
 
 export async function registerWorkflow(
   input: RegisterScopedInput,

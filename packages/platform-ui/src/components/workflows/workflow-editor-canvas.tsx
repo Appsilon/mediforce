@@ -115,6 +115,7 @@ export interface WorkflowEditorCanvasProps {
   initialSteps: WorkflowStep[];
   initialTransitions: WorkflowDefinition['transitions'];
   wdJsonFields?: Record<string, unknown>;
+  workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
   workflowName?: string;
   namespace?: string;
   renderSavePanel?: (
@@ -130,6 +131,7 @@ export function WorkflowEditorCanvas({
   initialSteps,
   initialTransitions,
   wdJsonFields,
+  workflowExternalSkillsRepo,
   workflowName,
   namespace,
   renderSavePanel,
@@ -718,6 +720,7 @@ export function WorkflowEditorCanvas({
               errors={stepErrors?.[selectedStep.id]}
               imageWarning={warningStepIds?.get(selectedStep.id)}
               dockerImages={dockerImages}
+              workflowExternalSkillsRepo={workflowExternalSkillsRepo}
             />
           </div>
         )}

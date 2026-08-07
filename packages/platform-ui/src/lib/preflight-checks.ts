@@ -1,5 +1,5 @@
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
-import { type WorkflowDefinition, normaliseModelId } from '@mediforce/platform-core';
+import { type WorkflowDefinition, normaliseModelId, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
 
 export interface PreflightAction {
   label: string;
@@ -23,8 +23,6 @@ export interface OpenRouterCreditsInfo {
 }
 
 const LOW_CREDITS_THRESHOLD = 0.5;
-const DOCKER_TUTORIAL_URL =
-  'https://github.com/Appsilon/mediforce/blob/main/docs/how-to/docker-image-setup.md';
 const OPENROUTER_CREDITS_URL = 'https://openrouter.ai/settings/credits';
 
 export function runPreflightChecks(
@@ -103,7 +101,7 @@ export function runPreflightChecks(
       },
       {
         label: 'Build manually',
-        href: DOCKER_TUTORIAL_URL,
+        href: DOCKER_IMAGE_SETUP_URL,
       },
     ];
     if (typeof options.adminEmail === 'string' && options.adminEmail.length > 0) {
