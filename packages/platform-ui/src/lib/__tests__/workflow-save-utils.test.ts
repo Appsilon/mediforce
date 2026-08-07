@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
 import type { WorkflowStep } from '@mediforce/platform-core';
 import { ApiError } from '@mediforce/platform-api/client';
-import { handleSaveFailure } from '../workflow-save-utils';
+import { handleSaveFailure, validateSteps } from '../workflow-save-utils';
 
 /**
  * Issues are produced by the real schema rather than hand-written strings:
@@ -114,5 +114,51 @@ describe('handleSaveFailure', () => {
     handleSaveFailure(err, []);
 
     expect(spy).toHaveBeenCalledWith('Workflow save failed', err);
+  });
+});
+
+describe('validateSteps — issue #1031 (unnamed parameters)', () => {
+  it('rejects a blank parameter name before it ever reaches the server', () => {
+    const steps: WorkflowStep[] = [
+      { ...step, params: [{ name: '', type: 'string', required: false }] },
+    ];
+
+    expect(validateSteps(steps)).toMatch(/parameter name.*empty.*"Review"/i);
+  });
+
+  it('rejects a whitespace-only parameter name', () => {
+    const steps: WorkflowStep[] = [
+      { ...step, params: [{ name: '   ', type: 'string', required: false }] },
+    ];
+
+    expect(validateSteps(steps)).toMatch(/parameter name.*empty.*"Review"/i);
+  });
+
+  it('rejects duplicate parameter names on the same step', () => {
+    const steps: WorkflowStep[] = [
+      {
+        ...step,
+        params: [
+          { name: 'amount', type: 'string', required: false },
+          { name: 'amount', type: 'number', required: false },
+        ],
+      },
+    ];
+
+    expect(validateSteps(steps)).toMatch(/duplicate parameter name.*"amount".*"Review"/i);
+  });
+
+  it('passes when every parameter is named and unique', () => {
+    const steps: WorkflowStep[] = [
+      {
+        ...step,
+        params: [
+          { name: 'amount', type: 'string', required: false },
+          { name: 'reason', type: 'string', required: false },
+        ],
+      },
+    ];
+
+    expect(validateSteps(steps)).toBeNull();
   });
 });

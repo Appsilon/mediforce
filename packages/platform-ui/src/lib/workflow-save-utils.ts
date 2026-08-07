@@ -26,6 +26,19 @@ const MAX_REPORTED_ISSUES = 4;
 
 export const DISPLAY_NAME_KEY = 'displayName';
 
+/**
+ * Counts step parameters by trimmed name, so "amount" and "amount " collide
+ * the same way the blank-name check already treats them as equivalent.
+ */
+export function paramNameCounts(params: { name: string }[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const p of params) {
+    const name = p.name.trim();
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export function workflowDisplayName(
   def: { name: string; metadata?: Record<string, unknown> | null },
 ): string {
@@ -142,6 +155,20 @@ export function validateSteps(steps: WorkflowStep[]): string | null {
   const emptyIds = steps.filter((s) => !s.id);
   if (emptyIds.length > 0) {
     return `Step ID is empty for: ${emptyIds.map((s) => `"${s.name}"`).join(', ')}`;
+  }
+
+  const emptyParamSteps = steps.filter((s) => (s.params ?? []).some((p) => p.name.trim() === ''));
+  if (emptyParamSteps.length > 0) {
+    return `Parameter name cannot be empty on: ${emptyParamSteps.map((s) => `"${s.name}"`).join(', ')}`;
+  }
+
+  const dupeParamNames = steps.flatMap((s) => (
+    [...paramNameCounts(s.params ?? []).entries()]
+      .filter(([, count]) => count > 1)
+      .map(([name]) => `"${name}" on step "${s.name}"`)
+  ));
+  if (dupeParamNames.length > 0) {
+    return `Duplicate parameter name: ${dupeParamNames.join(', ')}`;
   }
 
   const idCounts = new Map<string, number>();

@@ -7,6 +7,7 @@ import { usePlugins } from '@/hooks/use-plugins';
 import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
+import { paramNameCounts } from '@/lib/workflow-save-utils';
 
 import { toSlug, DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
@@ -418,10 +419,18 @@ export function StepEditor({
     return { ...allClosed, [id]: !prev[id] };
   });
 
+  const stepParamNameCounts = paramNameCounts(step.params ?? []);
+
   const parametersSection = !isTerminal ? (
         <Section title="Parameters">
           <div className="space-y-3">
-            {(step.params ?? []).map((param, idx) => (
+            {(step.params ?? []).map((param, idx) => {
+              const paramNameError = param.name.trim() === ''
+                ? 'This field cannot be empty.'
+                : (stepParamNameCounts.get(param.name.trim()) ?? 0) > 1
+                  ? 'Duplicate parameter name.'
+                  : undefined;
+              return (
               <div key={idx} className="rounded-xl border border-border/60 p-3 space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-muted-foreground">Parameter {idx + 1}</span>
@@ -437,7 +446,7 @@ export function StepEditor({
                   </button>
                 </div>
                 <FieldGroup>
-                <FieldRow label="name" tooltip={TIP.paramName}>
+                <FieldRow label="name" tooltip={TIP.paramName} error={paramNameError}>
                   <input
                     value={param.name}
                     onChange={(e) => {
@@ -445,7 +454,7 @@ export function StepEditor({
                       next[idx] = { ...next[idx], name: e.target.value };
                       onChange({ params: next });
                     }}
-                    className={riMono}
+                    className={cn(riMono, paramNameError && 'border border-red-400 focus:border-red-500')}
                   />
                 </FieldRow>
                 <FieldRow label="type" tooltip={TIP.paramType}>
@@ -511,7 +520,8 @@ export function StepEditor({
                 </FieldRow>
                 </FieldGroup>
               </div>
-            ))}
+              );
+            })}
           </div>
           <button
             onClick={() => onChange({ params: [...(step.params ?? []), { name: '', type: 'string', required: false }] })}

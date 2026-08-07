@@ -370,4 +370,48 @@ describe('StepEditor', () => {
       expect(select.options[0].textContent).not.toContain('mediforce-golden-image');
     });
   });
+
+  describe('parameters — issue #1031 (unnamed parameters)', () => {
+    it('[RENDER] flags a parameter with a blank name', () => {
+      render(
+        <StepEditor
+          step={buildStep({ params: [{ name: '', type: 'string', required: false }] })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+      expandCard('Task setup');
+      expect(screen.getByText('This field cannot be empty.')).toBeInTheDocument();
+    });
+
+    it('[RENDER] flags duplicate parameter names on the same step', () => {
+      render(
+        <StepEditor
+          step={buildStep({
+            params: [
+              { name: 'amount', type: 'string', required: false },
+              { name: 'amount', type: 'string', required: false },
+            ],
+          })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+      expandCard('Task setup');
+      expect(screen.getAllByText('Duplicate parameter name.')).toHaveLength(2);
+    });
+
+    it('[RENDER] does not flag a uniquely named parameter', () => {
+      render(
+        <StepEditor
+          step={buildStep({ params: [{ name: 'amount', type: 'string', required: false }] })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+      expandCard('Task setup');
+      expect(screen.queryByText('This field cannot be empty.')).not.toBeInTheDocument();
+      expect(screen.queryByText('Duplicate parameter name.')).not.toBeInTheDocument();
+    });
+  });
 });
