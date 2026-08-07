@@ -344,6 +344,60 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByRole('button', { name: /apply json/i })).toBeVisible();
   });
 
+  // ── Unapplied JSON edits are never silently discarded ──────────────────────
+
+  test('editing JSON without applying warns and confirms before the modal discards it', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
+
+    // No warning before any edit
+    await expect(page.getByText(/unapplied changes/i)).not.toBeVisible();
+
+    // Edit the JSON without clicking Apply
+    await page.locator('.cm-content').click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(' ');
+
+    // A prominent warning appears
+    await expect(page.getByText(/unapplied changes/i)).toBeVisible({ timeout: 5_000 });
+
+    // Trying to close via the X button prompts a confirm; dismissing it keeps
+    // the modal open with the edit intact.
+    let dialogSeen = false;
+    page.once('dialog', async (dialog) => {
+      dialogSeen = true;
+      expect(dialog.type()).toBe('confirm');
+      await dialog.dismiss();
+    });
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect.poll(() => dialogSeen).toBe(true);
+    await expect(page.locator('.cm-editor')).toBeVisible();
+    await expect(page.getByText(/unapplied changes/i)).toBeVisible();
+
+    // Accepting the confirm on a second close attempt discards the edit and
+    // closes the modal.
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(page.locator('.cm-editor')).not.toBeVisible();
+
+    // Reopening shows the unedited (re-synced) source — the edit is gone, as
+    // the user confirmed.
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    await expect(page.getByText(/unapplied changes/i)).not.toBeVisible();
+
+    // Clicking Apply after an edit clears the warning without needing a close.
+    await page.locator('.cm-content').click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(' ');
+    await expect(page.getByText(/unapplied changes/i)).toBeVisible({ timeout: 5_000 });
+    await page.getByRole('button', { name: /apply json/i }).click();
+    await expect(page.getByText(/unapplied changes/i)).not.toBeVisible();
+  });
+
   // ── Create new workflow ───────────────────────────────────────────────────
 
   test('create new workflow fills form and publishes', async ({ page }) => {
