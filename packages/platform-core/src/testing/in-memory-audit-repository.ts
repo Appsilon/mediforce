@@ -33,6 +33,18 @@ export class InMemoryAuditRepository implements AuditRepository {
         workspace = parent.namespace;
       }
     }
+    // A workspace-level event carries no parent run to derive the workspace
+    // from, so `namespace` is the only source — and PostgresAuditRepository
+    // throws without it (`audit_events.workspace` is NOT NULL). Mirror that
+    // here, or handlers that forget it pass their unit tests and 500 in
+    // production. Events that name a parent run stay lenient: tests seed
+    // deliberately orphaned events to assert they are filtered out.
+    if (workspace === undefined && event.processInstanceId === undefined) {
+      throw new Error(
+        'InMemoryAuditRepository.append: cannot resolve workspace — ' +
+          'a workspace-level event must carry `namespace`.',
+      );
+    }
 
     // Strip the write-time-only `namespace` hint before storing so the
     // stored shape matches the Postgres read (workspace is derived state
