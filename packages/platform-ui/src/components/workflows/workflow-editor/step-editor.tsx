@@ -19,6 +19,7 @@ import {
   RUNTIME_OPTIONS,
 } from './constants';
 import { CoworkSection } from './cowork-section';
+import { StepDataFlow } from './step-data-flow';
 import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
 
@@ -171,27 +172,27 @@ const TIP = {
 
   actionKind:              'Action type: http (outbound API call), reshape (update workflow variables), or email. Fixed at creation.',
   actionMethod:            'HTTP method for the outbound request.',
-  actionUrl:               'Target URL. Supports ${variables.field} and ${params.field} interpolation.',
-  actionBody:              'JSON body sent with the request. Supports ${variables.field} interpolation.',
-  actionValues:            'Key-value pairs to write into workflow variables. Values support ${variables.field} interpolation.',
+  actionUrl:               'Target URL. Supports ${steps.<id>.<field>}, ${triggerPayload.<field>} and ${secrets.NAME} interpolation.',
+  actionBody:              'JSON body sent with the request. Supports ${steps.<id>.<field>} interpolation. Only the response is stored, so ${secrets.NAME} is safe here.',
+  actionValues:            'Key-value pairs that become this step\'s output. Values support ${steps.<id>.<field>} interpolation — never put ${secrets.NAME} here, the resolved values are persisted.',
   actionTo:                'Recipient email address(es), comma-separated.',
   actionCc:                'CC recipients, comma-separated.',
   actionBcc:               'BCC recipients, comma-separated. Not visible to other recipients.',
   actionFrom:              'Sender address. Must be authorised by the configured email provider.',
   actionReplyTo:           'Reply-to address. Replies from recipients go here instead of action.from.',
-  actionSubject:           'Email subject line. Supports ${variables.field} interpolation.',
+  actionSubject:           'Email subject line. Supports ${steps.<id>.<field>} interpolation.',
   actionEmailBody:         'Plain-text email body. Displayed by clients that do not support HTML.',
   actionHtml:              'HTML email body. HTML-capable clients show this instead of the plain-text body.',
 
   verdictName:             'Verdict label (e.g. "approve", "reject"). Referenced in downstream transition conditions.',
   verdictTarget:           'The step to route to when this verdict is selected.',
 
-  paramName:               'Identifier for this parameter. Reference it as ${params.name} in prompts and expressions.',
+  paramName:               'Identifier for this parameter. Its submitted value becomes part of this step\'s output — later steps read it as ${steps.<this step id>.<name>}.',
   paramType:               'Data type: string, number, boolean, or date. Controls validation and the input widget shown to users.',
-  paramRequired:           'When checked, the workflow cannot start until this parameter is provided.',
-  paramDescription:        'Hint text shown to users when filling in this parameter on the workflow start form.',
-  paramDefault:            'Value used when the parameter is not explicitly provided at workflow start.',
-  paramOptions:            'Fixed list of allowed values, comma-separated. Shown as a dropdown to users instead of a free-text input.',
+  paramRequired:           'When checked, the assignee cannot submit this task until the field has a value.',
+  paramDescription:        'Hint text shown next to this field on the task form.',
+  paramDefault:            'Value pre-filled on the task form. The assignee can overwrite it.',
+  paramOptions:            'Fixed list of allowed values, comma-separated. Shown as a dropdown instead of a free-text input.',
 };
 
 // ---------------------------------------------------------------------------
@@ -296,7 +297,13 @@ export function StepEditor({
 }) {
   const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
-  const selectedPluginDefaultModel = plugins.find((p) => p.name === step.plugin)?.metadata?.foundationModel;
+  const selectedPluginMetadata = plugins.find((p) => p.name === step.plugin)?.metadata;
+  const selectedPluginDefaultModel = selectedPluginMetadata?.foundationModel;
+  // The plugin declares its own io contract; prefer it over the authored
+  // fallback so the panel never drifts from what the runtime actually does.
+  const selectedPluginIo = selectedPluginMetadata?.inputDescription && selectedPluginMetadata?.outputDescription
+    ? { inputDescription: selectedPluginMetadata.inputDescription, outputDescription: selectedPluginMetadata.outputDescription }
+    : undefined;
   const { user } = useAuth();
   const { handle } = useParams<{ handle: string }>();
   const [secretKeys, setSecretKeys] = useState<string[]>([]);
@@ -423,6 +430,15 @@ export function StepEditor({
 
   const parametersSection = !isTerminal ? (
         <Section title="Parameters">
+          {/* Only the human-executor branch of the engine copies step.params
+              onto a task, so they are inert anywhere else — say so rather than
+              letting an author configure a form nobody is ever shown. */}
+          {paramsInAdvanced && (
+            <p className="text-[11px] leading-relaxed text-muted-foreground mb-3">
+              Parameters are only collected on human steps — the assignee fills them in on the task form.
+              This step takes its input from previous step outputs instead.
+            </p>
+          )}
           <div className="space-y-3">
             {(step.params ?? []).map((param, idx) => {
               const paramNameError = param.name.trim() === ''
@@ -617,6 +633,8 @@ export function StepEditor({
       {/* ── Primary config ───────────────────────────────────────── */}
       {hasPrimarySection && (
         <CollapsibleCard title={primaryTitle} open={openCards.primary} onToggle={() => toggleCard('primary')}>
+
+      <StepDataFlow step={step} pluginIo={selectedPluginIo} />
 
       {/* ── Agent config ─────────────────────────────────────────── */}
       {isAgent && (<>
