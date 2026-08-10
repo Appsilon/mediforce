@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import type { WorkflowStep } from '@mediforce/platform-core';
@@ -56,6 +57,52 @@ const dockerImages: DockerImageInfo[] = [
 // ---------------------------------------------------------------------------
 
 describe('StepEditor', () => {
+  it('[REGRESSION #1025] does not change a new step id while its name is being typed', () => {
+    const onChange = vi.fn();
+
+    render(
+      <StepEditor
+        step={buildStep({ id: 'new-step-1', name: '' })}
+        allSteps={[buildStep({ id: 'new-step-1', name: '' }), buildStep({ id: 'input-text', name: 'Input Text' })]}
+        onChange={onChange}
+      />,
+    );
+
+    const nameInput = screen.getByTestId('step-editor').querySelector('input') as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: 'input' } });
+
+    expect(onChange).toHaveBeenLastCalledWith({ name: 'input' });
+    expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'input' }));
+  });
+
+  it('[REGRESSION #1025] finalizes a unique generated id on blur', () => {
+    const onChange = vi.fn();
+
+    function ControlledStepEditor() {
+      const [step, setStep] = React.useState(buildStep({ id: 'new-step-1', name: '' }));
+      const existingStep = buildStep({ id: 'input-text', name: 'Input Text' });
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step, existingStep]}
+          onChange={(patch) => {
+            onChange(patch);
+            setStep((current) => ({ ...current, ...patch }));
+          }}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    const nameInput = screen.getByTestId('step-editor').querySelector('input') as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: 'input text' } });
+    expect(onChange).toHaveBeenLastCalledWith({ name: 'input text' });
+
+    fireEvent.blur(nameInput);
+
+    expect(onChange).toHaveBeenLastCalledWith({ id: 'input-text-2' });
+  });
+
   it('[RENDER] step type badge visible without expanding details', () => {
     render(
       <StepEditor

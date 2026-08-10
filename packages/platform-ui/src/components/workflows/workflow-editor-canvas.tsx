@@ -16,7 +16,7 @@ import {
   WORKFLOW_ASSISTANT_DEFAULT_MODEL,
   mergeVerdictTransitions,
   ensureEntryStepFirst,
-  toSlug,
+  uniqueSlug,
   validateWorkflowGraphAndReferences,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
@@ -281,11 +281,17 @@ export function WorkflowEditorCanvas({
   }, [jsonPreviewForSync]);
 
   const updateStep = useCallback((stepId: string, patch: Partial<WorkflowStep>) => {
+    const requestedId = patch.id;
+    const newId = requestedId && requestedId !== stepId
+      ? uniqueSlug(requestedId, editedStepsRef.current.map((step) => step.id), stepId)
+      : requestedId;
+    const normalizedPatch = requestedId && newId !== requestedId
+      ? { ...patch, id: newId }
+      : patch;
     setEditedSteps((prev) =>
-      prev.map((s) => (s.id === stepId ? { ...s, ...patch } : s)),
+      prev.map((s) => (s.id === stepId ? { ...s, ...normalizedPatch } : s)),
     );
-    if (patch.id && patch.id !== stepId) {
-      const newId = patch.id;
+    if (newId && newId !== stepId) {
       setEditedTransitions((prev) =>
         prev.map((t) => ({
           from: t.from === stepId ? newId : t.from,
@@ -324,15 +330,9 @@ export function WorkflowEditorCanvas({
     saveSnapshot();
     stepCounterRef.current += 1;
     const stepNum = stepCounterRef.current;
-    const nameSlug = payload.name ? toSlug(payload.name) : '';
-    let newId = nameSlug || `new-step-${stepNum}`;
-    if (nameSlug) {
-      let suffix = 2;
-      while (editedSteps.some((s) => s.id === newId)) {
-        newId = `${nameSlug}-${suffix}`;
-        suffix += 1;
-      }
-    }
+    const existingIds = editedSteps.map((step) => step.id);
+    const newId = uniqueSlug(payload.name ?? '', existingIds)
+      || uniqueSlug(`new-step-${String(stepNum)}`, existingIds);
     const newStep: WorkflowStep = {
       ...payload,
       id: newId,

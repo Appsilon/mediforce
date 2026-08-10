@@ -1,4 +1,4 @@
-import { toSlug } from '../utils/slug';
+import { uniqueSlug } from '../utils/slug';
 import type { WorkflowStep, WorkflowDefinition } from './workflow-definition';
 import type { WorkflowAssistantToolCall } from './workflow-assistant-tools';
 
@@ -49,15 +49,9 @@ export function applyWorkflowAssistantToolCalls(
     if (call.tool === 'add_step') {
       const { insertAfterId, insertBeforeId, clientId, ...payload } = call.arguments;
       stepCounter += 1;
-      const nameSlug = payload.name ? toSlug(payload.name) : '';
-      let newId = nameSlug || `new-step-${String(stepCounter)}`;
-      if (nameSlug) {
-        let suffix = 2;
-        while (workingSteps.some((s) => s.id === newId)) {
-          newId = `${nameSlug}-${String(suffix)}`;
-          suffix += 1;
-        }
-      }
+      const existingIds = workingSteps.map((step) => step.id);
+      const newId = uniqueSlug(payload.name ?? '', existingIds)
+        || uniqueSlug(`new-step-${String(stepCounter)}`, existingIds);
       const newStep = {
         ...payload,
         id: newId,

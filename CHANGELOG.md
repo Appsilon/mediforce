@@ -13,6 +13,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Fixed
 - Workflow editors now provide an add-step action after all editable steps are removed, so an empty workflow can be rebuilt without refreshing or recreating it [#1024](https://github.com/Appsilon/mediforce/issues/1024).
+- Workshop step IDs now stay stable while a new step name is typed, then finalize to a unique slug on blur so prefix-overlapping names cannot corrupt graph transitions [#1025](https://github.com/Appsilon/mediforce/issues/1025).
 
 ## [2026-08-09]
 
