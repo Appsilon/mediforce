@@ -690,4 +690,44 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page).toHaveURL(/\/definitions\/1$/);
     await expect(saveAndDryRun).toBeEnabled();
   });
+
+  // ── Unsaved-changes guard ──────────────────────────────────────────────────
+
+  test('leaving an edited workflow asks before discarding the changes', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    await pageHeader(page).getByPlaceholder('Add a description…').fill('Edited but never saved');
+
+    // The breadcrumb back to the workflows list is the route reported in #1027.
+    const breadcrumb = page.locator('header nav').getByRole('link', { name: 'Workflows' });
+    await breadcrumb.click();
+
+    const prompt = page.getByText('You have unsaved changes. Are you sure you want to leave?');
+    await expect(prompt).toBeVisible({ timeout: 5_000 });
+    await expect(page).toHaveURL(/\/definitions\/1$/);
+
+    // Declining keeps both the page and the edit.
+    await page.getByRole('button', { name: /stay on this page/i }).click();
+    await expect(prompt).not.toBeVisible();
+    await expect(page).toHaveURL(/\/definitions\/1$/);
+    await expect(pageHeader(page).getByPlaceholder('Add a description…')).toHaveValue('Edited but never saved');
+
+    // Confirming discards them and completes the navigation that was held.
+    await breadcrumb.click();
+    await page.getByRole('button', { name: /leave without saving/i }).click();
+    await expect(page).not.toHaveURL(/\/definitions\/1$/, { timeout: 10_000 });
+  });
+
+  test('leaving an untouched workflow navigates without a prompt', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.locator('header nav').getByRole('link', { name: 'Workflows' }).click();
+
+    await expect(page).not.toHaveURL(/\/definitions\/1$/, { timeout: 10_000 });
+    await expect(page.getByText('You have unsaved changes. Are you sure you want to leave?')).not.toBeVisible();
+  });
 });
