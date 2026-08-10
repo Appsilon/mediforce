@@ -8,6 +8,7 @@ import { useWorkflowVersion } from '@/hooks/use-workflow-versions';
 import { useWorkflowTriggers } from '@/hooks/use-workflow-triggers';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
+import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { mediforceSilent } from '@/lib/mediforce';
 import { validateSteps, toastRegistrationWarnings, handleSaveFailure, workflowDisplayName } from '@/lib/workflow-save-utils';
@@ -42,6 +43,7 @@ export default function WorkflowDefinitionVersionPage() {
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
   const [stepErrors, setStepErrors] = useState<Record<string, Record<string, string>>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [canvasDirty, setCanvasDirty] = useState(false);
 
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>([]);
@@ -172,6 +174,8 @@ export default function WorkflowDefinitionVersionPage() {
 
   if (definition === null) return null;
 
+  const hasUnsavedChanges = canvasDirty || editedDescription !== (definition.description ?? '');
+
   return (
     <div className="flex h-full flex-col relative bg-white dark:bg-background">
       {/* Header */}
@@ -268,8 +272,11 @@ export default function WorkflowDefinitionVersionPage() {
         workflowExternalSkillsRepo={definition.externalSkillsRepo}
         wdJsonFields={{ ...definition, version: undefined, createdAt: undefined } as Record<string, unknown>}
         onChange={handleCanvasChange}
+        onDirtyChange={setCanvasDirty}
         stepErrors={stepErrors}
       />
+
+      <UnsavedChangesGuard when={hasUnsavedChanges} />
 
       <SaveVersionDialog
         open={dialogOpen}

@@ -124,7 +124,12 @@ export interface WorkflowEditorCanvasProps {
     onDiscard: () => void,
   ) => React.ReactNode;
   onChange?: (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => void;
+  onDirtyChange?: (dirty: boolean) => void;
   stepErrors?: Record<string, Record<string, string>>;
+}
+
+function serializeGraph(steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']): string {
+  return JSON.stringify({ steps, transitions });
 }
 
 export function WorkflowEditorCanvas({
@@ -136,6 +141,7 @@ export function WorkflowEditorCanvas({
   namespace,
   renderSavePanel,
   onChange,
+  onDirtyChange,
   stepErrors,
 }: WorkflowEditorCanvasProps) {
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
@@ -237,6 +243,18 @@ export function WorkflowEditorCanvas({
   useEffect(() => {
     onChange?.(editedSteps, editedTransitions);
   }, [editedSteps, editedTransitions, onChange]);
+
+  // Compare against the *normalised* baseline: mounting runs the incoming graph
+  // through `ensureTerminalConnected` below, so an un-normalised definition
+  // would otherwise read as edited before the user touches anything.
+  const baselineGraph = useMemo(() => {
+    const normalized = ensureTerminalConnected(initialSteps, initialTransitions);
+    return serializeGraph(normalized.steps, normalized.transitions);
+  }, [initialSteps, initialTransitions]);
+  const isDirty = serializeGraph(editedSteps, editedTransitions) !== baselineGraph;
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   useEffect(() => {
     if (!stepErrors || Object.keys(stepErrors).length === 0) return;
