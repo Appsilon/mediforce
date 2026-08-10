@@ -215,6 +215,29 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
   });
 
+  test('empty workflow canvas still allows adding a step', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
+
+    await expect(page.locator('.react-flow__node')).toHaveCount(3, { timeout: 10_000 });
+
+    // Remove every editable starter step, leaving only the protected terminal.
+    for (let remainingEditableSteps = 2; remainingEditableSteps > 0; remainingEditableSteps -= 1) {
+      await page.locator('.react-flow__node').first().hover();
+      await page.getByRole('button', { name: 'Delete step' }).click();
+      await expect(page.locator('.react-flow__node')).toHaveCount(remainingEditableSteps, { timeout: 5_000 });
+    }
+
+    // There is no edge left to host the usual inline plus button. The empty
+    // canvas must provide an equivalent add-step affordance.
+    await expect(page.getByRole('button', { name: 'Add step here' })).toBeVisible();
+    await page.getByRole('button', { name: 'Add step here' }).click();
+    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
+    await executorButton(page, 'human').click();
+
+    await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 5_000 });
+  });
+
   test('new step names finalize collision-safe ids after typing', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
