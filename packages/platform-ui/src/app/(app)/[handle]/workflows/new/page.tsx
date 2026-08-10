@@ -189,24 +189,26 @@ export default function NewWorkflowPage() {
           {/* Left: workflow identity */}
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-1">
-              {!workflowName.trim() && (
-                <span className="text-destructive shrink-0" title="Required to save">*</span>
+              {!toWorkflowId(workflowName) && (
+                <span className="text-destructive shrink-0" aria-hidden="true" title="Required to save">*</span>
               )}
               <input
                 value={workflowName}
                 onChange={(e) => setWorkflowName(e.target.value)}
                 placeholder="Add a Workflow Name…"
+                aria-required="true"
                 className="flex-1 min-w-0 bg-transparent text-xl font-bold tracking-tight text-foreground placeholder:text-muted-foreground/30 border-0 outline-none px-0 py-0"
               />
             </div>
             <div className="flex items-baseline gap-1">
               {!description.trim() && (
-                <span className="text-destructive text-sm shrink-0" title="Required to save">*</span>
+                <span className="text-destructive text-sm shrink-0" aria-hidden="true" title="Required to save">*</span>
               )}
               <input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Add a workflow description…"
+                aria-required="true"
                 className="flex-1 min-w-0 bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
               />
             </div>
