@@ -501,7 +501,7 @@ export {
 } from './utils/repo-url';
 export type { RepoCloneTarget } from './utils/repo-url';
 export { getWorkflowStatus, type WorkflowStatus } from './utils/workflow-status';
-export { toSlug } from './utils/slug';
+export { toSlug, uniqueSlug } from './utils/slug';
 
 // Workflow examples — shared loader for MCP tool, tests, and build scripts.
 // Uses Node.js fs/path so NOT exported from this barrel (breaks browser bundles).
