@@ -1018,6 +1018,7 @@ type FlowCanvasProps = {
 
 function FlowCanvas({ className, style, height, localNodes, edges, onNodesChange, onNodeClick, onPaneClick, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive, onTidy }: FlowCanvasProps) {
   const { fitView } = useReactFlow();
+  const hasEditableSteps = localNodes.some((node) => (node.data as StepNodeData).stepType !== 'terminal');
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<StepNodeData>) => {
@@ -1056,6 +1057,21 @@ function FlowCanvas({ className, style, height, localNodes, edges, onNodesChange
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1} className="!bg-white dark:!bg-background" />
+        {!hasEditableSteps && onAddBlock && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+            <button
+              onClick={() => {
+                onAddBlock();
+                setTimeout(() => fitView({ padding: 0.2, duration: 300, maxZoom: 1 }), 60);
+              }}
+              className="pointer-events-auto inline-flex items-center gap-2 rounded-lg border border-dashed border-primary/50 bg-white/90 px-4 py-2.5 text-sm font-medium text-primary shadow-sm transition-colors hover:border-primary hover:bg-primary/5 dark:bg-background/90"
+              aria-label="Add step here"
+            >
+              <Plus className="h-4 w-4" />
+              Add your first step
+            </button>
+          </div>
+        )}
         <CanvasControls
           onUndo={onUndo}
           onRedo={onRedo}
