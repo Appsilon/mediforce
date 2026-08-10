@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Plus, Send, Loader2, Bot, User, Settings, Check } from 'lucide-react';
+import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Plus, Send, Loader2, Bot, User, Settings, Check, AlertTriangle } from 'lucide-react';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
@@ -586,6 +586,30 @@ export function WorkflowEditorCanvas({
 
   const savePanel = renderSavePanel?.(editedSteps, editedTransitions, discardChanges) ?? null;
 
+  const jsonDirty = jsonDraft !== lastSyncedJsonRef.current;
+
+  useEffect(() => {
+    if (!jsonDirty) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [jsonDirty]);
+
+  const closeJsonPanel = () => {
+    if (jsonDirty) {
+      const discard = window.confirm(
+        'You have unapplied changes in the workflow source code editor. Discard them and close?',
+      );
+      if (!discard) return;
+      setJsonDraft(lastSyncedJsonRef.current);
+      setJsonError(null);
+    }
+    setRightPanelView(null);
+  };
+
   const applyJson = () => {
     try {
       const doc = JSON.parse(jsonDraft) as Record<string, unknown>;
@@ -932,7 +956,7 @@ export function WorkflowEditorCanvas({
 
       {rightPanelView === 'json' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
+          <div className="absolute inset-0 bg-black/40" onClick={closeJsonPanel} />
           <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-2xl mx-4 space-y-4 max-h-[85vh] flex flex-col">
             <div className="shrink-0 flex items-start justify-between gap-4">
               <div className="flex items-center gap-2">
@@ -940,7 +964,8 @@ export function WorkflowEditorCanvas({
                 <h2 className="text-sm font-semibold">Workflow source code (wd.json)</h2>
               </div>
               <button
-                onClick={() => setRightPanelView(null)}
+                onClick={closeJsonPanel}
+                aria-label="Close"
                 className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
                 <X className="h-4 w-4" />
@@ -958,9 +983,14 @@ export function WorkflowEditorCanvas({
               )}
             </div>
             <div className="shrink-0 flex items-center justify-end gap-2 pt-1">
-              {jsonError && (
+              {jsonError ? (
                 <p className="text-xs text-red-600 dark:text-red-400 mr-auto">{jsonError}</p>
-              )}
+              ) : jsonDirty ? (
+                <p className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 mr-auto">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Unapplied changes — click &ldquo;Apply JSON to canvas&rdquo; to keep them.
+                </p>
+              ) : null}
               <button
                 onClick={applyJson}
                 className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border hover:bg-muted text-foreground transition-colors"
