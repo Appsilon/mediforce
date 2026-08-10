@@ -180,6 +180,11 @@ export default function NewWorkflowPage() {
   };
 
   const canSave = saveState.status !== 'saving' && !!toWorkflowId(workflowName) && !!description.trim();
+  const missingFieldReason = !toWorkflowId(workflowName)
+    ? 'Enter a workflow name to save'
+    : !description.trim()
+      ? 'Add a description to save'
+      : undefined;
 
   return (
     <div className="flex h-full flex-col relative bg-white dark:bg-background">
@@ -252,13 +257,7 @@ export default function NewWorkflowPage() {
                 {saveState.message}
               </span>
             )}
-            <span
-              title={
-                !toWorkflowId(workflowName) ? 'Enter a workflow name to save' :
-                !description.trim() ? 'Add a description to save' :
-                undefined
-              }
-            >
+            <span title={missingFieldReason}>
               <button
                 onClick={() => setDialogOpen(true)}
                 disabled={!canSave}
@@ -277,6 +276,7 @@ export default function NewWorkflowPage() {
               label="Save & Dry Run"
               mode="dry-run"
               disabled={!canSave}
+              disabledTooltip={missingFieldReason}
               preflightEnabled={false}
               onBeforeStart={() => new Promise<number | undefined>((resolve) => {
                 startAfterSaveResolverRef.current = resolve;
@@ -289,6 +289,7 @@ export default function NewWorkflowPage() {
               label="Save & Start Run"
               mode="production"
               disabled={!canSave}
+              disabledTooltip={missingFieldReason}
               preflightEnabled={false}
               onBeforeStart={() => new Promise<number | undefined>((resolve) => {
                 startAfterSaveResolverRef.current = resolve;

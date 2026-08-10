@@ -29,7 +29,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - The admin Tool catalog now renders a single “New catalog entry” button when the catalog is empty [#1043](https://github.com/Appsilon/mediforce/issues/1043).
 - User workflow-definition lists now return only definitions in their member workspaces, including hiding foreign public workflows [#1047](https://github.com/Appsilon/mediforce/issues/1047).
 - Parallel E2E runs no longer hide Monitoring activity or workflow-status fixtures behind first-page pagination [#1134](https://github.com/Appsilon/mediforce/issues/1134).
-- The "New Workflow" page now marks the Name and Description fields with a required-field asterisk while they're empty; Description blocked saving with no upfront indication it was mandatory, only a disabled-button tooltip on hover [#1026](https://github.com/Appsilon/mediforce/issues/1026).
+- The "New Workflow" page now marks the Name and Description fields with a required-field asterisk while they're empty, and the disabled "Save & Dry Run" / "Save & Start Run" buttons show a tooltip naming the missing field instead of just an unexplained disabled icon; Description blocked saving with no upfront indication it was mandatory, only a disabled-button tooltip on hover [#1026](https://github.com/Appsilon/mediforce/issues/1026).
 
 ### Security
 - Public workflow links are read/copy-only: non-members can no longer start runs in the owning workspace [#1141](https://github.com/Appsilon/mediforce/pull/1141).
