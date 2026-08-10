@@ -188,18 +188,28 @@ export default function NewWorkflowPage() {
         <div className="flex items-start justify-between gap-6">
           {/* Left: workflow identity */}
           <div className="flex-1 min-w-0">
-            <input
-              value={workflowName}
-              onChange={(e) => setWorkflowName(e.target.value)}
-              placeholder="Add a Workflow Name…"
-              className="w-full bg-transparent text-xl font-bold tracking-tight text-foreground placeholder:text-muted-foreground/30 border-0 outline-none px-0 py-0"
-            />
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add a workflow description…"
-              className="w-full bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
-            />
+            <div className="flex items-baseline gap-1">
+              {!workflowName.trim() && (
+                <span className="text-destructive shrink-0" title="Required to save">*</span>
+              )}
+              <input
+                value={workflowName}
+                onChange={(e) => setWorkflowName(e.target.value)}
+                placeholder="Add a Workflow Name…"
+                className="flex-1 min-w-0 bg-transparent text-xl font-bold tracking-tight text-foreground placeholder:text-muted-foreground/30 border-0 outline-none px-0 py-0"
+              />
+            </div>
+            <div className="flex items-baseline gap-1">
+              {!description.trim() && (
+                <span className="text-destructive text-sm shrink-0" title="Required to save">*</span>
+              )}
+              <input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Add a workflow description…"
+                className="flex-1 min-w-0 bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
+              />
+            </div>
             {/* Secondary metadata row */}
             <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground/60 flex-wrap">
               <span className="shrink-0">Namespace:</span>
