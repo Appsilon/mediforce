@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-08-09]
+
 ### Changed
 - Public workflow sharing now explains that it is link-based, shows a persistent shared state, and offers a canonical link to copy [#1141](https://github.com/Appsilon/mediforce/pull/1141).
 - Import from git now defaults to the Mediforce repository URL and browses a repo-root `workflows-index.json` (the older `index.json` is still read when that is absent), keeps support for GitHub tree-scoped sources including slash-containing refs and branch-root `/tree/<ref>` URLs, and records provenance as the canonical repo plus a repo-root-relative path so `url` + `path` + `commit` locates the imported file.
