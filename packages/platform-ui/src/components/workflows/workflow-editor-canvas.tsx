@@ -330,10 +330,9 @@ export function WorkflowEditorCanvas({
     saveSnapshot();
     stepCounterRef.current += 1;
     const stepNum = stepCounterRef.current;
-    const newId = uniqueSlug(
-      payload.name || `new-step-${String(stepNum)}`,
-      editedSteps.map((step) => step.id),
-    );
+    const existingIds = editedSteps.map((step) => step.id);
+    const newId = uniqueSlug(payload.name ?? '', existingIds)
+      || uniqueSlug(`new-step-${String(stepNum)}`, existingIds);
     const newStep: WorkflowStep = {
       ...payload,
       id: newId,

@@ -51,6 +51,15 @@ describe('applyWorkflowAssistantToolCalls', () => {
     expect(steps.some((s) => s.id === 'email')).toBe(false);
   });
 
+  it('falls back to a generated id when the step name has no slug characters', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'add_step', arguments: { type: 'creation', executor: 'human', name: '!!!' } },
+    ];
+    const { steps, addedStepIds } = applyWorkflowAssistantToolCalls(baseCanvas().steps, baseCanvas().transitions, calls);
+    expect(addedStepIds).toEqual(['new-step-1']);
+    expect(steps.some((step) => step.id === 'new-step-1')).toBe(true);
+  });
+
   it('inserts a step with no explicit insertion point before the terminal and wires it in — never leaves it disconnected', () => {
     const calls: WorkflowAssistantToolCall[] = [
       { tool: 'add_step', arguments: { type: 'creation', executor: 'human', name: 'Approve' } },

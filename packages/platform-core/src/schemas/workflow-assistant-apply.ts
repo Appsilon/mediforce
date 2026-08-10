@@ -49,10 +49,9 @@ export function applyWorkflowAssistantToolCalls(
     if (call.tool === 'add_step') {
       const { insertAfterId, insertBeforeId, clientId, ...payload } = call.arguments;
       stepCounter += 1;
-      const newId = uniqueSlug(
-        payload.name || `new-step-${String(stepCounter)}`,
-        workingSteps.map((step) => step.id),
-      );
+      const existingIds = workingSteps.map((step) => step.id);
+      const newId = uniqueSlug(payload.name ?? '', existingIds)
+        || uniqueSlug(`new-step-${String(stepCounter)}`, existingIds);
       const newStep = {
         ...payload,
         id: newId,
