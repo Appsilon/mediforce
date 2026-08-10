@@ -182,6 +182,11 @@ export default function NewWorkflowPage() {
   };
 
   const canSave = saveState.status !== 'saving' && !!toWorkflowId(workflowName) && !!description.trim();
+  const missingFieldReason = !toWorkflowId(workflowName)
+    ? 'Enter a workflow name to save'
+    : !description.trim()
+      ? 'Add a description to save'
+      : undefined;
   const hasUnsavedChanges = canvasDirty || workflowName.trim() !== '' || description.trim() !== '';
 
   return (
@@ -191,18 +196,30 @@ export default function NewWorkflowPage() {
         <div className="flex items-start justify-between gap-6">
           {/* Left: workflow identity */}
           <div className="flex-1 min-w-0">
-            <input
-              value={workflowName}
-              onChange={(e) => setWorkflowName(e.target.value)}
-              placeholder="Add a Workflow Name…"
-              className="w-full bg-transparent text-xl font-bold tracking-tight text-foreground placeholder:text-muted-foreground/30 border-0 outline-none px-0 py-0"
-            />
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add a workflow description…"
-              className="w-full bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
-            />
+            <div className="flex items-baseline gap-1">
+              {!toWorkflowId(workflowName) && (
+                <span className="text-destructive shrink-0" aria-hidden="true" title="Required to save">*</span>
+              )}
+              <input
+                value={workflowName}
+                onChange={(e) => setWorkflowName(e.target.value)}
+                placeholder="Add a Workflow Name…"
+                aria-required="true"
+                className="flex-1 min-w-0 bg-transparent text-xl font-bold tracking-tight text-foreground placeholder:text-muted-foreground/30 border-0 outline-none px-0 py-0"
+              />
+            </div>
+            <div className="flex items-baseline gap-1">
+              {!description.trim() && (
+                <span className="text-destructive text-sm shrink-0" aria-hidden="true" title="Required to save">*</span>
+              )}
+              <input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Add a workflow description…"
+                aria-required="true"
+                className="flex-1 min-w-0 bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
+              />
+            </div>
             {/* Secondary metadata row */}
             <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground/60 flex-wrap">
               <span className="shrink-0">Namespace:</span>
@@ -243,13 +260,7 @@ export default function NewWorkflowPage() {
                 {saveState.message}
               </span>
             )}
-            <span
-              title={
-                !toWorkflowId(workflowName) ? 'Enter a workflow name to save' :
-                !description.trim() ? 'Add a description to save' :
-                undefined
-              }
-            >
+            <span title={missingFieldReason}>
               <button
                 onClick={() => setDialogOpen(true)}
                 disabled={!canSave}
@@ -268,6 +279,7 @@ export default function NewWorkflowPage() {
               label="Save & Dry Run"
               mode="dry-run"
               disabled={!canSave}
+              disabledTooltip={missingFieldReason}
               preflightEnabled={false}
               onBeforeStart={() => new Promise<number | undefined>((resolve) => {
                 startAfterSaveResolverRef.current = resolve;
@@ -280,6 +292,7 @@ export default function NewWorkflowPage() {
               label="Save & Start Run"
               mode="production"
               disabled={!canSave}
+              disabledTooltip={missingFieldReason}
               preflightEnabled={false}
               onBeforeStart={() => new Promise<number | undefined>((resolve) => {
                 startAfterSaveResolverRef.current = resolve;
