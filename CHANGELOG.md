@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Fixed
+- Workshop step IDs now stay stable while a new step name is typed, then finalize to a unique slug on blur so prefix-overlapping names cannot corrupt graph transitions [#1025](https://github.com/Appsilon/mediforce/issues/1025).
+
 ## [2026-08-09]
 
 ### Changed
