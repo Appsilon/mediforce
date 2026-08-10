@@ -17,4 +17,12 @@ export const mediforce = new Mediforce({
   fetch: apiFetch,
 });
 
+// Same client, but with the global 4xx toast suppressed. Use for calls whose
+// caller already renders a specific, detailed error locally (e.g. a workflow
+// save's validation-issue toast) — otherwise the generic listener and the
+// local handler both fire, producing two toasts for one failed request.
+export const mediforceSilent = new Mediforce({
+  fetch: (input, init) => apiFetch(input, { ...init, reportErrors: false }),
+});
+
 export { ApiError };
