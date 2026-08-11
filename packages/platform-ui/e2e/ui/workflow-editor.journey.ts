@@ -215,6 +215,60 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
   });
 
+  test('empty workflow canvas still allows adding a step', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
+
+    await expect(page.locator('.react-flow__node')).toHaveCount(3, { timeout: 10_000 });
+
+    // Remove every editable starter step, leaving only the protected terminal.
+    for (let remainingEditableSteps = 2; remainingEditableSteps > 0; remainingEditableSteps -= 1) {
+      await page.locator('.react-flow__node').first().hover();
+      await page.getByRole('button', { name: 'Delete step' }).click();
+      await expect(page.locator('.react-flow__node')).toHaveCount(remainingEditableSteps, { timeout: 5_000 });
+    }
+
+    // There is no edge left to host the usual inline plus button. The empty
+    // canvas must provide an equivalent add-step affordance.
+    await expect(page.getByRole('button', { name: 'Add step here' })).toBeVisible();
+    await page.getByRole('button', { name: 'Add step here' }).click();
+    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
+    await executorButton(page, 'human').click();
+
+    await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 5_000 });
+  });
+
+  test('new step names finalize collision-safe ids after typing', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+    const initialNodeCount = await page.locator('.react-flow__node').count();
+
+    await page.getByLabel('Add step here').first().click();
+    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
+    await executorButton(page, 'human').click();
+    await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
+
+    const newStepNode = page.locator('.react-flow__node').filter({ hasText: /New Step/i });
+    await newStepNode.click();
+
+    const stepEditor = page.locator('[data-testid="step-editor"]');
+    const nameInput = stepEditor.locator('input').first();
+    await nameInput.fill('Human Review');
+    await nameInput.blur();
+
+    await expect(nameInput).toHaveValue('Human Review');
+    await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
+    await expectJsonEditorContains(page, '"id": "human-review-2"');
+    await expectJsonEditorContains(page, '"id": "human-review"');
+    await expectJsonEditorContains(page, '"to": "human-review-2"');
+    await expectJsonEditorContains(page, '"from": "human-review-2"');
+    await expectJsonEditorContains(page, '"to": "narrative-summary"');
+  });
+
   // ── Undo ─────────────────────────────────────────────────────────────────
 
   test('undo reverses last canvas change', async ({ page }) => {
@@ -743,5 +797,45 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByRole('heading', { name: /name this version/i })).not.toBeVisible();
     await expect(page).toHaveURL(/\/definitions\/1$/);
     await expect(saveAndDryRun).toBeEnabled();
+  });
+
+  // ── Unsaved-changes guard ──────────────────────────────────────────────────
+
+  test('leaving an edited workflow asks before discarding the changes', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    await pageHeader(page).getByPlaceholder('Add a description…').fill('Edited but never saved');
+
+    // The breadcrumb back to the workflows list is the route reported in #1027.
+    const breadcrumb = page.locator('header nav').getByRole('link', { name: 'Workflows' });
+    await breadcrumb.click();
+
+    const prompt = page.getByText('You have unsaved changes. Are you sure you want to leave?');
+    await expect(prompt).toBeVisible({ timeout: 5_000 });
+    await expect(page).toHaveURL(/\/definitions\/1$/);
+
+    // Declining keeps both the page and the edit.
+    await page.getByRole('button', { name: /stay on this page/i }).click();
+    await expect(prompt).not.toBeVisible();
+    await expect(page).toHaveURL(/\/definitions\/1$/);
+    await expect(pageHeader(page).getByPlaceholder('Add a description…')).toHaveValue('Edited but never saved');
+
+    // Confirming discards them and completes the navigation that was held.
+    await breadcrumb.click();
+    await page.getByRole('button', { name: /leave without saving/i }).click();
+    await expect(page).not.toHaveURL(/\/definitions\/1$/, { timeout: 10_000 });
+  });
+
+  test('leaving an untouched workflow navigates without a prompt', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.locator('header nav').getByRole('link', { name: 'Workflows' }).click();
+
+    await expect(page).not.toHaveURL(/\/definitions\/1$/, { timeout: 10_000 });
+    await expect(page.getByText('You have unsaved changes. Are you sure you want to leave?')).not.toBeVisible();
   });
 });

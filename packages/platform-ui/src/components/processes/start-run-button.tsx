@@ -31,6 +31,12 @@ interface StartRunButtonProps {
   archived?: boolean;
   label?: string;
   disabled?: boolean;
+  /**
+   * Tooltip shown while `disabled` is true and no more specific internal
+   * reason (archived, trigger stopped, no version) applies — e.g. the caller
+   * gating the button on unsaved required fields.
+   */
+  disabledTooltip?: string;
   onBeforeStart?: () => Promise<number | undefined>;
   /**
    * Whether to run workflow-scoped preflight fetches (versions, secrets, model
@@ -56,6 +62,7 @@ export function StartRunButton({
   archived = false,
   label,
   disabled = false,
+  disabledTooltip,
   onBeforeStart,
   preflightEnabled = true,
   mode,
@@ -245,7 +252,9 @@ export function StartRunButton({
         ? 'No workflow version available'
         : null;
   const isDisabled = disabledReason !== null || starting || preflightLoading || runningBeforeStart || disabled;
-  const tooltip = preflightLoading ? 'Checking workflow readiness...' : (disabledReason ?? undefined);
+  const tooltip = preflightLoading
+    ? 'Checking workflow readiness...'
+    : (disabledReason ?? (disabled ? disabledTooltip : undefined));
 
   const errorBanner = error ? (
     <p className="mt-1 text-xs text-destructive max-w-xs truncate" title={error}>{error}</p>

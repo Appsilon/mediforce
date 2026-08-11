@@ -9,7 +9,7 @@ import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
-import { toSlug, DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
+import { DEFAULT_AGENT_IMAGE, uniqueSlug } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
@@ -116,7 +116,7 @@ const STEP_TYPE_ICON: Record<string, { icon: React.ElementType; color: string; l
 
 const TIP = {
   name:                    'Human-readable name shown in the workflow diagram and task lists.',
-  id:                      'Unique slug identifier used in transition targets and API references. Auto-derived from the name.',
+  id:                      'Unique slug identifier used in transition targets and API references. Generated for new steps when the name is committed, and editable afterward.',
   description:             'Optional notes for collaborators explaining what this step does and why it exists.',
   type:                    'Structural role in the workflow: creation, review, decision, or terminal. Fixed at step creation.',
   executor:                'Who performs this step: human, agent, script, cowork, or action. Fixed at step creation.',
@@ -428,6 +428,12 @@ export function StepEditor({
 
   const stepParamNameCounts = paramNameCounts(step.params ?? []);
 
+  function commitNewStepId() {
+    if (!isNewStep) return;
+    const generatedId = uniqueSlug(step.name, allSteps.map((workflowStep) => workflowStep.id), step.id);
+    if (generatedId !== step.id) onChange({ id: generatedId });
+  }
+
   const parametersSection = !isTerminal ? (
         <Section title="Parameters">
           {/* Only the human-executor branch of the engine copies step.params
@@ -591,10 +597,9 @@ export function StepEditor({
           <input
             value={step.name}
             onChange={(e) => {
-              const patch: Partial<WorkflowStep> = { name: e.target.value };
-              if (isNewStep) patch.id = toSlug(e.target.value) || step.id;
-              onChange(patch);
+              onChange({ name: e.target.value });
             }}
+            onBlur={commitNewStepId}
             className={cn(ri, errors?.name && 'border-red-400 focus:border-red-500')}
           />
         </FieldRow>
