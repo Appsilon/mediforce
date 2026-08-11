@@ -634,7 +634,7 @@ export function StepEditor({
       {hasPrimarySection && (
         <CollapsibleCard title={primaryTitle} open={openCards.primary} onToggle={() => toggleCard('primary')}>
 
-      <StepDataFlow step={step} pluginIo={selectedPluginIo} namespace={handle} workflowName={workflowName} />
+      <StepDataFlow step={step} pluginIo={selectedPluginIo} />
 
       {/* ── Agent config ─────────────────────────────────────────── */}
       {isAgent && (<>

@@ -87,11 +87,6 @@ export const queryKeys = {
   /** Aggregate step-entry view for a process instance (processes.getSteps). */
   processSteps: (instanceId: string) => ['process-steps', instanceId] as const,
 
-  /** Live input/output example for a workflow step in the editor's Data Flow
-   *  panel (workflows.getStepSampleIo). */
-  stepSampleIo: (namespace: string, name: string, stepId: string) =>
-    ['step-sample-io', namespace, name, stepId] as const,
-
   /** Output Files listing for a run (runs.listOutputFiles). */
   runOutputFiles: (runId: string) => ['run-output-files', runId] as const,
 

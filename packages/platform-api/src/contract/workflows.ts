@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import {
   ProcessInstanceSchema,
-  StepExecutionStatusSchema,
   WorkflowDefinitionBaseSchema,
   WorkflowDefinitionSchema,
   WorkflowVisibilitySchema,
@@ -336,38 +335,6 @@ export const GetWorkflowRunCountOutputSchema = z.object({
 
 export type GetWorkflowRunCountInput = z.infer<typeof GetWorkflowRunCountInputSchema>;
 export type GetWorkflowRunCountOutput = z.infer<typeof GetWorkflowRunCountOutputSchema>;
-
-// Real input/output JSON from a step's latest attempt (success or failure),
-// for the step editor's Data Flow panel — a live example next to the generic
-// `/output/*.json` contract description. Scans recent runs newest-first and
-// returns the first one where this step ran at all; `null` fields mean the
-// step has never run in a scanned instance.
-//
-// `input` is shown even for a failed attempt — it's always the previous
-// step's real output regardless of how this step then fared, so it's exactly
-// what a script author needs to debug a bad read. `output` is withheld
-// unless the attempt actually completed, and also withheld for a dry run:
-// dry runs swap in `MockAgentPlugin` for every executor (including script),
-// so a dry run's "output" is a canned mock envelope, not what the author's
-// script produced — showing it would teach the wrong result.json shape.
-export const GetStepSampleIoInputSchema = z.object({
-  name: z.string().min(1),
-  namespace: z.string().min(1),
-  stepId: z.string().min(1),
-});
-
-export const GetStepSampleIoOutputSchema = z.object({
-  input: z.record(z.string(), z.unknown()).nullable(),
-  output: z.record(z.string(), z.unknown()).nullable(),
-  instanceId: z.string().nullable(),
-  completedAt: z.string().nullable(),
-  status: StepExecutionStatusSchema.nullable(),
-  error: z.string().nullable(),
-  fromDryRun: z.boolean(),
-});
-
-export type GetStepSampleIoInput = z.infer<typeof GetStepSampleIoInputSchema>;
-export type GetStepSampleIoOutput = z.infer<typeof GetStepSampleIoOutputSchema>;
 
 // Move all versions of a workflow from one workspace to another. Transfer
 // requires membership on BOTH source and target namespaces; the write goes

@@ -60,7 +60,6 @@ export { transferWorkflowNamespace } from './workflows/transfer-workflow';
 export { importWorkflow } from './workflows/import-workflow';
 export { getManifest } from './workflows/get-manifest';
 export { getWorkflowRunCount } from './workflows/get-run-count';
-export { getStepSampleIo } from './workflows/get-step-sample-io';
 export { checkRetiredModels } from './workflows/retired-model-check';
 
 export { chatCoworkSession } from './cowork/chat';

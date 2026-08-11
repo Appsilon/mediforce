@@ -15,22 +15,6 @@ vi.mock('@/hooks/use-plugins', () => ({
   usePlugins: () => ({ plugins: pluginState.plugins }),
 }));
 
-// Mutable so a test can simulate a run history; reset to "never run" in beforeEach.
-const sampleIoState = vi.hoisted(() => ({
-  value: {
-    input: null as Record<string, unknown> | null,
-    output: null as Record<string, unknown> | null,
-    status: null as string | null,
-    error: null as string | null,
-    fromDryRun: false,
-    loading: false,
-  },
-}));
-
-vi.mock('@/hooks/use-step-sample-io', () => ({
-  useStepSampleIo: () => sampleIoState.value,
-}));
-
 vi.mock('@/contexts/auth-context', () => ({
   useAuth: () => ({ user: null }),
 }));
@@ -79,9 +63,6 @@ const dockerImages: DockerImageInfo[] = [
 describe('StepEditor', () => {
   beforeEach(() => {
     pluginState.plugins = [];
-    sampleIoState.value = {
-      input: null, output: null, status: null, error: null, fromDryRun: false, loading: false,
-    };
   });
 
   it('[RENDER] step type badge visible without expanding details', () => {
@@ -466,7 +447,7 @@ describe('StepEditor', () => {
       expect(text).toContain('/output/result.json');
     });
 
-    it('[RENDER] a never-run script step shows the neutral read/write tip', () => {
+    it('[RENDER] a script step shows the neutral read/write tip', () => {
       render(
         <StepEditor
           step={buildStep({ executor: 'script', script: { runtime: 'python' } })}
@@ -479,86 +460,6 @@ describe('StepEditor', () => {
       const text = dataFlowText();
       expect(text).toContain('Your script should read');
       expect(text).toContain('json.load');
-      expect(text).not.toContain('Dry runs');
-      expect(text).not.toContain('Last run failed');
-    });
-
-    // Regression: a dry run's output is MockAgentPlugin's canned envelope, not
-    // the script's real output, so it's withheld — but that must read as "dry
-    // runs don't execute your script", not silently look like nothing ran.
-    it('[RENDER] a dry-run-only script step explains why there is no real output yet', () => {
-      sampleIoState.value = {
-        input: { projectName: 'test' },
-        output: null,
-        status: 'completed',
-        error: null,
-        fromDryRun: true,
-        loading: false,
-      };
-
-      render(
-        <StepEditor
-          step={buildStep({ executor: 'script', script: { runtime: 'python' } })}
-          allSteps={[]}
-          onChange={noop}
-        />,
-      );
-
-      expandCard('Script');
-      const text = dataFlowText();
-      expect(text).toContain("Last run's input (dry run)");
-      expect(text).toContain('Dry runs don');
-      expect(text).not.toContain('Last run failed');
-    });
-
-    it('[RENDER] a failed script step shows the error and the fix-it tip', () => {
-      sampleIoState.value = {
-        input: { orderId: 'o-42' },
-        output: null,
-        status: 'failed',
-        error: 'KeyError: orderId',
-        fromDryRun: false,
-        loading: false,
-      };
-
-      render(
-        <StepEditor
-          step={buildStep({ executor: 'script', script: { runtime: 'python' } })}
-          allSteps={[]}
-          onChange={noop}
-        />,
-      );
-
-      expandCard('Script');
-      const text = dataFlowText();
-      expect(text).toContain('Last run failed');
-      expect(text).toContain('KeyError: orderId');
-      expect(text).toContain('Make sure your script reads');
-    });
-
-    it('[RENDER] a completed real run shows the actual output, not the tip', () => {
-      sampleIoState.value = {
-        input: { projectName: 'ooo' },
-        output: { slug: 'ooo', projectName: 'ooo' },
-        status: 'completed',
-        error: null,
-        fromDryRun: false,
-        loading: false,
-      };
-
-      render(
-        <StepEditor
-          step={buildStep({ executor: 'script', script: { runtime: 'python' } })}
-          allSteps={[]}
-          onChange={noop}
-        />,
-      );
-
-      expandCard('Script');
-      const text = dataFlowText();
-      expect(text).toContain('"slug": "ooo"');
-      expect(text).not.toContain('Your script should read');
-      expect(text).not.toContain('Dry runs');
     });
 
     it('[RENDER] names the reference downstream steps use, with this step id', () => {

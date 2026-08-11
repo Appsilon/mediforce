@@ -47,8 +47,6 @@ import {
   DeleteWorkflowOutputSchema,
   GetWorkflowRunCountInputSchema,
   GetWorkflowRunCountOutputSchema,
-  GetStepSampleIoInputSchema,
-  GetStepSampleIoOutputSchema,
   TransferWorkflowInputSchema,
   TransferWorkflowOutputSchema,
   ImportWorkflowInputSchema,
@@ -300,8 +298,6 @@ import {
   type DeleteWorkflowOutput,
   type GetWorkflowRunCountInput,
   type GetWorkflowRunCountOutput,
-  type GetStepSampleIoInput,
-  type GetStepSampleIoOutput,
   type TransferWorkflowInput,
   type TransferWorkflowOutput,
   type ImportWorkflowInput,
@@ -629,7 +625,6 @@ export class Mediforce {
     setDefaultVersion: (input: SetDefaultVersionInput) => Promise<SetDefaultVersionOutput>;
     delete: (input: DeleteWorkflowInput) => Promise<DeleteWorkflowOutput>;
     getRunCount: (input: GetWorkflowRunCountInput) => Promise<GetWorkflowRunCountOutput>;
-    getStepSampleIo: (input: GetStepSampleIoInput) => Promise<GetStepSampleIoOutput>;
     transferNamespace: (input: TransferWorkflowInput) => Promise<TransferWorkflowOutput>;
     importFromRepo: (input: ImportWorkflowInput) => Promise<ImportWorkflowOutput>;
     getManifest: (input: GetManifestInput) => Promise<GetManifestOutput>;
@@ -1202,15 +1197,6 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.getRunCount');
         return GetWorkflowRunCountOutputSchema.parse(body);
-      },
-      getStepSampleIo: async (input) => {
-        const v = GetStepSampleIoInputSchema.parse(input);
-        const qs = toSearchParams({ namespace: v.namespace });
-        const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(v.name)}/steps/${encodeURIComponent(v.stepId)}/sample-io${qs}`,
-        );
-        const body = await parseJsonOrThrow(res, 'mediforce.workflows.getStepSampleIo');
-        return GetStepSampleIoOutputSchema.parse(body);
       },
       transferNamespace: (input) => {
         const v = TransferWorkflowInputSchema.parse(input);
