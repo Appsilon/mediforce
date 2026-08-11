@@ -3,6 +3,7 @@
 import React from 'react';
 import { ArrowDownToLine, ArrowUpFromLine, CornerDownRight } from 'lucide-react';
 import type { WorkflowStep } from '@mediforce/platform-core';
+import { useStepSampleIo } from '@/hooks/use-step-sample-io';
 
 interface StepIo {
   input: string;
@@ -101,14 +102,104 @@ function Code({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Real JSON from the step's last attempt, shown under the matching In/Out
+ *  row. Renders nothing for an empty or unavailable sample — the prose
+ *  description above already covers that case. */
+function SamplePreview({ label, value }: { label: string; value: Record<string, unknown> | null }) {
+  if (value === null || Object.keys(value).length === 0) return null;
+  return (
+    <div className="ml-5 rounded-md border border-border/40 bg-background/60 px-2 py-1.5">
+      <p className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/50 mb-0.5">{label}</p>
+      <pre className="text-[10px] font-mono text-foreground/70 whitespace-pre-wrap break-all max-h-24 overflow-y-auto">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    </div>
+  );
+}
+
+/** Minimal read-`/output/input.json`/write-`/output/result.json` boilerplate
+ *  per runtime — shown on a script step until a real output sample exists,
+ *  so the answer is "copy this shape" rather than another trip to the docs. */
+const RUNTIME_TIPS: Record<string, string> = {
+  python:
+    'import json\n\n' +
+    'with open("/output/input.json") as f:\n' +
+    '    data = json.load(f)\n\n' +
+    '# ... your logic ...\n\n' +
+    'with open("/output/result.json", "w") as f:\n' +
+    '    json.dump({"result": "ok"}, f)',
+  javascript:
+    'import { readFileSync, writeFileSync } from "node:fs";\n\n' +
+    'const data = JSON.parse(readFileSync("/output/input.json", "utf-8"));\n\n' +
+    '// ... your logic ...\n\n' +
+    'writeFileSync("/output/result.json", JSON.stringify({ result: "ok" }));',
+  r:
+    'library(jsonlite)\n' +
+    'data <- fromJSON("/output/input.json")\n\n' +
+    '# ... your logic ...\n\n' +
+    'write(toJSON(list(result = "ok"), auto_unbox = TRUE), "/output/result.json")',
+  bash:
+    '#!/bin/sh\nset -eu\n' +
+    'input=$(cat /output/input.json)\n\n' +
+    '# ... your logic ...\n\n' +
+    'printf \'{"result":"ok"}\' > /output/result.json',
+};
+
+/**
+ * Runtime-appropriate read/write example for a scriptable step, shown
+ * whenever there's no real output sample to point to instead — a brand new
+ * step (nothing has run yet), a dry-run-only step (output is a fake mock
+ * envelope, not a real example — explained explicitly so it doesn't read as
+ * "nothing happened"), or a step whose last real attempt failed (in which
+ * case the error is shown alongside it). Renders nothing for a runtime with
+ * no known snippet, or once a real output sample exists — at that point the
+ * JSON above already answers "what shape does this take".
+ */
+function ScriptTip({ runtime, error, fromDryRun }: { runtime?: string; error: string | null; fromDryRun: boolean }) {
+  const tip = runtime !== undefined ? RUNTIME_TIPS[runtime] : undefined;
+  if (tip === undefined) return null;
+
+  const failed = error !== null;
+  const guidance = failed
+    ? <>Make sure your script reads <Code>/output/input.json</Code> and writes <Code>/output/result.json</Code>:</>
+    : fromDryRun
+      ? <>Dry runs don&apos;t execute your script — this step ran a mock instead, so there&apos;s no real output to show yet. It should read <Code>/output/input.json</Code> and write <Code>/output/result.json</Code>:</>
+      : <>Your script should read <Code>/output/input.json</Code> and write <Code>/output/result.json</Code>:</>;
+
+  return (
+    <div
+      className={
+        failed
+          ? 'ml-5 rounded-md border border-red-300/60 bg-red-50 dark:border-red-800/50 dark:bg-red-950/20 px-2 py-1.5 space-y-1.5'
+          : 'ml-5 rounded-md border border-border/40 bg-background/60 px-2 py-1.5 space-y-1.5'
+      }
+    >
+      {failed && (
+        <>
+          <p className="text-[9px] font-medium uppercase tracking-wider text-red-600/70 dark:text-red-400/70">Last run failed</p>
+          <pre className="text-[10px] font-mono text-red-700 dark:text-red-400 whitespace-pre-wrap break-all max-h-20 overflow-y-auto">
+            {error}
+          </pre>
+        </>
+      )}
+      <p className="text-[10px] text-muted-foreground">{guidance}</p>
+      <pre className="text-[10px] font-mono text-foreground/70 bg-muted rounded px-1.5 py-1 overflow-x-auto">
+        {tip}
+      </pre>
+    </div>
+  );
+}
+
 /**
  * How data enters and leaves this step, and the reference later steps use to
  * read it. Answers issue #1029: the `/output/result.json` contract and the
  * `${steps.<id>.<field>}` reference were only discoverable from the docs.
  */
-export function StepDataFlow({ step, pluginIo }: {
+export function StepDataFlow({ step, pluginIo, namespace, workflowName }: {
   step: WorkflowStep;
   pluginIo?: { inputDescription: string; outputDescription: string };
+  namespace?: string;
+  workflowName?: string;
 }) {
   const fallback = fallbackIo(step);
   const io: StepIo = pluginIo
@@ -116,6 +207,7 @@ export function StepDataFlow({ step, pluginIo }: {
     : fallback;
 
   const hasVerdicts = step.type === 'review' || step.type === 'decision';
+  const sample = useStepSampleIo(namespace, workflowName, step.id);
 
   return (
     <div
@@ -124,7 +216,15 @@ export function StepDataFlow({ step, pluginIo }: {
     >
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Data flow</p>
       <Row icon={ArrowDownToLine} label="In">{io.input}</Row>
+      <SamplePreview
+        label={sample.fromDryRun ? "Last run's input (dry run)" : "Last run's input"}
+        value={sample.input}
+      />
       <Row icon={ArrowUpFromLine} label="Out">{io.output}</Row>
+      <SamplePreview label="Last run's output" value={sample.output} />
+      {sample.output === null && (
+        <ScriptTip runtime={step.script?.runtime} error={sample.error} fromDryRun={sample.fromDryRun} />
+      )}
       <Row icon={CornerDownRight} label="Next">
         Later steps read it as <Code>{`\${steps.${step.id}.${io.readPath}}`}</Code>
         {hasVerdicts && <> — and route on the verdict with <Code>verdict == &quot;…&quot;</Code> in a transition.</>}
