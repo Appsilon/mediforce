@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Fixed
+- `prod.mediforce.ai` no longer 525s at Cloudflare: Caddy now auto-provisions TLS certs and proxies for an optional `DOMAIN_ALIASES` list alongside the primary `DOMAIN`, so the new production hostname works while `phuse.mediforce.ai` keeps serving for backward compatibility [#1198](https://github.com/Appsilon/mediforce/pull/1198).
 - Workflow editors now provide an add-step action after all editable steps are removed, so an empty workflow can be rebuilt without refreshing or recreating it [#1024](https://github.com/Appsilon/mediforce/issues/1024).
 - Workshop step IDs now stay stable while a new step name is typed, then finalize to a unique slug on blur so prefix-overlapping names cannot corrupt graph transitions [#1025](https://github.com/Appsilon/mediforce/issues/1025).
 
