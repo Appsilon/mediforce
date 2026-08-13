@@ -5,6 +5,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { X, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mediforce, ApiError } from '@/lib/mediforce';
+import { WorkflowExampleGrid } from './workflow-example-grid';
 import type { ManifestEntry } from '@mediforce/platform-api/contract';
 
 const DEFAULT_REPO = 'https://github.com/Appsilon/mediforce';
@@ -23,11 +24,17 @@ type Step =
   | { kind: 'done'; imported: string[] }
   | { kind: 'error'; message: string; workflows?: ManifestEntry[] };
 
+/** 'source' asks for a repository first — the generic import. 'examples' skips
+ *  that question and browses the Mediforce examples straight away, the entry
+ *  point offered to a workspace with no workflows yet. */
+export type ImportEntry = 'source' | 'examples';
+
 export interface ImportWorkflowDialogProps {
   namespace: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImported?: () => void;
+  entry?: ImportEntry;
 }
 
 export function ImportWorkflowDialog({
@@ -35,10 +42,15 @@ export function ImportWorkflowDialog({
   open,
   onOpenChange,
   onImported,
+  entry = 'source',
 }: ImportWorkflowDialogProps) {
   const [repo, setRepo] = React.useState(DEFAULT_REPO);
   const [step, setStep] = React.useState<Step>({ kind: 'idle' });
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  // Starts at the prop and stays local: an examples import that fails, or a user
+  // reaching for another repository, drops into the source flow without the
+  // caller having to re-open the dialog.
+  const [flow, setFlow] = React.useState<ImportEntry>(entry);
   // 'browse' lists workflows from the repo's workflows-index.json manifest; 'path'
   // imports a single .wd.json by its path (mirrors the CLI) for repos with no
   // manifest.
@@ -60,6 +72,11 @@ export function ImportWorkflowDialog({
     setPath('');
     setRef('');
     setIdleError(null);
+    setFlow(entry);
+    if (entry === 'examples') void fetchManifest({ repo: DEFAULT_REPO, ref: '', flow: 'examples' });
+    // `entry` is read once per opening on purpose: changing it mid-session would
+    // otherwise reset a flow the user is halfway through.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   function handleClose() {
@@ -67,22 +84,47 @@ export function ImportWorkflowDialog({
     onOpenChange(false);
   }
 
-  async function fetchManifest() {
+  /** The examples flow fetches from the same effect that resets `repo`, `ref`
+   *  and `flow`, before those state updates land — so it passes them in rather
+   *  than reading the closure, which still holds the previous opening's values. */
+  async function fetchManifest(
+    overrides: { repo?: string; ref?: string; flow?: ImportEntry } = {},
+  ) {
+    const sourceRepo = overrides.repo ?? repo;
+    const sourceRef = (overrides.ref ?? ref).trim() || undefined;
+    const currentFlow = overrides.flow ?? flow;
     setStep({ kind: 'fetching' });
     setIdleError(null);
     try {
-      const result = await mediforce.workflows.getManifest({ repo, ref: ref.trim() || undefined });
+      const result = await mediforce.workflows.getManifest({
+        repo: sourceRepo,
+        ref: sourceRef,
+      });
       // Start with nothing selected — the user opts workflows in explicitly.
       setSelected(new Set());
       setStep({ kind: 'manifest', workflows: result.workflows });
     } catch (err) {
       const message = extractErrorMessage(err, 'Failed to fetch manifest.');
+      // The examples flow never asked for a repository, so path mode would be a
+      // non-sequitur: report the failure and let the user retry or switch repos.
+      if (currentFlow === 'examples') {
+        setStep({ kind: 'error', message });
+        return;
+      }
       // No manifest (e.g. repo has no workflows-index.json) is not a dead end —
       // drop into path mode so a single .wd.json can still be imported by its path.
       setMode('path');
       setIdleError(`${message} Add a workflows-index.json to enable browsing, or import a workflow by its path below.`);
       setStep({ kind: 'idle' });
     }
+  }
+
+  /** Leaves the examples flow for the generic import form, keeping the dialog open. */
+  function switchToSourceFlow() {
+    setFlow('source');
+    setSelected(new Set());
+    setStep({ kind: 'idle' });
+    setIdleError(null);
   }
 
   async function importByPath() {
@@ -110,9 +152,18 @@ export function ImportWorkflowDialog({
     });
   }
 
-  function toggleAll(workflows: ManifestEntry[]) {
-    const allSelected = workflows.every((wf) => selected.has(wf.name));
-    setSelected(allSelected ? new Set() : new Set(workflows.map((wf) => wf.name)));
+  function selectMany(names: string[], select: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const name of names) {
+        if (select) {
+          next.add(name);
+        } else {
+          next.delete(name);
+        }
+      }
+      return next;
+    });
   }
 
   async function handleImport(workflows: ManifestEntry[]) {
@@ -140,13 +191,26 @@ export function ImportWorkflowDialog({
     onImported?.();
   }
 
+  // The card grid needs the room; the plain forms — and a manifest that turned
+  // out to list nothing — look stranded in it.
+  const showsGrid =
+    (step.kind === 'manifest' && step.workflows.length > 0) ||
+    (step.kind === 'error' && step.workflows !== undefined && step.workflows.length > 0);
+
   return (
     <Dialog.Root open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-6 shadow-lg focus:outline-none">
+        <Dialog.Content
+          className={cn(
+            'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-6 shadow-lg focus:outline-none',
+            showsGrid ? 'max-w-3xl' : 'max-w-lg',
+          )}
+        >
           <div className="flex items-center justify-between mb-4">
-            <Dialog.Title className="text-base font-semibold">Import from git</Dialog.Title>
+            <Dialog.Title className="text-base font-semibold">
+              {flow === 'examples' ? 'Import example workflows' : 'Import from git'}
+            </Dialog.Title>
             <Dialog.Close asChild>
               <button
                 className="rounded-sm p-1 text-muted-foreground hover:text-foreground transition-colors"
@@ -160,7 +224,14 @@ export function ImportWorkflowDialog({
             Import workflow definitions from a GitHub repository.
           </Dialog.Description>
 
-          {(step.kind === 'idle' || step.kind === 'fetching') && (
+          {flow === 'examples' && step.kind === 'fetching' && (
+            <div className="flex flex-col items-center justify-center py-8 gap-3">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Loading examples…</p>
+            </div>
+          )}
+
+          {flow === 'source' && (step.kind === 'idle' || step.kind === 'fetching') && (
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground" htmlFor="import-repo-url">
@@ -294,12 +365,14 @@ export function ImportWorkflowDialog({
           {step.kind === 'manifest' && (
             <ManifestView
               repo={repo}
+              flow={flow}
               workflows={step.workflows}
               selected={selected}
               onToggle={toggleWorkflow}
-              onToggleAll={() => toggleAll(step.workflows)}
+              onSelectMany={selectMany}
               onImport={() => void handleImport(step.workflows)}
               onCancel={handleClose}
+              onSwitchRepo={switchToSourceFlow}
             />
           )}
 
@@ -348,27 +421,38 @@ export function ImportWorkflowDialog({
               {step.workflows !== undefined ? (
                 <ManifestView
                   repo={repo}
+                  flow={flow}
                   workflows={step.workflows}
                   selected={selected}
                   onToggle={toggleWorkflow}
-                  onToggleAll={() => toggleAll(step.workflows!)}
+                  onSelectMany={selectMany}
                   onImport={() => void handleImport(step.workflows!)}
                   onCancel={handleClose}
+                  onSwitchRepo={switchToSourceFlow}
                 />
               ) : (
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={handleClose}
-                    className="rounded-md px-4 py-2 text-sm font-medium border hover:bg-muted transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => void fetchManifest()}
-                    className="rounded-md px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                  >
-                    Retry
-                  </button>
+                <div className="flex items-center justify-between gap-2">
+                  {flow === 'examples' ? (
+                    <button onClick={switchToSourceFlow} className="text-xs text-primary hover:underline">
+                      Import from another repository
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleClose}
+                      className="rounded-md px-4 py-2 text-sm font-medium border hover:bg-muted transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => void fetchManifest()}
+                      className="rounded-md px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                    >
+                      Retry
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -381,83 +465,60 @@ export function ImportWorkflowDialog({
 
 interface ManifestViewProps {
   repo: string;
+  flow: ImportEntry;
   workflows: ManifestEntry[];
   selected: Set<string>;
   onToggle: (name: string) => void;
-  onToggleAll: () => void;
+  onSelectMany: (names: string[], select: boolean) => void;
   onImport: () => void;
   onCancel: () => void;
+  onSwitchRepo: () => void;
 }
 
 function ManifestView({
   repo,
+  flow,
   workflows,
   selected,
   onToggle,
-  onToggleAll,
+  onSelectMany,
   onImport,
   onCancel,
+  onSwitchRepo,
 }: ManifestViewProps) {
-  const allSelected = workflows.length > 0 && workflows.every((wf) => selected.has(wf.name));
   const someSelected = workflows.some((wf) => selected.has(wf.name));
   const selectedCount = workflows.filter((wf) => selected.has(wf.name)).length;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground truncate max-w-xs" title={repo}>
+      {flow === 'examples' ? (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            Ready-made workflows from the Mediforce repository — import them, run them, edit them.
+          </p>
+          <button onClick={onSwitchRepo} className="text-xs text-primary hover:underline shrink-0">
+            Import from another repository
+          </button>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground truncate" title={repo}>
           {repo}
         </p>
-        {workflows.length > 1 && (
-          <button onClick={onToggleAll} className="text-xs text-primary hover:underline shrink-0 ml-2">
-            {allSelected ? 'Deselect all' : 'Select all'}
-          </button>
-        )}
-      </div>
+      )}
 
       {workflows.length === 0 ? (
         <p className="text-sm text-muted-foreground py-4 text-center">
-          No workflows found in this repository.
+          {flow === 'examples'
+            ? 'No examples are published right now.'
+            : 'No workflows found in this repository.'}
         </p>
       ) : (
-        <div className="max-h-64 overflow-y-auto rounded-md border divide-y">
-          {workflows.map((wf) => (
-            <label
-              key={wf.name}
-              className={cn(
-                'flex items-start gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-accent',
-                selected.has(wf.name) && 'bg-accent/50',
-              )}
-            >
-              <input
-                type="checkbox"
-                checked={selected.has(wf.name)}
-                onChange={() => onToggle(wf.name)}
-                className="mt-0.5 h-3.5 w-3.5 rounded border-border accent-primary shrink-0"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{wf.name}</p>
-                {wf.description !== undefined && wf.description !== '' && (
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                    {wf.description}
-                  </p>
-                )}
-                {wf.tags !== undefined && wf.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {wf.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </label>
-          ))}
-        </div>
+        <WorkflowExampleGrid
+          workflows={workflows}
+          selected={selected}
+          onToggle={onToggle}
+          onSelectMany={onSelectMany}
+        />
       )}
 
       <div className="flex items-center justify-between">

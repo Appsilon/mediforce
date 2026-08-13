@@ -11,6 +11,12 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Added
+- A workspace with no workflows now offers **Import example workflows** next to **New workflow**. The box opens the import dialog straight on the Mediforce examples — no repository to fill in — presented as a card grid with tag filters, and both boxes disappear as soon as the workspace holds a workflow [#517](https://github.com/Appsilon/mediforce/issues/517).
+
+### Changed
+- "Import from git" lists a repository's workflows as a card grid with tag filters instead of a checkbox list, sharing one presentation with the new examples box. Repository, ref, import-by-path fallback, select-all and progress are unchanged; select-all now covers the workflows the active tag leaves visible, and a selection hidden by a filter says so rather than importing unseen [#517](https://github.com/Appsilon/mediforce/issues/517).
+
 ### Fixed
 - Workflow editors now provide an add-step action after all editable steps are removed, so an empty workflow can be rebuilt without refreshing or recreating it [#1024](https://github.com/Appsilon/mediforce/issues/1024).
 - Workshop step IDs now stay stable while a new step name is typed, then finalize to a unique slug on blur so prefix-overlapping names cannot corrupt graph transitions [#1025](https://github.com/Appsilon/mediforce/issues/1025).
