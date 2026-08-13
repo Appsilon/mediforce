@@ -12,6 +12,10 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Added
+- A workspace with no workflows now offers **Import example workflows** next to **New workflow**. The box opens the import dialog straight on the Mediforce examples — no repository to fill in — presented as a card grid with tag filters, and both boxes disappear as soon as the workspace holds a workflow [#517](https://github.com/Appsilon/mediforce/issues/517).
+
+### Changed
+- "Import from git" lists a repository's workflows as a card grid with tag filters instead of a checkbox list, sharing one presentation with the new examples box. Repository, ref, import-by-path fallback, select-all and progress are unchanged; select-all now covers the workflows the active tag leaves visible, and a selection hidden by a filter says so rather than importing unseen [#517](https://github.com/Appsilon/mediforce/issues/517).
 - The four checks that answer "is my workflow working?" now have distinct names and a documented order, so asking for one no longer gets you another: schema validation (`workflow validate`) → **Workflow readiness check** (`runPreflightChecks` — missing image/secret/model/credits) → **Dry Run** (a real Run with every agent and script step mocked, proving the graph and gates but never the agent's behaviour) → a real Run. `CONTEXT.md` gains both new terms plus the collision that motivated them — `workflow register --dry-run` is schema validation and executes nothing — and pins **Deployment** as per-environment: staging, production and each customer instance are peers, so a workflow is registered into each rather than "promoted" between them. **ADR-0013** (proposed) records that production workflow packages move out of `apps/` into their own repo, registered via the CLI because git import is unauthenticated and GitHub-only, with images built from `repo` + `commit` — without that swap the extraction silently breaks every Run at its first step [#1201](https://github.com/Appsilon/mediforce/pull/1201).
 
 ### Fixed

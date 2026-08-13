@@ -62,6 +62,7 @@ export async function seedPostgresNamespace(
     //   patterns   – journey-org-* (create-workspace.journey, timestamp suffix),
     //                branding-org-* (namespace-branding.journey, per-test org),
     //                import-org-* (workflow-import.journey, per-test org),
+    //                journey-examples-* (import-example-workflows.journey, timestamp suffix),
     //                tool-catalog-empty-* (admin-tool-catalog.journey, timestamp suffix)
     //
     // Agents use ON DELETE SET NULL for workspace removal, and built-in agents
@@ -92,6 +93,7 @@ export async function seedPostgresNamespace(
          OR handle LIKE 'journey-org-%'
          OR handle LIKE 'branding-org-%'
          OR handle LIKE 'import-org-%'
+         OR handle LIKE 'journey-examples-%'
          OR handle LIKE 'tool-catalog-empty-%'
     `;
 
