@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { User, Bot, Terminal, Zap, PenLine, GitBranch, Search } from 'lucide-react';
+import { User, Users, Bot, Terminal, Zap, PenLine, GitBranch, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CONTROL_MODE_LABELS, CONTROL_MODE_NUMBER, CONTROL_MODE_DISABLED, type ControlMode, type Executor, type NewStepPayload } from '@/lib/control-mode';
 import { CM_ROWS, STEP_TYPE_OPTIONS, type CMRow } from '@/lib/block-presets';
@@ -57,10 +57,12 @@ const ICON_COLOR: Record<string, string> = {
   violet: 'text-violet-500 dark:text-violet-400',
 };
 
-const EXECUTOR_ICON: Partial<Record<Executor, React.ReactNode>> = {
-  human:  <User className="h-3 w-3 shrink-0" />,
-  script: <Terminal className="h-3 w-3 shrink-0" />,
-  action: <Zap className="h-3 w-3 shrink-0" />,
+const EXECUTOR_ICON: Record<Executor, React.ReactNode> = {
+  human:  <User className="h-3.5 w-3.5 shrink-0" />,
+  script: <Terminal className="h-3.5 w-3.5 shrink-0" />,
+  action: <Zap className="h-3.5 w-3.5 shrink-0" />,
+  cowork: <Users className="h-3.5 w-3.5 shrink-0" />,
+  agent:  <Bot className="h-3.5 w-3.5 shrink-0" />,
 };
 
 function CMRowIcon({ cm, color }: { cm: CMRow['cm']; color: string }) {
@@ -113,16 +115,22 @@ export function BlockPicker({ onAdd }: Props) {
           {STEP_TYPE_OPTIONS.map((opt) => (
             <button
               key={opt.value}
+              data-testid={`step-type-option-${opt.value}`}
               onClick={() => setPendingType(opt.value)}
               className={cn(
-                'flex items-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-semibold border transition-all whitespace-nowrap flex-1 justify-center',
+                'flex-1 flex items-start gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all',
                 pendingType === opt.value ? STEP_TYPE_ACTIVE[opt.color] : STEP_TYPE_HOVER[opt.color],
               )}
             >
-              {opt.value === 'creation'
-                ? <PenLine className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
-                : <GitBranch className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />}
-              {opt.label}
+              <span className="mt-0.5">
+                {opt.value === 'creation'
+                  ? <PenLine className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                  : <GitBranch className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs font-semibold">{opt.label}</span>
+                <span className="block text-[10px] leading-snug text-muted-foreground">{opt.purpose}</span>
+              </span>
             </button>
           ))}
         </div>
@@ -150,26 +158,25 @@ export function BlockPicker({ onAdd }: Props) {
               <span className={cn('text-[11px] font-bold shrink-0', CM_LABEL_COLOR[row.color])}>
                 {CONTROL_MODE_LABELS[controlMode]}
               </span>
-              <span className="text-[10px] text-muted-foreground truncate">
-                {disabled
-                  ? <>{row.description.replace(' — coming soon', '')} — <em>coming soon</em></>
-                  : row.description}
-              </span>
             </div>
 
-            <div className="flex flex-wrap gap-1.5">
+            <div className="space-y-1.5">
               {row.buttons.map((btn) => (
                 <button
-                  key={btn.label}
+                  key={btn.id}
+                  data-testid={`executor-option-${btn.id}`}
                   disabled={disabled}
                   onClick={() => handleAdd(btn.payload)}
                   className={cn(
-                    'inline-flex items-center gap-1 rounded-lg py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap',
+                    'w-full flex items-start gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all',
                     disabled ? 'cursor-not-allowed' : BUTTON_CLASSES[btn.color],
                   )}
                 >
-                  {EXECUTOR_ICON[btn.payload.executor]}
-                  {btn.label}
+                  <span className="mt-0.5">{EXECUTOR_ICON[btn.payload.executor]}</span>
+                  <span className="min-w-0">
+                    <span className="block text-xs font-semibold">{btn.label}</span>
+                    <span className="block text-[10px] leading-snug text-muted-foreground">{btn.purpose}</span>
+                  </span>
                 </button>
               ))}
             </div>

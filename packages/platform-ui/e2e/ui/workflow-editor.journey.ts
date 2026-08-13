@@ -56,20 +56,22 @@ function pageHeader(page: import('@playwright/test').Page) {
 
 /**
  * Returns a step-type toggle button in the Add Step popover's Section 1.
- * 'creation' → "Create new result", 'decision' → "Make a decision".
+ * Matched by test id: each toggle renders its name plus a sentence on when to
+ * choose it, so the accessible name is not the label alone.
  */
 function stepTypeButton(page: import('@playwright/test').Page, type: 'creation' | 'decision') {
-  const label = type === 'creation' ? 'Create new result' : 'Make a decision';
-  return page.getByRole('button', { name: label, exact: true });
+  return page.getByTestId(`step-type-option-${type}`);
 }
 
 /**
- * Returns an executor button in the Add Step popover's "Executor" section.
- * 'agent' maps to "Autonomous agent" (L4).
+ * Returns an executor option in the Add Step popover's "Executor" section.
+ * 'agent' maps to "Autonomous agent" (L4). Matched by test id: each option
+ * renders its name plus a sentence on when to choose it, so the accessible
+ * name is not the label alone.
  */
 function executorButton(page: import('@playwright/test').Page, executor: 'human' | 'agent' | 'script' | 'cowork') {
-  const labels = { human: 'Human', agent: 'Autonomous agent', script: 'Script', cowork: 'Cowork' } as const;
-  return page.getByRole('button', { name: labels[executor], exact: true });
+  const optionIds = { human: 'human', agent: 'autonomous-agent', script: 'script', cowork: 'cowork' } as const;
+  return page.getByTestId(`executor-option-${optionIds[executor]}`);
 }
 
 /**
