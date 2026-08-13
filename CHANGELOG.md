@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Added
+- The four checks that answer "is my workflow working?" now have distinct names and a documented order, so asking for one no longer gets you another: schema validation (`workflow validate`) → **Workflow readiness check** (`runPreflightChecks` — missing image/secret/model/credits) → **Dry Run** (a real Run with every agent and script step mocked, proving the graph and gates but never the agent's behaviour) → a real Run. `CONTEXT.md` gains both new terms plus the collision that motivated them — `workflow register --dry-run` is schema validation and executes nothing — and pins **Deployment** as per-environment: staging, production and each customer instance are peers, so a workflow is registered into each rather than "promoted" between them. **ADR-0013** (proposed) records that production workflow packages move out of `apps/` into their own repo, registered via the CLI because git import is unauthenticated and GitHub-only, with images built from `repo` + `commit` — without that swap the extraction silently breaks every Run at its first step [#1201](https://github.com/Appsilon/mediforce/pull/1201).
+
 ### Fixed
 - Workflow editors now provide an add-step action after all editable steps are removed, so an empty workflow can be rebuilt without refreshing or recreating it [#1024](https://github.com/Appsilon/mediforce/issues/1024).
 - Workshop step IDs now stay stable while a new step name is typed, then finalize to a unique slug on blur so prefix-overlapping names cannot corrupt graph transitions [#1025](https://github.com/Appsilon/mediforce/issues/1025).
