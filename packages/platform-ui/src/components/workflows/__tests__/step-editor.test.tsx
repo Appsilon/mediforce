@@ -537,7 +537,25 @@ describe('StepEditor', () => {
       expect(text).toContain('${steps.step-1.');
     });
 
-    it('[RENDER] a decision step explains that transitions route on the verdict', () => {
+    it('[RENDER] a review step with both params and verdicts says the verdict rides along with the params', () => {
+      render(
+        <StepEditor
+          step={buildStep({
+            type: 'review',
+            executor: 'human',
+            params: [{ name: 'amount', type: 'string', required: true }],
+            verdicts: { approve: { target: 'done' } },
+          })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      expect(dataFlowText()).toContain('plus the selected verdict');
+    });
+
+    it('[RENDER] a decision step explains verdicts route via their own target, not a transition', () => {
       render(
         <StepEditor
           step={buildStep({ type: 'decision', executor: 'human', verdicts: { approve: { target: 'done' } } })}
@@ -547,10 +565,12 @@ describe('StepEditor', () => {
       );
 
       expandCard('Task setup');
-      expect(dataFlowText()).toContain('verdict ==');
+      const text = dataFlowText();
+      expect(text).toContain('its own target');
+      expect(text).not.toContain('verdict ==');
     });
 
-    it('[RENDER] an http action step points at the response body, not the envelope', () => {
+    it('[RENDER] an http action step points at the parsed JSON body, not the envelope', () => {
       render(
         <StepEditor
           step={buildStep({ executor: 'action', action: { kind: 'http', config: { method: 'GET', url: 'https://example.com' } } })}
@@ -560,7 +580,37 @@ describe('StepEditor', () => {
       );
 
       expandCard('Action');
-      expect(dataFlowText()).toContain('${steps.step-1.body.');
+      expect(dataFlowText()).toContain('${steps.step-1.body.json.');
+    });
+
+    it('[RENDER] a file-upload human step points at its files, not the Parameters form', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'human', ui: { component: 'file-upload' } })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      const text = dataFlowText();
+      expect(text).toContain('{ files }');
+      expect(text).toContain('${steps.step-1.files}');
+    });
+
+    it('[RENDER] a verdict-only human step (no params) says its output is the verdict', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'human' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      const text = dataFlowText();
+      expect(text).toContain('{ verdict }');
+      expect(text).toContain('${steps.step-1.verdict}');
     });
 
     it('[RENDER] a registered plugin describes its own contract instead of the fallback', () => {

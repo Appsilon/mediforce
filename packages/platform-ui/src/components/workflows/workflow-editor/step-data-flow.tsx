@@ -46,8 +46,8 @@ function fallbackIo(step: WorkflowStep): StepIo {
         case 'http':
           return {
             input: 'The URL, headers and body below, with ${...} placeholders resolved.',
-            output: 'The response as { status, headers, body } — a non-2xx response is output, not a failure.',
-            readPath: 'body.<field>',
+            output: 'The response as { status, headers, body: { json, text } } — a non-2xx response is output, not a failure.',
+            readPath: 'body.json.<field>',
           };
         case 'reshape':
           return {
@@ -69,12 +69,48 @@ function fallbackIo(step: WorkflowStep): StepIo {
           };
       }
     case 'human':
-    default:
-      return {
-        input: 'The task form the assignee fills in — built from the Parameters below.',
-        output: 'The submitted parameter values, each at the top level.',
-        readPath: '<parameter name>',
-      };
+    default: {
+      // Mirrors resolveTaskKind in complete-human-task.ts — the ui.component
+      // picks the task's shape, and it's not the Parameters form for three of them.
+      switch (step.ui?.component) {
+        case 'file-upload':
+          return {
+            input: 'The task assigned to the user, who uploads files per the settings below.',
+            output: 'The uploaded files, as { files }.',
+            readPath: 'files',
+          };
+        case 'assignment-table':
+          return {
+            input: 'The task assigned to the user, who fills in the assignment table.',
+            output: 'The submitted assignments, as { assignments }.',
+            readPath: 'assignments',
+          };
+        case 'table-editor':
+          return {
+            input: 'The task assigned to the user, who edits the table.',
+            output: 'The edited rows, as { rows }.',
+            readPath: 'rows',
+          };
+        default: {
+          const hasParams = Array.isArray(step.params) && step.params.length > 0;
+          if (!hasParams) {
+            return {
+              input: 'The task assigned to the user — no form fields, just a verdict.',
+              output: 'The selected verdict, as { verdict }.',
+              readPath: 'verdict',
+            };
+          }
+          const hasStepVerdicts = step.verdicts !== undefined && Object.keys(step.verdicts).length > 0;
+          return {
+            input: 'The task form the assignee fills in — built from the Parameters below.',
+            output: hasStepVerdicts
+              ? 'The submitted parameter values plus the selected verdict, each at the top level.'
+              : 'The submitted parameter values, each at the top level.',
+            readPath: '<parameter name>',
+          };
+        }
+      }
+    }
   }
 }
 
@@ -154,16 +190,15 @@ function ScriptTip({ runtime }: { runtime?: string }) {
  * read it. Answers issue #1029: the `/output/result.json` contract and the
  * `${steps.<id>.<field>}` reference were only discoverable from the docs.
  */
-export function StepDataFlow({ step, pluginIo }: {
+export function StepDataFlow({ step, pluginIo, hasVerdicts }: {
   step: WorkflowStep;
   pluginIo?: { inputDescription: string; outputDescription: string };
+  hasVerdicts: boolean;
 }) {
   const fallback = fallbackIo(step);
   const io: StepIo = pluginIo
     ? { input: pluginIo.inputDescription, output: pluginIo.outputDescription, readPath: fallback.readPath }
     : fallback;
-
-  const hasVerdicts = step.type === 'review' || step.type === 'decision';
 
   return (
     <div
@@ -176,7 +211,7 @@ export function StepDataFlow({ step, pluginIo }: {
       <ScriptTip runtime={step.script?.runtime} />
       <Row icon={CornerDownRight} label="Next">
         Later steps read it as <Code>{`\${steps.${step.id}.${io.readPath}}`}</Code>
-        {hasVerdicts && <> — and route on the verdict with <Code>verdict == &quot;…&quot;</Code> in a transition.</>}
+        {hasVerdicts && <> — each verdict routes to its own target below, bypassing transitions entirely.</>}
       </Row>
     </div>
   );

@@ -172,7 +172,7 @@ const TIP = {
 
   actionKind:              'Action type: http (outbound API call), reshape (update workflow variables), or email. Fixed at creation.',
   actionMethod:            'HTTP method for the outbound request.',
-  actionUrl:               'Target URL. Supports ${steps.<id>.<field>}, ${triggerPayload.<field>} and ${secrets.NAME} interpolation.',
+  actionUrl:               'Target URL. Supports ${steps.<id>.<field>} and ${triggerPayload.<field>} interpolation — never put ${secrets.NAME} here, the resolved URL is persisted as this step\'s output.',
   actionBody:              'JSON body sent with the request. Supports ${steps.<id>.<field>} interpolation. Only the response is stored, so ${secrets.NAME} is safe here.',
   actionValues:            'Key-value pairs that become this step\'s output. Values support ${steps.<id>.<field>} interpolation — never put ${secrets.NAME} here, the resolved values are persisted.',
   actionTo:                'Recipient email address(es), comma-separated.',
@@ -639,7 +639,7 @@ export function StepEditor({
       {hasPrimarySection && (
         <CollapsibleCard title={primaryTitle} open={openCards.primary} onToggle={() => toggleCard('primary')}>
 
-      <StepDataFlow step={step} pluginIo={selectedPluginIo} />
+      <StepDataFlow step={step} pluginIo={selectedPluginIo} hasVerdicts={hasVerdicts} />
 
       {/* ── Agent config ─────────────────────────────────────────── */}
       {isAgent && (<>
