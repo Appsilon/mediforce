@@ -166,6 +166,35 @@ pnpm test:e2e:ui            # interactive Playwright UI mode
 pnpm build    # builds all packages
 ```
 
+## Branches
+
+Two branches are permanent: `main` (default, deploys to staging via
+`deploy-staging.yml`) and `production` (live deploy target — `deploy-production.yml`
+triggers on every push to it). Everything else on `origin` is temporary.
+
+Work branches are named `<type>/<slug>`, e.g. `feat/cron-trigger-management`,
+`fix/1158-agent-time-budget-overhead`. Bots own their own prefixes: `renovate/*`
+(Renovate recreates and drops these itself) and `changelog/cut-<sunday>` (one per
+weekly run of `changelog-cut.yml`, disposable once its PR merges).
+
+**Retention rule:**
+
+| Branch | Kept |
+|--------|------|
+| `main`, `production` | Always |
+| Open PR | Until the PR closes |
+| Merged PR | Deleted on merge — by GitHub's *Automatically delete head branches* repo setting, which must stay enabled |
+| Closed (unmerged) PR, or no PR, and no commit for 60 days | Deleted in the periodic sweep |
+
+Deleting a branch never destroys review history: a PR keeps its commits under
+`refs/pull/<number>/head`, so `git fetch origin pull/<number>/head` restores the
+work regardless. For a branch that never had a PR, restore from its SHA with
+`git push origin <sha>:refs/heads/<name>` while the object is still reachable.
+
+The sweep is manual and rare — the delete-on-merge setting is what keeps the
+list short. Re-run it by listing branches with no open PR and no commit in 60
+days, and confirming the list before deleting.
+
 ## Deployment
 
 Staging and production servers are hosted on **Hetzner**.
