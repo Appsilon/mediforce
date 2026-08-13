@@ -11,6 +11,14 @@ concepts. **Not a spec, not implementation guide.**
 **Deployment**:
 A single running Mediforce installation. Typically dedicated to one customer
 (single-tenant). Contains many Namespaces.
+Each environment — Appsilon's own production instance, staging, and each
+per-customer instance — is a **separate Deployment** with its own database,
+Users, and Namespaces. They are **peers, not tiers of one installation**: a
+Workflow does not "promote" from staging to production, it is registered or
+imported into each Deployment independently.
+_Avoid_: "environment" as a synonym for a slice of one Deployment (it isn't —
+each is a whole Deployment), and "the instance" unqualified when more than one
+Deployment is in play.
 
 **Namespace** *(today canonical; rename to Workspace proposed in ADR-001)*:
 An isolated scope of work inside a Deployment. Owns workflow definitions,
@@ -60,6 +68,27 @@ implementation legacy and renames to `WorkflowRun` in ADR-0001.
 _Avoid_: "Workflow Instance" (briefly proposed but inconsistent with the
 project's own "Run" vocabulary), "Process Instance" (legacy schema name
 only), "Workflow" alone (ambiguous — Definition or Run?).
+
+**Dry Run**:
+A Workflow Run executed with `dryRun` set, in which **every** `agent` and
+`script` step is swapped for the mock plugin. The graph, transitions, gates,
+and human steps execute for real; only the expensive agent/script work is
+faked. It answers *"is the workflow structured as I intended?"* — never *"does
+the agent do what I want?"*, which only a real Run answers.
+_Code:_ `ProcessInstance.dryRun`; the swap lives in `mock-agent-plugin`
+(`packages/agent-runtime/src/plugins/mock-agent-plugin.ts`). Dry Runs are a
+first-class filter on the run listing surfaces, not a hidden mode.
+_Avoid_: `workflow register --dry-run` (that is **schema validation** of a
+definition, not a Run — it executes nothing), and "test run" (unclaimed term;
+the canonical name is Dry Run).
+
+**Workflow readiness check** *(pre-run, static)*:
+The static check run before a Run starts: missing container image, missing
+Secret, low model credits, unknown model — each reported with a fix action.
+Distinct from a **Dry Run**: readiness inspects the Definition without
+executing anything; a Dry Run executes the graph.
+_Code:_ `runPreflightChecks` (`packages/platform-ui/src/lib/preflight-checks.ts`).
+_Avoid_: "validation" (that is schema-shape checking, a third, earlier gate).
 
 **Trigger** *(detached mutable resource — ADR-0011)*:
 What causes a Workflow to run, or makes it hand-startable. Three live kinds:
@@ -435,6 +464,22 @@ the user-facing immutable log.
   many **Agent OAuth Tokens** (per server).
 
 ## Flagged ambiguities
+
+- **"Is my workflow working?" — four distinct gates, one overloaded word**
+  *(resolved 2026-08-11)*: "validate", "verify", "test", and "dry run" are used
+  interchangeably in conversation but name four different checks, each
+  answering a different question:
+  1. **Schema validation** (`workflow validate`) — is the definition legal?
+  2. **Workflow readiness check** (`runPreflightChecks`) — are the image,
+     Secrets, model, and credits it needs actually present?
+  3. **Dry Run** — is the graph structured as intended? (agent/script work
+     mocked)
+  4. **Run** — does the work itself produce what I wanted?
+
+  Only (4) answers behaviour. Nothing in the product currently tells a user
+  this ladder exists or which rung answers their question.
+  _Avoid_: "dry run" for (1) — `workflow register --dry-run` is schema
+  validation and executes nothing, which collides with the Dry Run entry above.
 
 - **Workflow Definition `source`** *(resolved 2026-06-02; commit pinning added
   2026-06-24)*: A Workflow Definition imported from a git repo carries an
