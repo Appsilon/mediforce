@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { mediforce } from '@/lib/mediforce';
+import type { GetManifestOutput, ImportWorkflowOutput } from '@mediforce/platform-api/contract';
 import { ImportWorkflowDialog } from '../import-workflow-dialog';
 
 vi.mock('@/lib/mediforce', () => ({
@@ -17,7 +18,7 @@ vi.mock('@/lib/mediforce', () => ({
 const getManifestMock = vi.mocked(mediforce.workflows.getManifest);
 const importFromRepoMock = vi.mocked(mediforce.workflows.importFromRepo);
 
-const MANIFEST = {
+const MANIFEST: GetManifestOutput = {
   workflows: [
     {
       name: 'tutorial-linear-pipeline',
@@ -34,12 +35,18 @@ const MANIFEST = {
   ],
 };
 
+const IMPORTED: ImportWorkflowOutput = {
+  success: true,
+  name: 'tutorial-review-loop',
+  version: 1,
+};
+
 describe('ImportWorkflowDialog', () => {
   beforeEach(() => {
     getManifestMock.mockReset();
     importFromRepoMock.mockReset();
-    getManifestMock.mockResolvedValue(MANIFEST as never);
-    importFromRepoMock.mockResolvedValue({} as never);
+    getManifestMock.mockResolvedValue(MANIFEST);
+    importFromRepoMock.mockResolvedValue(IMPORTED);
   });
 
   // Spelled out rather than compared against the exported constant: importing

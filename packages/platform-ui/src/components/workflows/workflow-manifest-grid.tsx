@@ -6,7 +6,7 @@ import type { ManifestEntry } from '@mediforce/platform-api/contract';
 
 const ALL_TAGS = '__all__';
 
-export interface WorkflowExampleGridProps {
+export interface WorkflowManifestGridProps {
   workflows: ManifestEntry[];
   selected: Set<string>;
   onToggle: (name: string) => void;
@@ -15,12 +15,12 @@ export interface WorkflowExampleGridProps {
   onSelectMany: (names: string[], select: boolean) => void;
 }
 
-export function WorkflowExampleGrid({
+export function WorkflowManifestGrid({
   workflows,
   selected,
   onToggle,
   onSelectMany,
-}: WorkflowExampleGridProps) {
+}: WorkflowManifestGridProps) {
   const [tag, setTag] = React.useState<string>(ALL_TAGS);
 
   const tags = React.useMemo(() => {

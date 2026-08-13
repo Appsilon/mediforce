@@ -1,37 +1,21 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { trackPageErrors } from '../helpers/page-errors';
+import { probeGitHub } from '../helpers/github-reachable';
 
 /**
- * Issue #517 — a workspace with no workflows offers "Import example workflows"
- * next to "New workflow", and the box disappears once the namespace holds one.
+ * A workspace with no workflows offers "Import example workflows" next to
+ * "New workflow", and the box disappears once the namespace holds one.
  *
  * The dialog browses `workflows-index.json` and imports through
- * `POST /api/workflow-definitions/import`, so the run necessarily reaches
- * github.com — there is no local stand-in for resolving a ref to an immutable
- * commit. The probe below self-skips with a diagnostic when GitHub is
- * unreachable or rate limited, the same gate `workflow-import.journey` uses.
+ * `POST /api/workflow-definitions/import`, so the run needs both GitHub
+ * surfaces — hence the shared reachability gate.
  */
-
-const GITHUB_API_PROBE = 'https://api.github.com/repos/Appsilon/mediforce/commits/main';
-const MANIFEST_PROBE =
-  'https://raw.githubusercontent.com/Appsilon/mediforce/main/workflows-index.json';
 
 let githubAvailable = false;
 
-async function isAvailable(url: string): Promise<boolean> {
-  try {
-    return (await fetch(url)).ok;
-  } catch {
-    return false;
-  }
-}
-
 test.beforeAll(async () => {
-  const [api, raw] = await Promise.all([
-    isAvailable(GITHUB_API_PROBE),
-    isAvailable(MANIFEST_PROBE),
-  ]);
-  githubAvailable = api && raw;
+  const { apiReachable, manifestPublished } = await probeGitHub();
+  githubAvailable = apiReachable && manifestPublished;
 });
 
 test.describe('Import example workflows journey', () => {

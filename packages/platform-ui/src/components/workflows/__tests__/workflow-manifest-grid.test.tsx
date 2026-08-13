@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ManifestEntry } from '@mediforce/platform-api/contract';
-import { WorkflowExampleGrid } from '../workflow-example-grid';
+import { WorkflowManifestGrid } from '../workflow-manifest-grid';
 
 const WORKFLOWS: ManifestEntry[] = [
   {
@@ -23,10 +23,10 @@ const WORKFLOWS: ManifestEntry[] = [
   },
 ];
 
-describe('WorkflowExampleGrid', () => {
+describe('WorkflowManifestGrid', () => {
   it('renders a card per workflow with its description and tags', () => {
     render(
-      <WorkflowExampleGrid
+      <WorkflowManifestGrid
         workflows={WORKFLOWS}
         selected={new Set()}
         onToggle={vi.fn()}
@@ -43,7 +43,7 @@ describe('WorkflowExampleGrid', () => {
   it('narrows the visible cards to the picked tag and restores them with All', async () => {
     const user = userEvent.setup();
     render(
-      <WorkflowExampleGrid
+      <WorkflowManifestGrid
         workflows={WORKFLOWS}
         selected={new Set()}
         onToggle={vi.fn()}
@@ -71,7 +71,7 @@ describe('WorkflowExampleGrid', () => {
     const user = userEvent.setup();
     const onToggle = vi.fn();
     render(
-      <WorkflowExampleGrid
+      <WorkflowManifestGrid
         workflows={WORKFLOWS}
         selected={new Set()}
         onToggle={onToggle}
@@ -88,7 +88,7 @@ describe('WorkflowExampleGrid', () => {
     const user = userEvent.setup();
     const onSelectMany = vi.fn();
     render(
-      <WorkflowExampleGrid
+      <WorkflowManifestGrid
         workflows={WORKFLOWS}
         selected={new Set()}
         onToggle={vi.fn()}
@@ -107,7 +107,7 @@ describe('WorkflowExampleGrid', () => {
 
   it('offers Deselect all once every visible workflow is selected', () => {
     render(
-      <WorkflowExampleGrid
+      <WorkflowManifestGrid
         workflows={WORKFLOWS}
         selected={new Set(WORKFLOWS.map((wf) => wf.name))}
         onToggle={vi.fn()}
@@ -121,7 +121,7 @@ describe('WorkflowExampleGrid', () => {
   it('warns that a selection hidden by the filter is still imported', async () => {
     const user = userEvent.setup();
     render(
-      <WorkflowExampleGrid
+      <WorkflowManifestGrid
         workflows={WORKFLOWS}
         selected={new Set(['tutorial-linear-pipeline'])}
         onToggle={vi.fn()}
@@ -140,7 +140,7 @@ describe('WorkflowExampleGrid', () => {
 
   it('reflects the selected set on the checkboxes', () => {
     render(
-      <WorkflowExampleGrid
+      <WorkflowManifestGrid
         workflows={WORKFLOWS}
         selected={new Set(['tutorial-review-loop'])}
         onToggle={vi.fn()}

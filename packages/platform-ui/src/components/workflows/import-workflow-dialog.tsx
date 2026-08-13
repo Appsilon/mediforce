@@ -5,7 +5,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { X, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mediforce, ApiError } from '@/lib/mediforce';
-import { WorkflowExampleGrid } from './workflow-example-grid';
+import { WorkflowManifestGrid } from './workflow-manifest-grid';
 import type { ManifestEntry } from '@mediforce/platform-api/contract';
 
 const DEFAULT_REPO = 'https://github.com/Appsilon/mediforce';
@@ -47,10 +47,13 @@ export function ImportWorkflowDialog({
   const [repo, setRepo] = React.useState(DEFAULT_REPO);
   const [step, setStep] = React.useState<Step>({ kind: 'idle' });
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
-  // Starts at the prop and stays local: an examples import that fails, or a user
-  // reaching for another repository, drops into the source flow without the
-  // caller having to re-open the dialog.
-  const [flow, setFlow] = React.useState<ImportEntry>(entry);
+  // Derived from the prop rather than seeded into state: the dialog stays
+  // mounted between openings, so state seeded in the open effect would let the
+  // previous session's view paint for a frame. The override lets a user reaching
+  // for another repository drop into the source flow without the caller having
+  // to re-open the dialog; it is cleared on close, before the next first paint.
+  const [flowOverride, setFlowOverride] = React.useState<ImportEntry | null>(null);
+  const flow = flowOverride ?? entry;
   // 'browse' lists workflows from the repo's workflows-index.json manifest; 'path'
   // imports a single .wd.json by its path (mirrors the CLI) for repos with no
   // manifest.
@@ -72,8 +75,7 @@ export function ImportWorkflowDialog({
     setPath('');
     setRef('');
     setIdleError(null);
-    setFlow(entry);
-    if (entry === 'examples') void fetchManifest({ repo: DEFAULT_REPO, ref: '', flow: 'examples' });
+    if (entry === 'examples') void fetchManifest({ repo: DEFAULT_REPO, ref: '' });
     // `entry` is read once per opening on purpose: changing it mid-session would
     // otherwise reset a flow the user is halfway through.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,18 +83,16 @@ export function ImportWorkflowDialog({
 
   function handleClose() {
     if (step.kind === 'importing') return;
+    setFlowOverride(null);
     onOpenChange(false);
   }
 
-  /** The examples flow fetches from the same effect that resets `repo`, `ref`
-   *  and `flow`, before those state updates land — so it passes them in rather
-   *  than reading the closure, which still holds the previous opening's values. */
-  async function fetchManifest(
-    overrides: { repo?: string; ref?: string; flow?: ImportEntry } = {},
-  ) {
+  /** The examples flow fetches from the same effect that resets `repo` and
+   *  `ref`, before those state updates land — so it passes them in rather than
+   *  reading the closure, which still holds the previous opening's values. */
+  async function fetchManifest(overrides: { repo?: string; ref?: string } = {}) {
     const sourceRepo = overrides.repo ?? repo;
     const sourceRef = (overrides.ref ?? ref).trim() || undefined;
-    const currentFlow = overrides.flow ?? flow;
     setStep({ kind: 'fetching' });
     setIdleError(null);
     try {
@@ -107,7 +107,7 @@ export function ImportWorkflowDialog({
       const message = extractErrorMessage(err, 'Failed to fetch manifest.');
       // The examples flow never asked for a repository, so path mode would be a
       // non-sequitur: report the failure and let the user retry or switch repos.
-      if (currentFlow === 'examples') {
+      if (flow === 'examples') {
         setStep({ kind: 'error', message });
         return;
       }
@@ -119,9 +119,8 @@ export function ImportWorkflowDialog({
     }
   }
 
-  /** Leaves the examples flow for the generic import form, keeping the dialog open. */
   function switchToSourceFlow() {
-    setFlow('source');
+    setFlowOverride('source');
     setSelected(new Set());
     setStep({ kind: 'idle' });
     setIdleError(null);
@@ -513,7 +512,7 @@ function ManifestView({
             : 'No workflows found in this repository.'}
         </p>
       ) : (
-        <WorkflowExampleGrid
+        <WorkflowManifestGrid
           workflows={workflows}
           selected={selected}
           onToggle={onToggle}
