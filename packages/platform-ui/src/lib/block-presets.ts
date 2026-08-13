@@ -29,7 +29,7 @@ export const STEP_TYPE_OPTIONS = [
   {
     value: 'decision' as const,
     label: 'Make a decision',
-    purpose: 'A routing-only step: it produces no result, it picks which branch the run takes next.',
+    purpose: 'A routing step: it picks which branch the run takes next, and records its verdict for later steps to read.',
     color: 'purple',
   },
 ] as const;
