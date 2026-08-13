@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
@@ -7,8 +7,13 @@ import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 
 // ---- Mocks (must be before component import) ----
 
+// Mutable so a test can register plugin metadata; reset to empty in beforeEach.
+const pluginState = vi.hoisted(() => ({
+  plugins: [] as { name: string; metadata?: Record<string, unknown> }[],
+}));
+
 vi.mock('@/hooks/use-plugins', () => ({
-  usePlugins: () => ({ plugins: [] }),
+  usePlugins: () => ({ plugins: pluginState.plugins }),
 }));
 
 vi.mock('@/contexts/auth-context', () => ({
@@ -57,6 +62,10 @@ const dockerImages: DockerImageInfo[] = [
 // ---------------------------------------------------------------------------
 
 describe('StepEditor', () => {
+  beforeEach(() => {
+    pluginState.plugins = [];
+  });
+
   it('[REGRESSION #1025] does not change a new step id while its name is being typed', () => {
     const onChange = vi.fn();
 
@@ -459,6 +468,211 @@ describe('StepEditor', () => {
       expandCard('Task setup');
       expect(screen.queryByText('This field cannot be empty.')).not.toBeInTheDocument();
       expect(screen.queryByText('Duplicate parameter name.')).not.toBeInTheDocument();
+    });
+  });
+
+  // Nothing in the editor said how a step's output reaches the next step, and
+  // the `/output/result.json` contract a script must honour was knowledge you
+  // could only get from the docs.
+  describe('data flow guidance — issue #1029', () => {
+    function dataFlowText(): string {
+      return screen.getByTestId('step-data-flow').textContent ?? '';
+    }
+
+    it('[RENDER] a script step spells out the /output file contract', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'script', plugin: 'script-container' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Script');
+      const text = dataFlowText();
+      expect(text).toContain('/output/input.json');
+      expect(text).toContain('/output/result.json');
+    });
+
+    it('[RENDER] a script step shows the neutral read/write tip', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'script', script: { runtime: 'python' } })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Script');
+      const text = dataFlowText();
+      expect(text).toContain('Your script should read');
+      expect(text).toContain('json.load');
+    });
+
+    it('[RENDER] names the reference downstream steps use, with this step id', () => {
+      render(
+        <StepEditor
+          step={buildStep({ id: 'extract-data', executor: 'script' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Script');
+      expect(dataFlowText()).toContain('${steps.extract-data.');
+    });
+
+    it('[RENDER] a human step says its parameter values become the step output', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'human', params: [{ name: 'amount', type: 'string', required: true }] })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      const text = dataFlowText();
+      expect(text).toContain('Parameters');
+      expect(text).toContain('${steps.step-1.');
+    });
+
+    it('[RENDER] a review step with both params and verdicts says the verdict rides along with the params', () => {
+      render(
+        <StepEditor
+          step={buildStep({
+            type: 'review',
+            executor: 'human',
+            params: [{ name: 'amount', type: 'string', required: true }],
+            verdicts: { approve: { target: 'done' } },
+          })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      expect(dataFlowText()).toContain('plus the selected verdict');
+    });
+
+    it('[RENDER] a decision step explains verdicts route via their own target, not a transition', () => {
+      render(
+        <StepEditor
+          step={buildStep({ type: 'decision', executor: 'human', verdicts: { approve: { target: 'done' } } })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      const text = dataFlowText();
+      expect(text).toContain('its own target');
+      expect(text).not.toContain('verdict ==');
+    });
+
+    it('[RENDER] an http action step points at the parsed JSON body, not the envelope', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'action', action: { kind: 'http', config: { method: 'GET', url: 'https://example.com' } } })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Action');
+      expect(dataFlowText()).toContain('${steps.step-1.body.json.');
+    });
+
+    it('[RENDER] a file-upload human step points at its files, not the Parameters form', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'human', ui: { component: 'file-upload' } })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      const text = dataFlowText();
+      expect(text).toContain('{ files }');
+      expect(text).toContain('${steps.step-1.files}');
+    });
+
+    it('[RENDER] a verdict-only human step (no params) says its output is the verdict', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'human' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      const text = dataFlowText();
+      expect(text).toContain('{ verdict }');
+      expect(text).toContain('${steps.step-1.verdict}');
+    });
+
+    it('[RENDER] a registered plugin describes its own contract instead of the fallback', () => {
+      pluginState.plugins = [{
+        name: 'databricks-job',
+        metadata: {
+          inputDescription: 'step.databricks: jobId + optional notebookParams.',
+          outputDescription: 'JSON object the notebook exits with.',
+        },
+      }];
+
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'script', plugin: 'databricks-job' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Script');
+      const text = dataFlowText();
+      expect(text).toContain('JSON object the notebook exits with.');
+      expect(text).not.toContain('/output/result.json');
+    });
+
+    // step.params only reach a task on the engine's human-executor branch.
+    it('[RENDER] warns that parameters on a non-human step are never collected', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'agent' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Advanced');
+      expect(screen.getByText(/only collected on human steps/i)).toBeInTheDocument();
+    });
+
+    it('[RENDER] a human step gets no such warning — its parameters are the form', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'human' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      expect(screen.queryByText(/only collected on human steps/i)).not.toBeInTheDocument();
+    });
+
+    it('[RENDER] terminal steps get no data flow panel — nothing reads them', () => {
+      render(
+        <StepEditor
+          step={buildStep({ type: 'terminal', executor: 'human' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expect(screen.queryByTestId('step-data-flow')).not.toBeInTheDocument();
     });
   });
 });
