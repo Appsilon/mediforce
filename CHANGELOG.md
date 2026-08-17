@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-08-16]
+
 ### Added
 - A workspace with no workflows now offers **Import example workflows** next to **New workflow**. The box opens the import dialog straight on the Mediforce examples — no repository to fill in — presented as a card grid with tag filters, and both boxes disappear as soon as the workspace holds a workflow [#517](https://github.com/Appsilon/mediforce/issues/517).
 
