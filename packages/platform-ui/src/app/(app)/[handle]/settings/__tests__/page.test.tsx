@@ -7,6 +7,7 @@ import type { NamespaceMemberWithAuth } from '@mediforce/platform-api/contract';
 
 const listMembersMock = vi.fn();
 const resendInviteMock = vi.fn();
+const inviteMock = vi.fn();
 
 vi.mock('@/lib/mediforce', () => ({
   // The component reads `err.message` off any Error, so the resend path needs no
@@ -16,6 +17,7 @@ vi.mock('@/lib/mediforce', () => ({
     users: {
       listMembers: (...args: unknown[]) => listMembersMock(...args),
       resendInvite: (...args: unknown[]) => resendInviteMock(...args),
+      invite: (...args: unknown[]) => inviteMock(...args),
     },
   },
 }));
@@ -99,6 +101,7 @@ function renderPage() {
 beforeEach(() => {
   listMembersMock.mockReset();
   resendInviteMock.mockReset();
+  inviteMock.mockReset();
   listMembersMock.mockResolvedValue({ members: [OWNER, PENDING, ACTIVATED] });
   namespaceType = 'organization';
 });
@@ -132,6 +135,31 @@ describe('WorkspaceConfigPage — resend invite', () => {
         screen.getByText('Cannot resend invite: user has already activated their account'),
       ).toBeInTheDocument(),
     );
+  });
+});
+
+describe('WorkspaceConfigPage — invite', () => {
+  it('[refresh] shows the invited member in the table without a reload', async () => {
+    const INVITED = member({ uid: 'invited-uid', displayName: 'Invited Person' });
+    inviteMock.mockResolvedValue({
+      email: 'invited@acme.dev',
+      emailSent: true,
+      isExisting: false,
+    });
+    renderPage();
+
+    await screen.findByText('Pending Person');
+    expect(screen.queryByText('Invited Person')).not.toBeInTheDocument();
+
+    // The refreshed list carries the new member — the page must re-read it
+    // after the invite instead of waiting for a page load.
+    listMembersMock.mockResolvedValue({ members: [OWNER, PENDING, ACTIVATED, INVITED] });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await userEvent.type(screen.getByLabelText(/Email/), 'invited@acme.dev');
+    await userEvent.click(screen.getByRole('button', { name: 'Send invite' }));
+
+    expect(await screen.findByText('Invited Person')).toBeInTheDocument();
   });
 });
 
