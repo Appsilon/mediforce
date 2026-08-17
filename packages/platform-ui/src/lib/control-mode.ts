@@ -46,14 +46,6 @@ export const CONTROL_MODE_LABELS: Record<ControlMode, string> = {
   'autonomous-agent': 'Autonomous agent',
 };
 
-export const CONTROL_MODE_DESCRIPTIONS: Record<ControlMode, string> = {
-  'no-agent':         'Step handled by a human, script, or action — no AI agent involved.',
-  'assist':            'Human leads and executes; AI reviews the result. (Coming soon)',
-  'cowork':           'Agent and human collaborate in real-time via chat or voice.',
-  'human-review':     'Agent executes, human reviews and approves before the workflow proceeds.',
-  'autonomous-agent': 'Agent executes and the result advances the workflow without human review.',
-};
-
 /** Modes disabled in the wizard (shown but not selectable). */
 export const CONTROL_MODE_DISABLED: Record<ControlMode, boolean> = {
   'no-agent':         false,
