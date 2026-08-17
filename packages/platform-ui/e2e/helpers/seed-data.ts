@@ -572,6 +572,26 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       error: 'API rate limit exceeded — retried 3 times',
       assignedRoles: ['reviewer'],
     },
+    // Dedicated instance for retry-step-audit.journey.ts — isolated from
+    // proc-retry-test because that one is consumed by the L4 UI journey, and
+    // both projects share one MEDIFORCE_DATA_DIR.
+    'proc-retry-audit': {
+      id: 'proc-retry-audit',
+      namespace: 'test',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1',
+      status: 'paused',
+      currentStepId: 'human-review',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: threeDaysAgo,
+      createdBy: testUserId,
+      pauseReason: 'agent_escalated',
+      error: 'Simulated step failure for retry audit journey',
+      assignedRoles: ['reviewer'],
+    },
     // Dedicated runs for runs-names.journey.ts (GET /api/runs/names, #588).
     // Unique definitionNames + ids so the projected { id, definitionName }
     // assertions are deterministic. `proc-names-deleted` carries a non-null
@@ -1376,6 +1396,26 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       iterationNumber: 0,
       gateResult: null,
       error: 'Simulated step failure for retry journey',
+    },
+  };
+
+  const retryAuditStepExecutions: Record<string, Record<string, unknown>> = {
+    // The only execution for human-review, so it is unambiguously the one
+    // retry-step-audit.journey.ts expects as `previousExecutionId`.
+    'exec-retry-audit-fail-1': {
+      id: 'exec-retry-audit-fail-1',
+      instanceId: 'proc-retry-audit',
+      stepId: 'human-review',
+      status: 'failed',
+      input: {},
+      output: null,
+      verdict: null,
+      executedBy: 'auto-runner',
+      startedAt: threeDaysAgo,
+      completedAt: threeDaysAgo,
+      iterationNumber: 0,
+      gateResult: null,
+      error: 'Simulated step failure for retry audit journey',
     },
   };
 
@@ -2405,5 +2445,5 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     }
   }
 
-  return { humanTasks, processInstances, agentRuns, agentEvents, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
+  return { humanTasks, processInstances, agentRuns, agentEvents, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, retryAuditStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
 }
