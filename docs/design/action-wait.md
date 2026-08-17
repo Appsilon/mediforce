@@ -1,7 +1,7 @@
 # action kind: 'wait'
 
-**Status:** Draft  
-**Date:** 2026-05-26  
+**Status:** Implemented  
+**Date:** 2026-05-26 (implementation notes updated 2026-08-17)  
 **Issue:** #521
 
 ## Problem
@@ -121,62 +121,37 @@ if (output.__wait && typeof output.__wait === 'object') {
 }
 ```
 
-#### 2. At top of loop — check if timer-paused instance is ready
+#### 2. Verify the pause write committed
 
-```ts
-if (instance.status === 'paused' && instance.pauseReason === 'waiting_for_timer') {
-  const waitMeta = instance.variables.__wait;
-  const now = new Date();
-  const resumeAt = new Date(waitMeta.resumeAt);
-
-  let conditionMet = false;
-  if (waitMeta.condition) {
-    conditionMet = evaluateExpression(waitMeta.condition, {
-      output: instance.variables,
-      variables: instance.variables,
-    });
-  }
-
-  if (now >= resumeAt || conditionMet) {
-    const waitedSeconds = Math.round((now.getTime() - new Date(waitMeta.pausedAt).getTime()) / 1000);
-    const resumeReason = conditionMet ? 'condition_met'
-      : 'duration_elapsed';
-    const waitOutput = { resumeReason, waitedSeconds, resolvedAt: now.toISOString() };
-
-    const { __wait: _, ...cleanVars } = instance.variables;
-    await instanceRepo.update(instanceId, {
-      status: 'running', pauseReason: null,
-      variables: { ...cleanVars, [waitMeta.stepId]: waitOutput },
-      updatedAt: now.toISOString(),
-    });
-    await engine.advanceStep(instanceId, waitOutput, { id: 'auto-runner', role: 'system' });
-    continue;
-  }
-  break; // not ready yet, next poll will re-check
-}
-```
+The pause is two writes against a repository with no transaction guarantee, so
+the second one (`pauseReason` + `__wait`) can be lost silently — leaving the run
+`paused` with a null reason, which no sweep recognises and no user can act on.
+The auto-runner re-reads the instance after the write and escalates to `failed`
+when `pauseReason !== 'waiting_for_timer'`, rather than letting the run stall
+forever.
 
 ### Resume path
 
-**Critical:** The run endpoint (`POST /api/processes/:id/run`) rejects paused instances with 409. The auto-runner loop guards `if (instance.status !== 'running') break`. So the timer resume logic has no execution path through the existing code.
+**Critical:** The run endpoint (`POST /api/processes/:id/run`) rejects paused instances with 409. The auto-runner loop guards `if (instance.status !== 'running') break`. So the timer resume cannot live inside that loop.
 
-**Solution: dedicated resume-wait endpoint.** New route `POST /api/processes/:id/resume-wait`:
+**Solution: dedicated resume-wait endpoint.** `POST /api/processes/:id/resume-wait`, a thin route adapter over the `resumeWait` handler:
 
-1. Load instance, verify `status === 'paused' && pauseReason === 'waiting_for_timer'`
+1. Load instance, verify `status === 'paused' && pauseReason === 'waiting_for_timer'` (else `PreconditionFailedError`)
 2. Read `variables.__wait`, check `resumeAt <= now` or evaluate `condition`
-3. If ready: set `status: 'running'`, clear `pauseReason`, write wait output, call `engine.advanceStep()`
-4. If not ready: return 200 with `{ ready: false, resumeAt }`
+3. If ready: set `status: 'running'`, clear `pauseReason`, write wait output, call `engine.advanceStep()`, then audit + kick (best-effort, after the state write commits)
+4. If not ready: return `{ resumed: false, resumeAt }`
 
 This avoids modifying the `status !== 'running'` guard that protects other code paths.
 
 ### Polling / heartbeat
 
-**The cron heartbeat at `platform-ui/src/app/api/cron/heartbeat/route.ts` today only fires cron-triggered workflow instances.** It does NOT sweep paused instances. A new section must be added:
+**The cron heartbeat originally only fired cron-triggered workflow instances.** It gained a sweep:
 
 1. Query all instances: `status === 'paused' && pauseReason === 'waiting_for_timer'`
-2. For each, check `variables.__wait.resumeAt <= now` (cheap, no expression eval needed for time check)
-3. POST `resume-wait` endpoint for eligible instances
-4. Catch per-instance errors (don't let one broken condition crash the sweep)
+2. For each, call `resumeWait` in-process (not over HTTP — the sweep and the handler share a process)
+3. Catch per-instance errors (don't let one broken condition crash the sweep)
+
+A sibling sweep escalates `paused` runs with a null `pauseReason` — the lost-write case above, for runs that predate the post-write verification.
 
 This gives ~15-min granularity at zero infrastructure cost.
 
@@ -253,6 +228,21 @@ interface WaitActionOutput {
 
 ### Spawn + wait-for-children pattern
 
+**Not implemented as written below.** No mechanism writes child completion back
+into the parent's variables, and neither the heartbeat sweep nor `resumeWait`
+queries child instance statuses — so a `condition` referencing child progress
+(`allCompleted`, response counts) never becomes true and the run simply waits
+out its `deadline`. `condition` works against variables the *parent's own* steps
+wrote; it cannot observe children.
+
+The shipped pattern (see `apps/team-pulse`) is **deadline-only wait, then
+collect**: spawn → wait until `deadline` → a script step reads
+`steps.<spawn>.spawned[].instanceId` and fetches each child to gather results,
+tolerating children that never finished. Closing the gap needs either
+child→parent write-back or a child-status query in the sweep —
+[#1215](https://github.com/Appsilon/mediforce/issues/1215),
+[action-spawn.md](action-spawn.md) Open Questions §3.
+
 ```json
 [
   {
@@ -314,8 +304,11 @@ Example conditions:
 
 | Expression | Meaning |
 |---|---|
-| `variables.spawn_perspectives.allCompleted == true` | All child workflows done |
-| `variables.collect.responseCount >= 5` | Enough responses |
+| `variables.collect.responseCount >= 5` | A parent step recorded enough responses |
+| `variables.poll_status.ready == true` | A parent step polled an external system and set a flag |
+
+Both read variables written by **the parent's own earlier steps**. Child
+workflow state is not visible to `condition` — see the spawn+wait note above.
 
 **Constraint:** Step IDs used in condition expressions must use underscores, not hyphens. The expression parser's `isIdentChar()` only accepts `[a-zA-Z_0-9]` — hyphens would be parsed as subtraction. Example: use `spawn_perspectives` not `spawn-perspectives` as the step ID.
 
@@ -329,11 +322,17 @@ Example conditions:
 | `core-actions/handlers/__tests__/wait.test.ts` | New file: handler tests |
 | `core-actions/types.ts` | Add `WaitActionHandler` type |
 | `core-actions/index.ts` | Re-export `waitActionHandler` |
-| `platform-ui/.../run/route.ts` | `__wait` sentinel detection after action dispatch (before `advanceStep`) |
-| `platform-ui/src/app/api/processes/[instanceId]/resume-wait/route.ts` | New endpoint: check timer, resume if ready |
-| `platform-ui/src/app/api/cron/heartbeat/route.ts` | Add sweep: query `waiting_for_timer` instances, POST resume-wait for eligible |
-| `platform-ui/lib/workflow-status.ts` | Add `waiting_for_timer` display mapping |
+| `platform-ui/src/app/api/processes/[instanceId]/run/route.ts` | `__wait` sentinel detection after action dispatch (before `advanceStep`) + post-write pause verification |
+| `platform-api/handlers/processes/resume-wait.ts` | New handler: check timer, resume if ready |
+| `platform-ui/src/app/api/processes/[instanceId]/resume-wait/route.ts` | Route adapter over `resumeWait` |
+| `platform-api/handlers/cron/heartbeat.ts` | Sweep: query `waiting_for_timer` instances, call `resumeWait` for eligible |
+| `platform-core/src/utils/workflow-status.ts` | `waiting_for_timer` display mapping (→ `in_progress`) |
 | `platform-api/services/platform-services.ts` | Register `waitActionHandler` |
+
+The auto-runner loop itself is still an inline Next.js route — it is the one
+orchestration endpoint the headless migration (ADR-0005) deliberately left in
+`platform-ui`, so the sentinel-detection half of this design lives there while
+the resume half is a headless handler.
 
 ## Edge cases
 
@@ -341,16 +340,18 @@ Example conditions:
 2. **Duration zero**: rejected by superRefine validation.
 3. **Condition already true at pause time**: resolves on next heartbeat poll (~15 min max).
 4. **Instance manually resumed**: `pauseReason` cleared → auto-runner re-enters wait step, handler checks deadline again (idempotent — if deadline passed, returns immediately; if not, re-pauses with fresh `__wait`).
-5. **Server restart**: no in-memory state. `resumeAt` and `condition` persisted in Firestore. Heartbeat picks up on next tick.
+5. **Server restart**: no in-memory state. `resumeAt` and `condition` persisted with the run. Heartbeat picks up on next tick.
 6. **Condition expression throws**: heartbeat sweep catches per-instance errors, logs, continues to next instance. Never crashes the entire sweep.
 7. **Two sequential wait steps**: first wait's `__wait` is cleaned up on resume before second wait writes its own. No collision.
 8. **`__wait` collision with external API response**: tighter sentinel check: verify `output.__wait?.stepId` matches current step ID, not just `typeof === 'object'`.
+9. **Wait step re-entered by a workflow loop**: each visit dispatches a fresh wait. The previous cycle's resolved output is still in `variables[stepId]`, but it is not a completed wait for *this* visit — reusing it would advance the loop instantly.
+10. **`deadline` fed by a `datetime` param**: params are stored as UTC ISO strings, so `new Date(deadline)` needs no timezone reconciliation. The UI shows the browser timezone next to the field so the author can see what instant the server will act on.
 
 ## Design decisions
 
 **`__wait` sentinel pattern.** Handlers are pure functions that return data — they can't pause instances directly. The auto-runner owns lifecycle transitions, so it intercepts the sentinel.
 
-**`variables.__wait` not a first-class field.** Avoids Firestore migration and touching every ProcessInstance read path.
+**`variables.__wait` not a first-class field.** Avoids a storage migration and touching every ProcessInstance read path.
 
 **Cron heartbeat for v1.** BullMQ upgrade path is clean when sub-minute precision matters.
 

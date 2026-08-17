@@ -1,7 +1,7 @@
 # action kind: 'spawn'
 
-**Status:** Draft  
-**Date:** 2026-05-26 (updated 2026-05-27)  
+**Status:** Implemented  
+**Date:** 2026-05-26 (updated 2026-08-17)  
 **Issue:** #521  
 **Decision:** `forEach` lives in spawn action, not on WorkflowStepSchema.
 Fan-out over multi-step sub-graphs = child workflows. Engine stays linear (single `currentStepId`).
@@ -222,9 +222,14 @@ Hard cap of 50 spawns per step execution. Error: `"spawn fan-out exceeds maximum
 
 ### Parent-child tracking
 
-`triggeredBy` on child instance set to `spawn:<parentInstanceId>`. Queryable today without schema changes.
-
-**Known limitation:** `triggeredBy` is copied to `ProcessInstance.createdBy`, which means the child's `createdBy` will show `spawn:abc123` instead of a human actor. Any UI/audit code displaying `createdBy` as a person will show a machine reference. This is acceptable for v1 but explicit `parentInstanceId`/`childInstanceIds` fields on `ProcessInstanceSchema` are required before multi-tenant production use.
+The child instance carries `triggeredBy: 'spawn'` plus an explicit
+`parentInstanceId` on `ProcessInstanceSchema`, threaded through
+`ManualTrigger.fireWorkflow` → `WorkflowEngine`. The link is a first-class
+field rather than a parsed `spawn:<id>` string in `triggeredBy`, so `createdBy`
+keeps meaning "a person" and parent→child queries need no string surgery.
+There is no reciprocal `childInstanceIds` array — children are found by
+querying on `parentInstanceId`, which avoids an unbounded array on the parent
+row and a second write per spawn.
 
 ## Changes by File
 
@@ -232,18 +237,21 @@ Hard cap of 50 spawns per step execution. Error: `"spawn fan-out exceeds maximum
 |------|--------|
 | `platform-core/schemas/workflow-definition.ts` | Add `SpawnTargetSchema`, `SpawnActionConfigSchema`; extend `ActionConfigSchema` union; add forEach+array validation to `validateSteps` |
 | `platform-core/index.ts` | Re-export new schemas and types |
-| `core-actions/types.ts` | Extend `ActionContext` with `namespace: string`; add `SpawnActionHandler` type alias; extend `InterpolationSources` with optional `item` field |
-| `core-actions/interpolation.ts` | Add `item` as a resolvable root in `resolvePath()` |
+| `core-actions/types.ts` | Extend `ActionContext` with `namespace`; add `SpawnActionHandler` type alias |
+| `platform-core/interpolation.ts` | Add optional `item` to `InterpolationSources` and as a resolvable root in `resolvePath()` |
 | `core-actions/handlers/spawn.ts` | New file. Factory `createSpawnActionHandler(...)` |
 | `core-actions/handlers/__tests__/spawn.test.ts` | New file. Handler tests (single, fan-out, errors, empty forEach) |
 | `core-actions/index.ts` | Export `createSpawnActionHandler` |
 | `platform-api/services/platform-services.ts` | Register spawn handler: `actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo))` |
-| `platform-ui/.../run/route.ts` | Pass `namespace: initialInstance.namespace` in `ActionContext` |
+| `platform-ui/src/app/api/processes/[instanceId]/run/route.ts` | Pass `namespace: initialInstance.namespace` in `ActionContext` (the auto-runner loop is still an inline route — see ADR-0005) |
 | `core-actions/validate-action-secrets.ts` | Scan spawn `payload` values for `${secrets.*}` refs |
 
-### Follow-up (separate PR)
+### Not done
 
-`apps/backlog-triage/src/backlog-triage.wd.json` — refactor `dispatch` step to use `spawn` action for agent runs instead of inline script.
+`apps/backlog-triage/src/backlog-triage.wd.json` still dispatches via the inline
+`fetch` script this document was written to replace. The problem statement above
+therefore still describes live code. `apps/team-pulse` is the reference consumer
+of the `spawn` action.
 
 ## Relation to `wait` Action
 
@@ -253,7 +261,12 @@ Hard cap of 50 spawns per step execution. Error: `"spawn fan-out exceeds maximum
 spawn step --> ... other steps ... --> wait step --> next step
 ```
 
-`spawn` output is designed with `wait` in mind: `spawned[].instanceId` is the join key. No schema changes to `spawn` needed when `wait` lands.
+`spawned[].instanceId` is the join key. **But the join is manual today:** `wait`
+can only pause on a `duration` or `deadline` (its `condition` sees the parent's
+own variables, never a child's status), so a parent waits out the deadline and
+then a script step fetches each `spawned[].instanceId` to collect results —
+tolerating children that never finished. "Wait until all children complete" does
+not exist; see Open Questions §3.
 
 ## Design Decisions
 
@@ -282,5 +295,5 @@ Decision: spawn child workflows (option a-ish with child WDs). Each child is a f
 ## Open Questions
 
 1. **Cross-namespace spawn.** v1 restricts to parent's namespace. CRO-to-sponsor use cases may need cross-namespace with permission grants later.
-2. **Concurrency.** Fan-out spawns sequential in v1. `Promise.all` risks Firestore write overload. Future: configurable `concurrency` parameter.
-3. **Child → parent write-back.** The `wait` action needs to know when children complete. Two options: (a) the wait handler's heartbeat actively queries child instance statuses via `instanceRepo.getById()`, or (b) child completion triggers a callback that updates parent variables. v1 uses (a) — the heartbeat sweep checks child statuses on each poll. No write-back mechanism needed.
+2. **Concurrency.** Fan-out spawns sequential in v1. `Promise.all` risks overloading the storage backend with concurrent writes. Future: configurable `concurrency` parameter.
+3. **Child → parent write-back. Still open — neither option shipped** ([#1215](https://github.com/Appsilon/mediforce/issues/1215)). The `wait` action needs to know when children complete. Two options: (a) the heartbeat sweep queries child instance statuses via `parentInstanceId` before deciding whether a wait is resolved, or (b) child completion writes back into the parent's variables. Today it does neither: a parent waits out its deadline and a downstream script step fetches the children by `spawned[].instanceId`. (a) is the cheaper fix — `parentInstanceId` already exists, so the sweep can count non-terminal children with one query and no new write path.
