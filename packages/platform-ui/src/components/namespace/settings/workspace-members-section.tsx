@@ -3,17 +3,13 @@
 import { useState } from 'react';
 import { Check } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import type { InviteUserOutput, ResendInviteOutput } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import type { NamespaceMemberDetail } from '@/hooks/use-namespace-members';
 import { useRemoveMember, useUpdateMemberRole } from '@/hooks/use-namespace-mutations';
 import { MembersTable } from './members-table';
-import { InviteUserForm, type InviteResult } from './invite-user-form';
-
-interface ResendResult {
-  email: string;
-  emailSent: boolean;
-}
+import { InviteUserForm, type InviteDraft, EMPTY_INVITE_DRAFT } from './invite-user-form';
 
 interface WorkspaceMembersSectionProps {
   handle: string;
@@ -23,8 +19,6 @@ interface WorkspaceMembersSectionProps {
   isOwner: boolean;
   currentUserId: string | undefined;
   inviterName: string | undefined;
-  /** Re-reads the members list after a mutation. */
-  onMembersChanged: () => void;
   /** Surfaces a failed member mutation in the page-level danger banner. */
   onError: (message: string | null) => void;
 }
@@ -37,28 +31,35 @@ export function WorkspaceMembersSection({
   isOwner,
   currentUserId,
   inviterName,
-  onMembersChanged,
   onError,
 }: WorkspaceMembersSectionProps) {
   const qc = useQueryClient();
 
   const [showInviteForm, setShowInviteForm] = useState(false);
-  const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
+  // The draft outlives the form so Cancel keeps a half-typed invite; only a
+  // sent invite clears it.
+  const [inviteDraft, setInviteDraft] = useState<InviteDraft>(EMPTY_INVITE_DRAFT);
+  const [inviteResult, setInviteResult] = useState<InviteUserOutput | null>(null);
   const [resendingUid, setResendingUid] = useState<string | null>(null);
-  const [resendResult, setResendResult] = useState<ResendResult | null>(null);
+  const [resendResult, setResendResult] = useState<ResendInviteOutput | null>(null);
   const [resendError, setResendError] = useState<string | null>(null);
 
   const removeMember = useRemoveMember(handle);
   const updateMemberRole = useUpdateMemberRole(handle);
 
-  async function handleInvited(result: InviteResult) {
+  /** Re-reads the members list after a mutation that changed it. */
+  async function refreshMembers() {
+    await qc.invalidateQueries({ queryKey: queryKeys.namespaceMembers(handle) });
+  }
+
+  async function handleInvited(result: InviteUserOutput) {
     setInviteResult(result);
     setShowInviteForm(false);
-    // Refresh the members list — PR4 swapped the previous onSnapshot
-    // subscription for `useNamespace` react-query, so the cache needs an
-    // explicit invalidation now that the invite mutation isn't a hook.
+    setInviteDraft(EMPTY_INVITE_DRAFT);
+    // The invite is a plain contract call rather than a react-query mutation,
+    // so both caches holding the new member need an explicit invalidation.
     await qc.invalidateQueries({ queryKey: queryKeys.namespace(handle) });
-    onMembersChanged();
+    await refreshMembers();
   }
 
   async function handleResendInvite(memberUid: string) {
@@ -70,11 +71,8 @@ export function WorkspaceMembersSection({
         uid: memberUid,
         namespaceHandle: handle,
       });
-      setResendResult({
-        email: data.email,
-        emailSent: data.emailSent,
-      });
-      onMembersChanged();
+      setResendResult(data);
+      await refreshMembers();
     } catch (err: unknown) {
       // The button is hidden once a member has signed in, but a member who set
       // a password without ever signing in still isn't pending, so the handler
@@ -92,7 +90,7 @@ export function WorkspaceMembersSection({
     onError(null);
     try {
       await removeMember.mutateAsync({ handle, uid: memberUid });
-      onMembersChanged();
+      await refreshMembers();
     } catch (err: unknown) {
       onError(err instanceof Error ? err.message : 'Failed to remove member.');
     }
@@ -103,7 +101,7 @@ export function WorkspaceMembersSection({
     const nextRole: 'admin' | 'member' = currentRole === 'admin' ? 'member' : 'admin';
     try {
       await updateMemberRole.mutateAsync({ handle, uid: memberUid, role: nextRole });
-      onMembersChanged();
+      await refreshMembers();
     } catch (err: unknown) {
       onError(err instanceof Error ? err.message : 'Failed to update member role.');
     }
@@ -215,6 +213,8 @@ export function WorkspaceMembersSection({
         <InviteUserForm
           handle={handle}
           inviterName={inviterName}
+          draft={inviteDraft}
+          onDraftChange={setInviteDraft}
           onInvited={handleInvited}
           onCancel={() => setShowInviteForm(false)}
         />

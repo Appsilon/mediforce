@@ -1,5 +1,3 @@
-'use client';
-
 import { Fragment } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';

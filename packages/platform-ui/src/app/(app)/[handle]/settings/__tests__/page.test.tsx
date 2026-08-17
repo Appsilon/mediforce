@@ -161,6 +161,18 @@ describe('WorkspaceConfigPage — invite', () => {
 
     expect(await screen.findByText('Invited Person')).toBeInTheDocument();
   });
+
+  it('[draft] keeps a half-typed invite when the form is cancelled and reopened', async () => {
+    renderPage();
+
+    await screen.findByText('Pending Person');
+    await userEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+    await userEvent.type(screen.getByLabelText(/Email/), 'half-typed@acme.dev');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Invite user' }));
+
+    expect(screen.getByLabelText(/Email/)).toHaveValue('half-typed@acme.dev');
+  });
 });
 
 describe('WorkspaceConfigPage — danger zone', () => {

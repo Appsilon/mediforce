@@ -7,12 +7,12 @@ import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
 import { useNamespaceMembers } from '@/hooks/use-namespace-members';
-import { NamespaceSecretsEditor } from '@/components/namespace/namespace-secrets-editor';
 import { DefaultWorkspaceSection } from '@/components/namespace/settings/default-workspace-section';
 import { WorkspaceAdministrationSection } from '@/components/namespace/settings/workspace-administration-section';
 import { WorkspaceDangerZone } from '@/components/namespace/settings/workspace-danger-zone';
 import { WorkspaceMembersSection } from '@/components/namespace/settings/workspace-members-section';
 import { WorkspaceProfileSection } from '@/components/namespace/settings/workspace-profile-section';
+import { WorkspaceSecretsSection } from '@/components/namespace/settings/workspace-secrets-section';
 
 export default function WorkspaceConfigPage() {
   const params = useParams();
@@ -21,7 +21,7 @@ export default function WorkspaceConfigPage() {
 
   const { user } = useAuth();
   const { namespace, personalHandles, loading: namespaceLoading } = useNamespace(handle);
-  const { members, loading: membersLoading, refresh: refreshMembers } = useNamespaceMembers(handle);
+  const { members, loading: membersLoading } = useNamespaceMembers(handle);
 
   const currentUserMember = useMemo(
     () =>
@@ -103,17 +103,11 @@ export default function WorkspaceConfigPage() {
           isOwner={isOwner}
           currentUserId={user?.id}
           inviterName={user?.name ?? user?.email ?? undefined}
-          onMembersChanged={() => { void refreshMembers(); }}
           onError={setDangerError}
         />
 
-        {canEditProfile && user?.id && (
-          <div className="mb-10 space-y-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace Secrets</h2>
-            <div className="rounded-lg border bg-card px-4 py-5">
-              <NamespaceSecretsEditor namespace={handle} userId={user.id} />
-            </div>
-          </div>
+        {canEditProfile && user !== null && user.id !== '' && (
+          <WorkspaceSecretsSection handle={handle} userId={user.id} />
         )}
 
         {canEditProfile && <WorkspaceAdministrationSection handle={handle} />}

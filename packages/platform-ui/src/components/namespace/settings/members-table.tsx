@@ -101,8 +101,7 @@ export function MembersTable({
             const initials = name.includes(' ')
               ? `${name.split(' ')[0]?.[0] ?? ''}${name.split(' ')[1]?.[0] ?? ''}`.toUpperCase()
               : name.slice(0, 2).toUpperCase();
-            const neverSignedIn =
-              member.lastSignInTime === null || member.lastSignInTime === undefined;
+            const lastSignIn = member.lastSignInTime ?? null;
 
             return (
               <tr key={member.id} className="hover:bg-muted/30 transition-colors">
@@ -158,9 +157,9 @@ export function MembersTable({
                 {/* Last sign in — owner/admin only; server returns null for members */}
                 {canManageMembers && (
                   <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
-                    {member.lastSignInTime === null || member.lastSignInTime === undefined
+                    {lastSignIn === null
                       ? <span className="text-muted-foreground/50">Never</span>
-                      : formatLastSignIn(member.lastSignInTime)}
+                      : formatLastSignIn(lastSignIn)}
                   </td>
                 )}
 
@@ -173,7 +172,7 @@ export function MembersTable({
                             still pending. Once the member has signed in
                             the backend refuses the resend, so hide it
                             rather than surface a confusing error. */}
-                        {neverSignedIn && (
+                        {lastSignIn === null && (
                           <button
                             type="button"
                             onClick={() => onResendInvite(member.uid)}

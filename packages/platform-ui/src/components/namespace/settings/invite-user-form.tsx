@@ -1,28 +1,36 @@
 'use client';
 
 import { useState } from 'react';
+import type { InviteUserInput, InviteUserOutput } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 
-type MemberRole = 'member' | 'admin';
-
-export interface InviteResult {
+export interface InviteDraft {
   email: string;
-  emailSent: boolean;
-  isExisting: boolean;
+  displayName: string;
+  role: InviteUserInput['role'];
 }
+
+export const EMPTY_INVITE_DRAFT: InviteDraft = { email: '', displayName: '', role: 'member' };
 
 interface InviteUserFormProps {
   handle: string;
   /** Shown to the invitee as who invited them. */
   inviterName: string | undefined;
-  onInvited: (result: InviteResult) => void;
+  /** Held by the section so Cancel does not throw away a half-typed invite. */
+  draft: InviteDraft;
+  onDraftChange: (draft: InviteDraft) => void;
+  onInvited: (result: InviteUserOutput) => void;
   onCancel: () => void;
 }
 
-export function InviteUserForm({ handle, inviterName, onInvited, onCancel }: InviteUserFormProps) {
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState<MemberRole>('member');
+export function InviteUserForm({
+  handle,
+  inviterName,
+  draft,
+  onDraftChange,
+  onInvited,
+  onCancel,
+}: InviteUserFormProps) {
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +38,7 @@ export function InviteUserForm({ handle, inviterName, onInvited, onCancel }: Inv
     event.preventDefault();
     setError(null);
 
-    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedEmail = draft.email.trim().toLowerCase();
     if (trimmedEmail === '') {
       setError('Email is required.');
       return;
@@ -40,17 +48,13 @@ export function InviteUserForm({ handle, inviterName, onInvited, onCancel }: Inv
     try {
       const data = await mediforce.users.invite({
         email: trimmedEmail,
-        displayName: name.trim() !== '' ? name.trim() : undefined,
+        displayName: draft.displayName.trim() !== '' ? draft.displayName.trim() : undefined,
         namespaceHandle: handle,
-        role,
+        role: draft.role,
         inviterName,
       });
 
-      onInvited({
-        email: data.email,
-        emailSent: data.emailSent,
-        isExisting: data.isExisting,
-      });
+      onInvited(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to send invite.');
     } finally {
@@ -69,8 +73,8 @@ export function InviteUserForm({ handle, inviterName, onInvited, onCancel }: Inv
           <input
             id="inviteEmail"
             type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={draft.email}
+            onChange={(e) => onDraftChange({ ...draft, email: e.target.value })}
             placeholder="colleague@example.com"
             className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             disabled={inviting}
@@ -85,8 +89,8 @@ export function InviteUserForm({ handle, inviterName, onInvited, onCancel }: Inv
           <input
             id="inviteName"
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={draft.displayName}
+            onChange={(e) => onDraftChange({ ...draft, displayName: e.target.value })}
             placeholder="Jane Smith"
             className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             disabled={inviting}
@@ -99,8 +103,8 @@ export function InviteUserForm({ handle, inviterName, onInvited, onCancel }: Inv
           </label>
           <select
             id="inviteRole"
-            value={role}
-            onChange={(e) => setRole(e.target.value as MemberRole)}
+            value={draft.role}
+            onChange={(e) => onDraftChange({ ...draft, role: e.target.value as InviteDraft['role'] })}
             className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             disabled={inviting}
           >
