@@ -360,7 +360,7 @@ importers:
         version: 6.43.2
       '@hookform/resolvers':
         specifier: ^5.0.0
-        version: 5.7.1(@standard-schema/spec@1.1.0)(ajv@8.18.0)(react-hook-form@7.85.0(react@19.2.8))(zod@4.4.3)
+        version: 5.7.1(@standard-schema/spec@1.1.0)(ajv@8.20.0)(react-hook-form@7.85.0(react@19.2.8))(zod@4.4.3)
       '@lezer/highlight':
         specifier: ^1.2.3
         version: 1.2.3
@@ -4699,13 +4699,13 @@ snapshots:
     dependencies:
       hono: 4.13.1
 
-  '@hookform/resolvers@5.7.1(@standard-schema/spec@1.1.0)(ajv@8.18.0)(react-hook-form@7.85.0(react@19.2.8))(zod@4.4.3)':
+  '@hookform/resolvers@5.7.1(@standard-schema/spec@1.1.0)(ajv@8.20.0)(react-hook-form@7.85.0(react@19.2.8))(zod@4.4.3)':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.85.0(react@19.2.8)
     optionalDependencies:
       '@standard-schema/spec': 1.1.0
-      ajv: 8.18.0
+      ajv: 8.20.0
       zod: 4.4.3
 
   '@img/colour@1.1.0':
