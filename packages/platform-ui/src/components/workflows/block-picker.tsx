@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { User, Bot, Terminal, PenLine, GitBranch, Search, Mail, Plus, X } from 'lucide-react';
 import { BLOCK_PRESETS, BLOCK_CATEGORIES, type BlockCategory, type BlockPreset } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
@@ -170,25 +170,74 @@ function BlockNodePreview({ label, executor, autonomyLevel, stepType, badge, dim
   );
 }
 
-/** A hover tooltip anchored under the option it explains. */
-function OptionTooltip({ children }: { children: React.ReactNode }) {
+/**
+ * An option plus its description.
+ *
+ * The description flies out to the left on hover, positioned `fixed` so it is
+ * never clipped by the panel's scroll container and always sits above the
+ * canvas. A screen-reader copy stays inside the button so the description is
+ * still attached to the control it explains.
+ */
+function OptionButton({ testId, disabled, onPick, description, children }: {
+  testId: string;
+  disabled: boolean;
+  onPick: () => void;
+  description: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
+
+  const show = () => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (rect) setAnchor({ top: rect.top, left: rect.left });
+  };
+  const hide = () => setAnchor(null);
+
   return (
-    <span className="pointer-events-none absolute left-0 right-0 top-full z-50 mt-1 rounded-md border bg-popover px-2.5 py-2 text-[10px] font-normal leading-relaxed text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
-      {children}
-    </span>
+    <>
+      <button
+        ref={ref}
+        type="button"
+        data-testid={testId}
+        disabled={disabled}
+        onClick={onPick}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onFocus={show}
+        onBlur={hide}
+        className={cn('group relative block w-full', disabled ? 'cursor-not-allowed' : 'cursor-pointer')}
+      >
+        {children}
+        <span className="sr-only">{description}</span>
+      </button>
+      {anchor !== null && (
+        <div
+          style={{ position: 'fixed', top: anchor.top, left: anchor.left - 8, transform: 'translateX(-100%)' }}
+          className="pointer-events-none z-[200] w-64 rounded-md border bg-popover px-2.5 py-2 text-[10px] leading-relaxed text-popover-foreground shadow-md"
+        >
+          {description}
+        </div>
+      )}
+    </>
   );
 }
 
 export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
   const [tier, setTier] = useState<Tier>('simple');
   const [pendingType, setPendingType] = useState<'creation' | 'decision'>('creation');
-  // Sections size to their content, so all can be open without a two-option
-  // category stretching down the panel.
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // One section at a time, first open — the step editor's accordion. Cards size
+  // to their content so a one-option section does not stretch down the panel.
+  const [openSection, setOpenSection] = useState<string>(BLOCK_CATEGORIES[0]);
   const { capabilities } = useCapabilities();
 
-  const isOpen = (key: string) => collapsed[key] !== true;
-  const toggle = (key: string) => setCollapsed((prev) => ({ ...prev, [key]: prev[key] !== true }));
+  const isOpen = (key: string) => openSection === key;
+  const toggle = (key: string) => setOpenSection((current) => (current === key ? '' : key));
+
+  const switchTier = (next: Tier) => {
+    setTier(next);
+    setOpenSection(next === 'simple' ? BLOCK_CATEGORIES[0] : CM_ROWS[0].cm);
+  };
 
   const handleAdd = (payload: Omit<NewStepPayload, 'type'>) => {
     onAdd({ ...payload, type: pendingType });
@@ -203,7 +252,7 @@ export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-      {/* Header card — title, close, and which tier is showing */}
+      {/* Header card — title, close, tier, and (in Full) the step type */}
       <div className="shrink-0 rounded-xl border shadow-lg bg-white dark:bg-background overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3">
           <Plus className="h-4 w-4 text-primary shrink-0" />
@@ -220,13 +269,14 @@ export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="border-t px-4 py-3">
+
+        <div className="border-t px-4 py-3 space-y-2.5">
           <div className="flex rounded-lg border p-0.5">
             {(['simple', 'full'] as const).map((value) => (
               <button
                 key={value}
                 data-testid={`picker-tier-${value}`}
-                onClick={() => setTier(value)}
+                onClick={() => switchTier(value)}
                 className={cn(
                   'flex-1 rounded-md py-1 text-xs font-medium transition-colors cursor-pointer',
                   tier === value ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
@@ -236,6 +286,32 @@ export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
               </button>
             ))}
           </div>
+
+          {tier === 'full' && (
+            <div className="flex gap-2">
+              {STEP_TYPE_OPTIONS.map((opt) => (
+                <OptionButton
+                  key={opt.value}
+                  testId={`step-type-option-${opt.value}`}
+                  disabled={false}
+                  onPick={() => setPendingType(opt.value)}
+                  description={opt.purpose}
+                >
+                  <span
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-lg py-1.5 px-2.5 border transition-all',
+                      pendingType === opt.value ? STEP_TYPE_ACTIVE[opt.color] : STEP_TYPE_HOVER[opt.color],
+                    )}
+                  >
+                    {opt.value === 'creation'
+                      ? <PenLine className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                      : <GitBranch className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />}
+                    <span className="min-w-0 flex-1 truncate text-xs font-semibold text-left">{opt.label}</span>
+                  </span>
+                </OptionButton>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -247,6 +323,7 @@ export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
         return (
           <CollapsibleCard
             key={category}
+            testId={`section-${category}`}
             fill={false}
             open={isOpen(category)}
             onToggle={() => toggle(category)}
@@ -264,13 +341,21 @@ export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
                 const status = statusFor(preset);
                 const unavailable = status !== null && status.available === false;
                 return (
-                  <button
+                  <OptionButton
                     key={preset.id}
-                    type="button"
-                    data-testid={`preset-option-${preset.id}`}
+                    testId={`preset-option-${preset.id}`}
                     disabled={unavailable}
-                    onClick={() => onAdd(preset.payload)}
-                    className={cn('group relative block w-full', unavailable ? 'cursor-not-allowed' : 'cursor-pointer')}
+                    onPick={() => onAdd(preset.payload)}
+                    description={
+                      <>
+                        {preset.purpose}
+                        {unavailable && (
+                          <span className="mt-1.5 block text-muted-foreground">
+                            {status?.reason ?? 'Not available on this instance.'}
+                          </span>
+                        )}
+                      </>
+                    }
                   >
                     <BlockNodePreview
                       label={preset.label}
@@ -280,15 +365,7 @@ export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
                       badge={status?.available === true ? status.detail : undefined}
                       dimmed={unavailable}
                     />
-                    <OptionTooltip>
-                      {preset.purpose}
-                      {unavailable && (
-                        <span className="mt-1.5 block text-muted-foreground">
-                          {status?.reason ?? 'Not available on this instance.'}
-                        </span>
-                      )}
-                    </OptionTooltip>
-                  </button>
+                  </OptionButton>
                 );
               })}
             </div>
@@ -296,84 +373,50 @@ export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
         );
       })}
 
-      {tier === 'full' && (
-        <>
-          <CollapsibleCard fill={false} title="Step type" open={isOpen('step-type')} onToggle={() => toggle('step-type')}>
-            <div className="flex gap-2">
-              {STEP_TYPE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  data-testid={`step-type-option-${opt.value}`}
-                  onClick={() => setPendingType(opt.value)}
-                  className={cn(
-                    'group relative flex-1 flex items-center gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all cursor-pointer',
-                    pendingType === opt.value ? STEP_TYPE_ACTIVE[opt.color] : STEP_TYPE_HOVER[opt.color],
-                  )}
+      {/* One card per control mode, so Full folds the same way Simple does. */}
+      {tier === 'full' && CM_ROWS.map((row) => {
+        const controlMode = CM_TO_CONTROL_MODE[row.cm];
+        const disabled = CONTROL_MODE_DISABLED[controlMode];
+        return (
+          <CollapsibleCard
+            key={row.cm}
+            testId={`section-${row.cm}`}
+            fill={false}
+            open={isOpen(row.cm)}
+            onToggle={() => toggle(row.cm)}
+            titleNode={
+              <>
+                <span className="flex items-center gap-0.5 shrink-0">
+                  <CMRowIcon cm={row.cm} color={row.color} />
+                </span>
+                <span className={cn('text-[11px] font-bold shrink-0', CM_LABEL_COLOR[row.color])}>
+                  {CONTROL_MODE_LABELS[controlMode]}
+                </span>
+              </>
+            }
+          >
+            <div className="space-y-2">
+              {row.buttons.map((btn) => (
+                <OptionButton
+                  key={btn.id}
+                  testId={`executor-option-${btn.id}`}
+                  disabled={disabled}
+                  onPick={() => handleAdd(btn.payload)}
+                  description={btn.purpose}
                 >
-                  <span className="shrink-0">
-                    {opt.value === 'creation'
-                      ? <PenLine className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
-                      : <GitBranch className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-xs font-semibold">{opt.label}</span>
-                  <OptionTooltip>{opt.purpose}</OptionTooltip>
-                </button>
+                  <BlockNodePreview
+                    label={btn.label}
+                    executor={btn.payload.executor}
+                    autonomyLevel={btn.payload.autonomyLevel}
+                    stepType={pendingType}
+                    dimmed={disabled}
+                  />
+                </OptionButton>
               ))}
             </div>
           </CollapsibleCard>
-
-          <CollapsibleCard fill={false} title="Executor" open={isOpen('executor')} onToggle={() => toggle('executor')}>
-            <div className="space-y-2">
-              {CM_ROWS.map((row) => {
-                const controlMode = CM_TO_CONTROL_MODE[row.cm];
-                const disabled = CONTROL_MODE_DISABLED[controlMode];
-                const options = row.buttons.map((btn) => (
-                  <button
-                    key={btn.id}
-                    type="button"
-                    data-testid={`executor-option-${btn.id}`}
-                    disabled={disabled}
-                    onClick={() => handleAdd(btn.payload)}
-                    className={cn('group relative block w-full', disabled ? 'cursor-not-allowed' : 'cursor-pointer')}
-                  >
-                    <BlockNodePreview
-                      label={btn.label}
-                      executor={btn.payload.executor}
-                      autonomyLevel={btn.payload.autonomyLevel}
-                      stepType={pendingType}
-                      dimmed={disabled}
-                    />
-                    <OptionTooltip>{btn.purpose}</OptionTooltip>
-                  </button>
-                ));
-
-                // A single option already names its own control mode inside the
-                // block, so wrapping it in a group card labelled the same thing
-                // said "Cowork" twice. Only a row with real alternatives needs
-                // the grouping.
-                if (row.buttons.length === 1) return <div key={row.cm}>{options}</div>;
-
-                return (
-                  <div
-                    key={row.cm}
-                    className={cn('rounded-xl border px-3 py-2.5 space-y-2', CM_BORDER[row.color], disabled && 'opacity-50')}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="flex items-center gap-0.5 shrink-0">
-                        <CMRowIcon cm={row.cm} color={row.color} />
-                      </span>
-                      <span className={cn('text-[11px] font-bold shrink-0', CM_LABEL_COLOR[row.color])}>
-                        {CONTROL_MODE_LABELS[controlMode]}
-                      </span>
-                    </div>
-                    <div className="space-y-2">{options}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </CollapsibleCard>
-        </>
-      )}
+        );
+      })}
     </div>
   );
 }
