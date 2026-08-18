@@ -56,7 +56,7 @@ Load on demand, only when the design touches them:
 
 - `docs/adr/0008-step-executor-model.md` — executor model (source of truth for
   `executor`).
-- `docs/adr/0006-control-mode-ui-concept.md` — control modes (CM0/CM2/CM3/CM4).
+- `docs/adr/0014-control-mode-ui-concept.md` — control modes (CM0/CM2/CM3/CM4).
 - `docs/how-to/import-from-git.md` and `docs/how-to/docker-image-setup.md`.
 - `packages/platform-core/src/schemas/workflow-definition.ts` — the schema
   itself, when an example does not answer a field question.
