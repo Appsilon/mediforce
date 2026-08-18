@@ -150,6 +150,9 @@ export const queryKeys = {
   modelRegistry: {
     list: () => ['model-registry'] as const,
   },
+  /** What this deployment can run. Changes only on redeploy or an admin
+   *  reconfiguring email, so NICE LIVE is generous. */
+  capabilities: () => ['capabilities'] as const,
   /** Workspace-wide audit trail (Monitoring → Users / Tasks tabs) —
    *  keyset-paginated, server-side filtered by action set + actor +
    *  date range. Each tab passes its own `actions` slice, so the two

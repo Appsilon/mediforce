@@ -107,6 +107,15 @@ function CMRowIcon({ cm, color }: { cm: CMRow['cm']; color: string }) {
   return <Bot className={iconCls} />;
 }
 
+/**
+ * An agent or cowork step cannot run without a model configured, whichever tier
+ * offered it. Deriving the requirement from the executor is what keeps Simple
+ * and Full from disagreeing about the same block.
+ */
+function executorCapability(executor: string): string | undefined {
+  return executor === 'agent' || executor === 'cowork' ? 'agents' : undefined;
+}
+
 type Props = {
   onAdd: (payload: NewStepPayload) => void;
   onClose: () => void;
@@ -241,10 +250,12 @@ export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
 
   // Unknown capabilities (endpoint unreachable) read as available — a picker
   // that greys everything out because one fetch failed is the worse failure.
-  const statusFor = (preset: BlockPreset) => {
-    if (preset.requires === undefined || capabilities === null) return null;
-    return capabilities[preset.requires] ?? null;
+  const statusOf = (capability: string | undefined) => {
+    if (capability === undefined || capabilities === null) return null;
+    return capabilities[capability] ?? null;
   };
+  const statusFor = (preset: BlockPreset) =>
+    statusOf(preset.requires ?? executorCapability(preset.payload.executor));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -394,23 +405,38 @@ export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
             }
           >
             <div className="space-y-2">
-              {row.buttons.map((btn) => (
-                <OptionButton
-                  key={btn.id}
-                  testId={`executor-option-${btn.id}`}
-                  disabled={disabled}
-                  onPick={() => handleAdd(btn.payload)}
-                  description={btn.purpose}
-                >
-                  <BlockNodePreview
-                    label={btn.label}
-                    executor={btn.payload.executor}
-                    autonomyLevel={btn.payload.autonomyLevel}
-                    stepType={pendingType}
-                    dimmed={disabled}
-                  />
-                </OptionButton>
-              ))}
+              {row.buttons.map((btn) => {
+                const status = statusOf(executorCapability(btn.payload.executor));
+                const unavailable = status !== null && status.available === false;
+                const blocked = disabled || unavailable;
+                return (
+                  <OptionButton
+                    key={btn.id}
+                    testId={`executor-option-${btn.id}`}
+                    disabled={blocked}
+                    onPick={() => handleAdd(btn.payload)}
+                    description={
+                      <>
+                        {btn.purpose}
+                        {unavailable && (
+                          <span className="mt-1.5 block text-muted-foreground">
+                            {status.reason ?? 'Not available on this instance.'}
+                          </span>
+                        )}
+                      </>
+                    }
+                  >
+                    <BlockNodePreview
+                      label={btn.label}
+                      executor={btn.payload.executor}
+                      autonomyLevel={btn.payload.autonomyLevel}
+                      stepType={pendingType}
+                      badge={status?.available === true ? status.detail : undefined}
+                      dimmed={blocked}
+                    />
+                  </OptionButton>
+                );
+              })}
             </div>
           </CollapsibleCard>
         );
