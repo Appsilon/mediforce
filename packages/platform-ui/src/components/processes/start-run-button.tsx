@@ -19,6 +19,7 @@ import { useOpenRouterCredits } from '@/hooks/use-openrouter-credits';
 import { useNamespaceAdminContact } from '@/hooks/use-namespace-admin-contact';
 import { useModelValidation } from '@/hooks/use-model-validation';
 import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
+import { VerificationLadder, type ReadinessResult } from '@/components/workflows/verification-ladder';
 import { ParamField } from '@/components/ui/param-field';
 import { buildTriggerPayload, hasInvalidObjectInput } from '@/lib/trigger-input-payload';
 import type { TriggerInputField } from '@mediforce/platform-core';
@@ -281,11 +282,21 @@ export function StartRunButton({
 
   const startButtonLabel = hasWarnings ? 'Start anyway' : 'Start run';
 
+  // Left undefined when the workflow does not exist yet — no readiness check has
+  // run, so the ladder shows its static hint instead of claiming "all present".
+  const readinessResult: ReadinessResult | undefined = !preflightEnabled
+    ? undefined
+    : preflightLoading
+      ? 'checking'
+      : hasWarnings
+        ? { warnings: warnings.length }
+        : 'clear';
+
   const preflightDialog = (
     <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md rounded-lg border bg-background p-6 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md max-h-[85vh] overflow-y-auto rounded-lg border bg-background p-6 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
           <div className="flex items-start gap-3 mb-4">
             <div className="rounded-full bg-muted p-2">
               {hasTriggerInput ? (
@@ -378,6 +389,10 @@ export function StartRunButton({
               ))}
             </div>
           )}
+
+          <div className="mt-4">
+            <VerificationLadder activeRung="readiness" readiness={readinessResult} />
+          </div>
 
           <div className="flex items-center gap-2 mt-5">
             <div className="flex-1" />

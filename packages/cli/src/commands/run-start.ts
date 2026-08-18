@@ -25,7 +25,8 @@ export const runStartCommand = defineCommand({
     },
     'dry-run': {
       type: 'boolean',
-      description: 'Tag the run as a dry run (real execution, labelled for testing)',
+      description:
+        'Start a Dry Run: the graph, transitions, gates and human steps execute for real, every agent and script step is mocked. Answers "is it structured as I intended?", never "does the agent do what I want?"',
     },
   },
   async run({ args, output, stdin, mediforce, jsonMode }) {

@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Added
+- The four checks that answer "will this workflow work?" are now visible as one ladder at the two points a user asks: the save-version dialog and the "Before you start" dialog both render each rung with the question it answers — schema validation ("is the definition legal?", runs on every save) → **Workflow readiness check** ("are the image, secrets, model and credits present?", showing its live result and linking to the warnings below it) → **Dry Run** ("is it structured as I intended?", agent and script work mocked) → **Run** ("does the work produce what I wanted?", the only rung that answers behaviour). The rungs already cleared are ticked, so the ladder reads as a progression rather than four unrelated buttons. New guide [`docs/how-to/verify-a-workflow.md`](docs/how-to/verify-a-workflow.md) is linked from both dialogs and from `workflow validate` on success, which now says which gate it is and what to do next. CLI help stops contradicting the pinned terminology: `run start --dry-run` described itself as "real execution, labelled for testing" when it in fact mocks every agent and script step, and `workflow register --dry-run` now says outright that it is schema validation and executes nothing [#1188](https://github.com/Appsilon/mediforce/issues/1188).
+
 ## [2026-08-16]
 
 ### Added
