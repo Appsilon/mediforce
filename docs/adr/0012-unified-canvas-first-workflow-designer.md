@@ -68,7 +68,7 @@ The Co-Work Workflow Designer Workflow (`apps/workflow-designer/src/workflow-des
 
 - Spec (3), routing between "design" / "answer" / "ask": the existing system has no classifier — it relies entirely on prompt wording and the LLM's own choice of whether to emit a tool call. The new assistant follows the same pattern (a single tool-call-or-not decision per turn) rather than introducing a separate classification step, since no prior art suggested a more reliable approach was already validated.
 - The canvas-mutation tool schema and its handlers — translating an LLM tool call into calls against the existing `addStep`/`updateStep`/`removeStep`/etc. functions already in `workflow-editor-canvas.tsx`. The Co-Work Designer Workflow's equivalent (`update_artifact`) mutated a JSON artifact tracked by the engine, which does not apply here.
-- Streaming: not present anywhere in the current cowork implementation (explicitly deferred, see `docs/adr/draft/cowork-streaming.md` and issue #516). Request/response is the starting point for the AI Assistant pane too; streaming is a follow-up if response latency proves it necessary.
+- Streaming: not present anywhere in the current cowork implementation (explicitly deferred, see `docs/research/cowork-streaming.md` and issue #516). Request/response is the starting point for the AI Assistant pane too; streaming is a follow-up if response latency proves it necessary.
 
 **Tool boundary — editing vs. execution:**
 
@@ -106,4 +106,4 @@ Each phase is independently shippable. Phase 4 capability wiring (AI → canvas 
 - ADR-0008: Step executor model (executor types reused as-is)
 - PR #783: Autonomy levels refactor — workflow designer & execution history overhaul (foundation this work builds on)
 - `apps/workflow-designer/src/workflow-designer.wd.json`: the Co-Work Workflow Designer Workflow this ADR deprecates as a creation path — source of the reusable pieces documented above
-- `docs/adr/draft/cowork-streaming.md`, issue #516: streaming design, deferred for both cowork and the new AI Assistant pane
+- `docs/research/cowork-streaming.md`, issue #516: streaming design, deferred for both cowork and the new AI Assistant pane

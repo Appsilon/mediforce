@@ -1,15 +1,15 @@
-# ADR-NNNN — Cowork streaming overhaul (deferred)
+# Research — Cowork streaming overhaul (deferred)
 
-**Status:** Draft (deferred — see [#516](https://github.com/Appsilon/mediforce/issues/516))
+**Status:** Research note (deferred — see [#516](https://github.com/Appsilon/mediforce/issues/516))
 **Date:** 2026-05-26
 **Builds on:** ADR-0005 (headless platform-API/UI separation)
-**Successor to:** Phase 3.1 parity migration (landed under ADR-0005, see [`docs/headless-migration.md` § Phase 3.1](../../headless-migration.md))
+**Successor to:** Phase 3.1 parity migration (landed under ADR-0005, see [`docs/headless-migration.md` § Phase 3.1](../headless-migration.md))
 
-## Scope of this draft
+## Scope of this note
 
-This draft is **NOT** the record of Phase 3.1's parity migration — that decision lives inside ADR-0005 / `headless-migration.md` because it slotted into the existing headless-migration framework (no new architectural concept).
+This note is **NOT** the record of Phase 3.1's parity migration — that decision lives inside ADR-0005 / `headless-migration.md` because it slotted into the existing headless-migration framework (no new architectural concept).
 
-This draft preserves the trade-space the 2026-05-26 grill session walked through, so the **future streaming overhaul** can start from informed ground instead of re-deriving every option. When the streaming work picks up, this draft becomes a real ADR; until then it's a research note tied to [#516](https://github.com/Appsilon/mediforce/issues/516).
+This note preserves the trade-space the 2026-05-26 grill session walked through, so the **future streaming overhaul** can start from informed ground instead of re-deriving every option. When the streaming work picks up, the decision it produces becomes a real numbered ADR; until then this stays a research note tied to [#516](https://github.com/Appsilon/mediforce/issues/516).
 
 ## Background — why the trade-space matters
 
@@ -105,8 +105,8 @@ Multi-tab live sync intentionally excluded — no demand.
 
 ## References
 
-- [ADR-0005 headless platform-API/UI separation](../0005-headless-platform-api-ui-separation.md)
-- [`headless-migration.md` § Phase 3.1](../../headless-migration.md) — record of the parity migration that landed
+- [ADR-0005 headless platform-API/UI separation](../adr/0005-headless-platform-api-ui-separation.md)
+- [`headless-migration.md` § Phase 3.1](../headless-migration.md) — record of the parity migration that landed
 - [Vercel Chat SDK concurrency changelog](https://vercel.com/changelog/chat-sdk-now-supports-concurrent-message-handling)
 - [Open WebUI message queue docs](https://docs.openwebui.com/features/chat-conversations/chat-features/message-queue/)
 - [Claude Code SDK streaming output](https://code.claude.com/docs/en/agent-sdk/streaming-output)

@@ -42,7 +42,7 @@ Every step is assigned a Control Mode (CM0–CM4) — the same picker used in th
 | **Human review** `CM3` | Agent completes the step; a human reviews and approves before the workflow proceeds. |
 | **Autonomous agent** `CM4` | Agent completes the step and the workflow advances on its own; a human can review after the fact via the audit trail. |
 
-`executor` and `autonomyLevel` remain the underlying schema fields (unchanged); Control Mode is a UI-only classification layered on top — see [`docs/design/AUTONOMY-LEVELS-REFACTOR.md`](docs/design/AUTONOMY-LEVELS-REFACTOR.md).
+`executor` and `autonomyLevel` remain the underlying schema fields (unchanged); Control Mode is a UI-only classification layered on top — see [ADR-0006](docs/adr/0006-control-mode-ui-concept.md).
 
 At any mode, an agent can signal uncertainty and escalate to a human. This isn't a failure mode — it's how the system maintains safety in production.
 
