@@ -1,6 +1,11 @@
+---
+status: proposed
+audience: engineers
+last_reviewed: 2026-08-18
+---
+
 # ADR-0016: Unified Canvas-First Workflow Designer
 
-**Status:** Proposed
 **Date:** 2026-06-30
 
 ## Context
@@ -54,7 +59,7 @@ The Co-Work Workflow Designer Workflow (`apps/workflow-designer/src/workflow-des
 
 **Reused as-is (no engine dependency):**
 
-- The authoring docs (`docs/how-to-create-workflow.md`, `docs/workflow-capabilities.md`, `docs/workflow-authoring-golden-rules.md`) — embedded verbatim into the system prompt as the capability & authoring reference (see PLAN-0011 for the build-time bake mechanism), rather than the assistant re-deriving the schema. (Supersedes the earlier plan to ground on `getWorkflowAuthorableJsonSchema()` + `loadWorkflowExamples()`.)
+- The authoring docs (`docs/guides/create-workflow.md`, `docs/reference/workflow-capabilities.md`, `docs/reference/workflow-authoring-golden-rules.md`) — embedded verbatim into the system prompt as the capability & authoring reference (see PLAN-0011 for the build-time bake mechanism), rather than the assistant re-deriving the schema. (Supersedes the earlier plan to ground on `getWorkflowAuthorableJsonSchema()` + `loadWorkflowExamples()`.)
 - `callOpenRouter()` in `packages/platform-api/src/services/openrouter-client.ts` — generic chat-completions + tool-calling wrapper, not cowork-specific.
 - `ModelPicker` (`packages/platform-ui/src/components/workflows/workflow-editor/model-picker.tsx`) — drop-in model selector (registry-backed, context/pricing/tools/vision badges, custom model ID support). Satisfies spec (4) directly.
 - The `DEFAULT_MODEL = 'anthropic/claude-sonnet-4'` fallback convention from `packages/platform-api/src/handlers/cowork/chat.ts` — same default-with-override pattern for spec (4).

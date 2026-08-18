@@ -481,7 +481,7 @@ the user-facing immutable log.
   "Before you start" dialog (rung 2, with its live result), both rendering
   `VerificationLadder`
   (`packages/platform-ui/src/components/workflows/verification-ladder.tsx`).
-  _Docs:_ [`docs/how-to/verify-a-workflow.md`](docs/how-to/verify-a-workflow.md),
+  _Docs:_ [`docs/guides/verify-a-workflow.md`](docs/guides/verify-a-workflow.md),
   linked from both surfaces and from `workflow validate` on success.
   _Avoid_: "dry run" for (1) — `workflow register --dry-run` is schema
   validation and executes nothing, which collides with the Dry Run entry above.

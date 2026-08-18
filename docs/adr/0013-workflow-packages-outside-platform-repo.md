@@ -1,5 +1,7 @@
 ---
-status: proposed
+status: accepted
+audience: engineers
+last_reviewed: 2026-08-13
 ---
 
 # Workflow packages live outside the platform repo

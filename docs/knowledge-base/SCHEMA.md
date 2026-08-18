@@ -1,3 +1,9 @@
+---
+status: living
+audience: agents
+last_reviewed: 2026-06-29
+---
+
 # Mediforce Knowledge Base — Schema
 
 Concrete instantiation of the abstract [LLM Wiki pattern](./LLM-WIKI.md) (Karpathy). Pairs with [`STYLE.md`](./STYLE.md) (caveman) + the `/knowledge-base` skill (`skills/knowledge-base/SKILL.md` — operations: ingest, query, file, lint). Read all three before touching the wiki.
@@ -67,7 +73,7 @@ Then: one-sentence **bold summary** (used verbatim in `index.md`). Then sections
 ## Conventions
 
 - English only (matches `AGENTS.md`).
-- Cross-refs: relative markdown (`[pkg](../entities/packages/workflow-engine.md)`). No wikilinks — GitHub doesn't render them.
+- Cross-refs: relative markdown (`[pkg](./wiki/entities/packages/workflow-engine.md)`). No wikilinks — GitHub doesn't render them.
 - Relative `.md` links stay inside `wiki/`; cite anything outside (e.g. `AGENTS.md`) in plain text.
 - Filenames: lowercase kebab-case.
 - No emojis.

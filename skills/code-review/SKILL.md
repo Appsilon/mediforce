@@ -75,11 +75,11 @@ Don't rediscover these every run. Always pass this exact list to the Standards s
   - `docs/adr/0001-firestore-to-postgres.md` — data layer direction.
   - `docs/adr/0004-scoped-data-access-authorization.md` — authz model.
   - `docs/adr/0005-headless-platform-api-ui-separation.md` — package boundaries.
-- `docs/architecture.md` — package graph + dependency direction.
-- `docs/api-architecture.md` — handler / contract / repo layering inside `platform-api`.
-- `docs/development.md` — local dev conventions.
-- `docs/E2E-STRATEGY.md` — L1–L5 test-level model (`/new-test` enforces).
-- `docs/knowledge-base/wiki/STYLE.md` — wiki/docs style.
+- `docs/concepts/architecture.md` — package graph + dependency direction.
+- `docs/reference/api-architecture.md` — handler / contract / repo layering inside `platform-api`.
+- `docs/start/development.md` — local dev conventions.
+- `docs/testing/e2e-strategy.md` — L1–L5 test-level model (`/new-test` enforces).
+- `docs/knowledge-base/STYLE.md` — wiki/docs style.
 - `docs/knowledge-base/wiki/gotchas/` — known environmental pitfalls; consult before debugging weird failures.
 
 **Skip** (tooling already enforces): `eslint.config.*`, `biome.json`, `tsconfig.json`, `.editorconfig`, `prettier.config.*`. Note their existence in the sub-agent prompt but don't re-check what tooling checks.
@@ -98,7 +98,7 @@ Single message, three `Agent` tool calls, `general-purpose` subagent. Each promp
 
 **Standards sub-agent prompt** (file-by-file, low-level):
 
-> Read the fixed standards list from step 3 (paste it in — `AGENTS.md`, `CLAUDE.md`, `.claude/skills/code-review/references/review-checklist.md`, every file under `docs/adr/`, `docs/architecture.md`, `docs/api-architecture.md`, `docs/development.md`, `docs/E2E-STRATEGY.md`, `docs/knowledge-base/wiki/STYLE.md`). Use the reuse-targets cheat sheet from step 3 when checking 5c. Walk the diff **file by file, hunk by hunk**. For each changed file report:
+> Read the fixed standards list from step 3 (paste it in — `AGENTS.md`, `CLAUDE.md`, `.claude/skills/code-review/references/review-checklist.md`, every file under `docs/adr/`, `docs/concepts/architecture.md`, `docs/reference/api-architecture.md`, `docs/start/development.md`, `docs/testing/e2e-strategy.md`, `docs/knowledge-base/STYLE.md`). Use the reuse-targets cheat sheet from step 3 when checking 5c. Walk the diff **file by file, hunk by hunk**. For each changed file report:
 > - Convention violations (cite the rule: file + line of the standard).
 > - **Dead code** — functions/exports/files not referenced anywhere. Grep to verify.
 > - **DRY/KISS violations** — duplicated logic, unnecessary abstraction, layers that solve nothing.

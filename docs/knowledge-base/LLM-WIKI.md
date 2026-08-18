@@ -1,3 +1,9 @@
+---
+status: living
+audience: agents
+last_reviewed: 2026-04-23
+---
+
 # LLM Wiki
 
 > **Source**: Andrej Karpathy's [llm-wiki.md gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) (April 2026, improved version). Included verbatim. This is the abstract pattern. For the Mediforce-specific instantiation (raw-source locations, page types, conventions, ingest/query/lint workflows for this repo), see [`SCHEMA.md`](./SCHEMA.md).

@@ -4,7 +4,7 @@
 Drives three chain links through the HTTP API, showing a user-typed message
 flowing from one run into the next:
 
-    1. Register a fresh copy of `docs/examples/previous-run-example.wd.json`
+    1. Register a fresh copy of `docs/reference/examples/previous-run-example.wd.json`
        (script step runs in Docker; human step renders a params form).
     2. Run 1 — auto-runner executes the script step (reads /output/previous_run.json,
        writes a summary), then pauses on the human form. Submit `{ message: "from run 1" }`.

@@ -1,3 +1,9 @@
+---
+status: living
+audience: agents
+last_reviewed: 2026-04-23
+---
+
 # Wiki writing style: caveman
 
 Wiki prose in caveman. ~60–75% fewer tokens than full prose, substance intact. Agents read wiki in-session — every token costs context.

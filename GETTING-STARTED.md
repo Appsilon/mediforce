@@ -4,7 +4,7 @@ Get the app running locally in minutes. Start with mocked agents and demo data,
 then move to the full local stack (Postgres data layer + NextAuth) and
 build your own workflows.
 
-Agents / quick lookups: see [docs/dev-quickref.md](docs/dev-quickref.md).
+Agents / quick lookups: see [docs/start/dev-quickref.md](docs/start/dev-quickref.md).
 
 ## Prerequisites
 
@@ -114,7 +114,7 @@ on `:5432` (`DATABASE_URL` is required at boot). It does **not** start Postgres 
 run `pnpm dev` once to leave a container running, or point `DATABASE_URL` at your
 own DB.
 
-Full decision table + ports + migration steps: [docs/dev-quickref.md](docs/dev-quickref.md).
+Full decision table + ports + migration steps: [docs/start/dev-quickref.md](docs/start/dev-quickref.md).
 
 ---
 
@@ -479,8 +479,8 @@ images for script-executor steps](#build-images-for-script-executor-steps)).
 
 ## Next steps
 
-- [Dev quick reference](docs/dev-quickref.md) — terse command/decision/port lookup
-- [Development Guide](docs/development.md) — monorepo structure, testing, deployment
-- [Postgres local dev](docs/postgres-local-dev.md) — reset, migrations, inspecting the DB
-- [Architecture](docs/architecture.md) — processes, steps, agents, compliance
+- [Dev quick reference](docs/start/dev-quickref.md) — terse command/decision/port lookup
+- [Development Guide](docs/start/development.md) — monorepo structure, testing, deployment
+- [Postgres local dev](docs/start/postgres-local-dev.md) — reset, migrations, inspecting the DB
+- [Architecture](docs/concepts/architecture.md) — processes, steps, agents, compliance
 - [AGENTS.md](AGENTS.md) — contribution guidelines for AI-assisted development

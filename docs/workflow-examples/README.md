@@ -1,3 +1,9 @@
+---
+status: living
+audience: workflow-authors
+last_reviewed: 2026-07-29
+---
+
 # Workflow examples
 
 These files are tutorial examples for the workflow definition schema. They are
@@ -5,11 +11,11 @@ small on purpose: each example demonstrates one concept, such as review loops,
 script variants, action steps, trigger input, or validation gates.
 
 They are not complete production Workflow Packages. For production package
-standards, use [workflow-authoring-golden-rules.md](../workflow-authoring-golden-rules.md)
+standards, use [workflow-authoring-golden-rules.md](../reference/workflow-authoring-golden-rules.md)
 and the production-style reference package in
 [`apps/golden-standard-workflow`](../../apps/golden-standard-workflow). For the
 map of capabilities to the source files that define them, see
-[workflow-capabilities.md](../workflow-capabilities.md).
+[workflow-capabilities.md](../reference/workflow-capabilities.md).
 
 ## Index — what each file teaches
 

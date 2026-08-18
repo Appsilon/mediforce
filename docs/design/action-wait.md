@@ -1,3 +1,9 @@
+---
+status: living
+audience: engineers
+last_reviewed: 2026-08-17
+---
+
 # action kind: 'wait'
 
 **Status:** Implemented  

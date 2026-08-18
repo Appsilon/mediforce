@@ -24,7 +24,7 @@ Mediforce is that infrastructure. Open-source, built for pharma, designed so you
 
 **Compliance is not a bolt-on.** Audit trails, accountability, data integrity, and scoped access are built into the platform from day one — not layered on top.
 
-> **[Read the full vision — why this needs to exist and where we're headed](docs/vision.md)**
+> **[Read the full vision — why this needs to exist and where we're headed](docs/concepts/vision.md)**
 
 ## How It Works
 
@@ -101,7 +101,7 @@ We're building the standard for human-agent collaboration in pharma — and we'r
 **[Getting Started Guide](GETTING-STARTED.md)** — Quick start with demo data, no setup required.
 
 > **Datastore (ADR-0001).** Server data layer runs on self-hosted Postgres.
-> See [`docs/postgres-local-dev.md`](docs/postgres-local-dev.md) and
+> See [`docs/start/postgres-local-dev.md`](docs/start/postgres-local-dev.md) and
 > [`docs/adr/0001-firestore-to-postgres.md`](docs/adr/0001-firestore-to-postgres.md).
 
 
@@ -154,7 +154,7 @@ provider in `.env.local`: either `ENABLE_PASSWORD_AUTH=true` for email+password,
 or `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` for Google sign-in.
 
 Migration mechanics, schema authoring, and troubleshooting live in
-[`docs/postgres-local-dev.md`](docs/postgres-local-dev.md).
+[`docs/start/postgres-local-dev.md`](docs/start/postgres-local-dev.md).
 
 ### Queue mode (production architecture)
 
@@ -256,7 +256,7 @@ pnpm dev:no-docker
 
 > Requires `claude` to be available on your `PATH`. Use this script (not `ALLOW_LOCAL_AGENTS=true pnpm dev`) — the env var doesn't propagate reliably through pnpm script aliases.
 
-> Full guide: **[docs/development.md](docs/development.md)**
+> Full guide: **[docs/start/development.md](docs/start/development.md)**
 
 ## Staging / production ops (Postgres)
 
@@ -334,10 +334,10 @@ emails would ship a dead `http://localhost` link.
 | | |
 |---|---|
 | **[Getting Started](GETTING-STARTED.md)** | Set up your development environment — local Postgres data layer plus NextAuth |
-| **[Vision](docs/vision.md)** | Why this needs to exist, what agents actually do in pharma, and where we're headed |
-| **[Architecture](docs/architecture.md)** | Processes, steps, agents, compliance — the technical foundation |
-| **[How We Work](docs/how-we-work.md)** | Building bottom-up, in public, with real processes |
-| **[Development](docs/development.md)** | Setup, monorepo structure, testing, deployment |
+| **[Vision](docs/concepts/vision.md)** | Why this needs to exist, what agents actually do in pharma, and where we're headed |
+| **[Architecture](docs/concepts/architecture.md)** | Processes, steps, agents, compliance — the technical foundation |
+| **[How We Work](docs/concepts/how-we-work.md)** | Building bottom-up, in public, with real processes |
+| **[Development](docs/start/development.md)** | Setup, monorepo structure, testing, deployment |
 
 ## License
 

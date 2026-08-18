@@ -1,9 +1,15 @@
+---
+status: draft
+audience: engineers
+last_reviewed: 2026-08-17
+---
+
 # Research — Cowork streaming overhaul (deferred)
 
 **Status:** Research note (deferred — see [#516](https://github.com/Appsilon/mediforce/issues/516))
 **Date:** 2026-05-26
 **Builds on:** ADR-0005 (headless platform-API/UI separation)
-**Successor to:** Phase 3.1 parity migration (landed under ADR-0005, see [`docs/headless-migration.md` § Phase 3.1](../headless-migration.md))
+**Successor to:** Phase 3.1 parity migration (landed under ADR-0005, see [`docs/archive/headless-migration.md` § Phase 3.1](../archive/headless-migration.md))
 
 ## Scope of this note
 
@@ -106,7 +112,7 @@ Multi-tab live sync intentionally excluded — no demand.
 ## References
 
 - [ADR-0005 headless platform-API/UI separation](../adr/0005-headless-platform-api-ui-separation.md)
-- [`headless-migration.md` § Phase 3.1](../headless-migration.md) — record of the parity migration that landed
+- [`headless-migration.md` § Phase 3.1](../archive/headless-migration.md) — record of the parity migration that landed
 - [Vercel Chat SDK concurrency changelog](https://vercel.com/changelog/chat-sdk-now-supports-concurrent-message-handling)
 - [Open WebUI message queue docs](https://docs.openwebui.com/features/chat-conversations/chat-features/message-queue/)
 - [Claude Code SDK streaming output](https://code.claude.com/docs/en/agent-sdk/streaming-output)

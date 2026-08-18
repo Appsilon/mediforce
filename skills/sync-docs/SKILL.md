@@ -16,25 +16,26 @@ Keep the project's documentation in sync with code changes.
 
 ## Monitored docs
 
-**Edit these lists to add new files as the project grows.**
+**The monitored set is [`docs/README.md`](../../docs/README.md)'s routing table
+plus `README.md` and `GETTING-STARTED.md` at the repo root.** Read the routing
+table at the start of every run — it is the one list, so it cannot disagree with
+what the docs folder actually holds. A doc is monitored when its `status` is
+`living`; skip `draft` and `historical`.
+
+Which tier a doc lands in follows from what it contains, not from a second list:
 
 ### Tier 1 — executable truth (auto-apply)
 
 Commands, ports, env vars, script names, CLI flags. The correct value is verifiable from code — fixes are applied directly and reported.
 
-- `GETTING-STARTED.md`
-- `docs/dev-quickref.md`
-- `docs/postgres-local-dev.md`
-- `docs/running-workspace-locally.md`
-- `docs/CONTAINER_STEPS.md`
+Everything under `docs/start/` and `docs/reference/`, plus `GETTING-STARTED.md`.
 
 ### Tier 2 — narrative truth (propose)
 
 Feature descriptions, architecture overviews, concept explanations. Changes are written as a draft and shown as a `git diff` for review before staging.
 
-- `README.md`
-- `docs/architecture.md`
-- `docs/api-architecture.md`
+`README.md`, and everything under `docs/concepts/`, `docs/guides/`, and
+`docs/testing/`.
 
 ## Usage
 
@@ -115,8 +116,8 @@ After all files are processed:
 ```
 sync-docs complete
   auto-fixed : GETTING-STARTED.md (line 31: dev:mock → dev:local)
-  proposed   : docs/architecture.md — review with git diff before staging
-  up to date : README.md, docs/dev-quickref.md, docs/api-architecture.md, ...
+  proposed   : docs/concepts/architecture.md — review with git diff before staging
+  up to date : README.md, docs/start/dev-quickref.md, docs/reference/api-architecture.md, ...
 ```
 
 Remind the user to inspect Tier 2 changes with `git diff` before staging.
@@ -128,8 +129,9 @@ Remind the user to inspect Tier 2 changes with `git diff` before staging.
 Never modify:
 - `CONTEXT.md` — owned by `/grill-with-docs` (domain glossary)
 - `AGENTS.md`, `CLAUDE.md` — engineering process policy, human-authored only
-- `docs/vision.md`, `docs/how-we-work.md`, `docs/ai-development-process.md` — strategy/policy
-- `docs/headless-migration*.md`, `docs/PREVIOUS_RUN.md` — ephemeral plans
+- `docs/concepts/vision.md`, `docs/concepts/how-we-work.md`, `docs/contributing/ai-development-process.md` — strategy/policy
+- `docs/archive/` — completed migrations, kept as historical record
+- `docs/design/`, `docs/research/` — `draft` status, undecided by definition
 - `CHANGELOG.md` — change signal source only, never a target
-- `docs/E2E-STRATEGY.md`, `docs/ENGINE-TESTING.md` — testing process, not product docs
+- `docs/testing/e2e-strategy.md`, `docs/testing/engine-testing.md` — testing process, not product docs
 - `docs/adr/` — ADRs are immutable records of past decisions

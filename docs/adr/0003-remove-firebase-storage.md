@@ -1,7 +1,13 @@
+---
+status: proposed
+audience: engineers
+last_reviewed: 2026-08-18
+---
+
 # 0003 — Remove Firebase Storage: delete uploaded-skills, task attachments to a BlobStore (filesystem now, S3 later)
 
-- **Status:** Proposed (grilled & reshaped 2026-06-16; supersedes the
-  2026-05-20 "skills → Postgres bytea / attachments inline + DMS link" draft)
+- **Status note:** grilled & reshaped 2026-06-16; supersedes the
+  2026-05-20 "skills → Postgres bytea / attachments inline + DMS link" draft.
 - **Date:** 2026-05-20 (reshaped 2026-06-16)
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)
@@ -10,7 +16,7 @@
   [ADR-0015](./0015-output-files-on-run-branch.md) (the `~/.mediforce` data
   volume the API host already mounts).
 - **Lands before:** [ADR-0002](./0002-firebase-auth-to-nextauth.md) — see §5.
-- **Implementation plan:** [PLAN-0003.md](./PLAN-0003.md)
+- **Implementation plan:** [PLAN-0003.md](../archive/PLAN-0003.md)
 
 ## Context
 

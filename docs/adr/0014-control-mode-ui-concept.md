@@ -1,10 +1,15 @@
+---
+status: accepted
+audience: engineers
+last_reviewed: 2026-08-18
+---
+
 # 0014 — Control mode is a UI concept
 
 > **Status: Implemented.** The control mode UI concept described here is now
 > live. The mapping is implemented in
 > [`packages/platform-ui/src/lib/control-mode.ts`](../../packages/platform-ui/src/lib/control-mode.ts).
 
-- **Status:** Accepted
 - **Date:** 2026-05-27
 - **Author:** Paweł Przytuła (@przytu1)
 

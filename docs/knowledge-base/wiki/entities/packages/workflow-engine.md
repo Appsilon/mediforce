@@ -33,7 +33,7 @@ Runs the workflow loop. Given `ProcessInstance`: advance steps, route transition
 - `src/graph/` — graph validator.
 - `src/review/` — `ReviewTracker`.
 - `src/triggers/` — manual / webhook / cron.
-- `src/__tests__/` — engine integration tests (see `docs/ENGINE-TESTING.md`).
+- `src/__tests__/` — engine integration tests (see `docs/testing/engine-testing.md`).
 
 ## Relationships
 
@@ -46,4 +46,4 @@ Runs the workflow loop. Given `ProcessInstance`: advance steps, route transition
 - `packages/workflow-engine/src/engine/workflow-engine.ts`
 - `packages/workflow-engine/src/engine/transition-resolver.ts`
 - `AGENTS.md` → "Key architectural patterns"
-- `docs/ENGINE-TESTING.md`
+- `docs/testing/engine-testing.md`

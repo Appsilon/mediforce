@@ -1,3 +1,9 @@
+---
+status: draft
+audience: engineers
+last_reviewed: 2026-06-18
+---
+
 # Layer 2 (Scores) — Research Document
 
 **Date:** 2026-06-12

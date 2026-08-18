@@ -1,10 +1,10 @@
 ---
 name: generate-pitch
-description: Generate a Marp pitch deck (docs/pitch/deck.md) from the product vision and structure definition. Reads PRODUCT_VISION.md, STRUCTURE.md, and theme CSS, then produces a presentation and exports to PDF.
+description: Generate a Marp pitch deck (docs/pitch/deck.md) from the product vision and this skill's structure definition, then export it to PDF. Use when the deck needs regenerating after a vision or positioning change.
 allowed-tools: Read, Write, Bash
 metadata:
   author: Appsilon
-  version: "1.0"
+  version: "2.0"
   domain: product
   complexity: basic
   tags: pitch, presentation, marp
@@ -20,60 +20,69 @@ metadata:
 
 ## Inputs
 
-- **Required**: The following files must exist in the repository:
-  1. `docs/PRODUCT_VISION.md` — the source content (positioning, messaging, value, target customers, etc.)
-  2. `docs/pitch/STRUCTURE.md` — defines slide order, types, tone rules, and content guidance
-  3. `docs/pitch/themes/mediforce.css` — available CSS classes and components for the Marp theme
+**Content — what the deck says.** Read from the repo docs (`docs/README.md` is
+the routing table if any of these have moved):
+
+1. `docs/concepts/vision.md` — positioning, target users, regulatory angle.
+2. `README.md` — what the product does, in the words the project actually uses.
+3. `docs/concepts/architecture.md` — the package graph, for the technical slides.
+4. `docs/adr/README.md` — the decisions behind anything the deck claims.
+
+**Structure and styling — how the deck is shaped.** These ship with the skill,
+so the deck can be generated in a fresh checkout with no scaffolding:
+
+5. `skills/generate-pitch/references/structure.md` — slide order, types, tone rules.
+6. `skills/generate-pitch/references/theme.css` — the Marp theme.
 
 ## Procedure
 
-### Step 1: Read all input files
+### Step 1: Read the inputs
 
-Read all three input files to understand the current product vision, the deck structure, and the available CSS classes.
+Read the four content docs and the two skill references.
 
-```
-docs/PRODUCT_VISION.md
-docs/pitch/STRUCTURE.md
-docs/pitch/themes/mediforce.css
-```
+**Expected:** You know the slide order and available styles, and you have the
+product facts to fill them from the docs rather than from memory.
 
-**Expected:** You have a clear understanding of the content to include, the slide order and types, and the visual components available.
-
-**On failure:** If any file is missing, inform the user and stop. All three files are required.
+**On failure:** If a content doc is missing, check `docs/README.md` for its
+current location before telling the user it is gone.
 
 ### Step 2: Generate the deck
 
-Generate `docs/pitch/deck.md` following STRUCTURE.md exactly — slide order, types, tone, and content rules. Pull content from PRODUCT_VISION.md, rewriting it to match the tone and audience defined in STRUCTURE.md.
+Write `docs/pitch/deck.md` following `references/structure.md` exactly — slide
+order, types, tone, and content rules. Pull facts from the content docs,
+rewriting them for the audience defined in the structure file.
 
-Ensure every slide fits on one 16:9 page. Keep text concise and follow the technical rules in STRUCTURE.md.
+Ensure every slide fits on one 16:9 page.
 
-**Expected:** A complete Marp markdown file at `docs/pitch/deck.md` that follows the structure definition and contains accurate content from the product vision.
+**Expected:** A complete Marp markdown file at `docs/pitch/deck.md`.
 
-**On failure:** Review STRUCTURE.md for any slide you missed or any content that overflows. Trim text until every slide fits on one page.
+**On failure:** Review the structure file for any slide you missed or content
+that overflows. Trim text until every slide fits on one page.
 
 ### Step 3: Export to PDF
 
-Run the Marp CLI to export the deck to PDF:
-
 ```bash
-npx @marp-team/marp-cli --html --allow-local-files --theme ./docs/pitch/themes/mediforce.css ./docs/pitch/deck.md -o ./docs/pitch/deck.pdf
+npx @marp-team/marp-cli --html --allow-local-files \
+  --theme ./skills/generate-pitch/references/theme.css \
+  ./docs/pitch/deck.md -o ./docs/pitch/deck.pdf
 ```
 
-**Expected:** A PDF file at `docs/pitch/deck.pdf` with all slides rendered correctly.
+**Expected:** A PDF at `docs/pitch/deck.pdf` with all slides rendered correctly.
 
-**On failure:** Check that `npx` and the Marp CLI package are available. Verify the theme CSS path is correct. Review any Marp CLI error messages.
+**On failure:** Check that `npx` and the Marp CLI package are available, and
+review the Marp CLI error messages.
 
 ## Validation
 
-- `docs/pitch/deck.md` exists and follows STRUCTURE.md slide order exactly.
+- `docs/pitch/deck.md` exists and follows the structure file's slide order exactly.
 - Every slide fits on one 16:9 page (no content overflow).
-- Content is sourced from PRODUCT_VISION.md and rewritten for the deck's target audience.
+- Every factual claim traces to one of the content docs.
 - `docs/pitch/deck.pdf` is generated without errors.
 
 ## Common Pitfalls
 
-- **Using investor language** — never use TAM/SAM, fundraising, category creation, or first-mover language unless STRUCTURE.md explicitly says to.
+- **Using investor language** — never use TAM/SAM, fundraising, category creation, or first-mover language.
 - **Blaming the customer** — challenges come from missing infrastructure, not from the customer's failures.
-- **Losing the central theme** — human-agent collaboration as peers/teammates must be the central theme throughout.
-- **Content overflow** — this is the #1 problem. Keep slides concise. When in doubt, cut text.
-- **Ignoring STRUCTURE.md** — STRUCTURE.md is the source of truth for what slides exist and how they're framed. PRODUCT_VISION.md is the source of truth for content and facts. Don't mix them up.
+- **Losing the central theme** — human-agent collaboration as peers must run through the whole deck.
+- **Content overflow** — the most common problem. When in doubt, cut text.
+- **Inventing facts** — the structure file says what slides exist; the content docs say what is true. Do not fill a slide from memory.

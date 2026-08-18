@@ -212,4 +212,10 @@ Slash commands like `/new-test` mean "read and follow
 
 See `README.md` for one-time env setup (Node, pnpm, Firebase CLI, `.env.local`).
 For the day-to-day dev loop (which `pnpm dev*` to run, test levels, CLI,
-migrations, ports, troubleshooting) see [`docs/dev-quickref.md`](docs/dev-quickref.md).
+migrations, ports, troubleshooting) see [`docs/start/dev-quickref.md`](docs/start/dev-quickref.md).
+
+**For everything else in `docs/`, read [`docs/README.md`](docs/README.md) first.**
+It is the routing table: topic → path → audience → status. Every doc declares
+`status: living | draft | historical` in its frontmatter — act on `living`, treat
+`draft` as undecided, and cite `historical` only as a record of what was true
+then.

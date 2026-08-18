@@ -1,7 +1,7 @@
 # Golden Standard Workflow
 
 This app is the production-style companion to
-[`docs/workflow-authoring-golden-rules.md`](../../docs/workflow-authoring-golden-rules.md).
+[`docs/reference/workflow-authoring-golden-rules.md`](../../docs/reference/workflow-authoring-golden-rules.md).
 Use it when the tutorial examples are too small.
 
 It shows:

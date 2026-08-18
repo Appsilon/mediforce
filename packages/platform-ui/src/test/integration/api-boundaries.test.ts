@@ -118,7 +118,7 @@ describe('platform-api boundary conventions', () => {
     expect(
       offenders,
       'New `firebase/firestore` import detected. The Phase 4 PRD ' +
-        '(docs/headless-migration-phase-4-plan.md) forbids new Firestore ' +
+        '(docs/archive/headless-migration-phase-4-plan.md) forbids new Firestore ' +
         'subscriptions in platform-ui; migrate via mediforce.X.Y() + ' +
         'react-query instead.',
     ).toEqual([]);
@@ -167,7 +167,7 @@ describe('platform-api boundary conventions', () => {
 
     expect(
       missing.map((f) => relative(MONOREPO_ROOT, f)),
-      'Every handler needs a sibling __tests__/<name>.test.ts — see docs/ENGINE-TESTING.md',
+      'Every handler needs a sibling __tests__/<name>.test.ts — see docs/testing/engine-testing.md',
     ).toEqual([]);
   });
 });

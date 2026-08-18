@@ -36,7 +36,7 @@ async function openTriggersTab(page: import('@playwright/test').Page): Promise<v
 
 /** Remove a cron row if a previous attempt left it behind. Playwright retries
  *  reuse the same seeded database, so a mutating journey has to reset at the
- *  start rather than trust its own cleanup (docs/E2E-STRATEGY.md). */
+ *  start rather than trust its own cleanup (docs/testing/e2e-strategy.md). */
 async function deleteCronRowIfPresent(
   page: import('@playwright/test').Page,
   triggerName: string,

@@ -40,7 +40,7 @@ pnpm dev:mock
 MOCK_AGENT=true pnpm dev
 ```
 
-See `docs/running-workspace-locally.md` for the full step-by-step on exercising the workspace + Docker path locally.
+See `docs/start/running-workspace-locally.md` for the full step-by-step on exercising the workspace + Docker path locally.
 
 ## PR Preview Deployments
 
