@@ -89,4 +89,4 @@ appendix can capture what actually shipped vs the original decision body.
 | [0014](./0014-control-mode-ui-concept.md) | Control mode is a UI concept | Accepted |
 | [0015](./0015-output-files-on-run-branch.md) | Output Files live on the run branch of the git workspace | Accepted |
 | [0016](./0016-unified-canvas-first-workflow-designer.md) | Unified canvas-first workflow designer (+ [PLAN](../archive/PLAN-0016.md)) | Proposed |
-| [0017](./0017-retire-llm-maintained-wiki.md) | Retire the LLM-maintained wiki; docs live next to what they describe | Accepted |
+| [0017](./0017-retire-llm-maintained-wiki.md) | Retire the LLM-maintained wiki; docs live next to what they describe (+ [PLAN](./PLAN-0017.md)) | Accepted |
