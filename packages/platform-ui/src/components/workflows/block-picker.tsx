@@ -11,12 +11,30 @@ import { CM_ROWS, STEP_TYPE_OPTIONS, type CMRow } from '@/lib/block-presets';
 /** Which tier of the picker is showing. Simple opens first — most adds are ordinary. */
 type Tier = 'simple' | 'full';
 
+// Each category is a card in the same shape as a control-mode row: coloured
+// border, coloured label with an icon, options stacked inside.
 const CATEGORY_LABELS: Record<BlockCategory, string> = {
   people: 'People',
   communicate: 'Communicate',
   data: 'Data',
   ai: 'AI',
   control: 'Control',
+};
+
+const CATEGORY_COLOR: Record<BlockCategory, string> = {
+  people: 'orange',
+  communicate: 'pink',
+  data: 'yellow',
+  ai: 'violet',
+  control: 'teal',
+};
+
+const CATEGORY_ICON: Record<BlockCategory, React.ComponentType<{ className?: string }>> = {
+  people: User,
+  communicate: Mail,
+  data: Terminal,
+  ai: Bot,
+  control: GitBranch,
 };
 
 const PRESET_ICON: Record<string, React.ReactNode> = {
@@ -60,8 +78,12 @@ const STEP_TYPE_HOVER: Record<string, string> = {
   purple: 'hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300 hover:ring-1 hover:ring-purple-300 dark:hover:bg-purple-900/20 dark:hover:text-purple-300 dark:hover:ring-purple-700',
 };
 
+// Keyed by colour, not by control mode — both tiers group their options into
+// the same bordered card with a coloured label, so both read from these.
 const CM_BORDER: Record<string, string> = {
   orange: 'border-orange-200 dark:border-orange-800/60',
+  yellow: 'border-yellow-200 dark:border-yellow-800/60',
+  pink:   'border-pink-200 dark:border-pink-800/60',
   lime:   'border-lime-200 dark:border-lime-800/60',
   teal:   'border-teal-200 dark:border-teal-800/60',
   indigo: 'border-indigo-200 dark:border-indigo-800/60',
@@ -70,6 +92,8 @@ const CM_BORDER: Record<string, string> = {
 
 const CM_LABEL_COLOR: Record<string, string> = {
   orange: 'text-orange-600 dark:text-orange-400',
+  yellow: 'text-yellow-600 dark:text-yellow-400',
+  pink:   'text-pink-600 dark:text-pink-400',
   lime:   'text-lime-600 dark:text-lime-400',
   teal:   'text-teal-600 dark:text-teal-400',
   indigo: 'text-indigo-600 dark:text-indigo-400',
@@ -78,6 +102,8 @@ const CM_LABEL_COLOR: Record<string, string> = {
 
 const ICON_COLOR: Record<string, string> = {
   orange: 'text-orange-400 dark:text-orange-500',
+  yellow: 'text-yellow-500 dark:text-yellow-400',
+  pink:   'text-pink-500 dark:text-pink-400',
   lime:   'text-lime-500 dark:text-lime-400',
   teal:   'text-teal-500 dark:text-teal-400',
   indigo: 'text-indigo-500 dark:text-indigo-400',
@@ -131,8 +157,9 @@ type Props = {
  * reason on hover — hiding them would leave the author wondering whether the
  * platform can do it at all.
  */
-function PresetButton({ preset, unavailableReason, detail, onPick }: {
+function PresetButton({ preset, color, unavailableReason, detail, onPick }: {
   preset: BlockPreset;
+  color: string;
   unavailableReason: string | null;
   detail: string | undefined;
   onPick: () => void;
@@ -146,17 +173,15 @@ function PresetButton({ preset, unavailableReason, detail, onPick }: {
         onClick={onPick}
         className={cn(
           'w-full flex items-start gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all',
-          unavailable
-            ? 'cursor-not-allowed opacity-50'
-            : 'hover:bg-muted hover:border-foreground/30 cursor-pointer',
+          unavailable ? 'cursor-not-allowed opacity-50' : BUTTON_CLASSES[color],
         )}
       >
-        <span className="mt-0.5 text-muted-foreground">{PRESET_ICON[preset.id]}</span>
+        <span className={cn('mt-0.5', ICON_COLOR[color])}>{PRESET_ICON[preset.id]}</span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
             <span className="text-xs font-semibold">{preset.label}</span>
             {detail !== undefined && (
-              <span className="rounded px-1 py-px text-[9px] font-medium uppercase tracking-wide bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+              <span className="rounded border px-1 py-px text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
                 {detail}
               </span>
             )}
@@ -209,28 +234,40 @@ export function BlockPicker({ onAdd }: Props) {
       </div>
 
       {tier === 'simple' && (
-        <div className="space-y-4">
+        <div className="space-y-2">
           {BLOCK_CATEGORIES.map((category) => {
             const presets = BLOCK_PRESETS.filter((preset) => preset.category === category);
             if (presets.length === 0) return null;
+            const color = CATEGORY_COLOR[category];
+            const CategoryIcon = CATEGORY_ICON[category];
             return (
-              <div key={category} className="space-y-1.5">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  {CATEGORY_LABELS[category]}
-                </p>
-                {presets.map((preset) => {
-                  const status = statusFor(preset);
-                  const unavailable = status !== null && status.available === false;
-                  return (
-                    <PresetButton
-                      key={preset.id}
-                      preset={preset}
-                      unavailableReason={unavailable ? (status.reason ?? 'Not available on this instance.') : null}
-                      detail={status?.available === true ? status.detail : undefined}
-                      onPick={() => onAdd(preset.payload)}
-                    />
-                  );
-                })}
+              <div
+                key={category}
+                className={cn('rounded-xl border px-3 py-2.5 space-y-2', CM_BORDER[color])}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <CategoryIcon className={cn('h-3.5 w-3.5 shrink-0', ICON_COLOR[color])} />
+                  <span className={cn('text-[11px] font-bold shrink-0', CM_LABEL_COLOR[color])}>
+                    {CATEGORY_LABELS[category]}
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {presets.map((preset) => {
+                    const status = statusFor(preset);
+                    const unavailable = status !== null && status.available === false;
+                    return (
+                      <PresetButton
+                        key={preset.id}
+                        preset={preset}
+                        color={color}
+                        unavailableReason={unavailable ? (status.reason ?? 'Not available on this instance.') : null}
+                        detail={status?.available === true ? status.detail : undefined}
+                        onPick={() => onAdd(preset.payload)}
+                      />
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
