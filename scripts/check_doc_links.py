@@ -16,7 +16,9 @@ are stripped before the existence check.
 A document declaring `status: historical` (or, for an ADR, `status: superseded`)
 in its frontmatter is skipped entirely: it records a past state of the repo, so
 its references are expected to point at files that have since been deleted.
-`CHANGELOG.md` is skipped for the same reason.
+`CHANGELOG.md` is skipped for the same reason, as is everything under
+`docs/archive/` — that directory is historical by definition, so an archived
+document does not have to declare it per-file to be exempt.
 """
 
 import re
@@ -29,6 +31,7 @@ SKIP_DIRS = {".git", "node_modules", ".next", "dist", "build", ".turbo", "covera
 
 # Records of a past repo state — their references are meant to be frozen, not live.
 SKIP_FILES = {"CHANGELOG.md"}
+SKIP_PREFIXES = ("docs/archive/",)
 
 FENCE_RE = re.compile(r"^\s*(```|~~~)")
 FRONTMATTER_STATUS_RE = re.compile(r"^status:\s*(\S+)\s*$", re.MULTILINE)
@@ -81,6 +84,8 @@ def check_file(path: Path) -> list[str]:
     text = path.read_text(encoding="utf-8")
     rel = path.relative_to(REPO_ROOT)
     if rel.as_posix() in SKIP_FILES or is_historical(text):
+        return []
+    if rel.as_posix().startswith(SKIP_PREFIXES):
         return []
 
     in_fence = False

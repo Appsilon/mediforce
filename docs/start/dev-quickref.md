@@ -167,7 +167,7 @@ Requires SSH access to the staging host (uses `deploy` user by default, override
 | 3100 | bull-board (`dev:queue`)        |
 | 6006 | Phoenix trace viewer (opt-in)   |
 
-## Troubleshooting (top 5)
+## Troubleshooting
 
 | Symptom                                  | Fix                                                              |
 |------------------------------------------|-----------------------------------------------------------------|
@@ -179,3 +179,47 @@ Requires SSH access to the staging host (uses `deploy` user by default, override
 | Stale / corrupt local data               | `docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v && pnpm dev` (wipes the pg volume). |
 | `mediforce: missing API key`             | Set `MEDIFORCE_API_KEY` (see [GETTING-STARTED §3](../../GETTING-STARTED.md#3-run-the-cli)). |
 | `Unable to find image '...' locally` (script step) | Build local agent images: `./scripts/rebuild-docker-images.sh` ([GETTING-STARTED](../../GETTING-STARTED.md#build-images-for-script-executor-steps)). |
+| `DATABASE_URL must be set to seed auth users for E2E` | Remote env (CI, Claude Code web, fresh box) with no Postgres — `pnpm dev` once, then export `DATABASE_URL`. `auth-setup.ts` and the E2E server must share one database. |
+| Every authenticated journey redirects to `/login`  | `AUTH_SECRET` missing — NextAuth can't sign the session. `playwright.config.ts` carries a fixed test-only fallback. |
+| Playwright: "chromium executable not found"        | `npx playwright install --with-deps chromium`. Binary must match the `@playwright/test` version. |
+| Stale E2E server on 9007                           | `fuser -k 9007/tcp`.                                             |
+
+Playwright's `globalSetup` applies migrations and starts the mock OAuth server
+itself — no separate migration step before `pnpm test:e2e`.
+
+## Gotchas
+
+Two invariants that look like bugs when you trip them.
+
+### `@mediforce/source` resolves imports to `src/`, not `dist/`
+
+Edit `packages/platform-core/src/` and `platform-ui` picks it up with no
+rebuild; Vitest reads the TS directly. That is deliberate, not a misconfigured
+build.
+
+Every `@mediforce/*` package declares an `exports` map with a
+`"@mediforce/source"` condition pointing at source `.ts`. Root `tsconfig.json`
+sets `customConditions`, `vitest.config.ts` sets `resolve.conditions`. In
+production builds the condition is absent and resolution falls back to `dist/`.
+
+Don't add a build step to dev, and don't import `@mediforce/*/dist/…`
+anywhere. Adding a subpath export means touching `package.json` exports and
+`tsconfig.json` paths; Vitest follows automatically. New package? Copy
+`platform-core/package.json`. Full surface:
+`grep -rn '@mediforce/source' packages/ apps/ tsconfig.json vitest.config.ts`.
+
+### Runtime skill paths are hardcoded in `.wd.json`
+
+Move or rename a runtime skill directory and the step fails at execution:
+`BaseContainerAgentPlugin.readSkillFile()` can't find it. `skillsDir` in the
+WorkflowDefinition is a literal path, not a registry lookup.
+
+Two tiers, different resolution — don't confuse them:
+
+| Tier | Location | Resolved by |
+|------|----------|-------------|
+| Runtime | `apps/*/plugins/*/skills/` | `agent-runtime` via `skillsDir` in `.wd.json` |
+| Development | `skills/` (symlinked into `.claude/skills/`) | Claude Code slash-command loader |
+
+Each app indexes its own runtime skills in a local `_registry.yml`. Before
+refactoring: `grep -rn 'skillsDir' apps/ packages/`.

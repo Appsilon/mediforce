@@ -62,15 +62,18 @@ Every engineering doc, what it is for, and how far to trust it.
 | Architectural decisions | [`adr/README.md`](adr/README.md) | engineers | living |
 | Implemented design notes | [`design/`](design/) | engineers | living |
 | Deferred explorations | [`research/`](research/) | engineers | draft |
-| LLM-maintained wiki | [`knowledge-base/`](knowledge-base/) | agents | living |
-| Executed plans, runbooks, completed migrations | [`archive/`](archive/) | engineers | historical |
+| Style for agent-facing docs | [`contributing/doc-style.md`](contributing/doc-style.md) | agents | living |
+| Executed plans, runbooks, completed migrations, the retired knowledge base | [`archive/`](archive/) | engineers | historical |
 
 **`archive/` is not guidance.** It holds the two completed headless-migration
 docs, the four executed ADR implementation plans (`PLAN-0001`, `PLAN-0002`,
-`PLAN-0003`, `PLAN-0016`) and the staging-cutover runbook. Cite them for
+`PLAN-0003`, `PLAN-0016`), the staging-cutover runbook, and the retired
+[`knowledge-base/`](archive/knowledge-base/README.md). Cite them for
 history — including the `PLAN-NNNN §N.N` section numbers that code comments
 reference — never as instructions for what to build now. A plan lives in
-`adr/` alongside its ADR only while the work is in flight.
+`adr/` alongside its ADR only while the work is in flight. Everything under
+`archive/` is exempt from the link checker, because its references point at a
+repo that no longer exists.
 
 ## Conventions
 

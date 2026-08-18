@@ -42,11 +42,6 @@ domains:
         complexity: basic
         language: multi
         description: Review and validate Renovate dependency PRs
-      - id: knowledge-base
-        path: skills/knowledge-base/SKILL.md
-        complexity: basic
-        language: multi
-        description: Ingest, query, and lint the LLM-compiled wiki (Karpathy LLM Wiki pattern)
       - id: add-changelog-entry
         path: skills/add-changelog-entry/SKILL.md
         complexity: basic
