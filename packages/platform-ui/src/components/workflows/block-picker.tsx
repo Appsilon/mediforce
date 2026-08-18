@@ -1,10 +1,37 @@
 'use client';
 
 import React, { useState } from 'react';
-import { User, Users, Bot, Terminal, Zap, PenLine, GitBranch, Search } from 'lucide-react';
+import { User, Users, Bot, Terminal, Zap, PenLine, GitBranch, Search, Mail, Globe, Clock, CheckSquare, Wand2 } from 'lucide-react';
+import { BLOCK_PRESETS, BLOCK_CATEGORIES, type BlockCategory, type BlockPreset } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
+import { useCapabilities } from '@/hooks/use-capabilities';
 import { CONTROL_MODE_LABELS, CONTROL_MODE_NUMBER, CONTROL_MODE_DISABLED, type ControlMode, type Executor, type NewStepPayload } from '@/lib/control-mode';
 import { CM_ROWS, STEP_TYPE_OPTIONS, type CMRow } from '@/lib/block-presets';
+
+/** Which tier of the picker is showing. Simple opens first — most adds are ordinary. */
+type Tier = 'simple' | 'full';
+
+const CATEGORY_LABELS: Record<BlockCategory, string> = {
+  people: 'People',
+  communicate: 'Communicate',
+  data: 'Data',
+  ai: 'AI',
+  control: 'Control',
+};
+
+const PRESET_ICON: Record<string, React.ReactNode> = {
+  'collect-input': <User className="h-3.5 w-3.5 shrink-0" />,
+  'ask-for-approval': <CheckSquare className="h-3.5 w-3.5 shrink-0" />,
+  'send-email': <Mail className="h-3.5 w-3.5 shrink-0" />,
+  'run-script': <Terminal className="h-3.5 w-3.5 shrink-0" />,
+  'call-api': <Globe className="h-3.5 w-3.5 shrink-0" />,
+  'transform-data': <Wand2 className="h-3.5 w-3.5 shrink-0" />,
+  'agent-drafts-person-approves': <Bot className="h-3.5 w-3.5 shrink-0" />,
+  'work-with-an-agent-live': <Users className="h-3.5 w-3.5 shrink-0" />,
+  'route-by-condition': <GitBranch className="h-3.5 w-3.5 shrink-0" />,
+  'wait': <Clock className="h-3.5 w-3.5 shrink-0" />,
+  'run-another-workflow': <Zap className="h-3.5 w-3.5 shrink-0" />,
+};
 
 // Inverse of CONTROL_MODE_NUMBER (control mode → CM label), derived so the two
 // never drift.
@@ -99,15 +126,119 @@ type Props = {
   onAdd: (payload: NewStepPayload) => void;
 };
 
+/**
+ * One pre-made block. Unavailable blocks stay visible but greyed, with the
+ * reason on hover — hiding them would leave the author wondering whether the
+ * platform can do it at all.
+ */
+function PresetButton({ preset, unavailableReason, detail, onPick }: {
+  preset: BlockPreset;
+  unavailableReason: string | null;
+  detail: string | undefined;
+  onPick: () => void;
+}) {
+  const unavailable = unavailableReason !== null;
+  return (
+    <span className="group relative block">
+      <button
+        data-testid={`preset-option-${preset.id}`}
+        disabled={unavailable}
+        onClick={onPick}
+        className={cn(
+          'w-full flex items-start gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all',
+          unavailable
+            ? 'cursor-not-allowed opacity-50'
+            : 'hover:bg-muted hover:border-foreground/30 cursor-pointer',
+        )}
+      >
+        <span className="mt-0.5 text-muted-foreground">{PRESET_ICON[preset.id]}</span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold">{preset.label}</span>
+            {detail !== undefined && (
+              <span className="rounded px-1 py-px text-[9px] font-medium uppercase tracking-wide bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                {detail}
+              </span>
+            )}
+          </span>
+          <span className="block text-[10px] leading-snug text-muted-foreground">{preset.purpose}</span>
+        </span>
+      </button>
+      {unavailable && (
+        <span className="pointer-events-none absolute left-2 right-2 top-full z-50 mt-1 rounded-md border bg-popover px-2.5 py-2 text-[10px] leading-relaxed text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+          {unavailableReason}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function BlockPicker({ onAdd }: Props) {
+  const [tier, setTier] = useState<Tier>('simple');
   const [pendingType, setPendingType] = useState<'creation' | 'decision'>('creation');
+  const { capabilities } = useCapabilities();
 
   const handleAdd = (payload: Omit<NewStepPayload, 'type'>) => {
     onAdd({ ...payload, type: pendingType });
   };
 
+  // Unknown capabilities (endpoint unreachable) read as available — a picker
+  // that greys everything out because one fetch failed is the worse failure.
+  const statusFor = (preset: BlockPreset) => {
+    if (preset.requires === undefined || capabilities === null) return null;
+    return capabilities[preset.requires] ?? null;
+  };
+
   return (
     <div className="flex flex-col gap-5 p-4">
+      {/* Tier — pre-made blocks, or the full executor picker */}
+      <div className="flex rounded-lg border p-0.5">
+        {(['simple', 'full'] as const).map((value) => (
+          <button
+            key={value}
+            data-testid={`picker-tier-${value}`}
+            onClick={() => setTier(value)}
+            className={cn(
+              'flex-1 rounded-md py-1 text-xs font-medium transition-colors cursor-pointer',
+              tier === value ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {value === 'simple' ? 'Simple' : 'Full'}
+          </button>
+        ))}
+      </div>
+
+      {tier === 'simple' && (
+        <div className="space-y-4">
+          {BLOCK_CATEGORIES.map((category) => {
+            const presets = BLOCK_PRESETS.filter((preset) => preset.category === category);
+            if (presets.length === 0) return null;
+            return (
+              <div key={category} className="space-y-1.5">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  {CATEGORY_LABELS[category]}
+                </p>
+                {presets.map((preset) => {
+                  const status = statusFor(preset);
+                  const unavailable = status !== null && status.available === false;
+                  return (
+                    <PresetButton
+                      key={preset.id}
+                      preset={preset}
+                      unavailableReason={unavailable ? (status.reason ?? 'Not available on this instance.') : null}
+                      detail={status?.available === true ? status.detail : undefined}
+                      onPick={() => onAdd(preset.payload)}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tier === 'full' && (
+      <>
       {/* Step type */}
       <div className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Step type</p>
@@ -184,6 +315,8 @@ export function BlockPicker({ onAdd }: Props) {
           );
         })}
       </div>
+      </>
+      )}
     </div>
   );
 }

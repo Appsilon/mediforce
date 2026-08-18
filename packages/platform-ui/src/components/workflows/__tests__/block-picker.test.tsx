@@ -4,6 +4,17 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import { BlockPicker } from '../block-picker';
 import { CM_ROWS, STEP_TYPE_OPTIONS } from '@/lib/block-presets';
+import { BLOCK_PRESETS } from '@mediforce/platform-core';
+import type { NewStepPayload } from '@/lib/control-mode';
+
+/**
+ * The step-type and executor picker lives in the Full tier; the picker opens on
+ * Simple (pre-made blocks). Every test below is about the Full tier.
+ */
+function renderFullTier(onAdd: (payload: NewStepPayload) => void = () => {}): void {
+  render(<BlockPicker onAdd={onAdd} />);
+  fireEvent.click(screen.getByTestId('picker-tier-full'));
+}
 
 function optionButton(id: string): HTMLElement {
   return screen.getByTestId(`executor-option-${id}`);
@@ -15,7 +26,7 @@ function stepTypeButton(value: string): HTMLElement {
 
 describe('BlockPicker step type guidance (#1186)', () => {
   it('explains every step type, not just its name', () => {
-    render(<BlockPicker onAdd={() => {}} />);
+    renderFullTier();
 
     for (const option of STEP_TYPE_OPTIONS) {
       expect(stepTypeButton(option.value)).toHaveTextContent(option.purpose);
@@ -23,7 +34,7 @@ describe('BlockPicker step type guidance (#1186)', () => {
   });
 
   it('states what each step type is for in the wording the golden rules use', () => {
-    render(<BlockPicker onAdd={() => {}} />);
+    renderFullTier();
 
     expect(stepTypeButton('creation')).toHaveTextContent(/produces a result/i);
     expect(stepTypeButton('decision')).toHaveTextContent(/which branch/i);
@@ -32,7 +43,7 @@ describe('BlockPicker step type guidance (#1186)', () => {
 
 describe('BlockPicker executor guidance (#1186)', () => {
   it('explains every executor option, not just its name', () => {
-    render(<BlockPicker onAdd={() => {}} />);
+    renderFullTier();
 
     for (const row of CM_ROWS) {
       for (const button of row.buttons) {
@@ -42,7 +53,7 @@ describe('BlockPicker executor guidance (#1186)', () => {
   });
 
   it('states what each executor is for in the wording the golden rules use', () => {
-    render(<BlockPicker onAdd={() => {}} />);
+    renderFullTier();
 
     expect(optionButton('human')).toHaveTextContent(/accountability, approval/i);
     expect(optionButton('script')).toHaveTextContent(/deterministic/i);
@@ -54,7 +65,7 @@ describe('BlockPicker executor guidance (#1186)', () => {
 
   it('adds the executor the clicked option describes', () => {
     const onAdd = vi.fn();
-    render(<BlockPicker onAdd={onAdd} />);
+    renderFullTier(onAdd);
 
     fireEvent.click(optionButton('script'));
 
@@ -63,7 +74,7 @@ describe('BlockPicker executor guidance (#1186)', () => {
 
   it('carries the selected step type into the added step', () => {
     const onAdd = vi.fn();
-    render(<BlockPicker onAdd={onAdd} />);
+    renderFullTier(onAdd);
 
     fireEvent.click(stepTypeButton('decision'));
     fireEvent.click(optionButton('human-review'));
@@ -77,7 +88,7 @@ describe('BlockPicker executor guidance (#1186)', () => {
 
   it('does not add a step for a control mode that is not implemented yet', () => {
     const onAdd = vi.fn();
-    render(<BlockPicker onAdd={onAdd} />);
+    renderFullTier(onAdd);
 
     const assist = optionButton('assist');
     expect(assist).toBeDisabled();
@@ -85,5 +96,56 @@ describe('BlockPicker executor guidance (#1186)', () => {
 
     fireEvent.click(assist);
     expect(onAdd).not.toHaveBeenCalled();
+  });
+});
+
+describe('BlockPicker pre-made blocks (Simple tier)', () => {
+  it('opens on Simple, so pre-made blocks are what an author sees first', () => {
+    render(<BlockPicker onAdd={() => {}} />);
+
+    expect(screen.getByTestId('preset-option-send-email')).toBeInTheDocument();
+    expect(screen.queryByTestId('executor-option-script')).not.toBeInTheDocument();
+  });
+
+  it('describes every pre-made block, not just its name', () => {
+    render(<BlockPicker onAdd={() => {}} />);
+
+    for (const preset of BLOCK_PRESETS) {
+      expect(screen.getByTestId(`preset-option-${preset.id}`)).toHaveTextContent(preset.purpose);
+    }
+  });
+
+  it('adds the block fully configured, carrying its own step type', () => {
+    const onAdd = vi.fn();
+    render(<BlockPicker onAdd={onAdd} />);
+
+    fireEvent.click(screen.getByTestId('preset-option-route-by-condition'));
+
+    expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ type: 'decision' }));
+  });
+
+  it('seeds an action block with its kind, so it is never inserted config-less', () => {
+    const onAdd = vi.fn();
+    render(<BlockPicker onAdd={onAdd} />);
+
+    fireEvent.click(screen.getByTestId('preset-option-send-email'));
+
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        executor: 'action',
+        action: expect.objectContaining({ kind: 'email' }),
+      }),
+    );
+  });
+
+  it('gives a review block its verdicts, which the schema requires', () => {
+    const onAdd = vi.fn();
+    render(<BlockPicker onAdd={onAdd} />);
+
+    fireEvent.click(screen.getByTestId('preset-option-ask-for-approval'));
+
+    const payload = onAdd.mock.calls[0][0];
+    expect(payload.type).toBe('review');
+    expect(Object.keys(payload.verdicts)).toEqual(['approve', 'reject']);
   });
 });
