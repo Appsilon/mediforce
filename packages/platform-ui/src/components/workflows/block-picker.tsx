@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { User, Users, Bot, Terminal, Zap, PenLine, GitBranch, Search, Mail, Globe, Clock, CheckSquare, Wand2 } from 'lucide-react';
+import { User, Bot, Terminal, PenLine, GitBranch, Search, Mail, Plus, X } from 'lucide-react';
 import { BLOCK_PRESETS, BLOCK_CATEGORIES, type BlockCategory, type BlockPreset } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { useCapabilities } from '@/hooks/use-capabilities';
 import { CollapsibleCard } from './workflow-editor/collapsible-card';
-import { CONTROL_MODE_LABELS, CONTROL_MODE_NUMBER, CONTROL_MODE_DISABLED, type ControlMode, type Executor, type NewStepPayload } from '@/lib/control-mode';
+import { CONTROL_MODE_LABELS, CONTROL_MODE_NUMBER, CONTROL_MODE_DISABLED, getControlMode, type ControlMode, type NewStepPayload } from '@/lib/control-mode';
+import { STEP_STYLES, STEP_TYPE_CONFIG, ExecutorIcon, getExecutorLabel } from './workflow-diagram';
 import { CM_ROWS, STEP_TYPE_OPTIONS, type CMRow } from '@/lib/block-presets';
 
 /** Which tier of the picker is showing. Simple opens first — most adds are ordinary. */
@@ -38,36 +39,11 @@ const CATEGORY_ICON: Record<BlockCategory, React.ComponentType<{ className?: str
   control: GitBranch,
 };
 
-const PRESET_ICON: Record<string, React.ReactNode> = {
-  'collect-input': <User className="h-3.5 w-3.5 shrink-0" />,
-  'ask-for-approval': <CheckSquare className="h-3.5 w-3.5 shrink-0" />,
-  'send-email': <Mail className="h-3.5 w-3.5 shrink-0" />,
-  'run-script': <Terminal className="h-3.5 w-3.5 shrink-0" />,
-  'call-api': <Globe className="h-3.5 w-3.5 shrink-0" />,
-  'transform-data': <Wand2 className="h-3.5 w-3.5 shrink-0" />,
-  'agent-drafts-person-approves': <Bot className="h-3.5 w-3.5 shrink-0" />,
-  'work-with-an-agent-live': <Users className="h-3.5 w-3.5 shrink-0" />,
-  'route-by-condition': <GitBranch className="h-3.5 w-3.5 shrink-0" />,
-  'wait': <Clock className="h-3.5 w-3.5 shrink-0" />,
-  'run-another-workflow': <Zap className="h-3.5 w-3.5 shrink-0" />,
-};
-
 // Inverse of CONTROL_MODE_NUMBER (control mode → CM label), derived so the two
 // never drift.
 const CM_TO_CONTROL_MODE = Object.fromEntries(
   (Object.entries(CONTROL_MODE_NUMBER) as [ControlMode, string][]).map(([mode, cm]) => [cm, mode]),
 ) as Record<CMRow['cm'], ControlMode>;
-
-// Full Tailwind class strings — must not be constructed dynamically (purge safety).
-const BUTTON_CLASSES: Record<string, string> = {
-  orange: 'hover:bg-orange-50 hover:text-orange-700 hover:border-orange-400 hover:ring-1 hover:ring-orange-200 dark:hover:bg-orange-950/20 dark:hover:text-orange-300 dark:hover:border-orange-500 dark:hover:ring-orange-800',
-  yellow: 'hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-400 hover:ring-1 hover:ring-yellow-200 dark:hover:bg-yellow-950/20 dark:hover:text-yellow-300 dark:hover:border-yellow-500 dark:hover:ring-yellow-800',
-  pink:   'hover:bg-pink-50 hover:text-pink-700 hover:border-pink-400 hover:ring-1 hover:ring-pink-200 dark:hover:bg-pink-950/20 dark:hover:text-pink-300 dark:hover:border-pink-500 dark:hover:ring-pink-800',
-  lime:   'hover:bg-lime-50 hover:text-lime-700 hover:border-lime-400 hover:ring-1 hover:ring-lime-200 dark:hover:bg-lime-950/20 dark:hover:text-lime-300 dark:hover:border-lime-500 dark:hover:ring-lime-800',
-  teal:   'hover:bg-teal-50 hover:text-teal-700 hover:border-teal-400 hover:ring-1 hover:ring-teal-200 dark:hover:bg-teal-900/20 dark:hover:text-teal-300 dark:hover:border-teal-600 dark:hover:ring-teal-800',
-  indigo: 'hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-400 hover:ring-1 hover:ring-indigo-200 dark:hover:bg-indigo-950/20 dark:hover:text-indigo-300 dark:hover:border-indigo-500 dark:hover:ring-indigo-800',
-  violet: 'hover:bg-violet-50 hover:text-violet-700 hover:border-violet-400 hover:ring-1 hover:ring-violet-200 dark:hover:bg-violet-950/20 dark:hover:text-violet-300 dark:hover:border-violet-500 dark:hover:ring-violet-800',
-};
 
 const STEP_TYPE_ACTIVE: Record<string, string> = {
   blue:   'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
@@ -111,14 +87,6 @@ const ICON_COLOR: Record<string, string> = {
   violet: 'text-violet-500 dark:text-violet-400',
 };
 
-const EXECUTOR_ICON: Record<Executor, React.ReactNode> = {
-  human:  <User className="h-3.5 w-3.5 shrink-0" />,
-  script: <Terminal className="h-3.5 w-3.5 shrink-0" />,
-  action: <Zap className="h-3.5 w-3.5 shrink-0" />,
-  cowork: <Users className="h-3.5 w-3.5 shrink-0" />,
-  agent:  <Bot className="h-3.5 w-3.5 shrink-0" />,
-};
-
 function CMRowIcon({ cm, color }: { cm: CMRow['cm']; color: string }) {
   const iconCls = cn('h-3.5 w-3.5', ICON_COLOR[color]);
   if (cm === 'CM0') return <User className={iconCls} />;
@@ -151,55 +119,76 @@ function CMRowIcon({ cm, color }: { cm: CMRow['cm']; color: string }) {
 
 type Props = {
   onAdd: (payload: NewStepPayload) => void;
+  onClose: () => void;
+  /** Inserting between two existing steps rather than appending. */
+  onEdge?: boolean;
 };
 
 /**
- * One pre-made block. Unavailable blocks stay visible but greyed, with the
- * reason on hover — hiding them would leave the author wondering whether the
- * platform can do it at all.
+ * A block drawn the way the canvas draws it: same rounded chrome, same executor
+ * row, same step-type tint. What you pick is what you get.
  */
-function PresetButton({ preset, color, unavailableReason, detail, onPick }: {
-  preset: BlockPreset;
-  color: string;
-  unavailableReason: string | null;
-  detail: string | undefined;
-  onPick: () => void;
+function BlockNodePreview({ label, executor, autonomyLevel, stepType, badge, dimmed }: {
+  label: string;
+  executor: string;
+  autonomyLevel?: string;
+  stepType: string;
+  badge?: string;
+  dimmed?: boolean;
 }) {
-  const unavailable = unavailableReason !== null;
+  const style = STEP_STYLES[stepType] ?? STEP_STYLES.creation;
+  const typeConfig = STEP_TYPE_CONFIG[stepType] ?? STEP_TYPE_CONFIG.creation;
+  const mode = getControlMode(executor, autonomyLevel);
   return (
-    <span className="group relative block">
-      <button
-        data-testid={`preset-option-${preset.id}`}
-        disabled={unavailable}
-        onClick={onPick}
-        className={cn(
-          'w-full flex items-center gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all',
-          unavailable ? 'cursor-not-allowed opacity-50' : BUTTON_CLASSES[color],
-        )}
-      >
-        <span className={cn('shrink-0', ICON_COLOR[color])}>{PRESET_ICON[preset.id]}</span>
-        <span className="min-w-0 flex-1 truncate text-xs font-semibold">{preset.label}</span>
-        {detail !== undefined && (
-          <span className="shrink-0 rounded border px-1 py-px text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-            {detail}
+    <span
+      className={cn(
+        'block rounded-xl border-[1.5px] px-3 py-2.5 text-left transition-shadow',
+        style.bg,
+        style.border,
+        dimmed ? 'opacity-50' : 'group-hover:shadow-md',
+      )}
+    >
+      <span className="flex items-center gap-1.5 min-w-0">
+        <ExecutorIcon executor={executor} autonomyLevel={autonomyLevel} />
+        <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
+          {getExecutorLabel(executor, mode)}
+        </span>
+        <span className="text-muted-foreground/40 text-[10px] shrink-0">&middot;</span>
+        <span className={cn('text-[10px] font-semibold truncate', typeConfig.color)}>
+          {typeConfig.label}
+        </span>
+        {badge !== undefined && (
+          <span className="ml-auto shrink-0 rounded border px-1 py-px text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+            {badge}
           </span>
         )}
-        <span className="pointer-events-none absolute left-2 right-2 top-full z-50 mt-1 rounded-md border bg-popover px-2.5 py-2 text-[10px] font-normal leading-relaxed text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
-          {preset.purpose}
-          {unavailable && (
-            <span className="mt-1.5 block text-muted-foreground">{unavailableReason}</span>
-          )}
-        </span>
-      </button>
+      </span>
+      <span className="mt-2 block text-[12px] font-semibold leading-snug text-foreground line-clamp-2">
+        {label}
+      </span>
     </span>
   );
 }
 
-export function BlockPicker({ onAdd }: Props) {
+/** A hover tooltip anchored under the option it explains. */
+function OptionTooltip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="pointer-events-none absolute left-0 right-0 top-full z-50 mt-1 rounded-md border bg-popover px-2.5 py-2 text-[10px] font-normal leading-relaxed text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+      {children}
+    </span>
+  );
+}
+
+export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
   const [tier, setTier] = useState<Tier>('simple');
-  const [openCategory, setOpenCategory] = useState<BlockCategory | null>('people');
   const [pendingType, setPendingType] = useState<'creation' | 'decision'>('creation');
+  // Sections size to their content, so all can be open without a two-option
+  // category stretching down the panel.
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const { capabilities } = useCapabilities();
+
+  const isOpen = (key: string) => collapsed[key] !== true;
+  const toggle = (key: string) => setCollapsed((prev) => ({ ...prev, [key]: prev[key] !== true }));
 
   const handleAdd = (payload: Omit<NewStepPayload, 'type'>) => {
     onAdd({ ...payload, type: pendingType });
@@ -213,22 +202,41 @@ export function BlockPicker({ onAdd }: Props) {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
-      {/* Tier — pre-made blocks, or the full executor picker */}
-      <div className="shrink-0 flex rounded-lg border bg-white dark:bg-background p-0.5">
-        {(['simple', 'full'] as const).map((value) => (
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+      {/* Header card — title, close, and which tier is showing */}
+      <div className="shrink-0 rounded-xl border shadow-lg bg-white dark:bg-background overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3">
+          <Plus className="h-4 w-4 text-primary shrink-0" />
+          <span className="flex-1 min-w-0 truncate text-sm font-semibold">
+            {onEdge ? 'Insert step' : 'Add block'}
+          </span>
+          {onEdge && <span className="shrink-0 text-[10px] text-muted-foreground">on edge</span>}
           <button
-            key={value}
-            data-testid={`picker-tier-${value}`}
-            onClick={() => setTier(value)}
-            className={cn(
-              'flex-1 rounded-md py-1 text-xs font-medium transition-colors cursor-pointer',
-              tier === value ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
-            )}
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="shrink-0 rounded-md p-1 text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
           >
-            {value === 'simple' ? 'Simple' : 'Full'}
+            <X className="h-3.5 w-3.5" />
           </button>
-        ))}
+        </div>
+        <div className="border-t px-4 py-3">
+          <div className="flex rounded-lg border p-0.5">
+            {(['simple', 'full'] as const).map((value) => (
+              <button
+                key={value}
+                data-testid={`picker-tier-${value}`}
+                onClick={() => setTier(value)}
+                className={cn(
+                  'flex-1 rounded-md py-1 text-xs font-medium transition-colors cursor-pointer',
+                  tier === value ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {value === 'simple' ? 'Simple' : 'Full'}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {tier === 'simple' && BLOCK_CATEGORIES.map((category) => {
@@ -239,8 +247,9 @@ export function BlockPicker({ onAdd }: Props) {
         return (
           <CollapsibleCard
             key={category}
-            open={openCategory === category}
-            onToggle={() => setOpenCategory((current) => (current === category ? null : category))}
+            fill={false}
+            open={isOpen(category)}
+            onToggle={() => toggle(category)}
             titleNode={
               <>
                 <CategoryIcon className={cn('h-3.5 w-3.5 shrink-0', ICON_COLOR[color])} />
@@ -250,19 +259,36 @@ export function BlockPicker({ onAdd }: Props) {
               </>
             }
           >
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {presets.map((preset) => {
                 const status = statusFor(preset);
                 const unavailable = status !== null && status.available === false;
                 return (
-                  <PresetButton
+                  <button
                     key={preset.id}
-                    preset={preset}
-                    color={color}
-                    unavailableReason={unavailable ? (status.reason ?? 'Not available on this instance.') : null}
-                    detail={status?.available === true ? status.detail : undefined}
-                    onPick={() => onAdd(preset.payload)}
-                  />
+                    type="button"
+                    data-testid={`preset-option-${preset.id}`}
+                    disabled={unavailable}
+                    onClick={() => onAdd(preset.payload)}
+                    className={cn('group relative block w-full', unavailable ? 'cursor-not-allowed' : 'cursor-pointer')}
+                  >
+                    <BlockNodePreview
+                      label={preset.label}
+                      executor={preset.payload.executor}
+                      autonomyLevel={preset.payload.autonomyLevel}
+                      stepType={preset.payload.type ?? 'creation'}
+                      badge={status?.available === true ? status.detail : undefined}
+                      dimmed={unavailable}
+                    />
+                    <OptionTooltip>
+                      {preset.purpose}
+                      {unavailable && (
+                        <span className="mt-1.5 block text-muted-foreground">
+                          {status?.reason ?? 'Not available on this instance.'}
+                        </span>
+                      )}
+                    </OptionTooltip>
+                  </button>
                 );
               })}
             </div>
@@ -271,84 +297,82 @@ export function BlockPicker({ onAdd }: Props) {
       })}
 
       {tier === 'full' && (
-      <div className="flex flex-col gap-5">
-      {/* Step type */}
-      <div className="space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Step type</p>
-        <div className="flex gap-2">
-          {STEP_TYPE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              data-testid={`step-type-option-${opt.value}`}
-              onClick={() => setPendingType(opt.value)}
-              className={cn(
-                'group relative flex-1 flex items-center gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all',
-                pendingType === opt.value ? STEP_TYPE_ACTIVE[opt.color] : STEP_TYPE_HOVER[opt.color],
-              )}
-            >
-              <span className="shrink-0">
-                {opt.value === 'creation'
-                  ? <PenLine className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
-                  : <GitBranch className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-xs font-semibold">{opt.label}</span>
-              <span className="pointer-events-none absolute left-0 right-0 top-full z-50 mt-1 rounded-md border bg-popover px-2.5 py-2 text-[10px] font-normal leading-relaxed text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
-                {opt.purpose}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* CM rows — stacked cards, one per control mode */}
-      <div className="space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Executor</p>
-        {CM_ROWS.map((row) => {
-          const controlMode = CM_TO_CONTROL_MODE[row.cm];
-          const disabled = CONTROL_MODE_DISABLED[controlMode];
-          return (
-          <div
-            key={row.cm}
-            className={cn(
-              'rounded-xl border px-3 py-2.5 space-y-2 transition-opacity',
-              CM_BORDER[row.color],
-              disabled && 'opacity-50',
-            )}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="flex items-center gap-0.5 shrink-0">
-                <CMRowIcon cm={row.cm} color={row.color} />
-              </span>
-              <span className={cn('text-[11px] font-bold shrink-0', CM_LABEL_COLOR[row.color])}>
-                {CONTROL_MODE_LABELS[controlMode]}
-              </span>
-            </div>
-
-            <div className="space-y-1.5">
-              {row.buttons.map((btn) => (
+        <>
+          <CollapsibleCard fill={false} title="Step type" open={isOpen('step-type')} onToggle={() => toggle('step-type')}>
+            <div className="flex gap-2">
+              {STEP_TYPE_OPTIONS.map((opt) => (
                 <button
-                  key={btn.id}
-                  data-testid={`executor-option-${btn.id}`}
-                  disabled={disabled}
-                  onClick={() => handleAdd(btn.payload)}
+                  key={opt.value}
+                  data-testid={`step-type-option-${opt.value}`}
+                  onClick={() => setPendingType(opt.value)}
                   className={cn(
-                    'group relative w-full flex items-center gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all',
-                    disabled ? 'cursor-not-allowed' : BUTTON_CLASSES[btn.color],
+                    'group relative flex-1 flex items-center gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all cursor-pointer',
+                    pendingType === opt.value ? STEP_TYPE_ACTIVE[opt.color] : STEP_TYPE_HOVER[opt.color],
                   )}
                 >
-                  <span className="shrink-0">{EXECUTOR_ICON[btn.payload.executor]}</span>
-                  <span className="min-w-0 flex-1 truncate text-xs font-semibold">{btn.label}</span>
-                  <span className="pointer-events-none absolute left-0 right-0 top-full z-50 mt-1 rounded-md border bg-popover px-2.5 py-2 text-[10px] font-normal leading-relaxed text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
-                    {btn.purpose}
+                  <span className="shrink-0">
+                    {opt.value === 'creation'
+                      ? <PenLine className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                      : <GitBranch className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />}
                   </span>
+                  <span className="min-w-0 flex-1 truncate text-xs font-semibold">{opt.label}</span>
+                  <OptionTooltip>{opt.purpose}</OptionTooltip>
                 </button>
               ))}
             </div>
-          </div>
-          );
-        })}
-      </div>
-      </div>
+          </CollapsibleCard>
+
+          <CollapsibleCard fill={false} title="Executor" open={isOpen('executor')} onToggle={() => toggle('executor')}>
+            <div className="space-y-2">
+              {CM_ROWS.map((row) => {
+                const controlMode = CM_TO_CONTROL_MODE[row.cm];
+                const disabled = CONTROL_MODE_DISABLED[controlMode];
+                const options = row.buttons.map((btn) => (
+                  <button
+                    key={btn.id}
+                    type="button"
+                    data-testid={`executor-option-${btn.id}`}
+                    disabled={disabled}
+                    onClick={() => handleAdd(btn.payload)}
+                    className={cn('group relative block w-full', disabled ? 'cursor-not-allowed' : 'cursor-pointer')}
+                  >
+                    <BlockNodePreview
+                      label={btn.label}
+                      executor={btn.payload.executor}
+                      autonomyLevel={btn.payload.autonomyLevel}
+                      stepType={pendingType}
+                      dimmed={disabled}
+                    />
+                    <OptionTooltip>{btn.purpose}</OptionTooltip>
+                  </button>
+                ));
+
+                // A single option already names its own control mode inside the
+                // block, so wrapping it in a group card labelled the same thing
+                // said "Cowork" twice. Only a row with real alternatives needs
+                // the grouping.
+                if (row.buttons.length === 1) return <div key={row.cm}>{options}</div>;
+
+                return (
+                  <div
+                    key={row.cm}
+                    className={cn('rounded-xl border px-3 py-2.5 space-y-2', CM_BORDER[row.color], disabled && 'opacity-50')}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="flex items-center gap-0.5 shrink-0">
+                        <CMRowIcon cm={row.cm} color={row.color} />
+                      </span>
+                      <span className={cn('text-[11px] font-bold shrink-0', CM_LABEL_COLOR[row.color])}>
+                        {CONTROL_MODE_LABELS[controlMode]}
+                      </span>
+                    </div>
+                    <div className="space-y-2">{options}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleCard>
+        </>
       )}
     </div>
   );

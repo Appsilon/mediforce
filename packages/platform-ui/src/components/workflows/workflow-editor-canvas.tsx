@@ -767,25 +767,11 @@ export function WorkflowEditorCanvas({
 
         {rightPanelView === 'add-block' && (
           <div className="w-80 shrink-0 my-3 mr-3 px-1 min-h-0 flex flex-col">
-            <div className="shrink-0 flex items-center justify-between gap-2 pb-2 px-1">
-              <div className="flex items-center gap-2 min-w-0">
-                <Plus className="h-4 w-4 text-primary shrink-0" />
-                <span className="text-sm font-semibold shrink-0">
-                  {addBlockContext ? 'Insert step' : 'Add block'}
-                </span>
-                {addBlockContext && (
-                  <span className="text-[10px] text-muted-foreground font-normal">on edge</span>
-                )}
-              </div>
-              <button
-                onClick={closeAddBlock}
-                aria-label="Close"
-                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <BlockPicker onAdd={handleBlockAdd} />
+            <BlockPicker
+              onAdd={handleBlockAdd}
+              onClose={closeAddBlock}
+              onEdge={addBlockContext !== null}
+            />
           </div>
         )}
 

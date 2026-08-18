@@ -18,7 +18,7 @@ vi.mock('@/hooks/use-capabilities', () => ({
  * Simple (pre-made blocks). Every test below is about the Full tier.
  */
 function renderFullTier(onAdd: (payload: NewStepPayload) => void = () => {}): void {
-  render(<BlockPicker onAdd={onAdd} />);
+  render(<BlockPicker onAdd={onAdd} onClose={() => {}} />);
   fireEvent.click(screen.getByTestId('picker-tier-full'));
 }
 
@@ -106,48 +106,43 @@ describe('BlockPicker executor guidance (#1186)', () => {
 });
 
 describe('BlockPicker pre-made blocks (Simple tier)', () => {
-  const CATEGORY_LABEL: Record<string, string> = {
-    people: 'People',
-    communicate: 'Communicate',
-    data: 'Data',
-    ai: 'AI',
-    control: 'Control',
-  };
-
-  /** Categories fold one at a time, so a block is in the DOM only once opened. */
-  function expandCategory(category: string): void {
-    fireEvent.click(screen.getByRole('button', { name: CATEGORY_LABEL[category] }));
+  function renderSimple(onAdd: (payload: NewStepPayload) => void = () => {}): void {
+    render(<BlockPicker onAdd={onAdd} onClose={() => {}} />);
   }
 
-  it('opens on Simple with the first category expanded', () => {
-    render(<BlockPicker onAdd={() => {}} />);
+  it('opens on Simple with every category expanded', () => {
+    renderSimple();
 
     expect(screen.getByTestId('preset-option-collect-input')).toBeInTheDocument();
+    expect(screen.getByTestId('preset-option-send-email')).toBeInTheDocument();
     expect(screen.queryByTestId('executor-option-script')).not.toBeInTheDocument();
   });
 
-  it('folds one category at a time, like the step editor', () => {
-    render(<BlockPicker onAdd={() => {}} />);
+  it('folds one category without collapsing the others', () => {
+    renderSimple();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Communicate' }));
+
+    expect(screen.queryByTestId('preset-option-send-email')).not.toBeInTheDocument();
     expect(screen.getByTestId('preset-option-collect-input')).toBeInTheDocument();
-
-    expandCategory('communicate');
-
-    expect(screen.getByTestId('preset-option-send-email')).toBeInTheDocument();
-    expect(screen.queryByTestId('preset-option-collect-input')).not.toBeInTheDocument();
   });
 
   it('describes every pre-made block, not just its name', () => {
-    render(<BlockPicker onAdd={() => {}} />);
+    renderSimple();
 
-    for (const category of Object.keys(CATEGORY_LABEL)) {
-      const presets = BLOCK_PRESETS.filter((preset) => preset.category === category);
-      if (presets.length === 0) continue;
-      if (screen.queryByTestId(`preset-option-${presets[0].id}`) === null) expandCategory(category);
-      for (const preset of presets) {
-        expect(screen.getByTestId(`preset-option-${preset.id}`)).toHaveTextContent(preset.purpose);
-      }
+    for (const preset of BLOCK_PRESETS) {
+      expect(screen.getByTestId(`preset-option-${preset.id}`)).toHaveTextContent(preset.purpose);
     }
+  });
+
+  it('draws each block the way the canvas draws it, executor and step type included', () => {
+    renderSimple();
+
+    const sendEmail = screen.getByTestId('preset-option-send-email');
+    expect(sendEmail).toHaveTextContent('Action');
+    expect(sendEmail).toHaveTextContent('Creation');
+
+    expect(screen.getByTestId('preset-option-route-by-condition')).toHaveTextContent('Decision');
   });
 
   it('states no description with an em dash, which reads badly in a tooltip', () => {
@@ -156,11 +151,16 @@ describe('BlockPicker pre-made blocks (Simple tier)', () => {
     }
   });
 
+  it('offers no review-typed block, since that step type is deprecated', () => {
+    for (const preset of BLOCK_PRESETS) {
+      expect(preset.payload.type).not.toBe('review');
+    }
+  });
+
   it('adds the block fully configured, carrying its own step type', () => {
     const onAdd = vi.fn();
-    render(<BlockPicker onAdd={onAdd} />);
+    renderSimple(onAdd);
 
-    expandCategory('control');
     fireEvent.click(screen.getByTestId('preset-option-route-by-condition'));
 
     expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ type: 'decision' }));
@@ -168,9 +168,8 @@ describe('BlockPicker pre-made blocks (Simple tier)', () => {
 
   it('seeds an action block with its kind, so it is never inserted config-less', () => {
     const onAdd = vi.fn();
-    render(<BlockPicker onAdd={onAdd} />);
+    renderSimple(onAdd);
 
-    expandCategory('communicate');
     fireEvent.click(screen.getByTestId('preset-option-send-email'));
 
     expect(onAdd).toHaveBeenCalledWith(
@@ -181,14 +180,12 @@ describe('BlockPicker pre-made blocks (Simple tier)', () => {
     );
   });
 
-  it('gives a review block its verdicts, which the schema requires', () => {
-    const onAdd = vi.fn();
-    render(<BlockPicker onAdd={onAdd} />);
+  it('closes the panel from the header card', () => {
+    const onClose = vi.fn();
+    render(<BlockPicker onAdd={() => {}} onClose={onClose} />);
 
-    fireEvent.click(screen.getByTestId('preset-option-ask-for-approval'));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
-    const payload = onAdd.mock.calls[0][0];
-    expect(payload.type).toBe('review');
-    expect(Object.keys(payload.verdicts)).toEqual(['approve', 'reject']);
+    expect(onClose).toHaveBeenCalled();
   });
 });
