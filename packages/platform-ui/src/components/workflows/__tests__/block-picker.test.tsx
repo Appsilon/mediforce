@@ -13,13 +13,24 @@ vi.mock('@/hooks/use-capabilities', () => ({
   useCapabilities: () => ({ capabilities: null, loading: false }),
 }));
 
-/**
- * The step-type and executor picker lives in the Full tier; the picker opens on
- * Simple (pre-made blocks). Every test below is about the Full tier.
- */
-function renderFullTier(onAdd: (payload: NewStepPayload) => void = () => {}): void {
+function renderPicker(onAdd: (payload: NewStepPayload) => void = () => {}): void {
   render(<BlockPicker onAdd={onAdd} onClose={() => {}} />);
+}
+
+function renderFullTier(onAdd: (payload: NewStepPayload) => void = () => {}): void {
+  renderPicker(onAdd);
   fireEvent.click(screen.getByTestId('picker-tier-full'));
+}
+
+/**
+ * Sections fold one at a time, so the card holding an option has to be open
+ * before that option exists. Idempotent — clicking an already-open card would
+ * toggle it shut.
+ */
+function openSection(key: string): void {
+  const card = screen.getByTestId(`section-${key}`);
+  if (card.getAttribute('data-open') === 'true') return;
+  fireEvent.click(card.querySelector('button') as HTMLElement);
 }
 
 function optionButton(id: string): HTMLElement {
@@ -28,6 +39,14 @@ function optionButton(id: string): HTMLElement {
 
 function stepTypeButton(value: string): HTMLElement {
   return screen.getByTestId(`step-type-option-${value}`);
+}
+
+/** Opens the control-mode card holding `optionId`, then returns that option. */
+function executorOption(optionId: string): HTMLElement {
+  const row = CM_ROWS.find((candidate) => candidate.buttons.some((btn) => btn.id === optionId));
+  if (row === undefined) throw new Error(`no control-mode row holds ${optionId}`);
+  openSection(row.cm);
+  return optionButton(optionId);
 }
 
 describe('BlockPicker step type guidance (#1186)', () => {
@@ -45,6 +64,16 @@ describe('BlockPicker step type guidance (#1186)', () => {
     expect(stepTypeButton('creation')).toHaveTextContent(/produces a result/i);
     expect(stepTypeButton('decision')).toHaveTextContent(/which branch/i);
   });
+
+  it('keeps the step type in the header card, visible whatever is folded', () => {
+    renderFullTier();
+
+    openSection('CM2');
+
+    expect(screen.getByTestId('step-type-option-creation')).toBeInTheDocument();
+    expect(screen.getByTestId('step-type-option-decision')).toBeInTheDocument();
+    expect(screen.queryByTestId('section-step-type')).not.toBeInTheDocument();
+  });
 });
 
 describe('BlockPicker executor guidance (#1186)', () => {
@@ -53,7 +82,7 @@ describe('BlockPicker executor guidance (#1186)', () => {
 
     for (const row of CM_ROWS) {
       for (const button of row.buttons) {
-        expect(optionButton(button.id)).toHaveTextContent(button.purpose);
+        expect(executorOption(button.id)).toHaveTextContent(button.purpose);
       }
     }
   });
@@ -61,19 +90,32 @@ describe('BlockPicker executor guidance (#1186)', () => {
   it('states what each executor is for in the wording the golden rules use', () => {
     renderFullTier();
 
-    expect(optionButton('human')).toHaveTextContent(/accountability, approval/i);
-    expect(optionButton('script')).toHaveTextContent(/deterministic/i);
-    expect(optionButton('action')).toHaveTextContent(/email/i);
-    expect(optionButton('cowork')).toHaveTextContent(/real time/i);
-    expect(optionButton('human-review')).toHaveTextContent(/approves/i);
-    expect(optionButton('autonomous-agent')).toHaveTextContent(/no approval/i);
+    expect(executorOption('human')).toHaveTextContent(/accountability, approval/i);
+    expect(executorOption('script')).toHaveTextContent(/deterministic/i);
+    expect(executorOption('action')).toHaveTextContent(/email/i);
+    expect(executorOption('cowork')).toHaveTextContent(/real time/i);
+    expect(executorOption('human-review')).toHaveTextContent(/approves/i);
+    expect(executorOption('autonomous-agent')).toHaveTextContent(/no approval/i);
+  });
+
+  it('gives every control mode its own card, folded shut until asked for', () => {
+    renderFullTier();
+
+    expect(screen.queryByTestId('executor-option-cowork')).not.toBeInTheDocument();
+
+    openSection('CM2');
+    expect(screen.getByTestId('executor-option-cowork')).toBeInTheDocument();
+
+    openSection('CM0');
+    expect(screen.queryByTestId('executor-option-cowork')).not.toBeInTheDocument();
+    expect(screen.getByTestId('executor-option-script')).toBeInTheDocument();
   });
 
   it('adds the executor the clicked option describes', () => {
     const onAdd = vi.fn();
     renderFullTier(onAdd);
 
-    fireEvent.click(optionButton('script'));
+    fireEvent.click(executorOption('script'));
 
     expect(onAdd).toHaveBeenCalledWith({ executor: 'script', type: 'creation' });
   });
@@ -83,7 +125,7 @@ describe('BlockPicker executor guidance (#1186)', () => {
     renderFullTier(onAdd);
 
     fireEvent.click(stepTypeButton('decision'));
-    fireEvent.click(optionButton('human-review'));
+    fireEvent.click(executorOption('human-review'));
 
     expect(onAdd).toHaveBeenCalledWith({
       executor: 'agent',
@@ -96,7 +138,7 @@ describe('BlockPicker executor guidance (#1186)', () => {
     const onAdd = vi.fn();
     renderFullTier(onAdd);
 
-    const assist = optionButton('assist');
+    const assist = executorOption('assist');
     expect(assist).toBeDisabled();
     expect(assist).toHaveTextContent(/coming soon/i);
 
@@ -106,48 +148,47 @@ describe('BlockPicker executor guidance (#1186)', () => {
 });
 
 describe('BlockPicker pre-made blocks (Simple tier)', () => {
-  function renderSimple(onAdd: (payload: NewStepPayload) => void = () => {}): void {
-    render(<BlockPicker onAdd={onAdd} onClose={() => {}} />);
-  }
-
-  it('opens on Simple with every category expanded', () => {
-    renderSimple();
+  it('opens on Simple with only the first category expanded', () => {
+    renderPicker();
 
     expect(screen.getByTestId('preset-option-collect-input')).toBeInTheDocument();
-    expect(screen.getByTestId('preset-option-send-email')).toBeInTheDocument();
+    expect(screen.queryByTestId('preset-option-send-email')).not.toBeInTheDocument();
     expect(screen.queryByTestId('executor-option-script')).not.toBeInTheDocument();
   });
 
-  it('folds one category without collapsing the others', () => {
-    renderSimple();
+  it('opening a category closes the one that was open', () => {
+    renderPicker();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Communicate' }));
+    openSection('communicate');
 
-    expect(screen.queryByTestId('preset-option-send-email')).not.toBeInTheDocument();
-    expect(screen.getByTestId('preset-option-collect-input')).toBeInTheDocument();
+    expect(screen.getByTestId('preset-option-send-email')).toBeInTheDocument();
+    expect(screen.queryByTestId('preset-option-collect-input')).not.toBeInTheDocument();
   });
 
   it('describes every pre-made block, not just its name', () => {
-    renderSimple();
+    renderPicker();
 
     for (const preset of BLOCK_PRESETS) {
+      openSection(preset.category);
       expect(screen.getByTestId(`preset-option-${preset.id}`)).toHaveTextContent(preset.purpose);
     }
   });
 
   it('draws each block the way the canvas draws it, executor and step type included', () => {
-    renderSimple();
+    renderPicker();
 
+    openSection('communicate');
     const sendEmail = screen.getByTestId('preset-option-send-email');
     expect(sendEmail).toHaveTextContent('Action');
     expect(sendEmail).toHaveTextContent('Creation');
 
+    openSection('control');
     expect(screen.getByTestId('preset-option-route-by-condition')).toHaveTextContent('Decision');
   });
 
   it('states no description with an em dash, which reads badly in a tooltip', () => {
     for (const preset of BLOCK_PRESETS) {
-      expect(preset.purpose).not.toContain('\u2014');
+      expect(preset.purpose).not.toContain('—');
     }
   });
 
@@ -159,8 +200,9 @@ describe('BlockPicker pre-made blocks (Simple tier)', () => {
 
   it('adds the block fully configured, carrying its own step type', () => {
     const onAdd = vi.fn();
-    renderSimple(onAdd);
+    renderPicker(onAdd);
 
+    openSection('control');
     fireEvent.click(screen.getByTestId('preset-option-route-by-condition'));
 
     expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ type: 'decision' }));
@@ -168,8 +210,9 @@ describe('BlockPicker pre-made blocks (Simple tier)', () => {
 
   it('seeds an action block with its kind, so it is never inserted config-less', () => {
     const onAdd = vi.fn();
-    renderSimple(onAdd);
+    renderPicker(onAdd);
 
+    openSection('communicate');
     fireEvent.click(screen.getByTestId('preset-option-send-email'));
 
     expect(onAdd).toHaveBeenCalledWith(

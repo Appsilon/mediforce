@@ -22,6 +22,7 @@ export function CollapsibleCard({
   open,
   onToggle,
   fill = true,
+  testId,
   children,
 }: {
   title?: string;
@@ -36,13 +37,19 @@ export function CollapsibleCard({
    * two-option section stretching down the whole panel.
    */
   fill?: boolean;
+  /** Stamps `data-testid` plus `data-open`, so a test can open a card by key. */
+  testId?: string;
   children: React.ReactNode;
 }) {
   const titleContent = titleNode ?? (
     <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">{title}</span>
   );
   return (
-    <div className={cn('rounded-xl border shadow-lg overflow-hidden bg-white dark:bg-background flex flex-col', open && fill && 'flex-1 min-h-0')}>
+    <div
+      data-testid={testId}
+      data-open={open}
+      className={cn('rounded-xl border shadow-lg overflow-hidden bg-white dark:bg-background flex flex-col', open && fill && 'flex-1 min-h-0')}
+    >
       <div className="flex items-center gap-2 px-4 py-3 shrink-0">
         <button type="button" onClick={onToggle} className="flex flex-1 min-w-0 items-center gap-2 text-left cursor-pointer">
           {titleContent}
