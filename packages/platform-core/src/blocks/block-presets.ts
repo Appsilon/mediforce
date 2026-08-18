@@ -16,9 +16,9 @@ import type { WorkflowStep } from '../schemas/workflow-definition';
  * URL, a target workflow). Those are declared in `needsInput` and left empty;
  * the editor's existing step-error highlighting surfaces them.
  *
- * No preset emits `type: 'review'` — the review step type is deprecated, so
- * offering one here would hand authors a shape being retired. Approval belongs
- * on an agent step at L3 ("Agent drafts, person approves").
+ * No preset emits `type: 'review'`. Those steps keep working for existing
+ * workflows, but the picker stops offering the type for new ones per ADR-0006;
+ * approval belongs on an agent step at L3 ("Agent drafts, person approves").
  */
 
 /** Capabilities an instance may or may not have wired up. */
