@@ -15,6 +15,10 @@ import type { WorkflowStep } from '../schemas/workflow-definition';
  * Presets deliberately do NOT invent author-specific values (a recipient, a
  * URL, a target workflow). Those are declared in `needsInput` and left empty;
  * the editor's existing step-error highlighting surfaces them.
+ *
+ * No preset emits `type: 'review'` — the review step type is deprecated, so
+ * offering one here would hand authors a shape being retired. Approval belongs
+ * on an agent step at L3 ("Agent drafts, person approves").
  */
 
 /** Capabilities an instance may or may not have wired up. */
@@ -65,20 +69,6 @@ export const BLOCK_PRESETS: BlockPreset[] = [
       params: [
         { name: 'notes', type: 'textarea', required: true, description: 'What the workflow needs from you' },
       ],
-    },
-  },
-  {
-    id: 'ask-for-approval',
-    label: 'Ask for approval',
-    purpose: 'A person signs off before the run continues, or sends it back.',
-    category: 'people',
-    payload: {
-      type: 'review',
-      executor: 'human',
-      verdicts: {
-        approve: { target: '', intent: 'success' },
-        reject: { target: '', intent: 'danger', requiresComment: true },
-      },
     },
   },
   {

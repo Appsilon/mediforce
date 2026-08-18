@@ -62,9 +62,9 @@ describe('BLOCK_PRESETS', () => {
     expect(routing.map((preset) => preset.id)).toContain('route-by-condition');
   });
 
-  it('carries verdicts on the approval preset so a review step is never verdict-less', () => {
-    const approval = BLOCK_PRESETS.find((preset) => preset.id === 'ask-for-approval');
-    expect(approval?.payload.type).toBe('review');
-    expect(Object.keys(approval?.payload.verdicts ?? {})).toEqual(['approve', 'reject']);
+  it('emits no review-typed step, since that step type is deprecated', () => {
+    for (const preset of BLOCK_PRESETS) {
+      expect(preset.payload.type).not.toBe('review');
+    }
   });
 });
