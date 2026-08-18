@@ -64,14 +64,36 @@ function stepTypeButton(page: import('@playwright/test').Page, type: 'creation' 
 }
 
 /**
- * Returns an executor option in the Add Step popover's "Executor" section.
- * 'agent' maps to "Autonomous agent" (L4). Matched by test id: each option
- * renders its name plus a sentence on when to choose it, so the accessible
- * name is not the label alone.
+ * Switches to the Full tier and opens the control-mode card holding `executor`,
+ * then returns that option.
+ *
+ * The picker opens on Simple (pre-made blocks); executors live in Full, where
+ * each control mode is its own card and one folds open at a time. 'agent' maps
+ * to "Autonomous agent" (CM4).
  */
-function executorButton(page: import('@playwright/test').Page, executor: 'human' | 'agent' | 'script' | 'cowork') {
-  const optionIds = { human: 'human', agent: 'autonomous-agent', script: 'script', cowork: 'cowork' } as const;
-  return page.getByTestId(`executor-option-${optionIds[executor]}`);
+async function executorButton(
+  page: import('@playwright/test').Page,
+  executor: 'human' | 'agent' | 'script' | 'cowork',
+) {
+  const options = {
+    human:  { id: 'human',             section: 'CM0' },
+    script: { id: 'script',            section: 'CM0' },
+    cowork: { id: 'cowork',            section: 'CM2' },
+    agent:  { id: 'autonomous-agent',  section: 'CM4' },
+  } as const;
+  const { id, section } = options[executor];
+
+  await page.getByTestId('picker-tier-full').click();
+  const card = page.getByTestId(`section-${section}`);
+  if (await card.getAttribute('data-open') !== 'true') {
+    await card.getByRole('button').first().click();
+  }
+  return page.getByTestId(`executor-option-${id}`);
+}
+
+/** Waits for the Add Block panel to be on screen. */
+async function expectPickerOpen(page: import('@playwright/test').Page) {
+  await expect(page.getByTestId('picker-tier-simple')).toBeVisible({ timeout: 3_000 });
 }
 
 /**
@@ -200,20 +222,22 @@ test.describe('Workflow Editor Journey', () => {
 
     // Open Add Step popover via the "+" button on an edge
     await page.getByLabel('Add step here').first().click();
-    // Both sections visible simultaneously — wait for the executor section header
-    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
+    await expectPickerOpen(page);
 
-    // Section 1: step type toggles (Creation active by default, Decision available)
+    // Step type lives in the header card, so it is on screen in the Full tier
+    // whatever section is folded open.
+    await page.getByTestId('picker-tier-full').click();
     await expect(stepTypeButton(page, 'creation')).toBeVisible();
     await expect(stepTypeButton(page, 'decision')).toBeVisible();
 
-    // Section 2: executor buttons all visible simultaneously
-    await expect(executorButton(page, 'human')).toBeVisible();
-    await expect(executorButton(page, 'agent')).toBeVisible();
-    await expect(executorButton(page, 'script')).toBeVisible();
+    // Each control mode is its own card and one folds open at a time, so the
+    // executors are reachable one at a time rather than all at once.
+    await expect(await executorButton(page, 'human')).toBeVisible();
+    await expect(await executorButton(page, 'script')).toBeVisible();
+    await expect(await executorButton(page, 'agent')).toBeVisible();
 
     // Choose human executor — step is added to the diagram
-    await executorButton(page, 'human').click();
+    await (await executorButton(page, 'human')).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
   });
 
@@ -234,8 +258,8 @@ test.describe('Workflow Editor Journey', () => {
     // canvas must provide an equivalent add-step affordance.
     await expect(page.getByRole('button', { name: 'Add step here' })).toBeVisible();
     await page.getByRole('button', { name: 'Add step here' }).click();
-    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
-    await executorButton(page, 'human').click();
+    await expectPickerOpen(page);
+    await (await executorButton(page, 'human')).click();
 
     await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 5_000 });
   });
@@ -248,8 +272,8 @@ test.describe('Workflow Editor Journey', () => {
     const initialNodeCount = await page.locator('.react-flow__node').count();
 
     await page.getByLabel('Add step here').first().click();
-    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
-    await executorButton(page, 'human').click();
+    await expectPickerOpen(page);
+    await (await executorButton(page, 'human')).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
     const newStepNode = page.locator('.react-flow__node').filter({ hasText: /New Step/i });
@@ -286,8 +310,8 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add a step via edge "+" button
     await page.getByLabel('Add step here').first().click();
-    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
-    await executorButton(page, 'human').click();
+    await expectPickerOpen(page);
+    await (await executorButton(page, 'human')).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
     // Undo is now enabled
@@ -318,8 +342,8 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add a step via edge "+" button
     await page.getByLabel('Add step here').first().click();
-    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
-    await executorButton(page, 'human').click();
+    await expectPickerOpen(page);
+    await (await executorButton(page, 'human')).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
     // Undo the step addition
@@ -712,8 +736,8 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add an agent step via edge "+" button
     await page.getByLabel('Add step here').first().click();
-    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
-    await executorButton(page, 'agent').click();
+    await expectPickerOpen(page);
+    await (await executorButton(page, 'agent')).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
     // Click the new step node — step editor opens showing the icon header
@@ -752,8 +776,8 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add a cowork step via edge "+" button
     await page.getByLabel('Add step here').first().click();
-    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
-    await executorButton(page, 'cowork').click();
+    await expectPickerOpen(page);
+    await (await executorButton(page, 'cowork')).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
     // New node shows "Cowork" executor label in the diagram
@@ -797,8 +821,8 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add a cowork step
     await page.getByLabel('Add step here').first().click();
-    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
-    await executorButton(page, 'cowork').click();
+    await expectPickerOpen(page);
+    await (await executorButton(page, 'cowork')).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
     // Open the new step editor
