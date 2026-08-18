@@ -71,7 +71,7 @@ domains:
         path: skills/sync-docs/SKILL.md
         complexity: moderate
         language: multi
-        description: Keep monitored docs in sync — auto-fixes Tier 1 (commands/ports/env vars), proposes Tier 2 (narrative) as git diff
+        description: Check whether this session's changes made any doc untrue; routes each change to the doc that owns it (colocated package READMEs first, then the docs/ routing table)
       - id: design-workflow
         path: skills/design-workflow/SKILL.md
         complexity: intermediate

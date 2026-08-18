@@ -79,7 +79,10 @@ repo that no longer exists.
 
 ### Status header
 
-Every doc starts with frontmatter:
+Every doc **under `docs/`** starts with frontmatter. Colocated `packages/*/` and
+`apps/*/` READMEs do not carry it: they are a directory's front door on GitHub,
+written for a person arriving at the code, and their freshness comes from
+sitting next to the thing they describe rather than from a review date.
 
 ```yaml
 ---
@@ -111,12 +114,36 @@ numbered `adr/NNNN-*.md` / `adr/plans/PLAN-NNNN.md` /
 
 ### Links
 
-Relative Markdown links. `scripts/check_doc_links.py` runs in CI and fails the
-build on a link or backticked `docs/`/`skills/` path that does not resolve;
+Relative Markdown links. `scripts/check_doc_links.py` runs in CI
+(`pnpm check:docs`) and fails the build on a link or backticked
+`docs/`/`skills/` path that does not resolve. It checks that references
+*resolve*, not that prose is *true* — stale prose is caught by rule 11 in
+`AGENTS.md` and by `/sync-docs`;
 docs marked `historical` are exempt, because their references point at a repo
 that no longer exists.
 
 ### Where new docs go
+
+**A package or app documents itself.** Every directory under `packages/` and
+`apps/` carries its own `README.md`, and that file is the authority on what the
+package is for, what depends on it, and what you must not do to it. `docs/`
+covers only what spans more than one package. When you add a package or an app,
+its README lands in the same PR — a directory without one is an incomplete
+directory. `scripts/check_readme_coverage.py` enforces this in CI
+(`pnpm check:readmes`); it runs in `ci.yml` rather than the docs workflow,
+because a new package containing no Markdown file matches no `**.md` path
+filter.
+
+This is geometry, not filing preference. A `git rm -r packages/foo` carries off
+`packages/foo/README.md` with the code; it cannot carry off a page three
+directories away. That asymmetry is why the retired knowledge base filled up
+with entries describing deleted code ([ADR-0017](adr/0017-retire-llm-maintained-wiki.md)),
+and why a colocated README stays honest without a review cadence to enforce it.
+
+Keep them short and aimed at what the code does not say. A README that restates
+`src/index.ts` earns nothing and goes stale the first time an export changes.
+
+For docs that genuinely span packages:
 
 `start/` get running · `concepts/` what Mediforce is · `guides/` how do I X ·
 `reference/` lookup surfaces · `testing/` test strategy · `contributing/` how we

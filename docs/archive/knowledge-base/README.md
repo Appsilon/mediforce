@@ -44,8 +44,13 @@ belongs next to the thing, where `git rm` takes it along.
 | Caveman writing rules (`STYLE.md`) | [`../../contributing/doc-style.md`](../../contributing/doc-style.md) |
 | `mediforce-source`, `skillsDir`, remote-E2E gotchas | [`../../start/dev-quickref.md`](../../start/dev-quickref.md) — Troubleshooting and Gotchas |
 | `in-memory-repos-not-mocks` | already covered by [`../../testing/engine-testing.md`](../../testing/engine-testing.md) |
-| Package / app / plugin entity pages | superseded by colocated `README.md`s |
+| Package / app / plugin entity pages | ported to colocated `README.md`s and **deleted from this archive**, so there is no second copy to disagree |
 | CDISC, CTCAE, RECIST, ICH-GCP concept pages | not carried forward — see below |
+
+Thirteen entity pages were verified against the code, ported, and removed
+(2026-08-18). The five `supply-intelligence` pages were not: they describe code
+that has been deleted, so there was nothing to port them to. They remain here as
+the clearest illustration of the drift described above.
 
 The four pharma-standard pages (`wiki/concepts/cdisc-sdtm.md`,
 `ctcae-grading.md`, `recist-v1-1.md`, `ich-gcp.md`) are the only content here

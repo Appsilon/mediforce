@@ -32,6 +32,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  readme-coverage:
+    # Every package and app documents itself (docs/README.md). Lives here and
+    # not in docs.yml because a new package with no Markdown file matches no
+    # `**.md` path filter — the exact case this catches.
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 scripts/check_readme_coverage.py
+
   typecheck:
     runs-on: ubuntu-latest
     timeout-minutes: 5

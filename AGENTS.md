@@ -29,7 +29,7 @@ in dev (no build).
 ## Per-task workflow
 
 ```
-understand → simplify → write test (RED) → implement (GREEN) → self-review → log → ship
+understand → simplify → write test (RED) → implement (GREEN) → self-review → log → docs → ship
 ```
 
 1. **Simplify first.** Before coding, ask: *can this be smaller?* Cut layers,
@@ -145,7 +145,20 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    nested list. Skip only for trivial edits. Weekly cut is automated —
    never edit dated `## [YYYY-MM-DD]` sections by hand.
 
-10. **No regressions.** Every migration / refactor / rewrite must keep the
+11. **Sync the docs via `/sync-docs`.** Before reporting done, run it — with no
+    arguments it checks what *this session* changed and what that made untrue,
+    then fixes it in the same diff. It routes each change to the doc that owns
+    it: **colocated first** (touched `packages/foo/src/` → `packages/foo/README.md`
+    is the file that now lies), then the routing table in `docs/README.md` for
+    anything cross-cutting. Renamed a symbol → every doc naming it is stale;
+    `/sync-docs` greps for them. New package or app → its README ships in this
+    PR (`pnpm check:readmes` fails the build otherwise). `pnpm check:docs`
+    catches broken links, never stale prose — passing CI is not evidence the
+    docs are true. A doc fix is never a follow-up issue: the reader who hits the
+    stale line has no way to know it is stale, which is how the retired wiki got
+    to "`platform-infra` = Firestore repositories" (ADR-0017).
+
+12. **No regressions.** Every migration / refactor / rewrite must keep the
     user-observable surface intact unless the user explicitly accepts the
     change. Before opening the PR, diff OLD vs NEW behaviour on every
     replaced read / write / endpoint / hook: visible rows, polled freshness,
@@ -157,7 +170,7 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
     or get explicit user acceptance with a tracked follow-up. `/code-review`
     checklist §3a enforces this; treat it as a SHIP gate.
 
-11. **Safe defaults — new features ship deployable.** Every new env var /
+13. **Safe defaults — new features ship deployable.** Every new env var /
     feature gets a safe default or degrades gracefully, so deploying new code
     needs no per-deployment config change and never breaks an environment that
     hasn't set it. Pick the default that keeps the common deployment working (a
@@ -170,7 +183,7 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
     toggle does nothing. Fail loud (boot-fail) **only** when silent behaviour
     would actively harm users (e.g. emailing dead `localhost` login links) —
     and even then keep a default so a normal deploy never trips it. Complements
-    §10: §10 protects existing surface, this protects new-feature rollout.
+    §12: §12 protects existing surface, this protects new-feature rollout.
 
 ## Skills
 
@@ -202,11 +215,14 @@ Slash commands like `/new-test` mean "read and follow
 8. Main thread = manager + lead architect. NEVER fg subagent or
    non-trivial bash. Decompose, narrate, verify actual output.
 9. Log non-trivial changes via `/add-changelog-entry`.
-10. No regressions. Diff OLD vs NEW user-observable behaviour on every
+10. `/sync-docs` before reporting done — it checks this session's diff and
+    fixes what it made untrue, in the same diff. Colocated README first,
+    then the `docs/README.md` routing table. Never a follow-up issue.
+11. No regressions. Diff OLD vs NEW user-observable behaviour on every
     replaced read / write / endpoint / hook. Silent `.limit()` caps, silent
     default flips, missing parity branches all count. Word them
     "regression", never "risk".
-11. Safe defaults — a new env var/feature has a safe default or degrades
+12. Safe defaults — a new env var/feature has a safe default or degrades
     gracefully; deploy needs no config change; wire the whole path (code +
     `docker-compose.prod.yml`); fail loud only on user-harming silence.
 

@@ -1,6 +1,23 @@
 # @mediforce/platform-ui
 
-Main web application for Mediforce — built with Next.js.
+Main web application for Mediforce — built with Next.js 15 (App Router).
+
+Top of the dependency graph: it consumes every other package and nothing
+consumes it. Workspace-scoped pages live under
+`src/app/(app)/[handle]/`, HTTP route adapters under `src/app/api/`, and
+`src/proxy.ts` handles NextAuth session / API-key auth and CORS.
+
+**Routes are adapters, not logic.** A route parses the request, builds the
+caller scope, calls a handler in
+[`@mediforce/platform-api`](../platform-api/README.md), and serialises the
+result. Business logic in a route is unreachable from the CLI and from agents,
+which call the same handler directly — see
+[`docs/reference/api-architecture.md`](../../docs/reference/api-architecture.md).
+Do not add new Server Actions ([ADR-0005](../../docs/adr/0005-headless-platform-api-ui-separation.md)).
+
+The composition root is `getPlatformServices()`, which now lives in
+`@mediforce/platform-api/services`; `src/lib/platform-services.ts` is a
+temporary re-export shim, not an API to extend.
 
 ## Getting Started
 

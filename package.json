@@ -25,7 +25,8 @@
     "db:migrate": "pnpm --filter @mediforce/platform-infra exec drizzle-kit migrate",
     "db:generate": "pnpm --filter @mediforce/platform-infra exec drizzle-kit generate",
     "link:cli": "python3 scripts/link-cli.py",
-  "check:docs": "python3 scripts/check_doc_links.py"
+  "check:docs": "python3 scripts/check_doc_links.py",
+    "check:readmes": "python3 scripts/check_readme_coverage.py"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

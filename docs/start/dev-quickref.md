@@ -104,6 +104,20 @@ pnpm exec mediforce workflow list --json   # machine-readable
 Auth: `MEDIFORCE_API_KEY`. Base URL: `MEDIFORCE_BASE_URL` (default `http://localhost:9003`).
 **Never hit production.** Missing a command? Add it in the same PR (see the skill).
 
+## Repo checks
+
+```bash
+pnpm typecheck        # tsc -b --noEmit, whole workspace
+pnpm check:docs       # links + backticked docs//skills/ paths resolve
+pnpm check:readmes    # every packages/*/ and apps/*/ has a README.md
+```
+
+`check:docs` runs in `docs.yml`, `check:readmes` in `ci.yml` — a new package
+with no Markdown file matches no `**.md` path filter, so the docs workflow
+would never fire on it.
+
+Both check *references*, never whether prose is true. For that, `/sync-docs`.
+
 ## Tracing (Phoenix)
 
 Agent runs emit OTel spans ([ADR-0007](../adr/0007-llm-evaluation-observability.md)).
