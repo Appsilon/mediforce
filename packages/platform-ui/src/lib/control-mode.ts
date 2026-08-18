@@ -4,7 +4,7 @@
  * The schema fields `executor` and `autonomyLevel` are never renamed.
  * `ControlMode` exists only in the UI layer and is never written to storage.
  *
- * Mapping (ADR-0006: docs/adr/0006-control-mode-ui-concept.md):
+ * Mapping (ADR-0014: docs/adr/0014-control-mode-ui-concept.md):
  *   CM0  No agent          executor: human | script | action
  *                          also: executor: agent, autonomyLevel: L0 | L1  (developer-only flags)
  *   CM1  Assist            not yet implemented — disabled in wizard UI

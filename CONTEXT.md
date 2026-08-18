@@ -520,7 +520,7 @@ the user-facing immutable log.
   Variables = accumulated outputs forwarded across steps. Artifact =
   collaboratively built deliverable inside a cowork session (promoted to
   Output only on cowork finalize). Output Files = files a step leaves
-  behind alongside its Output (resolved 2026-06-10, ADR-0007). Keep the
+  behind alongside its Output (resolved 2026-06-10, ADR-0015). Keep the
   distinction in storage too.
 - **"Generated Files" (UI label) vs Output Files** *(resolved 2026-07-06)*:
   The agent-output review/step UI renders a **"Generated Files"** list

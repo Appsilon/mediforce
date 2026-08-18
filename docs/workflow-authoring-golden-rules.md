@@ -166,7 +166,7 @@ own release process.
 
 Workflow Designer presents **Control Mode** — a UI-only concept. `.wd.json`
 still stores `executor` and sometimes `autonomyLevel`. The mode↔shape mapping is
-defined by [ADR-0006](adr/0006-control-mode-ui-concept.md); the executor model
+defined by [ADR-0014](adr/0014-control-mode-ui-concept.md); the executor model
 is [ADR-0008](adr/0008-step-executor-model.md). Treat those ADRs as the source
 of truth — the load-bearing rules are:
 

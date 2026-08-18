@@ -1,4 +1,4 @@
-# ADR-0012: Unified Canvas-First Workflow Designer
+# ADR-0016: Unified Canvas-First Workflow Designer
 
 **Status:** Proposed
 **Date:** 2026-06-30
@@ -102,7 +102,7 @@ Each phase is independently shippable. Phase 4 capability wiring (AI → canvas 
 
 ## Related
 
-- ADR-0006b: Control mode is a UI concept (CM0–CM4 mapping reused as-is)
+- ADR-0014: Control mode is a UI concept (CM0–CM4 mapping reused as-is)
 - ADR-0008: Step executor model (executor types reused as-is)
 - PR #783: Autonomy levels refactor — workflow designer & execution history overhaul (foundation this work builds on)
 - `apps/workflow-designer/src/workflow-designer.wd.json`: the Co-Work Workflow Designer Workflow this ADR deprecates as a creation path — source of the reusable pieces documented above

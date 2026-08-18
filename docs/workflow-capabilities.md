@@ -23,7 +23,7 @@ schema-by-example lives in [`workflow-examples/`](workflow-examples/README.md).
 The executor enum and per-executor config are in
 [`workflow-definition.ts`](../packages/platform-core/src/schemas/workflow-definition.ts);
 the model is [ADR-0008](adr/0008-step-executor-model.md), control modes are
-[ADR-0006](adr/0006-control-mode-ui-concept.md). The canonical use table is
+[ADR-0014](adr/0014-control-mode-ui-concept.md). The canonical use table is
 golden-rules §5 — do not duplicate it here.
 
 | Executor | Capability headline | Source |
@@ -165,7 +165,7 @@ The executor table headlines the `agent` executor; these are the control fields
 that decide *how supervised* the agent is and *what it may reach*. All fields are
 on `WorkflowAgentConfigSchema` / `WorkflowStepSchema` in
 [`workflow-definition.ts`](../packages/platform-core/src/schemas/workflow-definition.ts);
-the control-mode mapping is golden-rules §5 + [ADR-0006](adr/0006-control-mode-ui-concept.md)
+the control-mode mapping is golden-rules §5 + [ADR-0014](adr/0014-control-mode-ui-concept.md)
 / [ADR-0008](adr/0008-step-executor-model.md). The rows below point at the
 runtime that *enforces* each one — the behaviour is not visible from the schema.
 

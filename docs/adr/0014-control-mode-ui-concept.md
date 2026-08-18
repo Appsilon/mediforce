@@ -1,4 +1,4 @@
-# 0006 — Control mode is a UI concept
+# 0014 — Control mode is a UI concept
 
 > **Status: Implemented.** The control mode UI concept described here is now
 > live. The mapping is implemented in
