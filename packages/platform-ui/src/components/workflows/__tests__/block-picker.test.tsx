@@ -249,6 +249,24 @@ describe('BlockPicker pre-made blocks (Simple tier)', () => {
     expect(onAdd).not.toHaveBeenCalled();
   });
 
+  it('greys the same executor in both tiers, so they cannot disagree', () => {
+    capabilityState.value = {
+      agents: { available: false, reason: 'No agent model is configured on this instance.' },
+    };
+    renderPicker();
+
+    openSection('ai');
+    expect(screen.getByTestId('preset-option-work-with-an-agent-live'))
+      .toHaveAttribute('aria-disabled', 'true');
+
+    fireEvent.click(screen.getByTestId('picker-tier-full'));
+    openSection('CM2');
+    expect(screen.getByTestId('executor-option-cowork')).toHaveAttribute('aria-disabled', 'true');
+    openSection('CM4');
+    expect(screen.getByTestId('executor-option-autonomous-agent'))
+      .toHaveAttribute('aria-disabled', 'true');
+  });
+
   it('badges an available block with how the instance provides it', () => {
     capabilityState.value = { email: { available: true, detail: 'smtp' } };
     renderPicker();
