@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { VerificationLadder } from '../verification-ladder';
+import { VerificationLadder, deriveReadinessResult } from '../verification-ladder';
 
 describe('VerificationLadder', () => {
   it('[RENDER] names all four rungs and the question each one answers', () => {
@@ -30,7 +30,7 @@ describe('VerificationLadder', () => {
 
   it('[RENDER] falls back to a static hint for readiness when no live result is supplied', () => {
     render(<VerificationLadder activeRung="schema" />);
-    expect(screen.getByText('Runs before a run starts.')).toBeInTheDocument();
+    expect(screen.getByText('Runs in the app before a run starts.')).toBeInTheDocument();
   });
 
   it('[RENDER] reports a clear live readiness result', () => {
@@ -48,6 +48,19 @@ describe('VerificationLadder', () => {
     expect(screen.getByText('1 warning above.')).toBeInTheDocument();
   });
 
+  it('[RENDER] reports readiness as indeterminate when a check could not run', () => {
+    render(<VerificationLadder activeRung="readiness" readiness="incomplete" />);
+    expect(screen.getByText('Some checks could not run.')).toBeInTheDocument();
+    expect(screen.queryByText('All present.')).not.toBeInTheDocument();
+  });
+
+  it('[RENDER] warns that a Dry Run still fires action steps for real', () => {
+    render(<VerificationLadder activeRung="readiness" />);
+    expect(
+      screen.getByText('Mocks agent and script work. Action steps still fire for real.'),
+    ).toBeInTheDocument();
+  });
+
   it('[RENDER] reports readiness still checking', () => {
     render(<VerificationLadder activeRung="readiness" readiness="checking" />);
     expect(screen.getByText('Checking…')).toBeInTheDocument();
@@ -60,5 +73,34 @@ describe('VerificationLadder', () => {
       'href',
       'https://github.com/Appsilon/mediforce/blob/main/docs/how-to/verify-a-workflow.md',
     );
+  });
+});
+
+describe('deriveReadinessResult', () => {
+  const CLEAR = { enabled: true, loading: false, warningCount: 0, skippedCount: 0 };
+
+  it('is undefined on a surface that runs no readiness check', () => {
+    expect(deriveReadinessResult({ ...CLEAR, enabled: false })).toBeUndefined();
+  });
+
+  it('reports checking while the probes are in flight', () => {
+    expect(deriveReadinessResult({ ...CLEAR, loading: true })).toBe('checking');
+  });
+
+  it('reports the warning count when the check found something', () => {
+    expect(deriveReadinessResult({ ...CLEAR, warningCount: 2 })).toEqual({ warnings: 2 });
+  });
+
+  it('reports incomplete rather than clear when a probe could not run', () => {
+    expect(deriveReadinessResult({ ...CLEAR, skippedCount: 1 })).toBe('incomplete');
+  });
+
+  it('reports clear only when the check finished, found nothing and skipped nothing', () => {
+    expect(deriveReadinessResult(CLEAR)).toBe('clear');
+  });
+
+  it('prefers the warning count over the skipped-probe notice', () => {
+    expect(deriveReadinessResult({ ...CLEAR, warningCount: 1, skippedCount: 1 }))
+      .toEqual({ warnings: 1 });
   });
 });

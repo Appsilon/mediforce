@@ -11,7 +11,7 @@ Work up the ladder. Each rung assumes the ones below it passed.
 |---|-------|---------|-------|
 | 1 | Schema validation | Is the definition legal? | Nothing — no execution |
 | 2 | Workflow readiness check | Are the image, secrets, model and credits it needs present? | Nothing — no execution |
-| 3 | Dry Run | Is the workflow structured as I intended? | A real Run with agent/script work mocked |
+| 3 | Dry Run | Is the workflow structured as I intended? | A real Run with agent/script work mocked — **action steps still fire** |
 | 4 | Run | Does the work produce what I wanted? | The real thing — containers, model calls, credits |
 
 ## 1. Schema validation — *is the definition legal?*
@@ -56,9 +56,15 @@ what is missing, each with a fix action:
 - **Unknown model** — an agent step names a model that is not in the registry
   (a suggestion is offered when there is a near match).
 
-It runs automatically before a Run starts, and its findings appear in the
-"Before you start" dialog. Workspace-wide findings are also listed on the
-workflow list page.
+**This check lives in the web app, not in the platform.** It runs when you start
+a run from the UI, and its findings appear in the "Before you start" dialog.
+Workspace-wide findings are also listed on the workflow list page.
+
+`mediforce run start` and the `POST /api/runs` endpoint **skip it** — they
+validate the definition and the trigger payload, then fire. A run started from
+the CLI or the API with a missing image or an unset secret is accepted and fails
+later, in the step that needs the missing thing. To clear rung 2 for a workflow
+you drive from the CLI, open it in the app once and read the dialog.
 
 Readiness executes nothing — it reads the definition and your workspace. It is
 not a substitute for a Dry Run: everything can be present and the graph still be
@@ -69,6 +75,15 @@ wired wrong.
 A **real Run** with `dryRun` set, in which every `agent` and `script` step is
 swapped for the mock plugin. The graph, transitions, verdict gates, and human
 steps all execute for real; only the expensive agent and script work is faked.
+
+> **A Dry Run is not a sandbox.** Only agent and script steps are mocked.
+> `action` steps run exactly as they would in a real Run: an `email` action
+> sends the email, an `http` action issues the request against the real
+> endpoint. A workflow that mails an investigator or POSTs to a production API
+> will do so on every Dry Run. Point those actions at a test recipient or a
+> staging endpoint before you dry-run a workflow you did not write. (`spawn`
+> is the one action that knows about dry runs — child workflows inherit the
+> parent's dry-run mode.)
 
 Start one with the **Dry Run** button next to Start run (or **Save & Dry Run**
 in the editor), or from the CLI:
@@ -86,7 +101,8 @@ Use it to answer:
 
 Dry Runs are a first-class filter on the run listing, so you can find them
 later. A Dry Run **cannot** tell you whether an agent does what you want — its
-output is mock output.
+output is mock output — and it does **not** protect external systems from the
+workflow's action steps.
 
 ## 4. Run — *does the work produce what I wanted?*
 

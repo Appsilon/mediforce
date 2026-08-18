@@ -18,8 +18,8 @@ import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useOpenRouterCredits } from '@/hooks/use-openrouter-credits';
 import { useNamespaceAdminContact } from '@/hooks/use-namespace-admin-contact';
 import { useModelValidation } from '@/hooks/use-model-validation';
-import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
-import { VerificationLadder, type ReadinessResult } from '@/components/workflows/verification-ladder';
+import { runPreflightChecks, findSkippedChecks, type PreflightWarning } from '@/lib/preflight-checks';
+import { VerificationLadder, deriveReadinessResult } from '@/components/workflows/verification-ladder';
 import { ParamField } from '@/components/ui/param-field';
 import { buildTriggerPayload, hasInvalidObjectInput } from '@/lib/trigger-input-payload';
 import type { TriggerInputField } from '@mediforce/platform-core';
@@ -173,6 +173,18 @@ export function StartRunButton({
     });
   }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.effectiveRemaining, handle, workflowName, adminContact.email, modelValidation.isLoading, modelValidation.unknown]);
 
+  // A probe that failed produces no warnings, exactly like a probe that passed.
+  // Tracked separately so the ladder reports "some checks could not run" rather
+  // than claiming a pass for a check that never completed.
+  const skippedChecks = React.useMemo(() => {
+    if (!effectiveDefinition) return [];
+    return findSkippedChecks(effectiveDefinition, {
+      dockerAvailable,
+      creditsFailed: openRouterCredits.error !== undefined,
+      modelValidationFailed: modelValidation.error !== null,
+    });
+  }, [effectiveDefinition, dockerAvailable, openRouterCredits.error, modelValidation.error]);
+
   const preflightLoading = preflightEnabled && (definitionLoading || dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading);
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
@@ -284,13 +296,12 @@ export function StartRunButton({
 
   // Left undefined when the workflow does not exist yet — no readiness check has
   // run, so the ladder shows its static hint instead of claiming "all present".
-  const readinessResult: ReadinessResult | undefined = !preflightEnabled
-    ? undefined
-    : preflightLoading
-      ? 'checking'
-      : hasWarnings
-        ? { warnings: warnings.length }
-        : 'clear';
+  const readinessResult = deriveReadinessResult({
+    enabled: preflightEnabled,
+    loading: preflightLoading,
+    warningCount: warnings.length,
+    skippedCount: skippedChecks.length,
+  });
 
   const preflightDialog = (
     <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>

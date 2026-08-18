@@ -185,7 +185,9 @@ pnpm exec mediforce workflow register \
 
 That flag is schema validation and executes nothing — it is **not** a Dry Run.
 A Dry Run is a real Run with agent and script steps mocked
-(`run start --dry-run`, or the **Dry Run** button in the UI).
+(`run start --dry-run`, or the **Dry Run** button in the UI). Only those two step
+kinds are mocked: `action` steps still send the email and issue the HTTP request
+for real.
 
 Then walk the production-ready checklist at the bottom of
 [workflow-authoring-golden-rules.md](workflow-authoring-golden-rules.md).
