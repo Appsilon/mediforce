@@ -70,6 +70,7 @@ export { listCoworkSessions } from './cowork/list-cowork-sessions';
 export { synthesizeVoiceArtifact } from './cowork/voice-synthesize';
 
 export { listPlugins } from './plugins/list-plugins';
+export { getCapabilities } from './capabilities/get-capabilities';
 
 export { heartbeat as cronHeartbeat } from './cron/heartbeat';
 

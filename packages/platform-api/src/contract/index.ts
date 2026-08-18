@@ -161,6 +161,15 @@ export {
 } from './email-status';
 
 export {
+  GetCapabilitiesInputSchema,
+  GetCapabilitiesOutputSchema,
+  CapabilityStatusSchema,
+  type GetCapabilitiesInput,
+  type GetCapabilitiesOutput,
+  type CapabilityStatus,
+} from './capabilities';
+
+export {
   ListAgentsInputSchema,
   ListAgentsOutputSchema,
   GetAgentInputSchema,
