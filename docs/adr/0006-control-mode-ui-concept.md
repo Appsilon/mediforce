@@ -1,6 +1,8 @@
 # 0006 — Control mode is a UI concept
 
-> **Status: Implemented.** The control mode UI concept described here is now live. See the implementation design: [AUTONOMY-LEVELS-REFACTOR.md](../design/AUTONOMY-LEVELS-REFACTOR.md).
+> **Status: Implemented.** The control mode UI concept described here is now
+> live. The mapping is implemented in
+> [`packages/platform-ui/src/lib/control-mode.ts`](../../packages/platform-ui/src/lib/control-mode.ts).
 
 - **Status:** Accepted
 - **Date:** 2026-05-27
@@ -41,14 +43,24 @@ Control Modes (CM0–CM4) are the UI labels shown in the step picker. They are a
 | CM3 | Human review | `agent` | `L3` | Enabled |
 | CM4 | Autonomous agent | `agent` | `L4` | Enabled |
 
-`executor: 'agent', autonomyLevel: 'L2'` is retained in the schema for backward compat; it maps to the 'assist' control mode for display of existing steps only. No new L2 steps can be created from the wizard.
+Assist (CM1) means *the human leads and executes the step; AI reviews the
+result*. That requires platform support which does not exist yet, so the
+option is shown but disabled.
+
+`executor: 'agent', autonomyLevel: 'L2'` (the retired "Ghost" mode — agent
+drafts, human approves) is retained in the schema for backward compat; it maps
+to the 'assist' control mode for display of existing steps only. No new L2
+steps can be created from the wizard. Consolidating L2 into L3 — both have the
+agent doing the work under human review — is deferred.
 
 The mapping is 1:1 and deterministic in both directions. The wizard reads
 stored values → derives the active control mode; on save it maps the selected
 control mode → writes `executor` + `autonomyLevel`.
 
-L0 and L1 instrumentation modes have no wizard UI; they can only be set via
-raw JSON.
+L0 and L1 are instrumentation flags for developer use, set via raw JSON. They
+have no wizard UI: a stored step carrying `L0` or `L1` displays as CM0 (No
+agent) with no warning. Because control mode is never written back, the stored
+value survives an edit unchanged.
 
 ## Considered alternatives
 
@@ -90,5 +102,6 @@ dual-write.
 - The mapping table in this ADR is the single source of truth for the
   control-mode ↔ schema-fields correspondence. Any change to the mapping
   requires amending this ADR.
-- "Full autonomy" was renamed to "Autonomous agent" (CM4) in June 2026.
-  Schema value `L4` is unchanged. See AUTONOMY-LEVELS-REFACTOR.md.
+- "Full autonomy" was renamed to "Autonomous agent" (CM4) in June 2026 —
+  labels, badges, docs, and the `ControlMode` type key
+  (`'full-autonomy'` → `'autonomous-agent'`). Schema value `L4` is unchanged.

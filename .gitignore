@@ -17,7 +17,9 @@ dist/
 # misc
 .DS_Store
 *.pem
-minutes/*.html
+
+# scratch output written into a package working directory
+packages/*/tmp/
 
 # service-account keys / runtime-mounted secrets
 /secrets/

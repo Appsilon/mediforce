@@ -937,7 +937,7 @@ interface RunKicker {
 - Voice-realtime is browser↔OpenAI WebRTC direct. No platform streaming. Server Actions only mint ephemeral keys + synthesise post-transcript artifact (blocking JSON).
 - No surface that migrates in Phase 3.1 actually streams. No SSE adapter / handler-shape decision needs to land.
 
-**Decision: pure parity migration. Smallest possible change. No streaming, no schema, no UX improvement.** See [`docs/adr/draft/cowork-streaming.md`](adr/draft/cowork-streaming.md) for full design rationale + trade-space considered.
+**Decision: pure parity migration. Smallest possible change. No streaming, no schema, no UX improvement.** See [`docs/research/cowork-streaming.md`](research/cowork-streaming.md) for full design rationale + trade-space considered.
 
 **Post-migration surface:**
 
