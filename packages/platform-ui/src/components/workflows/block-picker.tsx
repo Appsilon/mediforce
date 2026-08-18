@@ -163,10 +163,15 @@ function BlockNodePreview({ label, executor, autonomyLevel, stepType, badge, dim
 /**
  * An option plus its description.
  *
- * The description flies out to the left on hover, positioned `fixed` so it is
- * never clipped by the panel's scroll container and always sits above the
- * canvas. A screen-reader copy stays inside the button so the description is
- * still attached to the control it explains.
+ * The description flies out to the left on hover, positioned `fixed` so the
+ * panel's scroll container cannot clip it and it sits above the canvas. A
+ * screen-reader copy stays inside the button so the description is attached to
+ * the control it explains.
+ *
+ * Unavailable options are NOT `disabled`: a disabled button dispatches no mouse
+ * events and cannot take focus, which would make the reason unreachable on
+ * exactly the blocks that most need explaining. They advertise `aria-disabled`
+ * and refuse the click instead.
  */
 function OptionButton({ testId, disabled, onPick, description, children }: {
   testId: string;
@@ -190,8 +195,8 @@ function OptionButton({ testId, disabled, onPick, description, children }: {
         ref={ref}
         type="button"
         data-testid={testId}
-        disabled={disabled}
-        onClick={onPick}
+        aria-disabled={disabled || undefined}
+        onClick={disabled ? undefined : onPick}
         onMouseEnter={show}
         onMouseLeave={hide}
         onFocus={show}
@@ -203,6 +208,7 @@ function OptionButton({ testId, disabled, onPick, description, children }: {
       </button>
       {anchor !== null && (
         <div
+          data-testid={`${testId}-description`}
           style={{ position: 'fixed', top: anchor.top, left: anchor.left - 8, transform: 'translateX(-100%)' }}
           className="pointer-events-none z-[200] w-64 rounded-md border bg-popover px-2.5 py-2 text-[10px] leading-relaxed text-popover-foreground shadow-md"
         >
@@ -241,8 +247,9 @@ export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-      {/* Header card — title, close, tier, and (in Full) the step type */}
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      {/* Header card — title, close, tier, and (in Full) the step type. Outside
+          the scrolling region below, so it stays put however long the list is. */}
       <div className="shrink-0 rounded-xl border shadow-lg bg-white dark:bg-background overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3">
           <Plus className="h-4 w-4 text-primary shrink-0" />
@@ -305,6 +312,7 @@ export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
         </div>
       </div>
 
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
       {tier === 'simple' && BLOCK_CATEGORIES.map((category) => {
         const presets = BLOCK_PRESETS.filter((preset) => preset.category === category);
         if (presets.length === 0) return null;
@@ -407,6 +415,7 @@ export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
           </CollapsibleCard>
         );
       })}
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
@@ -7,11 +7,16 @@ import { CM_ROWS, STEP_TYPE_OPTIONS } from '@/lib/block-presets';
 import { BLOCK_PRESETS } from '@mediforce/platform-core';
 import type { NewStepPayload } from '@/lib/control-mode';
 
-// Availability is exercised through the capabilities endpoint's own tests; here
-// an unknown instance keeps every block enabled and keeps the render synchronous.
-vi.mock('@/hooks/use-capabilities', () => ({
-  useCapabilities: () => ({ capabilities: null, loading: false }),
+// Capability state is injected rather than fetched, so the render stays
+// synchronous. `null` means "unknown", which keeps every block enabled.
+const capabilityState = vi.hoisted(() => ({
+  value: null as Record<string, { available: boolean; detail?: string; reason?: string }> | null,
 }));
+vi.mock('@/hooks/use-capabilities', () => ({
+  useCapabilities: () => ({ capabilities: capabilityState.value, loading: false }),
+}));
+
+afterEach(() => { capabilityState.value = null; });
 
 function renderPicker(onAdd: (payload: NewStepPayload) => void = () => {}): void {
   render(<BlockPicker onAdd={onAdd} onClose={() => {}} />);
@@ -139,7 +144,7 @@ describe('BlockPicker executor guidance (#1186)', () => {
     renderFullTier(onAdd);
 
     const assist = executorOption('assist');
-    expect(assist).toBeDisabled();
+    expect(assist).toHaveAttribute('aria-disabled', 'true');
     expect(assist).toHaveTextContent(/coming soon/i);
 
     fireEvent.click(assist);
@@ -221,6 +226,35 @@ describe('BlockPicker pre-made blocks (Simple tier)', () => {
         action: expect.objectContaining({ kind: 'email' }),
       }),
     );
+  });
+
+  it('greys an unavailable block but still reveals why on hover', () => {
+    capabilityState.value = {
+      email: { available: false, reason: 'No email delivery is configured on this instance.' },
+    };
+    const onAdd = vi.fn();
+    renderPicker(onAdd);
+
+    openSection('communicate');
+    const sendEmail = screen.getByTestId('preset-option-send-email');
+    expect(sendEmail).toHaveAttribute('aria-disabled', 'true');
+
+    // A `disabled` button would fire no mouse events, so the reason has to be
+    // reachable on an enabled-but-refusing one.
+    fireEvent.mouseEnter(sendEmail);
+    expect(screen.getByTestId('preset-option-send-email-description'))
+      .toHaveTextContent('No email delivery is configured on this instance.');
+
+    fireEvent.click(sendEmail);
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it('badges an available block with how the instance provides it', () => {
+    capabilityState.value = { email: { available: true, detail: 'smtp' } };
+    renderPicker();
+
+    openSection('communicate');
+    expect(screen.getByTestId('preset-option-send-email')).toHaveTextContent('smtp');
   });
 
   it('closes the panel from the header card', () => {
