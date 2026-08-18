@@ -42,14 +42,14 @@ export const CM_ROWS: CMRow[] = [
       {
         id: 'human',
         label: 'Human',
-        purpose: 'Input, accountability, approval, rejection, classification — work a person has to sign for.',
+        purpose: 'Input, accountability, approval, rejection, classification. Work a person has to sign for.',
         color: 'orange',
         payload: { executor: 'human' },
       },
       {
         id: 'script',
         label: 'Script',
-        purpose: 'Deterministic parsing, validation, conversion, file work, API glue — same input, same output, every run.',
+        purpose: 'Deterministic parsing, validation, conversion, file work, API glue. Same input, same output, every run.',
         color: 'yellow',
         payload: { executor: 'script' },
       },
@@ -69,7 +69,7 @@ export const CM_ROWS: CMRow[] = [
       {
         id: 'assist',
         label: 'Assist',
-        purpose: 'A person does the work and an agent reviews it — coming soon.',
+        purpose: 'A person does the work and an agent reviews it. Coming soon.',
         color: 'lime',
         payload: { executor: 'human' },
       },
@@ -95,7 +95,7 @@ export const CM_ROWS: CMRow[] = [
       {
         id: 'human-review',
         label: 'Human review',
-        purpose: 'Judgment, synthesis, planning, flexible edits — the agent drafts, a person approves or sends it back before the run continues.',
+        purpose: 'Judgment, synthesis, planning, flexible edits. The agent drafts, then a person approves or sends it back before the run continues.',
         color: 'indigo',
         payload: { executor: 'agent', autonomyLevel: 'L3' },
       },
@@ -108,7 +108,7 @@ export const CM_ROWS: CMRow[] = [
       {
         id: 'autonomous-agent',
         label: 'Autonomous agent',
-        purpose: 'The same agent work with no approval gate — pick it once the constraints have been approved upstream.',
+        purpose: 'The same agent work with no approval gate. Pick it once the constraints have been approved upstream.',
         color: 'violet',
         payload: { executor: 'agent', autonomyLevel: 'L4' },
       },

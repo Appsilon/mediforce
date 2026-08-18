@@ -766,11 +766,11 @@ export function WorkflowEditorCanvas({
         )}
 
         {rightPanelView === 'add-block' && (
-          <div className="w-80 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col min-h-0">
-            <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b">
-              <div className="flex items-center gap-2">
-                <Plus className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold">
+          <div className="w-80 shrink-0 my-3 mr-3 px-1 min-h-0 flex flex-col">
+            <div className="shrink-0 flex items-center justify-between gap-2 pb-2 px-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <Plus className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm font-semibold shrink-0">
                   {addBlockContext ? 'Insert step' : 'Add block'}
                 </span>
                 {addBlockContext && (
@@ -779,14 +779,13 @@ export function WorkflowEditorCanvas({
               </div>
               <button
                 onClick={closeAddBlock}
-                className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                aria-label="Close"
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto">
-              <BlockPicker onAdd={handleBlockAdd} />
-            </div>
+            <BlockPicker onAdd={handleBlockAdd} />
           </div>
         )}
 
