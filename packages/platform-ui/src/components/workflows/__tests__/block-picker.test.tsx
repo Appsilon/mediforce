@@ -7,6 +7,12 @@ import { CM_ROWS, STEP_TYPE_OPTIONS } from '@/lib/block-presets';
 import { BLOCK_PRESETS } from '@mediforce/platform-core';
 import type { NewStepPayload } from '@/lib/control-mode';
 
+// Availability is exercised through the capabilities endpoint's own tests; here
+// an unknown instance keeps every block enabled and keeps the render synchronous.
+vi.mock('@/hooks/use-capabilities', () => ({
+  useCapabilities: () => ({ capabilities: null, loading: false }),
+}));
+
 /**
  * The step-type and executor picker lives in the Full tier; the picker opens on
  * Simple (pre-made blocks). Every test below is about the Full tier.
@@ -100,18 +106,53 @@ describe('BlockPicker executor guidance (#1186)', () => {
 });
 
 describe('BlockPicker pre-made blocks (Simple tier)', () => {
-  it('opens on Simple, so pre-made blocks are what an author sees first', () => {
+  const CATEGORY_LABEL: Record<string, string> = {
+    people: 'People',
+    communicate: 'Communicate',
+    data: 'Data',
+    ai: 'AI',
+    control: 'Control',
+  };
+
+  /** Categories fold one at a time, so a block is in the DOM only once opened. */
+  function expandCategory(category: string): void {
+    fireEvent.click(screen.getByRole('button', { name: CATEGORY_LABEL[category] }));
+  }
+
+  it('opens on Simple with the first category expanded', () => {
     render(<BlockPicker onAdd={() => {}} />);
 
-    expect(screen.getByTestId('preset-option-send-email')).toBeInTheDocument();
+    expect(screen.getByTestId('preset-option-collect-input')).toBeInTheDocument();
     expect(screen.queryByTestId('executor-option-script')).not.toBeInTheDocument();
+  });
+
+  it('folds one category at a time, like the step editor', () => {
+    render(<BlockPicker onAdd={() => {}} />);
+
+    expect(screen.getByTestId('preset-option-collect-input')).toBeInTheDocument();
+
+    expandCategory('communicate');
+
+    expect(screen.getByTestId('preset-option-send-email')).toBeInTheDocument();
+    expect(screen.queryByTestId('preset-option-collect-input')).not.toBeInTheDocument();
   });
 
   it('describes every pre-made block, not just its name', () => {
     render(<BlockPicker onAdd={() => {}} />);
 
+    for (const category of Object.keys(CATEGORY_LABEL)) {
+      const presets = BLOCK_PRESETS.filter((preset) => preset.category === category);
+      if (presets.length === 0) continue;
+      if (screen.queryByTestId(`preset-option-${presets[0].id}`) === null) expandCategory(category);
+      for (const preset of presets) {
+        expect(screen.getByTestId(`preset-option-${preset.id}`)).toHaveTextContent(preset.purpose);
+      }
+    }
+  });
+
+  it('states no description with an em dash, which reads badly in a tooltip', () => {
     for (const preset of BLOCK_PRESETS) {
-      expect(screen.getByTestId(`preset-option-${preset.id}`)).toHaveTextContent(preset.purpose);
+      expect(preset.purpose).not.toContain('\u2014');
     }
   });
 
@@ -119,6 +160,7 @@ describe('BlockPicker pre-made blocks (Simple tier)', () => {
     const onAdd = vi.fn();
     render(<BlockPicker onAdd={onAdd} />);
 
+    expandCategory('control');
     fireEvent.click(screen.getByTestId('preset-option-route-by-condition'));
 
     expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ type: 'decision' }));
@@ -128,6 +170,7 @@ describe('BlockPicker pre-made blocks (Simple tier)', () => {
     const onAdd = vi.fn();
     render(<BlockPicker onAdd={onAdd} />);
 
+    expandCategory('communicate');
     fireEvent.click(screen.getByTestId('preset-option-send-email'));
 
     expect(onAdd).toHaveBeenCalledWith(

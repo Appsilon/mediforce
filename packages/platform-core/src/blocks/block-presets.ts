@@ -104,7 +104,7 @@ export const BLOCK_PRESETS: BlockPreset[] = [
   {
     id: 'run-script',
     label: 'Run a Python script',
-    purpose: 'Deterministic parsing, validation, or file work — same input, same output.',
+    purpose: 'Deterministic parsing, validation, or file work. Same input, same output, every run.',
     category: 'data',
     payload: {
       type: 'creation',
@@ -186,7 +186,7 @@ export const BLOCK_PRESETS: BlockPreset[] = [
   {
     id: 'wait',
     label: 'Wait',
-    purpose: 'Pause before continuing — for a delay, a deadline, or a condition.',
+    purpose: 'Pause before continuing, for a delay, a deadline, or a condition.',
     category: 'control',
     payload: {
       type: 'creation',

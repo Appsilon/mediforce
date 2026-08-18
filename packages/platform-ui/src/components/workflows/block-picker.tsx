@@ -5,6 +5,7 @@ import { User, Users, Bot, Terminal, Zap, PenLine, GitBranch, Search, Mail, Glob
 import { BLOCK_PRESETS, BLOCK_CATEGORIES, type BlockCategory, type BlockPreset } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { useCapabilities } from '@/hooks/use-capabilities';
+import { CollapsibleCard } from './workflow-editor/collapsible-card';
 import { CONTROL_MODE_LABELS, CONTROL_MODE_NUMBER, CONTROL_MODE_DISABLED, type ControlMode, type Executor, type NewStepPayload } from '@/lib/control-mode';
 import { CM_ROWS, STEP_TYPE_OPTIONS, type CMRow } from '@/lib/block-presets';
 
@@ -172,34 +173,31 @@ function PresetButton({ preset, color, unavailableReason, detail, onPick }: {
         disabled={unavailable}
         onClick={onPick}
         className={cn(
-          'w-full flex items-start gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all',
+          'w-full flex items-center gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all',
           unavailable ? 'cursor-not-allowed opacity-50' : BUTTON_CLASSES[color],
         )}
       >
-        <span className={cn('mt-0.5', ICON_COLOR[color])}>{PRESET_ICON[preset.id]}</span>
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold">{preset.label}</span>
-            {detail !== undefined && (
-              <span className="rounded border px-1 py-px text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-                {detail}
-              </span>
-            )}
+        <span className={cn('shrink-0', ICON_COLOR[color])}>{PRESET_ICON[preset.id]}</span>
+        <span className="min-w-0 flex-1 truncate text-xs font-semibold">{preset.label}</span>
+        {detail !== undefined && (
+          <span className="shrink-0 rounded border px-1 py-px text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+            {detail}
           </span>
-          <span className="block text-[10px] leading-snug text-muted-foreground">{preset.purpose}</span>
+        )}
+        <span className="pointer-events-none absolute left-2 right-2 top-full z-50 mt-1 rounded-md border bg-popover px-2.5 py-2 text-[10px] font-normal leading-relaxed text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+          {preset.purpose}
+          {unavailable && (
+            <span className="mt-1.5 block text-muted-foreground">{unavailableReason}</span>
+          )}
         </span>
       </button>
-      {unavailable && (
-        <span className="pointer-events-none absolute left-2 right-2 top-full z-50 mt-1 rounded-md border bg-popover px-2.5 py-2 text-[10px] leading-relaxed text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
-          {unavailableReason}
-        </span>
-      )}
     </span>
   );
 }
 
 export function BlockPicker({ onAdd }: Props) {
   const [tier, setTier] = useState<Tier>('simple');
+  const [openCategory, setOpenCategory] = useState<BlockCategory | null>('people');
   const [pendingType, setPendingType] = useState<'creation' | 'decision'>('creation');
   const { capabilities } = useCapabilities();
 
@@ -215,9 +213,9 @@ export function BlockPicker({ onAdd }: Props) {
   };
 
   return (
-    <div className="flex flex-col gap-5 p-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       {/* Tier — pre-made blocks, or the full executor picker */}
-      <div className="flex rounded-lg border p-0.5">
+      <div className="shrink-0 flex rounded-lg border bg-white dark:bg-background p-0.5">
         {(['simple', 'full'] as const).map((value) => (
           <button
             key={value}
@@ -233,49 +231,47 @@ export function BlockPicker({ onAdd }: Props) {
         ))}
       </div>
 
-      {tier === 'simple' && (
-        <div className="space-y-2">
-          {BLOCK_CATEGORIES.map((category) => {
-            const presets = BLOCK_PRESETS.filter((preset) => preset.category === category);
-            if (presets.length === 0) return null;
-            const color = CATEGORY_COLOR[category];
-            const CategoryIcon = CATEGORY_ICON[category];
-            return (
-              <div
-                key={category}
-                className={cn('rounded-xl border px-3 py-2.5 space-y-2', CM_BORDER[color])}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <CategoryIcon className={cn('h-3.5 w-3.5 shrink-0', ICON_COLOR[color])} />
-                  <span className={cn('text-[11px] font-bold shrink-0', CM_LABEL_COLOR[color])}>
-                    {CATEGORY_LABELS[category]}
-                  </span>
-                </div>
-
-                <div className="space-y-1.5">
-                  {presets.map((preset) => {
-                    const status = statusFor(preset);
-                    const unavailable = status !== null && status.available === false;
-                    return (
-                      <PresetButton
-                        key={preset.id}
-                        preset={preset}
-                        color={color}
-                        unavailableReason={unavailable ? (status.reason ?? 'Not available on this instance.') : null}
-                        detail={status?.available === true ? status.detail : undefined}
-                        onPick={() => onAdd(preset.payload)}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {tier === 'simple' && BLOCK_CATEGORIES.map((category) => {
+        const presets = BLOCK_PRESETS.filter((preset) => preset.category === category);
+        if (presets.length === 0) return null;
+        const color = CATEGORY_COLOR[category];
+        const CategoryIcon = CATEGORY_ICON[category];
+        return (
+          <CollapsibleCard
+            key={category}
+            open={openCategory === category}
+            onToggle={() => setOpenCategory((current) => (current === category ? null : category))}
+            titleNode={
+              <>
+                <CategoryIcon className={cn('h-3.5 w-3.5 shrink-0', ICON_COLOR[color])} />
+                <span className={cn('text-[11px] font-bold shrink-0', CM_LABEL_COLOR[color])}>
+                  {CATEGORY_LABELS[category]}
+                </span>
+              </>
+            }
+          >
+            <div className="space-y-1.5">
+              {presets.map((preset) => {
+                const status = statusFor(preset);
+                const unavailable = status !== null && status.available === false;
+                return (
+                  <PresetButton
+                    key={preset.id}
+                    preset={preset}
+                    color={color}
+                    unavailableReason={unavailable ? (status.reason ?? 'Not available on this instance.') : null}
+                    detail={status?.available === true ? status.detail : undefined}
+                    onPick={() => onAdd(preset.payload)}
+                  />
+                );
+              })}
+            </div>
+          </CollapsibleCard>
+        );
+      })}
 
       {tier === 'full' && (
-      <>
+      <div className="flex flex-col gap-5">
       {/* Step type */}
       <div className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Step type</p>
@@ -286,18 +282,18 @@ export function BlockPicker({ onAdd }: Props) {
               data-testid={`step-type-option-${opt.value}`}
               onClick={() => setPendingType(opt.value)}
               className={cn(
-                'flex-1 flex items-start gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all',
+                'group relative flex-1 flex items-center gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all',
                 pendingType === opt.value ? STEP_TYPE_ACTIVE[opt.color] : STEP_TYPE_HOVER[opt.color],
               )}
             >
-              <span className="mt-0.5">
+              <span className="shrink-0">
                 {opt.value === 'creation'
                   ? <PenLine className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
                   : <GitBranch className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />}
               </span>
-              <span className="min-w-0">
-                <span className="block text-xs font-semibold">{opt.label}</span>
-                <span className="block text-[10px] leading-snug text-muted-foreground">{opt.purpose}</span>
+              <span className="min-w-0 flex-1 truncate text-xs font-semibold">{opt.label}</span>
+              <span className="pointer-events-none absolute left-0 right-0 top-full z-50 mt-1 rounded-md border bg-popover px-2.5 py-2 text-[10px] font-normal leading-relaxed text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+                {opt.purpose}
               </span>
             </button>
           ))}
@@ -336,14 +332,14 @@ export function BlockPicker({ onAdd }: Props) {
                   disabled={disabled}
                   onClick={() => handleAdd(btn.payload)}
                   className={cn(
-                    'w-full flex items-start gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all',
+                    'group relative w-full flex items-center gap-2 rounded-lg py-1.5 px-2.5 text-left border transition-all',
                     disabled ? 'cursor-not-allowed' : BUTTON_CLASSES[btn.color],
                   )}
                 >
-                  <span className="mt-0.5">{EXECUTOR_ICON[btn.payload.executor]}</span>
-                  <span className="min-w-0">
-                    <span className="block text-xs font-semibold">{btn.label}</span>
-                    <span className="block text-[10px] leading-snug text-muted-foreground">{btn.purpose}</span>
+                  <span className="shrink-0">{EXECUTOR_ICON[btn.payload.executor]}</span>
+                  <span className="min-w-0 flex-1 truncate text-xs font-semibold">{btn.label}</span>
+                  <span className="pointer-events-none absolute left-0 right-0 top-full z-50 mt-1 rounded-md border bg-popover px-2.5 py-2 text-[10px] font-normal leading-relaxed text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+                    {btn.purpose}
                   </span>
                 </button>
               ))}
@@ -352,7 +348,7 @@ export function BlockPicker({ onAdd }: Props) {
           );
         })}
       </div>
-      </>
+      </div>
       )}
     </div>
   );

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mediforce-dev-mock",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:mock"],
+      "port": 9007
+    }
+  ]
+}
