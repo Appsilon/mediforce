@@ -314,8 +314,10 @@ for revise/reject-style verdicts.
 Default failure behavior SHOULD be fail-fast. Use `continueOnError: true` only
 for non-critical side effects that may fail while the run continues.
 
-Validate before sharing with `mediforce workflow validate` (see
-[how-to-create-workflow.md](how-to-create-workflow.md#validate-before-sharing)).
+Verify before sharing by working up the four gates — schema validation,
+workflow readiness check, Dry Run, Run — each of which answers a different
+question. See [`how-to/verify-a-workflow.md`](how-to/verify-a-workflow.md) and
+[how-to-create-workflow.md](how-to-create-workflow.md#verify-before-sharing).
 
 Production-ready checklist:
 

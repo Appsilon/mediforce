@@ -476,8 +476,13 @@ the user-facing immutable log.
      mocked)
   4. **Run** — does the work itself produce what I wanted?
 
-  Only (4) answers behaviour. Nothing in the product currently tells a user
-  this ladder exists or which rung answers their question.
+  Only (4) answers behaviour. The ladder is surfaced in the product at the two
+  points a user asks the question: the save-version dialog (rung 1) and the
+  "Before you start" dialog (rung 2, with its live result), both rendering
+  `VerificationLadder`
+  (`packages/platform-ui/src/components/workflows/verification-ladder.tsx`).
+  _Docs:_ [`docs/how-to/verify-a-workflow.md`](docs/how-to/verify-a-workflow.md),
+  linked from both surfaces and from `workflow validate` on success.
   _Avoid_: "dry run" for (1) — `workflow register --dry-run` is schema
   validation and executes nothing, which collides with the Dry Run entry above.
 
