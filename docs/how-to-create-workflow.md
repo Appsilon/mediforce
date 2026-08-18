@@ -157,18 +157,24 @@ cloning, Docker builds, skills, or sync.
 Full reference, including the `workflows-index.json` manifest and CLI flags:
 [`how-to/import-from-git.md`](how-to/import-from-git.md).
 
-## Validate before sharing
+## Verify before sharing
 
-Validate the file against the canonical schema (exits non-zero and lists
-structured errors when invalid):
+Four checks answer four different questions — schema validation, the workflow
+readiness check, a Dry Run, and a Run. Which one you want depends on what you
+are asking; only a real Run answers "is the output any good?". The full ladder,
+and how to reach each rung, is in
+[`how-to/verify-a-workflow.md`](how-to/verify-a-workflow.md).
+
+Start with schema validation — it exits non-zero and lists structured errors
+when the definition is invalid:
 
 ```bash
 pnpm exec mediforce workflow validate path/to/workflow.wd.json
 ```
 
 `pnpm exec mediforce workflow schema` prints the schema the validator uses.
-To check registration against a specific namespace without writing a version,
-use the dry run:
+To schema-check registration against a specific namespace without writing a
+version:
 
 ```bash
 pnpm exec mediforce workflow register \
@@ -176,6 +182,12 @@ pnpm exec mediforce workflow register \
   --namespace docs \
   --dry-run
 ```
+
+That flag is schema validation and executes nothing — it is **not** a Dry Run.
+A Dry Run is a real Run with agent and script steps mocked
+(`run start --dry-run`, or the **Dry Run** button in the UI). Only those two step
+kinds are mocked: `action` steps still send the email and issue the HTTP request
+for real.
 
 Then walk the production-ready checklist at the bottom of
 [workflow-authoring-golden-rules.md](workflow-authoring-golden-rules.md).

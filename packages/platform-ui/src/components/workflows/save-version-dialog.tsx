@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { VerificationLadder } from '@/components/workflows/verification-ladder';
 import { cn } from '@/lib/utils';
 
 interface SaveVersionDialogProps {
@@ -52,7 +53,7 @@ export function SaveVersionDialog({
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
       {/* Dialog card */}
-      <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-md mx-4 space-y-4">
+      <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-md mx-4 space-y-4 max-h-[85vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold">Name this version</h2>
@@ -109,6 +110,8 @@ export function SaveVersionDialog({
           />
           <span className="text-xs text-muted-foreground">Set as default version</span>
         </label>
+
+        <VerificationLadder activeRung="schema" />
 
         <div className="flex justify-end gap-2 pt-1">
           <button

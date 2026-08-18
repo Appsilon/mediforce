@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { runPreflightChecks } from '../preflight-checks';
+import { runPreflightChecks, findSkippedChecks } from '../preflight-checks';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 
@@ -182,5 +182,80 @@ describe('runPreflightChecks', () => {
       secretKeys: [],
     });
     expect(result.filter((r) => r.category === 'unknown-model')).toEqual([]);
+  });
+});
+
+describe('findSkippedChecks', () => {
+  const ALL_RAN = { dockerAvailable: true, creditsFailed: false, modelValidationFailed: false };
+
+  function agentDefinition() {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.steps[0].executor = 'agent';
+    wd.steps[0].agent = { model: 'anthropic/claude-sonnet-4', image: 'python:3.11-slim' };
+    return wd;
+  }
+
+  it('reports nothing when every relevant check completed', () => {
+    expect(findSkippedChecks(agentDefinition(), ALL_RAN)).toEqual([]);
+  });
+
+  it('reports the image check when the registry is unreachable and a step names an image', () => {
+    expect(findSkippedChecks(agentDefinition(), { ...ALL_RAN, dockerAvailable: false }))
+      .toEqual(['images']);
+  });
+
+  it('does not report the image check when no step names an image to look up', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.steps[0].executor = 'human';
+    expect(findSkippedChecks(wd, { ...ALL_RAN, dockerAvailable: false })).toEqual([]);
+  });
+
+  it('does not report the image check for a step built from source', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.steps[0].executor = 'script';
+    wd.steps[0].script = { command: 'python run.py', image: 'built:latest', repo: 'org/repo', commit: 'abc123' };
+    expect(findSkippedChecks(wd, { ...ALL_RAN, dockerAvailable: false })).toEqual([]);
+  });
+
+  it('reports the model check when model validation errored', () => {
+    expect(findSkippedChecks(agentDefinition(), { ...ALL_RAN, modelValidationFailed: true }))
+      .toEqual(['models']);
+  });
+
+  it('does not report the model check when no agent step names a model', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.steps[0].executor = 'human';
+    expect(findSkippedChecks(wd, { ...ALL_RAN, modelValidationFailed: true })).toEqual([]);
+  });
+
+  it('reports the credits check when the credits probe failed and the workflow has agent steps', () => {
+    expect(findSkippedChecks(agentDefinition(), { ...ALL_RAN, creditsFailed: true }))
+      .toEqual(['credits']);
+  });
+
+  it('does not report the credits check for a workflow with no agent steps', () => {
+    const wd = buildWorkflowDefinition({
+      name: 'test-wf',
+      steps: [
+        {
+          id: 'transform',
+          name: 'Transform',
+          type: 'creation',
+          executor: 'script',
+          script: { command: 'python run.py', image: 'python:3.11-slim' },
+        },
+      ],
+      transitions: [],
+    });
+    expect(findSkippedChecks(wd, { ...ALL_RAN, creditsFailed: true })).toEqual([]);
+  });
+
+  it('reports every check that could not run', () => {
+    const skipped = findSkippedChecks(agentDefinition(), {
+      dockerAvailable: false,
+      creditsFailed: true,
+      modelValidationFailed: true,
+    });
+    expect(skipped.sort()).toEqual(['credits', 'images', 'models']);
   });
 });

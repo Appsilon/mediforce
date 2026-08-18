@@ -189,3 +189,54 @@ export function runPreflightChecks(
 
   return warnings;
 }
+
+/** A readiness check that was relevant to the definition but did not run. */
+export type SkippedCheck = 'images' | 'credits' | 'models';
+
+/**
+ * Which readiness checks could not run against this definition. An empty
+ * warning list means "all present" only when this returns nothing — a probe
+ * that failed produces no warnings either, and reporting that as a pass tells
+ * the user a check succeeded when it was skipped.
+ */
+export function findSkippedChecks(
+  definition: WorkflowDefinition,
+  options: {
+    /** False when the image registry is unreachable or not configured. */
+    dockerAvailable: boolean;
+    /** True when the credits probe itself failed (not merely unconfigured). */
+    creditsFailed: boolean;
+    /** True when the model registry lookup errored. */
+    modelValidationFailed: boolean;
+  },
+): SkippedCheck[] {
+  const steps = Array.isArray(definition.steps) ? definition.steps : [];
+
+  let needsImageLookup = false;
+  let hasAgentStep = false;
+  let namesModel = false;
+
+  for (const step of steps) {
+    if (step.executor !== 'agent' && step.executor !== 'script') continue;
+    const containerConfig = step.executor === 'script' ? step.script : step.agent;
+
+    const image = containerConfig?.image;
+    const hasBuildSource = typeof containerConfig?.repo === 'string' && containerConfig.repo.length > 0
+      && typeof containerConfig?.commit === 'string' && containerConfig.commit.length > 0;
+    if (typeof image === 'string' && image.length > 0 && !hasBuildSource) {
+      needsImageLookup = true;
+    }
+
+    if (step.executor === 'agent') {
+      hasAgentStep = true;
+      const model = step.agent?.model;
+      if (typeof model === 'string' && model.length > 0) namesModel = true;
+    }
+  }
+
+  const skipped: SkippedCheck[] = [];
+  if (needsImageLookup && !options.dockerAvailable) skipped.push('images');
+  if (hasAgentStep && options.creditsFailed) skipped.push('credits');
+  if (namesModel && options.modelValidationFailed) skipped.push('models');
+  return skipped;
+}
