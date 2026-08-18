@@ -55,18 +55,8 @@ const STEP_TYPE_HOVER: Record<string, string> = {
   purple: 'hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300 hover:ring-1 hover:ring-purple-300 dark:hover:bg-purple-900/20 dark:hover:text-purple-300 dark:hover:ring-purple-700',
 };
 
-// Keyed by colour, not by control mode — both tiers group their options into
-// the same bordered card with a coloured label, so both read from these.
-const CM_BORDER: Record<string, string> = {
-  orange: 'border-orange-200 dark:border-orange-800/60',
-  yellow: 'border-yellow-200 dark:border-yellow-800/60',
-  pink:   'border-pink-200 dark:border-pink-800/60',
-  lime:   'border-lime-200 dark:border-lime-800/60',
-  teal:   'border-teal-200 dark:border-teal-800/60',
-  indigo: 'border-indigo-200 dark:border-indigo-800/60',
-  violet: 'border-violet-200 dark:border-violet-800/60',
-};
-
+// Keyed by colour, not by control mode — both tiers label their section cards
+// the same way, so both read from these.
 const CM_LABEL_COLOR: Record<string, string> = {
   orange: 'text-orange-600 dark:text-orange-400',
   yellow: 'text-yellow-600 dark:text-yellow-400',
