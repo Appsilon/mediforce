@@ -502,6 +502,45 @@ test.describe('Workflow Editor Journey', () => {
 
   // ── Validation gates ─────────────────────────────────────────────────────
 
+  test('a new workflow targets the workspace you are in, not the first you belong to', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
+
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    // The namespace select defaults the save target. Defaulting it to the first
+    // namespace the user belongs to saves into the wrong workspace and then
+    // redirects to this one, which reads as "cannot find the workflow" (#1234).
+    const namespaceSelect = page.locator('select').first();
+    await expect(namespaceSelect).toHaveValue(TEST_ORG_HANDLE, { timeout: 10_000 });
+  });
+
+  test('saving a workflow with an added block lands on a page that finds it (#1234)', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    const unique = `e2e-1234-${Date.now()}`;
+    await page.getByPlaceholder('Add a Workflow Name…').fill(unique);
+    await page.getByPlaceholder('Add a workflow description…').fill('Reproduction for issue 1234');
+
+    // The user's steps: add a block from the toolbar, then save.
+    await page.getByRole('button', { name: 'Add Block', exact: true }).click();
+    await expect(page.getByTestId('executor-option-human')).toBeVisible({ timeout: 5_000 });
+    await page.getByTestId('executor-option-human').click();
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
+    await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('v1');
+    await page.getByRole('button', { name: /publish workflow/i }).click();
+
+    // Redirect must land somewhere that can actually load the workflow — the
+    // reported symptom is "it cannot find the workflow" after redirect.
+    await page.waitForURL(new RegExp(`/workflows/${unique}/?$`), { timeout: 20_000 });
+    await expect(page.getByRole('tab', { name: /runs/i })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/not found|could not find|cannot find/i)).toHaveCount(0);
+  });
+
   test('new workflow save blocked when workflow name slugifies to empty', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
