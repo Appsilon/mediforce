@@ -19,7 +19,6 @@ import { useOpenRouterCredits } from '@/hooks/use-openrouter-credits';
 import { useNamespaceAdminContact } from '@/hooks/use-namespace-admin-contact';
 import { useModelValidation } from '@/hooks/use-model-validation';
 import { runPreflightChecks, findSkippedChecks, type PreflightWarning } from '@/lib/preflight-checks';
-import { VerificationLadder, deriveReadinessResult } from '@/components/workflows/verification-ladder';
 import { ParamField } from '@/components/ui/param-field';
 import { buildTriggerPayload, hasInvalidObjectInput } from '@/lib/trigger-input-payload';
 import type { TriggerInputField } from '@mediforce/platform-core';
@@ -173,9 +172,8 @@ export function StartRunButton({
     });
   }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.effectiveRemaining, handle, workflowName, adminContact.email, modelValidation.isLoading, modelValidation.unknown]);
 
-  // A probe that failed produces no warnings, exactly like a probe that passed.
-  // Tracked separately so the ladder reports "some checks could not run" rather
-  // than claiming a pass for a check that never completed.
+  // A probe that failed produces no warnings, exactly like a probe that passed,
+  // so a skipped check must be said out loud rather than read as a pass.
   const skippedChecks = React.useMemo(() => {
     if (!effectiveDefinition) return [];
     return findSkippedChecks(effectiveDefinition, {
@@ -294,15 +292,6 @@ export function StartRunButton({
 
   const startButtonLabel = hasWarnings ? 'Start anyway' : 'Start run';
 
-  // Left undefined when the workflow does not exist yet — no readiness check has
-  // run, so the ladder shows its static hint instead of claiming "all present".
-  const readinessResult = deriveReadinessResult({
-    enabled: preflightEnabled,
-    loading: preflightLoading,
-    warningCount: warnings.length,
-    skippedCount: skippedChecks.length,
-  });
-
   const preflightDialog = (
     <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
       <Dialog.Portal>
@@ -325,7 +314,12 @@ export function StartRunButton({
                   ? 'Provide input values for this workflow run.'
                   : preflightLoading
                     ? 'Checking workflow readiness...'
-                    : `${warnings.length} item${warnings.length !== 1 ? 's' : ''} to review for a smooth run.`}
+                    : [
+                      `${warnings.length} item${warnings.length !== 1 ? 's' : ''} to review for a smooth run.`,
+                      skippedChecks.length > 0
+                        ? 'Some checks could not run, so this list may be incomplete.'
+                        : '',
+                    ].filter(Boolean).join(' ')}
               </Dialog.Description>
             </div>
             <Dialog.Close className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
@@ -400,10 +394,6 @@ export function StartRunButton({
               ))}
             </div>
           )}
-
-          <div className="mt-4">
-            <VerificationLadder activeRung="readiness" readiness={readinessResult} />
-          </div>
 
           <div className="flex items-center gap-2 mt-5">
             <div className="flex-1" />

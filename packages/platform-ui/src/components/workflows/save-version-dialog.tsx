@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import { VerificationLadder } from '@/components/workflows/verification-ladder';
 import { cn } from '@/lib/utils';
 
 interface SaveVersionDialogProps {
@@ -110,8 +109,6 @@ export function SaveVersionDialog({
           />
           <span className="text-xs text-muted-foreground">Set as default version</span>
         </label>
-
-        <VerificationLadder activeRung="schema" />
 
         <div className="flex justify-end gap-2 pt-1">
           <button
