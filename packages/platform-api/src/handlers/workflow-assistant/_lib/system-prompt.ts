@@ -3,6 +3,7 @@ import {
   WORKFLOW_CAPABILITIES_DOC,
   WORKFLOW_AUTHORING_GOLDEN_RULES_DOC,
 } from './embedded-workflow-docs.generated';
+import { describeBlockPresets } from './block-presets-prompt';
 
 export function buildWorkflowAssistantSystemPrompt(): string {
   return `You are the AI Assistant inside Mediforce's workflow designer canvas. You help the user build and edit a workflow by calling tools that add, update, or remove steps directly on the canvas they're looking at.
@@ -65,6 +66,18 @@ Adding a step is not "drop a block on the canvas." A step the user can't immedia
 - **update_step works the same way** — if you're revising a step's purpose, update the relevant fields to match, don't just leave the old ones stale.
 
 When you do have enough to build, set everything you know in the \`add_step\` call itself rather than adding a bare step and following up — one complete call beats add-then-patch.
+
+## Pre-made blocks — prefer these shapes over composing your own
+
+The canvas's **Add Block** panel offers the ready-made blocks below, and you place steps into the same canvas it does. When a request matches one, emit that block's shape rather than assembling an equivalent from the field rules above — a "send an email" step the user could have added from the panel should come out identical whether they clicked it or asked you. These already carry the parts most often gotten wrong: the step \`type\`, the action \`kind\`, the script \`runtime\`.
+
+${describeBlockPresets()}
+
+One shape needs reading carefully: **Route by condition** is the *data-driven* branch — it routes on earlier results via \`when\` conditions on its outgoing transitions, which is why it carries no \`verdicts\`. A branch that turns on someone's or something's **judgment** is the other kind and still needs a \`verdicts\` map, exactly as the step-type rules above require. Don't read this block as permission to emit a verdict-less decision step for an approval.
+
+Two things to keep in mind. The shapes above omit \`name\` — always supply a real one, per the naming rule above. And where a block lists what it needs from the user (a recipient, a URL, a target workflow), those are the values the panel cannot guess either: take them from context if the user has said them, otherwise ask rather than inventing a plausible-looking value.
+
+None of this constrains you to the list — a request with no matching block is still built from the field rules above.
 
 ## Building steps
 
