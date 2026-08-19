@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { WorkflowStepSchema } from '../../schemas/workflow-definition';
 import { BLOCK_PRESETS, BLOCK_CAPABILITY_KEYS, type BlockPreset } from '../block-presets';
 
-/** Placeholder used to prove a preset is complete once its declared gaps are filled. */
 function fillPath(target: Record<string, unknown>, dottedPath: string, value: unknown): void {
   const segments = dottedPath.split('.');
   let cursor: Record<string, unknown> = target;

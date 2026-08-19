@@ -770,7 +770,7 @@ export function WorkflowEditorCanvas({
             <BlockPicker
               onAdd={handleBlockAdd}
               onClose={closeAddBlock}
-              onEdge={addBlockContext !== null}
+              insertingOnEdge={addBlockContext !== null}
             />
           </div>
         )}

@@ -1,20 +1,18 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { User, Bot, Terminal, PenLine, GitBranch, Search, Mail, Plus, X } from 'lucide-react';
 import { BLOCK_PRESETS, BLOCK_CATEGORIES, type BlockCategory, type BlockPreset } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { useCapabilities } from '@/hooks/use-capabilities';
 import { CollapsibleCard } from './workflow-editor/collapsible-card';
+import { HoverTooltip } from './workflow-editor/hover-tooltip';
 import { CONTROL_MODE_LABELS, CONTROL_MODE_NUMBER, CONTROL_MODE_DISABLED, getControlMode, type ControlMode, type NewStepPayload } from '@/lib/control-mode';
 import { STEP_STYLES, STEP_TYPE_CONFIG, ExecutorIcon, getExecutorLabel } from './workflow-diagram';
 import { CM_ROWS, STEP_TYPE_OPTIONS, type CMRow } from '@/lib/block-presets';
 
-/** Which tier of the picker is showing. Simple opens first — most adds are ordinary. */
 type Tier = 'simple' | 'full';
 
-// Each category is a card in the same shape as a control-mode row: coloured
-// border, coloured label with an icon, options stacked inside.
 const CATEGORY_LABELS: Record<BlockCategory, string> = {
   people: 'People',
   communicate: 'Communicate',
@@ -119,14 +117,10 @@ function executorCapability(executor: string): string | undefined {
 type Props = {
   onAdd: (payload: NewStepPayload) => void;
   onClose: () => void;
-  /** Inserting between two existing steps rather than appending. */
-  onEdge?: boolean;
+  insertingOnEdge?: boolean;
 };
 
-/**
- * A block drawn the way the canvas draws it: same rounded chrome, same executor
- * row, same step-type tint. What you pick is what you get.
- */
+/** Reuses the canvas's own node chrome, so picker and canvas cannot drift. */
 function BlockNodePreview({ label, executor, autonomyLevel, stepType, badge, dimmed }: {
   label: string;
   executor: string;
@@ -170,17 +164,9 @@ function BlockNodePreview({ label, executor, autonomyLevel, stepType, badge, dim
 }
 
 /**
- * An option plus its description.
- *
- * The description flies out to the left on hover, positioned `fixed` so the
- * panel's scroll container cannot clip it and it sits above the canvas. A
- * screen-reader copy stays inside the button so the description is attached to
- * the control it explains.
- *
- * Unavailable options are NOT `disabled`: a disabled button dispatches no mouse
- * events and cannot take focus, which would make the reason unreachable on
- * exactly the blocks that most need explaining. They advertise `aria-disabled`
- * and refuse the click instead.
+ * Unavailable options are `aria-disabled`, not `disabled`: a disabled button
+ * dispatches no pointer events and takes no focus, so its reason would be
+ * unreachable on exactly the blocks that most need explaining.
  */
 function OptionButton({ testId, disabled, onPick, description, children }: {
   testId: string;
@@ -189,50 +175,27 @@ function OptionButton({ testId, disabled, onPick, description, children }: {
   description: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
-
-  const show = () => {
-    const rect = ref.current?.getBoundingClientRect();
-    if (rect) setAnchor({ top: rect.top, left: rect.left });
-  };
-  const hide = () => setAnchor(null);
-
   return (
-    <>
+    <HoverTooltip content={description}>
       <button
-        ref={ref}
         type="button"
         data-testid={testId}
         aria-disabled={disabled || undefined}
         onClick={disabled ? undefined : onPick}
-        onMouseEnter={show}
-        onMouseLeave={hide}
-        onFocus={show}
-        onBlur={hide}
         className={cn('group relative block w-full', disabled ? 'cursor-not-allowed' : 'cursor-pointer')}
       >
         {children}
         <span className="sr-only">{description}</span>
       </button>
-      {anchor !== null && (
-        <div
-          data-testid={`${testId}-description`}
-          style={{ position: 'fixed', top: anchor.top, left: anchor.left - 8, transform: 'translateX(-100%)' }}
-          className="pointer-events-none z-[200] w-64 rounded-md border bg-popover px-2.5 py-2 text-[10px] leading-relaxed text-popover-foreground shadow-md"
-        >
-          {description}
-        </div>
-      )}
-    </>
+    </HoverTooltip>
   );
 }
 
-export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
+export function BlockPicker({ onAdd, onClose, insertingOnEdge = false }: Props) {
   const [tier, setTier] = useState<Tier>('simple');
   const [pendingType, setPendingType] = useState<'creation' | 'decision'>('creation');
-  // One section at a time, first open — the step editor's accordion. Cards size
-  // to their content so a one-option section does not stretch down the panel.
+  // Cards size to content (`fill={false}`) so a one-option section does not
+  // stretch down the panel.
   const [openSection, setOpenSection] = useState<string>(BLOCK_CATEGORIES[0]);
   const { capabilities } = useCapabilities();
 
@@ -265,9 +228,9 @@ export function BlockPicker({ onAdd, onClose, onEdge = false }: Props) {
         <div className="flex items-center gap-2 px-4 py-3">
           <Plus className="h-4 w-4 text-primary shrink-0" />
           <span className="flex-1 min-w-0 truncate text-sm font-semibold">
-            {onEdge ? 'Insert step' : 'Add block'}
+            {insertingOnEdge ? 'Insert step' : 'Add block'}
           </span>
-          {onEdge && <span className="shrink-0 text-[10px] text-muted-foreground">on edge</span>}
+          {insertingOnEdge && <span className="shrink-0 text-[10px] text-muted-foreground">on edge</span>}
           <button
             type="button"
             onClick={onClose}
