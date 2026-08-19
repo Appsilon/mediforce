@@ -5,8 +5,8 @@ import type { WorkflowStep } from '../schemas/workflow-definition';
  * the control-mode rows, emitting a step that is already structurally correct
  * instead of an executor plus an empty config.
  *
- * Placed here rather than in the UI so the workflow assistant can build from the
- * same catalog. It does not yet — the picker is the only consumer today.
+ * Placed here rather than in the UI because the workflow assistant builds from
+ * the same catalog (see `block-presets-prompt`).
  *
  * Presets do NOT invent author-specific values (a recipient, a URL, a target
  * workflow); those are declared in `needsInput` and left empty for the editor's
@@ -17,7 +17,7 @@ import type { WorkflowStep } from '../schemas/workflow-definition';
  * step at L3.
  */
 
-export const BLOCK_CAPABILITY_KEYS = ['email', 'agents'] as const;
+export const BLOCK_CAPABILITY_KEYS = ['email'] as const;
 
 export type BlockCapabilityKey = (typeof BLOCK_CAPABILITY_KEYS)[number];
 
@@ -138,7 +138,6 @@ export const BLOCK_PRESETS: BlockPreset[] = [
     label: 'Agent drafts, person approves',
     purpose: 'Judgment or synthesis, with a human gate before the run continues.',
     category: 'ai',
-    requires: 'agents',
     payload: {
       type: 'creation',
       executor: 'agent',
@@ -150,7 +149,6 @@ export const BLOCK_PRESETS: BlockPreset[] = [
     label: 'Work with an agent live',
     purpose: 'A person and an agent build the result together, over chat.',
     category: 'ai',
-    requires: 'agents',
     payload: {
       type: 'creation',
       executor: 'cowork',
