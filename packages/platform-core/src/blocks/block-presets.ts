@@ -160,7 +160,7 @@ export const BLOCK_PRESETS: BlockPreset[] = [
   {
     id: 'route-by-condition',
     label: 'Route by condition',
-    purpose: 'Send the run down different paths based on earlier results.',
+    purpose: 'Route on earlier results, using conditions on its outgoing transitions.',
     category: 'control',
     payload: {
       type: 'decision',
