@@ -1,6 +1,6 @@
 # @mediforce/platform-ui
 
-Main web application for Mediforce — Next.js 15 (App Router).
+Main web application for Mediforce — Next.js 16 (App Router).
 
 Top of the dependency graph: it consumes every other package and nothing
 consumes it. That position is the reason its rules are about restraint — code

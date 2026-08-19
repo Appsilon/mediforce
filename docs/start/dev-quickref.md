@@ -111,10 +111,11 @@ pnpm check:docs       # doc metadata, routing, links, backticked docs//skills/ p
 pnpm check:readmes    # every packages/*/ and apps/*/ has a README.md
 ```
 
-`check:docs` runs in `docs.yml`, `check:readmes` in `ci.yml` — a new package
-with no Markdown file matches no `**.md` path filter, so the docs workflow
-would never fire on it. Both check *references*, never whether prose is true.
-For that, `/sync-docs`.
+`check:docs` runs in both `ci.yml` and `docs.yml` — a docs-only PR skips CI,
+and a code-only PR that renames a linked source file matches no `**.md` path
+filter. `check:readmes` runs in `ci.yml` only, for the same second reason: a new
+package with no Markdown file would never fire the docs workflow. Both check
+*references*, never whether prose is true. For that, `/sync-docs`.
 
 ## Add a migration
 

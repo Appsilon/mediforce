@@ -102,12 +102,16 @@ are cited by number.
 ### Links
 
 Relative Markdown links. `pnpm check:docs`
-([`check_doc_links.py`](../scripts/check_doc_links.py), run by its own
-[`docs.yml`](../.github/workflows/docs.yml) workflow because `ci.yml` skips
-docs-only changes) fails on a link or backticked `docs/`/`skills/` path that
-does not resolve, on invalid or missing frontmatter, and on an active doc
-missing from the table above. It checks structure, never whether prose is
-*true* — that is `AGENTS.md` rule 11 and `/sync-docs`.
+([`check_doc_links.py`](../scripts/check_doc_links.py)) fails on a link or
+backticked `docs/`/`skills/` path that does not resolve, on invalid or missing
+frontmatter, and on an active doc missing from the table above. It checks
+structure, never whether prose is *true* — that is `AGENTS.md` rule 11 and
+`/sync-docs`.
+
+It runs in both workflows, because a link breaks from both sides: docs-only PRs
+skip [`ci.yml`](../.github/workflows/ci.yml) entirely, and a code-only PR that
+renames or deletes a link target matches no `**.md` filter in
+[`docs.yml`](../.github/workflows/docs.yml).
 
 ### Where new docs go
 
@@ -116,8 +120,8 @@ missing from the table above. It checks structure, never whether prose is
 package is for, what depends on it, and what you must not do to it. It ships in
 the same PR as the package — `pnpm check:readmes`
 ([`check_readme_coverage.py`](../scripts/check_readme_coverage.py)) fails the
-build otherwise, and runs in `ci.yml` rather than `docs.yml` because a new
-package containing no Markdown file matches no `**.md` path filter.
+build otherwise, and runs in `ci.yml` only — a new package containing no
+Markdown file matches no `**.md` path filter, so `docs.yml` never fires on it.
 
 This is geometry, not filing preference: `git rm -r packages/foo` carries off
 `packages/foo/README.md` with the code; it cannot carry off a page three
