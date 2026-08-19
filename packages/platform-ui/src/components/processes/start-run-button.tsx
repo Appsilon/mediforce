@@ -37,7 +37,11 @@ interface StartRunButtonProps {
    * gating the button on unsaved required fields.
    */
   disabledTooltip?: string;
-  onBeforeStart?: () => Promise<number | undefined>;
+  /**
+   * Saves the workflow before starting and reports where it landed. The run must
+   * start in the workspace the save targeted, which is not always the route.
+   */
+  onBeforeStart?: () => Promise<{ version: number; namespace: string } | undefined>;
   /**
    * Whether to run workflow-scoped preflight fetches (versions, secrets, model
    * validation). Set false when the workflow does not exist yet — e.g. the new
@@ -172,8 +176,8 @@ export function StartRunButton({
     });
   }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.effectiveRemaining, handle, workflowName, adminContact.email, modelValidation.isLoading, modelValidation.unknown]);
 
-  // A probe that failed produces no warnings, exactly like a probe that passed,
-  // so a skipped check must be said out loud rather than read as a pass.
+  // A probe that failed produces no warnings, exactly like one that passed, so a
+  // skipped check has to be said out loud rather than read as a pass.
   const skippedChecks = React.useMemo(() => {
     if (!effectiveDefinition) return [];
     return findSkippedChecks(effectiveDefinition, {
@@ -187,8 +191,13 @@ export function StartRunButton({
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
 
+  // Where the run starts. The route handle is right everywhere except the
+  // new-workflow page, where `onBeforeStart` may have saved elsewhere.
+  const savedNamespaceRef = React.useRef<string | null>(null);
+
   async function executeStart(v?: number, dryRun?: boolean) {
     const targetVersion = v ?? effectiveVersion;
+    const startNamespace = savedNamespaceRef.current ?? handle;
     if (!user || targetVersion === null || targetVersion === 0) return;
 
     setStarting(true);
@@ -200,7 +209,7 @@ export function StartRunButton({
 
     try {
       const result = await startMutation.mutateAsync({
-        namespace: handle,
+        namespace: startNamespace,
         definitionName: workflowName,
         definitionVersion: targetVersion,
         triggerName: 'manual',
@@ -208,7 +217,7 @@ export function StartRunButton({
         payload,
         ...(dryRun ? { dryRun: true } : {}),
       });
-      router.push(`/${handle}/workflows/${encodeURIComponent(workflowName)}/runs/${result.run.id}`);
+      router.push(`/${startNamespace}/workflows/${encodeURIComponent(workflowName)}/runs/${result.run.id}`);
     } catch (err) {
       console.error('[StartRunButton] Failed to start run:', err);
       setError(err instanceof Error ? err.message : 'Failed to start run');
@@ -236,7 +245,9 @@ export function StartRunButton({
       setRunningBeforeStart(true);
       setError(null);
       try {
-        targetVersion = await onBeforeStart();
+        const saved = await onBeforeStart();
+        targetVersion = saved?.version;
+        savedNamespaceRef.current = saved?.namespace ?? null;
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to save before starting');
         setRunningBeforeStart(false);
@@ -314,12 +325,7 @@ export function StartRunButton({
                   ? 'Provide input values for this workflow run.'
                   : preflightLoading
                     ? 'Checking workflow readiness...'
-                    : [
-                      `${warnings.length} item${warnings.length !== 1 ? 's' : ''} to review for a smooth run.`,
-                      skippedChecks.length > 0
-                        ? 'Some checks could not run, so this list may be incomplete.'
-                        : '',
-                    ].filter(Boolean).join(' ')}
+                    : `${warnings.length} item${warnings.length !== 1 ? 's' : ''} to review for a smooth run.${skippedChecks.length > 0 ? ' Some checks could not run, so this list may be incomplete.' : ''}`}
               </Dialog.Description>
             </div>
             <Dialog.Close className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
