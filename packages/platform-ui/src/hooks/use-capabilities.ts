@@ -5,9 +5,9 @@ import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 import { NICE_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
-import type { CapabilityStatus } from '@mediforce/platform-api/contract';
+import type { GetCapabilitiesOutput } from '@mediforce/platform-api/contract';
 
-type Capabilities = Record<string, CapabilityStatus>;
+type Capabilities = GetCapabilitiesOutput['capabilities'];
 
 /**
  * Reference data that moves only on redeploy or an admin wiring up email, hence
@@ -19,7 +19,7 @@ type Capabilities = Record<string, CapabilityStatus>;
  */
 export function useCapabilities(): { capabilities: Capabilities | null; loading: boolean } {
   const query = useQuery({
-    queryKey: queryKeys.capabilities(),
+    queryKey: queryKeys.capabilities.get(),
     queryFn: async () => (await mediforce.capabilities.get()).capabilities,
     staleTime: NICE_LIVE_INTERVAL_MS,
     retry: stopRetryOn4xx,

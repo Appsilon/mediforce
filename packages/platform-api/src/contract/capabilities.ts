@@ -18,7 +18,6 @@ export type CapabilityStatus = z.infer<typeof CapabilityStatusSchema>;
 export const GetCapabilitiesOutputSchema = z.object({
   capabilities: z.object({
     email: CapabilityStatusSchema,
-    agents: CapabilityStatusSchema,
   }),
 });
 export type GetCapabilitiesOutput = z.infer<typeof GetCapabilitiesOutputSchema>;

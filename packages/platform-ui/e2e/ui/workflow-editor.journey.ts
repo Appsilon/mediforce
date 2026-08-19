@@ -241,6 +241,32 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
   });
 
+  test('a pre-made block inserts a step already carrying its action kind', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+    const initialNodeCount = await page.locator('.react-flow__node').count();
+
+    await page.getByLabel('Add step here').first().click();
+    await expectPickerOpen(page);
+
+    // Simple opens on the first category; Send email lives under Communicate.
+    const communicate = page.getByTestId('section-communicate');
+    if (await communicate.getAttribute('data-open') !== 'true') {
+      await communicate.getByRole('button').first().click();
+    }
+    await page.getByTestId('preset-option-send-email').click();
+
+    await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
+
+    // The point of a pre-made block: the step arrives configured, not bare. The
+    // old picker inserted an action step with no `action` at all.
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
+    await expectJsonEditorContains(page, '"kind": "email"');
+  });
+
   test('empty workflow canvas still allows adding a step', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
