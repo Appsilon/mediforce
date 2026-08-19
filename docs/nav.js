@@ -127,6 +127,13 @@
   style.textContent = css;
   document.head.appendChild(style);
 
+  // Declared here rather than in each page's head so nested pages get the same
+  // path prefix the header links already use.
+  const favicon = document.createElement('link');
+  favicon.rel = 'icon';
+  favicon.href = `${p}favicon.ico`;
+  document.head.appendChild(favicon);
+
   document.body.insertAdjacentHTML('afterbegin', html);
 
   const toggle = document.getElementById('site-nav-toggle');
