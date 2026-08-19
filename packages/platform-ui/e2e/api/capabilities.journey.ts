@@ -23,8 +23,12 @@ type CapabilitiesBody = {
   capabilities: Record<string, { available: boolean; detail?: string; reason?: string }>;
 };
 
-/** Keys the picker gates blocks on today. */
-const EXPECTED_KEYS = ['email', 'agents'];
+/**
+ * Keys the picker gates blocks on. Only capabilities the platform can answer for
+ * the whole deployment belong here — agent availability deliberately does not,
+ * since the model key can come from a workflow or namespace secret.
+ */
+const EXPECTED_KEYS = ['email'];
 
 test.describe('GET /api/capabilities — API E2E', () => {
   let callers: MultiNamespaceFixture;

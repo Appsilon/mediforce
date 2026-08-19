@@ -12,13 +12,17 @@ describe('describeBlockPresets', () => {
     }
   });
 
-  it('carries the executor and, where present, the action kind', () => {
+  it('carries each id, since that is what add_step resolves', () => {
     const described = describeBlockPresets();
     for (const preset of BLOCK_PRESETS) {
-      expect(described).toContain(`"executor":"${preset.payload.executor}"`);
+      expect(described, `missing id: ${preset.id}`).toContain(`\`${preset.id}\``);
     }
-    expect(described).toContain('"kind":"email"');
-    expect(described).toContain('"kind":"http"');
+  });
+
+  it('does not paste the payloads, which the resolver supplies server-side', () => {
+    const described = describeBlockPresets();
+    expect(described).not.toContain('"executor"');
+    expect(described).not.toContain('"kind"');
   });
 
   it('names the fields the author has to supply, rather than inventing them', () => {
@@ -49,11 +53,18 @@ describe('the assistant system prompt', () => {
     expect(prompt).toMatch(/judgment[\s\S]{0,120}verdicts/i);
   });
 
-  it('tells the assistant to supply a name, which the shapes deliberately omit', () => {
+  it('tells the assistant to pass presetId rather than rebuild the shape', () => {
     const prompt = buildWorkflowAssistantSystemPrompt();
-    expect(prompt).toMatch(/shapes above omit `name`/);
+    expect(prompt).toMatch(/pass its id as .?presetId.? on .?add_step/);
+    // No preset names its step; the assistant must supply one.
     for (const preset of BLOCK_PRESETS) {
       expect(preset.payload).not.toHaveProperty('name');
     }
+    expect(prompt).toMatch(/always a real .?name.?/);
+  });
+
+  it('says an unfilled gap is rejected, not silently sent', () => {
+    const prompt = buildWorkflowAssistantSystemPrompt();
+    expect(prompt).toMatch(/rejected/);
   });
 });
