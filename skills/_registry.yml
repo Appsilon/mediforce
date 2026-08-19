@@ -1,7 +1,7 @@
 version: "1.0"
 generated: "2026-06-11"
 standard: "agentskills.io/specification"
-total_skills: 14
+total_skills: 13
 
 # Runtime skills have their own per-app registries:
 #   apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/_registry.yml

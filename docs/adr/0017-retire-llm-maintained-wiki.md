@@ -88,6 +88,11 @@ READMEs are written the only orientation is the `<stack>` block in `AGENTS.md`.
 That work is deliberately not folded into #1220 — it is a new deliverable, not
 a mechanical move, and is tracked separately.
 
+> **Resolved since.** Every `packages/*/` and `apps/*/` directory now carries a
+> `README.md` (enforced by `pnpm check:readmes`), and
+> [`concepts/architecture.md`](../concepts/architecture.md) carries the package
+> graph. The regression recorded above is closed.
+
 Colocation fixes deletion-drift, not edit-drift: a `README.md` can still
 describe a renamed export. It is milder, because the README sits in the diff's
 own directory, and `/sync-docs` is the lever if it proves insufficient.

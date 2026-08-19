@@ -39,7 +39,7 @@ files at the start of every conversation to understand current state:
 - `docs/concepts/architecture.md` — how it works technically (package graph, dependency direction)
 - `docs/concepts/how-we-work.md` — how the team operates
 - `docs/adr/README.md` — the decisions already made, and why
-- `docs/design/` — in-flight design notes not yet decided
+- `docs/research/` — explored shapes that are deferred, not yet decided
 
 ## Usage Scenarios
 
@@ -56,7 +56,7 @@ files at the start of every conversation to understand current state:
 3. **Think in pharma reality.** Procurement cycles are 6-18 months. Validation is expensive. IT teams are gatekeepers. Innovation budgets exist but are fought over.
 4. **Keep it grounded.** Don't generate fluff. If something is unclear or underdeveloped, say so directly.
 5. **When making suggestions, propose concrete edits** to the design files. Don't just talk — update the documents.
-6. **Capture new ideas** in the doc they belong to — `docs/concepts/vision.md` for positioning, `docs/design/` for a shape not yet decided.
+6. **Capture new ideas** in the doc they belong to — `docs/concepts/vision.md` for positioning, `docs/research/` for a shape explored but not yet decided. Once a shape is decided, it becomes an ADR.
 7. **Don't multiply files.** Work within the existing structure. Add sections, not documents.
 8. **Speak whatever language** the user uses. But **always write files in English** — all content in the repo must be in English.
 9. **User often uses voice transcription** — expect typos, garbled words, and run-on sentences. Interpret intent, don't get stuck on literal text.

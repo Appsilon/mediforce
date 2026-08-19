@@ -1,88 +1,75 @@
 ---
 status: living
 audience: everyone
-last_reviewed: 2026-08-18
+last_reviewed: 2026-08-19
 ---
 
 # Mediforce documentation
 
 One read of this file should tell a human where to go and an agent what to
-trust. If a doc is not reachable from the table below, it is not documentation
-we maintain.
+trust. A doc not reachable from the table below is not documentation we
+maintain — the link checker fails the build on one.
 
-This folder also serves the public website at **mediforce.ai** — `index.html`,
-`security.html`, `validated-ai.html`, `fda-principles.html`, `examples.html`,
-`nav.js`, `CNAME`, `setup/`, `case-studies/`, `preview/`, `images/`. Those files
-back live URLs and never move. GitHub shows this README when you browse the
-folder; GitHub Pages serves `index.html` at the URL. Everything else below is
-engineering documentation.
+New here: [`../GETTING-STARTED.md`](../GETTING-STARTED.md), then
+[`start/dev-quickref.md`](start/dev-quickref.md).
 
-## Where do I go?
-
-| I want to… | Start here |
-|---|---|
-| Get the app running for the first time | [`../GETTING-STARTED.md`](../GETTING-STARTED.md) |
-| Look up a command, port, or env var | [`start/dev-quickref.md`](start/dev-quickref.md) |
-| Understand what Mediforce is and why | [`concepts/vision.md`](concepts/vision.md) |
-| Understand how the packages fit together | [`concepts/architecture.md`](concepts/architecture.md) |
-| Build a workflow | [`guides/create-workflow.md`](guides/create-workflow.md) |
-| Look up what a workflow *can* do | [`reference/workflow-capabilities.md`](reference/workflow-capabilities.md) |
-| Know which rules a production workflow must satisfy | [`reference/workflow-authoring-golden-rules.md`](reference/workflow-authoring-golden-rules.md) |
-| Write a test at the right level | [`testing/e2e-strategy.md`](testing/e2e-strategy.md) |
-| Know why the code is shaped the way it is | [`adr/README.md`](adr/README.md) |
-| Work on this repo with agents | [`contributing/ai-development-process.md`](contributing/ai-development-process.md) |
+> This folder also serves the public website at **mediforce.ai**: the `.html`
+> files and `nav.js` at this level, plus `CNAME`, `setup/`, `case-studies/`,
+> `preview/`, `images/`, `features/` and the loose images. Those back live URLs
+> and never move. GitHub Pages serves `index.html`; GitHub renders this README
+> when you browse the folder. Everything below is engineering documentation.
 
 ## Routing table
 
 Every engineering doc, what it is for, and how far to trust it.
 
-| Topic | Path | Audience | Status |
+| I want to… | Doc | Audience | Status |
 |---|---|---|---|
-| Command-first dev reference | [`start/dev-quickref.md`](start/dev-quickref.md) | engineers | living |
-| Local Postgres and migrations | [`start/postgres-local-dev.md`](start/postgres-local-dev.md) | engineers | living |
-| Running a workspace locally | [`start/running-workspace-locally.md`](start/running-workspace-locally.md) | engineers | living |
-| Local dev conventions, auth setup | [`start/development.md`](start/development.md) | engineers | living |
-| Product vision and positioning | [`concepts/vision.md`](concepts/vision.md) | everyone | living |
-| Package graph, autonomy model | [`concepts/architecture.md`](concepts/architecture.md) | engineers | living |
-| How the team operates | [`concepts/how-we-work.md`](concepts/how-we-work.md) | everyone | living |
-| Authoring a workflow, end to end | [`guides/create-workflow.md`](guides/create-workflow.md) | workflow authors | living |
-| Building and pushing step images | [`guides/docker-image-setup.md`](guides/docker-image-setup.md) | workflow authors | living |
-| Importing a workflow from git | [`guides/import-from-git.md`](guides/import-from-git.md) | workflow authors | living |
-| The four verification gates | [`guides/verify-a-workflow.md`](guides/verify-a-workflow.md) | workflow authors | living |
-| Onboarding a landing zone | [`guides/landing-zone-onboarding.md`](guides/landing-zone-onboarding.md) | operators | living |
-| What workflows can do, mapped to source | [`reference/workflow-capabilities.md`](reference/workflow-capabilities.md) | workflow authors | living |
-| Production rules a workflow must satisfy | [`reference/workflow-authoring-golden-rules.md`](reference/workflow-authoring-golden-rules.md) | workflow authors | living |
-| Handler / contract / repo layering | [`reference/api-architecture.md`](reference/api-architecture.md) | engineers | living |
-| Container step execution | [`reference/container-steps.md`](reference/container-steps.md) | engineers | living |
-| Carrying values into the next run | [`reference/previous-run.md`](reference/previous-run.md) | engineers | living |
-| Tutorial workflow definitions | [`workflow-examples/README.md`](workflow-examples/README.md) | workflow authors | living |
-| L1–L5 test-level model | [`testing/e2e-strategy.md`](testing/e2e-strategy.md) | engineers | living |
-| Workflow-engine test approach | [`testing/engine-testing.md`](testing/engine-testing.md) | engineers | living |
-| Building this repo with agents | [`contributing/ai-development-process.md`](contributing/ai-development-process.md) | everyone | living |
-| Architectural decisions | [`adr/README.md`](adr/README.md) | engineers | living |
-| Implemented design notes | [`design/`](design/) | engineers | living |
-| Deferred explorations | [`research/`](research/) | engineers | draft |
-| Style for agent-facing docs | [`contributing/doc-style.md`](contributing/doc-style.md) | agents | living |
-| Executed plans, runbooks, completed migrations, the retired knowledge base | [`archive/`](archive/) | engineers | historical |
+| Get the app running the first time | [`../GETTING-STARTED.md`](../GETTING-STARTED.md) | everyone | living |
+| Look up a command, port, or env var | [`start/dev-quickref.md`](start/dev-quickref.md) | engineers | living |
+| Follow local dev conventions and auth setup | [`start/development.md`](start/development.md) | engineers | living |
+| Run Postgres and migrations locally | [`start/postgres-local-dev.md`](start/postgres-local-dev.md) | engineers | living |
+| Run a workspace locally | [`start/running-workspace-locally.md`](start/running-workspace-locally.md) | engineers | living |
+| Understand what Mediforce is and why | [`concepts/vision.md`](concepts/vision.md) | everyone | living |
+| Use the canonical domain vocabulary | [`../CONTEXT.md`](../CONTEXT.md) | everyone | living |
+| See how the packages fit together | [`concepts/architecture.md`](concepts/architecture.md) | engineers | living |
+| Know how the team operates | [`concepts/how-we-work.md`](concepts/how-we-work.md) | everyone | living |
+| Build a workflow, end to end | [`guides/create-workflow.md`](guides/create-workflow.md) | workflow-authors | living |
+| Build and push step images | [`guides/docker-image-setup.md`](guides/docker-image-setup.md) | workflow-authors | living |
+| Import a workflow from git | [`guides/import-from-git.md`](guides/import-from-git.md) | workflow-authors | living |
+| Pass the four verification gates | [`guides/verify-a-workflow.md`](guides/verify-a-workflow.md) | workflow-authors | living |
+| Onboard a landing zone | [`guides/landing-zone-onboarding.md`](guides/landing-zone-onboarding.md) | operators | living |
+| Look up what a workflow *can* do | [`reference/workflow-capabilities.md`](reference/workflow-capabilities.md) | workflow-authors | living |
+| Know the rules a production workflow must satisfy | [`reference/workflow-authoring-golden-rules.md`](reference/workflow-authoring-golden-rules.md) | workflow-authors | living |
+| Add a handler, contract, or repository | [`reference/api-architecture.md`](reference/api-architecture.md) | engineers | living |
+| Understand container step execution | [`reference/container-steps.md`](reference/container-steps.md) | engineers | living |
+| Carry values into the next run | [`reference/previous-run.md`](reference/previous-run.md) | engineers | living |
+| Copy a working workflow definition | [`workflow-examples/README.md`](workflow-examples/README.md) | workflow-authors | living |
+| Write a test at the right level | [`testing/e2e-strategy.md`](testing/e2e-strategy.md) | engineers | living |
+| Test the workflow engine | [`testing/engine-testing.md`](testing/engine-testing.md) | engineers | living |
+| Work on this repo with agents | [`contributing/ai-development-process.md`](contributing/ai-development-process.md) | everyone | living |
+| Write a doc an agent will read | [`contributing/doc-style.md`](contributing/doc-style.md) | agents | living |
+| Know why the code is shaped the way it is | [`adr/README.md`](adr/README.md) | engineers | living |
+| Read the cowork streaming exploration | [`research/cowork-streaming.md`](research/cowork-streaming.md) | engineers | draft |
+| Read the Layer 2 score exploration | [`research/layer2-scores-research.md`](research/layer2-scores-research.md) | engineers | draft |
+| Cite finished work | [`archive/`](archive/) | engineers | historical |
 
-**`archive/` is not guidance.** It holds the two completed headless-migration
-docs, the four executed ADR implementation plans (`PLAN-0001`, `PLAN-0002`,
-`PLAN-0003`, `PLAN-0016`), the staging-cutover runbook, and the retired
-[`knowledge-base/`](archive/knowledge-base/README.md). Cite them for
-history — including the `PLAN-NNNN §N.N` section numbers that code comments
-reference — never as instructions for what to build now. A plan lives in
-`adr/` alongside its ADR only while the work is in flight. Everything under
-`archive/` is exempt from the link checker, because its references point at a
-repo that no longer exists.
+**`archive/` is not guidance.** Executed ADR implementation plans
+(`PLAN-NNNN`), the staging-cutover runbook, the completed headless-migration
+docs, and the retired [knowledge base](archive/knowledge-base/README.md). Cite
+them for history — including the `PLAN-NNNN §N.N` sections that code comments
+reference — never as instructions for what to build now. The link checker skips
+the whole directory, because its references point at a repo that no longer
+exists.
 
 ## Conventions
 
 ### Status header
 
 Every doc **under `docs/`** starts with frontmatter. Colocated `packages/*/` and
-`apps/*/` READMEs do not carry it: they are a directory's front door on GitHub,
-written for a person arriving at the code, and their freshness comes from
-sitting next to the thing they describe rather than from a review date.
+`apps/*/` READMEs do not: they are a directory's front door on GitHub, and their
+freshness comes from sitting next to the thing they describe rather than from a
+review date.
 
 ```yaml
 ---
@@ -96,59 +83,56 @@ last_reviewed: 2026-08-18
 
 - `living` — current, maintained, safe to act on.
 - `draft` — a shape being explored. Not decided, not binding.
-- `historical` — a record of a past state. Accurate about then, not about now.
+- `historical` — accurate about a past state, not about now.
 
-ADRs use their own lifecycle in the same field — `proposed`, `accepted`,
-`finalized`, `superseded` — defined in [`adr/README.md`](adr/README.md).
-`accepted` and `finalized` are binding; `superseded` is historical.
+ADRs use their own lifecycle in the same field — `accepted` and `finalized`
+bind, partial supersession names the sections it replaces, full supersession
+and deprecation are historical — defined in [`adr/README.md`](adr/README.md).
 
-`audience` is one of `everyone`, `engineers`, `workflow authors`, `operators`,
-`agents`. `last_reviewed` is the date someone last checked the doc against the
-code — not the date it was last edited.
+`audience` is one of `everyone`, `engineers`, `workflow-authors`, `operators`,
+`agents`. `last_reviewed` is when someone last checked the doc against the code,
+not when it was last edited.
 
 ### Naming
 
 Lowercase kebab-case, always. The only exceptions are `README.md` and the
-numbered `adr/NNNN-*.md` / `adr/plans/PLAN-NNNN.md` /
-`adr/runbooks/RUNBOOK-NNNN-*.md` families, which are cited by number.
+numbered `adr/NNNN-*.md`, `PLAN-NNNN.md` and `RUNBOOK-NNNN-*.md` families, which
+are cited by number.
 
 ### Links
 
-Relative Markdown links. `scripts/check_doc_links.py` runs in CI
-(`pnpm check:docs`) and fails the build on a link or backticked
-`docs/`/`skills/` path that does not resolve. It checks that references
-*resolve*, not that prose is *true* — stale prose is caught by rule 11 in
-`AGENTS.md` and by `/sync-docs`;
-docs marked `historical` are exempt, because their references point at a repo
-that no longer exists.
+Relative Markdown links. `pnpm check:docs`
+([`check_doc_links.py`](../scripts/check_doc_links.py), run by its own
+[`docs.yml`](../.github/workflows/docs.yml) workflow because `ci.yml` skips
+docs-only changes) fails on a link or backticked `docs/`/`skills/` path that
+does not resolve, on invalid or missing frontmatter, and on an active doc
+missing from the table above. It checks structure, never whether prose is
+*true* — that is `AGENTS.md` rule 11 and `/sync-docs`.
 
 ### Where new docs go
 
 **A package or app documents itself.** Every directory under `packages/` and
 `apps/` carries its own `README.md`, and that file is the authority on what the
-package is for, what depends on it, and what you must not do to it. `docs/`
-covers only what spans more than one package. When you add a package or an app,
-its README lands in the same PR — a directory without one is an incomplete
-directory. `scripts/check_readme_coverage.py` enforces this in CI
-(`pnpm check:readmes`); it runs in `ci.yml` rather than the docs workflow,
-because a new package containing no Markdown file matches no `**.md` path
-filter.
+package is for, what depends on it, and what you must not do to it. It ships in
+the same PR as the package — `pnpm check:readmes`
+([`check_readme_coverage.py`](../scripts/check_readme_coverage.py)) fails the
+build otherwise, and runs in `ci.yml` rather than `docs.yml` because a new
+package containing no Markdown file matches no `**.md` path filter.
 
-This is geometry, not filing preference. A `git rm -r packages/foo` carries off
+This is geometry, not filing preference: `git rm -r packages/foo` carries off
 `packages/foo/README.md` with the code; it cannot carry off a page three
 directories away. That asymmetry is why the retired knowledge base filled up
-with entries describing deleted code ([ADR-0017](adr/0017-retire-llm-maintained-wiki.md)),
-and why a colocated README stays honest without a review cadence to enforce it.
+with entries describing deleted code
+([ADR-0017](adr/0017-retire-llm-maintained-wiki.md)). Colocation does not
+prevent edit drift — `/sync-docs` checks changed names and claims against
+source. Keep READMEs short and aimed at what the code does not say.
 
-Keep them short and aimed at what the code does not say. A README that restates
-`src/index.ts` earns nothing and goes stale the first time an export changes.
-
-For docs that genuinely span packages:
+`docs/` covers only what spans more than one package:
 
 `start/` get running · `concepts/` what Mediforce is · `guides/` how do I X ·
 `reference/` lookup surfaces · `testing/` test strategy · `contributing/` how we
-build with agents · `adr/` decisions and their in-flight plans · `design/`
-rationale behind shipped behaviour · `research/` deferred · `archive/` finished.
+build with agents · `adr/` decisions and their in-flight plans · `research/`
+deferred explorations · `archive/` finished.
 
 A doc moves to `archive/` when the work it describes is done — that is what
 keeps `status: living` meaningful for everything else.
@@ -156,4 +140,4 @@ keeps `status: living` meaningful for everything else.
 Two directories are addressed from outside the repo and must not move:
 `workflow-examples/` is the default git-import source
 (`github.com/Appsilon/mediforce/tree/main/docs/workflow-examples`), and the
-website files listed at the top back live `mediforce.ai` URLs.
+website files noted at the top.

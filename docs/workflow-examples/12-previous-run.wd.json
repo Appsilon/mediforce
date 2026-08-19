@@ -1,8 +1,10 @@
 {
-  "_comment": "Reference WD demonstrating inputForNextRun end-to-end with a mixed script + human loop. Step 1 (`echo-previous`) is a Python script that reads /output/previous_run.json and summarizes what the prior run passed through. Step 2 (`set-next`) is a human params task — the operator types a message that becomes the next run's previousRun.message. Docker required for the script step. See docs/reference/previous-run.md.",
-  "name": "previous-run-example",
-  "title": "Previous Run Outputs Example",
-  "description": "Round-trips a message between runs: script reads `previousRun.message`, human sets next one.",
+  "name": "tutorial-previous-run",
+  "title": "Previous Run Outputs",
+  "description": "Round-trips a message between runs: a script step reads `previousRun.message` from /output/previous_run.json, a human step sets the message the next run will see. Demonstrates the inputForNextRun carry-over contract and the empty-object first-run case.",
+  "roles": [
+    "operator"
+  ],
   "steps": [
     {
       "id": "echo-previous",

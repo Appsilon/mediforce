@@ -128,6 +128,14 @@ missing key at runtime simply means the key is omitted from `previousRun`.
   would be a small admin action that marks historical completed runs as
   `deleted`, which the resolver already skips.
 
+## Runnable example
+
+[`docs/workflow-examples/12-previous-run.wd.json`](../workflow-examples/12-previous-run.wd.json)
+round-trips a message between runs: a script step reads `previousRun.message`
+from `/output/previous_run.json`, a human step sets what the next run will see.
+Docker is needed for the script step. `scripts/demo_previous_run.py` drives three
+chained runs of it against a local dev server.
+
 ## Related artefacts
 
 - Schema: `WorkflowDefinition.inputForNextRun`

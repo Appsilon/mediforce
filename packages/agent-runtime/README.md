@@ -1,7 +1,7 @@
 # @mediforce/agent-runtime
 
 Executes a step that runs code — an LLM agent in a container, a deterministic
-script, or a Databricks job. Owns the `AgentPlugin` contract, plugin dispatch,
+script, or a Databricks job. Owns the `StepExecutorPlugin` contract, plugin dispatch,
 the output envelope, autonomy enforcement, and fallback handling.
 
 The engine decides *which* step runs next; this package decides *how* that step
@@ -13,7 +13,7 @@ actually executes and whether its result is trustworthy enough to continue.
 |---|---|
 | `src/runner/` | `AgentRunner`, `PluginRegistry`, `FallbackHandler`, step executors, `OpenRouterLlmClient`, OTel tracing |
 | `src/plugins/` | `BaseContainerAgentPlugin` and the concrete plugins — see [`src/plugins/README.md`](src/plugins/README.md) |
-| `src/interfaces/` | `AgentPlugin`, review and step-executor plugin contracts |
+| `src/interfaces/` | `StepExecutorPlugin`, review and step-executor contracts |
 | `src/mcp/` | Per-step MCP resolution (`resolveMcpForStep`) |
 | `src/oauth/` | MCP OAuth — discovery, dynamic client registration, token resolution |
 | `src/workspace/` | Run workspace paths, output-file collection, workspace reads |

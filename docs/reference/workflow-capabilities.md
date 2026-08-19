@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-08-18
+last_reviewed: 2026-08-19
 ---
 
 # Workflow capabilities
@@ -11,18 +11,12 @@ define and run each capability. Read this before deciding something is
 impossible — most "you can't do that" answers are wrong because the capability
 lives in code the reader never opened.
 
-This file is a **map, not a spec**. It deliberately does not restate field rules
-or copy schema prose (that forks the source of truth). Each row points at the
-authoritative file; open it when you need the exact shape. The production
-checklist is [`workflow-authoring-golden-rules.md`](workflow-authoring-golden-rules.md);
-schema-by-example lives in [`workflow-examples/`](../workflow-examples/README.md).
-
-## How to use this when authoring
-
-1. Skim the capability tables below so you know what exists.
-2. For any capability you are about to use, open its **Source** file and read
-   the real schema / handler — do not author from this summary alone.
-3. Cite the source file when you tell a user something is or isn't possible.
+This file is a **map, not a spec**: it names the authoritative file instead of
+restating its rules. Before using a capability, open its **Source** and read the
+real schema / handler; cite that file when you tell a user something is or isn't
+possible. Production checklist:
+[`workflow-authoring-golden-rules.md`](workflow-authoring-golden-rules.md).
+Schema by example: [`workflow-examples/`](../workflow-examples/README.md).
 
 ## Executors — what a step can be
 
@@ -52,13 +46,14 @@ to a handler in [`core-actions/src/handlers/`](../../packages/core-actions/src/h
 | `http` | Outbound HTTP request, templated url/body/headers | `HttpActionConfigSchema` |
 | `reshape` | Pure data transform — rebuild an object from interpolated leaves | `ReshapeActionConfigSchema` |
 | `email` | Send email (Mailgun/SMTP; disabled when `MEDIFORCE_DISABLE_EMAIL=true`) | `EmailActionConfigSchema` |
-| `spawn` | Launch child workflow(s); **`forEach` fans out one child per item** | `SpawnActionConfigSchema` |
-| `wait` | Pause until a `duration`, a `deadline`, or a `condition` | `WaitActionConfigSchema` |
+| `spawn` | Launch child workflow run(s); **`forEach` fans out one child per item** | `SpawnActionConfigSchema` |
+| `wait` | Pause the run until a `duration` or `deadline` elapses | `WaitActionConfigSchema` |
 
 **Fan-out** (the "spawn a workflow per team member" pattern) is
 `action.kind: spawn` with `forEach: "${steps.x.list}"` and a single `targets`
-template using `${item.*}`. End-to-end working example:
-[`apps/team-pulse/src/team-pulse.wd.json`](../../apps/team-pulse/src/team-pulse.wd.json)
+template using `${item.*}`; the rationale for child runs over parallel branches
+is [ADR-0018](../adr/0018-fan-out-is-child-workflows.md). End-to-end working
+example: [`apps/team-pulse/src/team-pulse.wd.json`](../../apps/team-pulse/src/team-pulse.wd.json)
 (`spawn_perspectives` → `wait` → `collect_responses`), distilled in
 [`workflow-examples/11-fan-out-orchestration.wd.json`](../workflow-examples/11-fan-out-orchestration.wd.json).
 
@@ -70,18 +65,26 @@ Handler nuances not visible in the schema (in
   interpolated child payload is validated against that child's `triggerInput`
   contract before firing; a mismatch is reported in `errors[]` (or aborts when
   `continueOnSpawnError: false`).
+- `wait` **requires `duration` or `deadline`** — a condition-only wait throws
+  `Invalid deadline` ([`wait.ts`](../../packages/core-actions/src/handlers/wait.ts)).
+  The optional `condition` is an early exit *on top of* that timer: it is
+  interpolated at pause time, stored on the sentinel, and re-evaluated with
+  transition-`when` syntax by
+  [`resume-wait.ts`](../../packages/platform-api/src/handlers/processes/resume-wait.ts)
+  (`resumeReason: condition_met`) on every cron-heartbeat sweep, so resume
+  granularity is ~15 minutes. It sees only **this run's** step outputs, so
+  it cannot wait for spawned children — see [ADR-0018](../adr/0018-fan-out-is-child-workflows.md)
+  and [#1215](https://github.com/Appsilon/mediforce/issues/1215).
 - `email` supports `cc` / `bcc` / `replyTo` / `html` and is **rate-limited**
   (default 50/run, 30/minute) in [`email.ts`](../../packages/core-actions/src/handlers/email.ts).
 - `http` never throws on a non-2xx response — it returns `{ status, headers, body }`;
   only transport failures throw ([`http.ts`](../../packages/core-actions/src/handlers/http.ts)).
-- `wait` `condition` is stored on the pause sentinel but **not polled** by the
-  handler ([`wait.ts`](../../packages/core-actions/src/handlers/wait.ts)) — see the note above.
 
 ## Two expression languages — do not mix them
 
 | Use site | Syntax | Roots available | Source |
 |----------|--------|-----------------|--------|
-| Transition `when` | bare, no `${}`: `verdict == "x"`, `output.f > 1`, `&&`, `\|\|`, `!` | `output`, `variables`, `verdict` | [`expression-evaluator.ts`](../../packages/workflow-engine/src/expressions/expression-evaluator.ts) |
+| Transition `when`, `wait` `condition` | bare, no `${}`: `verdict == "x"`, `output.f > 1`, `&&`, `\|\|`, `!` | `output`, `variables`, `verdict` | [`expression-evaluator.ts`](../../packages/workflow-engine/src/expressions/expression-evaluator.ts) |
 | Action configs, `spawn` payloads, `assignedTo`, step `env`, http body | `${...}` templates with dot/index paths | `steps`, `item` (in `forEach`), `triggerPayload`, `triggerContext`, `variables`, `secrets` | [`interpolation.ts`](../../packages/platform-core/src/interpolation.ts) |
 
 Notes that trip people up:
@@ -95,18 +98,15 @@ Notes that trip people up:
   it — a step reading it has knowingly coupled itself to one trigger kind.
 - `${steps.<id>.<path>}` reads a previous step's output; `getPath` supports
   `a.b`, `a.0.x`, and `a[0].x`, and returns empty for missing paths.
+- Step ids inside a bare expression must use **underscores**: the parser reads
+  `output.spawn-perspectives.x` as subtraction. `${...}` templates are unaffected.
 - `${secrets.NAME}` resolves in any action config field (never in transition
-  `when` or human-step config). The runner passes `secrets` into every action
-  dispatch ([`run/route.ts`](../../packages/platform-ui/src/app/api/processes/[instanceId]/run/route.ts) —
-  `sources.secrets`), so a secret is **not** automatically scrubbed from output:
-  handlers that echo their interpolated config persist it. `reshape` returns its
-  interpolated `values` as the step output
-  ([`reshape.ts`](../../packages/core-actions/src/handlers/reshape.ts)), and `email`
-  writes back interpolated `to`/`subject`
-  ([`email.ts`](../../packages/core-actions/src/handlers/email.ts)). Keep
-  `${secrets.*}` in fields that are not echoed — `http` url/headers/body (only the
-  *response* is stored) and `email` `body`/`html` — not in `reshape` values or
-  `email` `to`/`subject`.
+  `when` or human-step config) and is **not scrubbed from output**: handlers
+  that echo their interpolated config persist it —
+  [`reshape.ts`](../../packages/core-actions/src/handlers/reshape.ts) returns its
+  `values`, [`email.ts`](../../packages/core-actions/src/handlers/email.ts) writes
+  back `to`/`subject`. Keep `${secrets.*}` in fields that are not echoed: `http`
+  url/headers/body (only the *response* is stored) and `email` `body`/`html`.
 
 ## Human steps — richer than "a form"
 
@@ -126,10 +126,10 @@ shared sub-schemas (`StepUiSchema`, `StepParamSchema`, `VerdictSchema`,
 
 What a human task can *submit back* is a discriminated union in
 [`task-completion.ts`](../../packages/platform-core/src/schemas/task-completion.ts):
-`verdict`, `params`, `verdict-with-params`, `upload` (file attachments — pairs
-with the `file-upload` component), `assignment` (item→assignee rows — pairs with
-`assignment-table`), and `rows` (edited table rows — pairs with `table-editor`).
-The completion kind, not just the component, is what shapes the step output.
+`verdict`, `params`, `verdict-with-params`, `upload` (pairs with `file-upload`),
+`assignment` (item→assignee rows — `assignment-table`), and `rows` (edited table
+rows — `table-editor`). The completion kind, not just the component, is what
+shapes the step output.
 
 ## Scripts — inline vs command
 
@@ -142,38 +142,36 @@ Runtimes and how each is launched are the `RUNTIME_CONFIG` map in
 | Command | `command` + `image` (or `dockerfile`+`repo`+`commit`) | the named/built image | any shell command in that image |
 
 Every script reads `/output/input.json` and writes `/output/result.json`. The
-working directory is `/workspace` (the per-run git worktree).
+working directory is `/workspace` (the per-run git worktree). A third mode is
+`plugin: databricks-job`, which requires step-level `databricks`
+(`DatabricksJobConfigSchema`) instead of `script`.
 
-**Command mode has no runtime auto-selection** — that is inline-only. A
-`command` can only execute code that is already reachable in the container:
-baked into the image, present at `/workspace` (via `workspace.remote`), or
-self-contained (`python3 -c "..."`). To run a script **file from your package**
-via `command`, copy it into a custom image (Dockerfile + `repo` + `commit`,
-which triggers the §2 pinning rules) or mount it through `workspace.remote`.
-Inline scripts need none of that, which is why they are the default for small
-glue — see golden-rules for the "move substantial code into pinned files"
-threshold.
+**Runtime auto-selection is inline-only.** A `command` can only execute code
+already reachable in the container: baked into the image, present at
+`/workspace` (via `workspace.remote`), or self-contained (`python3 -c "..."`).
+To run a script *file from your package*, copy it into a custom image
+(Dockerfile + `repo` + `commit`, which triggers the golden-rules §2 pinning
+rules) or mount it through `workspace.remote`. Inline scripts need none of that,
+which is why they are the default for small glue.
 
 ## Models
 
-Full model IDs come from the OpenRouter-synced registry (a deployment + API key
-are required to query it — `mediforce model list` / `mediforce model validate`
-hit the platform). Offline, prefer short Claude aliases (`sonnet`, `opus`,
+Full model IDs come from the OpenRouter-synced registry, populated by
+[`sync-models.ts`](../../packages/platform-api/src/handlers/models/sync-models.ts)
+and queried with `mediforce model list` / `mediforce model validate` (both need
+a deployment + API key). Offline, prefer short Claude aliases (`sonnet`, `opus`,
 `haiku`): the `claude-code-agent` plugin passes `--model` straight through, and
 the runtime default is `anthropic/claude-sonnet-4`
-([`llm-client.ts`](../../packages/agent-runtime/src/runner/llm-client.ts)). The
-OpenRouter sync that populates the registry is
-[`sync-models.ts`](../../packages/platform-api/src/handlers/models/sync-models.ts).
+([`llm-client.ts`](../../packages/agent-runtime/src/runner/llm-client.ts)).
 
 ## Agents — autonomy, reliability, review, internet access
 
-The executor table headlines the `agent` executor; these are the control fields
-that decide *how supervised* the agent is and *what it may reach*. All fields are
-on `WorkflowAgentConfigSchema` / `WorkflowStepSchema` in
+Control fields deciding *how supervised* an `agent` step is and *what it may
+reach*. All on `WorkflowAgentConfigSchema` / `WorkflowStepSchema` in
 [`workflow-definition.ts`](../../packages/platform-core/src/schemas/workflow-definition.ts);
 the control-mode mapping is golden-rules §5 + [ADR-0014](../adr/0014-control-mode-ui-concept.md)
-/ [ADR-0008](../adr/0008-step-executor-model.md). The rows below point at the
-runtime that *enforces* each one — the behaviour is not visible from the schema.
+/ [ADR-0008](../adr/0008-step-executor-model.md). The rows point at the runtime
+that *enforces* each one — the behaviour is not visible from the schema.
 
 | Capability | Field | Where the behaviour is defined |
 |-----------|-------|-------------------------------|
@@ -182,11 +180,10 @@ runtime that *enforces* each one — the behaviour is not visible from the schem
 | What happens below threshold / on failure | `agent.fallbackBehavior` = `escalate_to_human` \| `continue_with_flag` \| `pause` | [`fallback-handler.ts`](../../packages/agent-runtime/src/runner/fallback-handler.ts) |
 | Built-in approve/revise loop | `review` (`type`: `human`/`agent`/`none`, `maxIterations`, `timeBoxDays`) + L3 | iteration cap enforced by [`review-tracker.ts`](../../packages/workflow-engine/src/review/review-tracker.ts) + [`workflow-engine.ts`](../../packages/workflow-engine/src/engine/workflow-engine.ts); L3 task creation in [`agent-step-executor.ts`](../../packages/agent-runtime/src/runner/agent-step-executor.ts) |
 | **Internet / extra tools** | `agent.allowedTools` | base set is `Bash, Read, Write, Edit, Glob, Grep`; add `WebSearch`/`WebFetch` (or any built-in tool) here — merged in [`claude-code-agent-plugin.ts`](../../packages/agent-runtime/src/plugins/claude-code-agent-plugin.ts) |
-| Fail-soft (advance despite a step error) | `continueOnError` — **`action` steps only** | the only runtime branch that honours it is the action-executor catch ([`run/route.ts`](../../packages/platform-ui/src/app/api/processes/[instanceId]/run/route.ts), `currentStep.continueOnError === true`): it marks the step `failed`, logs a warning + audit entry, and advances with `{}`. Agent/script/human/cowork steps ignore the flag — for an `agent` step the equivalent is `fallbackBehavior` (`continue_with_flag`) |
+| Fail-soft (advance despite a step error) | `continueOnError` — **`action` steps only** | the only runtime branch honouring it is the action-executor catch in [`run/route.ts`](../../packages/platform-ui/src/app/api/processes/[instanceId]/run/route.ts): marks the step `failed`, logs a warning + audit entry, advances with `{}`. Agent/script/human/cowork steps ignore it — for `agent`, the equivalent is `fallbackBehavior: continue_with_flag` |
 
 `review.timeBoxDays` is accepted by the schema but **not enforced at runtime** —
-only `maxIterations` is checked. `wait` action `condition` is likewise stored
-but not polled. Treat both as declarative-only until the runtime catches up.
+only `maxIterations` is checked. Treat it as declarative-only.
 
 Which runtime actually runs an `agent`/`script` step is the registered plugin
 (via `step.plugin` / Agent Definition `runtimeId`): `claude-code-agent` is the
@@ -200,8 +197,7 @@ steps. All live in [`agent-runtime/src/plugins/`](../../packages/agent-runtime/s
 A workflow gives an agent external tools by **referencing an Agent Definition**
 (`step.agentId`), which carries the canonical MCP server bindings; the step may
 only *narrow* them. Tool Catalog entries and Agent Definition bindings are
-platform setup (`MANUAL`) — the production checklist is golden-rules §7. This is
-the source map for the schemas behind it.
+platform setup (`MANUAL`) — the production checklist is golden-rules §7.
 
 | Capability | Field / schema | Source |
 |-----------|----------------|--------|
@@ -212,17 +208,16 @@ the source map for the schemas behind it.
 | OAuth providers for http MCP servers | `OAuthProviderConfigSchema` | [`oauth-provider.ts`](../../packages/platform-core/src/schemas/oauth-provider.ts) |
 | Inline step-level MCP (**deprecated** — use `agentId`) | `agent.mcpServers` / `cowork.mcpServers` | `McpServerConfigSchema` ([`mcp-server-config.ts`](../../packages/platform-core/src/schemas/mcp-server-config.ts)) |
 
-The effective tool set a step actually gets is computed at runtime — agent
-bindings minus step restrictions — by
+The effective tool set a step actually gets — agent bindings minus step
+restrictions — is computed at runtime by
 [`resolve-effective-mcp.ts`](../../packages/platform-core/src/mcp/resolve-effective-mcp.ts)
 and [`resolve-mcp-for-step.ts`](../../packages/agent-runtime/src/mcp/resolve-mcp-for-step.ts).
 
 ## Notifications
 
-A workflow can push notifications to roles on lifecycle events. Config schema is
-`ProcessNotificationConfigSchema`
-([`process-config.ts`](../../packages/platform-core/src/schemas/process-config.ts));
-the field is `notifications[]` on the workflow definition.
+A workflow can push notifications to roles on lifecycle events, via
+`notifications[]` on the definition (`ProcessNotificationConfigSchema` in
+[`process-config.ts`](../../packages/platform-core/src/schemas/process-config.ts)).
 
 | `event` | Fires when | Dispatch |
 |---------|-----------|----------|
@@ -234,8 +229,8 @@ the same file.
 
 ## Cowork — chat & voice-realtime
 
-The executor table headlines `cowork`; the config is `WorkflowCoworkConfigSchema`
-in [`workflow-definition.ts`](../../packages/platform-core/src/schemas/workflow-definition.ts).
+`WorkflowCoworkConfigSchema` in
+[`workflow-definition.ts`](../../packages/platform-core/src/schemas/workflow-definition.ts).
 Beyond "live collaboration" it can extract a **structured artifact** from the
 conversation.
 
@@ -252,53 +247,49 @@ apps — the session output is itself a validated WorkflowDefinition.
 ## Triggers & trigger input
 
 Triggers are **not** declared on the definition. They are independent, mutable
-resources on the unified `triggers` table (shaped by `TriggerResourceSchema` in
+resources on the unified `triggers` table (`TriggerResourceSchema` in
 [`trigger.ts`](../../packages/platform-core/src/schemas/trigger.ts)), attached to a
 workflow out-of-band and managed via
 `mediforce workflow trigger-add|trigger-list|trigger-update|trigger-start|trigger-stop|trigger-remove`,
 the UI **Triggers** tab, or `POST /api/workflow-definitions/:name/triggers`. The
 `manual` trigger is a per-workflow singleton auto-seeded on register (hand-start
-works by default). Webhook config is narrowed by `WebhookTriggerConfigSchema`
-([`trigger.ts`](../../packages/platform-core/src/schemas/trigger.ts)). A cron
-payload can be supplied with `--payload '<json object>'` on `trigger-add` or
-`trigger-update`; it must satisfy the workflow's `triggerInput` contract.
-See [ADR-0011](../adr/0011-triggers-detached-unified-resource.md).
+works by default). A cron payload can be supplied with `--payload '<json object>'`
+on `trigger-add` / `trigger-update`; it must satisfy the workflow's `triggerInput`
+contract. See [ADR-0011](../adr/0011-triggers-detached-unified-resource.md).
 
-The three types are routed the same way regardless of how they are attached:
+`TriggerTypeSchema` has exactly three types, routed the same way regardless of
+how they are attached (`event` is reserved for the future — not in the enum, no
+router, do not author it):
 
 | `type` | Routed by | Notes |
 |--------|-----------|-------|
 | `manual` | [`manual-trigger.ts`](../../packages/workflow-engine/src/triggers/manual-trigger.ts) | form values come from `triggerInput`; no transport, so `triggerContext` is empty |
-| `webhook` | [`webhook-router.ts`](../../packages/workflow-engine/src/triggers/webhook-router.ts) | typed `method` + `path` (exact match, no globbing); the JSON body's **top-level keys map 1:1 onto `triggerInput`** and are validated (400 + per-field `details` on mismatch); the remaining HTTP envelope goes to `triggerContext` — credential headers are stripped |
+| `webhook` | [`webhook-router.ts`](../../packages/workflow-engine/src/triggers/webhook-router.ts) | typed `method` + `path` (exact match, no globbing) narrowed by `WebhookTriggerConfigSchema`; the JSON body's **top-level keys map 1:1 onto `triggerInput`** and are validated (400 + per-field `details` on mismatch); the remaining HTTP envelope goes to `triggerContext` — credential headers are stripped |
 | `cron` | [`cron-trigger.ts`](../../packages/workflow-engine/src/triggers/cron-trigger.ts) | `schedule` cron string; scheduler is deployment-side. An optional static `config.payload` per row is the tick's input, validated at attach time and again at fire time (drift skips the tick with a reason); `schedule`/`firedAt` go to `triggerContext` |
-| `event` | — | **in the enum but has no router** ([`triggers/`](../../packages/workflow-engine/src/triggers/) has only manual/webhook/cron) — treat as not yet implemented |
 
 `triggerInput` (`TriggerInputFieldSchema`) is the contract every trigger
 validates against, and doubles as the manual-start form. Spawned child runs use
-the same contract before their manual-style firing. Each field has a `type`
-of `string` / `number` / `boolean` / `date` / `datetime` / `select` /
-`multiselect` / `textarea` / `object`, plus `options` / `default` / `required`
-(it extends `StepParamSchema`). `object` holds an opaque JSON object whose
-contents the definition does not enumerate — the way a proxied third-party body
-enters a run; the Start Run form renders it as a JSON textarea and blocks
-submission while the text is not a JSON object. Validation is **total and always
-on**: undeclared fields are a hard error, and an empty/absent `triggerInput`
-means the payload must be empty.
+the same contract. Each field has a `type` of `string` / `number` / `boolean` /
+`date` / `datetime` / `select` / `multiselect` / `textarea` / `object`, plus
+`options` / `default` / `required` (it extends `StepParamSchema`). `object`
+holds an opaque JSON object the definition does not enumerate — the way a
+proxied third-party body enters a run; the Start Run form renders it as a JSON
+textarea. Validation is **total and always on**: undeclared fields are a hard
+error, and an empty/absent `triggerInput` means the payload must be empty.
 
-A field's `default` belongs to the contract, not to the form: `validatePayload`
-fills it in for every field a firing left out (`undefined` or `null` — a supplied
-`false` / `0` / `''` is a value and survives) and returns the resolved payload
-that the manual, webhook, cron and `spawn` paths all fire with. So a `required`
-field with a `default` is satisfiable by a cron row carrying no payload, and the
-default is type-checked like any other value. See
+A field's `default` belongs to the contract, not the form: `validatePayload`
+fills it in for every field a firing omitted (`undefined` / `null` — a supplied
+`false` / `0` / `''` survives) and the manual, webhook, cron and `spawn` paths
+all fire with that resolved payload, so a `required` field with a `default` is
+satisfiable by a cron row carrying no payload. Defaults are type-checked like
+any other value. See
 [`payload-validator.ts`](../../packages/platform-core/src/validation/payload-validator.ts)
 and the field-by-field tour in
 [`07-trigger-varieties.wd.json`](../workflow-examples/07-trigger-varieties.wd.json).
 
 ## Workflow-level fields (the envelope)
 
-Beyond `steps` / `transitions`, the workflow envelope carries config
-that applies to the whole definition. All on `WorkflowDefinitionBaseSchema` in
+Beyond `steps` / `transitions`, on `WorkflowDefinitionBaseSchema` in
 [`workflow-definition.ts`](../../packages/platform-core/src/schemas/workflow-definition.ts).
 
 | Capability | Field | Notes |
@@ -309,14 +300,8 @@ that applies to the whole definition. All on `WorkflowDefinitionBaseSchema` in
 | Agent context preamble | `preamble` | prepended context for agent steps |
 | Git-import provenance (no runtime effect) | `source` (`WorkflowSourceSchema`, `{url, path, commit}`) | informational only — see [ADR-0009](../adr/0009-workflow-import-scope-boundary.md) |
 | Copy lineage | `copiedFrom` | namespace/name/version this WD was duplicated from |
+| Shared `/workspace` git worktree per run | `workspace.remote` (`WorkflowWorkspaceSchema`) | one worktree on branch `run/<runId>`, mounted into every step; committed per-step, never pushed |
+| Carry values into the next run | `inputForNextRun` → `/output/previous_run.json` | golden-rules §8 |
 
 The authorable surface (what the design LLM may emit) is `WorkflowAuthorableSchema`
 in the same file — server-managed and lifecycle fields are excluded by construction.
-
-## Per-run git workspace, carry-over, Databricks
-
-| Capability | Field / schema | Source |
-|-----------|----------------|--------|
-| Shared `/workspace` git worktree per run | `workspace.remote` (`WorkflowWorkspaceSchema`) | [`workflow-definition.ts`](../../packages/platform-core/src/schemas/workflow-definition.ts) |
-| Carry values into the next run | `inputForNextRun` → `/output/previous_run.json` | golden-rules §8 |
-| Databricks job step | `databricks` (`DatabricksJobConfigSchema`) | [`workflow-definition.ts`](../../packages/platform-core/src/schemas/workflow-definition.ts) |

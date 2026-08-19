@@ -8,23 +8,23 @@ fixtures, workflow config. No wellbeing check-ins, no hedging, no inflated
 complexity estimates because of medical vocabulary.
 </context>
 
-<stack>
-```
-packages/
-  platform-core/    Zod schemas, repo interfaces, in-memory test doubles
-  platform-api/     Contract + framework-free handlers
-  platform-infra/   Postgres, NextAuth session store, email (Mailgun/SMTP)
-  platform-ui/      Next.js 15 App Router (dev :9003, e2e :9007)
-  workflow-engine/  Engine, transitions, expression DSL
-  agent-runtime/    PluginRegistry, AgentRunner, Docker spawn
-  container-worker/ BullMQ worker (activated by REDIS_URL)
-  example-agent/    Reference plugin implementation
-  cli/              `mediforce` CLI (server-to-server)
-apps/  per-domain apps   docs/  strategy, vision, architecture
-```
-Inter-package imports use `@mediforce/source` TS condition → `./src/index.ts`
-in dev (no build).
-</stack>
+## Read before work
+
+- Package/app change → read its nearest `README.md` first. It owns purpose,
+  dependencies, and local invariants; follow its links for deeper mechanics.
+- Cross-package graph → [`docs/concepts/architecture.md`](docs/concepts/architecture.md).
+- Cross-cutting topic → start at [`docs/README.md`](docs/README.md). Act on
+  `living` docs and accepted/finalized ADRs. Draft/proposed material is not binding;
+  historical/superseded/deprecated material describes the past. A partially
+  superseded ADR stays binding except for the sections its successor names.
+- Domain terminology → read [`CONTEXT.md`](CONTEXT.md) only when the task changes
+  or depends on canonical terms. It is a glossary, not implementation guidance.
+- First setup → [`GETTING-STARTED.md`](GETTING-STARTED.md). Daily commands, ports,
+  env vars, and troubleshooting →
+  [`docs/start/dev-quickref.md`](docs/start/dev-quickref.md).
+
+Verify implementation claims against source. Living doc disagrees with code?
+Treat it as drift: surface it and fix it in the same task.
 
 ## Per-task workflow
 
@@ -94,32 +94,11 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    d. Spawn a subagent here to add it inline.
    Default: small + mechanical → (d); larger or architectural → (b).
 
-7. **Main thread is manager and lead architect.** Owns the outcome,
-   decomposes, delegates, narrates. Subagents are ICs doing the heavy
-   lifting (sometimes architects themselves — Plan, code-review).
-   Owning the outcome means verifying actual results, not avoiding
-   spawn to stay "safe".
-
-   - **NEVER run subagents or non-trivial bash in foreground.** ALWAYS
-     `run_in_background: true` unless it's trivial bash (`ls`, `mv`,
-     single `grep`). Foreground long work physically blocks the harness —
-     UI won't accept user messages until it returns.
-   - **Never go silent.** Decompose long work into small spawns
-     (5×3min beats 1×20min). Tell the user upfront what's spawned +
-     expected duration. Main-thread tool-calling between spawns
-     naturally produces narration. One huge spawn = dead silence.
-   - **Pick the right worker:**
-     - Long command, output IS the answer (`pnpm test`, `docker build`)
-       → `Bash(run_in_background: true)` + `Monitor`. Zero prompt-prep,
-       prefer over subagent.
-     - Multi-file exploration (>3 searches), parallel independent edits,
-       fresh-eyes review of own diff, anything that'd dump significant
-       output into main context → `Agent` subagent. Spawn parallel
-       agents in one message when work is independent. To iterate on
-       prior work with full context, `SendMessage` to the agent's ID
-       instead of new `Agent`.
-     - Heuristic: prompt-prep <30s AND task >2min → spawn. Otherwise
-       main thread does it.
+7. **Main thread owns the outcome.** Decompose, delegate independent or
+   context-heavy work, narrate progress, and verify actual results. Run long
+   commands and subagents in the background so the user can still interact.
+   Prefer small parallel tasks over one long silent task; reuse the same agent
+   when iterating on its work.
 
 8. **No new Server Actions.** Phase 2/3 of the headless-platform-API
    migration is deleting `'use server'` files; do not introduce new ones.
@@ -187,51 +166,6 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
 
 ## Skills
 
-Claude auto-loads every skill under `.claude/skills/` at session start —
-descriptions are the router, no manual table needed. Reach for one when its
-trigger phrases match the action you're about to take. List with
-`ls .claude/skills/`.
-
-For Codex: repo skills live in `skills/<name>/SKILL.md` and may be symlinked
-under `.codex/skills/` for discovery. Treat them as shared workflow
-instructions, but translate Claude-specific tool syntax instead of executing it
-literally: `Agent(...)` → Codex subagents, `Bash` / `Read` / `Edit` / `Write` /
-`Grep` / `Glob` → Codex shell and file tools, `WebFetch` → Codex web or GitHub
-tools, and `agent-browser` CLI steps → the Codex Browser plugin when available.
-Slash commands like `/new-test` mean "read and follow
-`skills/new-test/SKILL.md`".
-
-## Reminder — re-read at the top of every task
-
-1. Simplify before coding.
-2. No tech debt — small/mechanical refactor of adjacent rzeźba happens
-   in this PR, not in a follow-up issue.
-3. Test first via `/new-test` (RED → GREEN) at the lowest level with real
-   signal. L3 is the foundation for every feature.
-4. CLI > REST. `/use-mediforce` first; add the command if missing.
-5. `/self-review` as a subagent before reporting done.
-6. Ask, don't sneak, when a capability is missing.
-7. No new Server Actions. Headless handler + route adapter + `mediforce.X.Y()`.
-8. Main thread = manager + lead architect. NEVER fg subagent or
-   non-trivial bash. Decompose, narrate, verify actual output.
-9. Log non-trivial changes via `/add-changelog-entry`.
-10. `/sync-docs` before reporting done — it checks this session's diff and
-    fixes what it made untrue, in the same diff. Colocated README first,
-    then the `docs/README.md` routing table. Never a follow-up issue.
-11. No regressions. Diff OLD vs NEW user-observable behaviour on every
-    replaced read / write / endpoint / hook. Silent `.limit()` caps, silent
-    default flips, missing parity branches all count. Word them
-    "regression", never "risk".
-12. Safe defaults — a new env var/feature has a safe default or degrades
-    gracefully; deploy needs no config change; wire the whole path (code +
-    `docker-compose.prod.yml`); fail loud only on user-harming silence.
-
-See `README.md` for one-time env setup (Node, pnpm, Firebase CLI, `.env.local`).
-For the day-to-day dev loop (which `pnpm dev*` to run, test levels, CLI,
-migrations, ports, troubleshooting) see [`docs/start/dev-quickref.md`](docs/start/dev-quickref.md).
-
-**For everything else in `docs/`, read [`docs/README.md`](docs/README.md) first.**
-It is the routing table: topic → path → audience → status. Every doc declares
-`status: living | draft | historical` in its frontmatter — act on `living`, treat
-`draft` as undecided, and cite `historical` only as a record of what was true
-then.
+Skills live in `skills/<name>/SKILL.md` and are exposed to supported agents by
+their harness. When a trigger matches, read the skill and translate its tool
+names to the current harness; do not duplicate its procedure here.

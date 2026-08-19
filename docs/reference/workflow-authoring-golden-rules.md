@@ -1,33 +1,30 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-08-18
+last_reviewed: 2026-08-19
 ---
 
 # Workflow authoring rules
 
 The production checklist a finished workflow MUST satisfy, whatever authored it.
-For the *process* of creating one — which path to use, importing from git,
-validating — see [how-to-create-workflow.md](../guides/create-workflow.md).
+For the *process* of creating one see [create-workflow.md](../guides/create-workflow.md);
+for what workflows can do, mapped to source, [workflow-capabilities.md](workflow-capabilities.md);
+for the schema by example [`docs/workflow-examples`](../workflow-examples/README.md)
+and the end-to-end reference package
+[`apps/golden-standard-workflow`](../../apps/golden-standard-workflow).
 
 `MUST` = required for production. `SHOULD` = default unless documented.
-`MANUAL` = platform/package setup that lives outside `.wd.json` (Dockerfiles,
-Tool Catalog entries, Agent Definition bindings, secrets).
+`MANUAL` = platform setup that lives outside `.wd.json` (Dockerfiles, Tool
+Catalog entries, Agent Definition bindings, secrets).
 
-Learn the schema from the tutorial examples in
-[`docs/workflow-examples`](../workflow-examples/README.md) and the end-to-end
-reference package [`apps/golden-standard-workflow`](../../apps/golden-standard-workflow).
-For the map of what workflows can do (actions, fan-out, expression languages,
-human UI, scripts, models) to the source files that define each, see
-[workflow-capabilities.md](workflow-capabilities.md).
 Examples are tutorials, not copy-paste templates: production workflows SHOULD
 move substantial runtime code out of inline scripts and into pinned package
 files/images.
 
 ## 1. Package The Workflow
 
-Keep production workflows in repo folders. Use private repos unless the workflow
-is intentionally public. The canonical layout is
+Keep production workflows in repo folders — private unless the workflow is
+intentionally public. The canonical layout is
 [`apps/golden-standard-workflow`](../../apps/golden-standard-workflow):
 
 ```text
@@ -39,38 +36,25 @@ workflow-repo/
   skills/my-skill/SKILL.md
   scripts/
   mcp/
+  setup/            # MANUAL: Tool Catalog entry + Agent Definition (§7)
 ```
 
 `README.md` MUST document: env vars, secrets, Agents, MCPs, Docker images,
 registration/import steps, output contracts, and a known-good input.
 
-The layout above is the **single-workflow repo** case (package == repo root).
-For a repo holding **several** workflows, keep one subfolder per workflow
-(`<workflow-name>/README.md`, `<workflow-name>/src/<workflow-name>.wd.json`,
-`<workflow-name>/Dockerfile`, …) and hoist a single `workflows-index.json` to the
-repo root listing every workflow with repo-root-relative `path`s
-(`<workflow-name>/src/…`).
+That is the **single-workflow repo** case (package == repo root). A repo holding
+**several** workflows keeps one subfolder per workflow (`<name>/README.md`,
+`<name>/src/<name>.wd.json`, `<name>/container/Dockerfile`, …) and one
+`workflows-index.json` at the top listing all of them.
 
-`workflows-index.json` SHOULD exist for standalone workflow repos that are
-imported via Git browse mode. Each `path` is relative to the repo root and must point at the
-`.wd.json`:
-
-```json
-{
-  "workflows": [
-    {
-      "name": "my-workflow",
-      "path": "src/my-workflow.wd.json",
-      "description": "Short operational description",
-      "tags": ["domain"]
-    }
-  ]
-}
-```
+`workflows-index.json` SHOULD exist for repos imported via Git browse mode. Each
+`path` points at a `.wd.json` relative to the **source root** — the repo root, or
+the subdirectory a `/tree/<ref>/<dir>` URL pointed at. Manifest format:
+[`import-from-git.md`](../guides/import-from-git.md#workflows-indexjson-manifest-format).
 
 Git import is a one-time copy of public GitHub repos and stores
 `source: { url, path, commit }` as provenance only — it does not drive runtime.
-See [how-to-create-workflow.md](../guides/create-workflow.md#import-from-git) and
+See [create-workflow.md](../guides/create-workflow.md#import-from-git) and
 [`import-from-git.md`](../guides/import-from-git.md).
 
 ## 2. Pin Runtime Sources
@@ -78,7 +62,7 @@ See [how-to-create-workflow.md](../guides/create-workflow.md#import-from-git) an
 MUST (once you build a custom image or pin sources):
 
 - Pin `externalSkillsRepo.commit`.
-- Pin step Docker build `repo + commit + dockerfile`.
+- Pin step Docker build `repo` + `commit` + `dockerfile`.
 - Avoid `latest` image tags outside local development.
 - Register/import a new workflow version for every released change.
 
@@ -101,39 +85,16 @@ or deterministic scripts baked into the image. Once you do, the pinning rules in
 Dockerfiles MUST NOT contain secrets, graph semantics, triggers, transitions,
 permissions, MCP grants, or deployment-specific endpoints.
 
-Concrete package example:
+A Dockerfile is `FROM mediforce-golden-image` plus only what the step actually
+needs — pinned `apt-get` / `pip install`, `COPY scripts/`, `COPY mcp/`,
+`WORKDIR /workspace`. Working example and the assets it copies in:
+[`container/Dockerfile`](../../apps/golden-standard-workflow/container/Dockerfile),
+[`scripts/`](../../apps/golden-standard-workflow/scripts),
+[`mcp/`](../../apps/golden-standard-workflow/mcp). To push a prebuilt image to a
+registry instead of the auto-build path, see
+[`docker-image-setup.md`](../guides/docker-image-setup.md).
 
-- Dockerfile: [`apps/golden-standard-workflow/container/Dockerfile`](../../apps/golden-standard-workflow/container/Dockerfile)
-- Scripts copied into the image: [`apps/golden-standard-workflow/scripts`](../../apps/golden-standard-workflow/scripts)
-- MCP executable copied into the image: [`apps/golden-standard-workflow/mcp`](../../apps/golden-standard-workflow/mcp)
-
-To push a prebuilt image to a registry instead of the auto-build path, see
-[`how-to/docker-image-setup.md`](../guides/docker-image-setup.md).
-
-Dockerfile pattern (everything after `FROM` is optional — include only what the
-step actually needs):
-
-```dockerfile
-FROM mediforce-golden-image
-
-# optional — only if a step needs OS packages
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends jq ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# optional — pinned language packages (incl. MCPs published as pip packages)
-RUN pip install --no-cache-dir --break-system-packages \
-    "pydantic==2.11.7"
-
-# optional — only if you ship workflow scripts
-COPY scripts/ /opt/my-workflow/scripts/
-# optional — only if you bake an MCP executable into the image
-COPY mcp/ /opt/my-workflow/mcp/
-
-WORKDIR /workspace
-```
-
-Workflow step using that Dockerfile in build mode:
+The step fields that select build mode:
 
 ```json
 {
@@ -150,7 +111,11 @@ Use `repoAuth` for private Docker build contexts.
 
 ## 4. Wire Skills Explicitly
 
-Workflow-specific skills SHOULD live in the workflow package.
+Workflow-specific skills SHOULD live in the workflow package: pin
+`externalSkillsRepo` at workflow level, and point the step at `agent.skill` plus
+`agent.skillsDir` (the skills folder's path inside that repo). Use a separate
+skills repo only when the skills are shared products with their own release
+process.
 
 ```json
 {
@@ -158,15 +123,9 @@ Workflow-specific skills SHOULD live in the workflow package.
     "url": "https://github.com/acme/workflow-repo.git",
     "commit": "0123456789abcdef0123456789abcdef01234567"
   },
-  "agent": {
-    "skill": "my-skill",
-    "skillsDir": "my-workflow/skills"
-  }
+  "agent": { "skill": "my-skill", "skillsDir": "my-workflow/skills" }
 }
 ```
-
-Use a separate skills repo only when the skills are shared products with their
-own release process.
 
 ## 5. Choose Control Mode, Executor, Type
 
@@ -183,12 +142,12 @@ of truth — the load-bearing rules are:
   agent approve/revise loop.
 - **CM4 Autonomous** (`executor: agent`, `autonomyLevel: L4`) for unsupervised
   advance after prior constraints/approval.
-- Do **not** create new CM1/L2 ("Assist") steps — backward compatibility only.
+- Do **not** create new CM1/L2 ("Assist") steps — the mode is disabled in the
+  picker and L2 is retained for backward compatibility only.
 
 `executor` and step `type` are schema enums in
-[`workflow-definition.ts`](../../packages/platform-core/src/schemas/workflow-definition.ts)
-(`executor: 'human' | 'agent' | 'script' | 'cowork' | 'action'`,
-`type: 'creation' | 'review' | 'decision' | 'terminal'`). Pick by intent:
+[`workflow-definition.ts`](../../packages/platform-core/src/schemas/workflow-definition.ts).
+Pick by intent:
 
 | Executor | Use for |
 |----------|---------|
@@ -213,11 +172,10 @@ business verdicts.
 
 MUST:
 
-- Never commit real secrets.
-- Never bake secrets into Docker images.
+- Never commit real secrets, and never bake them into Docker images.
 - Put non-secret deployment config in workflow or step `env`.
-- Put credentials in workflow or namespace secrets.
-- Reference secrets through `{{SECRET_NAME}}` templates.
+- Put credentials in workflow or namespace secrets, referenced as `{{NAME}}`
+  (or the namespaced `{{SECRET:name}}` form used by Tool Catalog entries).
 - Explain every variable in the package README.
 
 README env contract:
@@ -234,62 +192,27 @@ Example: [`06-env-secrets-databricks.wd.json`](../workflow-examples/06-env-secre
 Installing an MCP executable in Docker makes it runnable. It does not make it
 visible, reviewable, scoped, or auditable in Mediforce.
 
-`MANUAL`: Workflow Designer can reference `agentId` and `mcpRestrictions`, but
-Tool Catalog entries and Agent Definition MCP bindings are platform setup.
+`MANUAL`: a workflow can reference `agentId` and `mcpRestrictions`, but Tool
+Catalog entries and Agent Definition MCP bindings are platform setup.
 
 MUST for governable MCPs:
 
 1. Add the executable to the Docker image if runtime needs it.
-2. Add a namespace Tool Catalog entry in `/{handle}/admin/tool-catalog`.
-3. Bind that catalog entry to an Agent Definition.
-4. Set Agent binding `allowedTools` when only some tools are needed.
+2. Add a namespace Tool Catalog entry in `/{handle}/admin/tool-catalog` — shape:
+   [`setup/tool-catalog-entry.json`](../../apps/golden-standard-workflow/setup/tool-catalog-entry.json).
+3. Bind that entry to an Agent Definition through `mcpServers.<name>.catalogId` —
+   [`setup/agent-definition.json`](../../apps/golden-standard-workflow/setup/agent-definition.json).
+4. Set the binding's `allowedTools` when only some tools are needed.
 5. Reference the Agent from workflow steps with `agentId`.
-6. Narrow per-step access with `mcpRestrictions` only.
+6. Narrow per-step access with `mcpRestrictions` only (subtractive) — see the
+   `agent-review` step in
+   [`golden-standard-workflow.wd.json`](../../apps/golden-standard-workflow/src/golden-standard-workflow.wd.json).
 7. Document setup, secrets, OAuth/scopes, and affected steps in `README.md`.
 
-Tool Catalog entry:
-
-```json
-{
-  "id": "golden-standard-readonly-context",
-  "command": "python",
-  "args": ["/opt/golden-standard/mcp/readonly_context_mcp.py"],
-  "env": { "CONTEXT_TOKEN": "{{SECRET:CONTEXT_TOKEN}}" },
-  "description": "Read-only context MCP."
-}
-```
-
-Agent Definition binding:
-
-```json
-{
-  "mcpServers": {
-    "readonly-context": {
-      "type": "stdio",
-      "catalogId": "golden-standard-readonly-context",
-      "allowedTools": ["read_context", "list_context"]
-    }
-  }
-}
-```
-
-Workflow step restriction:
-
-```json
-{
-  "agentId": "golden-standard-reviewer",
-  "mcpRestrictions": {
-    "readonly-context": { "denyTools": ["write_context"] }
-  }
-}
-```
-
-Do not put MCP definitions inside workflow step `agent` or `cowork` config in
-new workflows. Those step-level fields are deprecated. `AgentDefinition.mcpServers`
-is current.
-
-HTTP MCPs can be bound directly on the Agent Definition. Stdio MCPs SHOULD use
-Tool Catalog entries.
+HTTP MCPs can be bound directly on the Agent Definition; stdio MCPs SHOULD use
+Tool Catalog entries. Do not put MCP definitions inside workflow step `agent` or
+`cowork` config in new workflows — those step-level fields are deprecated,
+`AgentDefinition.mcpServers` is current.
 
 ## 8. Define Data Contracts
 
@@ -310,20 +233,21 @@ MUST require writing `/output/result.json`.
 
 ## 9. Review, Failure, Validation
 
-Use CM3/L3 for Mediforce's built-in agent approve/revise loop. L3 revision
-currently keys off literal `approve` and `revise`; custom verdict keys belong
-on a separate human `type: review` step (a current, non-deprecated step type).
+Use CM3/L3 for Mediforce's built-in agent approve/revise loop. L3 revision keys
+off the literal `approve` and `revise` verdicts; custom verdict keys belong on a
+separate human `type: review` step.
 
 Human review steps MUST define explicit `verdicts`. Use `requiresComment: true`
 for revise/reject-style verdicts.
 
 Default failure behavior SHOULD be fail-fast. Use `continueOnError: true` only
-for non-critical side effects that may fail while the run continues.
+for non-critical `action` steps that may fail while the run continues — it is
+the only executor whose runtime honours the flag.
 
-Verify before sharing by working up the four gates — schema validation,
-workflow readiness check, Dry Run, Run — each of which answers a different
-question. See [`how-to/verify-a-workflow.md`](../guides/verify-a-workflow.md) and
-[how-to-create-workflow.md](../guides/create-workflow.md#verify-before-sharing).
+Verify before sharing by working up the four gates — schema validation, workflow
+readiness check, Dry Run, Run — each answering a different question. See
+[`verify-a-workflow.md`](../guides/verify-a-workflow.md) and
+[create-workflow.md](../guides/create-workflow.md#verify-before-sharing).
 
 Production-ready checklist:
 

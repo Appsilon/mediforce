@@ -1,29 +1,43 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-08-06
+last_reviewed: 2026-08-19
 ---
 
 # Import workflows from git
 
-Import copies a workflow definition (`.wd.json`) from a GitHub repository into a
-namespace and registers it as a normal versioned Workflow Definition. It is a
-**one-time copy** — there is no live link back to the repo and no automatic sync
-(see [ADR-0009](../adr/0009-workflow-import-scope-boundary.md)).
+Import copies a workflow definition (`.wd.json`) from a public GitHub repository
+into a namespace and registers it as a normal versioned Workflow Definition. It
+is a **one-time copy** — no live link back to the repo, no automatic sync (see
+[ADR-0009](../adr/0009-workflow-import-scope-boundary.md)).
 
-Two entry points:
+Import runs the same handler as `mediforce workflow register`, so anything that
+registers also imports: every step type, both image modes (prebuilt `image` and
+build-mode `repo` + `commit` + `dockerfile`), and fields like
+`externalSkillsRepo` / `workspace.remote` are copied verbatim. A top-level
+`namespace` in the file is ignored — the import target namespace wins.
+
+## Entry points
 
 - **UI** — workspace home → *Import from git*. Either **Browse** a repo's
   `workflows-index.json` manifest and pick workflows, or **Import by path** by
-  pasting the path to a single `.wd.json`.
-- **CLI** — `pnpm exec mediforce workflow import --repo <url> --path <file> --namespace <ns> [--ref <branch|tag|sha>]`.
+  pasting the path to a single `.wd.json`. Browse imports each selected workflow
+  as its own import; if one fails the batch stops and the earlier ones stay
+  imported. A workspace with no workflows yet also gets *Import example
+  workflows*, which skips the repo question and browses this repo's manifest.
+- **CLI** — one file per invocation:
 
-Both call the same handler as `mediforce workflow register`, so a file that
-registers will also import.
+```bash
+pnpm exec mediforce workflow import \
+  --repo <url> --path <file> --namespace <ns> [--ref <branch|tag|sha>]
+```
 
-## What gets recorded
+Both accept a repository URL or a GitHub `/tree/<ref>[/<directory>]` URL,
+including refs containing `/`.
 
-Each imported definition stores a provenance record:
+## Provenance
+
+Each imported definition stores:
 
 ```jsonc
 "source": {
@@ -33,49 +47,31 @@ Each imported definition stores a provenance record:
 }
 ```
 
-`--ref` selects *what* to import; it is resolved to an immutable commit SHA at
-import time, and the file is fetched at that SHA. It defaults to the ref in a
-GitHub tree URL, or `main` for a repository URL. Only the resolved `commit` is
-stored — the moving ref is not.
+`--ref` selects *what* to import. It defaults to the ref in a tree URL, or `main`
+for a repository URL, and is resolved to an immutable commit SHA before the file
+is fetched — so only the resolved `commit` is stored, never the moving ref.
 
-Provenance is normalised: importing through a tree URL records the canonical
-repository and a repo-root-relative `path`, not the pasted URL and its
-directory-relative path. So `url` + `path` + `commit` locates the exact file
-forever, whatever shape was pasted.
+Provenance is normalised: a pasted tree URL is recorded as the canonical
+repository plus a repo-root-relative `path`, so `url` + `path` + `commit` locates
+the exact file forever, whatever shape was pasted. It is a record only — nothing
+at runtime reads it.
 
-## Supported
+## Prerequisites and limits
 
-- **Public GitHub repos**, one `.wd.json` per import.
-- Browse via a `workflows-index.json` manifest at the repository root or at the
-  end of a GitHub `/tree/<ref>/<directory>` URL, including refs containing `/`
-  and a branch-root `/tree/<ref>`, or import a single file by path.
-- Files that declare a top-level `namespace` — it is ignored; the import target
-  namespace wins (parity with `workflow register`).
-- Any step the schema accepts: `human`, `agent` (`claude-code-agent`), `script`
-  (`script-container`, `databricks-job`), `cowork`, `action`.
-- Both image modes: prebuilt (`image`) and build-mode (`repo` + `commit` +
-  `dockerfile`). `externalSkillsRepo` and `workspace.remote` are preserved
-  verbatim.
-
-## Not supported / prerequisites
-
-- **Private repos** — no auth header is sent, so a private repo returns 404.
-- **Non-GitHub hosts** (GitLab, Bitbucket, self-hosted) are rejected.
-- **No live sync** — to pick up upstream changes, re-import (creates a new
-  version).
+- **Public GitHub only.** No auth header is sent, so a private repo returns 404;
+  non-GitHub hosts (GitLab, Bitbucket, self-hosted) are rejected.
+- **No sync.** Re-import to pick up upstream changes — that creates a new version.
 - **Secrets are not carried.** Importing succeeds, but running needs the
   workflow's secrets set in the target namespace first (e.g. `GITHUB_TOKEN`,
   `OPENROUTER_API_KEY`, `CDISC_API_KEY`) — exactly as with `register`. Import
   success does not imply run-readiness.
 - **Base images** (e.g. `mediforce-golden-image`) must exist on the platform;
   build-mode images are built at run start.
-- Deprecated fields (top-level `repo`, step-level `mcpServers`) are still parsed
-  but will stop importing cleanly once removed.
 
 ## `workflows-index.json` manifest format
 
-To make a repo or repository subdirectory browsable in the UI, add a
-`workflows-index.json` at the selected source root:
+To make a repository — or a subdirectory reached through a tree URL — browsable
+in the UI, add a `workflows-index.json` at that source root:
 
 ```jsonc
 {
@@ -91,9 +87,9 @@ To make a repo or repository subdirectory browsable in the UI, add a
 }
 ```
 
-`workflows-index.json` is the canonical name. `index.json` — the name manifests
-were published under before it — is still read when no `workflows-index.json`
-exists at the source root, so an existing repo stays browsable without being
+Each `path` is relative to that source root. `index.json` — the name manifests
+were published under before `workflows-index.json` — is still read when the
+canonical name is absent, so an existing repo stays browsable without being
 republished. Only a 404 falls back; a rate limit or server error is reported as
 itself.
 

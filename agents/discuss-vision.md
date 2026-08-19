@@ -43,7 +43,7 @@ Read all design files at the start to understand current state
 - `docs/concepts/architecture.md` — technical architecture
 - `docs/concepts/how-we-work.md` — how the team operates
 - `docs/adr/README.md` — decisions already made
-- `docs/design/` — in-flight design notes
+- `docs/research/` — explored shapes that are deferred, not yet decided
 
 ## Usage Scenarios
 

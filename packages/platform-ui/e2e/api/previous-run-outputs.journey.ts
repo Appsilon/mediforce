@@ -6,7 +6,7 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
  * the HTTP API only — no browser.
  *
  * Uses a Docker-free WD (single params-form human step) so the journey runs
- * fast and on CI without a daemon. The shipped `docs/reference/examples/previous-run-example.wd.json`
+ * fast and on CI without a daemon. The shipped `docs/workflow-examples/12-previous-run.wd.json`
  * uses a proper script + form pair; this journey asserts the core mechanism,
  * not the fancier demo.
  *

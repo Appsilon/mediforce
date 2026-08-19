@@ -13,19 +13,6 @@ workflow MUST satisfy, see
 
 ## Pick an authoring path
 
-### Workflow Designer (default)
-
-1. Open **Workflow Designer** in Mediforce.
-2. Describe the workflow goal, actors, inputs, outputs, review points, and
-   failure behavior.
-3. Let Workflow Designer draft the `.wd.json`, render the diagram, and validate
-   the schema.
-4. Add any platform/package setup the designer flags as manual: Dockerfiles,
-   scripts, skills, Tool Catalog entries, Agent Definition MCP bindings, and
-   secrets. See the golden rules for what each of these requires.
-5. Register or import the workflow as a new version.
-6. Run a dry run with a known-good input.
-
 ### AI Assistant (in the canvas)
 
 The Workflow Designer canvas has a built-in **AI Assistant** pane — describe the
@@ -92,11 +79,24 @@ What the skill does for you:
 The skill does **not** run `git commit` / `push` for you and never targets
 production — you own the commit and the SHA.
 
-### Hand-authoring
+### By hand — blocks on the canvas
 
-Use it only when building a reusable workflow package, maintaining built-in
-apps, or adding package assets that Workflow Designer cannot create yet. Follow
-the package layout, pinning, and validation rules in the golden rules.
+**Workflows → New Workflow** opens the Workflow Designer canvas on a starter
+template. Add blocks with **Add Block** (or the **+** on an edge to insert
+between two steps), choose the step type and executor in the picker, and set the
+block's fields in the step editor; **Workflow source code** shows the same
+unsaved workflow as `.wd.json`. Reach for it when you want precise control over
+one block. Which executor a block should be is decided in
+[golden rules §5](../reference/workflow-authoring-golden-rules.md#5-choose-control-mode-executor-type).
+Nothing is persisted until you **Save** (or **Save & Dry Run** / **Save & Start
+Run**).
+
+### By hand — the package files
+
+Write the `.wd.json` and its package yourself only when building a reusable
+workflow package, maintaining built-in apps, or adding package assets that
+Workflow Designer cannot create yet. Follow the package layout, pinning, and
+validation rules in the golden rules.
 
 ## Learn the schema from examples
 
@@ -161,7 +161,7 @@ GitHub repos only. Re-import to create a new version. The recorded
 cloning, Docker builds, skills, or sync.
 
 Full reference, including the `workflows-index.json` manifest and CLI flags:
-[`how-to/import-from-git.md`](import-from-git.md).
+[`import-from-git.md`](import-from-git.md).
 
 ## Verify before sharing
 
@@ -169,7 +169,7 @@ Four checks answer four different questions — schema validation, the workflow
 readiness check, a Dry Run, and a Run. Which one you want depends on what you
 are asking; only a real Run answers "is the output any good?". The full ladder,
 and how to reach each rung, is in
-[`how-to/verify-a-workflow.md`](verify-a-workflow.md).
+[`verify-a-workflow.md`](verify-a-workflow.md).
 
 Start with schema validation — it exits non-zero and lists structured errors
 when the definition is invalid:

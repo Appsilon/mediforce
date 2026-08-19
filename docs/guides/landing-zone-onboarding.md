@@ -1,120 +1,112 @@
 ---
 status: living
 audience: operators
-last_reviewed: 2026-04-29
+last_reviewed: 2026-08-19
 ---
 
 # Landing Zone — onboarding a new study
 
-## Audience
+For a data manager registering one new clinical-trial study against an already-deployed Mediforce platform.
 
-You are a data manager about to onboard a new clinical-trial study to the Mediforce Landing Zone. This guide assumes the platform itself is already deployed — your task is to register one new study against it.
+Prerequisite: the `mediforce-landing-zone:latest` image exists on the platform host (`scripts/rebuild-docker-images.sh` builds it). All studies share it — build once, not per study.
 
-## Pattern
+## One repo per study
 
-**One GitHub repository per study.** Each study has a dedicated repo that holds the study's contract (`config.yaml`), its CODEOWNERS for review, and templates for future cleaning rules. The canonical example is [`Appsilon/mediforce-landing-zone-study-demo`](https://github.com/Appsilon/mediforce-landing-zone-study-demo) — the demo for `CDISCPILOT01`.
+Each study gets its own GitHub repo holding the contract (`config.yaml`), the study-owned validation layer (`validation-rules.yaml`, `validate_custom.R`), `templates/`, and `CODEOWNERS`. Data managers own that repo; engineers own the platform monorepo. Separate repos keep review cadence, sign-off, and audit trail per study.
 
-Why per-study, not per-namespace or monorepo:
+Canonical example: [`Appsilon/mediforce-landing-zone-study-demo`](https://github.com/Appsilon/mediforce-landing-zone-study-demo) — the demo for `CDISCPILOT01`. Fork it for every new study.
 
-- **Separation of concerns.** Data managers own the study contract. Engineers own the platform. They evolve at different rates and need different review cadences.
-- **Granular CODEOWNERS.** Each study can require sign-off from the specific data managers responsible for it without coupling them to every other study's reviews.
-- **Self-contained audit trail.** The contract changes for one study live in one place; rolling back or auditing is straightforward.
-- **Forkable template.** New studies start from a copy of the demo repo, so the layout stays consistent.
+## 1. Create the study repo
 
-## Steps
+GitHub UI → "Use this template" on the demo repo. Name it `mediforce-landing-zone-{study-id}` (lowercase, e.g. `mediforce-landing-zone-cdiscpilot02`). Public unless the sponsor requires otherwise.
 
-### 1. Create a new GitHub repository from the demo
+## 2. Edit `config.yaml`
 
-Either use the demo as a template (GitHub UI: "Use this template") or copy the structure manually. Suggested name:
+- `studyId`, `title`, `sponsor`, `cro`
+- `contract.timeline` — enrollment start, last-patient-last-visit, database lock, submission target, `currentPhase`
+- `contract.expectedDeliveries[]` — per delivery type: `cadence` (`weekly` / `monthly` / `ad-hoc`), `day`, `slaHours`, `requiredDomains`
+- `sftp` — leave `host: host.docker.internal` and the other fields as placeholders; the real CRO endpoint belongs in workflow secrets, never in this file
+- `validation` — `standard`, `igVersion`, `rulesets`, `defineXml`, `routerThresholds`, `customRules`
 
-```
-mediforce-landing-zone-{STUDY_ID}
-```
+No runtime step reads `config.yaml` today — it is the human-readable contract. The executable copy is the workflow definition's `env` block (step 5), so keep the two in sync: `requiredDomains` → `EXPECTED_DOMAINS`, `validation.standard` → `VALIDATION_STANDARD`, `validation.igVersion` → `VALIDATION_IG_VERSION`, `studyId` → `STUDY_ID`.
 
-with `{STUDY_ID}` lowercased (e.g. `mediforce-landing-zone-cdiscpilot02`). Make the repo public unless the sponsor requires otherwise.
+## 3. Keep the study validation layer
 
-### 2. Edit `config.yaml`
+`validate_custom.R` and `validation-rules.yaml` stay in the repo — the workflow clones it to `/workspace`, and the `validate-custom` step reads both from there. If either is missing, that step emits a failure envelope instead of findings. Start from the demo's copies and `templates/validation-rules.template.yaml`.
 
-In the new repo, update `config.yaml`:
+## 4. Set CODEOWNERS
 
-- `studyId` — the canonical identifier (uppercase, must match the workflow definition's env var).
-- `title` — full study title.
-- `sponsor` and `cro` — names.
-- `contract.expectedDeliveries[]` — cadence (`weekly`, `monthly`, `ad-hoc`), day, and required SDTM/ADaM domains for each expected delivery type.
-- `sftp.host` — leave as `host.docker.internal` placeholder; the **real** CRO host belongs in workflow secrets, not in this file.
-- `validation.standard` / `igVersion` / `rulesets` — pick the validation profile matching the study phase.
-
-### 3. Set CODEOWNERS
-
-Replace the placeholder in `CODEOWNERS` with the team handle for the data managers responsible for this study, e.g.:
+Replace the placeholder with the team handle for the responsible data managers:
 
 ```
 * @appsilon/data-managers-cdiscpilot01
 ```
 
-GitHub will then auto-request review from that team on every PR that touches `config.yaml`.
+GitHub then auto-requests their review on every PR touching the contract — including the rules PRs the workflow opens itself.
 
-### 4. Create the workflow definition
+## 5. Create the workflow definition
 
-In the Mediforce platform UI (or by editing a JSON file in the platform monorepo), create a workflow definition for the study. The fastest path is to copy `apps/landing-zone/src/landing-zone-CDISCPILOT01.wd.json` and adjust:
+Copy `apps/landing-zone/src/landing-zone-CDISCPILOT01.wd.json` and adjust:
 
-- `name` — `landing-zone-{STUDY_ID}` (lowercase study id)
+- `name` — `landing-zone-<STUDY_ID>`, study id verbatim (uppercase, as in the demo); the filename follows
 - `title` and `description` — study-specific
-- `env.STUDY_ID` and the `*_<STUDY_ID>` secret refs
-- `workspace.remote` — `"{org}/{repo}"`, e.g. `"Appsilon/mediforce-landing-zone-cdiscpilot02"`
-- `workspace.remoteAuth` — `"GITHUB_TOKEN"` (this is the **name** of a workflow secret, not the token itself)
+- `env.STUDY_ID`, `env.EXPECTED_DOMAINS`, `env.VALIDATION_*`, and the `{{SECRET_<STUDY_ID>}}` refs
+- `workspace.remote` — `"{org}/{repo}"` from step 1
+- `workspace.remoteAuth` — `"GITHUB_TOKEN"` (the **name** of a secret, not the token itself)
 
-### 5. Configure workflow secrets
+## 6. Set workflow secrets
 
-Workflow secrets are scoped **per-WD** (per workflow definition), not per-namespace. In the platform UI, on the workflow definition's secrets page, set:
-
-- `SFTP_HOST_<STUDY_ID>` — real CRO SFTP hostname
-- `SFTP_USER_<STUDY_ID>` — SFTP username
-- `SFTP_PASS_<STUDY_ID>` — SFTP password / key passphrase
-- `GITHUB_TOKEN` — a Personal Access Token (or fine-grained token) with `repo` scope on the study repo, so the runtime can clone configs and (in v0.2) push cleaning-rule PRs
-
-Each new study needs its own secrets — they do not share across studies.
-
-### 6. Register the workflow definition
-
-Use the CLI to register the WD against the running platform:
+Secrets are scoped per workflow definition:
 
 ```bash
-mediforce workflow register \
-  --file apps/landing-zone/src/landing-zone-{study-id}.wd.json \
+pnpm exec mediforce secret set \
   --namespace <namespace> \
-  --base-url http://127.0.0.1:9003
+  --workflow landing-zone-<STUDY_ID> \
+  --key SFTP_PASS_<STUDY_ID> --stdin
 ```
 
-Replace `--base-url` with the production endpoint when registering against the deployed platform.
+| Secret | Value |
+|---|---|
+| `SFTP_HOST_<STUDY_ID>`, `SFTP_USER_<STUDY_ID>`, `SFTP_PASS_<STUDY_ID>` | Real CRO SFTP endpoint and credentials |
+| `CRO_CONTACT_EMAIL_<STUDY_ID>` | Recipient of the rejection email |
+| `DATA_MANAGER_EMAIL_<STUDY_ID>` | `replyTo` on that email |
+| `GITHUB_TOKEN` | Token with `contents:write` + `pull-requests:write` on the study repo — clones the config and pushes rules PRs |
+| `OPENROUTER_API_KEY` | Model access for the agent steps |
 
-### 7. Verify with a manual run
+Study-suffixed secrets are per study and never shared. The two unsuffixed ones can be set workspace-level (omit `--workflow`) so every study reuses them.
 
-Trigger a manual run to confirm the SFTP poll → validate → human-review pipeline works end-to-end:
+## 7. Register the workflow definition
 
 ```bash
-mediforce run start \
-  --workflow landing-zone-{study-id} \
-  --base-url http://127.0.0.1:9003
+pnpm exec mediforce workflow register \
+  --file apps/landing-zone/src/landing-zone-<STUDY_ID>.wd.json \
+  --namespace <namespace>
 ```
 
-Watch the run in the UI. The first poll should list whatever is currently on the CRO SFTP; if there are deliveries, validation should run and produce an HTML report for human review.
+Add `--base-url <url>` to target a deployed platform (default `http://localhost:9003`); `--dry-run` schema-checks the file without calling the API.
+
+## 8. Verify with a manual run
+
+```bash
+pnpm exec mediforce run start \
+  --workflow landing-zone-<STUDY_ID> \
+  --namespace <namespace>
+```
+
+Watch the run in the UI. The first poll lists whatever is currently on the CRO SFTP; if there are new files, CDISC validation and the study's R rules run, and an HTML report lands in the human-review task.
 
 ## What stays in the platform monorepo
 
-The study repo only owns the **contract** and **config**. Everything else stays in the platform monorepo (`Appsilon/mediforce`):
+The study repo owns the contract and its validation rules. Everything else is a platform-engineering change in `Appsilon/mediforce`:
 
-- Skills (the prompts agents run): `apps/landing-zone/plugins/landing-zone/skills/`
-- Scripts (SFTP poll, validate, accept-delivery): `apps/landing-zone/scripts/`
-- Container Dockerfile and image build: `apps/landing-zone/Dockerfile`
-- Plugin code (the runtime container plugin): `apps/landing-zone/plugins/landing-zone/`
-- Workflow definitions: `apps/landing-zone/src/*.wd.json`
+- `apps/landing-zone/scripts/` — SFTP poll, CDISC validation, custom-validation wrapper, accept-delivery, rules PR
+- `apps/landing-zone/plugins/landing-zone/skills/` — agent prompts (`data-validator`, `draft-rejection-note`, `propose-rules`)
+- `apps/landing-zone/container/Dockerfile` — the shared image
+- `apps/landing-zone/src/*.wd.json` — workflow definitions
 
-Updating any of these is a platform-engineering change, not a data-manager change. Updating `config.yaml` is the reverse — a data-manager change with no platform code involved.
+## Audit trail and the rules loop
 
-## v0.1 limitations and v0.2+ roadmap
+- Each run commits its step outputs and human verdicts to a `run/<runId>` branch in a bare repo on the platform host. Those branches are never pushed — the study repo only ever receives rules PRs.
+- After a rejection the workflow drafts a CRO note, emails it, then proposes new `validation-rules.yaml` entries for human approval; approving opens a PR against the study repo's `main`.
 
-See [`apps/landing-zone/FUTURE.md`](../../apps/landing-zone/FUTURE.md) for the full roadmap. Highlights relevant to onboarding:
-
-- **v0.1**: per-run audit trails (one branch per workflow run, with every script output and human verdict committed) accumulate inside the platform host's local bare repo. They do **not** push to the study GitHub repo.
-- **v0.2**: cleaning-rules-PR pattern. A new step in the workflow will detect deterministic value mismatches (e.g. `NY` vs `New York`), generate a feature branch on the study repo, and open a pull request proposing the mapping rule. Reviewing data managers approve or reject; merged rules feed back into validation. The `templates/cleaning-rule.template.yaml` file in the study repo is the placeholder for that shape.
+Roadmap: [`apps/landing-zone/FUTURE.md`](../../apps/landing-zone/FUTURE.md).

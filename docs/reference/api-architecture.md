@@ -1,143 +1,112 @@
 ---
 status: living
 audience: engineers
-last_reviewed: 2026-07-22
+last_reviewed: 2026-08-19
 ---
 
 # Mediforce API code architecture
 
-How API code is organised across packages, what the layers do, and why
-the headless platform separates them this way. Companion to product-level
-[`architecture.md`](../concepts/architecture.md) (which documents Steps, Processes,
-Autonomy levels — the *what*), this doc covers the *how*: the runtime
-shape of code that serves an API request.
-
-> Living doc. Architecture decisions land in
-> [`docs/adr/`](../adr/); this file describes the current implementation so
-> contributors can navigate it without re-deriving the pattern. Update
-> alongside ADR changes.
+How an API request is served: which package holds what, and where the boundary
+between framework code and business logic sits. Companion to
+[`architecture.md`](../concepts/architecture.md) — that doc covers the domain
+(Steps, Processes, Autonomy levels), this one covers the runtime shape of the
+code.
 
 ## The split
 
-Two layers with different concerns:
+**Handler** — `(input, scope) => Promise<output>`. Framework-free: no HTTP, no
+Next.js, no JSON, no Postgres. Receives already-parsed input and an
+already-authenticated, scoped data-access bag. Throws `HandlerError`. Lives in
+`packages/platform-api/src/handlers/<domain>/`.
 
-- **Handler** — pure, framework-free function. `(input, scope) => Promise<output>`.
-  Knows nothing about HTTP, Next.js, or JSON. Pure business logic over a
-  typed input and scoped data-access. Lives in
-  `packages/platform-api/src/handlers/`.
+**Adapter** — translates between the two worlds. Resolves the caller, parses the
+request into the input shape, builds `scope`, calls the handler, serializes the
+result, maps thrown errors to HTTP status codes. Lives in
+`packages/platform-ui/src/lib/route-adapter.ts`.
 
-- **Adapter** — boundary translator between HTTP-land and handler-land.
-  Takes a `NextRequest`, parses JSON body + path params into the input
-  shape, builds `scope` from the authenticated caller, calls the handler,
-  serializes output back to a `NextResponse`. Errors become HTTP status
-  codes. Lives in `packages/platform-ui/src/lib/route-adapter.ts`
-  (`createRouteAdapter`).
+Ports-and-adapters: the handler is the application core, the Next.js route is
+one presentation layer. Adding a consumer — standalone HTTP server, MCP tool,
+in-process CLI call — means wrapping the same handler from outside. The handler
+file does not change.
 
-```
-HTTP world                     Adapter                    Handler world
-─────────────                  ───────                    ─────────────
-NextRequest                    parse JSON                 input: ParsedInput
-URL path params       ─────►   extract path     ─────►    scope: CallerScope
-Authorization header           build scope                ↓
-                                                          (pure logic)
-                                                          ↓
-NextResponse (JSON)   ◄─────   serialize         ◄─────   output: TypedOutput
-HTTP status code               map ApiError → status      throw ApiError
-```
-
-This is the textbook ports-and-adapters / hexagonal split. The handler is
-the application core; the adapter is one of N possible presentation
-layers. Same handler, different adapter per consumer.
-
-## Why headless
-
-Today's adapters:
-
-- `createRouteAdapter` → Next.js route file mount. (Only one in use.)
-
-Forward-looking adapters the same handler can support without rewriting:
-
-- `createHonoAdapter` → standalone HTTP server (Hono, Fastify, etc.) for
-  a Phase 7 split deploy.
-- `createCliCommand` → direct in-process invocation from
-  `packages/cli/`, skipping the HTTP round-trip when the caller is the
-  same machine as the server. *(Today the CLI uses the `Mediforce` HTTP
-  client class instead — over HTTP to localhost. Direct invocation is
-  available later if the cost of the round-trip matters.)*
-- `createMcpTool` → MCP server tool definition wrapping the handler.
-
-Handler stays one file. New consumers wrap it from outside.
-
-## The pieces in code
+## The pieces
 
 | Concept | Package | File / dir | Purpose |
 |---|---|---|---|
 | **Contract** | `@mediforce/platform-api` | `contract/<domain>.ts` | Zod input + output schemas. The API surface. |
-| **Handler** | `@mediforce/platform-api` | `handlers/<domain>/<name>.ts` | Pure function `(input, scope) => output`. Throws typed `ApiError`. |
-| **Scope** | `@mediforce/platform-api` | `repositories/caller-scope.ts` + `authorized-*-repository.ts` | Per-request data-access bag with workspace authorization baked in. See [ADR-0004](../adr/0004-scoped-data-access-authorization.md). |
-| **Adapter** | `@mediforce/platform-ui` | `lib/route-adapter.ts` | `createRouteAdapter(schema, fromReq, handler)` → Next.js route fn. Also `listAdapter` / `getByIdAdapter` for trivial reads. |
+| **Handler** | `@mediforce/platform-api` | `handlers/<domain>/<name>.ts` | Pure function `(input, scope) => output`. Throws `HandlerError`. |
+| **Generic read adapters** | `@mediforce/platform-api` | `handlers/_generic.ts` | `listAdapter` / `getByIdAdapter` — bind a contract straight to a scope-bound repo, no handler file. |
+| **Scope** | `@mediforce/platform-api` | `repositories/create-caller-scope.ts` + `authorized-*-repository.ts` | Per-request data-access bag with namespace authorization baked in ([ADR-0004](../adr/0004-scoped-data-access-authorization.md)). |
+| **Adapter** | `@mediforce/platform-ui` | `lib/route-adapter.ts` | `createRouteAdapter(schema, fromRequest, handler, options?)` → Next.js route fn. |
 | **Route file** | `@mediforce/platform-ui` | `app/api/<path>/route.ts` | ~15 LOC. Imports contract + handler, wires the adapter. |
-| **Client (typed)** | `@mediforce/platform-api/client` | `Mediforce` class | Browser + Node + CLI consume the same contract. Parses responses through output schemas. |
+| **Client (typed)** | `@mediforce/platform-api/client` | `Mediforce` class | Browser, Node and CLI consume the same contract; parses responses through the output schemas. |
 
-## Where decisions live
+## Request pipeline
 
-- [`docs/adr/0004-scoped-data-access-authorization.md`](../adr/0004-scoped-data-access-authorization.md)
-  — `CallerScope` + `Authorized<Entity>Repository` wrappers; why
-  authorization moved out of handlers and into the data-access boundary.
-- [`docs/adr/0005-headless-platform-api-ui-separation.md`](../adr/0005-headless-platform-api-ui-separation.md)
-  — Mutation handler contract: error envelope, typed `ApiError`, HTTP
-  status mapping, response shape, Server Action policy, audit-bridge.
-- [`docs/archive/headless-migration.md`](../archive/headless-migration.md)
-  — Historical record; migration concluded in PR #534 (2026-05-31). ADRs persist.
+`createRouteAdapter` runs these in order, short-circuiting on the first failure:
 
-## Adapter responsibilities, in detail
-
-`createRouteAdapter`:
-
-1. Parse the `NextRequest` body / query / path params via the contract's
-   input schema. Zod failure → `400` with the validation issues in
+1. **Auth.** `resolveCallerIdentity` (`lib/api-auth.ts`) reads `X-Api-Key` or
+   the NextAuth session cookie → `CallerIdentity`. Failure → `401`. This runs
+   *before* input parsing, so an unauthenticated request with a malformed body
+   gets `401`, not `400`. `src/proxy.ts` separately gates `/api/*` for
+   credential presence ([ADR-0002](../adr/0002-firebase-auth-to-nextauth.md));
+   both layers stay.
+2. **Input.** `inputFromRequest(req, ctx)` builds a raw object from body, query
+   and path params (`ctx.params` is a promise on dynamic routes); the Zod schema
+   validates it. Failure → `400`, first issue as `error.message`, all issues in
    `error.details`.
-2. Resolve `CallerIdentity` — from the NextAuth session cookie (browser) or
-   `X-Api-Key` (server-to-server), resolved in `proxy.ts` + `api-auth.ts` (ADR-0002 §6).
-3. Build `CallerScope` via `createCallerScope(rawServices, caller)`.
-4. Invoke the handler `(input, scope) => Promise<output>`.
-5. Catch `ApiError` → status from the mapping table (see ADR-0005
-   §status mapping). Catch unexpected → `500` + `console.error`.
-6. Serialize the handler's output to `NextResponse.json(output)`.
+3. **Scope.** `createCallerScope(services, caller)` → `CallerScope`.
+4. **Handler.** Invoked as `(input, scope)`.
+5. **Response.** Output → `NextResponse.json(output)` at `200`
+   (`options.successStatus: 201` for routes that create a resource).
+   `HandlerError` → its `toEnvelope()` at its `statusCode`. A `ZodError`
+   escaping a handler → `400`. Anything else → `500`, full error logged.
 
-The route file is mechanical:
+Test seams: `options.resolveCaller` and `options.buildScope` substitute auth and
+services. Production code never sets either.
+
+A route file is mechanical — `app/api/tasks/[taskId]/claim/route.ts` in full:
 
 ```ts
-import { ClaimTaskInputSchema, claimTaskHandler } from '@mediforce/platform-api';
 import { createRouteAdapter } from '@/lib/route-adapter';
+import { claimTask } from '@mediforce/platform-api/handlers';
+import { ClaimTaskInputSchema, type ClaimTaskInput } from '@mediforce/platform-api/contract';
 
-export const POST = createRouteAdapter(
+interface RouteContext {
+  params: Promise<{ taskId: string }>;
+}
+
+export const POST = createRouteAdapter<
+  typeof ClaimTaskInputSchema,
+  ClaimTaskInput,
+  unknown,
+  RouteContext
+>(
   ClaimTaskInputSchema,
-  (req) => ({ taskId: req.params.taskId, ...await req.json() }),
-  claimTaskHandler,
+  async (_req, ctx) => ({ taskId: (await ctx.params).taskId }),
+  claimTask,
 );
 ```
 
-Trivial reads skip the handler file entirely via `listAdapter` /
-`getByIdAdapter` — see ADR-0004 §10.
+Trivial reads skip the handler file entirely — the route wires `listAdapter` or
+`getByIdAdapter` against the scope-bound repository (ADR-0004 Decision-10).
+Handlers exist only where there is genuine logic: cross-entity loads, role /
+ownership / state checks, or shape transforms.
 
-## What never goes in a handler
+## Errors
 
-- `NextRequest`, `NextResponse`, `cookies()`, any Next.js import.
-- Postgres / Drizzle imports.
-- Raw repositories from `@mediforce/platform-core/interfaces`.
-  Handler receives `CallerScope` only; the static guard
-  `no-raw-repo-imports.test.ts` (ADR-0004 §9) enforces this in CI.
+`HandlerError(code, message, details?)` is the only throwable. `code` is one of
+`unauthorized`, `forbidden`, `not_found`, `validation`, `payload_too_large`,
+`precondition_failed`, `conflict`, `rate_limited`, `internal`. `statusCode`
+derives from `code`; `toEnvelope()` produces the wire shape
+`{ error: { code, message, details? } }`. Subclasses — `ForbiddenError`,
+`NotFoundError`, `PreconditionFailedError`, `ConflictError`, `ValidationError`,
+`PayloadTooLargeError` — exist for the codes with real throw sites: narrower
+throw, identical envelope. `internal` has no subclass on purpose; the adapter
+emits it for anything uncaught. See
+[ADR-0005](../adr/0005-headless-platform-api-ui-separation.md).
 
-## What never goes in an adapter
-
-- Business logic. Adapter is pure plumbing.
-- State-machine validation. Lives in the handler or the entity-aware
-  wrapper repo.
-- Audit emission. Today handler-resident; future repo-resident (see
-  "Captured for later" in `headless-migration.md`).
-
-## The handler signature, illustrated
+## A handler, in full
 
 ```ts
 // contract/tasks.ts
@@ -145,57 +114,71 @@ export const ClaimTaskInputSchema = z.object({ taskId: z.string().min(1) });
 export const ClaimTaskOutputSchema = z.object({ task: HumanTaskSchema });
 
 // handlers/tasks/claim-task.ts
-export const claimTaskHandler = async (
+export async function claimTask(
   input: ClaimTaskInput,
   scope: CallerScope,
-): Promise<ClaimTaskOutput> => {
-  if (!scope.caller.userId) {
-    throw new ApiError('forbidden', 'User identity required');
+): Promise<ClaimTaskOutput> {
+  if (scope.caller.kind !== 'user') {
+    throw new ForbiddenError('Cannot claim as system actor');
   }
-  const task = await scope.humanTasks.claim(input.taskId, scope.caller.userId);
-  await scope.auditEvents.append({
-    action: 'task.claimed',
-    actorId: scope.caller.userId,
-    /* … see ADR-0005 audit-bridge … */
-  });
-  return { task };
-};
+  const task = await loadOr404(scope.tasks.getById(input.taskId), 'Task not found');
+  if (task.status !== 'pending') {
+    throw new PreconditionFailedError(`Cannot claim a ${task.status} task`, {
+      taskId: input.taskId,
+      currentStatus: task.status,
+    });
+  }
+  const claimed = await scope.tasks.claim(input.taskId, scope.caller.uid);
+  await scope.system.audit.append({ /* … see ADR-0005 audit bridge … */ });
+  return { task: claimed };
+}
 ```
 
-The handler reads as plain code: type-checked input, type-checked output,
-typed errors, scoped data-access. Nothing else.
+Typed input, typed output, typed errors, scoped data access. Nothing else.
+
+## Boundaries
+
+Never in a handler:
+
+- `NextRequest`, `NextResponse`, `cookies()`, any Next.js import.
+- Postgres or Drizzle imports.
+- Raw repositories from `@mediforce/platform-core/interfaces` — the handler gets
+  `CallerScope` only. `no-raw-repo-imports.test.ts` fails CI otherwise (ADR-0004
+  Decision-9).
+
+Never in an adapter:
+
+- Business logic, state-machine validation, audit emission.
+
+Two escape hatches, both exported from `route-adapter.ts`: `defaultBuildScope`
+and `jsonErrorResponse`, so the rare binary route that cannot compose through
+`createRouteAdapter` still runs the identical auth + scope pipeline and returns a
+byte-identical error envelope.
 
 ## Testing layers
 
-See [`headless-migration.md`](../archive/headless-migration.md) §Testing strategy
-for the full pyramid. Short version:
-
-- **Contract** — Zod schema invariants. <50ms.
+- **Contract** — Zod schema invariants.
 - **Handler** — pure function against `InMemory*Repository` from
   `@mediforce/platform-core/testing`. No mocks.
-- **Adapter** — `createRouteAdapter` wiring + error mapping. Sampled per
-  route.
-- **Cross-layer integration** — apiClient ↔ adapter ↔ handler ↔ repo,
-  in-process via loopback `apiFetch`. One per major feature.
-- **Structural guards** — `api-boundaries.test.ts`,
-  `no-raw-repo-imports.test.ts` (ADR-0004), forthcoming
-  mutation-pattern tests (ADR-0005).
+- **Adapter** — wiring and error mapping, sampled per route.
+- **Cross-layer** — client ↔ adapter ↔ handler ↔ repo, in-process via loopback
+  `apiFetch`. One per major feature.
+- **Structural guards** — `api-boundaries.test.ts` (platform-ui),
+  `no-raw-repo-imports.test.ts` (platform-api).
 
-## Glossary
+Level model and what a feature must ship:
+[`e2e-strategy.md`](../testing/e2e-strategy.md).
 
-Domain terms (Workflow Run, Human Task, Cowork Session, …) are defined
-in [`CONTEXT.md`](../../CONTEXT.md). This doc uses them as given; it
-documents implementation concepts only.
+## Where decisions live
 
-Implementation concepts introduced here that aren't in `CONTEXT.md`:
+- [ADR-0004](../adr/0004-scoped-data-access-authorization.md) — `CallerScope` and
+  `Authorized<Entity>Repository`; why authorization moved out of handlers into
+  the data-access boundary.
+- [ADR-0005](../adr/0005-headless-platform-api-ui-separation.md) — error
+  envelope, status mapping, response shape, Server Action policy, audit bridge.
+- [`archive/headless-migration.md`](../archive/headless-migration.md) —
+  historical record; the migration concluded in PR #534 (2026-05-31).
 
-- **Adapter** — boundary translator between transport (HTTP) and
-  framework-free handler.
-- **Handler** — pure framework-free function serving one API operation.
-- **Scope** (a.k.a. `CallerScope`) — per-request data-access bag with
-  workspace authorization wrappers around raw repositories. ADR-0004.
-- **Contract** — Zod input + output schema for one API operation; the
-  source of truth for the API.
-
-These are code-architecture vocabulary, not domain vocabulary — they
-deliberately live outside `CONTEXT.md`.
+Domain terms (Workflow Run, Human Task, Cowork Session, …) are defined in
+[`CONTEXT.md`](../../CONTEXT.md). Handler, adapter, scope and contract are
+code-architecture vocabulary and deliberately live here instead.

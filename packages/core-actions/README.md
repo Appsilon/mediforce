@@ -8,8 +8,8 @@ gets without a container, an image, or an LLM.
 | `http` | Calls an HTTP endpoint, returns status and parsed body |
 | `reshape` | Restructures earlier step output into a new shape |
 | `email` | Sends email, with rate limiting |
-| `spawn` | Starts another workflow run |
-| `wait` | Suspends the run until a deadline or signal |
+| `spawn` | Starts one or more child workflow runs; `forEach` fans out one per item |
+| `wait` | Suspends the run until a `duration` elapses or a `deadline` passes; an optional `condition` can resume it early |
 
 ## Why these are not scripts
 
@@ -36,3 +36,25 @@ with a list, rather than halfway through a run with one `undefined`.
 `packages/platform-api/src/services/platform-services.ts`. `email` registers only
 when an email sender is configured — an unconfigured action is not offered
 rather than failing at run time.
+
+## `spawn` and `wait`
+
+Fan-out is one child *workflow* per item, not one step repeated N times — the
+rejected alternatives and the parent→child linkage are in
+[ADR-0018](../../docs/adr/0018-fan-out-is-child-workflows.md).
+
+Handlers are pure functions and cannot pause a run, so `wait` returns a
+`__wait` sentinel and the auto-runner — which owns lifecycle transitions —
+intercepts it. Resuming is a separate `resumeWait` handler rather than part of
+the auto-runner loop, because that loop rejects non-running instances; the cron
+heartbeat calls it, so resume granularity is ~15 minutes.
+
+Two traps that cost real debugging time:
+
+- A `condition` sees only what **the parent's own steps** wrote. Child state is
+  invisible, so a condition on child progress never becomes true and the run
+  waits out its deadline. Collect children by `spawned[].instanceId` after the
+  wait instead — `apps/team-pulse` is the reference consumer, and closing the
+  gap is [#1215](https://github.com/Appsilon/mediforce/issues/1215).
+- Step ids inside a `condition` must use underscores. The expression parser
+  reads `spawn-perspectives` as subtraction.

@@ -1,32 +1,26 @@
 ---
 status: living
 audience: engineers
-last_reviewed: 2026-08-18
+last_reviewed: 2026-08-19
 ---
 
 # Development Guide
 
-## Prerequisites
+Local dev conventions, branch policy, deployment and auth setup.
+Install and first run: [GETTING-STARTED.md](../../GETTING-STARTED.md).
+Command lookup: [dev-quickref.md](dev-quickref.md).
+Package graph: [architecture.md](../concepts/architecture.md).
 
-- **Node.js** 20+
-- **pnpm** 10+ (`corepack enable && corepack prepare pnpm@latest --activate`)
-- **Docker** (local Postgres + agent containers)
+## Environment variables
 
-## Setup
-
-```bash
-git clone https://github.com/Appsilon/mediforce.git
-cd mediforce
-pnpm install
-```
-
-### Environment variables
+Local dev only — what a *deployed* server needs is
+[below](#environment-variables-per-deployment).
 
 ```bash
 cp packages/platform-ui/.env.example packages/platform-ui/.env.local
 ```
 
-Authentication is NextAuth / Auth.js v5 with Postgres-backed database sessions
+Auth is NextAuth / Auth.js v5 with Postgres-backed database sessions
 (ADR-0002) — there is no Firebase project to configure.
 
 | Variable | Description |
@@ -39,137 +33,62 @@ Authentication is NextAuth / Auth.js v5 with Postgres-backed database sessions
 | `OPENROUTER_API_KEY` | OpenRouter API key (for agent LLM calls) |
 | `PLATFORM_API_KEY` | Platform API key (server-to-server `X-Api-Key`) |
 
-The full annotated list lives in `packages/platform-ui/.env.example`.
-
-## Monorepo structure
-
-```
-packages/
-  platform-core/       # Shared types, domain models, test factories
-  platform-ui/         # Next.js UI — the main web application
-  platform-infra/      # Postgres infrastructure (Drizzle ORM) + NextAuth stores
-  platform-api/        # API contract schemas + pure handlers (framework-free)
-  agent-runtime/       # Agent execution engine
-  workflow-engine/     # Process orchestration engine
-  example-agent/       # Reference agent implementation
-```
-
-## Local Postgres dev
-
-All server data lives in a local Postgres (ADR-0001) — there is no Firestore
-data layer. `pnpm dev` starts the container, runs migrations, and boots the UI
-against it. Quick recipes:
-
-```bash
-# Reset local data (wipes the persistent volume, re-migrates)
-docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v && pnpm dev
-
-# Add a migration: edit a schema file under
-#   packages/platform-infra/src/postgres/schema/
-pnpm db:generate    # emit NNNN_*.sql + journal entry
-pnpm db:migrate     # apply locally (pnpm dev auto-runs this)
-
-# Run repo tests against a real Postgres
-TEST_DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce \
-  pnpm --filter @mediforce/platform-infra exec vitest run src/postgres
-```
-
-Deep dive (inspecting migration state, branch-collision renames, connection
-pool, troubleshooting): [postgres-local-dev.md](postgres-local-dev.md).
+The full annotated list lives in `packages/platform-ui/.env.example`; the
+boot-time authority on what is mandatory is
+`packages/platform-ui/src/instrumentation-node.ts`.
 
 ## Local agent execution
 
-When running with `ALLOW_LOCAL_AGENTS=true` (via `pnpm dev:no-docker`), the platform spawns agent CLIs directly as local processes instead of Docker containers. This mode is docker-free but **still requires Postgres on `:5432`** (`DATABASE_URL` is required at boot) — it does not start the container itself, so run `pnpm dev` once first or point `DATABASE_URL` at your own DB. The following tools must be installed and on your `PATH`:
+With `ALLOW_LOCAL_AGENTS=true` (what `pnpm dev:no-docker` sets), agent CLIs are
+spawned as host processes instead of Docker containers. Docker-free, but it
+**still needs Postgres on `:5432`** and does not start it — run `pnpm dev` once
+first, or point `DATABASE_URL` at your own DB.
 
 | Tool | Used by | Install |
 |------|---------|---------|
-| `claude` | `ClaudeCodeAgent` workflow steps | [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code) — `npm install -g @anthropic-ai/claude-code` |
-| `opencode` | `OpenCodeAgent` workflow steps | `npm install -g opencode-ai` |
+| `claude` | `ClaudeCodeAgent` steps | `npm install -g @anthropic-ai/claude-code` |
+| `opencode` | `OpenCodeAgent` steps | `npm install -g opencode-ai` |
 
-Verify both are available after installing:
-
-```bash
-claude --version
-opencode --version
-```
-
-Without `ALLOW_LOCAL_AGENTS=true`, agents run inside Docker containers instead. In that case you need **Docker** installed and running, but not the CLIs above.
-
-## Running the app
-
-```bash
-# Platform UI (default, port 9003)
-cd packages/platform-ui && pnpm dev
-```
+Both must be on `PATH` — verify with `claude --version` / `opencode --version`.
+Without the flag, agents run in Docker and neither CLI is needed.
 
 ## Testing
 
-### Unit & integration tests
-
-```bash
-# Unit + integration (vitest)
-pnpm test:unit
-
-# Only tests affected by your changes
-pnpm test:affected
-
-# With coverage
-pnpm test:coverage
-
-# Type checking
-pnpm typecheck
-
-# Everything (unit + e2e)
-pnpm test
-```
+Commands and levels: [dev-quickref.md](dev-quickref.md#test-levels). Level
+definitions and the rules behind them:
+[e2e-strategy.md](../testing/e2e-strategy.md).
 
 ### Contract tests
 
-Handlers in `platform-api` are tested against in-memory repositories from `@mediforce/platform-core/testing` — no mocks, no HTTP, no database, no dev server. The real win over E2E is not raw wall-clock time but zero ceremony: run the file, get the answer. Each handler is a pure function `(input, deps) => Promise<output>` with per-handler dependency injection, so tests read like the spec: set up repo state, call handler, assert on the return value. The canonical example is `packages/platform-api/src/handlers/tasks/__tests__/list-tasks.test.ts`, which exercises the `listTasks` handler backing `GET /api/tasks`.
+Handlers in `platform-api` are pure functions `(input, deps) => Promise<output>`
+with per-handler dependency injection, tested against the in-memory repositories
+from `@mediforce/platform-core/testing` — no mocks, no HTTP, no database, no dev
+server. The win is zero ceremony: set up repo state, call the handler, assert on
+the return value. Canonical example:
+`packages/platform-api/src/handlers/tasks/__tests__/list-tasks.test.ts`.
 
 ### E2E tests (Playwright)
 
-E2E tests live in `packages/platform-ui/e2e/`.
-
-A local Postgres must be up (`pnpm dev` once, or your own DB on `:5432`).
-No emulator is involved — Playwright's `globalSetup` applies the Drizzle
+E2E tests live in `packages/platform-ui/e2e/`. A local Postgres must be up
+(`pnpm dev` once, or your own DB on `:5432`); `globalSetup` applies the Drizzle
 migrations and starts the mock OAuth server itself.
 
-```bash
-pnpm test:e2e               # all E2E (L3 + L4)
-pnpm test:e2e:api           # L3 only — API E2E, no browser (~30s)
-pnpm test:e2e:ui            # L4 only — UI E2E with real Chromium (~3min)
-```
-
-Variants run from `packages/platform-ui`:
-
-```bash
-pnpm test:e2e:headed        # with browser visible
-pnpm test:e2e:ui            # interactive Playwright UI mode
-```
-
-`e2e/auth-setup.ts` automatically:
-1. Seeds Postgres with test data (workspaces, workflow definitions, tasks, process instances, agent runs, audit events)
-2. Upserts the test user's `auth_users` row and opens a NextAuth database session for it (`e2e/helpers/auth-session.ts`)
-3. Writes that session token as the `authjs.session-token` cookie into Playwright `storageState`, authenticating every downstream journey
-
-**Test structure:**
-- `e2e/smoke.spec.ts` — unauthenticated tests
+- `e2e/smoke.spec.ts` — unauthenticated
 - `e2e/api/*.journey.ts` — L3 API E2E
 - `e2e/ui/*.journey.ts` — L4 UI E2E
 - `e2e/helpers/` — Postgres seed + NextAuth session helpers
 
-### Recommended workflow
+`e2e/auth-setup.ts` seeds the Postgres fixture, upserts the test user's
+`auth_users` row, opens a NextAuth database session for it, and writes that
+session token as the `authjs.session-token` cookie into Playwright
+`storageState` — the cookie alone authenticates every downstream journey.
 
-1. `pnpm typecheck` — catches type errors (~5s)
-2. `pnpm test:affected` — tests for changed files only (<1s)
-3. `pnpm test:unit` — full L1+L2 (~9s)
-4. `pnpm test:e2e` — if UI/API contract changed (~4min)
-
-## Build
+Interactive variants run from `packages/platform-ui`:
 
 ```bash
-pnpm build    # builds all packages
+pnpm test:e2e:headed        # browser visible
+pnpm test:e2e:ui            # Playwright UI mode (from the repo root this
+                            # name means "L4 only" instead — different script)
 ```
 
 ## Branches
@@ -203,24 +122,97 @@ days, and confirming the list before deleting.
 
 ## Deployment
 
-Staging and production servers are hosted on **Hetzner**.
+Staging and production servers are hosted on **Hetzner**. Staging:
+`ssh deploy@204.168.165.57`. That machine also has an `sftpuser` account with
+SFTP enabled, used for the Data Landing Zone workflow demo. All credentials live
+in **1Password**, vault **Mediforce**.
 
-| Environment | SSH access |
-|-------------|-----------|
-| Staging | `ssh deploy@204.168.165.57` |
+Standing up a *new* server is driven by
+[`scripts/bootstrap-server.py`](../../scripts/bootstrap-server.py) (or the
+browser wizard at [`docs/setup/index.html`](../setup/index.html)), which collects
+every required env var — including `AUTH_SECRET`, a provider, and
+`ALLOWED_EMAIL_DOMAINS` — and prints the exact Google OAuth redirect URI to
+register. The server refuses to start if anything is missing.
 
-The staging machine also has an `sftpuser` account with SFTP enabled, used for the Data Landing Zone workflow demo.
+### Postgres in production (ADR-0001)
 
-All credentials (SSH passwords, etc.) are stored in **1Password** under the **Mediforce** vault.
+`docker-compose.prod.yml` runs `postgres:16-alpine` alongside Redis and applies
+Drizzle migrations from a short-lived `migrate` init container that `platform-ui`
+waits on (`depends_on: { migrate: { condition: service_completed_successfully } }`).
+Migrations are idempotent (drizzle's `__drizzle_migrations` ledger), so the deploy
+pipeline needs no separate migration step.
 
-Standing up a *new* server is driven by [`scripts/bootstrap-server.py`](../../scripts/bootstrap-server.py) (or the browser wizard in [`docs/setup/index.html`](../setup/index.html)), which collects every required env var — including the NextAuth ones (`AUTH_SECRET`, a provider, `ALLOWED_EMAIL_DOMAINS`) — and prints the exact Google OAuth redirect URI to register. The boot-time authority on what is mandatory is `packages/platform-ui/src/instrumentation-node.ts`; the server refuses to start if anything is missing.
+The host needs two things before `platform-ui` will start:
+
+1. `POSTGRES_PASSWORD` in `/opt/mediforce/.env` — no default. `POSTGRES_USER` and
+   `POSTGRES_DB` default to `mediforce`.
+2. `/var/lib/mediforce/postgres-data`, owned by UID 999 (the postgres-alpine
+   user). `docker-compose.staging.yml` bind-mounts that path so
+   `docker compose down -v` cannot wipe data — only an explicit `rm -rf` removes
+   it. Local dev keeps a named volume, where `down -v` stays a normal reset.
+
+`bootstrap-server.py` does both on a fresh host (`step_env_local` +
+`step_postgres_dir`: auto-generated password, correct directory ownership).
+Already-bootstrapped deployments — the current staging — are never re-bootstrapped:
+add the variable and create the directory over ssh.
+
+### Environment variables per deployment
+
+[`.env.example`](../../.env.example) is the annotated source of truth for every
+variable. Below is what to actually set per environment; anything not listed has
+a safe default.
+
+**Required (every deployment):**
+
+| Var | Notes |
+| --- | --- |
+| `POSTGRES_PASSWORD` | No default. `POSTGRES_USER` / `POSTGRES_DB` default to `mediforce`. |
+| `AUTH_SECRET` | Session signing. `openssl rand -hex 32`. |
+| `NEXT_PUBLIC_APP_URL` | Public origin of this deployment (e.g. `https://app.example.com`). `APP_BASE_URL` **auto-derives from it** in compose — set only this one. |
+| `ALLOWED_EMAIL_DOMAINS` | Comma-separated domain allowlist. Mandatory with any OAuth/OIDC provider on (boot-fails if empty) — otherwise any account at the IdP could sign in. |
+
+**Auth providers — enable at least one:**
+
+| Var | Default | Notes |
+| --- | --- | --- |
+| `ENABLE_PASSWORD_AUTH` | **on** | Email + password sign-in. Set `false` only for a Google/OIDC-only estate (also hides the invite "resend setup link" recovery form). |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | off | "Sign in with Google". |
+| `ENABLE_MAGIC_LINK` | off | Passwordless sign-in; needs email configured. Second first-password / recovery path. |
+| `OIDC_ISSUER` (+ client id/secret) | off | Customer SSO, one IdP per deployment. |
+
+**Email — required to send invites / magic-links** (choose one provider; the
+`*_FROM_EMAIL` must be on a **verified** sender domain or mail bounces / spams):
+
+- Mailgun: `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_FROM_EMAIL` (+ optional `MAILGUN_SENDER_NAME`).
+- SMTP: `SMTP_HOST`, `SMTP_FROM_EMAIL` (+ `SMTP_USER` / `SMTP_PASS` / `SMTP_PORT` / `SMTP_SECURE`).
+- Or `MEDIFORCE_DISABLE_EMAIL=true` to run without email (no invites / magic-links).
+
+In **production**, boot fails if email is enabled but `NEXT_PUBLIC_APP_URL` /
+`APP_BASE_URL` is unset or `localhost` — otherwise activation / magic-link emails
+would ship a dead `http://localhost` link.
+
+> **Inviting users to set a first password requires `ENABLE_PASSWORD_AUTH` (on by
+> default) and a configured email provider.** Existing Google users just sign in
+> with Google after their account is seeded — no invite, no password.
 
 ### Authentication setup (ADR-0002)
 
-Auth is NextAuth over Postgres — there is no Firebase project, service account, or emulator to provision. Every install is a greenfield install: there is nothing to export or migrate.
+Auth is NextAuth over Postgres — no Firebase project, service account, or
+emulator to provision. Every install is greenfield: nothing to export or migrate.
 
-Create the first user directly — an `auth_users` row with a bcrypt `password_hash` (see `packages/platform-ui/.env.example`, `ENABLE_PASSWORD_AUTH`), or configure OIDC against the customer's IdP and let them sign in. `user_roles` starts empty and is populated as roles are assigned.
+Create the first user directly — an `auth_users` row with a bcrypt
+`password_hash` (see `ENABLE_PASSWORD_AUTH` in
+`packages/platform-ui/.env.example`) — or configure OIDC against the customer's
+IdP and let them sign in. `user_roles` starts empty and fills as roles are
+assigned.
 
-Passwords are per-install: there is no password recovery flow yet ([issue #1001](https://github.com/Appsilon/mediforce/issues/1001)), so an install that offers only password auth needs an operator who can write a fresh hash.
+Passwords are per-install: there is no password recovery flow yet
+([issue #1001](https://github.com/Appsilon/mediforce/issues/1001)), so an install
+offering only password auth needs an operator who can write a fresh hash.
 
-> **Historical.** The one-time seed that copied identities out of Firebase Auth, keeping each user's uid so their workspaces, tasks and audit trail stayed attached, ran during the staging cutover and is done. The script and its runbook are kept for the record at [`scripts/migrate-firebase-auth-to-postgres/README.md`](../../scripts/migrate-firebase-auth-to-postgres/README.md) and [`docs/archive/RUNBOOK-0002-staging-cutover.md`](../archive/RUNBOOK-0002-staging-cutover.md). Do not run it against a new deployment.
+> **Historical.** The one-time seed that copied identities out of Firebase Auth,
+> keeping each user's uid so their workspaces, tasks and audit trail stayed
+> attached, ran during the staging cutover and is done. Kept for the record at
+> [`scripts/migrate-firebase-auth-to-postgres/README.md`](../../scripts/migrate-firebase-auth-to-postgres/README.md)
+> and [`docs/archive/RUNBOOK-0002-staging-cutover.md`](../archive/RUNBOOK-0002-staging-cutover.md).
+> Do not run it against a new deployment.

@@ -85,8 +85,9 @@ appendix can capture what actually shipped vs the original decision body.
 | [0010](./0010-durable-step-timeout-recovery.md) | Durable step timeout & stranded-run recovery | Accepted |
 | [0011](./0011-triggers-detached-unified-resource.md) | Triggers are detached resources in a unified table; the Workflow Definition is trigger-free | Accepted |
 | [0012](./0012-unified-trigger-input-contract.md) | Trigger Input is a workflow's total input contract; every trigger validates against it | Accepted |
-| [0013](./0013-workflow-packages-outside-platform-repo.md) | Workflow packages live outside the platform repo | Proposed |
+| [0013](./0013-workflow-packages-outside-platform-repo.md) | Workflow packages live outside the platform repo | Accepted |
 | [0014](./0014-control-mode-ui-concept.md) | Control mode is a UI concept | Accepted |
 | [0015](./0015-output-files-on-run-branch.md) | Output Files live on the run branch of the git workspace | Accepted |
 | [0016](./0016-unified-canvas-first-workflow-designer.md) | Unified canvas-first workflow designer (+ [PLAN](../archive/PLAN-0016.md)) | Proposed |
 | [0017](./0017-retire-llm-maintained-wiki.md) | Retire the LLM-maintained wiki; docs live next to what they describe (+ [PLAN](../archive/PLAN-0017.md), executed) | Accepted |
+| [0018](./0018-fan-out-is-child-workflows.md) | Fan-out over sub-graphs is child workflows; the engine stays linear | Accepted |

@@ -6,9 +6,8 @@ import postgres from 'postgres';
  * Postgres-backed test-user helpers (ADR-0002 PR2). Firebase Auth and its
  * emulator are gone — identity now lives in `auth_users` and sessions in
  * `auth_sessions`. These helpers seed those rows directly, mirroring the raw
- * `postgres-js` approach in `postgres-seed.ts` (Playwright resolves the
- * `@mediforce/source` condition, but a self-contained SQL helper keeps this
- * file dependency-light and matches the seed's proven pattern).
+ * `postgres-js` approach in `postgres-seed.ts`; a self-contained SQL helper
+ * keeps this file dependency-light and matches the seed's proven pattern.
  *
  * The filename is retained to avoid churning the ~6 journeys that import from
  * it; the "emulator" is historical.

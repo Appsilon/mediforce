@@ -1,79 +1,67 @@
 ---
 status: living
 audience: everyone
-last_reviewed: 2026-07-21
+last_reviewed: 2026-08-19
 ---
 
 # AI-Assisted Development Process
 
-How we use AI coding agents to build Mediforce — and how the repo is structured to make that work well.
+How we use AI coding agents to build Mediforce — and how the repo is structured to make that work.
 
-## Why This Matters
-
-AI agents are powerful but context-dependent. Without structure, they guess, hallucinate conventions, and produce inconsistent code. With the right files in the right places, they become reliable collaborators that follow your project's actual patterns.
-
-This isn't about trusting AI blindly — it's about giving it the right instructions so a human Tech Lead can delegate effectively and review confidently.
+AI agents are context-dependent: without structure they guess at conventions and produce inconsistent code. The fix is not trusting the agent more, it is putting the right instructions in the places the agent already reads, so a human Tech Lead can delegate and review with confidence.
 
 ## How It Works
 
 ### The Instruction Hierarchy
 
 ```
-CLAUDE.md (root)              ← Auto-loaded. Points to AGENTS.md
-└── AGENTS.md (root)          ← Per-task workflow + cross-cutting rules (~100 lines)
+CLAUDE.md (root)              ← Auto-loaded by Claude. One line: points to AGENTS.md
+└── AGENTS.md (root)          ← Per-task workflow + cross-cutting rules
 
-skills/*/SKILL.md             ← On-demand workflows (invoked via /skill-name)
-.claude/skills/<name>         ← Symlink — Claude auto-discovers descriptions at session start
-skills/*/references/          ← Checklists, templates used by skills
+CONTEXT.md (root)             ← Domain vocabulary — what our terms mean
+
+skills/<name>/SKILL.md        ← On-demand workflows (invoked via /skill-name)
+skills/<name>/references/     ← Checklists and templates used by a skill
+skills/_registry.yml          ← Hand-maintained index of the skills above
+.claude/skills/<name>         ← Symlink → skills/<name>. Claude reads descriptions here
+
+agents/<name>.md              ← Custom subagent definitions (design, discuss-vision)
+.claude/agents/               ← Symlink → ../agents
 ```
 
-**Key principle:** AGENTS.md stays under ~100 lines — workflow + rules only. Every "how to do X" lives in a skill. No manual Skills Router: Claude auto-loads every skill's `description:` from `.claude/skills/` at session start, and routes from natural-language triggers in the description itself.
+**Key principle:** `AGENTS.md` carries workflow and rules only — what to DO and what NOT to do. Every "how to do X" lives in a skill, so the always-loaded file stays a set of rules rather than a manual. There is no manual skills router: Claude reads every skill's `description:` from `.claude/skills/` at session start and routes on the natural-language triggers written into that description.
 
 ### The Agent Delegation Model
 
-The main AI thread acts as a **Tech Lead** — it delegates execution to subagents and focuses on architecture, coherence, and review.
+The main AI thread acts as a **Tech Lead** — it delegates execution to subagents and keeps ownership of architecture, coherence, and review.
 
 - **Delegate execution** — spawn subagents for research, analysis, and coding. Parallelize independent work.
-- **Think big picture** — focus on architecture, goals, and coherence, not line-by-line implementation.
+- **Think big picture** — architecture, goals, and coherence, not line-by-line implementation.
 - **Review, don't rubber-stamp** — reject hacks, unnecessary dependencies, over-engineering, and solutions that don't fit the project's direction.
 
-In practice: receive task → break it down → dispatch subagents → verify output → report back.
+In practice: receive task → break it down → dispatch subagents → verify actual output → report back. Owning the outcome means checking what the subagent really produced, not avoiding delegation to feel safe.
 
 ### Skills (Standardized Workflows)
 
-Skills are reusable instruction sets invoked on demand via `/skill-name`. Each skill's `description:` frontmatter contains trigger phrases — Claude auto-routes from natural language to the matching skill without any manual router. To browse: `ls .claude/skills/`.
+Skills are reusable, on-demand instruction sets. Browse the live catalog in
+[`skills/_registry.yml`](../../skills/_registry.yml) or with
+`ls .claude/skills/`; do not maintain a second list here. Each skill owns its
+procedure in `SKILL.md` and may carry checklists or templates under `references/`.
 
-| Skill | Purpose |
-|-------|---------|
-| `/new-test` | Pick the right test level (L1-L5), scaffold the file, walk RED → GREEN |
-| `/self-review` | Pre-PR check (typecheck + affected tests + diff + code-review). MUST run as subagent |
-| `/use-mediforce` | mediforce CLI, dev environment, REST fallback ladder, adding a CLI command |
-| `/grill-with-docs` | Optional planning skill — interview-style stress test of a plan against CONTEXT.md / ADRs, sharpens fuzzy terms before coding (from [mattpocock/skills](https://github.com/mattpocock/skills)) |
-| `/code-review` | Review PRs and diffs against an 8-section checklist (security, architecture, testing, etc.) |
-| `/e2e-test` | Write and run L4 UI journey tests |
-| `/agent-browser` | Visual verification of UI in a live browser |
-| `/renovate-review` | Triage and validate Renovate dependency PRs |
-| `/discord-update` | Write Discord updates from rough notes |
-| `/add-changelog-entry` | Append a one-line entry to CHANGELOG.md under `[Unreleased]` |
-| `/generate-pitch` | Generate a Marp pitch deck from vision docs |
+### Testing
 
-Each skill has a `SKILL.md` with step-by-step workflow and optional `references/` with templates and checklists.
+Tests come first, at the lowest level that gives real signal — `/new-test` picks the level and walks RED → GREEN, `/e2e-test` handles L4 UI journeys. Product features must land at **L3** (proves storage backend + middleware + auth). Infrastructure and tooling — CI scripts, build glue, `workflow.yaml` configs — are exercised by the thing they support and don't get their own tests.
 
-### Testing: TDD for UI features
-
-UI features follow a tight TDD loop where the E2E journey test comes first:
-
-1. **RED** — Write the E2E journey test first
-2. **GREEN** — Implement until the test passes
-3. **Ship** — test + feature code in the same PR
-
-Quality gates run after every change: typecheck (~5s), affected tests (<1s), full suite (~9s). E2E against a real Next + Postgres stack (~4min) before merging UI changes.
+Commands, levels, and how long each gate takes: [`start/dev-quickref.md`](../start/dev-quickref.md). Level definitions and the rules behind them: [`testing/e2e-strategy.md`](../testing/e2e-strategy.md).
 
 ## Adding New Instructions
 
 ### When to create a new skill
 
-When you find yourself giving the same multi-step instructions repeatedly. A skill standardizes the workflow so every invocation is consistent. Add the skill to `skills/`, register it in `_registry.yml`, and symlink it into `.claude/skills/`. The symlink is what makes Claude auto-load the skill's description at session start — no edit to `AGENTS.md` needed unless the workflow itself changes.
+When you catch yourself giving the same multi-step instructions repeatedly. Add the skill to `skills/`, list it in `skills/_registry.yml`, and symlink it into `.claude/skills/`. The symlink is what makes Claude auto-load the description at session start — no `AGENTS.md` edit is needed unless a cross-cutting rule changes.
+
+Custom subagents live in `agents/`; `.claude/agents/` is a directory symlink, so
+there is one copy to maintain.
 
 ### Writing style for instruction files
 
@@ -87,4 +75,4 @@ The module provides CRUD operations for managing processes.
 Use `makeCrudRoute` for all CRUD endpoints. MUST export `openApi` from every route.
 ```
 
-Every sentence tells the agent what to DO, what to REUSE, or what rules to FOLLOW.
+Every sentence tells the agent what to DO, what to REUSE, or what rule to FOLLOW. For the terseness rules that apply to agent-facing files — and the exemptions for human-facing prose — see [`contributing/doc-style.md`](doc-style.md).

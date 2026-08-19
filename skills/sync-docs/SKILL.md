@@ -54,6 +54,10 @@ the one list. Read it at the start of every run; never keep a copy here. Act on
 `status: living` only — `draft` is undecided, `historical` is a record of a past
 state and correctly describes a repo that no longer exists.
 
+If a change adds, removes, or changes a canonical domain term, also open
+`CONTEXT.md`. It is the glossary authority; keep implementation mechanics in
+the owning README or routed reference doc.
+
 ### Change → doc
 
 | Changed | Update |
@@ -66,7 +70,7 @@ state and correctly describes a repo that no longer exists.
 | Port changed | `docs/start/dev-quickref.md`, `packages/platform-ui/README.md` |
 | Step executor / action kind / step type | `docs/reference/workflow-capabilities.md`, `packages/core-actions/README.md` |
 | Handler / contract / adapter **pattern** | `docs/reference/api-architecture.md` |
-| Domain schema in `platform-core` | `packages/platform-core/README.md` |
+| Domain schema in `platform-core` | `packages/platform-core/README.md`; `CONTEXT.md` only if domain language changed |
 | Container spawn / image / git-mode behaviour | `docs/reference/container-steps.md`, `packages/agent-runtime/src/plugins/README.md` |
 | Test level or harness | `docs/testing/` |
 | An architectural decision | a **new ADR** — never retro-edit an existing one |
@@ -74,7 +78,7 @@ state and correctly describes a repo that no longer exists.
 A rename is the highest-yield case and is mechanical:
 
 ```bash
-grep -rln 'OldSymbolName' --include='*.md' packages/ apps/ docs/ skills/ AGENTS.md
+grep -rln 'OldSymbolName' --include='*.md' packages/ apps/ docs/ skills/ AGENTS.md CONTEXT.md
 ```
 
 Every hit is a doc that now lies. This is the check that catches
