@@ -10,15 +10,12 @@ import type { CapabilityStatus } from '@mediforce/platform-api/contract';
 type Capabilities = Record<string, CapabilityStatus>;
 
 /**
- * What this deployment can actually run, for gating pre-made blocks.
+ * Reference data that moves only on redeploy or an admin wiring up email, hence
+ * NICE LIVE.
  *
- * Deployment-wide reference data that only moves when someone redeploys or an
- * admin wires up email, so NICE LIVE (30 s) is generous.
- *
- * Returns `null` until the answer is known — while loading and if the request
- * fails. Callers treat unknown as available, because a picker that greys out
- * every block over one failed request is a worse failure than one that offers a
- * block the run later reports on.
+ * `null` means "not known yet" — loading or failed. Callers treat unknown as
+ * available: greying out every block over one failed request is the worse
+ * failure.
  */
 export function useCapabilities(): { capabilities: Capabilities | null; loading: boolean } {
   const query = useQuery({

@@ -1,27 +1,22 @@
 import type { WorkflowStep } from '../schemas/workflow-definition';
 
 /**
- * Pre-made blocks — the "Simple" tier of the Add Block picker.
+ * The "Simple" tier of the Add Block picker: capability-shaped counterparts to
+ * the control-mode rows, emitting a step that is already structurally correct
+ * instead of an executor plus an empty config.
  *
- * A preset is the capability-shaped counterpart to the control-mode rows the
- * picker already offers: it answers "what do you want to do" and emits a step
- * that is already structurally correct, rather than asking the author to pick
- * an executor and then fill an empty config by hand.
+ * Placed here rather than in the UI so the workflow assistant can build from the
+ * same catalog. It does not yet — the picker is the only consumer today.
  *
- * This lives in platform-core, not the UI, because the workflow assistant
- * builds steps from the same catalog — one source of truth for what a
- * "Send email" block is.
+ * Presets do NOT invent author-specific values (a recipient, a URL, a target
+ * workflow); those are declared in `needsInput` and left empty for the editor's
+ * step-error highlighting to surface.
  *
- * Presets deliberately do NOT invent author-specific values (a recipient, a
- * URL, a target workflow). Those are declared in `needsInput` and left empty;
- * the editor's existing step-error highlighting surfaces them.
- *
- * No preset emits `type: 'review'`. Those steps keep working for existing
- * workflows, but the picker stops offering the type for new ones per ADR-0006;
- * approval belongs on an agent step at L3 ("Agent drafts, person approves").
+ * None emits `type: 'review'`: those steps keep working, but per ADR-0006 the
+ * designer stops offering the type for new ones, so approval belongs on an agent
+ * step at L3.
  */
 
-/** Capabilities an instance may or may not have wired up. */
 export const BLOCK_CAPABILITY_KEYS = ['email', 'agents'] as const;
 
 export type BlockCapabilityKey = (typeof BLOCK_CAPABILITY_KEYS)[number];
@@ -31,9 +26,8 @@ export const BLOCK_CATEGORIES = ['people', 'communicate', 'data', 'ai', 'control
 export type BlockCategory = (typeof BLOCK_CATEGORIES)[number];
 
 /**
- * The step fields a preset contributes. `type` is included because a pre-made
- * block already knows whether it creates a result or routes — unlike the
- * control-mode tier, where a separate toggle supplies it.
+ * Includes `type` because a pre-made block already knows whether it creates a
+ * result or routes, unlike the control-mode tier where a toggle supplies it.
  */
 export type BlockPresetPayload = Partial<Omit<WorkflowStep, 'id'>> & {
   type: WorkflowStep['type'];

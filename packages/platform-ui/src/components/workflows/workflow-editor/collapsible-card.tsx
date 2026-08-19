@@ -5,15 +5,8 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * A self-contained collapsible section card.
- *
- * Cards stack directly in a panel column rather than nesting inside an outer
- * card, so the right rail reads as one level of surface. An open card takes the
- * remaining height and scrolls internally, which assumes the column keeps one
- * card open at a time.
- *
- * Shared by the step editor and the Add Block picker so the two views fold the
- * same way.
+ * Stacks directly in a panel column rather than nesting inside an outer card, so
+ * the right rail stays one level of surface.
  */
 export function CollapsibleCard({
   title,
@@ -31,10 +24,8 @@ export function CollapsibleCard({
   open: boolean;
   onToggle: () => void;
   /**
-   * Take the column's remaining height when open (the step editor's behaviour,
-   * which relies on one card being open at a time). `false` sizes the card to
-   * its content instead, so several short cards can be open without a
-   * two-option section stretching down the whole panel.
+   * Fill the column's remaining height when open, which only works while one
+   * card is open at a time. `false` sizes to content instead.
    */
   fill?: boolean;
   /** Stamps `data-testid` plus `data-open`, so a test can open a card by key. */

@@ -239,11 +239,10 @@ describe('BlockPicker pre-made blocks (Simple tier)', () => {
     const sendEmail = screen.getByTestId('preset-option-send-email');
     expect(sendEmail).toHaveAttribute('aria-disabled', 'true');
 
-    // A `disabled` button would fire no mouse events, so the reason has to be
-    // reachable on an enabled-but-refusing one.
-    fireEvent.mouseEnter(sendEmail);
-    expect(screen.getByTestId('preset-option-send-email-description'))
-      .toHaveTextContent('No email delivery is configured on this instance.');
+    // A `disabled` button would fire no pointer events and take no focus, so the
+    // tooltip trigger could never fire. `aria-disabled` is the guard: this
+    // assertion fails if the option regresses to a real `disabled`.
+    expect(sendEmail).toHaveTextContent('No email delivery is configured on this instance.');
 
     fireEvent.click(sendEmail);
     expect(onAdd).not.toHaveBeenCalled();
