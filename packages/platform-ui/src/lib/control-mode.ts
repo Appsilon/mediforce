@@ -17,7 +17,7 @@
  * Note: executor: agent, autonomyLevel: L2 (old Ghost/Assist) maps to 'assist' for
  * display of existing steps, but is no longer creatable from the wizard.
  */
-import type { WorkflowStep } from '@mediforce/platform-core';
+import type { WorkflowStep, BlockPresetPayload } from '@mediforce/platform-core';
 
 /** Step executor — the canonical union from the WorkflowStep schema. */
 export type Executor = WorkflowStep['executor'];
@@ -104,11 +104,8 @@ export function controlModeToSchema(
 }
 
 /**
- * Payload for creating a new step from the wizard popover. Widened to accept any
- * WorkflowStep field (minus id) so the picker can seed plugin/cowork/agent config
- * in one shot; `type` and `executor` are always required.
+ * Payload for creating a new step from the picker. Aliased from platform-core so
+ * the picker, the presets and the assistant cannot drift on what a new step may
+ * carry: any WorkflowStep field minus `id`, with `type` and `executor` required.
  */
-export type NewStepPayload = Partial<Omit<WorkflowStep, 'id'>> & {
-  type: WorkflowStep['type'];
-  executor: Executor;
-};
+export type NewStepPayload = BlockPresetPayload;
