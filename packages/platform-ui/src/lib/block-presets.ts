@@ -5,7 +5,7 @@ export type CMRowButton = {
   id: string;
   label: string;
   /** What work belongs on this executor, so the picker answers "which one do I
-   *  pick?" without a trip to docs/workflow-authoring-golden-rules.md (#1186). */
+   *  pick?" without a trip to docs/reference/workflow-authoring-golden-rules.md (#1186). */
   purpose: string;
   color: string;
   // The step type (creation/decision) is chosen by the picker toggle and merged

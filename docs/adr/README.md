@@ -1,3 +1,9 @@
+---
+status: living
+audience: engineers
+last_reviewed: 2026-08-18
+---
+
 # Architectural Decision Records
 
 Short documents capturing significant architectural decisions, the rejected
@@ -30,7 +36,11 @@ doesn't fit the constraint.
 
 Every ADR is short and focused on the decision itself. Implementation detail
 goes into a separate `PLAN-NNNN.md` companion file when it would otherwise
-crowd the ADR.
+crowd the ADR. A plan lives next to its ADR while the work is in flight and
+moves to [`../archive/`](../archive/) once it has been executed — a finished
+plan is a record of how something was built, not instructions for building it.
+Operator runbooks (`RUNBOOK-NNNN-*.md`) follow the same rule. Every plan and
+runbook written so far has been executed, so they all sit in `archive/` today.
 
 See [grill-with-docs/ADR-FORMAT.md](../../.claude/skills/grill-with-docs/ADR-FORMAT.md)
 for the template.
@@ -63,9 +73,9 @@ appendix can capture what actually shipped vs the original decision body.
 
 | # | Decision | Status |
 | --- | --- | --- |
-| [0001](./0001-firestore-to-postgres.md) | Move primary datastore from Firestore to self-hosted Postgres (+ [PLAN](./PLAN-0001.md)) | Accepted |
-| [0002](./0002-firebase-auth-to-nextauth.md) | Move authentication from Firebase Auth to NextAuth (Auth.js v5) (+ [PLAN](./PLAN-0002.md), [RUNBOOK](./RUNBOOK-0002-staging-cutover.md)) | Accepted |
-| [0003](./0003-remove-firebase-storage.md) | Remove Firebase Storage: delete uploaded-skills, task attachments to a BlobStore (+ [PLAN](./PLAN-0003.md)) | Proposed |
+| [0001](./0001-firestore-to-postgres.md) | Move primary datastore from Firestore to self-hosted Postgres (+ [PLAN](../archive/PLAN-0001.md)) | Accepted |
+| [0002](./0002-firebase-auth-to-nextauth.md) | Move authentication from Firebase Auth to NextAuth (Auth.js v5) (+ [PLAN](../archive/PLAN-0002.md), [RUNBOOK](../archive/RUNBOOK-0002-staging-cutover.md)) | Accepted |
+| [0003](./0003-remove-firebase-storage.md) | Remove Firebase Storage: delete uploaded-skills, task attachments to a BlobStore (+ [PLAN](../archive/PLAN-0003.md)) | Proposed |
 | [0004](./0004-scoped-data-access-authorization.md) | Authorization enforcement moves to a scoped data-access layer | Finalized |
 | [0005](./0005-headless-platform-api-ui-separation.md) | Headless platform: API/UI separation | Accepted |
 | [0006](./0006-client-side-server-state.md) | Client-side server-state management | Accepted |
@@ -75,7 +85,9 @@ appendix can capture what actually shipped vs the original decision body.
 | [0010](./0010-durable-step-timeout-recovery.md) | Durable step timeout & stranded-run recovery | Accepted |
 | [0011](./0011-triggers-detached-unified-resource.md) | Triggers are detached resources in a unified table; the Workflow Definition is trigger-free | Accepted |
 | [0012](./0012-unified-trigger-input-contract.md) | Trigger Input is a workflow's total input contract; every trigger validates against it | Accepted |
-| [0013](./0013-workflow-packages-outside-platform-repo.md) | Workflow packages live outside the platform repo | Proposed |
+| [0013](./0013-workflow-packages-outside-platform-repo.md) | Workflow packages live outside the platform repo | Accepted |
 | [0014](./0014-control-mode-ui-concept.md) | Control mode is a UI concept | Accepted |
 | [0015](./0015-output-files-on-run-branch.md) | Output Files live on the run branch of the git workspace | Accepted |
-| [0016](./0016-unified-canvas-first-workflow-designer.md) | Unified canvas-first workflow designer (+ [PLAN](./PLAN-0016.md)) | Proposed |
+| [0016](./0016-unified-canvas-first-workflow-designer.md) | Unified canvas-first workflow designer (+ [PLAN](../archive/PLAN-0016.md)) | Proposed |
+| [0017](./0017-retire-llm-maintained-wiki.md) | Retire the LLM-maintained wiki; docs live next to what they describe (+ [PLAN](../archive/PLAN-0017.md), executed) | Accepted |
+| [0018](./0018-fan-out-is-child-workflows.md) | Fan-out over sub-graphs is child workflows; the engine stays linear | Accepted |

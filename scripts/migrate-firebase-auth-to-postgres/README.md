@@ -1,3 +1,9 @@
+---
+status: historical
+audience: engineers
+last_reviewed: 2026-07-28
+---
+
 # Firebase Auth → Postgres keep-uid seed (ADR-0002)
 
 One-time seed of `auth_users` (with a **verified email**) + the global
@@ -70,7 +76,7 @@ coordinator.** Never point it at production.
 ## One-command migration (`migrate-to-nextauth.py`)
 
 `migrate-to-nextauth.py` is the **automated path** for the manual seed sequence in
-[`docs/adr/RUNBOOK-0002-staging-cutover.md`](../../docs/adr/RUNBOOK-0002-staging-cutover.md)
+[`docs/archive/RUNBOOK-0002-staging-cutover.md`](../../docs/archive/RUNBOOK-0002-staging-cutover.md)
 (steps 4–5). It **wraps** the tsx seed above (it does not re-implement seeding)
 behind a single guarded command, so the next environment (e.g. cdisc) can be cut
 over without hand-copying the runbook commands.

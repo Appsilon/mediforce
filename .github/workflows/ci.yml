@@ -32,6 +32,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  docs-structure:
+    # Both checks live here and not only in docs.yml because their failure
+    # modes are triggered by *code* changes that match no `**.md` path filter:
+    # a new package with no Markdown file (readme coverage), and a renamed or
+    # deleted source file that active docs link to (doc links). docs.yml runs
+    # the link check again for docs-only PRs, which this workflow skips.
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 scripts/check_readme_coverage.py
+      - run: python3 scripts/check_doc_links.py
+
   typecheck:
     runs-on: ubuntu-latest
     timeout-minutes: 5

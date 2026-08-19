@@ -28,7 +28,7 @@ export async function register(): Promise<void> {
 // `depends_on: { migrate: { condition: service_completed_successfully } }`.
 // Local dev runs them via `pnpm dev` (which calls `pnpm db:migrate`
 // before the dev server) or `pnpm db:migrate` directly. See
-// docs/postgres-local-dev.md. Instrumentation-time migration was tried
+// docs/start/postgres-local-dev.md. Instrumentation-time migration was tried
 // (commit cd540e85) but Turbopack's instrumentation pipeline doesn't
 // honour `transpilePackages` for workspace imports, which forced type
 // suppressions and duplicated `postgres`/`drizzle-orm` as platform-ui

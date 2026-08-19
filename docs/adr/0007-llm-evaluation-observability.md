@@ -1,3 +1,9 @@
+---
+status: accepted
+audience: engineers
+last_reviewed: 2026-06-12
+---
+
 # 0007 — LLM evaluation & observability: layered model, hybrid system of record
 
 - **Status:** Accepted (layer 1 implemented in the same PR; layers 2–4

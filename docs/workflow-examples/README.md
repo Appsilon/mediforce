@@ -1,3 +1,9 @@
+---
+status: living
+audience: workflow-authors
+last_reviewed: 2026-07-29
+---
+
 # Workflow examples
 
 These files are tutorial examples for the workflow definition schema. They are
@@ -5,11 +11,11 @@ small on purpose: each example demonstrates one concept, such as review loops,
 script variants, action steps, trigger input, or validation gates.
 
 They are not complete production Workflow Packages. For production package
-standards, use [workflow-authoring-golden-rules.md](../workflow-authoring-golden-rules.md)
+standards, use [workflow-authoring-golden-rules.md](../reference/workflow-authoring-golden-rules.md)
 and the production-style reference package in
 [`apps/golden-standard-workflow`](../../apps/golden-standard-workflow). For the
 map of capabilities to the source files that define them, see
-[workflow-capabilities.md](../workflow-capabilities.md).
+[workflow-capabilities.md](../reference/workflow-capabilities.md).
 
 ## Index — what each file teaches
 
@@ -27,6 +33,7 @@ map of capabilities to the source files that define them, see
 | `09-cowork-step.wd.json` | `cowork` live collaboration step |
 | `10-validation-gate.wd.json` | Validation gate with verdicts |
 | `11-fan-out-orchestration.wd.json` | `spawn` + `forEach` fan-out, child workflows, `wait` |
+| `12-previous-run.wd.json` | `inputForNextRun` carry-over between runs — script reads `/output/previous_run.json`, human sets the next value. Needs Docker for the script step. Mechanism reference: [previous-run.md](../reference/previous-run.md) |
 
 Read the file whose capability matches what you are building; the set is small
 enough that reading all of them is also fine and gives full schema coverage.

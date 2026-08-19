@@ -1,3 +1,9 @@
+---
+status: historical
+audience: engineers
+last_reviewed: 2026-05-31
+---
+
 # Cutover Checklist — Firestore → Postgres (ADR-0001)
 
 Operator runbook. Iterative — every phase is observable, reversible, and

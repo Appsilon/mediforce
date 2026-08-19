@@ -1,6 +1,12 @@
+---
+status: accepted
+audience: engineers
+last_reviewed: 2026-08-18
+---
+
 # Output Files live on the run branch of the git workspace
 
-Status: accepted (2026-06-10)
+- **Date:** 2026-06-10
 
 Container agents write files into an ephemeral `/output` mount that is
 deleted after each step — everything except one whitelisted-extension

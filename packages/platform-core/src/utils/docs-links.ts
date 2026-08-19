@@ -4,11 +4,11 @@
  * output. Keeping one copy stops the surfaces drifting when a doc moves.
  */
 export const DOCKER_IMAGE_SETUP_URL =
-  'https://github.com/Appsilon/mediforce/blob/main/docs/how-to/docker-image-setup.md';
+  'https://github.com/Appsilon/mediforce/blob/main/docs/guides/docker-image-setup.md';
 
 /**
  * The four verification gates — schema validation, workflow readiness check,
  * Dry Run, Run — and which question each one answers.
  */
 export const VERIFY_WORKFLOW_URL =
-  'https://github.com/Appsilon/mediforce/blob/main/docs/how-to/verify-a-workflow.md';
+  'https://github.com/Appsilon/mediforce/blob/main/docs/guides/verify-a-workflow.md';

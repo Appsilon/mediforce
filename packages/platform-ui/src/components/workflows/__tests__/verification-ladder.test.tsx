@@ -71,7 +71,7 @@ describe('VerificationLadder', () => {
     const link = screen.getByRole('link', { name: /which check answers which question/i });
     expect(link).toHaveAttribute(
       'href',
-      'https://github.com/Appsilon/mediforce/blob/main/docs/how-to/verify-a-workflow.md',
+      'https://github.com/Appsilon/mediforce/blob/main/docs/guides/verify-a-workflow.md',
     );
   });
 });

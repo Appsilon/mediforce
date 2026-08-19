@@ -11,9 +11,9 @@ import {
 const REPO_ROOT = resolve(__dirname, '../../../../../../..');
 
 const CASES: Array<[string, string]> = [
-  ['docs/how-to-create-workflow.md', HOW_TO_CREATE_WORKFLOW_DOC],
-  ['docs/workflow-capabilities.md', WORKFLOW_CAPABILITIES_DOC],
-  ['docs/workflow-authoring-golden-rules.md', WORKFLOW_AUTHORING_GOLDEN_RULES_DOC],
+  ['docs/guides/create-workflow.md', HOW_TO_CREATE_WORKFLOW_DOC],
+  ['docs/reference/workflow-capabilities.md', WORKFLOW_CAPABILITIES_DOC],
+  ['docs/reference/workflow-authoring-golden-rules.md', WORKFLOW_AUTHORING_GOLDEN_RULES_DOC],
 ];
 
 describe('embedded workflow docs are in sync with source', () => {

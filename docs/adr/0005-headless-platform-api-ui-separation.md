@@ -1,3 +1,9 @@
+---
+status: accepted
+audience: engineers
+last_reviewed: 2026-07-16
+---
+
 # 0005 — Headless platform: API/UI separation
 
 - **Status:** Accepted (mutable while implementation in progress per the
@@ -13,9 +19,9 @@
     (`CallerScope` + wrapper layer). Partially supersedes ADR-0004 §5
     when the future audit-wiring phase lands — until then ADR-0004 §5
     stands as written.
-  - Implementation plan: [`docs/headless-migration.md`](../headless-migration.md)
+  - Implementation plan: [`docs/archive/headless-migration.md`](../archive/headless-migration.md)
     (living phased plan; deleted on migration completion).
-  - Code architecture reference: [`docs/api-architecture.md`](../api-architecture.md).
+  - Code architecture reference: [`docs/reference/api-architecture.md`](../reference/api-architecture.md).
 
 ## Context
 
@@ -23,7 +29,7 @@
 authorization into a `CallerScope` data-access bag and migrated the
 ten Phase 1 GET endpoints to the handler shape
 `(input, scope) => Promise<output>`. Phase 2 of the headless migration
-([`docs/headless-migration.md`](../headless-migration.md)) is the next
+([`docs/archive/headless-migration.md`](../archive/headless-migration.md)) is the next
 step — migrating eight lifecycle mutation routes (tasks claim/unclaim/
 complete/resolve, process cancel/resume, cron heartbeat) plus deleting
 the parallel Server Actions that hand-roll the same operations through
@@ -46,7 +52,7 @@ every subsequent headless-migration phase inherits.
 Domain terms (Workflow Run, Human Task, Cowork Session, Audit Event,
 …) are defined in [`CONTEXT.md`](../../CONTEXT.md). Implementation
 terms (handler, adapter, scope, contract) are defined in
-[`api-architecture.md`](../api-architecture.md).
+[`api-architecture.md`](../reference/api-architecture.md).
 
 ## Decision
 

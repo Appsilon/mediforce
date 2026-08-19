@@ -19,9 +19,8 @@ import {
  * shared by the auth boundary and the `/api/auth/password-login` route — so the
  * seeded session is byte-identical to a production one.
  *
- * Resolution note: the `@mediforce/source` condition (set by the `test:e2e`
- * npm script via `NODE_OPTIONS`) maps `@mediforce/platform-infra` to its
- * `src/index.ts`, so the drizzle primitives resolve without a build step.
+ * Workspace package exports point directly at source TypeScript, so the
+ * drizzle primitives resolve without a build step.
  */
 
 type PostgresConnection = ReturnType<typeof createPostgresClient>;
