@@ -1,84 +1,50 @@
 # @mediforce/platform-ui
 
-Main web application for Mediforce — built with Next.js 15 (App Router).
+Main web application for Mediforce — Next.js 15 (App Router).
 
 Top of the dependency graph: it consumes every other package and nothing
-consumes it. Workspace-scoped pages live under
-`src/app/(app)/[handle]/`, HTTP route adapters under `src/app/api/`, and
-`src/proxy.ts` handles NextAuth session / API-key auth and CORS.
+consumes it. That position is the reason its rules are about restraint — code
+that lands here is reachable from the browser and from nowhere else.
+
+## What lives here
+
+| Path | Holds |
+|---|---|
+| `src/app/(app)/[handle]/` | Workspace-scoped pages |
+| `src/app/api/` | HTTP route adapters over `platform-api` handlers |
+| `src/proxy.ts` | NextAuth session / API-key auth and CORS |
+| `src/components/`, `src/hooks/`, `src/contexts/` | UI surface |
+| `src/instrumentation*.ts` | OTel wiring ([ADR-0007](../../docs/adr/0007-llm-evaluation-observability.md)) |
+| `e2e/` | L3 API and L4 UI Playwright suites |
+
+## Rules
 
 **Routes are adapters, not logic.** A route parses the request, builds the
 caller scope, calls a handler in
 [`@mediforce/platform-api`](../platform-api/README.md), and serialises the
 result. Business logic in a route is unreachable from the CLI and from agents,
-which call the same handler directly — see
+which call the same handler directly —
 [`docs/reference/api-architecture.md`](../../docs/reference/api-architecture.md).
-Do not add new Server Actions ([ADR-0005](../../docs/adr/0005-headless-platform-api-ui-separation.md)).
 
-The composition root is `getPlatformServices()`, which now lives in
-`@mediforce/platform-api/services`; `src/lib/platform-services.ts` is a
-temporary re-export shim, not an API to extend.
+**No new Server Actions.** Every mutation is a handler plus a Zod contract plus a
+route adapter ([ADR-0005](../../docs/adr/0005-headless-platform-api-ui-separation.md)).
 
-## Getting Started
+**`src/lib/platform-services.ts` is a re-export shim, not an API.** The
+composition root is `getPlatformServices()` in `@mediforce/platform-api/services`;
+the shim exists only until its call sites migrate. Do not add symbols to it.
 
-```bash
-# Install dependencies (from repo root)
-pnpm install
+**Never call `fetch` directly from a client component.** Middleware 401s
+silently because no auth header is attached. Use the typed `mediforce` client
+from `@/lib/mediforce`, or `apiFetch` from `@/lib/api-fetch` for an endpoint
+that is not on the contract — the `use-mediforce` skill has the full ladder.
 
-# Start dev server on port 9003
-pnpm dev
-```
+## Running and testing it
 
-## Environment Variables
+Commands, ports, env vars and troubleshooting live in
+[`docs/start/dev-quickref.md`](../../docs/start/dev-quickref.md); first-time
+setup in [`GETTING-STARTED.md`](../../GETTING-STARTED.md). The authority on this
+package's environment is [`.env.example`](.env.example) — copy it to `.env.local`.
+Nothing is duplicated here, because a second copy is the one that goes stale.
 
-Copy `.env.example` to `.env.local` and fill in values.
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `AUTH_SECRET` | Yes | NextAuth session signing secret (`openssl rand -hex 32`) |
-| `DATABASE_URL` | Yes | Postgres connection string — identity and all app data |
-| `ENABLE_PASSWORD_AUTH` | No | Set to `true` to enable the email + password provider |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | No | Google OAuth provider credentials |
-| `OPENROUTER_API_KEY` | Yes | OpenRouter API key for LLM calls |
-| `PLATFORM_API_KEY` | Yes | Shared API key for cross-app server-to-server auth |
-| `MOCK_AGENT` | No | Set to `true` to use mock agent plugins instead of real Claude CLI — returns fixture data instantly, useful for UI development and UAT |
-
-## Dev Modes
-
-```bash
-# Standard dev server — port 9003, Postgres per .env.local
-pnpm dev
-
-# Mocked agents + seeded demo data — port 9007. No real keys, no Docker.
-# Use this to click through the UI without any setup.
-pnpm dev:mock
-
-# Dev with mock agents against your normal local database
-MOCK_AGENT=true pnpm dev
-```
-
-See `docs/start/running-workspace-locally.md` for the full step-by-step on exercising the workspace + Docker path locally.
-
-## PR Preview Deployments
-
-`vercel.json` configures automatic preview deployments via Vercel. Each pull request gets a temporary URL so reviewers can click through the UI without running the app locally. Preview deployments connect to the staging database.
-
-## Testing
-
-```bash
-# Unit + integration (vitest) — runs from repo root
-pnpm test:unit
-
-# All E2E (L3 + L4, Playwright) — needs Postgres on DATABASE_URL.
-# Playwright's globalSetup applies migrations; auth-setup seeds the user.
-pnpm test:e2e
-```
-
-E2E variants (run from this directory):
-
-```bash
-pnpm test:e2e -- --project=api           # L3 only — API E2E, no browser
-pnpm test:e2e -- --project=authenticated # L4 only — UI E2E
-pnpm test:e2e:headed                     # with visible browser
-pnpm test:e2e:ui                         # Playwright UI mode (interactive)
-```
+`vercel.json` gives every pull request a preview deployment against the staging
+database, and runs the `/api/cron/model-sync` cron.

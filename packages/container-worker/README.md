@@ -18,17 +18,14 @@ difference — same contract either way.
 ## Layout
 
 ```
-src/worker-entry.ts      Process entry point
-src/job-processor.ts     Consumes queue jobs, runs the container
-src/queue-client.ts      Enqueue side
-src/connection.ts        Redis connection
-src/schemas.ts           Job payload contracts
-src/docker-image-builder.ts   On-demand image builds
-src/docker-cleanup.ts    Reaps stale containers
-src/docker-info.ts       Daemon capability probing
-src/file-payload.ts      Workspace file transfer
-src/http-server.ts       Health and status endpoint
+src/worker-entry.ts    Process entry point
+src/queue-client.ts    Enqueue side, used by agent-runtime
+src/job-processor.ts   Consume side — runs the container, streams progress back
+src/schemas.ts         Job payload contracts
 ```
+
+The rest is Docker plumbing the processor leans on: image builds, stale-container
+cleanup, daemon probing, workspace file transfer, and a health endpoint.
 
 ## Rules
 
@@ -40,5 +37,9 @@ means a duplicated audit trail.
 worker are deployed separately and can briefly run different versions. Change
 `src/schemas.ts` additively.
 
-This is infrastructure, exercised by the container runs it serves rather than by
-unit tests of its own.
+## Testing
+
+Vitest covers the pieces with real logic — job processing, image builds,
+payload transfer, cleanup, daemon probing, the health endpoint. The queue
+round trip itself is proven by the container runs it serves, not by mocking
+BullMQ.
