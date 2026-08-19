@@ -12,7 +12,7 @@ import type { WorkflowStep } from '../schemas/workflow-definition';
  * workflow); those are declared in `needsInput` and left empty for the editor's
  * step-error highlighting to surface.
  *
- * None emits `type: 'review'`: those steps keep working, but per ADR-0006 the
+ * None emits `type: 'review'`: those steps keep working, but per ADR-0014 the
  * designer stops offering the type for new ones, so approval belongs on an agent
  * step at L3.
  */
