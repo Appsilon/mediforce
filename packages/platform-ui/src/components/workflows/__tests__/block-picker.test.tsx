@@ -197,7 +197,7 @@ describe('BlockPicker pre-made blocks (Simple tier)', () => {
     }
   });
 
-  it('offers no review-typed block, since that step type is deprecated', () => {
+  it('offers no review-typed block, since the designer no longer creates them', () => {
     for (const preset of BLOCK_PRESETS) {
       expect(preset.payload.type).not.toBe('review');
     }

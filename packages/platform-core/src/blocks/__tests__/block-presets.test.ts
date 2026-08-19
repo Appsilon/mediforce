@@ -62,7 +62,7 @@ describe('BLOCK_PRESETS', () => {
     expect(routing.map((preset) => preset.id)).toContain('route-by-condition');
   });
 
-  it('emits no review-typed step, since that step type is deprecated', () => {
+  it('emits no review-typed step, since the designer no longer creates them', () => {
     for (const preset of BLOCK_PRESETS) {
       expect(preset.payload.type).not.toBe('review');
     }
