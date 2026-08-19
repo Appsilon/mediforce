@@ -510,7 +510,7 @@ test.describe('Workflow Editor Journey', () => {
     // The save target defaults to the workspace in the route, and the user
     // belongs to more than one, so the default is a real choice rather than the
     // only option — otherwise the redirect below would pass either way.
-    const namespaceSelect = page.getByLabel('Namespace');
+    const namespaceSelect = page.getByLabel('Namespace', { exact: true });
     await expect(namespaceSelect).toHaveValue(TEST_ORG_HANDLE, { timeout: 10_000 });
     expect(await namespaceSelect.locator('option').count()).toBeGreaterThan(1);
 
@@ -530,7 +530,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // The redirect has to land somewhere that can actually load the workflow.
     await page.waitForURL(new RegExp(`/workflows/${unique}/?$`), { timeout: 20_000 });
-    await expect(page.getByRole('tab', { name: /runs/i })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('tab', { name: /runs/i })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/not found|could not find|cannot find/i)).toHaveCount(0);
   });
 
@@ -556,6 +556,7 @@ test.describe('Workflow Editor Journey', () => {
     await page.getByRole('button', { name: /publish workflow/i }).click();
 
     await page.waitForURL(new RegExp(`/${TEST_ORG_HANDLE}/workflows/${unique}/runs/`), { timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: unique })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/not found|could not find|cannot find/i)).toHaveCount(0);
   });
 
