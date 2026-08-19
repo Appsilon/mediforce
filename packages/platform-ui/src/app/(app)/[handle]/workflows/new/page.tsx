@@ -95,8 +95,12 @@ export default function NewWorkflowPage() {
     [],
   );
 
-  // Auto-select first namespace when namespaces load
-  const effectiveNamespace = namespace || namespaces[0]?.handle || '';
+  // Default to the workspace the user is standing in, not the first one they
+  // belong to: `namespaces[0]` is typically their personal workspace, so the
+  // old default saved into it and then redirected here, which reads as
+  // "cannot find the workflow" (#1234). The route handle is always present, so
+  // this also removes the empty-namespace case while `namespaces` is loading.
+  const effectiveNamespace = namespace || handle;
 
   const registerCurrentCanvas = useCallback(async (versionTitle: string) => {
     const steps = currentStepsRef.current;
@@ -139,7 +143,7 @@ export default function NewWorkflowPage() {
       );
       setSaveState({ status: 'saved', name: result.name });
       toastRegistrationWarnings(result.warnings, toast);
-      return { name: result.name, version: result.version };
+      return { name: result.name, version: result.version, namespace: effectiveNamespace };
     } catch (err) {
       const { stepErrors: failedSteps, message } = handleSaveFailure(err, orderedSteps);
       setStepErrors(failedSteps);
@@ -159,13 +163,13 @@ export default function NewWorkflowPage() {
         startResolver(result.version);
       } else {
         redirectTimerRef.current = setTimeout(() => {
-          router.push(routes.workflow(handle, result.name));
+          router.push(routes.workflow(result.namespace, result.name));
         }, 500);
       }
     } catch {
       if (startResolver) startResolver(undefined);
     }
-  }, [registerCurrentCanvas, handle, router]);
+  }, [registerCurrentCanvas, router]);
 
   const handleDialogClose = useCallback(() => {
     setDialogOpen(false);

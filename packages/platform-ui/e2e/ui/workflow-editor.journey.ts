@@ -508,11 +508,18 @@ test.describe('Workflow Editor Journey', () => {
 
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
 
-    // The namespace select defaults the save target. Defaulting it to the first
-    // namespace the user belongs to saves into the wrong workspace and then
-    // redirects to this one, which reads as "cannot find the workflow" (#1234).
+    // The namespace select is the save target. Defaulting it to the first
+    // namespace the user belongs to (typically their personal workspace) saves
+    // there and then redirects here, which reads as "cannot find the workflow"
+    // (#1234). Asserted against the route handle rather than a fixed value, so
+    // it holds however the user's namespaces happen to be ordered.
     const namespaceSelect = page.locator('select').first();
     await expect(namespaceSelect).toHaveValue(TEST_ORG_HANDLE, { timeout: 10_000 });
+
+    // The user belongs to more than this workspace, so the default is a real
+    // choice rather than the only option — otherwise this proves nothing.
+    const options = await namespaceSelect.locator('option').count();
+    expect(options).toBeGreaterThan(1);
   });
 
   test('saving a workflow with an added block lands on a page that finds it (#1234)', async ({ page }) => {
