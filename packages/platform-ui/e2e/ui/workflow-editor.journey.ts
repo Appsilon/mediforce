@@ -539,7 +539,8 @@ test.describe('Workflow Editor Journey', () => {
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
 
-    const unique = `e2e-1234-dry-${Date.now()}`;
+    const stamp = String(Date.now());
+    const unique = `e2e-1234-dry-${stamp}`;
     await page.getByPlaceholder('Add a Workflow Name…').fill(unique);
     await page.getByPlaceholder('Add a workflow description…').fill('Save and Dry Run namespace parity');
 
@@ -556,8 +557,13 @@ test.describe('Workflow Editor Journey', () => {
     await page.getByRole('button', { name: /publish workflow/i }).click();
 
     await page.waitForURL(new RegExp(`/${TEST_ORG_HANDLE}/workflows/${unique}/runs/`), { timeout: 30_000 });
-    await expect(page.getByRole('heading', { name: unique })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText(/not found|could not find|cannot find/i)).toHaveCount(0);
+
+    // The run report titles itself with the definition name run through
+    // `formatStepName`, which spaces and title-cases it; the timestamp is the
+    // part that survives unchanged. Waiting for the report rules out asserting
+    // against the loading skeleton, which says neither "found" nor "not found".
+    await expect(page.getByRole('heading', { name: new RegExp(stamp) })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Run not found.')).toHaveCount(0);
   });
 
   test('new workflow save blocked when workflow name slugifies to empty', async ({ page }) => {
