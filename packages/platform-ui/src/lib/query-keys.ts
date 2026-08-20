@@ -63,6 +63,11 @@ export const queryKeys = {
   workflowVersions: (namespace: string, name: string) =>
     ['workflow-versions', namespace, name] as const,
 
+  /** Live trigger rows for a workflow (triggers.list), reflecting the unified
+   *  `triggers` table's enabled/schedule state (ADR-0011). */
+  workflowTriggers: (namespace: string, name: string) =>
+    ['workflow-triggers', namespace, name] as const,
+
   /** Aggregate step-entry view for a process instance (processes.getSteps). */
   processSteps: (instanceId: string) => ['process-steps', instanceId] as const,
 
@@ -97,7 +102,6 @@ export const queryKeys = {
   },
   /** Single-namespace detail (members + metadata). */
   namespace: (handle: string) => ['namespace', handle] as const,
-  namespaceMembers: (handle: string) => ['namespace-members', handle] as const,
   agentRuns: {
     /** Prefix matcher — `['agent-runs']` invalidates every list slice. */
     all: () => ['agent-runs'] as const,

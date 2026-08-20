@@ -17,7 +17,6 @@ const baseWd = {
     { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
   ],
   transitions: [{ from: 'scan', to: 'done' }],
-  triggers: [{ type: 'manual' as const, name: 'Start' }],
 };
 
 describe('WorkflowDefinitionSchema — inputForNextRun', () => {

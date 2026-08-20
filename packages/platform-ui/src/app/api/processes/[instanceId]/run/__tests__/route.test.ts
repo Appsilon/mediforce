@@ -643,7 +643,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
         stepId: 'design',
         outputSchema: expect.objectContaining({
           type: 'object',
-          required: expect.arrayContaining(['name', 'steps', 'transitions', 'triggers']),
+          required: expect.arrayContaining(['name', 'steps', 'transitions']),
           properties: expect.objectContaining({
             name: expect.objectContaining({ type: 'string' }),
             steps: expect.objectContaining({ type: 'array' }),

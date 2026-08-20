@@ -62,13 +62,6 @@ export const TransitionSchema = z.object({
   when: z.string().optional(),
 });
 
-export const TriggerSchema = z.object({
-  type: z.enum(['manual', 'webhook', 'event', 'cron']),
-  name: z.string().min(1),
-  config: z.record(z.string(), z.unknown()).optional(),
-  schedule: z.string().optional(),
-});
-
 /** A git commit SHA: 7–40 lowercase hex chars. Shared by every field that pins
  *  an immutable commit (RepoSchema, externalSkillsRepo, container build source,
  *  imported-workflow provenance) so the validation lives in one place. */
@@ -91,7 +84,6 @@ export const ProcessDefinitionSchema = z.object({
   url: z.string().url().optional(),
   steps: z.array(StepSchema).min(1),
   transitions: z.array(TransitionSchema),
-  triggers: z.array(TriggerSchema).min(1),
   metadata: z.record(z.string(), z.unknown()).optional(),
   archived: z.boolean().optional(),
 });
@@ -108,5 +100,4 @@ export type StepParam = z.infer<typeof StepParamSchema>;
 export type Selection = z.infer<typeof SelectionSchema>;
 export type Step = z.infer<typeof StepSchema>;
 export type Transition = z.infer<typeof TransitionSchema>;
-export type Trigger = z.infer<typeof TriggerSchema>;
 export type ProcessDefinition = z.infer<typeof ProcessDefinitionSchema>;

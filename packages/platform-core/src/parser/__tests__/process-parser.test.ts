@@ -24,7 +24,6 @@ describe('parseProcessDefinition', () => {
       expect(result.data.version).toBe('1.0');
       expect(result.data.steps).toHaveLength(2);
       expect(result.data.transitions).toHaveLength(1);
-      expect(result.data.triggers).toHaveLength(1);
     });
 
     it('parses full YAML with all optional fields correctly', () => {
@@ -42,7 +41,6 @@ describe('parseProcessDefinition', () => {
       });
       expect(result.data.steps).toHaveLength(4);
       expect(result.data.transitions).toHaveLength(1);
-      expect(result.data.triggers).toHaveLength(2);
     });
 
     it('parses review step verdicts with correct target step IDs', () => {
@@ -119,16 +117,6 @@ describe('parseProcessDefinition', () => {
   });
 
   describe('schema validation errors', () => {
-    it('returns error mentioning "triggers" when triggers are missing', () => {
-      const yaml = loadFixture('invalid-schema.yaml');
-      const result = parseProcessDefinition(yaml);
-
-      expect(result.success).toBe(false);
-      if (result.success) return;
-
-      expect(result.error.toLowerCase()).toContain('triggers');
-    });
-
     it('returns error mentioning step type for unknown step type', () => {
       const yaml = loadFixture('invalid-schema.yaml');
       const result = parseProcessDefinition(yaml);

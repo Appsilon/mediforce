@@ -44,7 +44,7 @@ export const workflowListVersionsCommand = defineCommand({
       const flags = version.archived ? ' [archived]' : '';
       const title = version.title !== undefined ? `  "${version.title}"` : '';
       output.stdout(
-        `  v${String(version.version)}${flags} — ${String(version.stepCount)} steps, ${String(version.triggerCount)} triggers${title}`,
+        `  v${String(version.version)}${flags} — ${String(version.stepCount)} steps${title}`,
       );
     }
     return 0;

@@ -61,7 +61,6 @@ const coworkDesignerDef: WorkflowDefinition = {
     { from: 'intake', to: 'design' },
     { from: 'design', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start' }],
 };
 
 let processRepo: InMemoryProcessRepository;
@@ -155,7 +154,6 @@ describe('Cowork lifecycle: route → simulate session → finalize → complete
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'intake', to: 'done' }],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     await coworkSessionRepo.finalize(session.id, artifact);
 

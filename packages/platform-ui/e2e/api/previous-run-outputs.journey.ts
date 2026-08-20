@@ -73,7 +73,6 @@ test.describe('Previous run outputs — API E2E', () => {
         },
       ],
       transitions: [{ from: 'set-next', to: 'done' }],
-      triggers: [{ type: 'manual', name: 'Start' }],
       inputForNextRun: [
         { stepId: 'set-next', output: 'message', as: 'message' },
       ],

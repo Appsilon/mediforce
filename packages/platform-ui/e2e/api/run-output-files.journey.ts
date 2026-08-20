@@ -65,7 +65,6 @@ test.describe('Run Output Files — API E2E', () => {
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'generate', to: 'done' }],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     const createWdRes = await request.post(
       `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,

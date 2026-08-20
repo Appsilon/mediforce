@@ -119,13 +119,12 @@ export const workflowRegisterCommand = defineCommand({
         namespace: args.namespace,
         stepCount: body.steps.length,
         transitionCount: body.transitions.length,
-        triggerCount: body.triggers.length,
       };
       if (jsonMode) {
         printJson(output, summary);
       } else {
         output.stdout(
-          `[dry-run] OK — ${body.name} (namespace: ${args.namespace}, ${String(body.steps.length)} steps, ${String(body.transitions.length)} transitions, ${String(body.triggers.length)} triggers)`,
+          `[dry-run] OK — ${body.name} (namespace: ${args.namespace}, ${String(body.steps.length)} steps, ${String(body.transitions.length)} transitions)`,
         );
       }
       await warnMissingImages(body, output, jsonMode);

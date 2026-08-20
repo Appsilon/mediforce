@@ -5,8 +5,9 @@ import {
   InMemoryAuditRepository,
   InMemoryHumanTaskRepository,
   InMemoryCoworkSessionRepository,
+  InMemoryTriggerRepository,
 } from '@mediforce/platform-core';
-import type { WorkflowDefinition } from '@mediforce/platform-core';
+import type { TriggerResource, WorkflowDefinition } from '@mediforce/platform-core';
 import { WorkflowEngine } from '../../engine/workflow-engine';
 import { WebhookRouter } from '../webhook-router';
 
@@ -32,21 +33,35 @@ const definition: WorkflowDefinition = {
     },
   ],
   transitions: [],
-  triggers: [
-    {
-      type: 'webhook',
-      name: 'main',
-      config: { method: 'POST', path: '/execution-summaries' },
-    },
-  ],
 };
 
+/** An enabled `webhook` row in the unified triggers table. */
+function webhookRow(
+  overrides: Partial<Extract<TriggerResource, { type: 'webhook' }>> = {},
+): TriggerResource {
+  const now = new Date().toISOString();
+  return {
+    type: 'webhook',
+    namespace: 'examples',
+    workflowName: 'execution-summaries-api',
+    name: 'main',
+    enabled: true,
+    config: { method: 'POST', path: '/execution-summaries' },
+    lastTriggeredAt: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
 let processRepo: InMemoryProcessRepository;
+let triggerRepo: InMemoryTriggerRepository;
 let engine: WorkflowEngine;
 let router: WebhookRouter;
 
 beforeEach(async () => {
   processRepo = new InMemoryProcessRepository();
+  triggerRepo = new InMemoryTriggerRepository();
   const instanceRepo = new InMemoryProcessInstanceRepository();
   const auditRepo = new InMemoryAuditRepository();
   const humanTaskRepo = new InMemoryHumanTaskRepository();
@@ -61,8 +76,9 @@ beforeEach(async () => {
     humanTaskRepo,
     coworkSessionRepo,
   );
-  router = new WebhookRouter(engine, processRepo);
+  router = new WebhookRouter(engine, processRepo, triggerRepo);
   await processRepo.saveWorkflowDefinition(definition);
+  await triggerRepo.create(webhookRow());
 });
 
 describe('WebhookRouter', () => {
@@ -93,7 +109,7 @@ describe('WebhookRouter', () => {
       new InMemoryHumanTaskRepository(),
       new InMemoryCoworkSessionRepository(),
     );
-    router = new WebhookRouter(engine, processRepo);
+    router = new WebhookRouter(engine, processRepo, triggerRepo);
 
     const result = await router.route({
       namespace: 'examples',
@@ -175,6 +191,42 @@ describe('WebhookRouter', () => {
     expect(result.status).toBe(405);
   });
 
+  it('returns 404 when the matching webhook row is stopped (disabled)', async () => {
+    // Stop the webhook: the row exists but is disabled, so its endpoint no
+    // longer resolves. This is the table-backed lifecycle #931 buys — no new
+    // definition version needed to take a webhook offline.
+    await triggerRepo.update('examples', 'execution-summaries-api', 'main', {
+      enabled: false,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const result = await router.route({
+      namespace: 'examples',
+      workflowName: 'execution-summaries-api',
+      suffix: '/execution-summaries',
+      method: 'POST',
+      body: {},
+    });
+    expect(result.status).toBe(404);
+  });
+
+  it('resolves against the detached triggers table', async () => {
+    // Attach a second webhook at a NEW path that the definition never
+    // declared. The router must resolve it purely from the table.
+    await triggerRepo.create(
+      webhookRow({ name: 'reports', config: { method: 'POST', path: '/reports' } }),
+    );
+
+    const result = await router.route({
+      namespace: 'examples',
+      workflowName: 'execution-summaries-api',
+      suffix: '/reports',
+      method: 'POST',
+      body: { hello: 'world' },
+    });
+    expect(result.status).toBe(202);
+  });
+
   it('returns 400 when namespace is empty', async () => {
     const result = await router.route({
       namespace: '',
@@ -203,6 +255,8 @@ describe('WebhookRouter', () => {
     };
     await processRepo.saveWorkflowDefinition(tenantBV5);
     await processRepo.saveWorkflowDefinition(tenantAV3);
+    await triggerRepo.create(webhookRow({ namespace: 'tenant-a' }));
+    await triggerRepo.create(webhookRow({ namespace: 'tenant-b' }));
 
     const result = await router.route({
       namespace: 'tenant-a',

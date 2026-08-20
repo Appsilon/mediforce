@@ -2,7 +2,7 @@
 
 These files are tutorial examples for the workflow definition schema. They are
 small on purpose: each example demonstrates one concept, such as review loops,
-script variants, action steps, trigger varieties, or validation gates.
+script variants, action steps, trigger input, or validation gates.
 
 They are not complete production Workflow Packages. For production package
 standards, use [workflow-authoring-golden-rules.md](../workflow-authoring-golden-rules.md)
@@ -22,7 +22,7 @@ map of capabilities to the source files that define them, see
 | `04b-script-r-clinical.wd.json` | R runtime script step |
 | `05-action-steps.wd.json` | `http`, `reshape`, `email` actions |
 | `06-env-secrets-databricks.wd.json` | `env`, secrets, Databricks job step |
-| `07-trigger-varieties.wd.json` | `manual`, webhook, cron triggers |
+| `07-trigger-varieties.wd.json` | `triggerInput` fields (triggers themselves are table resources, not declared on the definition — see ADR-0011) |
 | `08-selection-review.wd.json` | `selection` + human review |
 | `09-cowork-step.wd.json` | `cowork` live collaboration step |
 | `10-validation-gate.wd.json` | Validation gate with verdicts |

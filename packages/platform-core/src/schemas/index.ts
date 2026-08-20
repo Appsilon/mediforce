@@ -6,7 +6,6 @@ export {
   normalizeSelection,
   StepSchema,
   TransitionSchema,
-  TriggerSchema,
   ProcessDefinitionSchema,
   type Verdict,
   type StepUi,
@@ -14,7 +13,6 @@ export {
   type Selection,
   type Step,
   type Transition,
-  type Trigger,
   type ProcessDefinition,
 } from './process-definition';
 
@@ -175,7 +173,6 @@ export {
   InputForNextRunEntrySchema,
   TriggerInputFieldSchema,
   HttpMethodSchema,
-  WebhookTriggerConfigSchema,
   HttpActionConfigSchema,
   ReshapeActionConfigSchema,
   EmailActionConfigSchema,
@@ -184,7 +181,7 @@ export {
   WaitActionConfigSchema,
   ActionConfigSchema,
   validateInputForNextRun,
-  validateExecutorAndTriggers,
+  validateSteps,
   validateTriggerInput,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
@@ -209,7 +206,6 @@ export {
   type InputForNextRunEntry,
   type TriggerInputField,
   type HttpMethod,
-  type WebhookTriggerConfig,
   type HttpActionConfig,
   type ReshapeActionConfig,
   type EmailActionConfig,
@@ -280,11 +276,6 @@ export {
 } from './namespace-secret';
 
 export {
-  CronTriggerStateSchema,
-  type CronTriggerState,
-} from './cron-trigger-state';
-
-export {
   TriggerTypeSchema,
   TriggerResourceSchema,
   CronTriggerResourceSchema,
@@ -292,12 +283,19 @@ export {
   ManualTriggerResourceSchema,
   CronTriggerConfigSchema,
   ManualTriggerConfigSchema,
+  WebhookTriggerConfigSchema,
+  PortableTriggerSchema,
+  TriggerConfigFileSchema,
+  toPortableTrigger,
   type TriggerType,
+  type WebhookTriggerConfig,
   type TriggerResource,
   type CronTriggerResource,
   type WebhookTriggerResource,
   type ManualTriggerResource,
   type TriggerConfig,
+  type PortableTrigger,
+  type TriggerConfigFile,
 } from './trigger';
 
 export {

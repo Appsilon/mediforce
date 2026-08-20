@@ -41,7 +41,6 @@ const coworkDef: WorkflowDefinition = {
     { from: 'intake', to: 'design' },
     { from: 'design', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start' }],
 };
 
 const coworkFirstDef: WorkflowDefinition = {
@@ -62,7 +61,6 @@ const coworkFirstDef: WorkflowDefinition = {
   transitions: [
     { from: 'brainstorm', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start' }],
 };
 
 // ---------------------------------------------------------------------------
@@ -128,7 +126,7 @@ describe('Cowork executor: advanceStep routes to cowork step', () => {
     await engine.advanceStep(instance.id, { idea: 'test' }, actor);
 
     // Simulate finalize: advance with artifact as output
-    const artifact = { name: 'my-workflow', steps: [], transitions: [], triggers: [] };
+    const artifact = { name: 'my-workflow', steps: [], transitions: [] };
     const afterFinalize = await engine.advanceStep(instance.id, artifact, actor);
 
     expect(afterFinalize.status).toBe('completed');

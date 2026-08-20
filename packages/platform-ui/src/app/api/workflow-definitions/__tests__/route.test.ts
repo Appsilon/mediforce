@@ -16,6 +16,11 @@ vi.mock('@/lib/platform-services', () => ({
     auditRepo: { append: mockAuditAppend },
     namespaceRepo: {},
     modelRegistryRepo: { list: vi.fn().mockResolvedValue([]) },
+    triggerRepo: {
+      listByWorkflow: vi.fn().mockResolvedValue([]),
+      create: vi.fn(),
+      deleteByWorkflow: vi.fn(),
+    },
   }),
 }));
 
@@ -46,7 +51,6 @@ const validBody = {
   visibility: 'private',
   steps: [{ id: 's1', name: 'Step 1', executor: 'human', assignedRole: 'reviewer' }],
   transitions: [{ from: 's1', to: '__end__' }],
-  triggers: [{ type: 'manual', name: 'manual' }],
 };
 
 describe('POST /api/workflow-definitions', () => {

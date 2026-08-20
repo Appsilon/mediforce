@@ -11,7 +11,6 @@ function workflowDefinition(name: string) {
       { id: 'noop', name: 'No-op Human Step', type: 'creation', executor: 'human' },
     ],
     transitions: [],
-    triggers: [{ type: 'manual', name: 'start' }],
   };
 }
 

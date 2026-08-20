@@ -6,12 +6,6 @@
   "roles": [
     "member"
   ],
-  "triggers": [
-    {
-      "name": "manual",
-      "type": "manual"
-    }
-  ],
   "triggerInput": [
     {
       "name": "userId",

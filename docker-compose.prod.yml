@@ -104,6 +104,7 @@ services:
       # account on earth signing in.
       - ALLOWED_EMAIL_DOMAINS=${ALLOWED_EMAIL_DOMAINS:-}
       - ENABLE_PASSWORD_AUTH=${ENABLE_PASSWORD_AUTH:-}
+      - ENABLE_MAGIC_LINK=${ENABLE_MAGIC_LINK:-}
       # Customer SSO — dormant until OIDC_ISSUER is set.
       - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}

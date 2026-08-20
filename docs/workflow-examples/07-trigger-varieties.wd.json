@@ -1,15 +1,10 @@
 {
-  "name": "tutorial-trigger-varieties",
-  "title": "Triggers & Trigger Input",
-  "description": "Multiple trigger types on one workflow — manual, webhook (with method + path config), and cron (with schedule). Demonstrates triggerInput fields that the user fills at trigger time, accessible as variables.* in when expressions.",
+  "name": "tutorial-trigger-input",
+  "title": "Trigger Input",
+  "description": "Demonstrates triggerInput fields that the user fills at trigger time, accessible as variables.* in when expressions. Triggers (manual, webhook, cron) are independent table resources managed via `mediforce workflow trigger-*` — they are no longer declared on the definition (ADR-0011, Issue #932).",
   "env": {
     "APP_BASE_URL": "{{APP_BASE_URL}}"
   },
-  "triggers": [
-    { "type": "manual", "name": "manual" },
-    { "type": "webhook", "name": "on-push", "config": { "method": "POST", "path": "/hooks/ingest" } },
-    { "type": "cron", "name": "nightly", "schedule": "0 2 * * *" }
-  ],
   "triggerInput": [
     {
       "name": "source",

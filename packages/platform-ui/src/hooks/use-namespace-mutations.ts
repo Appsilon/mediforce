@@ -62,7 +62,7 @@ export function useUpdateNamespace(handle: string) {
     },
     onSuccess: (data) => {
       qc.setQueryData<GetNamespaceOutput | undefined>(queryKeys.namespace(handle), (prev) => {
-        if (prev === undefined) return { namespace: data.namespace, members: [] };
+        if (prev === undefined) return { namespace: data.namespace, members: [], adminContact: null };
         return { ...prev, namespace: data.namespace };
       });
       qc.setQueryData<GetMeOutput | undefined>(queryKeys.users.me(), (prev) => {

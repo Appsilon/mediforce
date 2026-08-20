@@ -40,7 +40,6 @@ const REVIEW_THEN_DONE: WorkflowDefinition = {
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
   ],
   transitions: [{ from: 'review', to: 'done' }],
-  triggers: [{ type: 'manual', name: 'Start' }],
 };
 
 const PARAMS_THEN_DONE: WorkflowDefinition = {
@@ -53,7 +52,6 @@ const PARAMS_THEN_DONE: WorkflowDefinition = {
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
   ],
   transitions: [{ from: 'collect', to: 'done' }],
-  triggers: [{ type: 'manual', name: 'Start' }],
 };
 
 function pausedReviewInstance(

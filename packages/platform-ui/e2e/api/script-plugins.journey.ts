@@ -120,7 +120,6 @@ test.describe('script-container dispatch — API E2E', () => {
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'emit-result', to: 'done' }],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
 
     const createWdRes = await request.post(
@@ -217,7 +216,6 @@ test.describe('databricks-job dispatch — API E2E', () => {
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'run-checks', to: 'done' }],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
 
     const createWdRes = await request.post(

@@ -32,7 +32,6 @@ const linearDef: WorkflowDefinition = {
     { from: 'start', to: 'process' },
     { from: 'process', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start Process' }],
 };
 
 const branchingDef: WorkflowDefinition = {
@@ -52,7 +51,6 @@ const branchingDef: WorkflowDefinition = {
     { from: 'path-a', to: 'done' },
     { from: 'path-b', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start Branching' }],
 };
 
 const reviewDef: WorkflowDefinition = {
@@ -83,7 +81,6 @@ const reviewDef: WorkflowDefinition = {
     { from: 'review', to: 'draft' },
     { from: 'review', to: 'rejected' },
   ],
-  triggers: [{ type: 'manual', name: 'Start Review' }],
 };
 
 const actor: StepActor = { id: 'user-1', role: 'operator' };
@@ -642,7 +639,6 @@ describe('WorkflowEngine', () => {
         transitions: [
           { from: 'start', to: 'review' },
         ],
-        triggers: [{ type: 'manual' as const, name: 'Start' }],
       };
       await processRepo.saveWorkflowDefinition(defWithVerdicts);
 
@@ -697,7 +693,6 @@ describe('WorkflowEngine', () => {
           { from: 'start', to: 'process' },
           { from: 'process', to: 'done' },
         ],
-        triggers: [{ type: 'manual' as const, name: 'Start' }],
       };
       await processRepo.saveWorkflowDefinition(defWithRoles);
 
@@ -745,7 +740,6 @@ describe('WorkflowEngine', () => {
           { from: 'start', to: 'process' },
           { from: 'process', to: 'done' },
         ],
-        triggers: [{ type: 'manual' as const, name: 'Start' }],
       };
       await processRepo.saveWorkflowDefinition(defWithRoles);
 
@@ -790,7 +784,6 @@ describe('WorkflowEngine', () => {
         { from: 'generate', to: 'select-review' },
         { from: 'select-review', to: 'done' },
       ],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
 
     it('copies selection and options to HumanTask when review step has selection', async () => {
@@ -896,7 +889,6 @@ describe('WorkflowEngine', () => {
           { from: 'fetch', to: 'assign' },
           { from: 'assign', to: 'done' },
         ],
-        triggers: [{ type: 'manual', name: 'Start' }],
       };
       await processRepo.saveWorkflowDefinition(tableDef);
 
@@ -939,7 +931,6 @@ const linearWorkflowDef: WorkflowDefinition = {
     { from: 'start', to: 'process' },
     { from: 'process', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start Workflow' }],
   roles: ['operator', 'reviewer'],
 };
 
@@ -972,7 +963,6 @@ const reviewWorkflowDef: WorkflowDefinition = {
     { from: 'review', to: 'draft' },
     { from: 'review', to: 'rejected' },
   ],
-  triggers: [{ type: 'manual', name: 'Start Review Workflow' }],
   roles: ['reviewer'],
 };
 
@@ -1223,7 +1213,6 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
       { from: 'agent-step', to: 'human-step' },
       { from: 'human-step', to: 'done' },
     ],
-    triggers: [{ type: 'manual', name: 'Start' }],
   };
 
   it('[DATA] advanceStep after L2 agent completion routes to next human step and pauses', async () => {
@@ -1261,7 +1250,6 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'agent-step', to: 'done' }],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     await processRepo.saveWorkflowDefinition(directTerminalDef);
     const instance = await engine.createInstance('test', 'direct-terminal', 1, 'user-1', 'manual');
@@ -1291,7 +1279,6 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
         { from: 'step-1', to: 'step-2' },
         { from: 'step-2', to: 'done' },
       ],
-      triggers: [{ type: 'manual', name: 'Start' }],
     };
     await processRepo.saveWorkflowDefinition(chainedAgentDef);
     const instance = await engine.createInstance('test', 'chained-agents', 1, 'user-1', 'manual');

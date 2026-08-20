@@ -108,9 +108,8 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
      lands; the MVP at most carries one smoke test against a local Keycloak.
      Shipped now because it *is* the on-prem SSO GTM story and costs almost
      nothing dormant.
-   - **Email magic link** — **deferred** (was a fourth provider in the
-     draft). Needs SMTP wiring + the verification-token flow, which nobody
-     needs today. Add when a deployment without Google/OIDC/password asks.
+   - **Email magic link** — deferred at cutover, **now implemented** post-cutover
+     (`ENABLE_MAGIC_LINK`). See the 2026-07-23 addendum at the end of this ADR.
 
 4a. **Email-domain allowlist (decision 2026-06-16).** A deployment-level
    `ALLOWED_EMAIL_DOMAINS` env (comma-separated, e.g. `appsilon.com`) is
@@ -346,8 +345,10 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
   when a customer with >100 users asks.
 - **Federated logout / single sign-out** — supported by NextAuth for OIDC
   but needs wiring. Future ADR.
-- **Firebase Auth password hash migration** — explicitly deferred. Active
-  password users re-enroll via magic link or set a new password.
+- **Firebase Auth password hash migration** — **not done.** Legacy Firebase
+  passwords are not carried over; existing users are re-invited via the
+  activation-link flow (they set a fresh password) and magic-link gives
+  password-only users a first-password / recovery path.
 
 ## Open questions for review
 
@@ -367,8 +368,8 @@ see below.)
   anyway). See §3.
 - **Email-domain allowlist.** Added: `ALLOWED_EMAIL_DOMAINS` enforced in the
   `signIn` callback — mandatory in spirit once Google is on. See §4a.
-- **Magic-link provider.** Deferred (SMTP + verification-token flow; nobody
-  needs it today). See §4.
+- **Magic-link provider.** Deferred at cutover; implemented post-cutover
+  (`ENABLE_MAGIC_LINK`). See §4 and the 2026-07-23 addendum.
 
 - **Auth carrier (browser → API).** Resolved: cookie-native, same-origin
   (decision §6). The browser uses the NextAuth httpOnly session cookie;
@@ -378,3 +379,98 @@ see below.)
   completed 2026-05-31, PR #534). Mediforce now runs on Postgres + Firebase
   Auth — exactly the stable hybrid this ADR's §8 assumed. ADR-0002 is the
   next cutover; no bundling question remains.
+
+## Addendum (2026-07-23) — first-password delivery
+
+The staging cutover landed first-password delivery as a deliberate follow-up
+(issues #1001, #1002). This addendum records that decision.
+
+### The problem
+
+A pure password-only user (no Google, no existing session) had no way to obtain
+a FIRST password after the cutover: `set-password` needs a session, and the
+seed-based invite writes no password hash — a chicken-and-egg dead end
+(#1001 recovery, #1002 invite dead-end). Existing Firebase password users are in
+the same position after the cutover: their credential did not move, so they get a
+fresh password through the same first-password paths below.
+
+### First-password delivery via magic-link (implemented)
+
+Enable the **Auth.js Email provider** (`ENABLE_MAGIC_LINK`, reusing the
+`auth_verification_tokens` table and the configured Mailgun/SMTP sender). Unlike
+Credentials, the Email provider is fully compatible with the `database` session
+strategy — it mints the same `auth_sessions` row + cookie as Google, so
+revocation (§3) is unchanged. The link is gated: it is sent **only** to an
+address that already belongs to an `auth_users` row on an allowlisted domain
+(no self-registration; a miss returns silently for anti-enumeration). After
+signing in, the user sets a first password via the existing
+`POST /api/users/set-password`. This closes #1001 and #1002 with one provider.
+
+Chosen over an invite-minted one-time set-password link (narrower, still custom
+token plumbing) and admin-initiated reset (no self-service recovery).
+
+### Firebase passwords are not migrated
+
+Legacy Firebase scrypt passwords are **not** carried over. Existing users are
+re-invited via the activation-link flow (invite onboarding, below) and set a
+fresh password; magic-link is the recovery path for password-only users.
+
+## Addendum (2026-07-24) — invite onboarding
+
+The cutover removed the Firebase create-user-with-temp-password flow (`seedInvite`
+writes no password), which stranded a password-only invitee with no first-login
+path. The Force-Password-Change plumbing (`user_profiles.must_change_password`,
+`/change-password`, `clearMustChangePassword`) survived the cutover but nothing
+triggered it. This addendum wires invite onboarding onto it.
+
+### The flow
+An invite to a **pending** invitee (no session, no password) now:
+1. seeds the `auth_users` row + membership (unchanged), and sets
+   `must_change_password = true` — the **credential-setup gate**.
+2. sends an **activation email**: a one-time link `…/api/auth/callback/email?
+   callbackUrl=/change-password&token=…&email=…`.
+3. clicking it mints the same `auth_sessions` row + cookie as any provider and
+   lands on `/change-password`, which — because there is no existing hash —
+   renders "Create your new password" (no current-password field) and, on set,
+   clears the gate and continues into the workspace.
+
+### Decisions
+- **`must_change_password` is kept (not renamed).** It is the pure "block until a
+  credential exists" gate. The create-vs-change distinction (copy + the
+  re-authentication rule on `set-password`) already branches on `hasPassword`,
+  not on this flag — so the flag is not overloaded, it is just the gate.
+- **Two token kinds, one table/callback.** The invite **activation link** is
+  minted server-side (`mintVerificationToken`) with a **7-day** `expires` — people
+  act on invites over days. The login **magic-link** keeps the Email provider's
+  **15-minute** `maxAge` — a login link must be short-lived. Both live in
+  `auth_verification_tokens` and go through the same `/api/auth/callback/email`;
+  the callback honours each row's own `expires`. `mintVerificationToken`
+  replicates Auth.js's `sha256(token + AUTH_SECRET)` hashing so the existing
+  callback accepts our rows — pinned by a test that drives the real callback.
+- **Registration is decoupled from login-page display.** The Email provider is
+  registered whenever email is configured (it powers invite activation links),
+  **independent of `ENABLE_MAGIC_LINK`**, which now only controls whether the
+  login page offers "Email me a sign-in link" (surfaced by
+  `/api/auth/magic-link-login`). So **invite onboarding works even with login
+  magic-link off**.
+- **Email choice branches on `isInvitePending`, not `isExisting`.** A user
+  invited earlier who never activated is `isExisting === true` but still pending —
+  they must get the activation link, not the "added to a workspace" notice.
+- **Expired activation link** → the styled `/login` error page
+  (`?error=Verification`). Recovery paths, in order of self-sufficiency:
+  1. **Self-service resend** — `POST /api/auth/resend-setup-link` (public, on the
+     login page): a pending invitee re-requests their own fresh 7-day activation
+     link. Works **independent of `ENABLE_MAGIC_LINK`** and needs no admin.
+     Anti-enumeration: identical response whether or not the address is a pending
+     invitee; the link is sent only to a pending, allowlisted account.
+  2. Admin **resend-invite** — issues a fresh link and re-asserts the gate.
+  3. Login magic-link (if enabled) or a Google-domain sign-in.
+
+### Deferred (issue #1048)
+- Global enforcement: today `must_change_password` only redirects from `/login`;
+  a direct navigation to another route is not blocked. A layout/proxy guard
+  should force the gate everywhere.
+- Google exemption: a user who signs in via Google should not be forced to create
+  a local password.
+- Rate-limiting on the activation / magic-link / resend-setup-link sends (spam
+  protection; sibling of the password-login rate-limit #1003).

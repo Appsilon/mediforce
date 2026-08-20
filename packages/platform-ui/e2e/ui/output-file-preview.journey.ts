@@ -43,7 +43,6 @@ async function registerWorkflowDefinition(request: APIRequestContext, wdName: st
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
     ],
     transitions: [{ from: 'generate', to: 'done' }],
-    triggers: [{ type: 'manual', name: 'Start' }],
   };
   const res = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
     headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },

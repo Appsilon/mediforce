@@ -11,17 +11,6 @@
     "url": "https://github.com/Appsilon/mediforce.git",
     "commit": "1e51d23c1fb72d1728acfa081887fd2b95f99dda"
   },
-  "triggers": [
-    { "type": "manual", "name": "manual" },
-    {
-      "type": "webhook",
-      "name": "intake-webhook",
-      "config": {
-        "method": "POST",
-        "path": "/golden-standard/intake"
-      }
-    }
-  ],
   "triggerInput": [
     {
       "name": "studyId",

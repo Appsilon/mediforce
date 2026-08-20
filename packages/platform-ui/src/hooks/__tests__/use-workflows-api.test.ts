@@ -8,6 +8,7 @@ describe('mapApiToDefinitionGroups', () => {
       namespace: 'acme',
       latestVersion: 2,
       defaultVersion: 1,
+      manualStartEnabled: true,
       definition: {
         name: 'test-workflow',
         version: 2,
@@ -16,7 +17,6 @@ describe('mapApiToDefinitionGroups', () => {
           { id: 'process', type: 'agent' },
           { id: 'end', type: 'terminal' },
         ],
-        triggers: [{ type: 'manual', name: 'default' }],
         title: 'Test Workflow',
         description: 'A test',
         namespace: 'acme',
@@ -36,7 +36,6 @@ describe('mapApiToDefinitionGroups', () => {
       versions: [{
         version: '2',
         stepCount: 3,
-        triggerCount: 1,
         title: 'Test Workflow',
         description: 'A test',
       }],
@@ -62,7 +61,6 @@ describe('mapApiToDefinitionGroups', () => {
           name: 'wf-a',
           version: 1,
           steps: [],
-          triggers: [],
           namespace: 'ns-a',
         },
       },
@@ -75,7 +73,6 @@ describe('mapApiToDefinitionGroups', () => {
           name: 'wf-b',
           version: 1,
           steps: [],
-          triggers: [],
           namespace: 'ns-a',
         },
       },
@@ -108,7 +105,6 @@ describe('mapApiToDefinitionGroups', () => {
         name: 'cron-only',
         version: 1,
         steps: [{ id: 's1', type: 'start' }],
-        triggers: [{ type: 'cron', name: 'nightly' }],
         namespace: 'ns',
       },
     }];

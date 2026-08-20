@@ -12,12 +12,6 @@
   "roles": [
     "triager"
   ],
-  "triggers": [
-    {
-      "name": "manual",
-      "type": "manual"
-    }
-  ],
   "triggerInput": [
     {
       "name": "repo",

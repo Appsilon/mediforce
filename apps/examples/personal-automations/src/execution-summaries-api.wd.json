@@ -3,16 +3,6 @@
   "title": "Execution Summaries API",
   "description": "Echo webhook payload through HTTP. Reference template for webhook + single http action.",
   "preamble": "## Domain Context\nReference workflow. Validates webhook trigger -> http action -> polling round-trip against a local echo server.",
-  "triggers": [
-    {
-      "type": "webhook",
-      "name": "main",
-      "config": {
-        "method": "POST",
-        "path": "/execution-summaries"
-      }
-    }
-  ],
   "steps": [
     {
       "id": "echo",

@@ -51,7 +51,6 @@ const existingDefinition: WorkflowDefinition = {
   visibility: 'private',
   steps: [{ id: 's1', name: 'S1', executor: 'human', assignedRole: 'reviewer' }],
   transitions: [{ from: 's1', to: '__end__' }],
-  triggers: [{ type: 'manual', name: 'manual' }],
   createdAt: '2026-01-01T00:00:00Z',
 };
 

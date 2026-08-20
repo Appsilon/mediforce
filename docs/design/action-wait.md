@@ -39,7 +39,7 @@ export const WaitActionConfigSchema = z.object({
 
 // NOTE: No .refine() here — Zod discriminatedUnion requires plain z.object arms.
 // Mutual exclusivity (exactly one of duration/deadline) and zero-duration guard
-// are validated in validateExecutorAndTriggers (superRefine on WorkflowDefinitionSchema):
+// are validated in validateSteps (superRefine on WorkflowDefinitionSchema):
 //   if (step.action?.kind === 'wait') {
 //     const c = step.action.config;
 //     if ((c.duration !== undefined) === (c.deadline !== undefined))
@@ -323,7 +323,7 @@ Example conditions:
 
 | File | Change |
 |------|--------|
-| `platform-core/schemas/workflow-definition.ts` | Add `WaitActionConfigSchema`; extend `ActionConfigSchema` union; add duration/deadline validation to `validateExecutorAndTriggers` |
+| `platform-core/schemas/workflow-definition.ts` | Add `WaitActionConfigSchema`; extend `ActionConfigSchema` union; add duration/deadline validation to `validateSteps` |
 | `platform-core/index.ts` | Re-export new types |
 | `core-actions/handlers/wait.ts` | New file: wait handler |
 | `core-actions/handlers/__tests__/wait.test.ts` | New file: handler tests |

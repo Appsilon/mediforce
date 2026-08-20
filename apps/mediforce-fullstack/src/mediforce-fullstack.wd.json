@@ -474,16 +474,5 @@
       "from": "mark-needs-info",
       "to": "done"
     }
-  ],
-  "triggers": [
-    {
-      "type": "cron",
-      "name": "every-15-min",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "type": "manual",
-      "name": "manual"
-    }
   ]
 }

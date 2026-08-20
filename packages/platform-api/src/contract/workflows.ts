@@ -107,6 +107,13 @@ export const WorkflowDefinitionGroupSchema = z.object({
   defaultVersion: z.number().int().positive().nullable(),
   definition: WorkflowDefinitionSchema.nullable(),
   runSummary: WorkflowRunSummarySchema,
+  /**
+   * Whether the workflow has an **enabled `manual` trigger row** (ADR-0011) —
+   * i.e. it is hand-startable. Read from the `triggers` table (Issue #930):
+   * the catalog's Start Run gate is the same source of truth as the server
+   * guard. Defaults to `false` for older clients.
+   */
+  manualStartEnabled: z.boolean().default(false),
 });
 
 export const ListWorkflowsInputSchema = z.object({
@@ -150,7 +157,6 @@ export const WorkflowVersionSummarySchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
   stepCount: z.number().int().nonnegative(),
-  triggerCount: z.number().int().nonnegative(),
   createdAt: z.string().datetime().optional(),
 });
 

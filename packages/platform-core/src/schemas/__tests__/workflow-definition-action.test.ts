@@ -9,13 +9,6 @@ const baseTemplate = {
   name: 'execution-summaries-api',
   title: 'Execution Summaries API',
   description: 'Echo webhook payload through HTTP',
-  triggers: [
-    {
-      type: 'webhook',
-      name: 'main',
-      config: { method: 'POST', path: '/execution-summaries' },
-    },
-  ],
   steps: [
     {
       id: 'echo',
@@ -91,30 +84,6 @@ describe('workflow-definition action executor', () => {
           type: 'terminal',
           executor: 'action',
           action: { kind: 'noop', config: {} },
-        },
-      ],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects webhook trigger without method+path config', () => {
-    const result = parseWorkflowDefinitionForCreation({
-      ...baseTemplate,
-      namespace: 'examples',
-      triggers: [{ type: 'webhook', name: 'main', config: {} }],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects webhook trigger with bad path (missing leading /)', () => {
-    const result = parseWorkflowDefinitionForCreation({
-      ...baseTemplate,
-      namespace: 'examples',
-      triggers: [
-        {
-          type: 'webhook',
-          name: 'main',
-          config: { method: 'POST', path: 'execution-summaries' },
         },
       ],
     });

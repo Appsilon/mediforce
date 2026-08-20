@@ -28,11 +28,10 @@ describe('protocol-to-tfl process definition', () => {
     expect(def.version).toBeDefined();
   });
 
-  it('[DATA] has a manual trigger', () => {
+  it('[DATA] does not declare triggers (definitions are trigger-free, Issue #932)', () => {
     const def = loadDefinition();
 
-    const manualTrigger = def.triggers.find((t) => t.type === 'manual');
-    expect(manualTrigger).toBeDefined();
+    expect((def as Record<string, unknown>).triggers).toBeUndefined();
   });
 
   it('[DATA] first step is upload-documents with file-upload UI', () => {

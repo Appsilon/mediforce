@@ -27,12 +27,6 @@
     "CRO_CONTACT_EMAIL": "{{CRO_CONTACT_EMAIL_CDISCPILOT01}}",
     "DATA_MANAGER_EMAIL": "{{DATA_MANAGER_EMAIL_CDISCPILOT01}}"
   },
-  "triggers": [
-    {
-      "name": "manual",
-      "type": "manual"
-    }
-  ],
   "inputForNextRun": [
     {
       "stepId": "sftp-poll",

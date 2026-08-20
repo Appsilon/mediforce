@@ -12,7 +12,10 @@ describe('getWorkflowSchema handler', () => {
     const properties = schema.properties as Record<string, unknown>;
     expect(properties).toHaveProperty('steps');
     expect(properties).toHaveProperty('transitions');
-    expect(properties).toHaveProperty('triggers');
+
+    // Definitions are trigger-free (Issue #932) — triggers are independent
+    // table resources, never part of the authorable definition surface.
+    expect(properties).not.toHaveProperty('triggers');
 
     // Server-managed fields are excluded — authors never supply them.
     expect(properties).not.toHaveProperty('namespace');

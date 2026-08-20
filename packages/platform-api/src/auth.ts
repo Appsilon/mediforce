@@ -96,13 +96,20 @@ export function filterByCaller<T>(
  * Per ADR-0004 §4 the wrapper layer (`AuthorizedScope`) does NOT consult roles;
  * this handler-resident helper is the only consumer.
  */
+export function callerIsNamespaceAdmin(
+  caller: CallerIdentity,
+  namespace: string,
+): boolean {
+  if (caller.isSystemActor) return true;
+  const role = caller.namespaceRoles.get(namespace);
+  return role === 'owner' || role === 'admin';
+}
+
 export function assertCallerIsNamespaceAdmin(
   caller: CallerIdentity,
   namespace: string,
 ): void {
-  if (caller.isSystemActor) return;
-  const role = caller.namespaceRoles.get(namespace);
-  if (role !== 'owner' && role !== 'admin') {
+  if (!callerIsNamespaceAdmin(caller, namespace)) {
     throw new ForbiddenError();
   }
 }

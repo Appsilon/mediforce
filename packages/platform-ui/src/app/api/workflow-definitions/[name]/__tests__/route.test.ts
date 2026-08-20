@@ -21,6 +21,7 @@ vi.mock('@/lib/platform-services', () => ({
     humanTaskRepo: { setDeletedByInstanceIds: mockSetDeletedTasksByInstanceIds },
     auditRepo: { append: mockAuditAppend },
     namespaceRepo: {},
+    triggerRepo: { deleteByWorkflow: vi.fn(), listByWorkflow: vi.fn().mockResolvedValue([]) },
   }),
 }));
 

@@ -136,7 +136,7 @@ describe('importWorkflow handler', () => {
   });
 
   it('throws ValidationError when .wd.json has invalid shape', async () => {
-    mockFetchOk({ name: 'bad', steps: [] }); // missing required triggers
+    mockFetchOk({ name: 'bad', steps: [] }); // missing required definition fields
     const { scope } = buildScope();
 
     await expect(

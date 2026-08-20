@@ -6,7 +6,6 @@
   "expectedError": "has plugin 'script-container' but no script config",
   "definition": {
     "name": "anti-script-no-config",
-    "triggers": [{ "type": "manual", "name": "manual" }],
     "steps": [
       {
         "id": "run-script",

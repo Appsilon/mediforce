@@ -40,7 +40,6 @@ function buildWorkflowContext(overrides: Partial<WorkflowAgentContext> = {}): Wo
     visibility: 'private',
     steps: [step],
     transitions: [],
-    triggers: [{ type: 'manual', name: 'start' }],
     workspace: {},
   };
 

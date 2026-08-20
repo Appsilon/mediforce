@@ -19,9 +19,6 @@
     "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
     "GITHUB_TOKEN": "{{GITHUB_TOKEN}}"
   },
-  "triggers": [
-    { "name": "manual", "type": "manual" }
-  ],
   "triggerInput": [
     {
       "name": "ruleId",

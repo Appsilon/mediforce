@@ -4,10 +4,6 @@ description: >
   Transform clinical trial protocol documents into production-ready
   Tables, Figures, and Listings (TFLs).
 
-triggers:
-  - name: manual
-    type: manual
-
 steps:
   - id: upload-documents
     name: Upload Documents

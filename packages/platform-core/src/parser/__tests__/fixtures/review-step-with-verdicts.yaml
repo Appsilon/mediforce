@@ -29,6 +29,3 @@ transitions:
     to: intake
   - from: compliance-review
     to: rejected
-triggers:
-  - type: manual
-    name: Start Review

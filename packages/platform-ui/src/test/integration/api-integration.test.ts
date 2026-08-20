@@ -1245,7 +1245,6 @@ describe('Mediforce client ↔ route-adapter ↔ listWorkflowVersions (in-proces
     expect(v1?.archived).toBe(false);
     expect(v2?.archived).toBe(true);
     expect(v1?.stepCount).toBe(3);
-    expect(v1?.triggerCount).toBe(1);
   });
 
   it('404s when the workflow does not exist in the caller’s namespace', async () => {

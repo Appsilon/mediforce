@@ -36,7 +36,6 @@ export async function listWorkflowVersions(
     title: definition.title,
     description: definition.description,
     stepCount: definition.steps.length,
-    triggerCount: definition.triggers.length,
     createdAt: definition.createdAt,
   }));
 

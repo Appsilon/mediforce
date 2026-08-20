@@ -1,0 +1,11 @@
+-- Issue #932 (ADR-0011): Workflow Definitions become trigger-free.
+--
+-- Triggers were re-homed onto the unified `triggers` table by migrations
+-- 0036 (cron), 0037 (manual) and 0038 (webhook), which back-filled a row per
+-- declared trigger from every workflow's latest live definition. Every start
+-- path (heartbeat, hand-start guard, webhook router) now reads that table, so
+-- the `triggers` array embedded on each definition version is dead data.
+--
+-- Drop the column. Definitions no longer declare triggers; triggers are
+-- independent, mutable resources managed via `mediforce workflow trigger-*`.
+ALTER TABLE "workflow_definitions" DROP COLUMN "triggers";
