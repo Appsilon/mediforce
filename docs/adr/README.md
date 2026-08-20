@@ -91,3 +91,4 @@ appendix can capture what actually shipped vs the original decision body.
 | [0016](./0016-unified-canvas-first-workflow-designer.md) | Unified canvas-first workflow designer (+ [PLAN](../archive/PLAN-0016.md)) | Proposed |
 | [0017](./0017-retire-llm-maintained-wiki.md) | Retire the LLM-maintained wiki; docs live next to what they describe (+ [PLAN](../archive/PLAN-0017.md), executed) | Accepted |
 | [0018](./0018-fan-out-is-child-workflows.md) | Fan-out over sub-graphs is child workflows; the engine stays linear | Accepted |
+| [0019](./0019-prod-release-deploy.md) | Production deploy via GitHub Releases + pinned image tags | Proposed |
