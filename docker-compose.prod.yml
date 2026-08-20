@@ -58,7 +58,7 @@ services:
   # service_completed_successfully so the app boot never races a
   # half-applied schema.
   migrate:
-    # ADR-0012 — prod is pull-only. The image is the pinned :prod-current the
+    # ADR-0013 — prod is pull-only. The image is the pinned :prod-current the
     # deploy promoted; there is no on-box build.
     image: ghcr.io/appsilon/mediforce-migrate:prod-current
     restart: "no"
@@ -69,7 +69,7 @@ services:
         condition: service_healthy
 
   platform-ui:
-    # ADR-0012 — prod pulls the pinned :prod-current image; no on-box build.
+    # ADR-0013 — prod pulls the pinned :prod-current image; no on-box build.
     image: ghcr.io/appsilon/mediforce-platform-ui:prod-current
     restart: unless-stopped
     mem_limit: ${PLATFORM_UI_MEM_LIMIT:-2g}
@@ -85,7 +85,7 @@ services:
       # injected at container start by docker-entrypoint.sh (replaces the
       # __NEXT_PUBLIC_APP_URL__ placeholder). NEXT_PUBLIC_GIT_SHA is
       # deployment-invariant and baked into the image at CI build time
-      # (ADR-0012), so it is not passed here.
+      # (ADR-0013), so it is not passed here.
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
       # --- Authentication: NextAuth / Auth.js v5 (ADR-0002) ---
       # Server-side only. `instrumentation-node.ts` refuses to boot without
@@ -154,7 +154,7 @@ services:
         condition: service_completed_successfully
 
   container-worker:
-    # ADR-0012 — prod pulls the pinned :prod-current image; no on-box build.
+    # ADR-0013 — prod pulls the pinned :prod-current image; no on-box build.
     image: ghcr.io/appsilon/mediforce-container-worker:prod-current
     restart: unless-stopped
     mem_limit: ${AGENT_WORKER_MEM_LIMIT:-1280m}

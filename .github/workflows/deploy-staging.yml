@@ -36,7 +36,7 @@ jobs:
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
-          # ADR-0012 — the unified deploy.sh. The staging overlay overrides the
+          # ADR-0013 — the unified deploy.sh. The staging overlay overrides the
           # app images back to :latest, so staging keeps tracking `main`.
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy@${{ secrets[matrix.ip_secret] }} \
             "COMPOSE_FILES='docker-compose.prod.yml docker-compose.staging.yml' /opt/mediforce/scripts/deploy.sh $SHA"

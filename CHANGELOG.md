@@ -22,7 +22,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Changed
 
-- Production deploys now run from pinned image tags promoted via GitHub Releases (`:prod-current`/`:prod-previous`), with instant tag-swap rollback ([ADR-0012](docs/adr/0012-prod-release-deploy.md)).
+- Production deploys now run from pinned image tags promoted via GitHub Releases (`:prod-current`/`:prod-previous`), with instant tag-swap rollback ([ADR-0013](docs/adr/0013-prod-release-deploy.md)).
 - Authentication moved from Firebase Auth to NextAuth / Auth.js v5 — Google OAuth, a password sign-in route, and revocable database sessions in Postgres (ADR-0002).
   - Firebase Auth, the Firebase Admin SDK and the auth emulator are gone; the user directory, global process-roles and invites read Postgres, and a one-time seed keeps every existing uid so users re-login without losing data.
   - `pnpm dev:mock` starts the dev Postgres container instead of the Firebase emulator; the E2E suite seeds a database session cookie directly.

@@ -1,4 +1,4 @@
-# 0012 — Production deploy via GitHub Releases + pinned image tags
+# 0013 — Production deploy via GitHub Releases + pinned image tags
 
 - **Status:** Proposed (2026-07-29)
 - **Authors:** Marek Rogala (@marekrogala)
