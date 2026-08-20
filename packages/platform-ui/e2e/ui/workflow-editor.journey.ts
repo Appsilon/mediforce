@@ -251,12 +251,15 @@ test.describe('Workflow Editor Journey', () => {
     await page.getByLabel('Add step here').first().click();
     await expectPickerOpen(page);
 
-    // Simple opens on the first category; Send email lives under Communicate.
-    const communicate = page.getByTestId('section-communicate');
-    if (await communicate.getAttribute('data-open') !== 'true') {
-      await communicate.getByRole('button').first().click();
+    // Simple opens on the first category; Transform data lives under Data.
+    // `transform-data` needs no capability, so it is the preset that stays
+    // clickable on a deployment with no email provider — which the E2E server
+    // is (`MEDIFORCE_DISABLE_EMAIL=true`).
+    const data = page.getByTestId('section-data');
+    if (await data.getAttribute('data-open') !== 'true') {
+      await data.getByRole('button').first().click();
     }
-    await page.getByTestId('preset-option-send-email').click();
+    await page.getByTestId('preset-option-transform-data').click();
 
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
@@ -264,7 +267,29 @@ test.describe('Workflow Editor Journey', () => {
     // old picker inserted an action step with no `action` at all.
     await page.getByRole('button', { name: /workflow source code/i }).click();
     await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
-    await expectJsonEditorContains(page, '"kind": "email"');
+    await expectJsonEditorContains(page, '"kind": "reshape"');
+  });
+
+  test('a pre-made block needing a capability the instance lacks is offered but not clickable', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.getByLabel('Add step here').first().click();
+    await expectPickerOpen(page);
+
+    const communicate = page.getByTestId('section-communicate');
+    if (await communicate.getAttribute('data-open') !== 'true') {
+      await communicate.getByRole('button').first().click();
+    }
+
+    // Send email declares `requires: 'email'`, and this deployment has no email
+    // provider. The block stays visible with its reason reachable on hover
+    // rather than vanishing, so the author learns the capability exists.
+    const sendEmail = page.getByTestId('preset-option-send-email');
+    await expect(sendEmail).toBeVisible();
+    await expect(sendEmail).toHaveAttribute('aria-disabled', 'true');
   });
 
   test('empty workflow canvas still allows adding a step', async ({ page }) => {
