@@ -502,6 +502,70 @@ test.describe('Workflow Editor Journey', () => {
 
   // ── Validation gates ─────────────────────────────────────────────────────
 
+  test('saving a workflow lands on a page that finds it, in the workspace you are in', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    // The save target defaults to the workspace in the route, and the user
+    // belongs to more than one, so the default is a real choice rather than the
+    // only option — otherwise the redirect below would pass either way.
+    const namespaceSelect = page.getByLabel('Namespace', { exact: true });
+    await expect(namespaceSelect).toHaveValue(TEST_ORG_HANDLE, { timeout: 10_000 });
+    expect(await namespaceSelect.locator('option').count()).toBeGreaterThan(1);
+
+    const unique = `e2e-1234-${Date.now()}`;
+    await page.getByPlaceholder('Add a Workflow Name…').fill(unique);
+    await page.getByPlaceholder('Add a workflow description…').fill('Reproduction for issue 1234');
+
+    // The user's steps: add a block from the toolbar, then save.
+    await page.getByRole('button', { name: 'Add Block', exact: true }).click();
+    await expect(page.getByTestId('executor-option-human')).toBeVisible({ timeout: 5_000 });
+    await page.getByTestId('executor-option-human').click();
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
+    await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('v1');
+    await page.getByRole('button', { name: /publish workflow/i }).click();
+
+    // The redirect has to land somewhere that can actually load the workflow.
+    await page.waitForURL(new RegExp(`/workflows/${unique}/?$`), { timeout: 20_000 });
+    await expect(page.getByRole('tab', { name: /runs/i })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/not found|could not find|cannot find/i)).toHaveCount(0);
+  });
+
+  test('Save & Dry Run starts the run in the workspace the save targeted', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    const stamp = String(Date.now());
+    const unique = `e2e-1234-dry-${stamp}`;
+    await page.getByPlaceholder('Add a Workflow Name…').fill(unique);
+    await page.getByPlaceholder('Add a workflow description…').fill('Save and Dry Run namespace parity');
+
+    await page.getByRole('button', { name: 'Add Block', exact: true }).click();
+    await expect(page.getByTestId('executor-option-human')).toBeVisible({ timeout: 5_000 });
+    await page.getByTestId('executor-option-human').click();
+
+    // Save & Dry Run saves and then starts, so the run has to be created in the
+    // namespace the save targeted. Starting it in the route namespace instead
+    // looks for a version that exists only in the saved one.
+    await page.getByRole('button', { name: /save & dry run/i }).click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
+    await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('v1');
+    await page.getByRole('button', { name: /publish workflow/i }).click();
+
+    await page.waitForURL(new RegExp(`/${TEST_ORG_HANDLE}/workflows/${unique}/runs/`), { timeout: 30_000 });
+
+    // The run report titles itself with the definition name run through
+    // `formatStepName`, which spaces and title-cases it; the timestamp is the
+    // part that survives unchanged. Waiting for the report rules out asserting
+    // against the loading skeleton, which says neither "found" nor "not found".
+    await expect(page.getByRole('heading', { name: new RegExp(stamp) })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Run not found.')).toHaveCount(0);
+  });
+
   test('new workflow save blocked when workflow name slugifies to empty', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
