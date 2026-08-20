@@ -384,6 +384,33 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByRole('button', { name: /apply json/i })).toBeVisible();
   });
 
+  // ── Authoring paths are stated where the workflow is created (#1185) ──────
+
+  test('ways to author names every path and its import entry opens the importer', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    // The catalog does not carry this: the paths are stated once the user is in
+    // the editor, which is where the choice is actually being made.
+    await page.getByRole('button', { name: /ways to author/i }).click();
+
+    const canvas = page.getByTestId('authoring-path-canvas');
+    await expect(canvas).toContainText('Exact control over one block');
+    await expect(page.getByTestId('authoring-path-assistant')).toContainText('OPENROUTER_API_KEY');
+    // The path a reader without a checkout cannot otherwise discover, with the
+    // clone it needs rather than the skill name alone.
+    await expect(page.getByTestId('authoring-path-agent')).toContainText(
+      'git clone https://github.com/Appsilon/mediforce',
+    );
+
+    // Import is a click, not an instruction: the importer lives on the
+    // workspace home, so the entry navigates there with the dialog open.
+    await page.getByTestId('authoring-path-import').getByRole('link').click();
+    await page.waitForURL(new RegExp(`/${TEST_ORG_HANDLE}\\?import=source`), { timeout: 15_000 });
+    await expect(page.getByRole('dialog').getByLabel('Repository URL')).toBeVisible({ timeout: 15_000 });
+  });
+
   // ── Source editor is modal-gated (not an always-open panel) ───────────────
 
   test('source code editor is hidden until the modal is opened', async ({ page }) => {

@@ -22,6 +22,7 @@ import {
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import type { NewStepPayload } from '@/lib/control-mode';
 import { BlockPicker } from './block-picker';
+import { AuthoringPathsPopover } from './authoring-paths-popover';
 import { StepEditor } from './workflow-editor/step-editor';
 import { ModelPicker } from './workflow-editor/model-picker';
 import { selectBase } from './workflow-editor/step-editor-fields';
@@ -690,6 +691,8 @@ export function WorkflowEditorCanvas({
       <div className="shrink-0 border-b px-4 py-1.5 flex items-center gap-1.5 flex-wrap bg-white dark:bg-background">
 
         <div className="ml-auto flex items-center gap-1.5">
+          <AuthoringPathsPopover />
+
           <button
             onClick={() => setRightPanelView('secrets')}
             title="Workflow secrets"
@@ -710,12 +713,7 @@ export function WorkflowEditorCanvas({
             </button>
             <span className="pointer-events-none absolute top-full right-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
               <p>Mediforce workflows are defined as <strong>wd.json</strong> — the same JSON format used by every workflow package in the repo, capturing every step, transition, and configuration.</p>
-              <p>You can author workflows three ways:</p>
-              <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
-                <li>Generate with the <strong className="text-foreground">AI Assistant</strong> pane on the right</li>
-                <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
-              </ul>
+              <p>Edits here, on the canvas, and from the AI Assistant all write the same definition.</p>
             </span>
           </span>
         </div>
@@ -836,9 +834,13 @@ export function WorkflowEditorCanvas({
             )}
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
               {assistantMessages.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  Describe the workflow you want to build, or ask a question.
-                </p>
+                <div className="text-sm text-muted-foreground text-center py-6 space-y-3">
+                  <p>Describe the workflow you want to build, or ask a question.</p>
+                  <p className="text-xs">
+                    Working in a checkout? <span className="font-mono">/design-workflow</span> authors the
+                    whole package — scripts, Dockerfile, tests — not just the canvas.
+                  </p>
+                </div>
               ) : (
                 assistantMessages.map((message, index) => (
                   <div

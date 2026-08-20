@@ -12,3 +12,10 @@ export const DOCKER_IMAGE_SETUP_URL =
  */
 export const VERIFY_WORKFLOW_URL =
   'https://github.com/Appsilon/mediforce/blob/main/docs/guides/verify-a-workflow.md';
+
+/**
+ * The four ways to author a workflow and when to reach for each — the long form
+ * of the "Ways to author" popover in the editor.
+ */
+export const CREATE_WORKFLOW_URL =
+  'https://github.com/Appsilon/mediforce/blob/main/docs/guides/create-workflow.md';
