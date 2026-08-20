@@ -5,13 +5,20 @@
 // No LLM here — this is the "don't re-analyse the backlog" payoff. Sort by
 // priority (high>med>low) then oldest (FIFO fairness), pick one.
 //
+// For a `needs-approval` pick it also recovers triage's `blockers` from the
+// marker comment `apply-verdicts` left on the issue (one extra API call, on the
+// chosen issue only) and passes them to `draft-plan` as its worklist.
+//
 // Reads:  env GITHUB_TOKEN, FULLSTACK_REPO
-// Writes: /output/result.json → { selected, issueNumber, suitability, priority, title, body, url, author }
+// Writes: /output/result.json → { selected, issueNumber, suitability, priority, title, body, url, author, blockers }
 
 import { writeFileSync } from 'node:fs';
 
 const REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';
 const BLOCKED = ['fullstack:in-progress', 'fullstack:awaiting-human', 'fullstack:pr-open', 'fullstack:needs-info'];
+// Must match apply-verdicts.BLOCKERS_MARKER — the two scripts are embedded as
+// standalone inline scripts, so they cannot share a module.
+const BLOCKERS_MARKER = '<!-- fullstack:blockers';
 const PRIO_RANK = { 'fullstack:prio-high': 0, 'fullstack:prio-med': 1, 'fullstack:prio-low': 2 };
 
 function ghHeaders() {
@@ -51,6 +58,27 @@ export function rankCandidates(issues) {
   });
 }
 
+/** Recover triage's blockers from the marker comment written by
+ *  `apply-verdicts.blockersComment` (round-tripped in tests). Returns [] when the
+ *  comment is absent or malformed — an issue triaged before blockers existed is
+ *  normal, and `draft-plan` derives its own list from the issue text instead of
+ *  the run failing. Pure. */
+export function parseBlockersComment(comments) {
+  for (const comment of [...(comments || [])].reverse()) {
+    const body = (comment && comment.body) || '';
+    const start = body.indexOf(BLOCKERS_MARKER);
+    if (start < 0) continue;
+    const payload = body.slice(start + BLOCKERS_MARKER.length, body.indexOf('-->', start));
+    try {
+      const parsed = JSON.parse(payload);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // Someone edited the comment by hand — fall through to the next candidate.
+    }
+  }
+  return [];
+}
+
 export function isActionable(issue) {
   const labels = labelNames(issue);
   if (BLOCKED.some((l) => labels.includes(l))) return false;
@@ -79,6 +107,10 @@ async function main() {
   const chosen = ranked[0];
   const labels = labelNames(chosen);
   const suitability = labels.includes('fullstack:go') ? 'go' : 'needs-approval';
+  // Only the needs-approval path runs draft-plan, so only it pays for the comments call.
+  const blockers = suitability === 'needs-approval'
+    ? parseBlockersComment(await gh(`/repos/${REPO}/issues/${chosen.number}/comments?per_page=100`))
+    : [];
   const result = {
     selected: true,
     issueNumber: chosen.number,
@@ -88,9 +120,10 @@ async function main() {
     body: (chosen.body || '').slice(0, 4000),
     url: chosen.html_url,
     author: (chosen.user && chosen.user.login) || null,
+    blockers,
   };
   writeFileSync('/output/result.json', JSON.stringify(result));
-  console.log(`select: #${chosen.number} (${suitability}, ${result.priority})`);
+  console.log(`select: #${chosen.number} (${suitability}, ${result.priority}, ${blockers.length} blocker(s))`);
 }
 
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {

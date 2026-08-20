@@ -13,9 +13,9 @@ import { WorkflowStepSchema } from '../workflow-definition.js';
 const repoRoot = resolve(__dirname, '../../../../..');
 
 const DOC_PATHS = [
-  'docs/how-to-create-workflow.md',
-  'docs/workflow-authoring-golden-rules.md',
-  'docs/workflow-capabilities.md',
+  'docs/guides/create-workflow.md',
+  'docs/reference/workflow-authoring-golden-rules.md',
+  'docs/reference/workflow-capabilities.md',
 ];
 
 const docs = DOC_PATHS.map(rel => {

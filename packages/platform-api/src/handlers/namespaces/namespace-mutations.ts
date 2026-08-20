@@ -7,6 +7,7 @@ import { emitAudit } from '../../audit-helpers';
 import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import { resolvePersonalNamespace } from '../_helpers';
+import { deleteWorkflow } from '../workflows/delete-workflow';
 import type {
   DeleteNamespaceInput,
   DeleteNamespaceOutput,
@@ -14,6 +15,8 @@ import type {
   LeaveNamespaceOutput,
   RemoveNamespaceMemberInput,
   RemoveNamespaceMemberOutput,
+  ResetNamespaceInput,
+  ResetNamespaceOutput,
   UpdateNamespaceInput,
   UpdateNamespaceMemberRoleInput,
   UpdateNamespaceMemberRoleOutput,
@@ -82,7 +85,14 @@ export async function updateNamespace(
   return { namespace };
 }
 
-/** Owner-only cascade delete via `NamespaceRepository.deleteNamespaceCascade`. */
+/**
+ * Owner-only cascade delete via `NamespaceRepository.deleteNamespaceCascade`.
+ *
+ * Personal namespaces are rejected: `getMe` lazily re-bootstraps one for every
+ * user without a personal namespace, so the cascade would destroy the contents
+ * and hand back a fresh empty workspace on the next request — a reset wearing
+ * a delete label (issue #1044). `resetNamespace` is the honest action.
+ */
 export async function deleteNamespace(
   input: DeleteNamespaceInput,
   scope: CallerScope,
@@ -91,6 +101,13 @@ export async function deleteNamespace(
 
   const existing = await scope.workspaces.getNamespace(input.handle);
   if (existing === null) throw new NotFoundError(`Namespace "${input.handle}" not found`);
+
+  if (existing.type === 'personal') {
+    throw new PreconditionFailedError(
+      'A personal workspace cannot be deleted — every user needs one, so it would be recreated empty on the next sign-in. Reset it instead to remove its workflows.',
+      { handle: input.handle, type: existing.type },
+    );
+  }
 
   // `audit_events.workspace` is NOT NULL with an FK to `workspaces.handle`
   // *and* `ON DELETE CASCADE` (ADR-0001). So the deletion event needs a
@@ -122,6 +139,57 @@ export async function deleteNamespace(
   await scope.workspaces.deleteNamespaceCascade(input.handle);
 
   return { handle: input.handle };
+}
+
+/**
+ * Owner-only content wipe: every workflow in the workspace is deleted with the
+ * same cascade the per-workflow delete uses (triggers, runs, human tasks), the
+ * workspace itself and its members survive. This is what "Delete workspace"
+ * used to do to a personal workspace by accident (issue #1044) — here it is
+ * named for what it does, and the per-workflow audit trail is preserved.
+ *
+ * Not transactional: it reuses `deleteWorkflow` per workflow, including its
+ * `expectedRunCount` race guard, so a run started mid-reset surfaces the same
+ * 409 and leaves the earlier workflows deleted. Re-running finishes the job —
+ * a reset is idempotent by construction.
+ */
+export async function resetNamespace(
+  input: ResetNamespaceInput,
+  scope: CallerScope,
+): Promise<ResetNamespaceOutput> {
+  assertCallerIsNamespaceOwner(scope.caller, input.handle);
+
+  const existing = await scope.workspaces.getNamespace(input.handle);
+  if (existing === null) throw new NotFoundError(`Namespace "${input.handle}" not found`);
+
+  const groups = await scope.workflowDefinitions.listGroups(true);
+  const inNamespace = groups.filter((group) => group.namespace === input.handle);
+
+  let deletedRuns = 0;
+  for (const group of inNamespace) {
+    const runCount = await scope.workflowDefinitions.countInstancesByName(
+      input.handle,
+      group.name,
+    );
+    const result = await deleteWorkflow(
+      { name: group.name, namespace: input.handle, expectedRunCount: runCount },
+      scope,
+    );
+    deletedRuns += result.deletedRuns;
+  }
+
+  await emitAudit(scope.system.audit, scope.caller, {
+    action: 'namespace.reset',
+    description: `Namespace '${input.handle}' reset — ${inNamespace.length} workflow(s) and ${deletedRuns} run(s) deleted`,
+    inputSnapshot: { handle: input.handle },
+    outputSnapshot: { handle: input.handle, deletedWorkflows: inNamespace.length, deletedRuns },
+    basis: 'Owner reset workspace via API',
+    entityType: 'namespace',
+    entityId: input.handle,
+    namespace: input.handle,
+  });
+
+  return { handle: input.handle, deletedWorkflows: inNamespace.length, deletedRuns };
 }
 
 /**

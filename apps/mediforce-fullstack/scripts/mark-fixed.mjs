@@ -2,7 +2,7 @@
 //
 // Reached when `implement` reports changed=false, reason="already-fixed" with
 // evidence. Posts the evidence, closes the issue (reversible — a human reopens
-// if wrong), and drops the lease.
+// if wrong), and drops ownership.
 //
 // Reads:  /output/input.json (steps.implement), env GITHUB_TOKEN, FULLSTACK_REPO
 // Writes: /output/result.json

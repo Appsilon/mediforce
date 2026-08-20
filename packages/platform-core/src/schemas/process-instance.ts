@@ -8,6 +8,24 @@ export const InstanceStatusSchema = z.enum([
   'failed',
 ]);
 
+/**
+ * UI-facing status bucket derived from `{status, pauseReason, error}` — see
+ * `packages/platform-ui/src/lib/workflow-status.ts`'s `getWorkflowStatus`
+ * for the JS derivation. Declared here (not in platform-ui) so the Postgres
+ * repository's `displayStatus` filter/aggregation can share the same
+ * literal set instead of hand-rolling a parallel string union — the SQL
+ * `CASE` expression in `process-instance-repository.ts` must stay in sync
+ * with `getWorkflowStatus`'s branching by hand; there is no way to share
+ * the branching logic itself across JS and SQL, only the vocabulary.
+ */
+export const WorkflowDisplayStatusSchema = z.enum([
+  'in_progress',
+  'waiting_for_human',
+  'error',
+  'cancelled',
+  'completed',
+]);
+
 export const ProcessInstanceSchema = z.object({
   id: z.string().min(1),
   definitionName: z.string().min(1),
@@ -19,7 +37,14 @@ export const ProcessInstanceSchema = z.object({
   currentStepId: z.string().nullable(),
   variables: z.record(z.string(), z.unknown()),
   triggerType: z.enum(['manual', 'webhook', 'cron']),
+  /** The firing's **validated** input — conforms to the definition's
+   *  `triggerInput` contract whichever trigger fired it (ADR-0012). */
   triggerPayload: z.record(z.string(), z.unknown()),
+  /** Transport metadata of the firing (webhook `headers`/`query`/`method`/`path`,
+   *  cron `firedAt`/`schedule`). Carries no declared input. Optional: manual
+   *  starts have no transport, and runs created before ADR-0012 have no column
+   *  value — both parse as `undefined` rather than needing a backfill. */
+  triggerContext: z.record(z.string(), z.unknown()).optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   createdBy: z.string().min(1),
@@ -59,6 +84,7 @@ export const ProcessInstanceSchema = z.object({
 });
 
 export type InstanceStatus = z.infer<typeof InstanceStatusSchema>;
+export type WorkflowDisplayStatus = z.infer<typeof WorkflowDisplayStatusSchema>;
 export type ProcessInstance = z.infer<typeof ProcessInstanceSchema>;
 
 /**

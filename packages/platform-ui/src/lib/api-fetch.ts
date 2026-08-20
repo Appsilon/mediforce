@@ -13,6 +13,13 @@
  * Server-to-server calls (route handlers, cron, queue workers) use
  * `X-Api-Key: ${PLATFORM_API_KEY}` instead — the proxy accepts either.
  */
-export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
-  return fetch(input, { credentials: 'same-origin', ...init });
+import { reportApiResponseError } from './api-error-events';
+
+export type ApiFetchInit = RequestInit & { reportErrors?: boolean };
+
+export async function apiFetch(input: RequestInfo | URL, init: ApiFetchInit = {}): Promise<Response> {
+  const { reportErrors = true, ...requestInit } = init;
+  const response = await fetch(input, { credentials: 'same-origin', ...requestInit });
+  if (reportErrors) reportApiResponseError(response);
+  return response;
 }

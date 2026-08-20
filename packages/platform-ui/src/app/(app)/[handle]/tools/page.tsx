@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { AgentDefinition, ToolCatalogEntry } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
+import { routes } from '@/lib/routes';
 import { apiFetch } from '@/lib/api-fetch';
 import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
@@ -236,14 +237,14 @@ export default function ToolsPage() {
           {canAdmin && (
             <>
               <Link
-                href={`/${handle}/admin/tool-catalog`}
+                href={routes.adminToolCatalog(handle, { from: 'tools' })}
                 className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
               >
                 <Settings className="h-3.5 w-3.5" />
                 Manage catalog
               </Link>
               <Link
-                href={`/${handle}/admin/oauth-providers`}
+                href={routes.adminOAuthProviders(handle, { from: 'tools' })}
                 className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
               >
                 <KeyRound className="h-3.5 w-3.5" />

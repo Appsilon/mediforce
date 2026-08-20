@@ -19,9 +19,13 @@ export const GET = createRouteAdapter(
     // mirroring the home page's "show completed" toggle.
     const includeCompletedRuns =
       params.get('includeCompletedRuns') === 'false' ? false : undefined;
+    // Absent => schema default (false). Only an explicit `true` widens the list
+    // to archived workflows (the workspace danger dialog's destructive count).
+    const includeArchived = params.get('includeArchived') === 'true' ? true : undefined;
     return {
       ...(namespace !== null ? { namespace } : {}),
       ...(includeCompletedRuns === false ? { includeCompletedRuns } : {}),
+      ...(includeArchived === true ? { includeArchived } : {}),
     };
   },
   listWorkflows,

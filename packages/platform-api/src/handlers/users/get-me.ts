@@ -30,7 +30,11 @@ export async function getMe(input: GetMeInput, scope: CallerScope): Promise<GetM
   ]);
   const email = metadata?.email ?? null;
   const displayName = metadata?.displayName ?? null;
-  const mustChangePassword = profile?.mustChangePassword ?? false;
+  // A gate nobody can satisfy traps the user on `/change-password` forever, so
+  // with password auth off the flag is projected away — not cleared, so
+  // re-enabling password auth restores the gate.
+  const mustChangePassword =
+    scope.system.passwordAuthEnabled === true && profile?.mustChangePassword === true;
   const hasPassword = passwordHash !== null;
 
   let namespaces = await scope.workspaces.getNamespacesByUser(uid);

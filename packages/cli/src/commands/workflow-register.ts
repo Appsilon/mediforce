@@ -61,7 +61,11 @@ export const workflowRegisterCommand = defineCommand({
     file: { type: 'string', required: true, description: 'Path to the workflow definition JSON file' },
     namespace: { type: 'string', required: true, description: 'Namespace that owns the registered workflow' },
     visibility: { type: 'enum', options: ['public', 'private'], description: 'Override visibility' },
-    'dry-run': { type: 'boolean', description: 'Validate the file locally without calling the API' },
+    'dry-run': {
+      type: 'boolean',
+      description:
+        'Schema-validate the file locally without calling the API. Executes nothing — this is not a Dry Run (that is `run start --dry-run`)',
+    },
   },
   skipClientWhen: (args) => args['dry-run'] === true,
   async run({ args, output, mediforce, jsonMode }) {

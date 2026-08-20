@@ -19,8 +19,8 @@ import type {
   ProcessNotificationConfig,
 } from '@mediforce/platform-core';
 import type { Selection, TaskVerdict } from '@mediforce/platform-core';
-import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts, interpolate } from '@mediforce/platform-core';
-import { validateStepGraph } from '../graph/graph-validator';
+import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts, interpolate, toProcessDefinition } from '@mediforce/platform-core';
+import { validateStepGraph } from '@mediforce/platform-core';
 import { StepExecutor, type StepActor } from './step-executor';
 import { RoutingError, InvalidTransitionError, ParentInstanceNotFoundError } from './errors';
 import { ReviewTracker } from '../review/review-tracker';
@@ -80,7 +80,15 @@ export class WorkflowEngine {
     triggeredBy: string,
     triggerType: 'manual' | 'webhook' | 'cron',
     payload?: Record<string, unknown>,
-    opts?: { parentInstanceId?: string; parentDefinitionName?: string; dryRun?: boolean },
+    opts?: {
+      parentInstanceId?: string;
+      parentDefinitionName?: string;
+      dryRun?: boolean;
+      /** Transport metadata of the firing (ADR-0012). Carried in `opts` rather
+       *  than as another positional so the manual path — which has no transport
+       *  at all — keeps its existing call shape. */
+      triggerContext?: Record<string, unknown>;
+    },
   ): Promise<ProcessInstance> {
     const definition = await this.processRepository.getWorkflowDefinition(namespace, definitionName, version);
     if (!definition) {
@@ -102,6 +110,7 @@ export class WorkflowEngine {
       variables: {},
       triggerType,
       triggerPayload: payload ?? {},
+      ...(opts?.triggerContext === undefined ? {} : { triggerContext: opts.triggerContext }),
       createdAt: now,
       updatedAt: now,
       createdBy: triggeredBy,
@@ -241,7 +250,7 @@ export class WorkflowEngine {
       actor,
       // WorkflowDefinition steps are structurally compatible with ProcessDefinition
       // for routing purposes (same id/type/verdicts/transitions shape)
-      this.workflowDefinitionToProcessDefinition(definition),
+      toProcessDefinition(definition),
     );
 
     // HumanTask creation: create task when next step's executor is 'human'
@@ -294,6 +303,7 @@ export class WorkflowEngine {
           if (nextStep.assignedTo) {
             const resolved = interpolate(nextStep.assignedTo, {
               triggerPayload: (updatedInstance.triggerPayload as Record<string, unknown>) ?? {},
+              triggerContext: (updatedInstance.triggerContext as Record<string, unknown>) ?? {},
               steps: updatedInstance.variables,
               variables: updatedInstance.variables,
               secrets: {},
@@ -425,7 +435,7 @@ export class WorkflowEngine {
     }
 
     const workflowDef = await this.loadDefinitionUnified(instance);
-    const definition = this.workflowDefinitionToProcessDefinition(workflowDef);
+    const definition = toProcessDefinition(workflowDef);
     const workflowStep = workflowDef.steps.find((s) => s.id === stepId);
     const maxIterations = workflowStep?.review?.maxIterations;
 

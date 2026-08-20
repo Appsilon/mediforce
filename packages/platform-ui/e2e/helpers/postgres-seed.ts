@@ -1,15 +1,17 @@
 import postgres from 'postgres';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { TEST_ORG_HANDLE } from './constants';
-import { buildSeedData } from './seed-data';
+import { buildSeedData, AGENT_LOG_FILENAME, AGENT_LOG_FIXTURE_CONTENT } from './seed-data';
+
+// Matches LOGS_DIR in packages/platform-ui/src/app/api/step-logs/route.ts —
+// the AgentLogViewer pipeline reads step logs from this local tmp directory.
+const STEP_LOGS_DIR = join(tmpdir(), 'mediforce-step-logs');
 
 /**
  * Postgres seed for the full E2E fixture (ADR-0001 §5.2 #9), invoked
  * from `auth-setup.ts` before Playwright workers start.
- *
- * Uses raw `postgres-js` rather than the `@mediforce/platform-infra` package
- * because Playwright workers don't resolve the `@mediforce/source` package
- * exports condition the way `tsx` does at type-check time — importing the
- * compiled `dist` fails because we don't build it in CI.
  *
  * Reuses `buildSeedData` so the E2E fixture and the in-memory fixture stay
  * byte-identical.
@@ -53,7 +55,10 @@ export async function seedPostgresNamespace(
     //                bio-clear-owner, journey-user, bootstrap-journey,
     //                branding-personal
     //   patterns   – journey-org-* (create-workspace.journey, timestamp suffix),
-    //                branding-org-* (namespace-branding.journey, per-test org)
+    //                branding-org-* (namespace-branding.journey, per-test org),
+    //                import-org-* (workflow-import.journey, per-test org),
+    //                journey-examples-* (import-example-workflows.journey, timestamp suffix),
+    //                tool-catalog-empty-* (admin-tool-catalog.journey, timestamp suffix)
     //
     // Agents use ON DELETE SET NULL for workspace removal, and built-in agents
     // have no workspace FK at all, so reset the seeded IDs explicitly before
@@ -82,6 +87,9 @@ export async function seedPostgresNamespace(
       WHERE handle IN ${sql(fixtureHandles)}
          OR handle LIKE 'journey-org-%'
          OR handle LIKE 'branding-org-%'
+         OR handle LIKE 'import-org-%'
+         OR handle LIKE 'journey-examples-%'
+         OR handle LIKE 'tool-catalog-empty-%'
     `;
 
     // ── 1. workspaces ───────────────────────────────────────────────────────
@@ -191,8 +199,8 @@ export async function seedPostgresNamespace(
         INSERT INTO process_instances (
           id, workspace, definition_name, definition_version, status,
           current_step_id, variables, trigger_type, trigger_payload,
-          pause_reason, error, assigned_roles, created_by, created_at, updated_at,
-          deleted_at
+          pause_reason, error, assigned_roles, total_cost_usd, created_by, created_at, updated_at,
+          deleted_at, dry_run
         ) VALUES (
           ${proc.id as string},
           ${proc.namespace as string},
@@ -206,10 +214,12 @@ export async function seedPostgresNamespace(
           ${(proc.pauseReason as string | null) ?? null},
           ${(proc.error as string | null) ?? null},
           ${(proc.assignedRoles as string[] | undefined) ?? null},
+          ${(proc.totalCostUsd as number | undefined) ?? null},
           ${(proc.createdBy as string | null) ?? null},
           ${proc.createdAt as string},
           ${proc.updatedAt as string},
-          ${(proc.deletedAt as string | null) ?? null}
+          ${(proc.deletedAt as string | null) ?? null},
+          ${(proc.dryRun as boolean | undefined) ?? false}
         )
         ON CONFLICT (id) DO NOTHING
       `;
@@ -224,6 +234,7 @@ export async function seedPostgresNamespace(
       ...data.completedSupplyChainStepExecutions,
       ...data.stepFailureStepExecutions,
       ...data.retryTestStepExecutions,
+      ...data.retryAuditStepExecutions,
       ...data.agentEscalatedCancelStepExecutions,
       ...data.workflowRunStepExecutions,
     };
@@ -514,6 +525,29 @@ export async function seedPostgresNamespace(
         ON CONFLICT (workspace, id) DO NOTHING
       `;
     }
+
+    // ── 14. agent_events (+ the log file they point at) ─────────────────────
+    // Real AgentLogViewer pipeline, not a mocked UI: the event announces a
+    // log file path exactly like a live run does, and /api/step-logs reads
+    // the file from disk at request time — so it has to actually exist here.
+    for (const [id, event] of Object.entries(data.agentEvents)) {
+      await sql`
+        INSERT INTO agent_events (
+          id, process_instance_id, step_id, type, payload, sequence, timestamp
+        ) VALUES (
+          ${id},
+          ${event.processInstanceId as string},
+          ${event.stepId as string},
+          ${event.type as string},
+          ${sql.json(event.payload as unknown)},
+          ${event.sequence as number},
+          ${event.timestamp as string}
+        )
+        ON CONFLICT (id) DO NOTHING
+      `;
+    }
+    await mkdir(STEP_LOGS_DIR, { recursive: true });
+    await writeFile(join(STEP_LOGS_DIR, AGENT_LOG_FILENAME), AGENT_LOG_FIXTURE_CONTENT, 'utf-8');
   } finally {
     await sql.end({ timeout: 5 });
   }
@@ -646,6 +680,52 @@ export async function readPostgresWorkspace(
     const row = rows[0];
     if (!row) return null;
     return { handle: row.handle, displayName: row.display_name, bio: row.bio };
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * Move a cron trigger's fire cursor into the past so the next heartbeat sees the
+ * tick as due.
+ *
+ * `isDue` scans 15-minute boundaries in `(lastTriggeredAt, now]`, and a freshly
+ * attached row has no cursor yet — it falls back to the definition's
+ * `createdAt`, which is seconds old inside a test, so no boundary falls in the
+ * window and every tick reads "Not due" until the next quarter hour. Nothing on
+ * the API surface writes the cursor (only a successful fire does), so a journey
+ * that needs a *firing* heartbeat has to set it here or be green four minutes an
+ * hour.
+ *
+ * Throws when the update matches no row: a mistyped key would otherwise leave
+ * the trigger "Not due" and turn the assertion it supports into a silent pass.
+ */
+export async function backdatePostgresTriggerCursor(
+  namespace: string,
+  workflowName: string,
+  triggerName: string,
+  lastTriggeredAt: Date,
+): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to backdate a trigger cursor for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    const updated = await sql`
+      UPDATE triggers
+      SET last_triggered_at = ${lastTriggeredAt.toISOString()}
+      WHERE namespace = ${namespace}
+        AND workflow_name = ${workflowName}
+        AND trigger_name = ${triggerName}
+      RETURNING trigger_name
+    `;
+    if (updated.length !== 1) {
+      throw new Error(
+        `Expected to backdate 1 trigger, updated ${String(updated.length)} ` +
+          `(${namespace}/${workflowName}/${triggerName})`,
+      );
+    }
   } finally {
     await sql.end({ timeout: 5 });
   }

@@ -1,16 +1,22 @@
+---
+status: proposed
+audience: engineers
+last_reviewed: 2026-08-18
+---
+
 # 0003 — Remove Firebase Storage: delete uploaded-skills, task attachments to a BlobStore (filesystem now, S3 later)
 
-- **Status:** Proposed (grilled & reshaped 2026-06-16; supersedes the
-  2026-05-20 "skills → Postgres bytea / attachments inline + DMS link" draft)
+- **Status note:** grilled & reshaped 2026-06-16; supersedes the
+  2026-05-20 "skills → Postgres bytea / attachments inline + DMS link" draft.
 - **Date:** 2026-05-20 (reshaped 2026-06-16)
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)
 - **Depends on:** [ADR-0001](./0001-firestore-to-postgres.md) (Postgres for
   attachment metadata) and the shared-filesystem precedent in
-  [ADR-0007](./0007-output-files-on-run-branch.md) (the `~/.mediforce` data
+  [ADR-0015](./0015-output-files-on-run-branch.md) (the `~/.mediforce` data
   volume the API host already mounts).
 - **Lands before:** [ADR-0002](./0002-firebase-auth-to-nextauth.md) — see §5.
-- **Implementation plan:** [PLAN-0003.md](./PLAN-0003.md)
+- **Implementation plan:** [PLAN-0003.md](../archive/PLAN-0003.md)
 
 ## Context
 
@@ -58,7 +64,7 @@ filesystem implementation now.
    S3-compatible later.** Bytes go through a `BlobStore` port
    (`put` / `getStream` / `delete` by key). The default implementation
    writes under the **`~/.mediforce` data volume the API host already mounts
-   for ADR-0007** — no new service, no new operational requirement. An
+   for ADR-0015** — no new service, no new operational requirement. An
    S3-compatible implementation is an env-selected drop-in for deployments
    that already run object storage (deferred until a deployment asks; the
    interface keeps it non-breaking). Attachment **metadata** (name,
@@ -131,12 +137,12 @@ decision, not a storage-infra necessity.
 - Object storage is a non-breaking opt-in (`BlobStore` S3 impl) when a
   deployment wants it.
 - `pg_dump` stays lean — only metadata in Postgres; bytes live on the volume
-  (backed up by volume snapshot, same as ADR-0007's bare repos).
+  (backed up by volume snapshot, same as ADR-0015's bare repos).
 - Attachments are served via authenticated, workspace-scoped streaming app
   routes — no public bucket URLs, no CDN (fine at our scale).
 - The Agent Definition surface shrinks (`skillFileNames` gone); the only skill
   path is `skillsDir` from a selected repo.
-- The API host must share the `~/.mediforce` filesystem — already an ADR-0007
+- The API host must share the `~/.mediforce` filesystem — already an ADR-0015
   assumption, not new.
 
 ## Enterprise / pharma fit

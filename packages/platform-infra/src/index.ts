@@ -14,6 +14,7 @@ export {
   deleteUserSessions,
   SESSION_TTL_MS,
 } from './auth/session-store';
+export { recordSignInAuditEvent, type SignInMethod } from './auth/sign-in-audit';
 export {
   setUserPasswordHash,
   getUserPasswordHash,
@@ -35,7 +36,7 @@ export { createMailgunSender } from './email/mailgun-client';
 export type { MailgunConfig } from './email/mailgun-client';
 export { createSmtpSender } from './email/smtp-client';
 export type { SmtpConfig } from './email/smtp-client';
-export { resolveEmailSenderFromEnv } from './email/resolve-sender';
+export { resolveEmailSenderFromEnv, isEmailDeliveryConfigured } from './email/resolve-sender';
 export type { ResolvedEmailSender } from './email/resolve-sender';
 
 // Postgres repositories — the only data backend (ADR-0001).

@@ -34,6 +34,8 @@ export const DockerJobDataSchema = z.object({
   imageBuild: z.object({
     image: z.string(),
     repoUrl: z.string(),
+    /** Pre-normalization repo reference used to pick the clone transport; falls back to `repoUrl`. */
+    repoRef: z.string().optional(),
     commit: z.string(),
     dockerfile: z.string().optional(),
     repoToken: z.string().optional(),

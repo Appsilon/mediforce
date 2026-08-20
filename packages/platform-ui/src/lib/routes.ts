@@ -10,12 +10,29 @@ function encode(segment: string): string {
   return encodeURIComponent(segment);
 }
 
+/**
+ * Admin pages are reachable from more than one section, so their entry point
+ * travels in `?from=` and drives where the in-page back arrow returns to.
+ */
+export type AdminEntryPoint = 'tools' | 'settings';
+
+function withEntryPoint(path: string, from: AdminEntryPoint | undefined): string {
+  return from === undefined ? path : `${path}?from=${from}`;
+}
+
+export function adminBackHref(handle: string, from: string | null): string {
+  return from === 'tools' ? routes.tools(handle) : routes.settings(handle);
+}
+
 export const routes = {
   // ── Top-level ──────────────────────────────────────────────────
   home: (handle: string) => `/${handle}`,
 
   // ── Workflows ──────────────────────────────────────────────────
   workflows: (handle: string) => `/${handle}/workflows`,
+  /** Workspace home with the git importer already open — the authoring-paths
+   *  popover offers import from pages that do not host the dialog. */
+  importWorkflows: (handle: string) => `/${handle}?import=source`,
   workflow: (handle: string, name: string) => `/${handle}/workflows/${encode(name)}`,
   workflowDefinition: (handle: string, name: string, version: number | string) =>
     `/${handle}/workflows/${encode(name)}/definitions/${version}`,
@@ -80,6 +97,12 @@ export const routes = {
 
   // ── Settings ───────────────────────────────────────────────────
   settings: (handle: string) => `/${handle}/settings`,
+
+  // ── Admin ──────────────────────────────────────────────────────
+  adminToolCatalog: (handle: string, params?: { from?: AdminEntryPoint }) =>
+    withEntryPoint(`/${handle}/admin/tool-catalog`, params?.from),
+  adminOAuthProviders: (handle: string, params?: { from?: AdminEntryPoint }) =>
+    withEntryPoint(`/${handle}/admin/oauth-providers`, params?.from),
 
   // ── Orgs ───────────────────────────────────────────────────────
   orgs: () => '/orgs',

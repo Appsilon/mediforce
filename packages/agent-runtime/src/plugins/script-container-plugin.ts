@@ -6,7 +6,7 @@ import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/s
 import type { AgentConfig, ScriptStepConfig, StepConfig, PluginCapabilityMetadata, Presentation } from '@mediforce/platform-core';
 import { resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
 import { isLocalExecutionAllowed } from './base-container-agent-plugin';
 
 // Last-resort for the legacy process-mode path only; the workflow path resolves
@@ -387,13 +387,15 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           emitLine(detail);
         }
 
+        const imageHint = missingExecutableHint(detail, this.image);
+
         await emit({
           type: 'status',
-          payload: `script failed (${exitInfo}): ${detail.slice(0, 2000)}`,
+          payload: `script failed (${exitInfo}): ${detail.slice(0, 2000)}${imageHint}`,
           timestamp: new Date().toISOString(),
         });
 
-        throw new Error(`Script container failed (${exitInfo}): ${detail}`);
+        throw new Error(`Script container failed (${exitInfo}): ${detail}${imageHint}`);
       }
 
       const containerOutput = spawnResult.stdout.trim();

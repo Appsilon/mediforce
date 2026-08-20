@@ -1,16 +1,22 @@
-import { and, asc, count, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import {
   ProcessInstanceSchema,
   StepExecutionSchema,
   AgentEventSchema,
   RunNameEntrySchema,
   parseRow,
+  encodeProcessInstanceCursor,
+  decodeProcessInstanceCursor,
   type ProcessInstance,
   type ProcessInstanceRepository,
   type InstanceStatus,
   type StepExecution,
   type AgentEvent,
   type ListInstancesOptions,
+  type ListInstancesPageOptions,
+  type ListInstancesPage,
+  type WorkflowDisplayStatus,
+  type WorkflowDisplayStatusCounts,
   type WorkflowRunSummaryResult,
   type RunNameEntry,
 } from '@mediforce/platform-core';
@@ -23,6 +29,51 @@ import {
 
 const ACTIVE_STATUSES: readonly InstanceStatus[] = ['running', 'created', 'paused'];
 const NON_TERMINAL_STATUSES: readonly InstanceStatus[] = ['running', 'created', 'paused'];
+
+// Mirrors getWorkflowStatus's branching (packages/platform-core/src/utils/
+// workflow-status.ts) as a SQL condition per bucket — hand-ported, kept in
+// sync manually. Any change to that function's branching must be applied
+// here too.
+const WAITING_FOR_HUMAN_PAUSE_REASONS = [
+  'waiting_for_human',
+  'awaiting_agent_approval',
+  'cowork_in_progress',
+  'agent_escalated',
+  'agent_paused',
+] as const;
+
+function displayStatusConditions(): Record<WorkflowDisplayStatus, SQL> {
+  const paused = eq(processInstances.status, 'paused');
+  const failed = eq(processInstances.status, 'failed');
+  return {
+    completed: eq(processInstances.status, 'completed'),
+    in_progress: or(
+      inArray(processInstances.status, ['running', 'created']),
+      and(paused, eq(processInstances.pauseReason, 'waiting_for_timer')),
+    )!,
+    waiting_for_human: and(
+      paused,
+      inArray(processInstances.pauseReason, [...WAITING_FOR_HUMAN_PAUSE_REASONS]),
+    )!,
+    cancelled: and(failed, eq(processInstances.error, 'Cancelled by user'))!,
+    error: or(
+      and(
+        paused,
+        or(
+          isNull(processInstances.pauseReason),
+          and(
+            notInArray(processInstances.pauseReason, [...WAITING_FOR_HUMAN_PAUSE_REASONS]),
+            ne(processInstances.pauseReason, 'waiting_for_timer'),
+          ),
+        ),
+      ),
+      and(
+        failed,
+        or(isNull(processInstances.error), ne(processInstances.error, 'Cancelled by user')),
+      ),
+    )!,
+  };
+}
 
 /**
  * Postgres-backed ProcessInstanceRepository (ADR-0001, PLAN §1.2
@@ -82,6 +133,7 @@ export class PostgresProcessInstanceRepository
         variables: parsed.variables,
         triggerType: parsed.triggerType,
         triggerPayload: parsed.triggerPayload,
+        triggerContext: parsed.triggerContext ?? null,
         pauseReason: parsed.pauseReason,
         error: parsed.error,
         assignedRoles: parsed.assignedRoles,
@@ -189,6 +241,166 @@ export class PostgresProcessInstanceRepository
       .orderBy(desc(processInstances.createdAt))
       .limit(options.limit ?? 20);
     return rows.map((r) => toInstance(r));
+  }
+
+  async listPage(options: ListInstancesPageOptions): Promise<ListInstancesPage> {
+    return this.listPageImpl(options, undefined);
+  }
+
+  async listPageInNamespaces(
+    allowed: readonly string[],
+    options: ListInstancesPageOptions,
+  ): Promise<ListInstancesPage> {
+    if (allowed.length === 0) return { items: [] };
+    return this.listPageImpl(options, [...allowed]);
+  }
+
+  private async listPageImpl(
+    options: ListInstancesPageOptions,
+    allowed: readonly string[] | undefined,
+  ): Promise<ListInstancesPage> {
+    const conditions = [...this.pageBaseConditions(options, allowed)];
+    if (options.displayStatus !== undefined) {
+      conditions.push(displayStatusConditions()[options.displayStatus]);
+    }
+    const sort = options.sort ?? 'createdAt';
+    const direction = options.direction ?? 'desc';
+    if (options.cursor !== undefined) {
+      const after = decodeProcessInstanceCursor(options.cursor);
+      if (after !== null && after.sort === sort && after.direction === direction) {
+        const tieBreaker = or(
+          lt(processInstances.createdAt, new Date(after.createdAt)),
+          and(
+            eq(processInstances.createdAt, new Date(after.createdAt)),
+            sql`${processInstances.id} < ${after.id}`,
+          ),
+        )!;
+        if (sort === 'createdAt') {
+          conditions.push(
+            direction === 'asc'
+              ? or(
+                gt(processInstances.createdAt, new Date(after.createdAt)),
+                and(
+                  eq(processInstances.createdAt, new Date(after.createdAt)),
+                  sql`${processInstances.id} < ${after.id}`,
+                ),
+              )!
+              : tieBreaker,
+          );
+        } else if (after.totalCostUsd === null || after.totalCostUsd === undefined) {
+          conditions.push(and(isNull(processInstances.totalCostUsd), tieBreaker)!);
+        } else {
+          const cursorCost = String(after.totalCostUsd);
+          conditions.push(
+            or(
+              direction === 'asc'
+                ? gt(processInstances.totalCostUsd, cursorCost)
+                : lt(processInstances.totalCostUsd, cursorCost),
+              and(eq(processInstances.totalCostUsd, cursorCost), tieBreaker),
+              isNull(processInstances.totalCostUsd),
+            )!,
+          );
+        }
+      }
+    }
+    const rows = await this.db
+      .select()
+      .from(processInstances)
+      .where(and(...conditions))
+      .orderBy(
+        ...(sort === 'cost'
+          ? [
+            direction === 'asc'
+              ? sql`${processInstances.totalCostUsd} ASC NULLS LAST`
+              : sql`${processInstances.totalCostUsd} DESC NULLS LAST`,
+            desc(processInstances.createdAt),
+            desc(processInstances.id),
+          ]
+          : [
+            direction === 'asc' ? asc(processInstances.createdAt) : desc(processInstances.createdAt),
+            desc(processInstances.id),
+          ]),
+      )
+      .limit(options.limit + 1);
+    const hasMore = rows.length > options.limit;
+    const pageRows = hasMore ? rows.slice(0, options.limit) : rows;
+    const items = pageRows.map((r) => toInstance(r));
+    const last = items[items.length - 1];
+    if (hasMore && last !== undefined) {
+      return {
+        items,
+        nextCursor: encodeProcessInstanceCursor({
+          sort,
+          direction,
+          createdAt: last.createdAt,
+          id: last.id,
+          totalCostUsd: last.totalCostUsd ?? null,
+        }),
+      };
+    }
+    return { items };
+  }
+
+  async countByDisplayStatus(
+    options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
+  ): Promise<WorkflowDisplayStatusCounts> {
+    return this.countByDisplayStatusImpl(options, undefined);
+  }
+
+  async countByDisplayStatusInNamespaces(
+    allowed: readonly string[],
+    options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
+  ): Promise<WorkflowDisplayStatusCounts> {
+    if (allowed.length === 0) {
+      return { in_progress: 0, waiting_for_human: 0, error: 0, cancelled: 0, completed: 0 };
+    }
+    return this.countByDisplayStatusImpl(options, [...allowed]);
+  }
+
+  private async countByDisplayStatusImpl(
+    options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
+    allowed: readonly string[] | undefined,
+  ): Promise<WorkflowDisplayStatusCounts> {
+    const conditions = this.pageBaseConditions(options, allowed);
+    const buckets = displayStatusConditions();
+    const [row] = await this.db
+      .select({
+        in_progress: sql<number>`count(*) filter (where ${buckets.in_progress})`.mapWith(Number),
+        waiting_for_human: sql<number>`count(*) filter (where ${buckets.waiting_for_human})`.mapWith(Number),
+        error: sql<number>`count(*) filter (where ${buckets.error})`.mapWith(Number),
+        cancelled: sql<number>`count(*) filter (where ${buckets.cancelled})`.mapWith(Number),
+        completed: sql<number>`count(*) filter (where ${buckets.completed})`.mapWith(Number),
+      })
+      .from(processInstances)
+      .where(and(...conditions));
+    return row ?? { in_progress: 0, waiting_for_human: 0, error: 0, cancelled: 0, completed: 0 };
+  }
+
+  /** Shared base filters (workspace scoping, namespace, definitionName,
+   *  dryRun, archived, soft-delete) for both `listPage*` and
+   *  `countByDisplayStatus*` — keeps the two in sync so a KPI card's count
+   *  always matches what clicking it would filter the table to. */
+  private pageBaseConditions(
+    options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
+    allowed: readonly string[] | undefined,
+  ): SQL[] {
+    const conditions: SQL[] = [isNull(processInstances.deletedAt)];
+    if (allowed !== undefined) {
+      conditions.push(inArray(processInstances.workspace, [...allowed]));
+    }
+    if (options.namespace !== undefined) {
+      conditions.push(eq(processInstances.workspace, options.namespace));
+    }
+    if (options.definitionName !== undefined) {
+      conditions.push(eq(processInstances.definitionName, options.definitionName));
+    }
+    if (options.dryRun !== undefined) {
+      conditions.push(eq(processInstances.dryRun, options.dryRun));
+    }
+    if (options.archived !== true) {
+      conditions.push(isNull(processInstances.archivedAt));
+    }
+    return conditions;
   }
 
   async listDefinitionNames(namespace: string): Promise<RunNameEntry[]> {
@@ -398,22 +610,33 @@ export class PostgresProcessInstanceRepository
       );
   }
 
-  async getIdsByDefinitionName(name: string): Promise<string[]> {
+  async getIdsByDefinitionName(namespace: string, name: string): Promise<string[]> {
     const rows = await this.db
       .select({ id: processInstances.id })
       .from(processInstances)
-      .where(eq(processInstances.definitionName, name));
+      .where(
+        and(
+          eq(processInstances.workspace, namespace),
+          eq(processInstances.definitionName, name),
+        ),
+      );
     return rows.map((r) => r.id);
   }
 
   async setDeletedByDefinitionName(
+    namespace: string,
     name: string,
     deleted: boolean,
   ): Promise<void> {
     await this.db
       .update(processInstances)
       .set({ deletedAt: deleted ? new Date() : null })
-      .where(eq(processInstances.definitionName, name));
+      .where(
+        and(
+          eq(processInstances.workspace, namespace),
+          eq(processInstances.definitionName, name),
+        ),
+      );
   }
 
   async summarizeRunsByWorkflow(
@@ -511,6 +734,11 @@ function toInstance(row: typeof processInstances.$inferSelect): ProcessInstance 
     variables: (row.variables ?? {}) as Record<string, unknown>,
     triggerType: row.triggerType,
     triggerPayload: (row.triggerPayload ?? {}) as Record<string, unknown>,
+    // Left `undefined` (not `{}`) when the column is null so a manual start and
+    // a pre-ADR-0012 run both read as "this firing had no transport metadata".
+    ...(row.triggerContext === null || row.triggerContext === undefined
+      ? {}
+      : { triggerContext: row.triggerContext as Record<string, unknown> }),
     pauseReason: row.pauseReason,
     error: row.error,
     assignedRoles: row.assignedRoles ?? [],
@@ -568,4 +796,3 @@ function toAgentEvent(
     timestamp: row.timestamp.toISOString(),
   };
 }
-

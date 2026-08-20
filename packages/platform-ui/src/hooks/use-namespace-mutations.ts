@@ -10,6 +10,8 @@ import type {
   LeaveNamespaceOutput,
   RemoveNamespaceMemberInput,
   RemoveNamespaceMemberOutput,
+  ResetNamespaceInput,
+  ResetNamespaceOutput,
   UpdateNamespaceInput,
   UpdateNamespaceMemberRoleInput,
   UpdateNamespaceMemberRoleOutput,
@@ -224,6 +226,26 @@ export function useDeleteNamespace() {
     },
     onSuccess: (data) => {
       qc.removeQueries({ queryKey: queryKeys.namespace(data.handle) });
+    },
+  });
+}
+
+/**
+ * POST /api/namespaces/:handle/reset — delete every workflow in the workspace
+ * (cascading to its runs and tasks); the workspace itself survives. No
+ * optimistic patch: the caller stays on the settings page and the destroyed
+ * surfaces (workflow cards, runs, tasks) are re-fetched from the server rather
+ * than guessed at.
+ */
+export function useResetNamespace() {
+  const qc = useQueryClient();
+  return useMutation<ResetNamespaceOutput, Error, ResetNamespaceInput>({
+    mutationFn: (input) => mediforce.namespaces.reset(input),
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: ['workflows'] });
+      void qc.invalidateQueries({ queryKey: queryKeys.runs.all() });
+      void qc.invalidateQueries({ queryKey: queryKeys.tasks.all() });
+      void qc.invalidateQueries({ queryKey: queryKeys.namespace(data.handle) });
     },
   });
 }

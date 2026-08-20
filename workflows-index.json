@@ -1,0 +1,82 @@
+{
+  "workflows": [
+    {
+      "name": "tutorial-linear-pipeline",
+      "path": "docs/workflow-examples/01-linear-pipeline.wd.json",
+      "description": "Simplest workflow pattern: human fills a form, a script processes it, done. Demonstrates params, script-container with inlineScript, and basic transitions.",
+      "tags": ["tutorial", "pipeline"]
+    },
+    {
+      "name": "tutorial-review-loop",
+      "path": "docs/workflow-examples/02-review-loop.wd.json",
+      "description": "Agent generates content, human reviews it. Approve advances to done; revise sends it back to the agent. Demonstrates agent steps, autonomyLevel, review verdicts, and the approve/revise loop pattern.",
+      "tags": ["tutorial", "review"]
+    },
+    {
+      "name": "tutorial-conditional-branching",
+      "path": "docs/workflow-examples/03-conditional-branching.wd.json",
+      "description": "Route a request to different paths based on data. Demonstrates decision steps, 'when' expressions with comparisons, the 'else' catch-all, and multiple paths converging on a single terminal.",
+      "tags": ["tutorial", "branching"]
+    },
+    {
+      "name": "tutorial-script-variants",
+      "path": "docs/workflow-examples/04-script-variants.wd.json",
+      "description": "Chain script steps with different runtimes — JavaScript, Python, and Bash. Each step reads the previous step's output and transforms it further. Demonstrates runtime selection, data passing between scripts, and the script config block.",
+      "tags": ["tutorial", "scripts"]
+    },
+    {
+      "name": "tutorial-script-r-clinical",
+      "path": "docs/workflow-examples/04b-script-r-clinical.wd.json",
+      "description": "Use R for clinical data analysis within a workflow. Demonstrates R runtime in script-container, reading step input, computing summary statistics with base R, and writing structured JSON output. Essential pattern for pharma workflows where R is the validated statistical environment.",
+      "tags": ["tutorial", "scripts", "r"]
+    },
+    {
+      "name": "tutorial-action-steps",
+      "path": "docs/workflow-examples/05-action-steps.wd.json",
+      "description": "Workflow-level side effects without scripts or agents. Demonstrates action executor with http (API call), reshape (data transformation), and email (notification). Actions are declarative — the engine executes them directly.",
+      "tags": ["tutorial", "actions"]
+    },
+    {
+      "name": "tutorial-env-secrets-databricks",
+      "path": "docs/workflow-examples/06-env-secrets-databricks.wd.json",
+      "description": "Using environment variables and secrets in workflows. Shows top-level env block, per-step env overrides, {{SECRET}} interpolation syntax for platform-managed secrets, and a Databricks job step. Secrets are stored in the platform and injected at runtime — never hardcoded.",
+      "tags": ["tutorial", "secrets", "databricks"]
+    },
+    {
+      "name": "tutorial-trigger-input",
+      "path": "docs/workflow-examples/07-trigger-varieties.wd.json",
+      "description": "Demonstrates the unified Trigger Input contract (ADR-0012) across every field type it supports: string, number, boolean, date, datetime, select, multiselect, textarea and object. triggerInput is the workflow's total input contract and every trigger validates against it, so ${triggerPayload.<field>} reads identically no matter which one fired. Start it by hand (the Start Run form renders one widget per type, including a JSON textarea for `object`), POST {\"source\":\"edc\",\"priority\":\"urgent\",\"domains\":[\"AE\"],\"sourceRecord\":{\"subjectId\":\"S-014\"}} to its webhook, or attach a cron row carrying that same object as its static payload — all three produce the same triggerPayload, and a field the firing omits falls back to its declared `default` on every path. Triggers themselves are independent table resources managed via `mediforce workflow trigger-*` (ADR-0011, Issue #932).",
+      "tags": ["tutorial", "triggers"]
+    },
+    {
+      "name": "tutorial-selection-review",
+      "path": "docs/workflow-examples/08-selection-review.wd.json",
+      "description": "Fetch a list of options via script, then let a human pick one from the results. Demonstrates the selection review pattern: a script outputs an options array, a review step with selection: 1 presents them for picking, and verdicts route the choice.",
+      "tags": ["tutorial", "selection", "review"]
+    },
+    {
+      "name": "tutorial-cowork-step",
+      "path": "docs/workflow-examples/09-cowork-step.wd.json",
+      "description": "Collaborative human+AI step using the cowork executor. A human and a chat agent work together in real time to produce a structured artifact. Demonstrates cowork config: agent type, systemPrompt, outputSchema, and chat model selection.",
+      "tags": ["tutorial", "cowork"]
+    },
+    {
+      "name": "tutorial-validation-gate",
+      "path": "docs/workflow-examples/10-validation-gate.wd.json",
+      "description": "Script validates data, then conditional routing passes or loops back for fixes. Demonstrates the validation gate pattern: a script step outputs {valid: true/false, errors: [...]}, transitions branch on output.valid, and the fix step feeds corrections back.",
+      "tags": ["tutorial", "validation"]
+    },
+    {
+      "name": "tutorial-fan-out-orchestration",
+      "path": "docs/workflow-examples/11-fan-out-orchestration.wd.json",
+      "description": "Parent workflow that fans a child workflow out to every item in a list, waits for a collection window, then gathers the replies. Demonstrates action spawn with forEach (${item.*}), the wait action, and ${steps.*} interpolation. Distilled from apps/team-pulse.",
+      "tags": ["tutorial", "orchestration"]
+    },
+    {
+      "name": "tutorial-previous-run",
+      "path": "docs/workflow-examples/12-previous-run.wd.json",
+      "description": "Round-trips a message between runs: a script step reads `previousRun.message` from /output/previous_run.json, a human step sets the message the next run will see. Demonstrates the inputForNextRun carry-over contract and the empty-object first-run case.",
+      "tags": ["tutorial", "state"]
+    }
+  ]
+}

@@ -1,10 +1,3 @@
-/** L2/L3/L4 only — the three modes surfaced in the wizard. L0/L1 are developer-only (raw YAML). */
-export const AGENT_CONTROL_MODES = [
-  { value: 'L2' as const, label: 'Assist — agent draft, human approves' },
-  { value: 'L3' as const, label: 'Human review — agent output, explicit approval' },
-  { value: 'L4' as const, label: 'Autonomous agent — executes without review' },
-] as const;
-
 export const STEP_TYPE_LABELS: Record<string, string> = { creation: 'Creation', review: 'Review', decision: 'Decision', terminal: 'End' };
 
 export const FALLBACK_OPTIONS = [

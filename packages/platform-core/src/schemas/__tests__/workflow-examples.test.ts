@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, it, expect } from 'vitest';
 import {
@@ -87,6 +88,34 @@ describe('workflow examples', () => {
       );
       const badTransitions = transitions.filter(t => reviewIds.has(t.from));
       expect(badTransitions, 'review steps must not have outgoing transitions').toHaveLength(0);
+    });
+  });
+});
+
+// `workflows-index.json` is what the import dialog browses, and it lives apart
+// from the examples it lists — so without this, adding an example silently omits
+// it from browse, and editing one silently leaves the manifest describing the
+// old thing.
+describe('workflows-index.json browse manifest', () => {
+  const manifest = JSON.parse(
+    readFileSync(resolve(repoRoot, 'workflows-index.json'), 'utf8'),
+  ) as { workflows: Array<{ name: string; path: string; description?: string }> };
+
+  it('lists every example under docs/workflow-examples and nothing else', () => {
+    expect(manifest.workflows.map(wf => wf.path).sort()).toEqual(
+      examples.map(example => `docs/workflow-examples/${example.file}`).sort(),
+    );
+  });
+
+  describe.each(examples)('$file', ({ file, name, description }) => {
+    it("is listed under the definition's own name and description", () => {
+      expect(manifest.workflows).toContainEqual(
+        expect.objectContaining({
+          name,
+          path: `docs/workflow-examples/${file}`,
+          description,
+        }),
+      );
     });
   });
 });

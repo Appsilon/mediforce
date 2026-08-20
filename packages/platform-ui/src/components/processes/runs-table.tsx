@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ChevronRight, ExternalLink, Archive, ArchiveRestore, XCircle } from 'lucide-react';
+import { ChevronRight, ChevronUp, ChevronDown, ExternalLink, Archive, ArchiveRestore, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
@@ -14,12 +14,15 @@ import { ApiError } from '@/lib/mediforce';
 import type { BulkRunOutput } from '@mediforce/platform-api/contract';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 import { formatCostUsd } from '@/lib/format';
+import { LoadMoreFooter } from '@/components/load-more-footer';
 import { useToast } from '@/components/command-palette/toast-provider';
 import {
   useArchiveRun,
   useBulkArchiveRuns,
   useBulkCancelRuns,
 } from '@/hooks/use-run-mutations';
+
+export type RunSortField = 'cost' | 'started';
 
 interface RunsTableProps {
   runs: ProcessInstance[];
@@ -31,6 +34,15 @@ interface RunsTableProps {
   emptyMessage?: string;
   /** Map of instanceId → active task ID for direct task links. */
   activeTaskByInstance?: Map<string, string>;
+  /** True when the server has more rows beyond `runs` — shows the "Load
+   *  more" footer. Omit (or false) to hide it entirely (e.g. a fully-loaded
+   *  small table with no pagination source). */
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
+  sortField: RunSortField;
+  sortDirection: 'asc' | 'desc';
+  onSort: (field: RunSortField, direction: 'asc' | 'desc') => void;
 }
 
 function isCancellable(run: ProcessInstance): boolean {
@@ -50,6 +62,12 @@ export function RunsTable({
   runHref,
   emptyMessage = 'No runs found.',
   activeTaskByInstance,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
+  sortField,
+  sortDirection,
+  onSort,
 }: RunsTableProps) {
   const handle = useHandleFromPath();
   const { toast } = useToast();
@@ -87,6 +105,14 @@ export function RunsTable({
     selectAllRef.current.checked = allSelected;
     selectAllRef.current.indeterminate = someSelected && !allSelected;
   }, [selectedIds, runs]);
+
+  function handleSort(field: RunSortField) {
+    if (sortField === field) {
+      onSort(field, sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      onSort(field, 'desc');
+    }
+  }
 
   function toggleAll() {
     if (runs.every((r) => selectedIds.has(r.id))) {
@@ -167,17 +193,16 @@ export function RunsTable({
     `/${handle}/workflows/${encodeURIComponent(run.definitionName)}/runs/${run.id}`
   );
 
-  const dataHeaders = [
-    ...(showProcess ? ['Workflow'] : []),
-    'Run ID',
-    'Version',
-    'Status',
-    'Started by',
-    'Current Step',
-    'Cost',
-    'Started',
-    '', // per-row archive
-    '', // view link
+  const dataHeaders: Array<{ label: string; sortField?: RunSortField }> = [
+    ...(showProcess ? [{ label: 'Workflow' }] : []),
+    { label: 'Version' },
+    { label: 'Status' },
+    { label: 'Started by' },
+    { label: 'Current Step' },
+    { label: 'Cost', sortField: 'cost' },
+    { label: 'Started', sortField: 'started' },
+    { label: '' }, // per-row archive
+    { label: '' }, // view link
   ];
 
   if (loading) {
@@ -254,7 +279,19 @@ export function RunsTable({
             </th>
             {dataHeaders.map((h, i) => (
               <th key={i} className="px-4 py-2.5 text-left font-medium">
-                {h}
+                {h.sortField ? (
+                  <button
+                    onClick={() => handleSort(h.sortField!)}
+                    className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
+                  >
+                    {h.label}
+                    {sortField === h.sortField ? (
+                      sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3 opacity-30" />
+                    )}
+                  </button>
+                ) : h.label}
               </th>
             ))}
           </tr>
@@ -289,9 +326,6 @@ export function RunsTable({
                     </Link>
                   </td>
                 )}
-                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                  {run.id.slice(0, 8)}&hellip;
-                </td>
                 <td className="px-4 py-3 font-mono text-xs">
                   <span title="Definition version">v{run.definitionVersion}</span>
                   {run.configName && (
@@ -376,6 +410,7 @@ export function RunsTable({
           })}
         </tbody>
       </table>
+      <LoadMoreFooter hasMore={hasMore} loadingMore={loadingMore} onLoadMore={onLoadMore} />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import {
   parseWorkflowTemplate,
+  validateWorkflowGraphAndReferences,
   SERVER_MANAGED_WORKFLOW_FIELDS,
+  type WorkflowDefinition,
 } from '@mediforce/platform-core';
 import type {
   ValidateWorkflowInput,
@@ -11,15 +13,20 @@ import type { CallerScope } from '../../repositories/index';
 /**
  * Dry run of the canonical WorkflowDefinition validation, without persisting.
  *
- * Runs `parseWorkflowTemplate` — the same Zod schema + cross-field refinements
- * (verdict targets, executor/plugin rules, transition validity, trigger config,
- * `inputForNextRun`/`triggerInput`) that `parseWorkflowDefinitionForCreation`
- * applies at register time. This is the single source of truth: callers that
- * previously hand-reimplemented a partial copy of these checks delegate here so
- * the validation can never drift from the schema.
+ * Runs the same two gates `register` runs, in the same order:
  *
- * Errors are returned as data (`{ valid: false, errors }`), never thrown, so
- * callers can route on `valid` and surface the issues.
+ * 1. `parseWorkflowTemplate` — the Zod schema + cross-field refinements
+ *    (verdict targets, executor/plugin rules, transition validity, trigger
+ *    config, `inputForNextRun`/`triggerInput`) that
+ *    `parseWorkflowDefinitionForCreation` applies at register time.
+ * 2. `validateWorkflowGraphAndReferences` — structural graph validation
+ *    (reachability, terminal steps, dangling transitions) plus step-reference
+ *    validation (`${steps.<id>.<field>}`). Without this a definition could pass
+ *    `validate` and then fail `register`.
+ *
+ * This keeps the two handlers in agreement. Errors are returned as data
+ * (`{ valid: false, errors }`), never thrown, so callers can route on `valid`
+ * and surface the issues.
  */
 export async function validateWorkflow(
   input: ValidateWorkflowInput,
@@ -35,13 +42,33 @@ export async function validateWorkflow(
   }
 
   const parsed = parseWorkflowTemplate(candidate);
-  if (parsed.success) return { valid: true, errors: [] };
+  if (!parsed.success) {
+    return {
+      valid: false,
+      errors: parsed.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      })),
+    };
+  }
 
-  return {
-    valid: false,
-    errors: parsed.error.issues.map((issue) => ({
-      path: issue.path.join('.'),
-      message: issue.message,
-    })),
+  // The graph gate operates on a full WorkflowDefinition. A template lacks the
+  // server-managed fields, but graph/reference validation ignores them — fill
+  // placeholders so the shared gate can run on the parsed candidate.
+  const definition: WorkflowDefinition = {
+    ...parsed.data,
+    namespace: 'validate',
+    version: 1,
+    createdAt: new Date().toISOString(),
   };
+
+  const { errors: graphErrors } = validateWorkflowGraphAndReferences(definition);
+  if (graphErrors.length > 0) {
+    return {
+      valid: false,
+      errors: graphErrors.map((message) => ({ path: 'graph', message })),
+    };
+  }
+
+  return { valid: true, errors: [] };
 }

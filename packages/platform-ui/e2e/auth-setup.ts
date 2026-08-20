@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test as setup } from '@playwright/test';
-import { TEST_USER_ID } from './helpers/constants';
+import { TEST_USER_DISPLAY_NAME, TEST_USER_EMAIL, TEST_USER_ID } from './helpers/constants';
 import { openPostgresClient, seedAuthSession } from './helpers/auth-session';
 import { seedPostgresNamespace } from './helpers/postgres-seed';
 
@@ -14,9 +14,6 @@ function readMockOAuthBaseUrl(): string {
   if (!fs.existsSync(file)) return 'http://127.0.0.1:0';
   return fs.readFileSync(file, 'utf8').trim();
 }
-
-const TEST_EMAIL = 'test@mediforce.dev';
-const TEST_DISPLAY_NAME = 'Test User';
 
 // The session cookie name for database-strategy NextAuth over http (see
 // packages/platform-ui/src/lib/session-cookie.ts). Its value is the
@@ -51,16 +48,16 @@ setup('authenticate and seed data', async () => {
   // user, then persist the session token as the Playwright storage-state
   // cookie. This replaces the old Firebase emulator sign-in + `/test-login`
   // navigation — the cookie alone authenticates every downstream journey.
-  const { client, db } = openPostgresClient();
+  const connection = openPostgresClient();
   let sessionToken: string;
   try {
-    sessionToken = await seedAuthSession(db, {
+    sessionToken = await seedAuthSession(connection, {
       userId: TEST_USER_ID,
-      email: TEST_EMAIL,
-      name: TEST_DISPLAY_NAME,
+      email: TEST_USER_EMAIL,
+      name: TEST_USER_DISPLAY_NAME,
     });
   } finally {
-    await client.end({ timeout: 5 });
+    await connection.client.end({ timeout: 5 });
   }
 
   // 3. Write the Playwright storageState with the session cookie.

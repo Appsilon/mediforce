@@ -8,8 +8,8 @@ const DEFAULT_LIMIT = 50;
 
 /**
  * List agent runs visible to the caller. Workspace gating is enforced inside
- * `scope.agentRuns.list` (system actors see everything, user callers see only
- * runs whose parent process instance lives in one of their workspaces).
+ * `scope.agentRuns.listPage` (system actors see everything, user callers see
+ * only runs whose parent process instance lives in one of their workspaces).
  *
  * Cursor pagination is opaque to the client — the repository encodes the
  * `(startedAt, id)` tie-breaker. Sorting is `startedAt DESC` so the operator
@@ -19,12 +19,15 @@ export async function listAgentRuns(
   input: ListAgentRunsInput,
   scope: CallerScope,
 ): Promise<ListAgentRunsOutput> {
-  const page = await scope.agentRuns.list({
+  const page = await scope.agentRuns.listPage({
     limit: input.limit ?? DEFAULT_LIMIT,
     cursor: input.cursor,
     runId: input.runId,
     stepId: input.stepId,
     namespace: input.namespace,
+    status: input.status,
+    cardStatus: input.cardStatus,
+    processInstanceIds: input.processInstanceIds,
   });
   return {
     runs: [...page.items],

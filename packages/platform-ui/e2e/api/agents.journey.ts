@@ -72,3 +72,48 @@ test.describe('GET /api/agents — API E2E', () => {
     expect(body.agent.visibility).toBe('public');
   });
 });
+
+test.describe('POST /api/agents — API E2E', () => {
+  test('create: a name, a model and a namespace are enough', async ({ request }) => {
+    const res = await request.post('/api/agents', {
+      headers: apiKeyHeaders(),
+      data: {
+        name: `L3 Minimal Agent ${Date.now()}`,
+        iconName: 'Bot',
+        description: '',
+        foundationModel: 'anthropic/claude-sonnet-4',
+        systemPrompt: '',
+        inputDescription: '',
+        outputDescription: '',
+        namespace: 'test',
+      },
+    });
+    expect(res.status(), await res.text()).toBe(201);
+    const body = await res.json() as { agent: { id: string; namespace?: string } };
+    expect(body.agent.namespace).toBe('test');
+
+    const readBack = await request.get(`/api/agents/${body.agent.id}`, {
+      headers: apiKeyHeaders(),
+    });
+    expect(readBack.status(), await readBack.text()).toBe(200);
+  });
+
+  test('create: a namespace-less agent is rejected, not half-written', async ({ request }) => {
+    // The audit trail is workspace-scoped, so an agent with no namespace used
+    // to insert its row and then blow up appending the audit entry — a 500 on
+    // top of an orphan agent nobody could see or delete. Reject it up front.
+    const res = await request.post('/api/agents', {
+      headers: apiKeyHeaders(),
+      data: {
+        name: `L3 Namespaceless Agent ${Date.now()}`,
+        iconName: 'Bot',
+        description: '',
+        foundationModel: 'anthropic/claude-sonnet-4',
+        systemPrompt: '',
+        inputDescription: '',
+        outputDescription: '',
+      },
+    });
+    expect(res.status(), await res.text()).toBe(400);
+  });
+});

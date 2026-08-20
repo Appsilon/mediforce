@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect } from 'vitest';
-import { resolveEmailSenderFromEnv } from '../resolve-sender';
+import { resolveEmailSenderFromEnv, isEmailDeliveryConfigured } from '../resolve-sender';
 
 const MAILGUN_ENV: NodeJS.ProcessEnv = {
   MAILGUN_API_KEY: 'key-123',
@@ -123,5 +123,28 @@ describe('resolveEmailSenderFromEnv', () => {
 
   it('throws when email is enabled but no provider is configured', () => {
     expect(() => resolveEmailSenderFromEnv({})).toThrow(/no email provider is configured/);
+  });
+});
+
+describe('isEmailDeliveryConfigured', () => {
+  it('is true whenever a provider resolves, regardless of which sign-in methods are on', () => {
+    expect(isEmailDeliveryConfigured(MAILGUN_ENV)).toBe(true);
+    expect(isEmailDeliveryConfigured({ ...SMTP_ENV, ENABLE_MAGIC_LINK: 'false' })).toBe(true);
+  });
+
+  it('is false when email is disabled', () => {
+    expect(isEmailDeliveryConfigured({ MEDIFORCE_DISABLE_EMAIL: 'true', ...MAILGUN_ENV })).toBe(
+      false,
+    );
+  });
+
+  // The display flag must degrade rather than propagate the boot-time throw:
+  // `/api/auth/magic-link-login` is a public GET on the login page.
+  it('is false — never throwing — on a misconfigured deployment', () => {
+    expect(isEmailDeliveryConfigured({})).toBe(false);
+    expect(isEmailDeliveryConfigured({ EMAIL_PROVIDER: 'mailgun', MAILGUN_API_KEY: 'k' })).toBe(
+      false,
+    );
+    expect(isEmailDeliveryConfigured({ ...MAILGUN_ENV, ...SMTP_ENV })).toBe(false);
   });
 });

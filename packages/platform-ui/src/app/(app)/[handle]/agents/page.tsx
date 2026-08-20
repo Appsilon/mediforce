@@ -1,28 +1,14 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import * as Tabs from '@radix-ui/react-tabs';
 import { Bot, Cpu, Terminal, BarChart3, Settings, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useAgentRuns, useProcessNameMap } from '@/hooks/use-agent-runs';
-import { AgentRunListTable } from '@/components/agents/agent-run-list-table';
 import { getModelDisplayName } from '@/lib/agent-models';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 import type { AgentDefinition } from '@mediforce/platform-core';
-
-const ALL_STATUSES = [
-  'running',
-  'completed',
-  'timed_out',
-  'low_confidence',
-  'error',
-  'escalated',
-  'flagged',
-  'paused',
-] as const;
 
 interface AgentMetadata {
   name: string;
@@ -210,33 +196,21 @@ function AgentCatalog({ handle }: { handle: string }) {
   const [query, setQuery] = useState('');
 
   useEffect(() => {
-    Promise.all([
-      apiFetch('/api/plugins').then((res) => {
-        if (!res.ok) throw new Error(`Failed to fetch plugins: ${res.status}`);
-        return res.json() as Promise<{ plugins: AgentEntry[] }>;
-      }),
-      apiFetch('/api/agents').then((res) => {
+    apiFetch('/api/agents')
+      .then((res) => {
         if (!res.ok) throw new Error(`Failed to fetch agent definitions: ${res.status}`);
         return res.json() as Promise<{ agents: AgentDefinition[] }>;
-      }),
-    ])
-      .then(([pluginsData, definitionsData]) => {
+      })
+      .then((definitionsData) => {
         // Map from runtimeId → definition entry. Dedups definitions that share a
-        // runtimeId (e.g. an older seeded doc + the builtin-seeded doc) and also
-        // backs the plugin filter below.
+        // runtimeId (e.g. an older seeded doc + the builtin-seeded doc).
         const definitionByRuntimeId = new Map(
           (definitionsData.agents ?? []).map((def) => {
             const entry = agentDefinitionToEntry(def);
             return [entry.name, entry] as const;
           }),
         );
-        // For plugins not covered by a definition, include them as-is.
-        // For plugins that have a matching definition, the definition entry (with Configure button) wins.
-        const coveredRuntimeIds = new Set(definitionByRuntimeId.keys());
-        const uncoveredPlugins = (pluginsData.plugins ?? []).filter(
-          (p) => !coveredRuntimeIds.has(p.name),
-        );
-        setAgents([...definitionByRuntimeId.values(), ...uncoveredPlugins]);
+        setAgents([...definitionByRuntimeId.values()]);
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -306,41 +280,14 @@ function AgentCatalog({ handle }: { handle: string }) {
 
 export default function AgentsPage() {
   const { handle } = useParams<{ handle: string }>();
-  const { data: runs, loading } = useAgentRuns(handle);
-  const processNameMap = useProcessNameMap(handle);
-
-  const [processFilter, setProcessFilter] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-
-  const processNames = useMemo(() => {
-    // Drop empty / undefined definitionNames so the <select> doesn't end up
-    // with multiple <option key=""> children — that collision is what
-    // surfaces the "Each child in a list should have a unique key" warning
-    // from React when a legacy ProcessInstance lacks its name.
-    const names = new Set<string>();
-    for (const [, name] of processNameMap) {
-      if (typeof name === 'string' && name.length > 0) names.add(name);
-    }
-    return Array.from(names).sort();
-  }, [processNameMap]);
-
-  const filteredRuns = useMemo(() => {
-    return runs.filter((run) => {
-      if (processFilter) {
-        const name = processNameMap.get(run.processInstanceId);
-        if (name !== processFilter) return false;
-      }
-      if (statusFilter && run.status !== statusFilter) return false;
-      return true;
-    });
-  }, [runs, processFilter, statusFilter, processNameMap]);
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-start justify-between">
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm text-muted-foreground">
-            Available AI agents for building workflows
+          <h1 className="text-2xl font-bold">Custom Agents</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Custom configuration for foundation models
           </p>
         </div>
         <Link
@@ -355,70 +302,7 @@ export default function AgentsPage() {
         </Link>
       </div>
 
-      <Tabs.Root defaultValue="overview">
-        <Tabs.List className="flex gap-1 border-b mb-6">
-          <Tabs.Trigger
-            value="overview"
-            className="px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary -mb-px"
-          >
-            Available Agents
-          </Tabs.Trigger>
-          <Tabs.Trigger
-            value="run-history"
-            className="px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary -mb-px"
-          >
-            Run History
-          </Tabs.Trigger>
-        </Tabs.List>
-
-        <Tabs.Content value="overview" className="space-y-6">
-          <AgentCatalog handle={handle} />
-        </Tabs.Content>
-
-        <Tabs.Content value="run-history" className="space-y-4">
-          <div className="flex gap-3 items-center">
-            <select
-              value={processFilter ?? ''}
-              onChange={(e) => setProcessFilter(e.target.value || null)}
-              className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
-            >
-              <option key="__all" value="">All Workflows</option>
-              {processNames.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={statusFilter ?? ''}
-              onChange={(e) => setStatusFilter(e.target.value || null)}
-              className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
-            >
-              <option key="__all" value="">All Statuses</option>
-              {ALL_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {status.replace(/_/g, ' ')}
-                </option>
-              ))}
-            </select>
-
-            <span className="text-sm text-muted-foreground">
-              {loading
-                ? '\u2026'
-                : processFilter || statusFilter
-                ? `${filteredRuns.length} of ${runs.length} runs`
-                : `${runs.length} runs`}
-            </span>
-          </div>
-
-          <AgentRunListTable
-            runs={filteredRuns}
-            loading={loading}
-            processNameMap={processNameMap}
-          />
-        </Tabs.Content>
-      </Tabs.Root>
+      <AgentCatalog handle={handle} />
     </div>
   );
 }

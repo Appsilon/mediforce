@@ -58,9 +58,11 @@ export {
   InstanceStatusSchema,
   ProcessInstanceSchema,
   RunNameEntrySchema,
+  WorkflowDisplayStatusSchema,
   type InstanceStatus,
   type ProcessInstance,
   type RunNameEntry,
+  type WorkflowDisplayStatus,
 } from './process-instance';
 
 export {
@@ -97,8 +99,10 @@ export {
 export {
   AgentRunStatusSchema,
   AgentRunSchema,
+  AgentRunCardStatusSchema,
   type AgentRunStatus,
   type AgentRun,
+  type AgentRunCardStatus,
 } from './agent-run';
 
 export {
@@ -216,6 +220,28 @@ export {
 } from './workflow-definition';
 
 export {
+  AddStepToolSchema,
+  UpdateStepToolSchema,
+  RemoveStepToolSchema,
+  ListModelsToolSchema,
+  WORKFLOW_ASSISTANT_TOOLS,
+  WORKFLOW_ASSISTANT_DEFAULT_MODEL,
+  WorkflowAssistantToolCallSchema,
+  type AddStepTool,
+  type UpdateStepTool,
+  type RemoveStepTool,
+  type ListModelsTool,
+  type WorkflowAssistantToolName,
+  type WorkflowAssistantToolCall,
+} from './workflow-assistant-tools';
+
+export {
+  applyWorkflowAssistantToolCalls,
+  type ToolCallOutcome,
+  type ApplyToolCallsResult,
+} from './workflow-assistant-apply';
+
+export {
   ConversationTurnSchema,
   HumanTurnSchema,
   AgentTurnSchema,
@@ -321,3 +347,18 @@ export {
   type TableEditorRow,
   type CompleteHumanTaskPayload,
 } from './task-completion';
+
+export {
+  toProcessDefinition,
+  mergeVerdictTransitions,
+  ensureEntryStepFirst,
+  validateStepReferences,
+  type ReferenceIssue,
+} from './workflow-graph';
+
+export {
+  validateStepGraph,
+  validateWorkflowGraphAndReferences,
+  type ValidationResult,
+  type WorkflowGraphValidation,
+} from './graph-validator';

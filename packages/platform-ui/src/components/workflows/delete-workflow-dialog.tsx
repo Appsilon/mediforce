@@ -101,7 +101,8 @@ export function DeleteWorkflowDialog({ workflowName, namespace, open, onOpenChan
                     This will also delete {runCount} associated run{runCount !== 1 ? 's' : ''}.
                   </p>
                   <p className="text-muted-foreground mt-1">
-                    All process instances, tasks, and agent runs for this workflow will be removed.
+                    All process instances and tasks for this workflow will be removed. Agent run
+                    history stays.
                   </p>
                 </div>
               )}

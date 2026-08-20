@@ -6,7 +6,7 @@ test.describe('Trigger Input Journey', () => {
   test('start run dialog shows input form, validates required fields, and starts run', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Trigger%20Input%20Test`);
-    await expect(page.getByText('Trigger Input Test')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'Trigger Input Test' })).toBeVisible({ timeout: 10_000 });
 
     // Click Start Run — dialog opens with "Run input" title
     await page.getByRole('button', { name: /start run/i }).click();
@@ -54,7 +54,7 @@ test.describe('Trigger Input Journey', () => {
   test('cancel dialog without starting', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Trigger%20Input%20Test`);
-    await expect(page.getByText('Trigger Input Test')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'Trigger Input Test' })).toBeVisible({ timeout: 10_000 });
 
     // Open dialog
     await page.getByRole('button', { name: /start run/i }).click();

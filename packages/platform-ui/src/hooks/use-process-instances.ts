@@ -1,76 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { InstanceStatus } from '@mediforce/platform-core';
 import { ApiError, mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 import {
   CRITICAL_LIVE_INTERVAL_MS,
-  LEGACY_FIRESTORE_PARITY_LIMIT,
-  STANDARD_LIVE_INTERVAL_MS,
   TERMINAL_STATUSES,
 } from '@/lib/polling-cadence';
-
-export type ProcessStatusFilter = 'all' | 'running' | 'paused' | 'completed' | 'failed' | 'created';
-
-function statusForApi(filter: ProcessStatusFilter): InstanceStatus | undefined {
-  return filter === 'all' ? undefined : filter;
-}
-
-/**
- * List process instances scoped to a workspace. STANDARD LIVE per ADR-0006 §4
- * (5s poll). Namespace gating is enforced server-side: `mediforce.runs.list`
- * sends the `namespace` filter to the platform-API, which intersects it with
- * the caller's allowed namespaces.
- *
- * The `showArchived` toggle is applied client-side because the wire schema
- * already filters `deleted` and there is no separate `archived` predicate on
- * the list endpoint; the over-fetch is bounded by the list `limit`.
- */
-export function useProcessInstances(
-  statusFilter: ProcessStatusFilter,
-  definitionName: string | undefined,
-  showArchived: boolean,
-  namespace: string,
-) {
-  const apiStatus = statusForApi(statusFilter);
-  const query = useQuery({
-    queryKey: queryKeys.runs.byHandle(namespace, {
-      workflow: definitionName,
-      status: apiStatus,
-    }),
-    queryFn: async () => {
-      const result = await mediforce.runs.list({
-        namespace,
-        workflow: definitionName,
-        status: apiStatus,
-        limit: LEGACY_FIRESTORE_PARITY_LIMIT,
-      });
-      return result.runs;
-    },
-    enabled: namespace.length > 0,
-    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
-    retry: stopRetryOn4xx,
-  });
-
-  const data = useMemo(() => {
-    const runs = query.data ?? [];
-    return runs.filter((inst) => showArchived || inst.archived !== true);
-  }, [query.data, showArchived]);
-
-  // While `namespace` hasn't resolved yet (route params still loading) the
-  // query is disabled — `query.isPending` is true but `query.data` is also
-  // undefined. Reporting `loading: false` in that window let the page render
-  // its empty state ("No runs found.") before the first fetch even started.
-  // Treat namespace-pending as loading so the skeleton holds.
-  return {
-    data,
-    loading: namespace.length === 0 || query.isPending,
-    error: (query.error as Error | null) ?? null,
-  };
-}
 
 /**
  * Single process instance. CRITICAL LIVE per ADR-0006 §4 (1.5s poll) while
@@ -109,4 +46,3 @@ export function useProcessInstance(instanceId: string | null) {
     notFound,
   };
 }
-

@@ -4,7 +4,7 @@
  * The schema fields `executor` and `autonomyLevel` are never renamed.
  * `ControlMode` exists only in the UI layer and is never written to storage.
  *
- * Mapping (ADR-0006: docs/adr/0006-control-mode-ui-concept.md):
+ * Mapping (ADR-0014: docs/adr/0014-control-mode-ui-concept.md):
  *   CM0  No agent          executor: human | script | action
  *                          also: executor: agent, autonomyLevel: L0 | L1  (developer-only flags)
  *   CM1  Assist            not yet implemented — disabled in wizard UI
@@ -17,6 +17,10 @@
  * Note: executor: agent, autonomyLevel: L2 (old Ghost/Assist) maps to 'assist' for
  * display of existing steps, but is no longer creatable from the wizard.
  */
+import type { WorkflowStep } from '@mediforce/platform-core';
+
+/** Step executor — the canonical union from the WorkflowStep schema. */
+export type Executor = WorkflowStep['executor'];
 
 export type ControlMode =
   | 'no-agent'
@@ -40,14 +44,6 @@ export const CONTROL_MODE_LABELS: Record<ControlMode, string> = {
   'cowork':           'Cowork',
   'human-review':     'Human review',
   'autonomous-agent': 'Autonomous agent',
-};
-
-export const CONTROL_MODE_DESCRIPTIONS: Record<ControlMode, string> = {
-  'no-agent':         'Step handled by a human, script, or action — no AI agent involved.',
-  'assist':            'Human leads and executes; AI reviews the result. (Coming soon)',
-  'cowork':           'Agent and human collaborate in real-time via chat or voice.',
-  'human-review':     'Agent executes, human reviews and approves before the workflow proceeds.',
-  'autonomous-agent': 'Agent executes and the result advances the workflow without human review.',
 };
 
 /** Modes disabled in the wizard (shown but not selectable). */
@@ -107,11 +103,12 @@ export function controlModeToSchema(
   }
 }
 
-/** Payload for creating a new step from the wizard popover. */
-export type NewStepPayload = {
-  type: 'creation' | 'decision';
-  executor: string;
-  autonomyLevel?: string;
-  agentId?: string;
-  cowork?: { agent: 'chat' | 'voice-realtime' };
+/**
+ * Payload for creating a new step from the wizard popover. Widened to accept any
+ * WorkflowStep field (minus id) so the picker can seed plugin/cowork/agent config
+ * in one shot; `type` and `executor` are always required.
+ */
+export type NewStepPayload = Partial<Omit<WorkflowStep, 'id'>> & {
+  type: WorkflowStep['type'];
+  executor: Executor;
 };

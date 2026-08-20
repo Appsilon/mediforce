@@ -1,12 +1,19 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import type { WorkflowStep } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 
 // ---- Mocks (must be before component import) ----
 
+// Mutable so a test can register plugin metadata; reset to empty in beforeEach.
+const pluginState = vi.hoisted(() => ({
+  plugins: [] as { name: string; metadata?: Record<string, unknown> }[],
+}));
+
 vi.mock('@/hooks/use-plugins', () => ({
-  usePlugins: () => ({ plugins: [] }),
+  usePlugins: () => ({ plugins: pluginState.plugins }),
 }));
 
 vi.mock('@/contexts/auth-context', () => ({
@@ -39,6 +46,13 @@ function buildStep(overrides: Partial<WorkflowStep> = {}): WorkflowStep {
 
 const noop = () => {};
 
+// The step editor is a single-open accordion with only "Basics" open by default;
+// executor config lives in the (collapsed) primary/Advanced cards. Click a card
+// header to expand it before asserting its contents.
+function expandCard(name: string) {
+  fireEvent.click(screen.getByRole('button', { name }));
+}
+
 const dockerImages: DockerImageInfo[] = [
   { repository: 'mediforce/golden-image', tag: 'latest', id: 'abc', size: '1GB', created: '1d ago' },
 ];
@@ -48,6 +62,56 @@ const dockerImages: DockerImageInfo[] = [
 // ---------------------------------------------------------------------------
 
 describe('StepEditor', () => {
+  beforeEach(() => {
+    pluginState.plugins = [];
+  });
+
+  it('[REGRESSION #1025] does not change a new step id while its name is being typed', () => {
+    const onChange = vi.fn();
+
+    render(
+      <StepEditor
+        step={buildStep({ id: 'new-step-1', name: '' })}
+        allSteps={[buildStep({ id: 'new-step-1', name: '' }), buildStep({ id: 'input-text', name: 'Input Text' })]}
+        onChange={onChange}
+      />,
+    );
+
+    const nameInput = screen.getByTestId('step-editor').querySelector('input') as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: 'input' } });
+
+    expect(onChange).toHaveBeenLastCalledWith({ name: 'input' });
+    expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'input' }));
+  });
+
+  it('[REGRESSION #1025] finalizes a unique generated id on blur', () => {
+    const onChange = vi.fn();
+
+    function ControlledStepEditor() {
+      const [step, setStep] = React.useState(buildStep({ id: 'new-step-1', name: '' }));
+      const existingStep = buildStep({ id: 'input-text', name: 'Input Text' });
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step, existingStep]}
+          onChange={(patch) => {
+            onChange(patch);
+            setStep((current) => ({ ...current, ...patch }));
+          }}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    const nameInput = screen.getByTestId('step-editor').querySelector('input') as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: 'input text' } });
+    expect(onChange).toHaveBeenLastCalledWith({ name: 'input text' });
+
+    fireEvent.blur(nameInput);
+
+    expect(onChange).toHaveBeenLastCalledWith({ id: 'input-text-2' });
+  });
+
   it('[RENDER] step type badge visible without expanding details', () => {
     render(
       <StepEditor
@@ -212,11 +276,12 @@ describe('StepEditor', () => {
       />,
     );
 
-    // Agent-specific labels should be visible
-    expect(screen.getAllByText('autonomy level').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('agentId')).toBeInTheDocument();
-    expect(screen.getByText('agent.model')).toBeInTheDocument();
-    expect(screen.getByText('agent.prompt')).toBeInTheDocument();
+    expandCard('Prompt & model');
+    // Agent-specific labels should be visible (rendered via humanizeToken)
+    expect(screen.getAllByText('Autonomy Level').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Agent ID')).toBeInTheDocument();
+    expect(screen.getByText('Agent Model')).toBeInTheDocument();
+    expect(screen.getByText('Agent Prompt')).toBeInTheDocument();
   });
 
   it('[RENDER] script config fields are shown for script executor', () => {
@@ -228,9 +293,10 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('script.runtime')).toBeInTheDocument();
-    expect(screen.getByText('script.command')).toBeInTheDocument();
-    expect(screen.getByText('script.inlineScript')).toBeInTheDocument();
+    expandCard('Script');
+    expect(screen.getByText('Script Runtime')).toBeInTheDocument();
+    expect(screen.getByText('Script Command')).toBeInTheDocument();
+    expect(screen.getByText('Script Inline Script')).toBeInTheDocument();
   });
 
   it('[RENDER] human config shows allowedRoles field', () => {
@@ -242,7 +308,8 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('allowedRoles')).toBeInTheDocument();
+    expandCard('Advanced');
+    expect(screen.getByText('Allowed Roles')).toBeInTheDocument();
   });
 
   it('[RENDER] no placeholder text on regular inputs', () => {
@@ -273,10 +340,339 @@ describe('StepEditor', () => {
       />,
     );
 
+    expandCard('Prompt & model');
     fireEvent.change(screen.getByLabelText('Custom Docker image'), {
       target: { value: 'python:3.11-slim' },
     });
 
     expect(onChange).toHaveBeenCalledWith({ agent: { image: 'python:3.11-slim' } });
+  });
+
+  // Picking a minimal base image for an agent step fails at container start —
+  // it carries no agent CLI. The picker offers every discovered image equally,
+  // so it must at least say which one works and what leaving it blank does.
+  describe('agent image picker', () => {
+    const mixedImages: DockerImageInfo[] = [
+      { repository: 'alpine', tag: '3.24', id: 'a1', size: '8MB', created: '1d ago' },
+      { repository: 'mediforce-golden-image', tag: 'latest', id: 'g1', size: '1GB', created: '1d ago' },
+    ];
+
+    function renderAgentStep(
+      step: Partial<WorkflowStep> = {},
+      workflowExternalSkillsRepo?: { url: string; commit: string },
+    ) {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'agent', ...step })}
+          allSteps={[]}
+          onChange={noop}
+          dockerImages={mixedImages}
+          workflowExternalSkillsRepo={workflowExternalSkillsRepo}
+        />,
+      );
+      expandCard('Prompt & model');
+      return screen.getByLabelText('Known Docker image') as HTMLSelectElement;
+    }
+
+    it('[RENDER] the blank option names the image the platform falls back to', () => {
+      const select = renderAgentStep();
+      expect(select.options[0].textContent).toContain('mediforce-golden-image');
+    });
+
+    it('[RENDER] marks the golden image as recommended and lists it first', () => {
+      const select = renderAgentStep();
+      const listed = Array.from(select.options).slice(1).map((o) => o.textContent ?? '');
+      expect(listed[0]).toBe('★ mediforce-golden-image:latest');
+      expect(listed).toContain('alpine:3.24');
+    });
+
+    it('[RENDER] a build-mode step reports its build source instead of the default', () => {
+      const select = renderAgentStep({
+        agent: { repo: 'https://github.com/acme/wf.git', commit: 'abc1234', dockerfile: 'Dockerfile' },
+      });
+      expect(select.options[0].textContent).not.toContain('mediforce-golden-image');
+      expect(select.options[0].textContent).toContain('agent.repo');
+    });
+
+    it('[RENDER] a workflow-level build source is reflected in the blank option', () => {
+      const select = renderAgentStep(
+        { agent: { dockerfile: 'Dockerfile' } },
+        { url: 'https://github.com/acme/wf.git', commit: 'abc1234' },
+      );
+      expect(select.options[0].textContent).not.toContain(DEFAULT_AGENT_IMAGE);
+      expect(select.options[0].textContent).toContain('workflow');
+    });
+
+    it('[REGRESSION] treats the untagged persisted default as the discovered latest image', () => {
+      const select = renderAgentStep({ agent: { image: DEFAULT_AGENT_IMAGE } });
+      const matchingOptions = Array.from(select.options).filter(
+        (option) => option.value === DEFAULT_AGENT_IMAGE || option.value === `${DEFAULT_AGENT_IMAGE}:latest`,
+      );
+      expect(matchingOptions).toHaveLength(1);
+      expect(select.value).toBe(DEFAULT_AGENT_IMAGE);
+    });
+
+    it('[RENDER] the script picker keeps a neutral blank option — no agent default applies', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'script' })}
+          allSteps={[]}
+          onChange={noop}
+          dockerImages={mixedImages}
+        />,
+      );
+      expandCard('Script');
+      const select = screen.getByLabelText('Known Docker image') as HTMLSelectElement;
+      expect(select.options[0].textContent).not.toContain('mediforce-golden-image');
+    });
+  });
+
+  describe('parameters — issue #1031 (unnamed parameters)', () => {
+    it('[RENDER] flags a parameter with a blank name', () => {
+      render(
+        <StepEditor
+          step={buildStep({ params: [{ name: '', type: 'string', required: false }] })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+      expandCard('Task setup');
+      expect(screen.getByText('This field cannot be empty.')).toBeInTheDocument();
+    });
+
+    it('[RENDER] flags duplicate parameter names on the same step', () => {
+      render(
+        <StepEditor
+          step={buildStep({
+            params: [
+              { name: 'amount', type: 'string', required: false },
+              { name: 'amount', type: 'string', required: false },
+            ],
+          })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+      expandCard('Task setup');
+      expect(screen.getAllByText('Duplicate parameter name.')).toHaveLength(2);
+    });
+
+    it('[RENDER] does not flag a uniquely named parameter', () => {
+      render(
+        <StepEditor
+          step={buildStep({ params: [{ name: 'amount', type: 'string', required: false }] })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+      expandCard('Task setup');
+      expect(screen.queryByText('This field cannot be empty.')).not.toBeInTheDocument();
+      expect(screen.queryByText('Duplicate parameter name.')).not.toBeInTheDocument();
+    });
+  });
+
+  // Nothing in the editor said how a step's output reaches the next step, and
+  // the `/output/result.json` contract a script must honour was knowledge you
+  // could only get from the docs.
+  describe('data flow guidance — issue #1029', () => {
+    function dataFlowText(): string {
+      return screen.getByTestId('step-data-flow').textContent ?? '';
+    }
+
+    it('[RENDER] a script step spells out the /output file contract', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'script', plugin: 'script-container' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Script');
+      const text = dataFlowText();
+      expect(text).toContain('/output/input.json');
+      expect(text).toContain('/output/result.json');
+    });
+
+    it('[RENDER] a script step shows the neutral read/write tip', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'script', script: { runtime: 'python' } })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Script');
+      const text = dataFlowText();
+      expect(text).toContain('Your script should read');
+      expect(text).toContain('json.load');
+    });
+
+    it('[RENDER] names the reference downstream steps use, with this step id', () => {
+      render(
+        <StepEditor
+          step={buildStep({ id: 'extract-data', executor: 'script' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Script');
+      expect(dataFlowText()).toContain('${steps.extract-data.');
+    });
+
+    it('[RENDER] a human step says its parameter values become the step output', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'human', params: [{ name: 'amount', type: 'string', required: true }] })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      const text = dataFlowText();
+      expect(text).toContain('Parameters');
+      expect(text).toContain('${steps.step-1.');
+    });
+
+    it('[RENDER] a review step with both params and verdicts says the verdict rides along with the params', () => {
+      render(
+        <StepEditor
+          step={buildStep({
+            type: 'review',
+            executor: 'human',
+            params: [{ name: 'amount', type: 'string', required: true }],
+            verdicts: { approve: { target: 'done' } },
+          })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      expect(dataFlowText()).toContain('plus the selected verdict');
+    });
+
+    it('[RENDER] a decision step explains verdicts route via their own target, not a transition', () => {
+      render(
+        <StepEditor
+          step={buildStep({ type: 'decision', executor: 'human', verdicts: { approve: { target: 'done' } } })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      const text = dataFlowText();
+      expect(text).toContain('its own target');
+      expect(text).not.toContain('verdict ==');
+    });
+
+    it('[RENDER] an http action step points at the parsed JSON body, not the envelope', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'action', action: { kind: 'http', config: { method: 'GET', url: 'https://example.com' } } })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Action');
+      expect(dataFlowText()).toContain('${steps.step-1.body.json.');
+    });
+
+    it('[RENDER] a file-upload human step points at its files, not the Parameters form', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'human', ui: { component: 'file-upload' } })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      const text = dataFlowText();
+      expect(text).toContain('{ files }');
+      expect(text).toContain('${steps.step-1.files}');
+    });
+
+    it('[RENDER] a verdict-only human step (no params) says its output is the verdict', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'human' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      const text = dataFlowText();
+      expect(text).toContain('{ verdict }');
+      expect(text).toContain('${steps.step-1.verdict}');
+    });
+
+    it('[RENDER] a registered plugin describes its own contract instead of the fallback', () => {
+      pluginState.plugins = [{
+        name: 'databricks-job',
+        metadata: {
+          inputDescription: 'step.databricks: jobId + optional notebookParams.',
+          outputDescription: 'JSON object the notebook exits with.',
+        },
+      }];
+
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'script', plugin: 'databricks-job' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Script');
+      const text = dataFlowText();
+      expect(text).toContain('JSON object the notebook exits with.');
+      expect(text).not.toContain('/output/result.json');
+    });
+
+    // step.params only reach a task on the engine's human-executor branch.
+    it('[RENDER] warns that parameters on a non-human step are never collected', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'agent' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Advanced');
+      expect(screen.getByText(/only collected on human steps/i)).toBeInTheDocument();
+    });
+
+    it('[RENDER] a human step gets no such warning — its parameters are the form', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'human' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Task setup');
+      expect(screen.queryByText(/only collected on human steps/i)).not.toBeInTheDocument();
+    });
+
+    it('[RENDER] terminal steps get no data flow panel — nothing reads them', () => {
+      render(
+        <StepEditor
+          step={buildStep({ type: 'terminal', executor: 'human' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expect(screen.queryByTestId('step-data-flow')).not.toBeInTheDocument();
+    });
   });
 });

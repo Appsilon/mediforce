@@ -6,9 +6,8 @@ import postgres from 'postgres';
  * Postgres-backed test-user helpers (ADR-0002 PR2). Firebase Auth and its
  * emulator are gone — identity now lives in `auth_users` and sessions in
  * `auth_sessions`. These helpers seed those rows directly, mirroring the raw
- * `postgres-js` approach in `postgres-seed.ts` (Playwright resolves the
- * `@mediforce/source` condition, but a self-contained SQL helper keeps this
- * file dependency-light and matches the seed's proven pattern).
+ * `postgres-js` approach in `postgres-seed.ts`; a self-contained SQL helper
+ * keeps this file dependency-light and matches the seed's proven pattern.
  *
  * The filename is retained to avoid churning the ~6 journeys that import from
  * it; the "emulator" is historical.
@@ -34,18 +33,24 @@ function connect(): postgres.Sql {
  *
  * Idempotent: re-running upserts the name + password and returns the stable
  * id, so a Playwright retry after a password change re-seeds cleanly.
+ *
+ * `newUserId` pins the id for a *new* row — pass it when the caller shares an
+ * email with the E2E fixture (`TEST_USER_ID`) so `pnpm seed:dev` and
+ * `auth-setup` agree instead of racing a random uuid against the stable id. An
+ * existing row keeps its own id, which the caller gets back.
  */
 export async function createTestUser(
   email: string,
   password: string,
   displayName: string,
+  newUserId: string = randomUUID(),
 ): Promise<string> {
   const sql = connect();
   try {
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const rows = await sql<{ id: string }[]>`
       INSERT INTO auth_users (id, email, name, email_verified, password_hash)
-      VALUES (${randomUUID()}, ${email}, ${displayName}, now(), ${passwordHash})
+      VALUES (${newUserId}, ${email}, ${displayName}, now(), ${passwordHash})
       ON CONFLICT (email) DO UPDATE SET
         name = EXCLUDED.name,
         password_hash = EXCLUDED.password_hash,

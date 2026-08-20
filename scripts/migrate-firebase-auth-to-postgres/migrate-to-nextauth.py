@@ -2,7 +2,7 @@
 """Guarded, per-environment Firebase Auth -> NextAuth cutover seed (ADR-0002).
 
 This is the *automated* path for the manual seed sequence in
-``docs/adr/RUNBOOK-0002-staging-cutover.md`` (steps 4-5). It wraps the existing
+``docs/archive/RUNBOOK-0002-staging-cutover.md`` (steps 4-5). It wraps the existing
 seed ``scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts`` — it does
 NOT re-implement seeding — behind a single command with every pre-flight guard
 the runbook performs by eye, so the same cutover can be run against the next

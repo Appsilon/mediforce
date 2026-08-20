@@ -7,8 +7,10 @@ import {
   findPasswordCredentialByEmail,
   createDatabaseSession,
   recordSignIn,
+  recordSignInAuditEvent,
   SESSION_TTL_MS,
 } from '@mediforce/platform-infra';
+import { isPasswordAuthEnabled } from '@mediforce/platform-core';
 import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist';
 import { sessionCookieName, isSecureRequest } from '@/lib/session-cookie';
 
@@ -41,10 +43,16 @@ const INVALID_CREDENTIALS = { error: 'Incorrect email or password.' } as const;
 const DUMMY_HASH = '$2b$12$C6UzMDM.H6dfI/f/IKcEe.4nJmXQXbYCiL5C1xCtBHqAFwUeXPuLW';
 
 function passwordAuthEnabled(): boolean {
-  // On by default — a self-hosted deployment almost always wants password
-  // sign-in, and this keeps the invite / first-password flow working without an
-  // extra env flip. Set ENABLE_PASSWORD_AUTH=false for a Google/OIDC-only estate.
-  return process.env.ENABLE_PASSWORD_AUTH !== 'false';
+  return isPasswordAuthEnabled(process.env.ENABLE_PASSWORD_AUTH);
+}
+
+/** `x-forwarded-for` may carry a client,proxy1,proxy2 chain behind a load
+ *  balancer — the first entry is the original client. Falls back to
+ *  `x-real-ip` for proxies that set that instead. */
+function clientIpFrom(request: Request): string | null {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) return forwardedFor.split(',')[0]!.trim();
+  return request.headers.get('x-real-ip');
 }
 
 /** Whether this deployment offers password sign-in — the login page gates its
@@ -99,6 +107,17 @@ export async function POST(request: Request): Promise<NextResponse> {
   const expires = new Date(Date.now() + SESSION_TTL_MS);
   await createDatabaseSession(db, { sessionToken, userId: user.id, expires });
   await recordSignIn(db, user.id);
+  // Fire-and-forget: this is Monitoring telemetry, not part of the sign-in
+  // contract — the session cookie is already valid at this point, and a
+  // transient DB hiccup on the audit write must not fail the login response.
+  void recordSignInAuditEvent(db, {
+    uid: user.id,
+    method: {
+      kind: 'password',
+      ipAddress: clientIpFrom(request),
+      userAgent: request.headers.get('user-agent'),
+    },
+  }).catch(() => {});
 
   const secure = isSecureRequest(request);
   const response = NextResponse.json({ ok: true });

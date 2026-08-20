@@ -1,10 +1,11 @@
-// claim — set the `fullstack:in-progress` lease on the selected issue.
+// claim — set the `fullstack:in-progress` ownership marker on the selected issue.
 //
-// Runs on both entry points into `implement`: the go path (from `select`) and
-// the gate-approval path (from `clarify-approve`). Either way `select` ran, so
-// the issue number is at input.steps.select.issueNumber.
+// Runs on all three entry points into `implement`: the go path (from `select`),
+// the self-resolved plan path (from `draft-plan` when needsHuman is false), and
+// the gate-approval path (from `clarify-approve`). Every one of them ran
+// `select`, so the issue number is at input.steps.select.issueNumber.
 //
-// FAILS HARD: if we cannot set the lease we must NOT let `implement` proceed on
+// FAILS HARD: if we cannot set the ownership marker we must NOT let `implement` proceed on
 // an unclaimed issue (that invites duplicate work). A hard failure just means
 // the next tick re-selects it. Scripts ignore `continueOnError` anyway.
 //
@@ -15,7 +16,10 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';
 const IN_PROGRESS = 'fullstack:in-progress';
-const DROP = ['fullstack:go', 'fullstack:awaiting-human'];
+// `needs-approval` is dropped for the self-resolved plan path, which reaches
+// implement without passing through notify-gate (that is what swaps it for
+// `awaiting-human` on the human-gated path).
+export const DROP = ['fullstack:go', 'fullstack:needs-approval', 'fullstack:awaiting-human'];
 
 function ghHeaders() {
   const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };
@@ -47,7 +51,7 @@ async function main() {
   }
 
   writeFileSync('/output/result.json', JSON.stringify({ issueNumber, claimed: true }));
-  console.log(`claim: leased #${issueNumber}`);
+  console.log(`claim: claimed #${issueNumber}`);
 }
 
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeMoveEligibility, ensureTerminalConnected } from '../workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, nonGraphFieldsDiffer } from '../workflow-editor-utils';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -17,6 +17,106 @@ function tr(from: string, to: string) {
 // ---------------------------------------------------------------------------
 // computeMoveEligibility
 // ---------------------------------------------------------------------------
+
+describe('retargetVerdictTargets', () => {
+  function decision(id: string, verdicts: Record<string, string>): WorkflowStep {
+    return {
+      id, name: id, type: 'decision', executor: 'human',
+      verdicts: Object.fromEntries(
+        Object.entries(verdicts).map(([k, target]) => [k, { target }]),
+      ),
+    };
+  }
+
+  it('repoints only the matching verdict target on the scoped step (edge split)', () => {
+    const steps = [decision('review', { approve: 'ship', reject: 'done' }), step('inserted'), step('ship'), step('done', 'terminal')];
+    const out = retargetVerdictTargets(steps, 'review', 'ship', 'inserted');
+    expect(out[0].verdicts).toEqual({ approve: { target: 'inserted' }, reject: { target: 'done' } });
+  });
+
+  it('match=null repoints every verdict of the scoped step', () => {
+    const steps = [decision('review', { approve: 'ship', reject: 'done' }), step('inserted')];
+    const out = retargetVerdictTargets(steps, 'review', null, 'inserted');
+    expect(out[0].verdicts).toEqual({ approve: { target: 'inserted' }, reject: { target: 'inserted' } });
+  });
+
+  it('scope=null repoints the matching target across every step (insert before terminal)', () => {
+    const steps = [decision('a', { cancel: 'done' }), decision('b', { reject: 'done', approve: 'a' }), step('inserted'), step('done', 'terminal')];
+    const out = retargetVerdictTargets(steps, null, 'done', 'inserted');
+    expect(out[0].verdicts).toEqual({ cancel: { target: 'inserted' } });
+    expect(out[1].verdicts).toEqual({ reject: { target: 'inserted' }, approve: { target: 'a' } });
+  });
+
+  it('leaves steps without verdicts untouched and returns the same reference on no-op', () => {
+    const steps = [decision('review', { approve: 'ship' }), step('plain')];
+    const noop = retargetVerdictTargets(steps, 'review', 'nonexistent', 'inserted');
+    expect(noop).toBe(steps);
+  });
+
+  it('does not scope to a step that is not the target of the edit', () => {
+    const steps = [decision('a', { go: 'x' }), decision('b', { go: 'x' })];
+    const out = retargetVerdictTargets(steps, 'a', 'x', 'inserted');
+    expect(out[0].verdicts).toEqual({ go: { target: 'inserted' } });
+    expect(out[1].verdicts).toEqual({ go: { target: 'x' } });
+  });
+
+  it('a step literally named "any" is scoped as an id, not a match-everything sentinel', () => {
+    const steps = [decision('any', { go: 'x' }), decision('other', { go: 'x' })];
+    const out = retargetVerdictTargets(steps, 'any', 'x', 'inserted');
+    expect(out[0].verdicts).toEqual({ go: { target: 'inserted' } });
+    expect(out[1].verdicts).toEqual({ go: { target: 'x' } }); // untouched — 'any' is a real id here
+  });
+
+  it('a verdict target literally named "all" is matched exactly, not as a wildcard', () => {
+    const steps = [decision('d', { go: 'all', stay: 'here' })];
+    const out = retargetVerdictTargets(steps, 'd', 'all', 'inserted');
+    expect(out[0].verdicts).toEqual({ go: { target: 'inserted' }, stay: { target: 'here' } });
+  });
+});
+
+describe('bridgeTargetForDeletion', () => {
+  it("returns the deleted step's first outgoing target", () => {
+    const steps = [step('a'), step('b'), step('done', 'terminal')];
+    const transitions = [tr('a', 'b'), tr('b', 'done')];
+    expect(bridgeTargetForDeletion(steps, transitions, 'b')).toBe('done');
+  });
+
+  it('falls back to the terminal step when the deleted step has no outgoing transition', () => {
+    const steps = [step('a'), step('orphan'), step('done', 'terminal')];
+    const transitions = [tr('a', 'done')];
+    expect(bridgeTargetForDeletion(steps, transitions, 'orphan')).toBe('done');
+  });
+
+  it('returns undefined when there is neither an outgoing transition nor a terminal', () => {
+    const steps = [step('a'), step('b')];
+    expect(bridgeTargetForDeletion(steps, [], 'b')).toBeUndefined();
+  });
+});
+
+describe('nonGraphFieldsDiffer', () => {
+  it('is false when only steps/transitions changed', () => {
+    const wd = { title: 'T', triggers: [{ type: 'manual', name: 'start' }] };
+    const doc = { ...wd, steps: [{ id: 'a' }], transitions: [] };
+    expect(nonGraphFieldsDiffer(doc, wd)).toBe(false);
+  });
+
+  it('is false when non-graph keys are merely reordered (order-insensitive)', () => {
+    const wd = { title: 'T', triggers: [{ type: 'manual', name: 'start' }] };
+    const doc = { triggers: [{ name: 'start', type: 'manual' }], steps: [], transitions: [], title: 'T' };
+    expect(nonGraphFieldsDiffer(doc, wd)).toBe(false);
+  });
+
+  it('is true when a non-graph field value changed', () => {
+    const wd = { title: 'T', triggers: [] };
+    const doc = { title: 'Different', triggers: [], steps: [], transitions: [] };
+    expect(nonGraphFieldsDiffer(doc, wd)).toBe(true);
+  });
+
+  it('treats missing wdJsonFields as empty', () => {
+    expect(nonGraphFieldsDiffer({ steps: [], transitions: [] }, undefined)).toBe(false);
+    expect(nonGraphFieldsDiffer({ title: 'X', steps: [] }, undefined)).toBe(true);
+  });
+});
 
 describe('computeMoveEligibility', () => {
   it('returns empty sets for a single step with no transitions', () => {

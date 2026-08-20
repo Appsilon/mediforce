@@ -5,6 +5,10 @@ import {
   GetTaskOutputSchema,
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
+  AskWorkflowAssistantInputSchema,
+  AskWorkflowAssistantOutputSchema,
+  type AskWorkflowAssistantInput,
+  type AskWorkflowAssistantOutput,
   ValidateWorkflowOutputSchema,
   GetWorkflowSchemaOutputSchema,
   ListWorkflowsInputSchema,
@@ -19,6 +23,10 @@ import {
   StartRunOutputSchema,
   ListRunsInputSchema,
   ListRunsOutputSchema,
+  ListRunsPageClientInputSchema,
+  ListRunsPageOutputSchema,
+  GetWorkflowStatusCountsClientInputSchema,
+  GetWorkflowStatusCountsOutputSchema,
   ListRunNamesInputSchema,
   ListRunNamesOutputSchema,
   ListRunOutputFilesInputSchema,
@@ -102,6 +110,8 @@ import {
   GetProcessOutputSchema,
   ListAuditEventsInputSchema,
   ListAuditEventsOutputSchema,
+  ListNamespaceAuditEventsInputSchema,
+  ListNamespaceAuditEventsOutputSchema,
   ListAgentEventsInputSchema,
   ListAgentEventsOutputSchema,
   GetProcessStepsInputSchema,
@@ -123,6 +133,8 @@ import {
   ListPluginsOutputSchema,
   ClaimTaskInputSchema,
   ClaimTaskOutputSchema,
+  RecordTaskViewedInputSchema,
+  RecordTaskViewedOutputSchema,
   CompleteTaskInputSchema,
   CompleteTaskOutputSchema,
   ListAttachmentsInputSchema,
@@ -188,6 +200,8 @@ import {
   UpdateNamespaceOutputSchema,
   DeleteNamespaceInputSchema,
   DeleteNamespaceOutputSchema,
+  ResetNamespaceInputSchema,
+  ResetNamespaceOutputSchema,
   LeaveNamespaceInputSchema,
   LeaveNamespaceOutputSchema,
   RemoveNamespaceMemberInputSchema,
@@ -215,6 +229,8 @@ import {
   type UpdateNamespaceOutput,
   type DeleteNamespaceInput,
   type DeleteNamespaceOutput,
+  type ResetNamespaceInput,
+  type ResetNamespaceOutput,
   type LeaveNamespaceInput,
   type LeaveNamespaceOutput,
   type RemoveNamespaceMemberInput,
@@ -251,6 +267,8 @@ import {
   type GetTaskOutput,
   type ClaimTaskInput,
   type ClaimTaskOutput,
+  type RecordTaskViewedInput,
+  type RecordTaskViewedOutput,
   type CompleteTaskInput,
   type CompleteTaskOutput,
   type RegisterWorkflowBody,
@@ -306,6 +324,10 @@ import {
   type StartRunOutput,
   type ListRunsInput,
   type ListRunsOutput,
+  type ListRunsPageInput,
+  type ListRunsPageOutput,
+  type GetWorkflowStatusCountsInput,
+  type GetWorkflowStatusCountsOutput,
   type ListRunNamesInput,
   type ListRunNamesOutput,
   type ListRunOutputFilesInput,
@@ -370,6 +392,8 @@ import {
   type GetProcessOutput,
   type ListAuditEventsInput,
   type ListAuditEventsOutput,
+  type ListNamespaceAuditEventsInput,
+  type ListNamespaceAuditEventsOutput,
   type ListAgentEventsInput,
   type ListAgentEventsOutput,
   type GetProcessStepsInput,
@@ -405,10 +429,14 @@ import {
   ListAgentRunsOutputSchema,
   GetAgentRunInputSchema,
   GetAgentRunOutputSchema,
+  GetAgentRunCardStatusCountsInputSchema,
+  GetAgentRunCardStatusCountsOutputSchema,
   type ListAgentRunsInput,
   type ListAgentRunsOutput,
   type GetAgentRunInput,
   type GetAgentRunOutput,
+  type GetAgentRunCardStatusCountsInput,
+  type GetAgentRunCardStatusCountsOutput,
   MonitoringSummaryInputSchema,
   GetMonitoringSummaryOutputSchema,
   type MonitoringSummaryInput,
@@ -517,6 +545,7 @@ export class Mediforce {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
     get: (input: GetTaskInput) => Promise<GetTaskOutput>;
     claim: (input: ClaimTaskInput) => Promise<ClaimTaskOutput>;
+    recordViewed: (input: RecordTaskViewedInput) => Promise<RecordTaskViewedOutput>;
     complete: (input: CompleteTaskInput) => Promise<CompleteTaskOutput>;
     attachments: {
       list: (input: ListAttachmentsInput) => Promise<ListAttachmentsOutput>;
@@ -543,6 +572,9 @@ export class Mediforce {
   readonly processes: {
     get: (input: GetProcessInput) => Promise<GetProcessOutput>;
     listAuditEvents: (input: ListAuditEventsInput) => Promise<ListAuditEventsOutput>;
+    listNamespaceAuditEvents: (
+      input: ListNamespaceAuditEventsInput,
+    ) => Promise<ListNamespaceAuditEventsOutput>;
     agentEvents: (input: ListAgentEventsInput) => Promise<ListAgentEventsOutput>;
     getSteps: (input: GetProcessStepsInput) => Promise<GetProcessStepsOutput>;
   };
@@ -567,6 +599,13 @@ export class Mediforce {
 
   readonly plugins: {
     list: () => Promise<ListPluginsOutput>;
+  };
+
+  readonly assistant: {
+    ask: (
+      input: AskWorkflowAssistantInput,
+      options: { namespace: string },
+    ) => Promise<AskWorkflowAssistantOutput>;
   };
 
   readonly workflows: {
@@ -603,6 +642,8 @@ export class Mediforce {
 
   readonly runs: {
     list: (input?: ListRunsInput) => Promise<ListRunsOutput>;
+    listPage: (input?: ListRunsPageInput) => Promise<ListRunsPageOutput>;
+    statusCounts: (input?: GetWorkflowStatusCountsInput) => Promise<GetWorkflowStatusCountsOutput>;
     listNames: (input: ListRunNamesInput) => Promise<ListRunNamesOutput>;
     get: (input: GetRunInput) => Promise<GetRunOutput>;
     listOutputFiles: (input: ListRunOutputFilesInput) => Promise<ListRunOutputFilesOutput>;
@@ -711,6 +752,7 @@ export class Mediforce {
     create: (input: CreateNamespaceInput) => Promise<CreateNamespaceOutput>;
     update: (input: UpdateNamespaceInput) => Promise<UpdateNamespaceOutput>;
     delete: (input: DeleteNamespaceInput) => Promise<DeleteNamespaceOutput>;
+    reset: (input: ResetNamespaceInput) => Promise<ResetNamespaceOutput>;
     leave: (input: LeaveNamespaceInput) => Promise<LeaveNamespaceOutput>;
     removeMember: (input: RemoveNamespaceMemberInput) => Promise<RemoveNamespaceMemberOutput>;
     updateMemberRole: (input: UpdateNamespaceMemberRoleInput) => Promise<UpdateNamespaceMemberRoleOutput>;
@@ -719,6 +761,9 @@ export class Mediforce {
   readonly agentRuns: {
     list: (input?: ListAgentRunsInput) => Promise<ListAgentRunsOutput>;
     get: (input: GetAgentRunInput) => Promise<GetAgentRunOutput>;
+    cardStatusCounts: (
+      input?: GetAgentRunCardStatusCountsInput,
+    ) => Promise<GetAgentRunCardStatusCountsOutput>;
   };
 
   readonly monitoring: {
@@ -775,6 +820,7 @@ export class Mediforce {
           role: validated.role,
           stepId: validated.stepId,
           status: validated.status,
+          namespace: validated.namespace,
         });
         const res = await this.request(`/api/tasks${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.list');
@@ -796,6 +842,16 @@ export class Mediforce {
           undefined,
           ClaimTaskOutputSchema,
           'mediforce.tasks.claim',
+        );
+      },
+      recordViewed: async (input) => {
+        const validated = RecordTaskViewedInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/tasks/${encodeURIComponent(validated.taskId)}/viewed`,
+          undefined,
+          RecordTaskViewedOutputSchema,
+          'mediforce.tasks.recordViewed',
         );
       },
       complete: async (input) => {
@@ -871,6 +927,21 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.processes.listAuditEvents');
         return ListAuditEventsOutputSchema.parse(body);
+      },
+      listNamespaceAuditEvents: async (input) => {
+        const validated = ListNamespaceAuditEventsInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          limit: validated.limit !== undefined ? String(validated.limit) : undefined,
+          cursor: validated.cursor,
+          action: validated.actions,
+          actorId: validated.actorId,
+          fromDate: validated.fromDate,
+          toDate: validated.toDate,
+        });
+        const res = await this.request(`/api/audit-events${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.processes.listNamespaceAuditEvents');
+        return ListNamespaceAuditEventsOutputSchema.parse(body);
       },
       agentEvents: async (input) => {
         const validated = ListAgentEventsInputSchema.parse(input);
@@ -974,6 +1045,26 @@ export class Mediforce {
       },
     };
 
+    this.assistant = {
+      ask: async (input, options) => {
+        const validatedInput = AskWorkflowAssistantInputSchema.parse(input);
+        const namespace = options.namespace;
+        if (typeof namespace !== 'string' || namespace.length === 0) {
+          throw new Error(
+            'mediforce.assistant.ask: `namespace` is required (passed as an HTTP query parameter).',
+          );
+        }
+        const qs = toSearchParams({ namespace });
+        return this.sendJson(
+          'POST',
+          `/api/workflow-assistant${qs}`,
+          { ...validatedInput } as Record<string, unknown>,
+          AskWorkflowAssistantOutputSchema,
+          'mediforce.assistant.ask',
+        );
+      },
+    };
+
     this.workflows = {
       register: async (input, options) => {
         const validatedInput = RegisterWorkflowInputSchema.parse(input);
@@ -1014,6 +1105,9 @@ export class Mediforce {
               // Forward only when the caller turns "show completed" off; the
               // server defaults to true, so omitting keeps the common URL clean.
               includeCompletedRuns: validated.includeCompletedRuns ? undefined : 'false',
+              // Same shape, opposite default: the server omits archived unless
+              // asked, so only an explicit opt-in travels.
+              includeArchived: validated.includeArchived ? 'true' : undefined,
             })
           : '';
         const res = await this.request(`/api/workflow-definitions${qs}`);
@@ -1171,6 +1265,7 @@ export class Mediforce {
             triggerName: v.triggerName,
             type: v.type,
             schedule: v.schedule,
+            payload: v.payload,
             method: v.method,
             path: v.path,
             enabled: v.enabled,
@@ -1184,7 +1279,7 @@ export class Mediforce {
         return this.sendJson(
           'PATCH',
           `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/triggers/${encodeURIComponent(v.triggerName)}`,
-          { namespace: v.namespace, schedule: v.schedule },
+          { namespace: v.namespace, schedule: v.schedule, payload: v.payload },
           UpdateTriggerOutputSchema,
           'mediforce.triggers.update',
         );
@@ -1389,6 +1484,44 @@ export class Mediforce {
         const res = await this.request(`/api/runs${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.runs.list');
         return ListRunsOutputSchema.parse(body);
+      },
+      listPage: async (input) => {
+        // NOT `ListRunsPageInputSchema.parse(input)`: that schema's
+        // `dryRun`/`archived` fields are `z.enum(['true','false'])` — wire-
+        // format strings for the ROUTE ADAPTER's query-string parsing. The
+        // caller's `input` (from `useProcessInstancesPage`) carries real JS
+        // booleans, which fail that enum's runtime validation and throw
+        // before any request is sent. `ListRunsPageClientInputSchema` is the
+        // real-boolean counterpart, validated here instead.
+        const validated = ListRunsPageClientInputSchema.parse(input ?? {});
+        const qs = toSearchParams({
+          workflow: validated.workflow,
+          namespace: validated.namespace,
+          dryRun: validated.dryRun !== undefined ? String(validated.dryRun) : undefined,
+          archived: validated.archived !== undefined ? String(validated.archived) : undefined,
+          displayStatus: validated.displayStatus,
+          sort: validated.sort,
+          direction: validated.direction,
+          cursor: validated.cursor,
+          limit: String(validated.limit ?? 20),
+        });
+        const res = await this.request(`/api/runs/page${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.runs.listPage');
+        return ListRunsPageOutputSchema.parse(body);
+      },
+      statusCounts: async (input) => {
+        // Same reasoning as `listPage` above — `GetWorkflowStatusCountsClientInputSchema`
+        // is the real-boolean counterpart to the wire-format input schema.
+        const validated = GetWorkflowStatusCountsClientInputSchema.parse(input ?? {});
+        const qs = toSearchParams({
+          workflow: validated.workflow,
+          namespace: validated.namespace,
+          dryRun: validated.dryRun !== undefined ? String(validated.dryRun) : undefined,
+          archived: validated.archived !== undefined ? String(validated.archived) : undefined,
+        });
+        const res = await this.request(`/api/runs/status-counts${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.runs.statusCounts');
+        return GetWorkflowStatusCountsOutputSchema.parse(body);
       },
       listNames: async (input) => {
         const validated = ListRunNamesInputSchema.parse(input);
@@ -1777,6 +1910,9 @@ export class Mediforce {
           stepId: validated.stepId,
           limit: validated.limit !== undefined ? String(validated.limit) : undefined,
           cursor: validated.cursor,
+          status: validated.status,
+          cardStatus: validated.cardStatus,
+          processInstanceId: validated.processInstanceIds,
         });
         const res = await this.request(`/api/agent-runs${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.list');
@@ -1789,6 +1925,17 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.get');
         return GetAgentRunOutputSchema.parse(body);
+      },
+      cardStatusCounts: async (input) => {
+        const validated = GetAgentRunCardStatusCountsInputSchema.parse(input ?? {});
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          status: validated.status,
+          processInstanceId: validated.processInstanceIds,
+        });
+        const res = await this.request(`/api/agent-runs/card-status-counts${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.cardStatusCounts');
+        return GetAgentRunCardStatusCountsOutputSchema.parse(body);
       },
     };
 
@@ -1899,6 +2046,16 @@ export class Mediforce {
           undefined,
           DeleteNamespaceOutputSchema,
           'mediforce.namespaces.delete',
+        );
+      },
+      reset: async (input) => {
+        const validated = ResetNamespaceInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}/reset`,
+          undefined,
+          ResetNamespaceOutputSchema,
+          'mediforce.namespaces.reset',
         );
       },
       leave: async (input) => {

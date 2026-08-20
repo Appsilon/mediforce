@@ -18,7 +18,7 @@ of the *Workflow Designer* app — same intelligence, run in the repo against th
 checked-out source instead of a live UI.
 
 You operationalize the **"Agent" authoring path** in
-`docs/how-to-create-workflow.md`: take the golden rules plus the user's goal,
+`docs/guides/create-workflow.md`: take the golden rules plus the user's goal,
 produce the `.wd.json` and package files, and require validation against the
 schema and checklist before returning a result.
 
@@ -35,14 +35,14 @@ and dynamic `assignedTo` are the classic misses).
 
 Read these before you say a single word about structure:
 
-1. `docs/workflow-capabilities.md` — the capability map: every executor, action
+1. `docs/reference/workflow-capabilities.md` — the capability map: every executor, action
    kind, both expression languages, human-step UI, scripts, and models, each
    cross-referenced to the **source file** that defines it. Read this first so
    you know what is possible. When a design touches a capability, open the
    source file it cites rather than authoring from the summary.
 2. `CONTEXT.md` — the glossary. Use canonical names (Namespace, Workflow vs
    Definition vs Run). Challenge any user term that conflicts with it.
-3. `docs/workflow-authoring-golden-rules.md` — the MUST / SHOULD / MANUAL
+3. `docs/reference/workflow-authoring-golden-rules.md` — the MUST / SHOULD / MANUAL
    production checklist. This is the spine of every challenge you make.
 4. `docs/workflow-examples/README.md` (start with its capability index) and the
    `01`–`11` example `.wd.json` files in `docs/workflow-examples/` — learn the
@@ -56,14 +56,14 @@ Load on demand, only when the design touches them:
 
 - `docs/adr/0008-step-executor-model.md` — executor model (source of truth for
   `executor`).
-- `docs/adr/0006-control-mode-ui-concept.md` — control modes (CM0/CM2/CM3/CM4).
-- `docs/how-to/import-from-git.md` and `docs/how-to/docker-image-setup.md`.
+- `docs/adr/0014-control-mode-ui-concept.md` — control modes (CM0/CM2/CM3/CM4).
+- `docs/guides/import-from-git.md` and `docs/guides/docker-image-setup.md`.
 - `packages/platform-core/src/schemas/workflow-definition.ts` — the schema
   itself, when an example does not answer a field question.
 - `packages/core-actions/src/handlers/` — the real action handlers (`http`,
   `reshape`, `email`, `spawn`, `wait`), when you need an action's exact config.
 - `packages/platform-core/src/interpolation.ts` — `${...}` template roots
-  (`steps`, `item`, `triggerPayload`, `variables`, `secrets`), and
+  (`steps`, `item`, `triggerPayload`, `triggerContext`, `variables`, `secrets`), and
   `packages/workflow-engine/src/expressions/expression-evaluator.ts` — the
   separate transition `when` language. Open these before claiming a value can't
   be referenced.
@@ -116,7 +116,7 @@ Pushing back here is mandatory, and you cite the rule when you do.
 ### Challenge gate C — inline script or pinned command?
 
 For every `script` step, decide where the code lives (see the inline-vs-command
-section of `docs/workflow-capabilities.md`):
+section of `docs/reference/workflow-capabilities.md`):
 
 - **Inline** (`inlineScript` + `runtime`) is the default for small, dependency-
   free glue and prototypes: no repo, no commit, no Dockerfile, auto image per
@@ -138,8 +138,11 @@ script **file** from the package unless it is baked into the image or mounted at
 Walk the design tree and resolve, per step where relevant: goal and trigger;
 actors; the work each step does; executor and control mode (CM0/CM2/CM3/CM4 —
 never create a new CM1/L2 step); review steps and their explicit verdicts;
-branching and loops; triggers and data contracts (`triggerInput`,
-`triggerPayload`, human `params`, `/output/result.json`); env and secrets;
+branching and loops; triggers and data contracts (`triggerInput` — the total
+input contract every trigger and spawned child firing validates against, read at
+runtime as `${triggerPayload.<field>}` whichever one fired; transport-only
+`${triggerContext.*}`; human `params`;
+`/output/result.json`); env and secrets;
 whether a step needs a custom container or runs on `mediforce-golden-image`; and
 any MCPs, skills, or agents needed (flag platform setup as MANUAL).
 
@@ -171,11 +174,12 @@ root** (the git repo the package lives in), not a leaf directory — a repo can
 hold many workflows. The skill then creates a subfolder named after the workflow
 and puts everything for this workflow inside it.
 
-**Canonical layout — one subfolder per workflow, `index.json` at repo root:**
+**Canonical layout — one subfolder per workflow, `workflows-index.json` at repo
+root:**
 
 ```text
 <repo-root>/
-  index.json                       # REPO-LEVEL — lists ALL workflows; create or MERGE
+  workflows-index.json             # REPO-LEVEL — lists ALL workflows; create or MERGE
   <workflow-name>/
     README.md                      # env contract, secrets, agents, MCPs, images,
                                    #   register/import steps, output contracts, sample input (§1/§6)
@@ -189,15 +193,15 @@ and puts everything for this workflow inside it.
                                    #   ONLY if the workflow uses governable MCPs (§7)
 ```
 
-**Only `index.json` is repo-level.** Everything else for the workflow lives under
-`<workflow-name>/`. When `index.json` already exists at the repo root (a
+**Only `workflows-index.json` is repo-level.** Everything else for the workflow
+lives under `<workflow-name>/`. When it already exists at the repo root (a
 multi-workflow repo), **merge** this workflow's entry — do not overwrite. Each
 `path` is **repo-root-relative**: `<workflow-name>/src/<workflow-name>.wd.json`.
 
 > Golden-rules §1 and `apps/golden-standard-workflow` show the package *as* the
-> repo root (`index.json` and `README.md` at the package level). That is the
+> repo root (`workflows-index.json` and `README.md` at the package level). That is the
 > single-workflow-repo special case. For a repo that holds several workflows,
-> hoist `index.json` to the repo root and nest each workflow in its own subfolder,
+> hoist `workflows-index.json` to the repo root and nest each workflow in its own subfolder,
 > as above. If the user's repo holds exactly one workflow, the package-as-root
 > shape from §1 is fine.
 
@@ -237,8 +241,8 @@ Be honest about three tiers, and keep them separate in what you tell the user:
 
 The `README.md` MUST cover the env-contract table, secrets, agents, MCPs,
 images, registration/import steps, output contracts, and a known-good input
-(golden-rules §1, §6). The `index.json` follows the §1 shape so the package can
-be imported from git.
+(golden-rules §1, §6). The `workflows-index.json` follows the §1 shape so the
+package can be imported from git.
 
 ### Edit mode: edit in place, diff for regressions
 
@@ -288,7 +292,7 @@ bare checkout. Treat them as optional. When authoring offline:
   default is `anthropic/claude-sonnet-4`.
 - Or copy a full ID already used in an example / `apps/*` workflow.
 - The registry itself is populated from OpenRouter (`sync-models.ts`); see the
-  Models section of `docs/workflow-capabilities.md` for the source pointers.
+  Models section of `docs/reference/workflow-capabilities.md` for the source pointers.
 
 Run `model validate` only as a best-effort confirmation when a deployment + key
 are available; never block authoring on it.
@@ -446,7 +450,7 @@ with their values:
      --file <repo-root>/<workflow-name>/src/<workflow-name>.wd.json --namespace <ns>
    ```
 2. **Import from git** (push first; one-time copy, public GitHub only; `--path`
-   and `index.json` paths are **repo-root-relative**, `--ref` is HEAD/C2):
+   and `workflows-index.json` paths are **repo-root-relative**, `--ref` is HEAD/C2):
    ```bash
    pnpm exec mediforce workflow import \
      --repo <url> --path <workflow-name>/src/<workflow-name>.wd.json \

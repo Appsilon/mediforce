@@ -120,26 +120,27 @@ export class PostgresProcessRepository implements ProcessRepository {
   async listAllWorkflowDefinitions(
     includeArchived: boolean,
   ): Promise<WorkflowDefinitionListResult> {
-    return this.fetchAndGroup(includeArchived, () => true);
+    return this.fetchAndGroup(includeArchived);
   }
 
-  async listWorkflowDefinitionsVisibleTo(
-    allowed: readonly string[],
+  async listWorkflowDefinitionsInNamespaces(
+    namespaces: readonly string[],
     includeArchived: boolean,
   ): Promise<WorkflowDefinitionListResult> {
-    return this.fetchAndGroup(includeArchived, (group) => {
-      const latest = group.versions.find((v) => v.version === group.latestVersion);
-      if (latest === undefined) return false;
-      if (latest.visibility === 'public') return true;
-      return allowed.includes(latest.namespace);
-    });
+    if (namespaces.length === 0) return { definitions: [] };
+    return this.fetchAndGroup(includeArchived, namespaces);
   }
 
   private async fetchAndGroup(
     includeArchived: boolean,
-    predicate: (group: WorkflowDefinitionGroup) => boolean,
+    namespaces?: readonly string[],
   ): Promise<WorkflowDefinitionListResult> {
-    const rows = await this.db.select().from(workflowDefinitions);
+    const rows = namespaces === undefined
+      ? await this.db.select().from(workflowDefinitions)
+      : await this.db
+          .select()
+          .from(workflowDefinitions)
+          .where(inArray(workflowDefinitions.workspace, namespaces));
 
     const grouped = new Map<string, WorkflowDefinition[]>();
     for (const row of rows) {
@@ -170,7 +171,7 @@ export class PostgresProcessRepository implements ProcessRepository {
       }),
     );
 
-    return { definitions: groups.filter(predicate) };
+    return { definitions: groups };
   }
 
   async getDefaultWorkflowVersion(

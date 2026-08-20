@@ -78,6 +78,12 @@ export interface SendActivationEmailInput {
    * `APP_BASE_URL`/`NEXT_PUBLIC_APP_URL` → localhost.
    */
   readonly baseUrl?: string;
+  /**
+   * `false` where `ENABLE_PASSWORD_AUTH=false`: the link lands the invitee on
+   * workspace selection rather than the create-password page, and the copy
+   * stops promising a password they cannot set. Defaults to `true`.
+   */
+  readonly passwordSetupEnabled?: boolean;
 }
 
 /**

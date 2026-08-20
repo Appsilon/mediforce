@@ -64,6 +64,7 @@ import {
   isLocalAgentMode,
   type DockerImagesService,
 } from './docker-images-service';
+import { isPasswordAuthEnabled } from '@mediforce/platform-core';
 import { sendWorkspaceNotificationEmail, sendInviteSetupEmail } from './invite-emails';
 import { normalizeBaseUrl, resolveInviteAppUrl } from '../contract/config';
 import type {
@@ -83,7 +84,7 @@ import {
   PluginRegistry,
   OpenRouterLlmClient,
   ClaudeCodeAgentPlugin,
-  MockClaudeCodeAgentPlugin,
+  MockAgentPlugin,
   OpenCodeAgentPlugin,
   ScriptContainerPlugin,
   DatabricksJobPlugin,
@@ -151,6 +152,9 @@ export interface PlatformServices {
    * consume via `scope.system.userDirectory`.
    */
   userDirectory: UserDirectoryService;
+  /** `isPasswordAuthEnabled(ENABLE_PASSWORD_AUTH)`, resolved once at wiring
+   *  time so handlers never read `process.env`. */
+  passwordAuthEnabled: boolean;
 }
 
 /** Invite-activation links live for 7 days — long enough for a colleague to
@@ -201,8 +205,13 @@ class EmailInviteNotificationService implements InviteNotificationService {
       new Date(Date.now() + ACTIVATION_TOKEN_TTL_MS),
       this.authSecret,
     );
+    const passwordSetupEnabled = input.passwordSetupEnabled !== false;
+    // With password auth off there is no create-password step to land on — and
+    // `/change-password` posts to a `password-login` route that 404s — so the
+    // link drops the invitee straight into workspace selection instead.
+    const callbackUrl = passwordSetupEnabled ? '/change-password' : '/workspace-selection';
     const activationUrl = `${appUrl}/api/auth/callback/email?callbackUrl=${encodeURIComponent(
-      '/change-password',
+      callbackUrl,
     )}&token=${raw}&email=${encodeURIComponent(email)}`;
     await sendInviteSetupEmail(
       {
@@ -212,6 +221,7 @@ class EmailInviteNotificationService implements InviteNotificationService {
         activationUrl,
         appUrl,
         senderName: this.senderName,
+        passwordSetupEnabled,
       },
       this.sendEmail,
     );
@@ -262,11 +272,11 @@ export function getPlatformServices(): PlatformServices {
 
   const useMockAgent = process.env.MOCK_AGENT === 'true';
   if (useMockAgent) {
-    console.log('[platform-services] MOCK_AGENT=true — using MockClaudeCodeAgentPlugin');
+    console.log('[platform-services] MOCK_AGENT=true — using MockAgentPlugin');
   }
   pluginRegistry.register(
     'claude-code-agent',
-    useMockAgent ? new MockClaudeCodeAgentPlugin() : new ClaudeCodeAgentPlugin(),
+    useMockAgent ? new MockAgentPlugin() : new ClaudeCodeAgentPlugin(),
   );
 
   pluginRegistry.register('opencode-agent', new OpenCodeAgentPlugin());
@@ -307,6 +317,8 @@ export function getPlatformServices(): PlatformServices {
   // `recordSignIn` on every successful sign-in.
   const userDirectoryService: UserDirectoryService = new PostgresUserDirectoryService(pg);
 
+  const passwordAuthEnabled = isPasswordAuthEnabled(process.env.ENABLE_PASSWORD_AUTH);
+
   const engine = new WorkflowEngine(
     processRepo,
     instanceRepo,
@@ -338,7 +350,10 @@ export function getPlatformServices(): PlatformServices {
   actionRegistry.register('http', httpActionHandler);
   actionRegistry.register('reshape', reshapeActionHandler);
   const spawnRunKicker = createHttpSelfFetchRunKicker({
-    baseUrl: () => process.env.APP_BASE_URL ?? 'http://localhost:9003',
+    // APP_BASE_URL, then NEXT_PUBLIC_APP_URL (dev:mock / e2e set only that),
+    // then localhost — same chain as the attachment-download base URL, so a
+    // self-fetch never dials a dead port. `||` treats empty-string as unset.
+    baseUrl: () => process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9003',
     apiKey: () => process.env.PLATFORM_API_KEY ?? '',
   });
   actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo, spawnRunKicker));
@@ -416,6 +431,7 @@ export function getPlatformServices(): PlatformServices {
     emailProviderInfo,
     dockerImages,
     userDirectory: userDirectoryService,
+    passwordAuthEnabled,
   };
 
   if (!seedingStarted) {

@@ -1,5 +1,7 @@
 ---
 status: accepted
+audience: engineers
+last_reviewed: 2026-07-27
 ---
 
 # Triggers are detached resources in a unified table; the Workflow Definition is trigger-free

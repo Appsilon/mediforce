@@ -37,6 +37,29 @@ data/
   outputs/                 # Generated ADaM datasets, TLGs, and teal apps
 ```
 
+## Workflow definition
+
+`src/protocol-to-tfl.wd.json` — 6 steps plus a terminal:
+
+| # | Step | Type | Autonomy |
+|---|------|------|----------|
+| 1 | `upload-documents` | human | — |
+| 2 | `extract-metadata` | agent | L3 |
+| 3 | `generate-tlg-shells` | agent | L3 |
+| 4 | `upload-sdtm` | human | — |
+| 5 | `generate-adam` | agent | L3 |
+| 6 | `generate-tlg` | agent | L3 |
+| 7 | `done` | terminal | — |
+
+Agent work is committed to the workspace remote
+`Appsilon/mediforce-clinical-workspace`, declared in the definition's
+`workspace` block — reviewers read the diff there rather than a JSON blob.
+
+**Skill paths are hardcoded.** All four agent steps set
+`skillsDir: "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills"`. Moving or
+renaming the skills directory breaks the workflow at run time, not at
+validation — update the definition in the same commit.
+
 ## Usage
 
 Each skill is invoked via Claude Code with a natural language prompt. For example:

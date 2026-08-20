@@ -16,9 +16,12 @@ import { createLineStreamReader } from '@mediforce/platform-core';
 export interface ImageBuildMeta {
   image: string;
   repoUrl: string;
+  /** User-supplied repo reference (pre-normalization), used to pick the clone transport.
+   *  `repoUrl` stays the SSH-normalized form so it remains the cache-tag identity. */
+  repoRef: string;
   commit: string;
   dockerfile?: string;
-  /** Resolved token for authenticated HTTPS clone. When absent, falls back to SSH deploy key. */
+  /** Resolved token for authenticated HTTPS clones; SSH refs without a token use the deploy key. */
   repoToken?: string;
 }
 
@@ -85,6 +88,12 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
     if (request.imageBuild) {
       await ensureImage(request.imageBuild);
     }
+
+    // Remove any stale container holding this name (crashed/killed/retried
+    // attempt). `docker run --rm` only cleans up on a clean exit, so without this
+    // a retry hits `Conflict. The container name "…" is already in use` (exit 125).
+    const { removeStaleContainer } = await import('@mediforce/container-worker');
+    await removeStaleContainer(request.containerName);
 
     const { logFile } = request;
     let logDirReady: Promise<void> | null = null;

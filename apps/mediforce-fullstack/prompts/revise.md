@@ -11,7 +11,7 @@ and re-push. This is a bounded loop (max 2 passes); make the concerns count.
 
 ### Do
 Clone and check out the branch, apply the fixable concerns following repo
-conventions (`AGENTS.md`, `docs/CONTEXT.md`), commit, and re-push the SAME branch:
+conventions (`AGENTS.md`, `CONTEXT.md`), commit, and re-push the SAME branch:
 
 ```
 rm -rf /tmp/revise && git clone --depth 1 https://$GITHUB_TOKEN@github.com/Appsilon/mediforce.git /tmp/revise
@@ -29,6 +29,12 @@ test suite (no install in-container).
 - `reviewCount` = (`revise.reviewCount` from the input, or 0) **+ 1**.
 - `reviseLog` = the prior `revise.reviseLog` (or `[]`) **with your new pass
   appended** — one line summarising what this pass changed.
+
+## Completion criteria
+
+Finish once every mechanically fixable concern is addressed and pushed, with any
+remaining judgement call recorded in the log. Do not turn review fixes into a
+new refactor or investigate unrelated code.
 
 ## Output Contract (MANDATORY)
 

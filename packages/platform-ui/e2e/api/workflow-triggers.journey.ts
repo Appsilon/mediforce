@@ -1,5 +1,7 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
+import { ApiError, Mediforce } from '@mediforce/platform-api/client';
+import type { CronTriggerResource, TriggerResource } from '@mediforce/platform-core';
 
 /**
  * Trigger management API (ADR-0011; cron, manual, and webhook on the unified
@@ -7,8 +9,9 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
  * triggers to an EXISTING workflow, starting/stopping, modifying, and deleting
  * them — none of which requires registering a new workflow version. Also
  * verifies a stopped cron trigger does not fire on the heartbeat, the manual
- * singleton gates hand-start, and a webhook's derived URL starts a run while it
- * is attached and 404s once removed.
+ * singleton gates hand-start, a webhook's derived URL starts a run while it is
+ * attached and 404s once removed, and a cron row's static payload (ADR-0012)
+ * survives the write → storage → read round trip.
  */
 
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
@@ -48,6 +51,81 @@ function manualOnlyWd(name: string) {
     ],
     transitions: [{ from: 'noop', to: 'done' }],
   };
+}
+
+/** Same shape plus a `triggerInput` contract. Under ADR-0012 every firing
+ *  validates against it, so a webhook body needs declared fields to carry —
+ *  `order` required and `note` optional, which exercises both the happy path and
+ *  the rejections. Kept separate from `manualOnlyWd` because a *required* field
+ *  also blocks attaching a payload-less cron row, which the cron tests rely on. */
+function webhookContractWd(name: string) {
+  return { ...manualOnlyWd(name), triggerInput: [
+    { name: 'order', type: 'number', required: true },
+    { name: 'note', type: 'string', required: false },
+  ] };
+}
+
+/** A contract an EMPTY payload still satisfies: the required field carries a
+ *  `default`, which under ADR-0012 belongs to the contract and is filled in for
+ *  any firing that omits it. That is what makes "clear the payload" a legal
+ *  write here, unlike on `webhookContractWd` (required, no default). */
+function defaultedContractWd(name: string) {
+  return { ...manualOnlyWd(name), triggerInput: [
+    { name: 'studyId', type: 'string', required: true, default: 'STUDY-DEFAULT' },
+    { name: 'priority', type: 'select', options: ['low', 'normal'], required: false },
+  ] };
+}
+
+/**
+ * The trigger API as a real caller reaches it. The cron static payload shipped
+ * broken because the client hand-builds each request body and dropped `payload`
+ * on create and update — a journey that hand-rolls the same body would have
+ * stayed green while the UI and `mediforce workflow trigger --payload` were
+ * both dead, so the payload cases drive the client instead of `request`.
+ */
+function apiClient(baseURL: string | undefined): Mediforce {
+  if (baseURL === undefined) {
+    throw new Error('Playwright baseURL is not configured — cannot build an API client');
+  }
+  return new Mediforce({ apiKey: API_KEY, baseUrl: baseURL });
+}
+
+function cronConfigOf(trigger: TriggerResource): CronTriggerResource['config'] {
+  if (trigger.type !== 'cron') {
+    throw new Error(`Expected a cron trigger, got '${trigger.type}'`);
+  }
+  return trigger.config;
+}
+
+/** The payload as it comes back OUT of storage on a fresh read — the half of the
+ *  round trip a create/update response echo can't prove. */
+async function storedCronPayload(
+  mediforce: Mediforce,
+  definitionName: string,
+  triggerName: string,
+): Promise<Record<string, unknown> | undefined> {
+  const { triggers } = await mediforce.triggers.list({
+    namespace: TEST_ORG_HANDLE,
+    definitionName,
+  });
+  const row = triggers.find((t) => t.name === triggerName);
+  if (row === undefined) {
+    throw new Error(`Trigger '${triggerName}' not found on '${definitionName}'`);
+  }
+  return cronConfigOf(row).payload;
+}
+
+/** Assert a write was REFUSED and hand back the error. A resolved promise fails
+ *  the test — the bug being guarded against reported success while discarding
+ *  the edit, so "did not throw" can never be a pass. */
+async function expectApiError(pending: Promise<unknown>): Promise<ApiError> {
+  try {
+    await pending;
+  } catch (error) {
+    if (error instanceof ApiError) return error;
+    throw error;
+  }
+  throw new Error('Expected the write to be rejected, but it succeeded');
 }
 
 test.describe('Trigger management — API E2E', () => {
@@ -149,7 +227,7 @@ test.describe('Trigger management — API E2E', () => {
 
     const createWdRes = await request.post(`${base}?namespace=${TEST_ORG_HANDLE}`, {
       headers: AUTH_HEADERS,
-      data: manualOnlyWd(wdName),
+      data: webhookContractWd(wdName),
     });
     expect(createWdRes.status(), await createWdRes.text()).toBe(201);
 
@@ -190,6 +268,33 @@ test.describe('Trigger management — API E2E', () => {
       expect(fireRes.status(), await fireRes.text()).toBe(202);
       const fired = (await fireRes.json()) as { runId: string };
       expect(fired.runId.length).toBeGreaterThan(0);
+
+      // ADR-0012: the body's top-level keys ARE the triggerInput contract, and
+      // it is enforced end-to-end — through the real route, not just the router.
+      const undeclaredRes = await request.post(created.webhookUrl, {
+        headers: AUTH_HEADERS,
+        data: { order: 42, undeclared: 'nope' },
+      });
+      expect(undeclaredRes.status()).toBe(400);
+      const undeclaredBody = (await undeclaredRes.json()) as {
+        error: string;
+        details?: Array<{ field: string }>;
+      };
+      // Per-field errors travel on `details`, mirroring what start-run returns
+      // for a rejected manual payload.
+      expect(undeclaredBody.details?.map((d) => d.field)).toContain('undeclared');
+
+      const missingRes = await request.post(created.webhookUrl, {
+        headers: AUTH_HEADERS,
+        data: { note: 'no order here' },
+      });
+      expect(missingRes.status()).toBe(400);
+
+      const mistypedRes = await request.post(created.webhookUrl, {
+        headers: AUTH_HEADERS,
+        data: { order: 'forty-two' },
+      });
+      expect(mistypedRes.status()).toBe(400);
 
       // Remove the webhook → the endpoint stops resolving (404).
       const delRes = await request.delete(`${webhookTriggerUrl}?namespace=${TEST_ORG_HANDLE}`, {
@@ -368,6 +473,137 @@ test.describe('Trigger management — API E2E', () => {
     } finally {
       await deleteWorkflowDefinition(request, sourceName);
       await deleteWorkflowDefinition(request, targetName);
+    }
+  });
+
+  test('cron static payload: create persists it, update replaces it, {} clears it (ADR-0012)', async ({
+    request,
+    baseURL,
+  }) => {
+    const wdName = `e2e-cronpayload-${Date.now()}`;
+    const mediforce = apiClient(baseURL);
+    const nightly = {
+      namespace: TEST_ORG_HANDLE,
+      definitionName: wdName,
+      triggerName: 'nightly',
+    };
+
+    const createWdRes = await request.post(`${base}?namespace=${TEST_ORG_HANDLE}`, {
+      headers: AUTH_HEADERS,
+      data: defaultedContractWd(wdName),
+    });
+    expect(createWdRes.status(), await createWdRes.text()).toBe(201);
+
+    try {
+      // Create WITH a payload — a cron tick has no caller, so this row is where
+      // the input it hands the Run is authored.
+      const created = await mediforce.triggers.create({
+        ...nightly,
+        type: 'cron',
+        enabled: true,
+        schedule: '0 3 * * *',
+        payload: { studyId: 'STUDY-A', priority: 'low' },
+      });
+      expect(cronConfigOf(created.trigger).payload).toEqual({
+        studyId: 'STUDY-A',
+        priority: 'low',
+      });
+      // Read back from storage, not from the create echo.
+      expect(await storedCronPayload(mediforce, wdName, 'nightly')).toEqual({
+        studyId: 'STUDY-A',
+        priority: 'low',
+      });
+
+      // Update REPLACES the payload wholesale (it is not merged) and carries the
+      // schedule over untouched.
+      const updated = await mediforce.triggers.update({
+        ...nightly,
+        payload: { studyId: 'STUDY-B' },
+      });
+      expect(cronConfigOf(updated.trigger).schedule).toBe('0 3 * * *');
+      expect(await storedCronPayload(mediforce, wdName, 'nightly')).toEqual({
+        studyId: 'STUDY-B',
+      });
+
+      // `payload: {}` CLEARS — the row becomes indistinguishable from one that
+      // never carried a payload, which is legal here because `studyId` has a
+      // default the contract fills in.
+      await mediforce.triggers.update({ ...nightly, payload: {} });
+      expect(await storedCronPayload(mediforce, wdName, 'nightly')).toBeUndefined();
+
+      // Identically on create: `{}` stores no payload rather than an empty one.
+      const weekly = await mediforce.triggers.create({
+        ...nightly,
+        triggerName: 'weekly',
+        type: 'cron',
+        enabled: true,
+        schedule: '0 4 * * *',
+        payload: {},
+      });
+      expect(cronConfigOf(weekly.trigger).payload).toBeUndefined();
+      expect(await storedCronPayload(mediforce, wdName, 'weekly')).toBeUndefined();
+    } finally {
+      await deleteWorkflowDefinition(request, wdName);
+    }
+  });
+
+  test('cron payload is validated against triggerInput at write time (ADR-0012 fail-fast)', async ({
+    request,
+    baseURL,
+  }) => {
+    const wdName = `e2e-cronpayload-reject-${Date.now()}`;
+    const mediforce = apiClient(baseURL);
+    const nightly = {
+      namespace: TEST_ORG_HANDLE,
+      definitionName: wdName,
+      triggerName: 'nightly',
+    };
+    const cronRow = { ...nightly, type: 'cron' as const, enabled: true, schedule: '0 3 * * *' };
+
+    // `order` is required with NO default, so nothing fills it in for a
+    // payload-less row.
+    const createWdRes = await request.post(`${base}?namespace=${TEST_ORG_HANDLE}`, {
+      headers: AUTH_HEADERS,
+      data: webhookContractWd(wdName),
+    });
+    expect(createWdRes.status(), await createWdRes.text()).toBe(201);
+
+    try {
+      // A payload that violates the contract is refused on write, naming every
+      // offending field rather than the first one.
+      const violating = await expectApiError(
+        mediforce.triggers.create({
+          ...cronRow,
+          payload: { order: 'forty-two', typo: 'nope' },
+        }),
+      );
+      expect(violating.status).toBe(400);
+      expect(violating.message).toContain("'order' must be a number");
+      expect(violating.message).toContain("unknown field 'typo'");
+
+      // A payload-less cron on a contract with a required, defaultless field can
+      // never fire, so attaching it is refused too — with the reason spelled out.
+      const payloadLess = await expectApiError(mediforce.triggers.create(cronRow));
+      expect(payloadLess.status).toBe(400);
+      expect(payloadLess.message).toContain('must carry a payload');
+
+      // Neither refusal left a row behind (the seeded manual is all there is).
+      const listed = await mediforce.triggers.list({
+        namespace: TEST_ORG_HANDLE,
+        definitionName: wdName,
+      });
+      expect(listed.triggers.map((t) => t.name)).toEqual(['manual']);
+
+      // The same check guards the PATCH route: a rejected edit leaves the stored
+      // payload exactly as it was.
+      await mediforce.triggers.create({ ...cronRow, payload: { order: 42 } });
+      const badUpdate = await expectApiError(
+        mediforce.triggers.update({ ...nightly, payload: { order: 43, typo: 'nope' } }),
+      );
+      expect(badUpdate.status).toBe(400);
+      expect(await storedCronPayload(mediforce, wdName, 'nightly')).toEqual({ order: 42 });
+    } finally {
+      await deleteWorkflowDefinition(request, wdName);
     }
   });
 });
