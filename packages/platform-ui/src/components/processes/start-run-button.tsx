@@ -5,7 +5,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as Popover from '@radix-ui/react-popover';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useRouter } from 'next/navigation';
-import { Play, FlaskConical, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound, FileInput } from 'lucide-react';
+import { Play, FlaskConical, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound, FileInput, ExternalLink } from 'lucide-react';
 import { useWorkflowVersions, useWorkflowVersion } from '@/hooks/use-workflow-versions';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useAuth } from '@/contexts/auth-context';
@@ -21,7 +21,7 @@ import { useModelValidation } from '@/hooks/use-model-validation';
 import { runPreflightChecks, findSkippedChecks, type PreflightWarning } from '@/lib/preflight-checks';
 import { ParamField } from '@/components/ui/param-field';
 import { buildTriggerPayload, hasInvalidObjectInput } from '@/lib/trigger-input-payload';
-import type { TriggerInputField } from '@mediforce/platform-core';
+import { VERIFY_WORKFLOW_URL, type TriggerInputField } from '@mediforce/platform-core';
 
 interface StartRunButtonProps {
   workflowName: string;
@@ -191,6 +191,13 @@ export function StartRunButton({
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
 
+  // Appended to whichever description the dialog shows: a run with trigger
+  // input still needs to hear that a probe never completed.
+  const skippedChecksNote =
+    preflightLoading === false && skippedChecks.length > 0
+      ? ' Some checks could not run, so the readiness warnings may be incomplete.'
+      : '';
+
   // Where the run starts. The route handle is right everywhere except the
   // new-workflow page, where `onBeforeStart` may have saved elsewhere.
   const savedNamespaceRef = React.useRef<string | null>(null);
@@ -325,7 +332,8 @@ export function StartRunButton({
                   ? 'Provide input values for this workflow run.'
                   : preflightLoading
                     ? 'Checking workflow readiness...'
-                    : `${warnings.length} item${warnings.length !== 1 ? 's' : ''} to review for a smooth run.${skippedChecks.length > 0 ? ' Some checks could not run, so this list may be incomplete.' : ''}`}
+                    : `${warnings.length} item${warnings.length !== 1 ? 's' : ''} to review for a smooth run.`}
+                {skippedChecksNote}
               </Dialog.Description>
             </div>
             <Dialog.Close className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
@@ -402,6 +410,15 @@ export function StartRunButton({
           )}
 
           <div className="flex items-center gap-2 mt-5">
+            <a
+              href={VERIFY_WORKFLOW_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
+            >
+              How verification works
+              <ExternalLink className="h-3 w-3" />
+            </a>
             <div className="flex-1" />
             <Dialog.Close className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors">
               Cancel

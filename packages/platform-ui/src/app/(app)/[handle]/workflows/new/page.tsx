@@ -98,8 +98,10 @@ export default function NewWorkflowPage() {
   // The workspace the user is standing in, which `namespaces[0]` (usually their
   // personal one) is not. Falls back only when the route handle is not one the
   // user can write to, so the picker never shows a target the save would reject.
-  const routeIsWritable = namespaces.length === 0 || namespaces.some((ns) => ns.handle === handle);
-  const effectiveNamespace = namespace || (routeIsWritable ? handle : namespaces[0]?.handle ?? '');
+  // Before the workspaces load there is nothing to check the handle against, so
+  // the route handle stands until they arrive.
+  const routeIsWritable = namespacesLoading || namespaces.some((ns) => ns.handle === handle);
+  const effectiveNamespace = namespace || (routeIsWritable ? handle : namespaces[0]?.handle ?? handle);
 
   const registerCurrentCanvas = useCallback(async (versionTitle: string) => {
     const steps = currentStepsRef.current;
