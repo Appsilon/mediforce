@@ -491,7 +491,7 @@ export { compact, parseRow } from './utils/compact';
 export { normaliseModelId } from './utils/normalise-model-id';
 export { emailLayout, escapeHtml } from './utils/email-layout';
 export { isPasswordAuthEnabled } from './utils/auth-env';
-export { DOCKER_IMAGE_SETUP_URL, VERIFY_WORKFLOW_URL } from './utils/docs-links';
+export { DOCKER_IMAGE_SETUP_URL, VERIFY_WORKFLOW_URL, CREATE_WORKFLOW_URL } from './utils/docs-links';
 export { DEFAULT_AGENT_IMAGE } from './utils/container-defaults';
 export {
   normalizeRepoUrls,

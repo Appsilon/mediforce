@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
@@ -430,9 +430,13 @@ function WorkflowCatalogPublic({ handle }: { handle: string }) {
 }
 
 function WorkflowCatalogMember({ handle }: { handle: string }) {
+  const searchParams = useSearchParams();
+  // `?import=source` opens the importer on arrival: the authoring-paths popover
+  // offers import from the editor, which does not host the dialog (#1185).
+  const importParam = searchParams.get('import');
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [showArchived, setShowArchived] = React.useState(false);
-  const [importOpen, setImportOpen] = React.useState(false);
+  const [importOpen, setImportOpen] = React.useState(importParam === 'source');
   const [importEntry, setImportEntry] = React.useState<ImportEntry>('source');
   const queryClient = useQueryClient();
 

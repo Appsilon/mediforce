@@ -13,6 +13,17 @@ workflow MUST satisfy, see
 
 ## Pick an authoring path
 
+The product states this same fork: **Ways to author**, in the Workflow Designer
+toolbar, names each path with a reason to pick it and the first move it takes —
+including the clone and the `/design-workflow` invocation, which are useless as
+a name alone. It is the summary of the sections below, worded in
+[`authoring-paths.ts`](../../packages/platform-ui/src/lib/authoring-paths.ts);
+change one, change the other. Its footer opens this file on GitHub
+(`CREATE_WORKFLOW_URL` in
+[`docs-links.ts`](../../packages/platform-core/src/utils/docs-links.ts)) rather
+than naming a path only a reader with a checkout could follow — so moving or
+renaming this file breaks that link.
+
 ### AI Assistant (in the canvas)
 
 The Workflow Designer canvas has a built-in **AI Assistant** pane — describe the

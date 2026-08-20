@@ -30,6 +30,9 @@ export const routes = {
 
   // ── Workflows ──────────────────────────────────────────────────
   workflows: (handle: string) => `/${handle}/workflows`,
+  /** Workspace home with the git importer already open — the authoring-paths
+   *  popover offers import from pages that do not host the dialog. */
+  importWorkflows: (handle: string) => `/${handle}?import=source`,
   workflow: (handle: string, name: string) => `/${handle}/workflows/${encode(name)}`,
   workflowDefinition: (handle: string, name: string, version: number | string) =>
     `/${handle}/workflows/${encode(name)}/definitions/${version}`,
