@@ -1,6 +1,7 @@
 import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../helpers/test-fixtures';
 import { seedPostgresOrganizationNamespace } from '../helpers/postgres-seed';
+import { probeGitHub, MANIFEST_PROBE } from '../helpers/github-reachable';
 
 /**
  * Workflow import from GitHub — API E2E.
@@ -13,9 +14,8 @@ import { seedPostgresOrganizationNamespace } from '../helpers/postgres-seed';
  * both source shapes the product accepts — the plain repository URL the import
  * dialog offers by default, and a tree URL a user pastes from the GitHub UI.
  *
- * These endpoints necessarily talk to github.com — there is no local stand-in for
- * "resolve a ref to an immutable commit". The network-dependent tests probe
- * GitHub once in `beforeAll` and self-skip with a diagnostic when it is
+ * These endpoints necessarily talk to github.com. The network-dependent tests
+ * probe GitHub once in `beforeAll` and self-skip with a diagnostic when it is
  * unreachable or rate limited (same shape as `workspace-docker.journey`'s Docker
  * gate); the auth and validation tests never skip, so an offline run still covers
  * every assertion that does not need the network.
@@ -45,28 +45,13 @@ interface DefinitionGroup {
   definition: { source?: { url: string; path: string; commit: string } } | null;
 }
 
-/** True when `url` answers 2xx unauthenticated. A transport failure or a 403
- *  (GitHub rate limit) reads as "not available here", not as a product defect. */
-async function isAvailable(url: string): Promise<boolean> {
-  try {
-    return (await fetch(url)).ok;
-  } catch {
-    return false;
-  }
-}
-
-const GITHUB_API_PROBE = 'https://api.github.com/repos/Appsilon/mediforce/commits/main';
-const MANIFEST_PROBE =
-  'https://raw.githubusercontent.com/Appsilon/mediforce/main/workflows-index.json';
-
 test.describe('Workflow import from GitHub — API E2E', () => {
   let gitHubReachable = false;
   let manifestPublished = false;
   let namespace = '';
 
   test.beforeAll(async () => {
-    gitHubReachable = await isAvailable(GITHUB_API_PROBE);
-    manifestPublished = gitHubReachable && (await isAvailable(MANIFEST_PROBE));
+    ({ apiReachable: gitHubReachable, manifestPublished } = await probeGitHub());
   });
 
   // Import writes a workflow definition, and `workflow_definitions.workspace` is

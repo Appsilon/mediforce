@@ -1,6 +1,11 @@
+---
+status: accepted
+audience: engineers
+last_reviewed: 2026-07-21
+---
+
 # ADR-0010: Durable Step Timeout & Stranded-Run Recovery
 
-**Status:** Accepted
 **Date:** 2026-07-15
 **Deciders:** Krystian Zielinski
 **Context issue:** [#868](https://github.com/Appsilon/mediforce/issues/868)

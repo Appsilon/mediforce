@@ -2,7 +2,7 @@
 
 ## 1. Architecture & Module Boundaries
 
-- [ ] Dependencies flow in the right direction (see package graph in `AGENTS.md`)
+- [ ] Dependencies flow in the right direction (see `docs/concepts/architecture.md`)
 - [ ] No cross-package imports via internal paths — use package-level exports only
 - [ ] New files are in the correct location per project conventions
 - [ ] No unnecessary coupling; shared code lives in shared packages
@@ -17,7 +17,7 @@
 
 ## 3. Data Integrity
 
-- [ ] Firestore queries are tenant-scoped where applicable
+- [ ] Repository reads/writes are caller-scoped per ADR-0004; no broad query followed by in-memory filtering
 - [ ] Nullable fields handled defensively
 - [ ] No unbounded reads (missing `.limit()`)
 

@@ -1,11 +1,12 @@
 import { readFile } from 'node:fs/promises';
+import { VERIFY_WORKFLOW_URL } from '@mediforce/platform-core';
 import { defineCommand } from '../define-command';
 import { printJson, printError } from '../output';
 
 export const workflowValidateCommand = defineCommand({
   name: 'mediforce workflow validate',
   description:
-    'Validate a workflow definition JSON file against the canonical schema without registering it. Reports structured errors; exits non-zero when invalid.',
+    'Schema-validate a workflow definition JSON file against the canonical schema without registering it — the first of four verification gates, answering "is the definition legal?". Reports structured errors; exits non-zero when invalid.',
   args: {
     file: {
       type: 'positional',
@@ -41,6 +42,9 @@ export const workflowValidateCommand = defineCommand({
       printJson(output, result);
     } else if (result.valid) {
       output.stdout('Valid — the workflow definition conforms to the schema.');
+      output.stdout(
+        `That is gate 1 of 4. Register it, then start a Dry Run (\`run start --dry-run\`) to check the graph is structured as you intended: ${VERIFY_WORKFLOW_URL}`,
+      );
     } else {
       output.stderr(`Invalid — ${String(result.errors.length)} error(s):`);
       for (const issue of result.errors) {

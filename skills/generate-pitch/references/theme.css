@@ -1,0 +1,100 @@
+/* @theme mediforce */
+/* Marp theme for the Mediforce pitch deck. Passed to marp-cli with --theme. */
+
+@import 'default';
+
+section {
+  --ink: #101418;
+  --muted: #5b6672;
+  --accent: #1f6feb;
+  --rule: #d8dee6;
+
+  background: #ffffff;
+  color: var(--ink);
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 26px;
+  padding: 64px 72px;
+}
+
+section h1 {
+  font-size: 46px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+}
+
+section h2 {
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--ink);
+  border-bottom: 2px solid var(--rule);
+  padding-bottom: 10px;
+}
+
+section h3 {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+section ul {
+  line-height: 1.5;
+}
+
+section li::marker {
+  color: var(--accent);
+}
+
+section strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+section code {
+  background: #f2f4f7;
+  border-radius: 4px;
+  font-size: 0.82em;
+  padding: 2px 6px;
+}
+
+section pre {
+  background: #f7f8fa;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  font-size: 0.7em;
+}
+
+section table {
+  font-size: 0.78em;
+}
+
+section table th {
+  background: #f2f4f7;
+  text-align: left;
+}
+
+/* Section dividers and the title slide. */
+section.lead {
+  background: #101418;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+section.lead h1,
+section.lead h2 {
+  border: none;
+  color: #ffffff;
+}
+
+section.lead p {
+  color: #aab4c0;
+  font-size: 28px;
+}
+
+section footer,
+section::after {
+  color: var(--muted);
+  font-size: 16px;
+}

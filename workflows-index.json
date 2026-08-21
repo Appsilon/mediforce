@@ -71,6 +71,12 @@
       "path": "docs/workflow-examples/11-fan-out-orchestration.wd.json",
       "description": "Parent workflow that fans a child workflow out to every item in a list, waits for a collection window, then gathers the replies. Demonstrates action spawn with forEach (${item.*}), the wait action, and ${steps.*} interpolation. Distilled from apps/team-pulse.",
       "tags": ["tutorial", "orchestration"]
+    },
+    {
+      "name": "tutorial-previous-run",
+      "path": "docs/workflow-examples/12-previous-run.wd.json",
+      "description": "Round-trips a message between runs: a script step reads `previousRun.message` from /output/previous_run.json, a human step sets the message the next run will see. Demonstrates the inputForNextRun carry-over contract and the empty-object first-run case.",
+      "tags": ["tutorial", "state"]
     }
   ]
 }

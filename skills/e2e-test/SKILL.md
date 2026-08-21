@@ -12,7 +12,7 @@ metadata:
 
 # E2E Journey Tests
 
-Full strategy: `docs/E2E-STRATEGY.md`
+Full strategy: `docs/testing/e2e-strategy.md`
 
 ## When to Use
 

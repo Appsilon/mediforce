@@ -229,8 +229,8 @@ export const WorkflowReviewConfigSchema = z.object({
  *
  * When set, the runtime creates one bare repo per workflow definition (host-cached)
  * and a fresh `git worktree` per run on branch `run/<runId>`. Every step in the run
- * mounts that worktree at `/workspace`. Commits are made per-step; pushes are
- * controlled by `push` and default to `never`.
+ * mounts that worktree at `/workspace`. Commits are made per-step; run branches
+ * are never pushed.
  *
  * Distinct from `agentConfig.repo + commit` which drive image build source and
  * skills source (both still tied to immutable SHAs).

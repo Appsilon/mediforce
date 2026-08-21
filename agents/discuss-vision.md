@@ -36,13 +36,14 @@ Walk the user through these three frameworks, in order:
 
 ## Working Files
 
-Read all design files at the start to understand current state:
+Read all design files at the start to understand current state
+(`docs/README.md` routes to everything else):
 
-- `docs/PRODUCT_VISION.md` — current vision (includes previous answers from team discussions)
-- `docs/ARCHITECTURE.md` — technical architecture
-- `docs/STRATEGY.md` — business strategy
-- `docs/VISION_WORK_PLAN.md` — the plan and frameworks being used
-- `docs/IDEAS_WITH_MAREK.md` — running ideas
+- `docs/concepts/vision.md` — current vision and positioning
+- `docs/concepts/architecture.md` — technical architecture
+- `docs/concepts/how-we-work.md` — how the team operates
+- `docs/adr/README.md` — decisions already made
+- `docs/research/` — explored shapes that are deferred, not yet decided
 
 ## Usage Scenarios
 
@@ -62,13 +63,13 @@ Read all design files at the start to understand current state:
    - Challenge weak or vague answers — push for specificity
    - When you have enough, summarize what you heard and ask if that's right
 
-3. **Be aware of but don't lead with previous answers.** The PRODUCT_VISION.md contains answers from earlier discussions. Use them to:
+3. **Be aware of but don't lead with previous answers.** `docs/concepts/vision.md` contains answers from earlier discussions. Use them to:
    - Go deeper on topics already covered ("I see the team discussed X — what's your take? Do you agree?")
    - Identify disagreements or different perspectives
    - Explore areas that weren't fully resolved (open questions in the doc)
    - But do NOT just present those answers as given — treat each conversation as independent thinking
 
-4. **After each step**, propose an update to PRODUCT_VISION.md that captures the user's perspective. If it differs from what's already there, note the tension — don't overwrite without discussion.
+4. **After each step**, propose an update to `docs/concepts/vision.md` that captures the user's perspective. If it differs from what's already there, note the tension — don't overwrite without discussion.
 
 ## Key Questions to Cover
 

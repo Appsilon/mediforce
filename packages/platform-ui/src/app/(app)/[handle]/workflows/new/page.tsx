@@ -83,7 +83,7 @@ export default function NewWorkflowPage() {
   const currentStepsRef = useRef<WorkflowStep[]>(TEMPLATE_STEPS);
   const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>(TEMPLATE_TRANSITIONS);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const startAfterSaveResolverRef = useRef<((version: number | undefined) => void) | null>(null);
+  const startAfterSaveResolverRef = useRef<((saved: { version: number; namespace: string } | undefined) => void) | null>(null);
 
   useEffect(() => () => { if (redirectTimerRef.current !== null) clearTimeout(redirectTimerRef.current); }, []);
 
@@ -95,8 +95,13 @@ export default function NewWorkflowPage() {
     [],
   );
 
-  // Auto-select first namespace when namespaces load
-  const effectiveNamespace = namespace || namespaces[0]?.handle || '';
+  // The workspace the user is standing in, which `namespaces[0]` (usually their
+  // personal one) is not. Falls back only when the route handle is not one the
+  // user can write to, so the picker never shows a target the save would reject.
+  // Before the workspaces load there is nothing to check the handle against, so
+  // the route handle stands until they arrive.
+  const routeIsWritable = namespacesLoading || namespaces.some((ns) => ns.handle === handle);
+  const effectiveNamespace = namespace || (routeIsWritable ? handle : namespaces[0]?.handle ?? handle);
 
   const registerCurrentCanvas = useCallback(async (versionTitle: string) => {
     const steps = currentStepsRef.current;
@@ -139,7 +144,7 @@ export default function NewWorkflowPage() {
       );
       setSaveState({ status: 'saved', name: result.name });
       toastRegistrationWarnings(result.warnings, toast);
-      return { name: result.name, version: result.version };
+      return { name: result.name, version: result.version, namespace: effectiveNamespace };
     } catch (err) {
       const { stepErrors: failedSteps, message } = handleSaveFailure(err, orderedSteps);
       setStepErrors(failedSteps);
@@ -156,16 +161,16 @@ export default function NewWorkflowPage() {
     try {
       const result = await registerCurrentCanvas(versionTitle);
       if (startResolver) {
-        startResolver(result.version);
+        startResolver({ version: result.version, namespace: result.namespace });
       } else {
         redirectTimerRef.current = setTimeout(() => {
-          router.push(routes.workflow(handle, result.name));
+          router.push(routes.workflow(result.namespace, result.name));
         }, 500);
       }
     } catch {
       if (startResolver) startResolver(undefined);
     }
-  }, [registerCurrentCanvas, handle, router]);
+  }, [registerCurrentCanvas, router]);
 
   const handleDialogClose = useCallback(() => {
     setDialogOpen(false);
@@ -177,7 +182,7 @@ export default function NewWorkflowPage() {
 
   const wdJsonFields: Record<string, unknown> = {
     name: toWorkflowId(workflowName) || 'my-workflow',
-    namespace: effectiveNamespace || undefined,
+    namespace: effectiveNamespace,
     description: description || undefined,
   };
 
@@ -224,13 +229,17 @@ export default function NewWorkflowPage() {
             <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground/60 flex-wrap">
               <span className="shrink-0">Namespace:</span>
               <select
+                aria-label="Namespace"
                 value={effectiveNamespace}
                 onChange={(e) => setNamespace(e.target.value)}
                 disabled={namespacesLoading || namespaces.length === 0}
                 className="bg-transparent border-0 text-xs text-muted-foreground/60 outline-none cursor-pointer hover:text-muted-foreground disabled:cursor-not-allowed py-0 max-w-[160px]"
               >
                 {namespacesLoading ? (
-                  <option value="">Loading…</option>
+                  // Carries the save target rather than an empty placeholder: a
+                  // `value` no option matches leaves the select displaying a
+                  // workspace other than the one the save would write to.
+                  <option value={effectiveNamespace}>{effectiveNamespace}</option>
                 ) : (
                   namespaces.map((ns) => (
                     <option key={ns.handle} value={ns.handle}>{ns.handle}</option>
@@ -281,7 +290,7 @@ export default function NewWorkflowPage() {
               disabled={!canSave}
               disabledTooltip={missingFieldReason}
               preflightEnabled={false}
-              onBeforeStart={() => new Promise<number | undefined>((resolve) => {
+              onBeforeStart={() => new Promise<{ version: number; namespace: string } | undefined>((resolve) => {
                 startAfterSaveResolverRef.current = resolve;
                 setDialogOpen(true);
               })}
@@ -294,7 +303,7 @@ export default function NewWorkflowPage() {
               disabled={!canSave}
               disabledTooltip={missingFieldReason}
               preflightEnabled={false}
-              onBeforeStart={() => new Promise<number | undefined>((resolve) => {
+              onBeforeStart={() => new Promise<{ version: number; namespace: string } | undefined>((resolve) => {
                 startAfterSaveResolverRef.current = resolve;
                 setDialogOpen(true);
               })}
@@ -307,7 +316,7 @@ export default function NewWorkflowPage() {
       <WorkflowEditorCanvas
         initialSteps={TEMPLATE_STEPS}
         initialTransitions={TEMPLATE_TRANSITIONS}
-        namespace={effectiveNamespace || undefined}
+        namespace={effectiveNamespace}
         wdJsonFields={wdJsonFields}
         onChange={handleCanvasChange}
         onDirtyChange={setCanvasDirty}

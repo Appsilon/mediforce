@@ -5,7 +5,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as Popover from '@radix-ui/react-popover';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useRouter } from 'next/navigation';
-import { Play, FlaskConical, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound, FileInput } from 'lucide-react';
+import { Play, FlaskConical, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound, FileInput, ExternalLink } from 'lucide-react';
 import { useWorkflowVersions, useWorkflowVersion } from '@/hooks/use-workflow-versions';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useAuth } from '@/contexts/auth-context';
@@ -18,10 +18,10 @@ import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useOpenRouterCredits } from '@/hooks/use-openrouter-credits';
 import { useNamespaceAdminContact } from '@/hooks/use-namespace-admin-contact';
 import { useModelValidation } from '@/hooks/use-model-validation';
-import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
+import { runPreflightChecks, findSkippedChecks, type PreflightWarning } from '@/lib/preflight-checks';
 import { ParamField } from '@/components/ui/param-field';
 import { buildTriggerPayload, hasInvalidObjectInput } from '@/lib/trigger-input-payload';
-import type { TriggerInputField } from '@mediforce/platform-core';
+import { VERIFY_WORKFLOW_URL, type TriggerInputField } from '@mediforce/platform-core';
 
 interface StartRunButtonProps {
   workflowName: string;
@@ -37,7 +37,11 @@ interface StartRunButtonProps {
    * gating the button on unsaved required fields.
    */
   disabledTooltip?: string;
-  onBeforeStart?: () => Promise<number | undefined>;
+  /**
+   * Saves the workflow before starting and reports where it landed. The run must
+   * start in the workspace the save targeted, which is not always the route.
+   */
+  onBeforeStart?: () => Promise<{ version: number; namespace: string } | undefined>;
   /**
    * Whether to run workflow-scoped preflight fetches (versions, secrets, model
    * validation). Set false when the workflow does not exist yet — e.g. the new
@@ -172,12 +176,35 @@ export function StartRunButton({
     });
   }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.effectiveRemaining, handle, workflowName, adminContact.email, modelValidation.isLoading, modelValidation.unknown]);
 
+  // A probe that failed produces no warnings, exactly like one that passed, so a
+  // skipped check has to be said out loud rather than read as a pass.
+  const skippedChecks = React.useMemo(() => {
+    if (!effectiveDefinition) return [];
+    return findSkippedChecks(effectiveDefinition, {
+      dockerAvailable,
+      creditsFailed: openRouterCredits.error !== undefined,
+      modelValidationFailed: modelValidation.error !== null,
+    });
+  }, [effectiveDefinition, dockerAvailable, openRouterCredits.error, modelValidation.error]);
+
   const preflightLoading = preflightEnabled && (definitionLoading || dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading);
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
 
+  // Appended to whichever description the dialog shows: a run with trigger
+  // input still needs to hear that a probe never completed.
+  const skippedChecksNote =
+    preflightLoading === false && skippedChecks.length > 0
+      ? ' Some checks could not run, so the readiness warnings may be incomplete.'
+      : '';
+
+  // Where the run starts. The route handle is right everywhere except the
+  // new-workflow page, where `onBeforeStart` may have saved elsewhere.
+  const savedNamespaceRef = React.useRef<string | null>(null);
+
   async function executeStart(v?: number, dryRun?: boolean) {
     const targetVersion = v ?? effectiveVersion;
+    const startNamespace = savedNamespaceRef.current ?? handle;
     if (!user || targetVersion === null || targetVersion === 0) return;
 
     setStarting(true);
@@ -189,7 +216,7 @@ export function StartRunButton({
 
     try {
       const result = await startMutation.mutateAsync({
-        namespace: handle,
+        namespace: startNamespace,
         definitionName: workflowName,
         definitionVersion: targetVersion,
         triggerName: 'manual',
@@ -197,7 +224,7 @@ export function StartRunButton({
         payload,
         ...(dryRun ? { dryRun: true } : {}),
       });
-      router.push(`/${handle}/workflows/${encodeURIComponent(workflowName)}/runs/${result.run.id}`);
+      router.push(`/${startNamespace}/workflows/${encodeURIComponent(workflowName)}/runs/${result.run.id}`);
     } catch (err) {
       console.error('[StartRunButton] Failed to start run:', err);
       setError(err instanceof Error ? err.message : 'Failed to start run');
@@ -225,7 +252,9 @@ export function StartRunButton({
       setRunningBeforeStart(true);
       setError(null);
       try {
-        targetVersion = await onBeforeStart();
+        const saved = await onBeforeStart();
+        targetVersion = saved?.version;
+        savedNamespaceRef.current = saved?.namespace ?? null;
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to save before starting');
         setRunningBeforeStart(false);
@@ -285,7 +314,7 @@ export function StartRunButton({
     <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md rounded-lg border bg-background p-6 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md max-h-[85vh] overflow-y-auto rounded-lg border bg-background p-6 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
           <div className="flex items-start gap-3 mb-4">
             <div className="rounded-full bg-muted p-2">
               {hasTriggerInput ? (
@@ -304,6 +333,7 @@ export function StartRunButton({
                   : preflightLoading
                     ? 'Checking workflow readiness...'
                     : `${warnings.length} item${warnings.length !== 1 ? 's' : ''} to review for a smooth run.`}
+                {skippedChecksNote}
               </Dialog.Description>
             </div>
             <Dialog.Close className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
@@ -380,6 +410,15 @@ export function StartRunButton({
           )}
 
           <div className="flex items-center gap-2 mt-5">
+            <a
+              href={VERIFY_WORKFLOW_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
+            >
+              How verification works
+              <ExternalLink className="h-3 w-3" />
+            </a>
             <div className="flex-1" />
             <Dialog.Close className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors">
               Cancel

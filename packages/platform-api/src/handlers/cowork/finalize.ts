@@ -12,7 +12,8 @@ import type { OutputSchemaShape } from '@mediforce/platform-core';
  * Finalize a cowork session and resume its parent process instance.
  *
  * Sequence (best-effort, non-transactional — see issue #516 for the
- * transactional version pending Postgres migration):
+ * transactional version, which needs a cross-repo transaction seam on
+ * CallerScope):
  *   1. `coworkSessions.finalize` (status='finalized', persist artifact)
  *   2. audit `cowork.session.finalized`
  *   3. `runs.update` (paused → running, clear pauseReason)

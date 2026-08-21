@@ -1,11 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { Pencil, Check, X, Settings, GitBranch, Plus, Download } from 'lucide-react';
+import { Pencil, Check, X, Settings, GitBranch, Plus, Download, BookOpen } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import { WorkspaceAvatar } from '@/components/workspace-avatar';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
@@ -21,7 +21,7 @@ import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons } from '@/compone
 import { WorkflowProblems } from '@/components/processes/workflow-problems';
 import { OpenRouterCreditsIndicator } from '@/components/namespace/openrouter-credits-indicator';
 import { WorkflowSecretKeysProvider } from '@/hooks/use-workflow-secret-keys';
-import { ImportWorkflowDialog } from '@/components/workflows/import-workflow-dialog';
+import { ImportWorkflowDialog, type ImportEntry } from '@/components/workflows/import-workflow-dialog';
 import { cn } from '@/lib/utils';
 import type { Namespace } from '@mediforce/platform-core';
 import { WorkspaceAccessError } from '@/components/workspace-access-error';
@@ -430,10 +430,20 @@ function WorkflowCatalogPublic({ handle }: { handle: string }) {
 }
 
 function WorkflowCatalogMember({ handle }: { handle: string }) {
+  const searchParams = useSearchParams();
+  // `?import=source` opens the importer on arrival: the authoring-paths popover
+  // offers import from the editor, which does not host the dialog (#1185).
+  const importParam = searchParams.get('import');
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [showArchived, setShowArchived] = React.useState(false);
-  const [importOpen, setImportOpen] = React.useState(false);
+  const [importOpen, setImportOpen] = React.useState(importParam === 'source');
+  const [importEntry, setImportEntry] = React.useState<ImportEntry>('source');
   const queryClient = useQueryClient();
+
+  function openImport(entry: ImportEntry) {
+    setImportEntry(entry);
+    setImportOpen(true);
+  }
 
   const { definitions, stepsByDefinition, latestDocs, loading: defsLoading } = useProcessDefinitions(showCompleted);
   const { data: activeTasks } = useMyActionableTasks();
@@ -487,7 +497,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
             hasArchivedDefinitions={hasArchivedDefinitions}
           />
           <button
-            onClick={() => setImportOpen(true)}
+            onClick={() => openImport('source')}
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap shrink-0',
               'border hover:bg-muted transition-colors',
@@ -510,6 +520,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
       </div>
       <ImportWorkflowDialog
         namespace={handle}
+        entry={importEntry}
         open={importOpen}
         onOpenChange={setImportOpen}
         onImported={() => void queryClient.invalidateQueries({ queryKey: ['workflows', 'list'] })}
@@ -518,23 +529,39 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
       {loading ? (
         <WorkflowCatalogSkeletons />
       ) : namespacedDefinitions.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-4 text-center py-16">
+        <div className="flex flex-col items-center justify-center gap-6 text-center py-16">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
             <GitBranch className="h-7 w-7 text-muted-foreground" />
           </div>
           <div>
             <p className="font-medium">No workflows defined yet</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Create your first workflow to start orchestrating agents and humans.
+              Start from a ready-made example, or author your own.
             </p>
           </div>
-          <Link
-            href={`/${handle}/workflows/new`}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New Workflow
-          </Link>
+          <div className="grid w-full max-w-2xl gap-4 sm:grid-cols-2">
+            <button
+              onClick={() => openImport('examples')}
+              className="flex flex-col items-start gap-2 rounded-lg border p-5 text-left transition-all hover:border-primary/40 hover:shadow-sm"
+            >
+              <BookOpen className="h-6 w-6 text-primary" />
+              <span className="font-medium">Import example workflows</span>
+              <span className="text-sm text-muted-foreground">
+                Browse the Mediforce examples and import the ones you want — they run as-is and are
+                yours to edit.
+              </span>
+            </button>
+            <Link
+              href={`/${handle}/workflows/new`}
+              className="flex flex-col items-start gap-2 rounded-lg border p-5 text-left transition-all hover:border-primary/40 hover:shadow-sm"
+            >
+              <Plus className="h-6 w-6 text-primary" />
+              <span className="font-medium">New workflow</span>
+              <span className="text-sm text-muted-foreground">
+                Author one from scratch in the editor.
+              </span>
+            </Link>
+          </div>
         </div>
       ) : sortedDefinitions.length === 0 ? (
         <div className="text-center py-16 text-sm text-muted-foreground">

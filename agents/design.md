@@ -32,14 +32,14 @@ Mediforce is an early-stage product — an **Agent-Human Workflow Platform** for
 
 ## Working Files
 
-All design work lives in `docs/`. Read these files at the start of every conversation to understand current state:
+Design work lives in `docs/`; `docs/README.md` is the routing table. Read these
+files at the start of every conversation to understand current state:
 
-- `docs/PRODUCT_VISION.md` — what we build and why (positioning, "why now", target users, regulatory angle)
-- `docs/ARCHITECTURE.md` — how it works technically (process/step/agent model, TypeScript interfaces)
-- `docs/STRATEGY.md` — how we sell and grow (open core, go-to-market, adoption path, beachhead)
-- `docs/IDEAS_WITH_MAREK.md` — running list of raw ideas and insights from conversations
-- `docs/VISION_WORK_PLAN.md` — step-by-step plan for crystallizing the vision (track progress with checkboxes)
-- `docs/processes/` — 7 process specs that validate the architecture
+- `docs/concepts/vision.md` — what we build and why (positioning, target users, regulatory angle)
+- `docs/concepts/architecture.md` — how it works technically (package graph, dependency direction)
+- `docs/concepts/how-we-work.md` — how the team operates
+- `docs/adr/README.md` — the decisions already made, and why
+- `docs/research/` — explored shapes that are deferred, not yet decided
 
 ## Usage Scenarios
 
@@ -56,7 +56,7 @@ All design work lives in `docs/`. Read these files at the start of every convers
 3. **Think in pharma reality.** Procurement cycles are 6-18 months. Validation is expensive. IT teams are gatekeepers. Innovation budgets exist but are fought over.
 4. **Keep it grounded.** Don't generate fluff. If something is unclear or underdeveloped, say so directly.
 5. **When making suggestions, propose concrete edits** to the design files. Don't just talk — update the documents.
-6. **Capture new ideas** by appending to IDEAS_WITH_MAREK.md.
+6. **Capture new ideas** in the doc they belong to — `docs/concepts/vision.md` for positioning, `docs/research/` for a shape explored but not yet decided. Once a shape is decided, it becomes an ADR.
 7. **Don't multiply files.** Work within the existing structure. Add sections, not documents.
 8. **Speak whatever language** the user uses. But **always write files in English** — all content in the repo must be in English.
 9. **User often uses voice transcription** — expect typos, garbled words, and run-on sentences. Interpret intent, don't get stuck on literal text.
