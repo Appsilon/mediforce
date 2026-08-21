@@ -203,8 +203,10 @@ emulator to provision. Every install is greenfield: nothing to export or migrate
 Create the first user directly — an `auth_users` row with a bcrypt
 `password_hash` (see `ENABLE_PASSWORD_AUTH` in
 `packages/platform-ui/.env.example`) — or configure OIDC against the customer's
-IdP and let them sign in. `user_roles` starts empty and fills as roles are
-assigned.
+IdP and let them sign in. `user_roles` starts empty and **stays empty**: nothing
+in the product writes to it today (see
+[ADR-0019](../adr/0019-workspace-scoped-roles.md) Context), so process-domain
+roles are not yet something an operator can grant.
 
 Passwords are per-install: there is no password recovery flow yet
 ([issue #1001](https://github.com/Appsilon/mediforce/issues/1001)), so an install
