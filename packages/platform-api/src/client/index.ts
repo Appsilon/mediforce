@@ -131,6 +131,7 @@ import {
   SynthesizeVoiceArtifactInputSchema,
   SynthesizeVoiceArtifactOutputSchema,
   ListPluginsOutputSchema,
+  GetCapabilitiesOutputSchema,
   ClaimTaskInputSchema,
   ClaimTaskOutputSchema,
   RecordTaskViewedInputSchema,
@@ -425,6 +426,7 @@ import {
   type SynthesizeVoiceArtifactInput,
   type SynthesizeVoiceArtifactOutput,
   type ListPluginsOutput,
+  type GetCapabilitiesOutput,
   ListAgentRunsInputSchema,
   ListAgentRunsOutputSchema,
   GetAgentRunInputSchema,
@@ -597,6 +599,10 @@ export class Mediforce {
     ) => Promise<SynthesizeVoiceArtifactOutput>;
   };
 
+  readonly capabilities: {
+    /** What this deployment can actually run, derived server-side. */
+    get(): Promise<GetCapabilitiesOutput>;
+  };
   readonly plugins: {
     list: () => Promise<ListPluginsOutput>;
   };
@@ -1034,6 +1040,14 @@ export class Mediforce {
           SynthesizeVoiceArtifactOutputSchema,
           'mediforce.cowork.voiceSynthesize',
         );
+      },
+    };
+
+    this.capabilities = {
+      get: async () => {
+        const res = await this.request('/api/capabilities');
+        const body = await parseJsonOrThrow(res, 'mediforce.capabilities.get');
+        return GetCapabilitiesOutputSchema.parse(body);
       },
     };
 

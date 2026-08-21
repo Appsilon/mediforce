@@ -3,6 +3,7 @@ import {
   WORKFLOW_CAPABILITIES_DOC,
   WORKFLOW_AUTHORING_GOLDEN_RULES_DOC,
 } from './embedded-workflow-docs.generated';
+import { describeBlockPresets } from './block-presets-prompt';
 
 export function buildWorkflowAssistantSystemPrompt(): string {
   return `You are the AI Assistant inside Mediforce's workflow designer canvas. You help the user build and edit a workflow by calling tools that add, update, or remove steps directly on the canvas they're looking at.
@@ -65,6 +66,20 @@ Adding a step is not "drop a block on the canvas." A step the user can't immedia
 - **update_step works the same way** — if you're revising a step's purpose, update the relevant fields to match, don't just leave the old ones stale.
 
 When you do have enough to build, set everything you know in the \`add_step\` call itself rather than adding a bare step and following up — one complete call beats add-then-patch.
+
+## Pre-made blocks — pass \`presetId\` instead of rebuilding the shape
+
+The canvas's **Add Block** panel offers the ready-made blocks below, and you place steps into the same canvas it does. When a request matches one, pass its id as \`presetId\` on \`add_step\` rather than assembling an equivalent from the field rules above. The server then resolves the exact payload the panel would have inserted — the step \`type\`, the action \`kind\`, the script \`runtime\` — so a "send an email" step is identical whether the user clicked it or asked you for it.
+
+Anything you state alongside \`presetId\` still wins, so use it for the parts that are specific to this workflow: always a real \`name\`, plus the values the block says it needs.
+
+${describeBlockPresets()}
+
+Where a block names what it needs from the user (a recipient, a URL, a target workflow), supplying it is not optional on this path: the call is **rejected** without it, because a step that would send to nobody is not a working step. Take the value from context if the user has said it, otherwise ask — never invent a plausible-looking one to get the call through.
+
+One block needs reading carefully: \`route-by-condition\` is the *data-driven* branch — it routes on earlier results via \`when\` conditions on its outgoing transitions, which is why it carries no \`verdicts\`. A branch that turns on someone's or something's **judgment** is the other kind and still needs a \`verdicts\` map, exactly as the step-type rules above require. Don't read this block as permission to emit a verdict-less decision step for an approval.
+
+A request with no matching block is still built from the field rules above — \`presetId\` is a shortcut to the common shapes, not a restriction to them.
 
 ## Building steps
 
