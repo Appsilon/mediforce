@@ -166,6 +166,24 @@ Implications the implementation issues must resolve, not decided here:
   live. The editor's role pick-list is not polish; it is what keeps the gate from
   becoming a footgun. →
   [#1252](https://github.com/Appsilon/mediforce/issues/1252)
+- **Membership removal must drop that user's roles in the workspace.** Roles
+  compose with Membership by AND, so a role held by a non-member is unreachable
+  — but it is not harmless: it survives `removeNamespaceMember` / `leaveNamespace`
+  and silently reactivates if the person is ever re-added. The `namespace` FK
+  cascades on workspace *deletion*, which is a different event. Delete the rows
+  in the same transaction as the membership. →
+  [#1248](https://github.com/Appsilon/mediforce/issues/1248)
+- **A declared role with zero holders strands every run that reaches it.** Today
+  23 workflow definitions in this repo already declare `allowedRoles` across 8
+  role names (`reviewer`, `biostatistician`, `operator`, `author`, …), and
+  `user_roles` is empty, so on the day enforcement lands every one of those steps
+  becomes unactionable — the #816 phantom-actor failure mode, reintroduced by a
+  different route. The gate must **fail closed** (an unheld role is not an open
+  step; silently un-gating an approval control is the worse failure in a
+  regulated context), so the deployability requirement of AGENTS.md §13 has to be
+  met by seeding rather than by weakening the check. →
+  [#1248](https://github.com/Appsilon/mediforce/issues/1248) /
+  [#1249](https://github.com/Appsilon/mediforce/issues/1249)
 
 ## Out of scope
 
