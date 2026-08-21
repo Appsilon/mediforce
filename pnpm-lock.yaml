@@ -8,7 +8,7 @@ overrides:
   axios: '>=1.15.0'
   protobufjs: 8.7.2
   hono: 4.13.2
-  '@hono/node-server': 2.1.0
+  '@hono/node-server': 2.1.1
   fast-xml-parser: 5.10.1
   node-forge: 1.4.0
   follow-redirects: 1.16.0
@@ -1227,8 +1227,8 @@ packages:
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
 
-  '@hono/node-server@2.1.0':
-    resolution: {integrity: sha512-XovyyCCnBzW+zKu+z/zq8hwNs4KOR5rEMAOxo2f40Q5xoOI37IMm6MIg2COOUtUApo0i6850MTBKH2u4QLGIqg==}
+  '@hono/node-server@2.1.1':
+    resolution: {integrity: sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: 4.13.2
@@ -4747,7 +4747,7 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
-  '@hono/node-server@2.1.0(hono@4.13.2)':
+  '@hono/node-server@2.1.1(hono@4.13.2)':
     dependencies:
       hono: 4.13.2
 
@@ -4920,7 +4920,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.30.0(zod@4.4.3)':
     dependencies:
-      '@hono/node-server': 2.1.0(hono@4.13.2)
+      '@hono/node-server': 2.1.1(hono@4.13.2)
       ajv: 8.20.0
       ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
