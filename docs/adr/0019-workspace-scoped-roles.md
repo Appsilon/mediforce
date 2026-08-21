@@ -6,6 +6,13 @@ last_reviewed: 2026-08-21
 
 # ADR-0019: Process roles are workspace-scoped
 
+> **Nothing here is built.** This ADR decides how roles *should* work; no part
+> of it ships. Today `user_roles` is Deployment-global with no write path, and
+> `step.allowedRoles` is declarative — any workspace member can claim and
+> complete any human task. Implementation is tracked by the epic,
+> [#1246](https://github.com/Appsilon/mediforce/issues/1246); this line changes
+> to "Implemented" when the ADR is promoted to `finalized`.
+
 **Date:** 2026-08-21
 **Deciders:** Krystian Zieliński
 **Issue:** [#1247](https://github.com/Appsilon/mediforce/issues/1247) (epic: [#1246](https://github.com/Appsilon/mediforce/issues/1246))
