@@ -1,3 +1,4 @@
+import { callerIsNamespaceAdmin } from '../../auth';
 import { NotFoundError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type {
@@ -11,6 +12,11 @@ import type {
  * metadata (email + lastSignInTime) merged in. Read-only — every active
  * member (any role) may read; non-members get an anti-enum 404 rather than
  * a 403 so that namespace existence does not leak to outsiders.
+ *
+ * `email` (contact / PII) and `lastSignInTime` (activity) are manager fields,
+ * gated to owner/admin (and apiKey) callers: a plain member receives `null`
+ * for both on every row. The roster — name, avatar, role and join date —
+ * stays visible to all members so collaboration still works.
  *
  * apiKey callers bypass the membership gate (server-to-server trust).
  *
@@ -30,10 +36,11 @@ export async function listNamespaceMembers(
 
   const memberDocs = await scope.workspaces.getMembers(input.namespace);
   const directory = scope.system.userDirectory;
+  const canSeeManagerFields = callerIsNamespaceAdmin(scope.caller, input.namespace);
 
   if (directory === null) {
     return {
-      members: memberDocs.map((doc) => withAuth(doc, null)),
+      members: memberDocs.map((doc) => withAuth(doc, null, canSeeManagerFields)),
     };
   }
 
@@ -42,13 +49,14 @@ export async function listNamespaceMembers(
   );
 
   return {
-    members: memberDocs.map((doc, index) => withAuth(doc, authData[index])),
+    members: memberDocs.map((doc, index) => withAuth(doc, authData[index], canSeeManagerFields)),
   };
 }
 
 function withAuth(
   doc: Awaited<ReturnType<CallerScope['workspaces']['getMembers']>>[number],
   metadata: { email: string | null; displayName?: string | null; lastSignInTime: string | null; photoURL?: string | null } | null,
+  canSeeManagerFields: boolean,
 ): NamespaceMemberWithAuth {
   const docDisplayName = typeof doc.displayName === 'string' && doc.displayName.length > 0
     ? doc.displayName
@@ -57,7 +65,7 @@ function withAuth(
     ...doc,
     avatarUrl: doc.avatarUrl ?? metadata?.photoURL ?? undefined,
     displayName: docDisplayName ?? metadata?.displayName ?? null,
-    email: metadata?.email ?? null,
-    lastSignInTime: metadata?.lastSignInTime ?? null,
+    email: canSeeManagerFields ? metadata?.email ?? null : null,
+    lastSignInTime: canSeeManagerFields ? metadata?.lastSignInTime ?? null : null,
   };
 }

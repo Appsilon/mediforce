@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatExitInfo, deriveBuildTag, resolveSkillsCloneUrl } from '../container-plugin';
+import { formatExitInfo, deriveBuildTag, missingExecutableHint } from '../container-plugin';
 
 describe('formatExitInfo', () => {
   it('[DATA] reports the exit code when the process exited normally', () => {
@@ -63,40 +63,36 @@ describe('deriveBuildTag', () => {
   });
 });
 
-describe('resolveSkillsCloneUrl', () => {
-  it('[DATA] clones an https ref over HTTPS as given, no SSH', () => {
-    const { cloneUrl, useSsh } = resolveSkillsCloneUrl('https://github.com/Appsilon/mediforce');
-    expect(cloneUrl).toBe('https://github.com/Appsilon/mediforce');
-    expect(useSsh).toBe(false);
+describe('missingExecutableHint', () => {
+  // Verbatim daemon output from picking a bare alpine image for an agent step:
+  // the one actionable fact — the image has no `bash` — is buried under four
+  // layers of OCI runtime framing.
+  const ALPINE_STDERR =
+    'docker: Error response from daemon: failed to create task for container: ' +
+    'failed to create shim task: OCI runtime create failed: runc create failed: ' +
+    'unable to start container process: error during container init: ' +
+    'exec: "bash": executable file not found in $PATH: unknown.';
+
+  it('[DATA] names the image and the missing executable', () => {
+    const hint = missingExecutableHint(ALPINE_STDERR, 'alpine:3.24');
+    expect(hint).toContain("'alpine:3.24'");
+    expect(hint).toContain("'bash'");
   });
 
-  it('[DATA] clones a git@ ref over SSH as given, never converting to HTTPS', () => {
-    const { cloneUrl, useSsh } = resolveSkillsCloneUrl('git@github.com:Appsilon/mediforce.git');
-    expect(cloneUrl).toBe('git@github.com:Appsilon/mediforce.git');
-    expect(useSsh).toBe(true);
+  it('[DATA] points at the Docker image setup guide', () => {
+    expect(missingExecutableHint(ALPINE_STDERR, 'alpine:3.24')).toContain(
+      'docs/guides/docker-image-setup.md',
+    );
   });
 
-  it('[DATA] clones an owner/repo shorthand over anonymous HTTPS', () => {
-    const { cloneUrl, useSsh } = resolveSkillsCloneUrl('Appsilon/mediforce');
-    expect(cloneUrl).toBe('https://github.com/Appsilon/mediforce');
-    expect(useSsh).toBe(false);
+  it('[DATA] falls back to generic wording when the image is unknown', () => {
+    const hint = missingExecutableHint(ALPINE_STDERR, undefined);
+    expect(hint).toContain("'bash'");
+    expect(hint).toContain('The configured image');
   });
 
-  it('[DATA] uses authenticated HTTPS (PAT) when a token is provided, even for an https ref', () => {
-    const { cloneUrl, useSsh } = resolveSkillsCloneUrl('https://github.com/Appsilon/mediforce', 'TOK');
-    expect(cloneUrl).toBe('https://x-access-token:TOK@github.com/Appsilon/mediforce.git');
-    expect(useSsh).toBe(false);
-  });
-
-  it('[DATA] a token forces HTTPS even when the ref is given in SSH form', () => {
-    const { cloneUrl, useSsh } = resolveSkillsCloneUrl('git@github.com:Appsilon/mediforce.git', 'TOK');
-    expect(cloneUrl).toBe('https://x-access-token:TOK@github.com/Appsilon/mediforce.git');
-    expect(useSsh).toBe(false);
-  });
-
-  it('[DATA] clones a local path directly, no SSH', () => {
-    const { cloneUrl, useSsh } = resolveSkillsCloneUrl('/path/to/bare.git');
-    expect(cloneUrl).toBe('/path/to/bare.git');
-    expect(useSsh).toBe(false);
+  it('[DATA] returns an empty hint for unrelated failures', () => {
+    expect(missingExecutableHint('Traceback (most recent call last): KeyError', 'python:3.12-slim')).toBe('');
+    expect(missingExecutableHint('', 'alpine:3.24')).toBe('');
   });
 });

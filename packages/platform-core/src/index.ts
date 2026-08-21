@@ -27,6 +27,7 @@ export {
   InstanceStatusSchema,
   ProcessInstanceSchema,
   RunNameEntrySchema,
+  WorkflowDisplayStatusSchema,
   StepExecutionStatusSchema,
   GateResultSchema,
   ReviewVerdictSchema,
@@ -40,6 +41,7 @@ export {
   AgentEventSchema,
   AgentRunStatusSchema,
   AgentRunSchema,
+  AgentRunCardStatusSchema,
   HumanTaskStatusSchema,
   HumanTaskSchema,
   HandoffStatusSchema,
@@ -130,6 +132,15 @@ export {
   AssignmentItemSchema,
   TableEditorRowSchema,
   CompleteHumanTaskPayloadSchema,
+  toProcessDefinition,
+  mergeVerdictTransitions,
+  ensureEntryStepFirst,
+  validateStepReferences,
+  type ReferenceIssue,
+  validateStepGraph,
+  validateWorkflowGraphAndReferences,
+  type ValidationResult,
+  type WorkflowGraphValidation,
 } from './schemas/index';
 
 export type { Handle } from './schemas/handle';
@@ -154,6 +165,7 @@ export type {
   InstanceStatus,
   ProcessInstance,
   RunNameEntry,
+  WorkflowDisplayStatus,
   StepExecutionStatus,
   GateResult,
   ReviewVerdict,
@@ -168,6 +180,7 @@ export type {
   AgentEvent,
   AgentRunStatus,
   AgentRun,
+  AgentRunCardStatus,
 } from './types/index';
 
 export type {
@@ -245,11 +258,31 @@ export {
   TaskAttachmentSchema,
   NewTaskAttachmentSchema,
 } from './schemas/index';
+export {
+  AddStepToolSchema,
+  UpdateStepToolSchema,
+  RemoveStepToolSchema,
+  ListModelsToolSchema,
+  WORKFLOW_ASSISTANT_TOOLS,
+  WORKFLOW_ASSISTANT_DEFAULT_MODEL,
+  WorkflowAssistantToolCallSchema,
+  applyWorkflowAssistantToolCalls,
+  type AddStepTool,
+  type UpdateStepTool,
+  type RemoveStepTool,
+  type ListModelsTool,
+  type WorkflowAssistantToolName,
+  type WorkflowAssistantToolCall,
+  type ToolCallOutcome,
+  type ApplyToolCallsResult,
+} from './schemas/index';
 
 // Interfaces (repository and service contracts)
 export type {
   AgentEventRepository,
   AuditRepository,
+  GetByNamespaceOptions,
+  GetByNamespacePage,
   AuthService,
   AuthUser,
   ProcessRepository,
@@ -257,6 +290,9 @@ export type {
   WorkflowDefinitionGroup,
   ProcessInstanceRepository,
   ListInstancesOptions,
+  ListInstancesPageOptions,
+  ListInstancesPage,
+  WorkflowDisplayStatusCounts,
   WorkflowRunSummaryResult,
   HumanTaskRepository,
   TaskAttachmentRepository,
@@ -270,6 +306,7 @@ export type {
   AgentRunRepository,
   ListAgentRunsOptions,
   ListAgentRunsPage,
+  AgentRunCardStatusCounts,
   CoworkSessionRepository,
   TriggerRepository,
   TriggerUpdate,
@@ -293,6 +330,16 @@ export {
   decodeAgentRunCursor,
 } from './cursors/agent-run-cursor';
 export type { AgentRunCursorPayload } from './cursors/agent-run-cursor';
+export {
+  encodeProcessInstanceCursor,
+  decodeProcessInstanceCursor,
+} from './cursors/process-instance-cursor';
+export type { ProcessInstanceCursorPayload } from './cursors/process-instance-cursor';
+export {
+  encodeAuditEventCursor,
+  decodeAuditEventCursor,
+} from './cursors/audit-event-cursor';
+export type { AuditEventCursorPayload } from './cursors/audit-event-cursor';
 
 // Agent definition schema + repository interface
 export {
@@ -395,8 +442,22 @@ export {
 // Validation
 export { validateProcessConfig } from './validation/config-validator';
 export type { ConfigValidationResult } from './validation/config-validator';
-export { validatePayload } from './validation/payload-validator';
+export { isJsonObject, validatePayload } from './validation/payload-validator';
 export type { PayloadValidationError, PayloadValidationResult } from './validation/payload-validator';
+
+// Version resolution — the one policy every unpinned firing resolves through
+export {
+  RUNNABLE_VERSION_REASONS,
+  pickRunnableVersion,
+  resolveRunnableVersion,
+  toWorkflowVersionSource,
+} from './workflows/resolve-runnable-version';
+export type {
+  RunnableVersion,
+  RunnableVersionReason,
+  VersionCandidate,
+  WorkflowVersionSource,
+} from './workflows/resolve-runnable-version';
 
 // MCP resolver (pure; wires AgentDefinition + step restrictions + catalog)
 export {
@@ -429,6 +490,18 @@ export { formatBytes } from './utils/format';
 export { compact, parseRow } from './utils/compact';
 export { normaliseModelId } from './utils/normalise-model-id';
 export { emailLayout, escapeHtml } from './utils/email-layout';
+export { isPasswordAuthEnabled } from './utils/auth-env';
+export { DOCKER_IMAGE_SETUP_URL, VERIFY_WORKFLOW_URL, CREATE_WORKFLOW_URL } from './utils/docs-links';
+export { DEFAULT_AGENT_IMAGE } from './utils/container-defaults';
+export {
+  normalizeRepoUrls,
+  toHttpsWithToken,
+  resolveRepoCloneTargets,
+  redactRepoCredentials,
+} from './utils/repo-url';
+export type { RepoCloneTarget } from './utils/repo-url';
+export { getWorkflowStatus, type WorkflowStatus } from './utils/workflow-status';
+export { toSlug, uniqueSlug } from './utils/slug';
 
 // Workflow examples — shared loader for MCP tool, tests, and build scripts.
 // Uses Node.js fs/path so NOT exported from this barrel (breaks browser bundles).

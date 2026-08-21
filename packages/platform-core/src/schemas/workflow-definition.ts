@@ -229,8 +229,8 @@ export const WorkflowReviewConfigSchema = z.object({
  *
  * When set, the runtime creates one bare repo per workflow definition (host-cached)
  * and a fresh `git worktree` per run on branch `run/<runId>`. Every step in the run
- * mounts that worktree at `/workspace`. Commits are made per-step; pushes are
- * controlled by `push` and default to `never`.
+ * mounts that worktree at `/workspace`. Commits are made per-step; run branches
+ * are never pushed.
  *
  * Distinct from `agentConfig.repo + commit` which drive image build source and
  * skills source (both still tied to immutable SHAs).
@@ -572,8 +572,13 @@ function validateVerdicts(
  * prefer {@link parseWorkflowDefinitionForCreation} which applies the
  * refinement for you.
  */
+/** `object` carries an opaque JSON object whose contents the Definition does not
+ *  enumerate — the escape hatch for a proxied third-party body (ADR-0012). It is
+ *  the only way un-enumerable input enters a Run: the validator checks it is a
+ *  non-null, non-array JSON object and nothing else. An opaque top-level array
+ *  nests under such a field rather than getting its own type. */
 export const TriggerInputFieldSchema = StepParamSchema.extend({
-  type: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'select', 'multiselect', 'textarea']).default('string'),
+  type: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'select', 'multiselect', 'textarea', 'object']).default('string'),
 });
 
 export type TriggerInputField = z.infer<typeof TriggerInputFieldSchema>;

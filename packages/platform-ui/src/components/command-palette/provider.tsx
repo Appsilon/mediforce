@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { ToastProvider, useToast } from './toast-provider';
+import { useToast } from './toast-provider';
 import { CommandPalette } from './palette';
 import { COMMANDS } from './commands';
 import type { Command, CommandContext, Shortcut } from './types';
@@ -42,11 +42,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 export function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
-  return (
-    <ToastProvider>
-      <CommandPaletteProviderInner>{children}</CommandPaletteProviderInner>
-    </ToastProvider>
-  );
+  return <CommandPaletteProviderInner>{children}</CommandPaletteProviderInner>;
 }
 
 function CommandPaletteProviderInner({ children }: { children: React.ReactNode }) {

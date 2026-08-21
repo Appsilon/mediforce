@@ -29,6 +29,7 @@ export type {
   InstanceStatus,
   ProcessInstance,
   RunNameEntry,
+  WorkflowDisplayStatus,
 } from '../schemas/process-instance';
 
 export type {
@@ -53,6 +54,7 @@ export type { AgentEvent } from '../schemas/agent-event';
 export type {
   AgentRunStatus,
   AgentRun,
+  AgentRunCardStatus,
 } from '../schemas/agent-run';
 
 export type {

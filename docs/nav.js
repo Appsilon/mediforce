@@ -127,6 +127,16 @@
   style.textContent = css;
   document.head.appendChild(style);
 
+  // Declared here rather than in each page's head so nested pages get the same
+  // path prefix the header links already use. A page that declares its own icon
+  // is updated in place — appending a second link leaves two competing favicons
+  // and the browser may keep the first.
+  const favicon = document.querySelector('link[rel="icon"]') ?? document.createElement('link');
+  favicon.rel = 'icon';
+  favicon.type = 'image/x-icon';
+  favicon.href = `${p}favicon.ico`;
+  if (favicon.parentNode === null) document.head.appendChild(favicon);
+
   document.body.insertAdjacentHTML('afterbegin', html);
 
   const toggle = document.getElementById('site-nav-toggle');

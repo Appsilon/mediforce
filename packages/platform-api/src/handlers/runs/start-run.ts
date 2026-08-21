@@ -1,4 +1,4 @@
-import { validatePayload } from '@mediforce/platform-core';
+import { resolveRunnableVersion, validatePayload } from '@mediforce/platform-core';
 import { ManualTriggerNotDeclaredError } from '@mediforce/workflow-engine';
 import type { StartRunInput, StartRunOutput } from '../../contract/runs';
 import type { CallerScope } from '../../repositories/index';
@@ -11,18 +11,26 @@ export async function startRun(
   scope: CallerScope,
 ): Promise<StartRunOutput> {
   const requestNamespace = input.namespace ?? '';
+  // An unpinned start resolves through the one shared policy (ADR-0011), the
+  // same one the cron heartbeat and spawn use: a manual firing and a cron firing
+  // of the same workflow must land on the same version, or ADR-0012's single
+  // `triggerInput` contract splits in two. `getLatestVersion` used here before
+  // was archived-inclusive, so a workflow whose head is archived started on a
+  // version nothing else would fire. An explicit `definitionVersion` still wins
+  // outright — pinning an archived version is a deliberate act.
   let version = input.definitionVersion;
-  if (!version) {
-    const resolved = await scope.workflowDefinitions.getLatestVersion(
+  if (version === undefined) {
+    const resolution = await resolveRunnableVersion(
+      scope.workflowDefinitions,
       requestNamespace,
       input.definitionName,
     );
-    if (resolved === 0) {
+    if (!resolution.ok) {
       throw new NotFoundError(
-        `No workflow definition found for '${input.definitionName}'`,
+        `No runnable workflow definition found for '${input.definitionName}': ${resolution.reason}`,
       );
     }
-    version = resolved;
+    version = resolution.def.version;
   }
 
   const definition = await scope.workflowDefinitions.get(
@@ -36,19 +44,18 @@ export async function startRun(
     );
   }
 
-  if (!scope.caller.isSystemActor && definition.visibility !== 'public') {
-    if (!scope.caller.namespaces.has(definition.namespace)) {
-      throw new ForbiddenError();
-    }
+  if (!scope.caller.isSystemActor && !scope.caller.namespaces.has(definition.namespace)) {
+    throw new ForbiddenError();
   }
 
-  const payload = input.payload ?? {};
-
-  if (definition.triggerInput && definition.triggerInput.length > 0) {
-    const validation = validatePayload(payload, definition.triggerInput);
-    if (!validation.valid) {
-      throw new HandlerError('validation', 'Invalid payload', validation.errors);
-    }
+  // Unconditional (ADR-0012): `triggerInput` is the workflow's *total* input
+  // contract, so an empty contract means "this workflow takes no input" and a
+  // caller passing fields anyway is rejected — the same rule the webhook and
+  // cron paths now apply. The old `length > 0` guard made an empty contract mean
+  // "anything goes", which is what let each trigger invent its own payload shape.
+  const validation = validatePayload(input.payload ?? {}, definition.triggerInput ?? []);
+  if (!validation.valid) {
+    throw new HandlerError('validation', 'Invalid payload', validation.errors);
   }
 
   let result;
@@ -59,7 +66,7 @@ export async function startRun(
       definitionVersion: version,
       triggerName: input.triggerName,
       triggeredBy: input.triggeredBy,
-      payload,
+      payload: validation.payload,
       ...(input.dryRun ? { dryRun: true } : {}),
     });
   } catch (err) {

@@ -9,8 +9,7 @@ import { AuthorizedScope } from './authorized-repository';
 /**
  * Workspace + visibility-scoped view of `ProcessRepository`'s workflow-
  * definition surface. Routes to `listAllWorkflowDefinitions` for system
- * actors and `listWorkflowDefinitionsVisibleTo` for user callers — the
- * storage layer enforces the public-OR-allowed predicate.
+ * actors and `listWorkflowDefinitionsInNamespaces` for user callers.
  *
  * Out-of-scope reads return null (single) or are filtered out (list). The
  * handler turns null into 404 — so a non-member cannot distinguish "exists in
@@ -71,7 +70,7 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
   listGroups = async (includeArchived: boolean): Promise<WorkflowDefinitionGroup[]> => {
     const { definitions } = this.caller.isSystemActor
       ? await this.raw.listAllWorkflowDefinitions(includeArchived)
-      : await this.raw.listWorkflowDefinitionsVisibleTo(
+      : await this.raw.listWorkflowDefinitionsInNamespaces(
           [...this.caller.namespaces],
           includeArchived,
         );

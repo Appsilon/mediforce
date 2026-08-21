@@ -3,6 +3,7 @@ import {
   InMemoryAuditRepository,
   InMemoryProcessInstanceRepository,
   buildProcessInstance,
+  buildStepExecution,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import type { ProcessInstance } from '@mediforce/platform-core';
@@ -31,6 +32,7 @@ interface EngineStubCall {
 function makeEngineStub(opts: {
   readonly result?: ProcessInstance;
   readonly throws?: Error;
+  readonly onCall?: () => Promise<void>;
 }) {
   const calls: EngineStubCall[] = [];
   return {
@@ -41,6 +43,7 @@ function makeEngineStub(opts: {
       actor: { readonly id: string; readonly role: string },
     ): Promise<ProcessInstance> {
       calls.push({ instanceId, stepId, actor });
+      if (opts.onCall) await opts.onCall();
       if (opts.throws) throw opts.throws;
       if (!opts.result) throw new Error('engine stub missing result');
       return opts.result;
@@ -111,10 +114,109 @@ describe('retryStep handler', () => {
       previousExecutionId: null,
       previousError: null,
     });
+    // Exact match: the retried execution's id is unknowable at audit time
+    // (created later by the runner), so no execution id may appear here.
+    expect(event.outputSnapshot).toEqual({
+      resetTo: 'running',
+      currentStepId: 'deploy',
+    });
 
     expect(kicker.kicks).toEqual([
       { instanceId: 'inst-a', triggeredBy: 'u-1' },
     ]);
+  });
+
+  it('snapshots the seeded failed execution as previous, never as new', async () => {
+    const failedExecution = buildStepExecution({
+      instanceId: 'inst-a',
+      stepId: 'deploy',
+      status: 'failed',
+      output: null,
+      error: 'deploy target unreachable',
+    });
+    await instanceRepo.addStepExecution('inst-a', failedExecution);
+
+    const instanceAfter: ProcessInstance = {
+      ...(await instanceRepo.getById('inst-a'))!,
+      status: 'running',
+      error: null,
+    };
+    const engineStub = makeEngineStub({ result: instanceAfter });
+    const scope = createTestScope({
+      instanceRepo,
+      auditRepo,
+      runKicker: noopRunKicker(),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+    Object.assign(scope.system, { engine: engineStub });
+
+    await retryStep({ runId: 'inst-a', stepId: 'deploy' }, scope);
+
+    const events = await auditRepo.getByProcess('inst-a');
+    expect(events).toHaveLength(1);
+    const event = events[0]!;
+    expect(event.inputSnapshot).toEqual({
+      instanceId: 'inst-a',
+      stepId: 'deploy',
+      previousExecutionId: failedExecution.id,
+      previousError: 'deploy target unreachable',
+    });
+    expect(event.outputSnapshot).toEqual({
+      resetTo: 'running',
+      currentStepId: 'deploy',
+    });
+  });
+
+  it('snapshots the pre-retry failure even when a worker claims the run mid-retry', async () => {
+    const failedExecution = buildStepExecution({
+      instanceId: 'inst-a',
+      stepId: 'deploy',
+      status: 'failed',
+      output: null,
+      error: 'deploy target unreachable',
+    });
+    await instanceRepo.addStepExecution('inst-a', failedExecution);
+
+    const instanceAfter: ProcessInstance = {
+      ...(await instanceRepo.getById('inst-a'))!,
+      status: 'running',
+      error: null,
+    };
+    // The engine flips the instance to `running`, so a worker may claim the run
+    // and append the retry's own execution before the handler audits.
+    const engineStub = makeEngineStub({
+      result: instanceAfter,
+      onCall: async () => {
+        await instanceRepo.addStepExecution(
+          'inst-a',
+          buildStepExecution({
+            instanceId: 'inst-a',
+            stepId: 'deploy',
+            status: 'running',
+            output: null,
+            error: null,
+            startedAt: '2030-01-01T00:00:00.000Z',
+          }),
+        );
+      },
+    });
+    const scope = createTestScope({
+      instanceRepo,
+      auditRepo,
+      runKicker: noopRunKicker(),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+    Object.assign(scope.system, { engine: engineStub });
+
+    await retryStep({ runId: 'inst-a', stepId: 'deploy' }, scope);
+
+    const event = (await auditRepo.getByProcess('inst-a'))[0]!;
+    expect(event.inputSnapshot).toEqual({
+      instanceId: 'inst-a',
+      stepId: 'deploy',
+      previousExecutionId: failedExecution.id,
+      previousError: 'deploy target unreachable',
+    });
   });
 
   it('maps engine InvalidTransitionError to PreconditionFailedError (409)', async () => {

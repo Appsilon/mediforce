@@ -20,8 +20,10 @@ test.describe('WD.workspace API journey', () => {
       description: 'API journey test — workspace round-trip',
       steps: [
         { id: 'noop', name: 'No-op Human Step', type: 'creation', executor: 'human' },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
-      transitions: [],
+      transitions: [{ from: 'noop', to: 'done' }],
+      triggers: [{ type: 'manual', name: 'start' }],
       workspace: {
         remote: 'Appsilon/workspace-roundtrip-fixture',
         remoteAuth: 'GITHUB_TOKEN',
@@ -58,8 +60,10 @@ test.describe('WD.workspace API journey', () => {
       description: 'API journey test — no workspace configured',
       steps: [
         { id: 'noop', name: 'No-op', type: 'creation', executor: 'human' },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
-      transitions: [],
+      transitions: [{ from: 'noop', to: 'done' }],
+      triggers: [{ type: 'manual', name: 'start' }],
     };
 
     const createRes = await request.post(

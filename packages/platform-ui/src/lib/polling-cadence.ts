@@ -21,11 +21,3 @@ export const TERMINAL_STATUSES: ReadonlySet<InstanceStatus> = new Set([
   'completed',
   'failed',
 ]);
-
-/**
- * Workaround cap shared by every legacy `runs.list({})` call that mirrors
- * the pre-Phase-4 Firestore `onSnapshot` (which loaded the entire collection
- * with no upper bound). Tracked by issue #588 — drop once `runs.list`
- * exposes proper pagination on the contract.
- */
-export const LEGACY_FIRESTORE_PARITY_LIMIT = 10_000;

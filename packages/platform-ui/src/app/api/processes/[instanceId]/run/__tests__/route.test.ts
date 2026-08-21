@@ -519,6 +519,62 @@ describe('POST /api/processes/[instanceId]/run', () => {
       }));
     });
 
+    it('[DATA] first step is a decision — task carries verdicts so the form renders a verdict picker', async () => {
+      const decisionFirstWorkflow = {
+        ...workflowDefinition,
+        steps: [
+          {
+            id: 'manager-proposes',
+            name: 'Manager Proposes',
+            type: 'decision',
+            executor: 'human',
+            params: [{ name: 'employee_name', type: 'string', required: true }],
+            verdicts: {
+              propose: { target: 'done', label: 'Propose' },
+              cancel: { target: 'done', label: 'Cancel' },
+            },
+          },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [
+          { from: 'manager-proposes', to: 'done' },
+        ],
+      };
+
+      mockInstanceGetById.mockImplementation(() =>
+        Promise.resolve({
+          id: 'inst-1',
+          namespace: 'test-ns',
+          definitionName: 'community-digest',
+          definitionVersion: '1',
+          status: 'running',
+          currentStepId: 'manager-proposes',
+          configName: undefined,
+          variables: {},
+          triggerPayload: {},
+        }),
+      );
+
+      mockGetWorkflowDefinition.mockResolvedValue(decisionFirstWorkflow);
+
+      const res = await POST(makeRequest(), { params: makeParams('inst-1') });
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
+
+      // Without verdicts on the task, the UI renders a params-only form (no
+      // verdict picker) and completing the step records no verdict — the engine
+      // then can't route the decision step and pauses with routing_error.
+      const createArg = mockHumanTaskCreate.mock.calls[0][0];
+      expect(createArg.stepId).toBe('manager-proposes');
+      expect(createArg.verdicts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ key: 'propose' }),
+          expect.objectContaining({ key: 'cancel' }),
+        ]),
+      );
+    });
+
     it('[DATA] chained agent steps execute in sequence until human step', async () => {
       const chainedWorkflow = {
         ...workflowDefinition,
@@ -903,6 +959,84 @@ describe('POST /api/processes/[instanceId]/run', () => {
       );
 
       // Paused, not advanced — the wait step stays current until resume.
+      expect(mockAdvanceStep).not.toHaveBeenCalled();
+    });
+
+    it('[DATA] re-dispatches a wait after a previous wait cycle resolved', async () => {
+      const rearmedWaitWorkflow = {
+        name: 'ci-poll',
+        version: 1,
+        namespace: 'test-ns',
+        steps: [
+          {
+            id: 'wait-ci',
+            name: 'Wait for CI',
+            type: 'creation',
+            executor: 'action',
+            action: { kind: 'wait', config: { deadline: '${steps.arm-timer.deadline}' } },
+          },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'wait-ci', to: 'done' }],
+      };
+      const waitSentinel = {
+        __wait: {
+          stepId: 'wait-ci',
+          resumeAt: '2026-06-01T14:00:00.000Z',
+          pausedAt: '2026-06-01T13:00:00.000Z',
+          mode: 'deadline',
+        },
+      };
+      let getByIdCalls = 0;
+
+      mockInstanceGetById.mockImplementation(() => {
+        getByIdCalls += 1;
+        const runningInstance = {
+          id: 'inst-1',
+          namespace: 'test-ns',
+          definitionName: 'ci-poll',
+          definitionVersion: '1',
+          status: 'running',
+          currentStepId: 'wait-ci',
+          configName: undefined,
+          variables: {
+            'arm-timer': { deadline: '2026-06-01T14:00:00.000Z' },
+            'wait-ci': { resumeReason: 'deadline_reached', waitedSeconds: 900 },
+          },
+          triggerPayload: {},
+        };
+        if (getByIdCalls <= 2) return Promise.resolve(runningInstance);
+        return Promise.resolve({
+          ...runningInstance,
+          status: 'paused',
+          pauseReason: 'waiting_for_timer',
+        });
+      });
+      mockGetWorkflowDefinition.mockResolvedValue(rearmedWaitWorkflow);
+      mockGetStepExecutions.mockResolvedValue([
+        {
+          id: 'wait-execution-0',
+          stepId: 'wait-ci',
+          status: 'completed',
+          startedAt: '2026-06-01T12:00:00.000Z',
+        },
+      ]);
+      mockActionDispatch.mockResolvedValue(waitSentinel);
+
+      const res = await POST(makeRequest(), { params: makeParams('inst-1') });
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
+
+      expect(mockActionDispatch).toHaveBeenCalledWith(
+        rearmedWaitWorkflow.steps[0].action,
+        expect.objectContaining({ stepId: 'wait-ci' }),
+      );
+      expect(mockInstanceUpdateStepExecution).toHaveBeenCalledWith(
+        'inst-1',
+        expect.any(String),
+        expect.objectContaining({ status: 'paused', output: null }),
+      );
       expect(mockAdvanceStep).not.toHaveBeenCalled();
     });
   });

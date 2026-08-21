@@ -1,10 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { AuditEvent } from '@mediforce/platform-core';
-import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
+import {
+  InMemoryAuditRepository,
+  InMemoryProcessRepository,
+  buildWorkflowDefinition,
+  resetFactorySequence,
+} from '@mediforce/platform-core/testing';
 import {
   deleteNamespace,
   leaveNamespace,
   removeNamespaceMember,
+  resetNamespace,
   updateNamespace,
   updateNamespaceMemberRole,
 } from '../namespace-mutations';
@@ -315,6 +321,146 @@ describe('deleteNamespace handler', () => {
     // FK-valid at insert (emitted before the cascade); no personal namespace
     // to anchor to, so the deleted handle is used.
     expect(recording.appendedNamespaces).toEqual([HANDLE]);
+  });
+
+  it('rejects a personal namespace — deleting one only re-bootstraps it on the next getMe', async () => {
+    seedOwnerPersonal();
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      caller: userCaller('uid-owner', ['uid-owner'], new Map([['uid-owner', 'owner']])),
+    });
+    await expect(deleteNamespace({ handle: 'uid-owner' }, scope)).rejects.toBeInstanceOf(
+      PreconditionFailedError,
+    );
+    expect(namespaceRepo.namespaces.get('uid-owner')).toBeDefined();
+    expect(auditRepo.getAll().filter((e) => e.action === 'namespace.deleted')).toHaveLength(0);
+  });
+
+  it('rejects a personal namespace for an apiKey caller too', async () => {
+    seedOwnerPersonal();
+    const scope = createTestScope({ namespaceRepo, auditRepo });
+    await expect(deleteNamespace({ handle: 'uid-owner' }, scope)).rejects.toBeInstanceOf(
+      PreconditionFailedError,
+    );
+    expect(namespaceRepo.namespaces.get('uid-owner')).toBeDefined();
+  });
+});
+
+describe('resetNamespace handler', () => {
+  let namespaceRepo: InMemoryNamespaceRepo;
+  let auditRepo: InMemoryAuditRepository;
+  let processRepo: InMemoryProcessRepository;
+
+  beforeEach(async () => {
+    resetFactorySequence();
+    namespaceRepo = seededRepo();
+    auditRepo = new InMemoryAuditRepository();
+    processRepo = new InMemoryProcessRepository();
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'flow-a', version: 1, namespace: HANDLE }),
+    );
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'flow-a', version: 2, namespace: HANDLE }),
+    );
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'flow-b', version: 1, namespace: HANDLE }),
+    );
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'other-flow', version: 1, namespace: 'other-ws' }),
+    );
+  });
+
+  it('deletes every workflow in the workspace and keeps the workspace and its members', async () => {
+    const scope = createTestScope({ namespaceRepo, auditRepo, processRepo, caller: ownerCaller });
+
+    const result = await resetNamespace({ handle: HANDLE }, scope);
+
+    expect(result).toEqual({ handle: HANDLE, deletedWorkflows: 2, deletedRuns: 0 });
+    expect(await processRepo.isWorkflowNameDeleted(HANDLE, 'flow-a')).toBe(true);
+    expect(await processRepo.isWorkflowNameDeleted(HANDLE, 'flow-b')).toBe(true);
+    expect(namespaceRepo.namespaces.get(HANDLE)).toBeDefined();
+    expect(namespaceRepo.members.get(HANDLE)).toHaveLength(3);
+  });
+
+  it('leaves workflows in other workspaces untouched', async () => {
+    const scope = createTestScope({ namespaceRepo, auditRepo, processRepo, caller: ownerCaller });
+    await resetNamespace({ handle: HANDLE }, scope);
+    expect(await processRepo.isWorkflowNameDeleted('other-ws', 'other-flow')).toBe(false);
+  });
+
+  it('resets a personal namespace — the one destructive action it does allow', async () => {
+    namespaceRepo.seedNamespace({
+      handle: 'uid-owner',
+      type: 'personal',
+      displayName: 'Owner',
+      linkedUserId: 'uid-owner',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    namespaceRepo.seedMember('uid-owner', { uid: 'uid-owner', role: 'owner', joinedAt: '2026-01-01T00:00:00.000Z' });
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'personal-flow', version: 1, namespace: 'uid-owner' }),
+    );
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      processRepo,
+      caller: userCaller('uid-owner', ['uid-owner'], new Map([['uid-owner', 'owner']])),
+    });
+
+    const result = await resetNamespace({ handle: 'uid-owner' }, scope);
+
+    expect(result.deletedWorkflows).toBe(1);
+    expect(namespaceRepo.namespaces.get('uid-owner')).toBeDefined();
+  });
+
+  it('rejects admin role with ForbiddenError (owner only)', async () => {
+    const scope = createTestScope({ namespaceRepo, auditRepo, processRepo, caller: adminCaller });
+    await expect(resetNamespace({ handle: HANDLE }, scope)).rejects.toBeInstanceOf(ForbiddenError);
+    expect(await processRepo.isWorkflowNameDeleted(HANDLE, 'flow-a')).toBe(false);
+  });
+
+  it('throws NotFoundError when the namespace does not exist', async () => {
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      processRepo,
+      caller: userCaller('uid-owner', ['ghost'], new Map([['ghost', 'owner']])),
+    });
+    await expect(resetNamespace({ handle: 'ghost' }, scope)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('emits namespace.reset anchored to the surviving workspace', async () => {
+    const recording = new RecordingAuditRepo();
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo: recording,
+      processRepo,
+      caller: ownerCaller,
+    });
+
+    await resetNamespace({ handle: HANDLE }, scope);
+
+    const events = recording.getAll().filter((e) => e.action === 'namespace.reset');
+    expect(events).toHaveLength(1);
+    expect(events[0]?.entityId).toBe(HANDLE);
+    expect(events[0]?.outputSnapshot).toMatchObject({ deletedWorkflows: 2 });
+    expect(recording.appendedNamespaces).toContain(HANDLE);
+  });
+
+  it('is a no-op that still succeeds on an empty workspace', async () => {
+    const emptyRepo = new InMemoryProcessRepository();
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      processRepo: emptyRepo,
+      caller: ownerCaller,
+    });
+    await expect(resetNamespace({ handle: HANDLE }, scope)).resolves.toEqual({
+      handle: HANDLE,
+      deletedWorkflows: 0,
+      deletedRuns: 0,
+    });
   });
 });
 

@@ -1,14 +1,20 @@
+---
+status: accepted
+audience: engineers
+last_reviewed: 2026-07-28
+---
+
 # 0002 — Move authentication from Firebase Auth to NextAuth (Auth.js v5)
 
-- **Status:** Accepted (2026-07-21 — shipped; supersedes the 2026-06-16
-  greenfield-uuid + remap draft, see §7). Deviations found during the cutover
+- **Status note:** shipped 2026-07-21; supersedes the 2026-06-16
+  greenfield-uuid + remap draft, see §7. Deviations found during the cutover
   are marked **Shipped as** inline.
 - **Date:** 2026-05-19 (reshaped 2026-06-16, 2026-06-29; implemented 2026-07-21)
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)
 - **Depends on:** [ADR-0001](./0001-firestore-to-postgres.md) (Postgres + Drizzle is the adapter target)
-- **Coordinates with:** [ADR-0004](./0004-scoped-data-access-authorization.md) (the `CallerIdentity` this ADR resolves feeds the caller-set repository base from ADR-0004 — the carrier change is orthogonal to that shape, as [ADR-0005](./0005-headless-platform-api-ui-separation.md) already noted) and the headless Phase 1–4 auth boundary (`proxy.ts` + `lib/api-auth.ts`). The browser `Mediforce` client / `apiFetch` **stop attaching an `Authorization` header for same-origin `/api/*` calls** — the NextAuth httpOnly session cookie rides automatically (see §6). Tracked in [`docs/headless-migration.md`](../headless-migration.md).
-- **Implementation plan:** [PLAN-0002.md](./PLAN-0002.md)
+- **Coordinates with:** [ADR-0004](./0004-scoped-data-access-authorization.md) (the `CallerIdentity` this ADR resolves feeds the caller-set repository base from ADR-0004 — the carrier change is orthogonal to that shape, as [ADR-0005](./0005-headless-platform-api-ui-separation.md) already noted) and the headless Phase 1–4 auth boundary (`proxy.ts` + `lib/api-auth.ts`). The browser `Mediforce` client / `apiFetch` **stop attaching an `Authorization` header for same-origin `/api/*` calls** — the NextAuth httpOnly session cookie rides automatically (see §6). Tracked in [`docs/archive/headless-migration.md`](../archive/headless-migration.md).
+- **Implementation plan:** [PLAN-0002.md](../archive/PLAN-0002.md)
 
 ## Context
 

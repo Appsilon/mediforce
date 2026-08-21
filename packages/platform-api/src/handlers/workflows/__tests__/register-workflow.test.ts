@@ -14,7 +14,7 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
-import { fetchFromContainerWorker } from '../../system/_docker';
+import { fetchFromContainerWorker, isLocalAgentMode } from '../../system/_docker';
 
 vi.mock('../../system/_docker', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../system/_docker')>();
@@ -110,6 +110,24 @@ describe('registerWorkflow handler', () => {
     expect(rows.find((t) => t.name === seeded!.name)?.enabled).toBe(false);
   });
 
+  it('rejects a workflow whose graph is incomplete — a step with no outgoing transition and unreachable from later steps', async () => {
+    const scope = buildScope();
+    const body = buildWorkflowDefinition({
+      name: 'flow-broken-graph',
+      namespace: 'team-alpha',
+      transitions: [{ from: 'intake', to: 'review' }],
+    });
+    const { version: _omitVersion, createdAt: _omitCreatedAt, namespace: _omitNamespace, ...input } = body;
+
+    await expect(registerWorkflow(
+      { ...input, namespace: 'team-alpha' },
+      scope,
+    )).rejects.toThrow(ValidationError);
+
+    const stored = await processRepo.getWorkflowDefinition('team-alpha', 'flow-broken-graph', 1);
+    expect(stored).toBeNull();
+  });
+
   it('rejects workflow with retired model in agent step', async () => {
     const retiredModelRepo = new InMemoryModelRegistryRepository();
     await retiredModelRepo.upsert({
@@ -198,7 +216,7 @@ describe('registerWorkflow handler', () => {
       .resolves.toMatchObject({ success: true, name: 'active-flow' });
   });
 
-  it('rejects agent step without Docker image when not in local agent mode', async () => {
+  it('defaults an agent step without a Docker image to the golden image', async () => {
     const scope = buildScope();
     const body = buildWorkflowDefinition({
       name: 'no-image-flow',
@@ -212,11 +230,31 @@ describe('registerWorkflow handler', () => {
     const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
 
     await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(ValidationError);
+      .resolves.toMatchObject({ success: true, name: 'no-image-flow' });
+    const stored = await processRepo.getWorkflowDefinition('team-alpha', 'no-image-flow', 1);
+    const analyzeStep = stored?.steps.find((s) => s.id === 'analyze');
+    expect(analyzeStep?.agent?.image).toBe('mediforce-golden-image');
+  });
+
+  it('defaults the golden image even in local agent mode (the saved definition must stay deployable)', async () => {
+    vi.mocked(isLocalAgentMode).mockReturnValueOnce(true);
+    const scope = buildScope();
+    const body = buildWorkflowDefinition({
+      name: 'local-no-image-flow',
+      namespace: 'team-alpha',
+      steps: [
+        { id: 'analyze', name: 'AI Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', prompt: 'Analyze' } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'analyze', to: 'done' }],
+    });
+    const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
+
     await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(/AI Analysis/);
-    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(/Docker image/i);
+      .resolves.toMatchObject({ success: true, name: 'local-no-image-flow' });
+    const stored = await processRepo.getWorkflowDefinition('team-alpha', 'local-no-image-flow', 1);
+    const analyzeStep = stored?.steps.find((s) => s.id === 'analyze');
+    expect(analyzeStep?.agent?.image).toBe('mediforce-golden-image');
   });
 
   it('accepts agent step without image when repo + commit configured (auto-build)', async () => {

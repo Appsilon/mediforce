@@ -84,5 +84,15 @@ export const agentRuns = pgTable(
     costIdx: index('agent_runs_cost_idx')
       .on(table.model, table.startedAt)
       .where(sql`${table.costUsd} is not null`),
+    // Backs the Monitoring → Agents tab's keyset-paginated, workspace-scoped
+    // list (`(workspace, started_at DESC, id DESC)` matches `listImpl`'s
+    // `WHERE workspace = ... ORDER BY started_at DESC, id DESC` exactly) —
+    // without it, a namespace-filtered keyset query sorts the whole
+    // matching set on every page instead of seeking into it.
+    workspaceStartedIdx: index('agent_runs_workspace_started_idx').on(
+      table.workspace,
+      table.startedAt.desc(),
+      table.id.desc(),
+    ),
   }),
 );

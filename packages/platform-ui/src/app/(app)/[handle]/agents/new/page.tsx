@@ -45,6 +45,7 @@ export default function NewAgentPage() {
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +54,7 @@ export default function NewAgentPage() {
 
   async function handleSave() {
     setSaving(true);
+    setError(null);
     try {
       await mediforce.agents.create({
         kind: 'plugin',
@@ -63,9 +65,16 @@ export default function NewAgentPage() {
         outputDescription,
         foundationModel: selectedModelId,
         systemPrompt: prompt,
+        namespace: handle,
         visibility: 'private',
       });
       router.push(`/${handle}/agents`);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Could not create the agent: ${err.message}`
+          : 'Could not create the agent.',
+      );
     } finally {
       setSaving(false);
     }
@@ -87,7 +96,8 @@ export default function NewAgentPage() {
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl">
       <div>
         <p className="text-sm text-muted-foreground">
-          Register a new AI agent and configure its capabilities.
+          Register a new AI agent and configure its capabilities. Only the agent
+          name and the foundation model are required.
         </p>
       </div>
 
@@ -130,7 +140,7 @@ export default function NewAgentPage() {
 
         {/* 3. Description */}
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Description</label>
+          <label className="text-sm font-medium">Description (optional)</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -143,7 +153,7 @@ export default function NewAgentPage() {
         {/* 4. Input / Output descriptions */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Input</label>
+            <label className="text-sm font-medium">Input (optional)</label>
             <input
               type="text"
               value={inputDescription}
@@ -153,7 +163,7 @@ export default function NewAgentPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Output</label>
+            <label className="text-sm font-medium">Output (optional)</label>
             <input
               type="text"
               value={outputDescription}
@@ -216,7 +226,7 @@ export default function NewAgentPage() {
 
         {/* 6. System prompt */}
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">System prompt</label>
+          <label className="text-sm font-medium">System prompt (optional)</label>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
@@ -240,6 +250,11 @@ export default function NewAgentPage() {
           >
             {saving ? 'Saving…' : 'Save new agent'}
           </button>
+          {error !== null && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
         </div>
 
       </div>

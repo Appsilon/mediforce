@@ -158,4 +158,10 @@ export interface SystemServices {
   readonly userDirectory: UserDirectoryService | null;
   readonly platformSettings: PlatformSettingsRepository;
   readonly emailProviderInfo: EmailProviderInfo | null;
+  /**
+   * Whether password authentication is enabled on this deployment (on by
+   * default). Invite flows gate the create-password path on it, and
+   * `setPassword` refuses outright when it is `false`.
+   */
+  readonly passwordAuthEnabled: boolean;
 }

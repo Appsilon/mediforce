@@ -4,11 +4,12 @@
  * Lightweight copy of agent-runtime/plugins/docker-image-builder.ts.
  * Duplicated to avoid pulling agent-runtime into container-worker.
  */
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { chmodSync, copyFileSync, existsSync, mkdtempSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
+import { redactRepoCredentials, resolveRepoCloneTargets } from '@mediforce/platform-core';
 
 const BUILD_COMMIT_LABEL = 'mediforce.build.commit';
 
@@ -16,12 +17,15 @@ let preparedDeployKeyPath: string | null = null;
 
 /**
  * NOTE: Keep in sync with the exported copy in
- * `packages/agent-runtime/src/plugins/container-plugin.ts`.
+ * `packages/agent-runtime/src/plugins/git-clone.ts`.
  * Duplicated so container-worker stays free of agent-runtime deps.
  */
 function prepareDeployKeyPath(): string {
   const source = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
-  if (!existsSync(source) || !statSync(source).isFile()) return source;
+  if (!existsSync(source)) return source;
+  if (!statSync(source).isFile()) {
+    throw new Error(`Deploy key path "${source}" must point to a regular file.`);
+  }
   if (preparedDeployKeyPath && existsSync(preparedDeployKeyPath) && statSync(preparedDeployKeyPath).isFile()) return preparedDeployKeyPath;
   const dir = mkdtempSync(join(tmpdir(), 'mediforce-ssh-'));
   const dest = join(dir, 'deploy_key');
@@ -56,17 +60,60 @@ export async function getImageBuildCommit(image: string): Promise<string | null>
   }
 }
 
-function toHttpsWithToken(sshUrl: string, token: string): string {
-  const match = sshUrl.match(/git@github\.com:(.+?)(?:\.git)?$/);
-  if (match) {
-    return `https://x-access-token:${token}@github.com/${match[1]}.git`;
+/**
+ * Fetch `commit` from `repoRef` into `targetDir`, trying each transport the
+ * reference resolves to. Mirrors `cloneRepoAtCommit` in
+ * `packages/agent-runtime/src/plugins/git-clone.ts`; the transport decision
+ * itself is shared via `@mediforce/platform-core`.
+ */
+function cloneRepoAtCommit(
+  targetDir: string,
+  repoRef: string,
+  commit: string,
+  repoToken?: string,
+): void {
+  const targets = resolveRepoCloneTargets(repoRef, repoToken);
+  let lastError: unknown;
+
+  execFileSync('git', ['init', targetDir], { stdio: 'pipe' });
+
+  for (const { cloneUrl, useSsh } of targets) {
+    try {
+      // SSH refs need a deploy key + GIT_SSH_COMMAND; HTTPS and local paths must not set it.
+      // Prompts are disabled so a private repo fails fast on the anonymous attempt
+      // instead of blocking on a credential read. Reading the deploy key happens inside
+      // the try so a broken key surfaces alongside the earlier transport's failure.
+      const execOpts = {
+        stdio: 'pipe' as const,
+        env: useSsh
+          ? { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: getGitSshCommand() }
+          : { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+      };
+
+      execFileSync('git', ['-C', targetDir, 'fetch', cloneUrl, commit, '--depth', '1'], execOpts);
+      execFileSync('git', ['-C', targetDir, 'checkout', 'FETCH_HEAD'], execOpts);
+      return;
+    } catch (error) {
+      lastError = error;
+      console.warn(
+        `[docker-image-builder] ${useSsh ? 'SSH' : 'HTTPS'} fetch of ${redactRepoCredentials(repoRef, repoToken)}@${commit.slice(0, 8)} failed`,
+      );
+    }
   }
-  return sshUrl.replace('https://', `https://x-access-token:${token}@`);
+
+  const transports = targets.map(({ useSsh }) => (useSsh ? 'SSH' : 'HTTPS')).join(' then ');
+  const safeRepoRef = redactRepoCredentials(repoRef, repoToken);
+  const lastErrorMessage = lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(
+    `Failed to fetch ${safeRepoRef}@${commit.slice(0, 8)} over ${transports}: ${redactRepoCredentials(lastErrorMessage, repoToken)}`,
+  );
 }
 
 export async function buildImageFromRepo(options: {
   image: string;
   repoUrl: string;
+  /** Pre-normalization repo reference used to pick the clone transport. Defaults to `repoUrl`. */
+  repoRef?: string;
   commit: string;
   dockerfile?: string;
   repoToken?: string;
@@ -75,16 +122,7 @@ export async function buildImageFromRepo(options: {
   const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-build-'));
 
   try {
-    const cloneUrl = repoToken ? toHttpsWithToken(repoUrl, repoToken) : repoUrl;
-    const execOpts = {
-      stdio: 'pipe' as const,
-      env: { ...process.env, GIT_SSH_COMMAND: getGitSshCommand() },
-    };
-
-    execSync(`git init "${buildDir}"`, execOpts);
-    execSync(`git -C "${buildDir}" remote add origin "${cloneUrl}"`, execOpts);
-    execSync(`git -C "${buildDir}" fetch origin "${commit}" --depth 1`, execOpts);
-    execSync(`git -C "${buildDir}" checkout FETCH_HEAD`, execOpts);
+    cloneRepoAtCommit(buildDir, options.repoRef ?? repoUrl, commit, repoToken);
 
     const dockerfilePath = join(buildDir, dockerfile);
     const buildContext = dirname(dockerfilePath);
@@ -102,11 +140,12 @@ export async function buildImageFromRepo(options: {
 export async function ensureImage(options: {
   image: string;
   repoUrl?: string;
+  repoRef?: string;
   commit?: string;
   dockerfile?: string;
   repoToken?: string;
 }): Promise<void> {
-  const { image, repoUrl, commit, dockerfile, repoToken } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile, repoToken } = options;
 
   if (!repoUrl || !commit) {
     const exists = await imageExistsLocally(image);
@@ -126,5 +165,5 @@ export async function ensureImage(options: {
     console.log(`[docker-image-builder] Image "${image}" stale (${currentCommit?.slice(0, 8)} → ${commit.slice(0, 8)}), rebuilding`);
   }
 
-  await buildImageFromRepo({ image, repoUrl, commit, dockerfile, repoToken });
+  await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, repoToken });
 }

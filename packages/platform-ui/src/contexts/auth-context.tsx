@@ -5,6 +5,7 @@ import { useSession, signIn, signOut as nextAuthSignOut, getProviders } from 'ne
 import type { Session } from 'next-auth';
 import { useQueryClient } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
+import { apiFetch } from '@/lib/api-fetch';
 import { queryKeys } from '@/lib/query-keys';
 import { useUserMe } from '@/hooks/use-user-me';
 
@@ -20,6 +21,10 @@ interface AuthContextValue {
   passwordAuthEnabled: boolean | null; // null = provider list not loaded yet
   googleAuthEnabled: boolean | null; // null = provider list not loaded yet
   magicLinkEnabled: boolean | null; // null = provider list not loaded yet
+  /** Whether the deployment can email a one-time link — the precondition for the
+   *  login page's "Expected a setup link? Resend" recovery. Independent of which
+   *  sign-in methods are offered. `null` = provider list not loaded yet. */
+  emailDeliveryEnabled: boolean | null;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signInWithMagicLink: (email: string) => Promise<void>;
@@ -43,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [passwordAuthEnabled, setPasswordAuthEnabled] = React.useState<boolean | null>(null);
   const [googleAuthEnabled, setGoogleAuthEnabled] = React.useState<boolean | null>(null);
   const [magicLinkEnabled, setMagicLinkEnabled] = React.useState<boolean | null>(null);
+  const [emailDeliveryEnabled, setEmailDeliveryEnabled] = React.useState<boolean | null>(null);
   const qc = useQueryClient();
 
   const user = session?.user ?? null;
@@ -66,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setGoogleAuthEnabled(false);
         }
       });
-    fetch(PASSWORD_LOGIN_PATH)
+    apiFetch(PASSWORD_LOGIN_PATH, { reportErrors: false })
       .then((res) => res.json())
       .then((body: { enabled?: boolean }) => {
         if (active) setPasswordAuthEnabled(body.enabled === true);
@@ -74,13 +80,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {
         if (active) setPasswordAuthEnabled(false);
       });
-    fetch(MAGIC_LINK_LOGIN_PATH)
+    apiFetch(MAGIC_LINK_LOGIN_PATH, { reportErrors: false })
       .then((res) => res.json())
-      .then((body: { enabled?: boolean }) => {
-        if (active) setMagicLinkEnabled(body.enabled === true);
+      .then((body: { enabled?: boolean; emailDeliveryEnabled?: boolean }) => {
+        if (active) {
+          setMagicLinkEnabled(body.enabled === true);
+          setEmailDeliveryEnabled(body.emailDeliveryEnabled === true);
+        }
       })
       .catch(() => {
-        if (active) setMagicLinkEnabled(false);
+        if (active) {
+          setMagicLinkEnabled(false);
+          setEmailDeliveryEnabled(false);
+        }
       });
     return () => {
       active = false;
@@ -123,10 +135,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Not `signIn('credentials', …)`: password auth is a plain route because
       // Auth.js forbids a Credentials provider under database sessions. The
       // route sets the same session cookie, so a session refetch picks it up.
-      const res = await fetch(PASSWORD_LOGIN_PATH, {
+      // `reportErrors: false`: a wrong password is a locally handled 401 that
+      // the login form reports itself — the global "your session may have
+      // expired" toast would contradict it, on a page with no session.
+      const res = await apiFetch(PASSWORD_LOGIN_PATH, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        reportErrors: false,
       });
       if (!res.ok) {
         throw new CredentialsSignInError();
@@ -167,6 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         passwordAuthEnabled,
         googleAuthEnabled,
         magicLinkEnabled,
+        emailDeliveryEnabled,
         signInWithGoogle,
         signInWithEmail,
         signInWithMagicLink,

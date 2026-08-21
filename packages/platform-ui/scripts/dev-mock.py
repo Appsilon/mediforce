@@ -29,6 +29,10 @@ DEMO_ENV: dict[str, str] = {
     "MOCK_AGENT": "true",
     "MEDIFORCE_DATA_DIR": "/tmp/mediforce-e2e-data",
     "NEXT_PUBLIC_APP_URL": f"http://localhost:{NEXT_PORT}",
+    # Server-side self-fetch base (attachment downloads, run-kicker). Without it
+    # those default to localhost:9003 while dev:mock serves :9007, so agent steps
+    # that read an uploaded file die "fetch failed".
+    "APP_BASE_URL": f"http://localhost:{NEXT_PORT}",
     "NO_PROXY": "localhost,127.0.0.1",
     "no_proxy": "localhost,127.0.0.1",
     "OPENROUTER_API_KEY": "fake-openrouter-key",
@@ -96,8 +100,11 @@ def run_next(env: dict[str, str]) -> int:
 
 def main() -> int:
     # An ambient DATABASE_URL wins so a developer can point mock mode at their
-    # own database; otherwise the shared dev container is used.
-    env = {**os.environ, **DEMO_ENV}
+    # own database; otherwise the shared dev container is used. DEMO_ENV entries
+    # are defaults, not overrides — a value already exported
+    # (e.g. `MOCK_AGENT=false OPENROUTER_API_KEY=sk-... pnpm dev:mock`) wins.
+    demo_defaults = {key: value for key, value in DEMO_ENV.items() if key not in os.environ}
+    env = {**os.environ, **demo_defaults}
     env.setdefault("DATABASE_URL", DEV_DATABASE_URL)
     try:
         if port_open(NEXT_PORT):

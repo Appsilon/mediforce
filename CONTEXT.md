@@ -1,3 +1,9 @@
+---
+status: living
+audience: everyone
+last_reviewed: 2026-08-19
+---
+
 # Mediforce
 
 Mediforce is a single-tenant, on-prem-capable workflow + agent orchestration
@@ -11,8 +17,16 @@ concepts. **Not a spec, not implementation guide.**
 **Deployment**:
 A single running Mediforce installation. Typically dedicated to one customer
 (single-tenant). Contains many Namespaces.
+Each environment — Appsilon's own production instance, staging, and each
+per-customer instance — is a **separate Deployment** with its own database,
+Users, and Namespaces. They are **peers, not tiers of one installation**: a
+Workflow does not "promote" from staging to production, it is registered or
+imported into each Deployment independently.
+_Avoid_: "environment" as a synonym for a slice of one Deployment (it isn't —
+each is a whole Deployment), and "the instance" unqualified when more than one
+Deployment is in play.
 
-**Namespace** *(today canonical; rename to Workspace proposed in ADR-001)*:
+**Namespace** *(canonical domain term; Workspace is the UI/storage term per ADR-0001)*:
 An isolated scope of work inside a Deployment. Owns workflow definitions,
 workflow runs, agents, OAuth providers, secrets, tool catalog,
 cowork sessions. Identified by a URL-safe `handle`. Two types: `personal`
@@ -32,8 +46,6 @@ storage key.
 A named, reusable process. Identified by `(namespace, name)`. Owns many
 versioned **Workflow Definitions**, a default-version pointer, visibility,
 archive state. The named thing users create, edit, share, and run.
-_Code:_ no explicit `Workflow` schema — encoded as `(namespace, name)` tuple
-with the `WorkflowDefinitionGroup` query-result type aggregating its versions.
 _Avoid_: "Workflow" used loosely for one version (= Workflow Definition) or
 for one execution (= Workflow Run).
 
@@ -48,17 +60,30 @@ a Workflow Run is instantiated from one specific Workflow Definition (version).
 _Avoid_: Process Definition (legacy schema name, replaced by Workflow
 Definition), conflating with the parent Workflow.
 
-**Workflow Run** *(today's `ProcessInstance` — rename to `WorkflowRun` proposed)*:
+**Workflow Run**:
 One execution of a Workflow Definition. Tracks current step, status,
-accumulated variables, trigger payload, total cost, deleted/archived flags.
-**"Run" is the canonical term** — used everywhere in the UI, URLs
-(`/workflows/{name}/runs/{runId}`), API routes (`/api/runs/{runId}`), schema
-comments ("new runs", "archived runs", git branch `run/<runId>`), and
-neighbour entities (`AgentRun`). The `ProcessInstance` schema name is
-implementation legacy and renames to `WorkflowRun` in ADR-0001.
+accumulated variables, trigger payload and trigger context, total cost,
+deleted/archived flags.
 _Avoid_: "Workflow Instance" (briefly proposed but inconsistent with the
-project's own "Run" vocabulary), "Process Instance" (legacy schema name
-only), "Workflow" alone (ambiguous — Definition or Run?).
+project's "Run" vocabulary), "Process Instance" (legacy code term),
+"Workflow" alone (ambiguous — Definition or Run?).
+
+**Dry Run**:
+A Workflow Run executed with `dryRun` set, in which **every** `agent` and
+`script` step is swapped for the mock plugin. The graph, transitions, gates,
+and human steps execute for real; only the expensive agent/script work is
+faked. It answers *"is the workflow structured as I intended?"* — never *"does
+the agent do what I want?"*, which only a real Run answers.
+_Avoid_: `workflow register --dry-run` (that is **schema validation** of a
+definition, not a Run — it executes nothing), and "test run" (unclaimed term;
+the canonical name is Dry Run).
+
+**Workflow readiness check** *(pre-run, static)*:
+The static check run before a Run starts: missing container image, missing
+Secret, low model credits, unknown model — each reported with a fix action.
+Distinct from a **Dry Run**: readiness inspects the Definition without
+executing anything; a Dry Run executes the graph.
+_Avoid_: "validation" (that is schema-shape checking, a third, earlier gate).
 
 **Trigger** *(detached mutable resource — ADR-0011)*:
 What causes a Workflow to run, or makes it hand-startable. Three live kinds:
@@ -70,23 +95,42 @@ and attached to a Workflow **independently of its immutable Workflow Definition*
 — managed like a Secret: added, toggled, retimed, and imported/exported without
 registering a new Definition version. The Definition carries no triggers
 (Issue #932).
-_Code:_ the persisted resource schema is `TriggerResource*` in
-`packages/platform-core/src/schemas/trigger.ts`. This is the permanent name —
-the old embedded trigger *declaration* (`TriggerSchema` / the `triggers` array on
-`process-definition.ts` / `workflow-definition.ts`) and its DB column are removed
-(migration `0039`).
-_Status:_ all three live kinds — `cron`, `manual`, `webhook` — are wired on the
-unified `triggers` table (managed from CLI / UI / API); the heartbeat fires
-row-driven from `listEnabledByType('cron')`, hand-start gates on an enabled
-`manual` row, and the webhook router resolves an enabled `webhook` row. The old
-`cron_trigger_state` overlay is retired (#929/#930/#931), and the Definition
-`triggers` field is gone (#932).
 _Avoid_: treating a Trigger as part of the Workflow Definition (it isn't — they
 are detached resources), or conflating it with the **Trigger Payload** on a
 Workflow Run (the data a firing hands the Run).
 
+**Trigger Input** *(contract; on the Workflow Definition — `triggerInput`)*:
+The **total, trigger-agnostic input contract** a Workflow declares — the named,
+typed fields a firing must supply, regardless of which Trigger kind fires. Every
+firing is validated against it: declared fields are required/typed, undeclared
+fields are **rejected** (strict), and an empty/absent contract means the payload
+must be **empty**. Opaque un-enumerable input (a proxied third-party JSON body)
+is declared as a single field of `object` type. A field's `default` is part of
+the contract, not of the manual form: it is filled in for every firing that
+omitted the field, on every path, so a `required` field with a `default` is
+satisfiable by a payload-less cron row.
+_Avoid_: treating `triggerInput` as webhook-body-only or manual-only; using
+**Trigger Context** to carry declared input.
+
+**Trigger Payload** *(runtime; on a Workflow Run)*:
+The **validated, trigger-agnostic** input a firing hands the Run — the caller's
+fields plus the contract's defaults for the ones they omitted. It conforms to
+the Workflow's **Trigger Input** contract and is read by Steps as
+`${triggerPayload.<field>}` no matter which Trigger fired.
+_Avoid_: putting transport metadata (HTTP headers, cron `firedAt`) on it — that
+belongs on **Trigger Context**.
+
+**Trigger Context** *(runtime; on a Workflow Run)*:
+A reserved, **trigger-specific** escape hatch holding the transport metadata of
+a firing (webhook `headers`/`query`/`method`/`path`, cron `firedAt`/`schedule`).
+Webhook credential headers — `authorization`, `proxy-authorization`, `cookie`,
+and `x-api-key` — are stripped before the remaining headers are persisted.
+Steps that read `${triggerContext.*}` knowingly re-couple to a Trigger kind.
+_Avoid_: routing declared workflow input through it — declared input is **Trigger
+Payload**.
+
 **Workflow Step** *(config; static)*:
-A node in a Workflow Definition's DAG. Defines `executor: human | agent |
+A node in a Workflow Definition's graph. Defines `executor: human | agent |
 script | cowork | action`, optional autonomy level (agent steps),
 allowed roles, verdicts, params.
 _Avoid_: "Step" alone (ambiguous — config or runtime instance?).
@@ -96,55 +140,15 @@ One attempt to execute one Workflow Step inside a Workflow Run. Captures
 input, output, verdict, gate result, iteration number, error. Optionally has
 0..1 Agent Run, 0..1 Cowork Session, 0..N Human Tasks attached.
 
-### Step execution model
-
-**Step Executor** *(dispatch strategy)*:
-The abstraction that dispatches a Workflow Step to its runtime and collects
-the result. Two concrete strategies today: `AgentStepExecutor` (LLM-driven,
-with autonomy levels, review/escalation) and `ScriptStepExecutor`
-(deterministic, auto-applied, no autonomy concept). Each delegates to a
-`PluginRunner` which calls the `StepExecutorPlugin`.
-_Code:_ `StepExecutor` interface with `execute()`. Replaces the monolithic
-`executeAgentStep()` function.
-_Avoid_: "AgentRunner" for script steps — AgentRunner is agent-only.
-
-**Step Executor Plugin** *(runtime implementation)*:
-Interface a plugin implements to be runnable by the `PluginRunner`:
-`initialize()` + `run()`. Implementations: `claude-code`, `opencode`,
-`script-container`, `databricks-job`, plus mocks. Registered in
-PluginRegistry.
-_Code:_ `StepExecutorPlugin` (rename from `AgentPlugin`).
-_Avoid_: conflating with Plugin (the glossary entry below is the
-domain-level concept; StepExecutorPlugin is the code interface).
-
-**Plugin Runner** *(shared infrastructure)*:
-Runs a `StepExecutorPlugin` — dispatch, collect output, report status.
-Shared by both `AgentStepExecutor` and `ScriptStepExecutor`. Does not
-know about autonomy levels, review, or escalation.
-_Code:_ `PluginRunner` (extracted from `AgentRunner`).
-
-**Step Output Envelope** *(base result shape)*:
-What every Step Execution produces: `result`, `duration_ms`, `annotations`,
-`gitMetadata`, `outputFiles`. Executor-agnostic.
-_Code:_ `StepOutputEnvelope` schema.
-
-**Agent Output Envelope** *(agent-specific extension)*:
-Extends Step Output Envelope with LLM-specific fields: `confidence`,
-`confidence_rationale`, `model`, `reasoning_summary`, `reasoning_chain`,
-`tokenUsage`. Only populated by agent-type steps.
-_Code:_ `AgentOutputEnvelope extends StepOutputEnvelope`.
-_Avoid_: using Agent Output Envelope for script steps — scripts produce
-Step Output Envelope (no confidence, no model).
-
 ### What an agent / human / cowork produces
 
 **Output** (`StepExecution.output`):
 Immediate result of one Step Execution. Polymorphic — shape depends on
 executor (form submission, agent envelope, script envelope, gate decision).
 
-**Variables** (`ProcessInstance.variables`):
-Accumulated outputs across all completed Step Executions of one Process
-Instance. The carry-forward state used to resolve `${steps.stepId.output.key}`
+**Variables**:
+Accumulated outputs across all completed Step Executions of one Workflow Run.
+The carry-forward state used to resolve `${steps.stepId.output.key}`
 in subsequent steps and transitions.
 
 **Artifact** (`CoworkSession.artifact`):
@@ -201,12 +205,8 @@ question, resolution. Lifecycle: `created → acknowledged → resolved`.
 ### Plugin / Skill / MCP
 
 **Plugin** *(runtime strategy)*:
-A pluggable step executor implementation. Today: `claude-code`, `opencode`,
-`script-container`, `databricks-job`, plus mocks. Each implements
-`StepExecutorPlugin` and is registered in PluginRegistry. Two families:
-agent plugins (LLM-driven, container-based) and script plugins
-(deterministic, container or remote API).
-_Code:_ `StepExecutorPlugin` interface (rename from `AgentPlugin`).
+A pluggable Step executor. Agent plugins are LLM-driven; script plugins are
+deterministic. Plugins produce an Output; autonomy remains a workflow concern.
 _Avoid_: conflating with Skill — Plugin is the runtime; Skill is data.
 
 **Skill** *(code payload)*:
@@ -215,19 +215,10 @@ A code artifact (script or git repo) consumed by an agent at spawn time
 _Avoid_: Conflating with Plugin — Plugin is the runtime; Skill is data.
 
 **Agent**:
-A reusable agent the platform can run — Claude Code / OpenCode /
-cowork-chat / voice-realtime / future runtimes. Bundles system prompt,
-foundation model, MCP server bindings, skills (and, in the future, tools).
-Referenced by a Workflow Step via `agentId`; the same Agent powers many
-Steps across many Workflows. Single mutable document — **not versioned
-today** (the agent IS the spec, one row per agent).
-_Future:_ if we introduce versioning, an **Agent Definition** would emerge
-as one versioned spec of an Agent (parallel to Workflow / Workflow Definition).
-_Code:_ user-facing surface (UI, URL `/api/agents/*`, CLI `agent-*`) uses
-"Agent". Schema (`AgentDefinitionSchema`), repository
-(`AgentDefinitionRepository`), and ADR-0001 Postgres table name are legacy
-artifacts from before this glossary entry was canonicalised — rename to
-`Agent*` pending in a follow-up.
+A reusable, mutable agent configuration: system prompt plus MCP server
+bindings. Workflow Steps reference Agents; one Agent can power many Steps and
+is not versioned today.
+_Avoid_: Agent Definition (legacy code term; there is no versioned definition).
 
 **MCP Server**:
 External tool host (stdio or HTTP) accessible to an agent via Model Context
@@ -241,20 +232,15 @@ Admin-curated stdio MCP server definition that agents reference by `catalogId`
 ### Identity / auth
 
 **User**:
-A human (or service account) authenticated to a Deployment. Identity owned by
-the auth library (NextAuth tables `auth_users` + `auth_accounts` + `auth_sessions`
-after ADR-0002). Mediforce-side fields live in `user_profiles`.
+A human or service account authenticated to a Deployment.
 
 **Session**:
-A server-side, DB-backed record proving a User is currently signed in. Carries
-a `session_token` (cookie value), `user_id`, `expires`. Revocable
-immediately by deleting the row.
+A server-side record proving a User is currently signed in. Revocable
+immediately.
 _Avoid_: "JWT" (we explicitly chose database sessions, not JWT).
 
 **Membership** *(workspace governance level)*:
 The kind of seat a User holds inside one Workspace: `owner | admin | member`.
-Stored in the `workspace_members.role` column (the dedicated `membership`
-column name is deferred until the domain layer adopts it — see ADR-0002).
 Owners can delete the Workspace and
 manage other owners; admins can manage members and workspace settings; members
 can use the Workspace.
@@ -262,37 +248,20 @@ _Avoid_: "Role" alone — that's overloaded with process-domain roles below.
 
 **Roles** *(process-domain, plural)*:
 Functional roles a User holds for workflow purposes — e.g. `reviewer`, `PI`,
-`approver`. **Deployment-global**, stored in the `user_roles(uid, role)` table.
-Drive `HumanTask.assignedRole` and `CoworkSession.assignedRole` gating,
-`WorkflowStep.allowedRoles` access control, and `getUsersByRole` notification
-targeting (which resolves a role to Users with **no** Workspace context).
-_Avoid_: confusing with Membership above. Roles are **global**, not
-per-Workspace — they were global Firebase custom claims and ADR-0002 keeps
-that semantics (a `user_roles` table, not a per-membership array; making them
-per-Workspace would silently rescope notification targeting). Per-Workspace
-functional roles can return later as a deliberate product decision.
-
-**Deployment admin**:
-A boolean on `user_profiles.deployment_admin`. The Deployment-wide
-superuser bit (formerly Firebase custom claim `role: 'admin'`). Rare —
-typically one sysadmin per Deployment. Cross-Workspace operational power.
+`approver`. Roles are Deployment-global and drive task assignment, Step access,
+and notifications.
+_Avoid_: confusing with Membership. Membership governs a Workspace; Roles
+describe workflow function across the Deployment.
 
 **Caller Identity** *(per-request authorization subject)*:
-The resolved subject of one API request, produced by `resolveCallerIdentity`.
-Two kinds: a **user** caller (a signed-in User — `uid` + Workspace memberships)
-or an **apiKey** caller (a system actor: CLI / agents / cron, full access).
-Browser users resolve from the Session cookie; machine callers from
-`X-Api-Key`. Feeds the caller-set repository base (ADR-0004).
+The authorization subject resolved for one request: either a signed-in User
+with Workspace memberships or a system actor.
 _Avoid_: conflating with User (the human/account) or Session (the sign-in
 record) — Caller Identity is the per-request derivative used for scoping.
 
 **Account linking** *(by verified email)*:
 Attaching a new sign-in provider (e.g. Google) to an existing User when the
-provider asserts the **same verified email**. Used so migration-seeded Users
-(ADR-0002) log in via Google onto their pre-existing `uid` with no remap.
-Enabled only for verified-email providers (`allowDangerousEmailAccountLinking`
-on Google), gated by the email-domain allowlist.
-_Avoid_: the old `pendingGoogleLink` password-link dance (dropped in ADR-0002).
+provider asserts the **same verified email**.
 
 **OAuth Provider Config** *(per-Namespace)*:
 Authorization-server endpoint + credentials. GitHub / Google built-in; custom
@@ -307,8 +276,8 @@ Key-value secrets visible to all workflows in a Namespace. Resolved via
 `{{SECRET:name}}` template at runtime.
 
 **Workflow Secret** *(narrower scope)*:
-Secrets scoped to one Workflow Definition. Wins over Namespace Secret if
-same key exists (precedence).
+Secrets scoped to one Workflow across all its Definition versions. Wins over a
+Namespace Secret with the same key.
 
 ### Evaluation domain
 
@@ -381,93 +350,14 @@ the user-facing immutable log.
 
 ## Flagged ambiguities
 
-- **Workflow Definition `source`** *(resolved 2026-06-02; commit pinning added
-  2026-06-24)*: A Workflow Definition imported from a git repo carries an
-  optional `source: { url, path, commit }` record identifying the git origin
-  (GitHub-only, public repos only — no auth header is sent). `commit` is the
-  immutable SHA resolved from the requested ref at import time (the import
-  *input* still accepts a branch/tag/SHA `ref`; only the resolved `commit` is
-  stored — `ref` is transient, not durable provenance). The resolve-then-fetch
-  order pins the fetched file to the recorded SHA. Reuses `RepoSchema` (`url`)
-  plus the shared `CommitShaSchema` regex. Informational only — no automatic
-  sync. Distinct from `copiedFrom`, which tracks within-Deployment copies.
-
-- **Namespace vs Workspace** *(active rename in flight)*: Code uses
-  `namespace` everywhere — schema fields, repos, Firestore collection,
-  Postgres columns (post-migration). UI uses "Workspace" in user-facing
-  strings (placeholders, redirect paths, hook names). **Today's canonical
-  domain term: `Namespace`.** ADR-001 proposes the inverse — flip to
-  `Workspace` as the canonical user-facing term, with `namespace` retiring to
-  a storage-level synonym at most. Decision deferred to ADR-001 review.
-- **Process vs Workflow** *(legacy)*: `Process*` is legacy naming. `Workflow*`
-  is the present canonical. Some repos still named `ProcessRepository`
-  while managing `WorkflowDefinitions`; `processInstanceId` field name
-  ubiquitous. ADR-001 renames at storage level only (column names);
-  follow-up PRs rename repositories and types incrementally. New code
-  uses Workflow.
-- **Agent vs Agent Definition** *(legacy asymmetry)*: Canonical user-facing
-  term is **Agent** (UI labels, URL `/api/agents/*`, CLI `agent-*`). Today
-  there is no versioning — one mutable document per Agent. The schema
-  (`AgentDefinitionSchema`) and repository (`AgentDefinitionRepository`)
-  carry the "Definition" suffix as a historical artifact, mirroring the
-  Workflow / Workflow Definition split that exists in the workflow domain
-  because workflows really are versioned. Rename of schema + repo to
-  drop the suffix is pending in a follow-up PR. If we ever introduce
-  agent versioning, the suffix will earn its keep — see the **Agent**
-  glossary entry.
-- **Output vs Variables vs Artifact vs Output Files**: four distinct
-  concepts, often confused. Output = one step's immediate result.
-  Variables = accumulated outputs forwarded across steps. Artifact =
-  collaboratively built deliverable inside a cowork session (promoted to
-  Output only on cowork finalize). Output Files = files a step leaves
-  behind alongside its Output (resolved 2026-06-10, ADR-0007). Keep the
-  distinction in storage too.
-- **"Generated Files" (UI label) vs Output Files** *(resolved 2026-07-06)*:
-  The agent-output review/step UI renders a **"Generated Files"** list
-  sourced from `AgentOutputEnvelope.gitMetadata.changedFiles` — the
-  git-provenance list of every path the step's commit touched anywhere in
-  the `/workspace` repo. This is **not** the Output Files listing:
-  changedFiles are bare filenames with **no byte-retrieval route** (clickable
-  only when the repo is a public GitHub URL, dead grey text otherwise),
-  whereas Output Files (`.mediforce/output/<stepId>/`) have `git cat-file`
-  bytes served by `/api/runs/<runId>/files/<path>`. **Output File preview**
-  (in-browser rendering of a file's bytes in a modal) targets **Output Files
-  only**; changedFiles stay provenance metadata. _Avoid_: calling the
-  renderable in-UI files "artifacts" (= Cowork deliverable) or conflating
-  them with the "Generated Files" provenance list.
-- **Workflow visibility (`public` vs `private`)**: Defined in PR #346 — a
-  `public` Workflow Definition is **read-discoverable from other
-  Namespaces**; `private` is members-only. **Workflow Runs (runs) are
-  always members-only**, regardless of the parent definition's visibility.
-  Default changed to `private` later. Postgres needs same semantic — most
-  natural: app-layer filter today, RLS policy `USING (namespace IN (member of)
-  OR (table = workflow_definitions AND visibility = 'public'))` in the
-  future RLS ADR. Resolved 2026-05-19: `public` stays a live cross-workspace
-  feature — teams can publish, platform ships examples — no pharma-deployment
-  disable. Access goes through an **explicit repo method**
-  (`discoverPublicWorkflows()`); default `list()` stays workspace-scoped.
+- **"Is my workflow working?"** names four checks: schema validation asks
+  whether the Definition is legal; readiness asks whether dependencies are
+  available; a Dry Run executes the graph with agent/script work mocked; a Run
+  tests real behaviour. Only the Run answers whether the work is good.
+- **Generated Files vs Output Files**: Generated Files are git-provenance paths
+  changed by a Step. Output Files are preserved, downloadable deliverables.
+  Neither is a Cowork Artifact.
 - **L0 vs L2 with `result: null`**: Both allow null result. L0 = Silent
   Observer (annotations only, no decision attempted). L2 = Informed Agent
   (decision made, but confidence below threshold → null + fallback path).
-  Storage shape identical; semantics differ.
-- **`workspace` name collision** *(resolved 2026-05-19)*: With the
-  Namespace → Workspace rename proposed in ADR-001, the existing
-  `WorkflowDefinition.workspace` field (git working-tree config) collides.
-  Resolution: rename that field to **`gitWorkspace`**. The schema type
-  `WorkflowWorkspaceSchema` becomes `WorkflowGitWorkspaceSchema`,
-  `WorkflowWorkspace` type becomes `WorkflowGitWorkspace`.
-- **Fail-proof repository scoping** *(resolved 2026-05-19, applies to
-  ADR-001 implementation)*: Two invariants on every repo query:
-  (1) workspace/namespace scoping enforced at the repo base class — caller
-  cannot construct a query that crosses workspaces by accident;
-  (2) soft-delete filter (`deleted_at IS NULL AND archived_at IS NULL`)
-  enforced at the repo base class — caller cannot accidentally read
-  tombstones. Both have explicit opt-out methods (`crossWorkspacePublic()`,
-  `includeArchived()`, `includeDeleted()`) used only at audited call sites
-  (admin, public workflow discovery, cleanup jobs). Postgres RLS in the
-  later Phase 2 ADR adds belt-and-suspenders enforcement.
-- **Retention policy** *(resolved 2026-05-19)*: Soft-delete is **forever**
-  for now — no automatic hard-delete purge after N days. A later ADR may
-  introduce retention windows if a customer asks. Operational implication:
-  storage grows monotonically; partial indexes on `deleted_at IS NULL`
-  keep query cost flat.
+  Their shapes can match; their semantics do not.

@@ -4,7 +4,7 @@ import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { checkRetiredModels } from '@mediforce/platform-api/handlers';
-import { resolveCoworkOutputSchema, resolveStepTimeoutMs, type WorkflowStep, type ProcessInstanceRepository } from '@mediforce/platform-core';
+import { resolveCoworkOutputSchema, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -456,6 +456,7 @@ export async function POST(
             if (currentStep.assignedTo !== undefined) {
               const resolved = interpolate(currentStep.assignedTo, {
                 triggerPayload: (instance.triggerPayload as Record<string, unknown>) ?? {},
+                triggerContext: (instance.triggerContext as Record<string, unknown>) ?? {},
                 steps: instance.variables,
                 variables: instance.variables,
                 // Secrets are deliberately withheld: the resolved value is persisted
@@ -497,6 +498,7 @@ export async function POST(
               }
             }
 
+            const resolvedVerdicts = buildTaskVerdicts(currentStep.verdicts);
             await humanTaskRepo.create({
               id: taskId,
               processInstanceId: instanceId,
@@ -513,6 +515,7 @@ export async function POST(
               ...(currentStep.ui ? { ui: currentStep.ui } : {}),
               ...(currentStep.params?.length ? { params: currentStep.params } : {}),
               ...(options ? { options } : {}),
+              ...(resolvedVerdicts ? { verdicts: resolvedVerdicts } : {}),
             });
 
             await auditRepo.append({
@@ -570,10 +573,17 @@ export async function POST(
             if (currentStep.action.kind === 'wait') {
               const preResolved = instance.variables[instance.currentStepId] as Record<string, unknown> | undefined;
               if (preResolved?.resumeReason) {
-                console.log(`[auto-runner] Wait step '${instance.currentStepId}' already resolved (${preResolved.resumeReason}) — advancing`);
-                await engine.advanceStep(instanceId, preResolved, { id: 'auto-runner', role: 'system' });
-                stepsExecuted++;
-                continue;
+                const waitExecutions = await instanceRepo.getStepExecutions(instanceId);
+                const latestWaitExecution = waitExecutions
+                  .filter((execution) => execution.stepId === instance.currentStepId)
+                  .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
+
+                if (latestWaitExecution?.status === 'paused') {
+                  console.log(`[auto-runner] Wait step '${instance.currentStepId}' already resolved (${preResolved.resumeReason}) — advancing`);
+                  await engine.advanceStep(instanceId, preResolved, { id: 'auto-runner', role: 'system' });
+                  stepsExecuted++;
+                  continue;
+                }
               }
             }
 
@@ -640,6 +650,7 @@ export async function POST(
                 ...(instance.dryRun ? { dryRun: true } : {}),
                 sources: {
                   triggerPayload: (instance.triggerPayload as Record<string, unknown>) ?? {},
+                  triggerContext: (instance.triggerContext as Record<string, unknown>) ?? {},
                   steps: instance.variables,
                   variables: instance.variables,
                   secrets: workflowSecrets,

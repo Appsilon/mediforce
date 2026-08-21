@@ -8,14 +8,29 @@ import {
 } from '@mediforce/platform-core';
 
 export const GetNamespaceInputSchema = z.object({ handle: HandleSchema });
+
+/**
+ * Contact details of the workspace's primary owner (earliest-joined `owner`),
+ * exposed to every member so a non-admin can reach someone when a run is
+ * blocked or setup is missing. This is the ONE member email a plain member may
+ * see — the bulk `listNamespaceMembers` roster gates email/last-sign-in to
+ * admins. `null` when the workspace has no owner or no directory is wired.
+ */
+export const NamespaceAdminContactSchema = z.object({
+  displayName: z.string().nullable(),
+  email: z.string().nullable(),
+});
+
 export const GetNamespaceOutputSchema = z.object({
   namespace: NamespaceSchema,
   members: z.array(NamespaceMemberSchema),
   personalHandles: z.record(z.string(), z.string()).optional(),
+  adminContact: NamespaceAdminContactSchema.nullable(),
 });
 
 export type GetNamespaceInput = z.infer<typeof GetNamespaceInputSchema>;
 export type GetNamespaceOutput = z.infer<typeof GetNamespaceOutputSchema>;
+export type NamespaceAdminContact = z.infer<typeof NamespaceAdminContactSchema>;
 
 export const CreateNamespaceInputSchema = z.object({
   handle: HandleSchema,
@@ -66,12 +81,30 @@ export type UpdateNamespaceInput = z.infer<typeof UpdateNamespaceInputSchema>;
 export type UpdateNamespaceOutput = z.infer<typeof UpdateNamespaceOutputSchema>;
 
 /**
- * DELETE /api/namespaces/:handle — cascade delete (owner only).
+ * DELETE /api/namespaces/:handle — cascade delete (owner only). Personal
+ * workspaces are rejected with 409 `precondition_failed`: every user needs
+ * one, so `getMe` re-bootstraps a personal namespace the moment it is gone —
+ * deleting one wipes its contents instead of removing it. Reset it instead.
  */
 export const DeleteNamespaceInputSchema = z.object({ handle: HandleSchema });
 export const DeleteNamespaceOutputSchema = z.object({ handle: HandleSchema });
 export type DeleteNamespaceInput = z.infer<typeof DeleteNamespaceInputSchema>;
 export type DeleteNamespaceOutput = z.infer<typeof DeleteNamespaceOutputSchema>;
+
+/**
+ * POST /api/namespaces/:handle/reset — delete every workflow in the workspace
+ * (cascading to its runs and tasks) while the workspace, its members, its
+ * secrets and its audit trail survive. Owner only. This is the honest version
+ * of what deleting a personal workspace used to do by accident.
+ */
+export const ResetNamespaceInputSchema = z.object({ handle: HandleSchema });
+export const ResetNamespaceOutputSchema = z.object({
+  handle: HandleSchema,
+  deletedWorkflows: z.number().int().nonnegative(),
+  deletedRuns: z.number().int().nonnegative(),
+});
+export type ResetNamespaceInput = z.infer<typeof ResetNamespaceInputSchema>;
+export type ResetNamespaceOutput = z.infer<typeof ResetNamespaceOutputSchema>;
 
 /**
  * POST /api/namespaces/:handle/leave — caller removes self from workspace.

@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench, Database } from 'lucide-react';
+import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronsUpDown, Building2, Check, ChevronRight, Wrench, Database } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import { BrandTheme } from './brand-theme';
 import { WorkspaceAvatar } from './workspace-avatar';
@@ -17,10 +17,12 @@ import { ThemeToggle } from './theme-toggle';
 import { CommandPaletteTrigger } from './command-palette';
 import { cn } from '@/lib/utils';
 import { workspaceSwitchHref } from '@/lib/workspace-switch';
+import { useNamespace } from '@/hooks/use-namespace';
+import { WorkspaceAccessError } from './workspace-access-error';
+import { formatStepName } from '@/lib/format';
 
 const NAV_ITEMS = [
   { href: '', label: 'Workflows', icon: GitBranch, badge: null, exact: true },
-  { href: '/runs', label: 'All runs', icon: Play, badge: null, exact: false },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null, exact: false },
   { href: '/tools', label: 'Tools', icon: Wrench, badge: null, exact: false },
   { href: '/tasks', label: 'Human actions', icon: User, badge: null, exact: false },
@@ -50,10 +52,10 @@ function NavItem({
     <Link
       href={href}
       className={cn(
-        'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+        'flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition-colors',
         active
-          ? 'bg-primary/10 text-primary'
-          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+          ? 'bg-primary-subtle text-primary'
+          : 'text-muted-foreground hover:bg-accent hover:text-foreground',
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
@@ -63,6 +65,18 @@ function NavItem({
           {badge}
         </span>
       )}
+    </Link>
+  );
+}
+
+function ActionItem({ href, label, icon: Icon }: { href: string; label: string; icon: React.ElementType }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+    >
+      <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+      <span className="flex-1">{label}</span>
     </Link>
   );
 }
@@ -96,7 +110,7 @@ function buildBreadcrumbs(pathname: string, handle: string, prefix: string): Cru
   if (s0 === 'workflows') {
     if (!s1 || s1 === 'new') return [workflows, { label: 'New Workflow', href: null }];
 
-    const workflowName = decodeURIComponent(s1);
+    const workflowName = formatStepName(decodeURIComponent(s1));
     const workflowHref = `${prefix}/workflows/${s1}`;
     const workflow: Crumb = { label: workflowName, href: workflowHref };
 
@@ -130,12 +144,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Extract handle from URL: /{handle}/workflows/... -> handle
   const handleFromPath = pathname.split('/')[1] ?? '';
+  const isWorkspaceRoute = handleFromPath !== '' && !pathname.startsWith('/workspaces/');
+  const {
+    namespace: routeNamespace,
+    loading: routeNamespaceLoading,
+    accessDenied: routeNamespaceAccessDenied,
+  } = useNamespace(isWorkspaceRoute ? handleFromPath : null);
 
   // Find the active namespace by matching the handle from the URL
   const activeNamespace = namespaces.find((ns) => ns.handle === handleFromPath) ?? null;
-  const activeDisplayName = activeNamespace !== null
-    ? (activeNamespace.type === 'personal' ? 'My profile' : activeNamespace.displayName)
-    : handleFromPath;
+  const activeDisplayName = !isWorkspaceRoute
+    ? handleFromPath
+    : routeNamespace !== null
+      ? (routeNamespace.type === 'personal' ? 'My profile' : routeNamespace.displayName)
+      : 'Workspace unavailable';
 
   // Build handle-prefixed href
   const handlePrefix = handleFromPath !== '' ? `/${handleFromPath}` : '';
@@ -145,23 +167,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { daysSinceUpdate, loading: rankingsLoading } = useRankingsAge();
   const [rankingsBannerDismissed, setRankingsBannerDismissed] = React.useState(false);
   const showRankingsBanner = canAdmin && !rankingsLoading && !rankingsBannerDismissed
+    && process.env.NEXT_PUBLIC_USE_EMULATORS !== 'true'
     && (daysSinceUpdate === null || daysSinceUpdate > 21);
+
+  if (isWorkspaceRoute && routeNamespaceAccessDenied) {
+    return <WorkspaceAccessError handle={handleFromPath} />;
+  }
+
+  // Hold the workspace chrome (and the child page's own requests) until the
+  // access check settles, so an unauthorized handle never flashes a workspace
+  // the user cannot open.
+  if (isWorkspaceRoute && routeNamespaceLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center" data-testid="workspace-access-loading">
+        <div className="text-sm text-muted-foreground animate-pulse">Loading workspace…</div>
+      </div>
+    );
+  }
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className="flex h-16 items-center border-b px-4 gap-2.5">
-        <Image src="/logo.png" alt="Mediforce logo" width={32} height={32} className="shrink-0" />
-        <span className="font-headline text-lg font-semibold text-primary">Mediforce</span>
+      <div className="flex items-center px-4 pt-4 pb-3 gap-2">
+        <Image src="/logo.png" alt="Mediforce logo" width={28} height={28} className="shrink-0" />
+        <span className="font-headline text-lg font-bold text-primary">Mediforce</span>
       </div>
 
       {/* Namespace context switcher — below logo */}
-      <div className="border-b px-3 py-3">
+      <div className="px-3 pb-3">
         <Popover.Root>
           <Popover.Trigger asChild>
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-accent transition-colors"
+              className="flex w-full items-center gap-2 rounded-lg border bg-white dark:bg-background px-2 py-2 text-sm shadow-sm hover:bg-muted/40 transition-colors"
               aria-label="Switch namespace"
             >
               {(() => {
@@ -177,9 +215,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       .join('')
                   : '?';
                 const avatarFallback = (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary text-xs font-semibold">
                     {activeNamespace !== null && activeNamespace.type === 'organization' ? (
-                      (() => { const Icon = getWorkspaceIcon(activeNamespace.icon); return <Icon className="h-3.5 w-3.5" />; })()
+                      (() => { const Icon = getWorkspaceIcon(activeNamespace.icon); return <Icon className="h-4 w-4" />; })()
                     ) : (
                       initials
                     )}
@@ -193,10 +231,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   />
                 );
               })()}
-              <span className="flex-1 truncate text-left text-sm font-medium">
+              <span className="flex-1 truncate text-left text-sm font-bold">
                 {activeDisplayName}
               </span>
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             </button>
           </Popover.Trigger>
           <Popover.Portal>
@@ -207,56 +245,63 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className="z-50 w-[260px] rounded-md border bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
             >
               <div className="py-1">
-                {personalNamespace !== null && (
-                  <>
-                    <Popover.Close asChild>
-                      <Link
-                        href={workspaceSwitchHref(pathname, handleFromPath, personalNamespace.handle)}
-                        className={cn(
-                          'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
-                          handleFromPath === personalNamespace.handle ? 'text-foreground' : 'text-muted-foreground',
-                        )}
-                      >
-                        <WorkspaceAvatar
-                          source={user?.image}
-                          className="h-5 w-5 shrink-0 rounded-full object-cover"
-                          fallback={<User className="h-4 w-4 shrink-0" />}
-                        />
-                        <span className="flex-1 truncate">
-                          <span className="block font-medium text-foreground">My profile</span>
-                          <span className="block text-xs text-muted-foreground">@{personalNamespace.handle}</span>
-                        </span>
-                        {handleFromPath === personalNamespace.handle && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
-                      </Link>
-                    </Popover.Close>
-                    <div className="my-1 border-t" />
-                  </>
-                )}
-                {namespaces.filter((ns) => ns.type === 'organization').map((ns) => {
-                  const isActive = handleFromPath === ns.handle;
+                {(() => {
+                  const orgNamespaces = namespaces.filter((ns) => ns.type === 'organization');
                   return (
-                    <Popover.Close asChild key={ns.handle}>
-                      <Link
-                        href={workspaceSwitchHref(pathname, handleFromPath, ns.handle)}
-                        className={cn(
-                          'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
-                          isActive ? 'text-foreground' : 'text-muted-foreground',
-                        )}
-                      >
-                        <WorkspaceAvatar
-                          source={ns.logo}
-                          className="h-4 w-4 shrink-0 rounded object-cover"
-                          fallback={(() => { const Icon = getWorkspaceIcon(ns.icon); return <Icon className="h-4 w-4 shrink-0" />; })()}
-                        />
-                        <span className="flex-1 truncate">
-                          <span className="block font-medium text-foreground">{ns.displayName}</span>
-                          <span className="block text-xs text-muted-foreground">@{ns.handle}</span>
-                        </span>
-                        {isActive && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
-                      </Link>
-                    </Popover.Close>
+                    <>
+                      {personalNamespace !== null && (
+                        <>
+                          <Popover.Close asChild>
+                            <Link
+                              href={workspaceSwitchHref(pathname, handleFromPath, personalNamespace.handle)}
+                              className={cn(
+                                'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
+                                handleFromPath === personalNamespace.handle ? 'text-foreground' : 'text-muted-foreground',
+                              )}
+                            >
+                              <WorkspaceAvatar
+                                source={user?.image}
+                                className="h-5 w-5 shrink-0 rounded-full object-cover"
+                                fallback={<User className="h-4 w-4 shrink-0" />}
+                              />
+                              <span className="flex-1 truncate">
+                                <span className="block font-medium text-foreground">My profile</span>
+                                <span className="block text-xs text-muted-foreground">@{personalNamespace.handle}</span>
+                              </span>
+                              {handleFromPath === personalNamespace.handle && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                            </Link>
+                          </Popover.Close>
+                          {orgNamespaces.length > 0 && <div className="my-1 border-t" />}
+                        </>
+                      )}
+                      {orgNamespaces.map((ns) => {
+                        const isActive = handleFromPath === ns.handle;
+                        return (
+                          <Popover.Close asChild key={ns.handle}>
+                            <Link
+                              href={workspaceSwitchHref(pathname, handleFromPath, ns.handle)}
+                              className={cn(
+                                'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
+                                isActive ? 'text-foreground' : 'text-muted-foreground',
+                              )}
+                            >
+                              <WorkspaceAvatar
+                                source={ns.logo}
+                                className="h-4 w-4 shrink-0 rounded object-cover"
+                                fallback={(() => { const Icon = getWorkspaceIcon(ns.icon); return <Icon className="h-4 w-4 shrink-0" />; })()}
+                              />
+                              <span className="flex-1 truncate">
+                                <span className="block font-medium text-foreground">{ns.displayName}</span>
+                                <span className="block text-xs text-muted-foreground">@{ns.handle}</span>
+                              </span>
+                              {isActive && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                            </Link>
+                          </Popover.Close>
+                        );
+                      })}
+                    </>
                   );
-                })}
+                })()}
                 <div className="my-1 border-t" />
                 <Popover.Close asChild>
                   <Link
@@ -274,18 +319,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex-1 space-y-1 px-3 pb-3">
         {ACTION_ITEMS.map((item) => (
-          <NavItem
+          <ActionItem
             key={item.path}
             href={`${handlePrefix}${item.path}`}
             label={item.label}
             icon={item.icon}
-            badge={item.badge}
-            active={pathname.startsWith(`${handlePrefix}${item.path}`)}
           />
         ))}
-        <div className="my-2 border-t" />
+        <div className="h-3" />
         {NAV_ITEMS.map((item) => {
           const fullHref = `${handlePrefix}${item.href}`;
           const isActive = item.exact
@@ -314,7 +357,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </React.Fragment>
           );
         })}
-        <div className="my-2 border-t" />
+        <div className="h-3" />
         <NavItem
           href={`${handlePrefix}${MONITORING_ITEM.path}`}
           label={MONITORING_ITEM.label}
@@ -355,7 +398,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
       <div className="flex flex-1 overflow-hidden">
       {/* Sidebar — desktop */}
-      <aside className="hidden w-[280px] shrink-0 border-r md:flex md:flex-col">
+      <aside className="hidden w-[224px] shrink-0 border-r bg-background md:flex md:flex-col">
         <SidebarContent />
       </aside>
 
@@ -366,16 +409,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="absolute inset-0 bg-black/50"
             onClick={() => setSidebarOpen(false)}
           />
-          <aside className="absolute left-0 top-0 h-full w-[280px] border-r bg-background shadow-xl">
+          <aside className="absolute left-0 top-0 h-full w-[224px] border-r bg-background shadow-xl">
             <SidebarContent />
           </aside>
         </div>
       )}
 
       {/* Main content area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden bg-white dark:bg-background">
         {/* Top bar */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b px-4 print:hidden">
+        <header className="flex h-12 shrink-0 items-center justify-between border-b px-4 print:hidden">
           <div className="flex items-center gap-3">
             {/* Mobile menu toggle */}
             <button
@@ -386,18 +429,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
             <nav className="flex items-center gap-1 text-sm">
-              {breadcrumbs.length > 1 && (
-                <>
-                  <Link
-                    href={breadcrumbs[breadcrumbs.length - 2].href ?? '#'}
-                    className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors mr-2"
-                  >
-                    <ArrowLeft className="h-3.5 w-3.5" />
-                    Go back
-                  </Link>
-                  <span className="text-muted-foreground/30">|</span>
-                </>
-              )}
               {breadcrumbs.map((crumb, i) => (
                 <React.Fragment key={i}>
                   {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />}

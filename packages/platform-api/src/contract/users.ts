@@ -70,7 +70,17 @@ export const NamespaceMemberWithAuthSchema = NamespaceMemberSchema.extend({
    * chains `?? member.uid` to render a stable fallback.
    */
   displayName: z.string().nullable(),
+  /**
+   * Contact / PII, gated server-side to owner/admin (and apiKey) callers — see
+   * `listNamespaceMembers`. A plain member receives `null` for every row, so
+   * `null` means either "no email on file" or "caller not privileged"; the UI
+   * only shows the column to managers.
+   */
   email: z.string().nullable(),
+  /**
+   * Per-member activity data, gated the same way as `email`. `null` means
+   * either "never signed in" or "caller not privileged to see it".
+   */
   lastSignInTime: z.string().nullable(),
 });
 

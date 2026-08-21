@@ -99,5 +99,5 @@ docker compose -f apps/landing-zone/docker-compose.sftp.yml down
 
 - [PR #213](https://github.com/Appsilon/mediforce/pull/213) — per-run git worktree (workspace foundation)
 - [PR #217](https://github.com/Appsilon/mediforce/pull/217) — `inputForNextRun` (SFTP listing carry-over)
-- [`docs/PREVIOUS_RUN.md`](../../docs/PREVIOUS_RUN.md) — carry-over mechanism docs
-- [`docs/running-workspace-locally.md`](../../docs/running-workspace-locally.md) — workspace setup
+- [`docs/reference/previous-run.md`](../../docs/reference/previous-run.md) — carry-over mechanism docs
+- [`docs/start/running-workspace-locally.md`](../../docs/start/running-workspace-locally.md) — workspace setup

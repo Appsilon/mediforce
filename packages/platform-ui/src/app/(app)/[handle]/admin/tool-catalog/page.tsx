@@ -8,6 +8,7 @@ import type { AgentDefinition, ToolCatalogEntry } from '@mediforce/platform-core
 import { apiFetch } from '@/lib/api-fetch';
 import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
+import { adminBackHref } from '@/lib/routes';
 import { CatalogList } from '@/components/admin/tool-catalog/catalog-list';
 import { CatalogForm } from '@/components/admin/tool-catalog/catalog-form';
 import { DeleteCatalogEntryDialog } from '@/components/admin/tool-catalog/delete-catalog-entry-dialog';
@@ -163,7 +164,7 @@ export default function AdminToolCatalogPage() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex items-center gap-3">
           <Link
-            href={`/${handle}`}
+            href={adminBackHref(handle, search.get('from'))}
             className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             aria-label="Back"
           >
@@ -213,16 +214,6 @@ export default function AdminToolCatalogPage() {
                     ? 'Add your first entry to get started.'
                     : 'Or click “New catalog entry” above to add another.'}
                 </p>
-                {entries.length === 0 && (
-                  <button
-                    type="button"
-                    onClick={handleNew}
-                    className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    New catalog entry
-                  </button>
-                )}
               </div>
             )}
 

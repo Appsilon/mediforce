@@ -12,7 +12,7 @@ metadata:
 
 # E2E Journey Tests
 
-Full strategy: `docs/E2E-STRATEGY.md`
+Full strategy: `docs/testing/e2e-strategy.md`
 
 ## When to Use
 
@@ -86,7 +86,7 @@ Use this dedicated instance in the test. Never mutate `proc-running-1` or other 
 
 ```bash
 # Run single test while developing
-pnpm test:e2e -- --grep "<test name>"
+pnpm test:e2e --grep "<test name>"
 
 # Run all E2E
 pnpm test:e2e
@@ -102,4 +102,4 @@ Commit the test file with the feature code in the same PR.
 - Check Postgres is reachable: `psql "$DATABASE_URL" -c 'select 1'`
 - Strict mode error → use `.first()` or more specific locator
 - Auth issue → the `setup` project seeds `auth_users` + `auth_sessions`; re-run it
-  (`pnpm test:e2e -- --project=setup`) and confirm `e2e/.auth/user.json` exists
+  (`pnpm test:e2e --project=setup`) and confirm `e2e/.auth/user.json` exists

@@ -8,13 +8,13 @@ import { trackPageErrors } from '../helpers/page-errors';
  * Workflow author opens a step whose agent has a stdio MCP binding
  * (`mcp-test-agent.mcpServers.filesystem`) and narrows it at step level:
  * disables the server on one step, then adds a denyTools entry on another
- * step. Verifies the YAML source panel reflects both changes.
+ * step. Verifies the wd.json source reflects both changes.
  */
 
 const WORKFLOW_URL = `/${TEST_ORG_HANDLE}/workflows/MCP%20Restrictions%20Test/definitions/1`;
 
 test.describe('Step MCP Restrictions Journey', () => {
-  test('agent step shows restrictions panel, disable + denyTools surface in YAML', async ({ page }) => {
+  test('agent step shows restrictions panel, disable + denyTools surface in wd.json', async ({ page }) => {
     trackPageErrors(page);
 
     await page.goto(WORKFLOW_URL);
@@ -28,7 +28,10 @@ test.describe('Step MCP Restrictions Journey', () => {
     // MCP Restrictions section appears with one server hydrated from
     // /api/agents/mcp-test-agent/mcp-servers. Section titles in the
     // step editor render as styled <p> labels, not semantic headings.
-    const sidePanel = page.locator('div.border-l');
+    const sidePanel = page.locator('[data-testid="step-editor"]');
+    // The step editor is a single-open accordion; MCP Restrictions lives in the
+    // "Advanced" card, collapsed by default — open it before asserting.
+    await sidePanel.getByRole('button', { name: 'Advanced' }).click();
     await expect(sidePanel.getByText('MCP Restrictions', { exact: true })).toBeVisible({ timeout: 10_000 });
     // The binding list hydrates after an API call to
     // /api/agents/mcp-test-agent/mcp-servers. On cold compile this
@@ -49,13 +52,14 @@ test.describe('Step MCP Restrictions Journey', () => {
     await denyInput.press('Enter');
     await expect(sidePanel.getByText('write').first()).toBeVisible();
 
-    // Deselect step — YAML panel returns and reflects both edits.
+    // Deselect the step, then open the source modal — it reflects both edits.
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
-    const yamlContent = page.locator('.cm-content');
-    await expect(yamlContent).toBeVisible({ timeout: 10_000 });
-    await expect(yamlContent).toContainText('mcpRestrictions', { timeout: 5_000 });
-    await expect(yamlContent).toContainText('filesystem');
-    await expect(yamlContent).toContainText('disable');
-    await expect(yamlContent).toContainText('write');
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    const jsonContent = page.locator('.cm-content');
+    await expect(jsonContent).toBeVisible({ timeout: 10_000 });
+    await expect(jsonContent).toContainText('mcpRestrictions', { timeout: 5_000 });
+    await expect(jsonContent).toContainText('filesystem');
+    await expect(jsonContent).toContainText('disable');
+    await expect(jsonContent).toContainText('write');
   });
 });

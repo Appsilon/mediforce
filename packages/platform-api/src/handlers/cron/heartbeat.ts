@@ -3,7 +3,11 @@ import type {
   ProcessInstance,
   WorkflowDefinition,
 } from '@mediforce/platform-core';
-import { resolveStrandedBudgetMs } from '@mediforce/platform-core';
+import {
+  resolveRunnableVersion,
+  resolveStrandedBudgetMs,
+  validatePayload,
+} from '@mediforce/platform-core';
 import { validateCronSchedule, isDue } from '@mediforce/workflow-engine';
 import type {
   HeartbeatInput,
@@ -16,6 +20,12 @@ import { ForbiddenError, PreconditionFailedError } from '../../errors';
 import { resumeWait } from '../processes/resume-wait';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
+
+// A firing tick also carries the payload it fires with — the row's static input
+// resolved against the contract's defaults, not the raw config (ADR-0012).
+type PayloadEvaluation =
+  | { fire: true; payload: Record<string, unknown> }
+  | { fire: false; reason: string };
 
 // Fallback age used only when a run's current step (or its definition) can't be
 // resolved: the runtime's default step timeout + grace, derived from the same
@@ -68,34 +78,23 @@ function evaluateTrigger(
   return { fire: true };
 }
 
-type Resolution = { ok: true; def: WorkflowDefinition } | { ok: false; reason: string };
-
-// Resolve the Workflow Definition version a Cron Trigger fires (ADR-0011):
-// the workflow's default version when it is itself runnable, otherwise the
-// newest live (non-archived, non-deleted) version. Both the default pointer and
-// `getLatestVersion` include archived versions, so selecting from them directly
-// would skip a workflow whose head is archived even though an earlier version
-// is still runnable. Skips deleted or fully-archived targets so a stale row can
-// never fire a ghost run.
-async function resolveTarget(
-  scope: CallerScope,
-  namespace: string,
-  workflowName: string,
-): Promise<Resolution> {
-  if (await scope.workflowDefinitions.isNameDeleted(namespace, workflowName)) {
-    return { ok: false, reason: 'Workflow deleted' };
-  }
-  const versions = await scope.workflowDefinitions.listVersions(namespace, workflowName);
-  if (versions.length === 0) return { ok: false, reason: 'No resolvable version' };
-
-  const live = versions.filter((v) => v.archived !== true && v.deleted !== true);
-  if (live.length === 0) return { ok: false, reason: 'No live version' };
-
-  const defaultVersion = await scope.workflowDefinitions.getDefaultVersion(namespace, workflowName);
-  const def =
-    live.find((v) => v.version === defaultVersion) ??
-    live.reduce((newest, v) => (v.version > newest.version ? v : newest));
-  return { ok: true, def };
+// Fire-time half of ADR-0012's two-stage cron payload check. The attach-time
+// check already rejected a payload that violated the contract as it stood then,
+// so reaching here means a *later* definition version moved the contract under a
+// trigger row nobody touched. That is drift, not a caller error — skip the tick
+// with a reason on the heartbeat's audit trail rather than erroring, exactly as
+// a deleted workflow or an invalid schedule does.
+function evaluatePayload(
+  trigger: CronTriggerResource,
+  def: WorkflowDefinition,
+): PayloadEvaluation {
+  const validation = validatePayload(trigger.config.payload ?? {}, def.triggerInput ?? []);
+  if (validation.valid) return { fire: true, payload: validation.payload };
+  const detail = validation.errors.map((error) => error.message).join('; ');
+  return {
+    fire: false,
+    reason: `Payload no longer satisfies triggerInput of v${String(def.version)}: ${detail}`,
+  };
 }
 
 // System-actor only — reads across every workspace's definitions; gating
@@ -123,7 +122,11 @@ export async function heartbeat(
   );
 
   for (const trigger of cronTriggers) {
-    const resolution = await resolveTarget(scope, trigger.namespace, trigger.workflowName);
+    const resolution = await resolveRunnableVersion(
+      scope.workflowDefinitions,
+      trigger.namespace,
+      trigger.workflowName,
+    );
     if (!resolution.ok) {
       skipped.push({
         definitionName: trigger.workflowName,
@@ -151,13 +154,26 @@ export async function heartbeat(
       continue;
     }
 
+    // Checked only once the tick is otherwise due, so a drifted payload on a
+    // schedule that isn't firing yet stays quiet instead of logging every beat.
+    const payloadCheck = evaluatePayload(trigger, def);
+    if (!payloadCheck.fire) {
+      skipped.push({ ...entryHead, reason: payloadCheck.reason });
+      console.log(`[cron-heartbeat] skip '${trigger.workflowName}/${trigger.name}': ${payloadCheck.reason}`);
+      continue;
+    }
+
     const result = await scope.system.cronTrigger.fireWorkflow({
       namespace: def.namespace,
       definitionName: def.name,
       definitionVersion: def.version,
       triggerName: trigger.name,
       triggeredBy: 'cron-heartbeat',
-      payload: { schedule: trigger.config.schedule, firedAt: now.toISOString() },
+      // The row's static input (ADR-0012) — trigger-agnostic, so a step reads it
+      // as `${triggerPayload.<field>}` like any other firing. The tick's own
+      // `schedule`/`firedAt` are transport and ride on `context` instead.
+      payload: payloadCheck.payload,
+      context: { schedule: trigger.config.schedule, firedAt: now.toISOString() },
     });
 
     // Advance the fire cursor AFTER a successful fire (at-least-once semantics).

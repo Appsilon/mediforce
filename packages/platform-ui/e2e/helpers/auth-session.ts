@@ -3,7 +3,6 @@ import {
   createDatabaseSession,
   createPostgresClient,
   SESSION_TTL_MS,
-  type Database,
 } from '@mediforce/platform-infra';
 
 /**
@@ -20,13 +19,14 @@ import {
  * shared by the auth boundary and the `/api/auth/password-login` route — so the
  * seeded session is byte-identical to a production one.
  *
- * Resolution note: the `@mediforce/source` condition (set by the `test:e2e`
- * npm script via `NODE_OPTIONS`) maps `@mediforce/platform-infra` to its
- * `src/index.ts`, so the drizzle primitives resolve without a build step.
+ * Workspace package exports point directly at source TypeScript, so the
+ * drizzle primitives resolve without a build step.
  */
 
+type PostgresConnection = ReturnType<typeof createPostgresClient>;
+
 /** Open a drizzle Postgres client for E2E seeding. Caller closes it. */
-export function openPostgresClient(): { client: ReturnType<typeof createPostgresClient>['client']; db: Database } {
+export function openPostgresClient(): PostgresConnection {
   return createPostgresClient();
 }
 
@@ -41,9 +41,22 @@ function newSessionToken(): string {
  * cookie value.
  */
 export async function seedAuthSession(
-  db: Database,
+  { client, db }: PostgresConnection,
   user: { userId: string; email: string; name: string },
 ): Promise<string> {
+  // `auth_users.email` is unique (plus a unique `lower(email)` index), so a row
+  // holding this email under a *different* id makes the upsert below fail —
+  // `onConflictDoUpdate` targets `id` and never sees the email collision. Every
+  // caller now pins `TEST_USER_ID`, but a database seeded before that fix still
+  // holds the email under a random uuid, so drop the impostor — the FK cascade
+  // clears its sessions/accounts/roles and the fixture is re-seeded under the
+  // stable id. Raw SQL, like the sibling seed helpers: `drizzle-orm` is not a
+  // declared `platform-ui` dependency, so importing its operators here would
+  // only resolve by pnpm hoisting.
+  await client`
+    DELETE FROM auth_users WHERE lower(email) = lower(${user.email}) AND id <> ${user.userId}
+  `;
+
   await db
     .insert(authUsers)
     .values({

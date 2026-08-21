@@ -67,7 +67,7 @@ services:
   # and serves the UI on the same port. Opt-in via the `tracing` profile:
   #   docker compose up -d phoenix
   #   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:6006 pnpm dev
-  # See docs/dev-quickref.md § Tracing.
+  # See docs/start/dev-quickref.md § Tracing.
   phoenix:
     image: arizephoenix/phoenix:version-17
     profiles: [tracing]

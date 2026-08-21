@@ -26,9 +26,14 @@ test.describe('Workflow Home Journey', () => {
     // Close popover
     await page.locator('body').click({ position: { x: 0, y: 0 } });
 
-    // Navigate to run detail by clicking the first active run row
-    // (all running seed instances are Supply Chain Review, so any row works)
-    await page.getByText('In Progress').first().click();
+    // Navigate to run detail by clicking an active run row scoped to the
+    // Supply Chain Review card specifically — the shared `test` namespace
+    // now has running seed instances under other workflow definitions too
+    // (e.g. L3 API journey fixtures), so an unscoped "first In Progress on
+    // the page" click is no longer guaranteed to land on Supply Chain
+    // Review.
+    const supplyChainCard = page.locator('div.rounded-lg', { hasText: 'Supply Chain Review' }).first();
+    await supplyChainCard.getByText('In Progress').first().click();
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 30_000 });
   });
 });

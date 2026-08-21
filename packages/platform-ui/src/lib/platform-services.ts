@@ -5,7 +5,7 @@
 // existing `@/lib/platform-services` imports across routes, server actions
 // and server utilities keep working unchanged while the migration completes.
 //
-// End state (see `docs/headless-migration.md`, Phase 5):
+// End state (see `docs/archive/headless-migration.md`, Phase 5):
 //   - Every caller imports `getPlatformServices` directly from
 //     `@mediforce/platform-api/services`.
 //   - Every caller imports `getAppBaseUrl` from `@/lib/app-base-url`.

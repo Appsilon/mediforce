@@ -1,7 +1,13 @@
+---
+status: historical
+audience: engineers
+last_reviewed: 2026-05-31
+---
+
 # Firestore -> Postgres cutover scripts
 
 One-shot data move scripts for the ADR-0001 cutover window. See
-[`../../docs/adr/PLAN-0001.md`](../../docs/adr/PLAN-0001.md) §8 for the
+[`../../docs/archive/PLAN-0001.md`](../../docs/archive/PLAN-0001.md) §8 for the
 operational procedure these scripts plug into.
 
 ## Files

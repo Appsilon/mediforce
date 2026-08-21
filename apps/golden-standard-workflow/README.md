@@ -1,12 +1,12 @@
 # Golden Standard Workflow
 
 This app is the production-style companion to
-[`docs/workflow-authoring-golden-rules.md`](../../docs/workflow-authoring-golden-rules.md).
+[`docs/reference/workflow-authoring-golden-rules.md`](../../docs/reference/workflow-authoring-golden-rules.md).
 Use it when the tutorial examples are too small.
 
 It shows:
 
-- `index.json` for Git import browse mode.
+- `workflows-index.json` for Git import browse mode.
 - A package README with setup contracts.
 - A pinned workflow definition in `src/golden-standard-workflow.wd.json`.
 - A Dockerfile that installs runtime dependencies and copies scripts/MCP code.
@@ -19,7 +19,7 @@ It shows:
 
 ```text
 apps/golden-standard-workflow/
-  index.json
+  workflows-index.json
   README.md
   container/Dockerfile
   mcp/readonly_context_mcp.py
