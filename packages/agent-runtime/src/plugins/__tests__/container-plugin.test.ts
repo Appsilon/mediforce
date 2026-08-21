@@ -81,7 +81,7 @@ describe('missingExecutableHint', () => {
 
   it('[DATA] points at the Docker image setup guide', () => {
     expect(missingExecutableHint(ALPINE_STDERR, 'alpine:3.24')).toContain(
-      'docs/how-to/docker-image-setup.md',
+      'docs/guides/docker-image-setup.md',
     );
   });
 

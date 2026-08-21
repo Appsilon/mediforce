@@ -20,13 +20,13 @@ One entry point for adding a test. **Always pick the lowest level that gives rea
 |---|------------------|------------|--------------------------------------------------------------------------|
 | 1 | Unit             | vitest     | Pure function, no I/O. Fastest signal — use whenever possible.           |
 | 2 | Integration      | vitest     | Multi-component logic; route handlers wired to fake services.            |
-| 3 | API E2E          | Playwright | **Every new endpoint or handler.** Proves Firestore + middleware + auth. |
+| 3 | API E2E          | Playwright | **Every new endpoint or handler.** Proves Postgres + middleware + auth. |
 | 4 | UI E2E           | Playwright | A real multi-step user journey in the browser. Sparse. Use `/e2e-test`.  |
 | 5 | External / Tier 2| vitest     | Touching `agent-runtime`, `mcp-client`, or LLM-provider code.            |
 
 **Rule of thumb:** every feature MUST be covered at **L3** (foundation). L1/L2 add logic coverage. L4 is for the journey only, not edge cases. L5 is opt-in and costs cents per run.
 
-**For a new endpoint or handler, start at L3 directly.** L1/L2 are layers on top of the proven wiring, not replacements for it. Skipping L3 leaves the real Firestore + middleware + auth path untested.
+**For a new endpoint or handler, start at L3 directly.** L1/L2 are layers on top of the proven wiring, not replacements for it. Skipping L3 leaves the real Postgres + middleware + auth path untested.
 
 ## Step 2 — Scaffold
 
@@ -51,7 +51,7 @@ Run: `npx vitest run path/to/file.test.ts`
 
 Location: `packages/platform-ui/src/test/integration/<feature>.test.ts`
 
-Import route handlers directly, mock `getPlatformServices()` with in-memory fakes. Does NOT hit Firestore or middleware — claim "API works" only with an L3 alongside.
+Import route handlers directly, mock `getPlatformServices()` with in-memory fakes. Does NOT hit Postgres or middleware — claim "API works" only with an L3 alongside.
 
 ```ts
 import * as route from '@/app/api/<...>/route';
@@ -68,7 +68,7 @@ it('POST creates the resource', async () => {
 });
 ```
 
-### L3 — API E2E (Playwright, real server + emulators)
+### L3 — API E2E (Playwright, real server + Postgres)
 
 Location: `packages/platform-ui/e2e/api/<feature>.spec.ts`. Use the `request` fixture only — **no `page`**.
 

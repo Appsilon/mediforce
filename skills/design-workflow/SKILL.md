@@ -18,7 +18,7 @@ of the *Workflow Designer* app — same intelligence, run in the repo against th
 checked-out source instead of a live UI.
 
 You operationalize the **"Agent" authoring path** in
-`docs/how-to-create-workflow.md`: take the golden rules plus the user's goal,
+`docs/guides/create-workflow.md`: take the golden rules plus the user's goal,
 produce the `.wd.json` and package files, and require validation against the
 schema and checklist before returning a result.
 
@@ -35,14 +35,14 @@ and dynamic `assignedTo` are the classic misses).
 
 Read these before you say a single word about structure:
 
-1. `docs/workflow-capabilities.md` — the capability map: every executor, action
+1. `docs/reference/workflow-capabilities.md` — the capability map: every executor, action
    kind, both expression languages, human-step UI, scripts, and models, each
    cross-referenced to the **source file** that defines it. Read this first so
    you know what is possible. When a design touches a capability, open the
    source file it cites rather than authoring from the summary.
 2. `CONTEXT.md` — the glossary. Use canonical names (Namespace, Workflow vs
    Definition vs Run). Challenge any user term that conflicts with it.
-3. `docs/workflow-authoring-golden-rules.md` — the MUST / SHOULD / MANUAL
+3. `docs/reference/workflow-authoring-golden-rules.md` — the MUST / SHOULD / MANUAL
    production checklist. This is the spine of every challenge you make.
 4. `docs/workflow-examples/README.md` (start with its capability index) and the
    `01`–`11` example `.wd.json` files in `docs/workflow-examples/` — learn the
@@ -56,8 +56,8 @@ Load on demand, only when the design touches them:
 
 - `docs/adr/0008-step-executor-model.md` — executor model (source of truth for
   `executor`).
-- `docs/adr/0006-control-mode-ui-concept.md` — control modes (CM0/CM2/CM3/CM4).
-- `docs/how-to/import-from-git.md` and `docs/how-to/docker-image-setup.md`.
+- `docs/adr/0014-control-mode-ui-concept.md` — control modes (CM0/CM2/CM3/CM4).
+- `docs/guides/import-from-git.md` and `docs/guides/docker-image-setup.md`.
 - `packages/platform-core/src/schemas/workflow-definition.ts` — the schema
   itself, when an example does not answer a field question.
 - `packages/core-actions/src/handlers/` — the real action handlers (`http`,
@@ -116,7 +116,7 @@ Pushing back here is mandatory, and you cite the rule when you do.
 ### Challenge gate C — inline script or pinned command?
 
 For every `script` step, decide where the code lives (see the inline-vs-command
-section of `docs/workflow-capabilities.md`):
+section of `docs/reference/workflow-capabilities.md`):
 
 - **Inline** (`inlineScript` + `runtime`) is the default for small, dependency-
   free glue and prototypes: no repo, no commit, no Dockerfile, auto image per
@@ -292,7 +292,7 @@ bare checkout. Treat them as optional. When authoring offline:
   default is `anthropic/claude-sonnet-4`.
 - Or copy a full ID already used in an example / `apps/*` workflow.
 - The registry itself is populated from OpenRouter (`sync-models.ts`); see the
-  Models section of `docs/workflow-capabilities.md` for the source pointers.
+  Models section of `docs/reference/workflow-capabilities.md` for the source pointers.
 
 Run `model validate` only as a best-effort confirmation when a deployment + key
 are available; never block authoring on it.

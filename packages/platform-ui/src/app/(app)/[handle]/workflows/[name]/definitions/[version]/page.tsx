@@ -49,7 +49,7 @@ export default function WorkflowDefinitionVersionPage() {
   const currentStepsRef = useRef<WorkflowStep[]>([]);
   const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>([]);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const startAfterSaveResolverRef = useRef<((version: number | undefined) => void) | null>(null);
+  const startAfterSaveResolverRef = useRef<((saved: { version: number; namespace: string } | undefined) => void) | null>(null);
 
   useEffect(() => () => { if (redirectTimerRef.current !== null) clearTimeout(redirectTimerRef.current); }, []);
 
@@ -134,7 +134,7 @@ export default function WorkflowDefinitionVersionPage() {
     try {
       const result = await saveCurrentCanvas(title, setAsDefault);
       if (startResolver) {
-        startResolver(result.version);
+        startResolver({ version: result.version, namespace: handle });
       } else {
         redirectTimerRef.current = setTimeout(() => {
           router.push(routes.workflow(handle, decodedName));
@@ -241,7 +241,7 @@ export default function WorkflowDefinitionVersionPage() {
               archived={definition.archived === true}
               label="Save & Dry Run"
               mode="dry-run"
-              onBeforeStart={() => new Promise<number | undefined>((resolve) => {
+              onBeforeStart={() => new Promise<{ version: number; namespace: string } | undefined>((resolve) => {
                 startAfterSaveResolverRef.current = resolve;
                 setDialogOpen(true);
               })}
@@ -253,7 +253,7 @@ export default function WorkflowDefinitionVersionPage() {
               archived={definition.archived === true}
               label="Save & Start Run"
               mode="production"
-              onBeforeStart={() => new Promise<number | undefined>((resolve) => {
+              onBeforeStart={() => new Promise<{ version: number; namespace: string } | undefined>((resolve) => {
                 startAfterSaveResolverRef.current = resolve;
                 setDialogOpen(true);
               })}

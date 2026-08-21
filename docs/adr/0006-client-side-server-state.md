@@ -1,3 +1,9 @@
+---
+status: accepted
+audience: engineers
+last_reviewed: 2026-05-28
+---
+
 # 0006 — Client-side server-state management
 
 - **Status:** Accepted (mutable while implementation in progress per the
@@ -7,7 +13,7 @@
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)
 - **Relates to:**
-  - Lands together with [`docs/headless-migration-phase-4-plan.md`](../headless-migration-phase-4-plan.md)
+  - Lands together with [`docs/archive/headless-migration-phase-4-plan.md`](../archive/headless-migration-phase-4-plan.md)
     (Phase 4 of the headless migration).
   - Complements [`ADR-0001`](./0001-firestore-to-postgres.md) — this ADR
     is the browser-side counterpart of ADR-0001's "realtime swap"
@@ -27,7 +33,7 @@ echo). Together they shape the **server side** of the headless
 platform.
 
 The headless migration's Phase 4
-([`docs/headless-migration-phase-4-plan.md`](../headless-migration-phase-4-plan.md)) is the **browser
+([`docs/archive/headless-migration-phase-4-plan.md`](../archive/headless-migration-phase-4-plan.md)) is the **browser
 side** of the same architecture: every UI consumer stops importing
 `firebase/firestore` and reads / writes through the typed
 `mediforce.X.Y()` client. To do that without losing the live-update
@@ -225,7 +231,7 @@ copy-paste from these:
 This ADR does **not** add SSE in Phase 4 (per [`ADR-0001`](./0001-firestore-to-postgres.md) §5
 amendment, 2026-05-28). When SSE arrives (per resource — see future
 per-resource event-stream consolidation ADR, captured-for-later in
-[`docs/headless-migration.md`](../headless-migration.md)), each SSE
+[`docs/archive/headless-migration.md`](../archive/headless-migration.md)), each SSE
 hook plugs into the existing cache via `setQueryData`:
 
 ```ts

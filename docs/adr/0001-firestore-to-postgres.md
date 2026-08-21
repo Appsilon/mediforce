@@ -1,10 +1,15 @@
+---
+status: accepted
+audience: engineers
+last_reviewed: 2026-05-31
+---
+
 # 0001 — Move primary datastore from Firestore to self-hosted Postgres
 
-- **Status:** Accepted
 - **Date:** 2026-05-19 (accepted 2026-05-31)
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)
-- **Implementation plan:** [PLAN-0001.md](./PLAN-0001.md)
+- **Implementation plan:** [PLAN-0001.md](../archive/PLAN-0001.md)
 
 ## Context
 
@@ -64,7 +69,7 @@ Move the primary datastore to **self-hosted Postgres 16**, accessed via
    `(input, scope) => Promise<output>` does not preclude a sibling
    `createStreamingRouteAdapter` later. _Amended 2026-05-28 to drop the
    original SSE-at-cutover commitment per Phase 4 plan grilling; see
-   [`docs/headless-migration-phase-4-plan.md`](../headless-migration-phase-4-plan.md)
+   [`docs/archive/headless-migration-phase-4-plan.md`](../archive/headless-migration-phase-4-plan.md)
    § 2 "ADR amendments bundled" for full reasoning._
 6. **Cross-workspace public discovery.** `WorkflowDefinition.visibility =
    'public'` remains a live, cross-Workspace feature — teams may publish,
@@ -247,7 +252,7 @@ indirection.
 - One-time migration effort, estimated 2 focused engineering weeks.
 - ~20 UI consumer sites are rewired from `onSnapshot` to react-query polling
   (1–10 s, terminal-state gating). Mostly mechanical; see
-  [`docs/headless-migration-phase-4-plan.md`](../headless-migration-phase-4-plan.md)
+  [`docs/archive/headless-migration-phase-4-plan.md`](../archive/headless-migration-phase-4-plan.md)
   per-consumer migration table.
 - New operational responsibility for self-hosted customers: Postgres backup.
   Standard tooling; documented as part of this migration.

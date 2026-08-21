@@ -19,9 +19,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # (source doc, exported constant name)
 DOCS = [
-    ("docs/how-to-create-workflow.md", "HOW_TO_CREATE_WORKFLOW_DOC"),
-    ("docs/workflow-capabilities.md", "WORKFLOW_CAPABILITIES_DOC"),
-    ("docs/workflow-authoring-golden-rules.md", "WORKFLOW_AUTHORING_GOLDEN_RULES_DOC"),
+    ("docs/guides/create-workflow.md", "HOW_TO_CREATE_WORKFLOW_DOC"),
+    ("docs/reference/workflow-capabilities.md", "WORKFLOW_CAPABILITIES_DOC"),
+    ("docs/reference/workflow-authoring-golden-rules.md", "WORKFLOW_AUTHORING_GOLDEN_RULES_DOC"),
 ]
 
 OUT = REPO_ROOT / (

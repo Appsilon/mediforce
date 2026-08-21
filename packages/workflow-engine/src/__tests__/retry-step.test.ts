@@ -115,6 +115,20 @@ describe('WorkflowEngine.retryStep', () => {
     expect(events[0].actorId).toBe('user-1');
   });
 
+  // Callers audit the retry using the latest execution as `previousExecutionId`
+  // (see platform-api's retry-step handler). That is only the failed execution
+  // being replaced as long as retryStep itself creates none — the fresh
+  // execution is the auto-runner's job.
+  it('creates no new step execution — the auto-runner does that', async () => {
+    const instanceId = await seedFailedInstance(instanceRepo);
+    const before = await instanceRepo.getStepExecutions(instanceId);
+
+    await engine.retryStep(instanceId, 'deploy', actor);
+
+    const after = await instanceRepo.getStepExecutions(instanceId);
+    expect(after.map((e) => e.id)).toEqual(before.map((e) => e.id));
+  });
+
   it('refuses to retry when the instance is running or completed', async () => {
     const instanceId = await seedFailedInstance(instanceRepo);
     await instanceRepo.update(instanceId, { status: 'running' });

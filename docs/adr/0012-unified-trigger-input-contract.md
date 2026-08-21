@@ -1,5 +1,7 @@
 ---
 status: accepted
+audience: engineers
+last_reviewed: 2026-07-31
 ---
 
 # Trigger Input is a workflow's total input contract; every trigger validates against it

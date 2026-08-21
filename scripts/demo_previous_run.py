@@ -4,7 +4,7 @@
 Drives three chain links through the HTTP API, showing a user-typed message
 flowing from one run into the next:
 
-    1. Register a fresh copy of `docs/examples/previous-run-example.wd.json`
+    1. Register a fresh copy of `docs/workflow-examples/12-previous-run.wd.json`
        (script step runs in Docker; human step renders a params form).
     2. Run 1 — auto-runner executes the script step (reads /output/previous_run.json,
        writes a summary), then pauses on the human form. Submit `{ message: "from run 1" }`.
@@ -31,7 +31,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent.parent
-WD_PATH = ROOT / "docs" / "examples" / "previous-run-example.wd.json"
+WD_PATH = ROOT / "docs" / "workflow-examples" / "12-previous-run.wd.json"
 
 BASE = os.environ.get("MEDIFORCE_URL", "http://localhost:9003").rstrip("/")
 API_KEY = os.environ.get("MEDIFORCE_API_KEY", os.environ.get("PLATFORM_API_KEY", "test-api-key"))

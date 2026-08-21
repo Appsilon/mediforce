@@ -1,5 +1,7 @@
 ---
 status: accepted
+audience: engineers
+last_reviewed: 2026-06-24
 ---
 
 # Workflow git import is a one-time copy from public GitHub only

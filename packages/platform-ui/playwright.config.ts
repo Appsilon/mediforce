@@ -96,7 +96,7 @@ if (runFullSuite) {
 // hot-reload beats suite speed (headed / --ui).
 // CI pre-builds in a separate step; locally, `start:e2e` rebuilds whenever
 // the source no longer matches the built bundle (see "E2E build freshness"
-// in docs/dev-quickref.md). `reuseExistingServer: true` connects to a
+// in docs/start/dev-quickref.md). `reuseExistingServer: true` connects to a
 // server the build step already started.
 const primaryWebServer = {
   command: runFullSuite

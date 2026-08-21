@@ -13,11 +13,6 @@ const STEP_LOGS_DIR = join(tmpdir(), 'mediforce-step-logs');
  * Postgres seed for the full E2E fixture (ADR-0001 §5.2 #9), invoked
  * from `auth-setup.ts` before Playwright workers start.
  *
- * Uses raw `postgres-js` rather than the `@mediforce/platform-infra` package
- * because Playwright workers don't resolve the `@mediforce/source` package
- * exports condition the way `tsx` does at type-check time — importing the
- * compiled `dist` fails because we don't build it in CI.
- *
  * Reuses `buildSeedData` so the E2E fixture and the in-memory fixture stay
  * byte-identical.
  *
@@ -62,6 +57,7 @@ export async function seedPostgresNamespace(
     //   patterns   – journey-org-* (create-workspace.journey, timestamp suffix),
     //                branding-org-* (namespace-branding.journey, per-test org),
     //                import-org-* (workflow-import.journey, per-test org),
+    //                journey-examples-* (import-example-workflows.journey, timestamp suffix),
     //                tool-catalog-empty-* (admin-tool-catalog.journey, timestamp suffix)
     //
     // Agents use ON DELETE SET NULL for workspace removal, and built-in agents
@@ -92,6 +88,7 @@ export async function seedPostgresNamespace(
          OR handle LIKE 'journey-org-%'
          OR handle LIKE 'branding-org-%'
          OR handle LIKE 'import-org-%'
+         OR handle LIKE 'journey-examples-%'
          OR handle LIKE 'tool-catalog-empty-%'
     `;
 
@@ -237,6 +234,7 @@ export async function seedPostgresNamespace(
       ...data.completedSupplyChainStepExecutions,
       ...data.stepFailureStepExecutions,
       ...data.retryTestStepExecutions,
+      ...data.retryAuditStepExecutions,
       ...data.agentEscalatedCancelStepExecutions,
       ...data.workflowRunStepExecutions,
     };
