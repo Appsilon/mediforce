@@ -1,19 +1,262 @@
 name: Deploy to Production
 
+# ADR-0019 — production deploys from immutable, pinned images promoted through
+# moving tags (:prod-current / :prod-previous), triggered by publishing a
+# GitHub Release. workflow_dispatch(ref) is the escape hatch for rollback or a
+# deliberate SHA at a chosen moment.
 on:
-  push:
-    branches: [production]
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      ref:
+        required: true
+        description: "SHA or tag to deploy"
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/appsilon/mediforce
 
 jobs:
+  # Resolve the target ref → full SHA (+ short SHA, release tag). On
+  # workflow_dispatch, if the :<sha> images already exist in ghcr the build is a
+  # no-op (rollback fast-path); releases always build so they also stamp :<tag>.
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      sha: ${{ steps.ref.outputs.sha }}
+      sha_short: ${{ steps.ref.outputs.sha_short }}
+      tag: ${{ steps.ref.outputs.tag }}
+      skip_build: ${{ steps.skip.outputs.skip_build }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve ref
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            REF="${{ github.event.release.tag_name }}"
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            REF="${{ github.event.inputs.ref }}"
+            TAG=""
+          fi
+          git fetch --tags --force origin
+          SHA=$(git rev-parse "${REF}^{commit}")
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "sha_short=${SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Resolved $REF -> $SHA (tag='$TAG')"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Decide whether to skip the build
+        id: skip
+        run: |
+          SKIP=false
+          # Only workflow_dispatch (rollback / redeploy) may skip; a release
+          # always builds so it also stamps :<tag>. Skip only when ALL THREE
+          # images already exist at :<sha> — a partial set must rebuild.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SHA="${{ steps.ref.outputs.sha }}"
+            ALL=true
+            for image in platform-ui migrate container-worker; do
+              if ! docker manifest inspect \
+                "${{ env.IMAGE_PREFIX }}-${image}:${SHA}" >/dev/null 2>&1; then
+                echo "Missing ${image}:${SHA} — will build."
+                ALL=false
+              fi
+            done
+            if [ "$ALL" = true ]; then
+              SKIP=true
+              echo "All three images for ${SHA} already exist — skipping build."
+            fi
+          fi
+          echo "skip_build=$SKIP" >> "$GITHUB_OUTPUT"
+
+  # Multi-arch per-arch build (mirrors build-images.yml: buildx, ghcr login,
+  # same Dockerfile targets and cache scopes). Per-arch tags are SHA-scoped so
+  # they never collide with the fixed slug tags build-images.yml uses.
+  build:
+    needs: resolve
+    if: needs.resolve.outputs.skip_build != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Sanitise platform slug
+        run: echo "PLATFORM_SLUG=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_ENV
+
+      - name: Build & push platform-ui (${{ matrix.platform }})
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: packages/platform-ui/Dockerfile
+          target: runner
+          platforms: ${{ matrix.platform }}
+          push: true
+          # ADR-0019 — bake the git SHA into the image; no runtime injection.
+          build-args: |
+            NEXT_PUBLIC_GIT_SHA=${{ needs.resolve.outputs.sha_short }}
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-platform-ui:${{ needs.resolve.outputs.sha }}-${{ env.PLATFORM_SLUG }}
+          cache-from: type=gha,scope=platform-ui-${{ env.PLATFORM_SLUG }}
+          cache-to: type=gha,mode=max,scope=platform-ui-${{ env.PLATFORM_SLUG }}
+
+      - name: Build & push migrate (${{ matrix.platform }})
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: packages/platform-ui/Dockerfile
+          target: migrate
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-migrate:${{ needs.resolve.outputs.sha }}-${{ env.PLATFORM_SLUG }}
+          cache-from: type=gha,scope=migrate-${{ env.PLATFORM_SLUG }}
+          cache-to: type=gha,mode=max,scope=migrate-${{ env.PLATFORM_SLUG }}
+
+      - name: Build & push container-worker (${{ matrix.platform }})
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: packages/container-worker/Dockerfile.worker
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-container-worker:${{ needs.resolve.outputs.sha }}-${{ env.PLATFORM_SLUG }}
+          cache-from: type=gha,scope=container-worker-${{ env.PLATFORM_SLUG }}
+          cache-to: type=gha,mode=max,scope=container-worker-${{ env.PLATFORM_SLUG }}
+
+  # Fold the per-arch builds into a multi-arch manifest tagged :<sha> (and
+  # :<tag> on a release).
+  merge:
+    needs: [resolve, build]
+    if: needs.resolve.outputs.skip_build != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Create multi-arch manifests
+        run: |
+          SHA="${{ needs.resolve.outputs.sha }}"
+          TAG="${{ needs.resolve.outputs.tag }}"
+          for image in platform-ui migrate container-worker; do
+            REPO="${{ env.IMAGE_PREFIX }}-${image}"
+            EXTRA=()
+            if [ -n "$TAG" ]; then
+              EXTRA=(--tag "${REPO}:${TAG}")
+            fi
+            docker buildx imagetools create \
+              --tag "${REPO}:${SHA}" \
+              "${EXTRA[@]}" \
+              "${REPO}:${SHA}-linux-amd64" \
+              "${REPO}:${SHA}-linux-arm64"
+          done
+
+  # Gated by the `production` GitHub Environment protection rule (required
+  # reviewer). The ghcr retag lives HERE, after the approval, so a
+  # rejected/cancelled run never rotates the pointers and destroys the rollback
+  # target. Order inside the job: approval → retag prod-current/prod-previous →
+  # SSH the box to pull :prod-current.
   deploy:
+    needs: [resolve, merge]
+    if: always() && needs.resolve.result == 'success' && (needs.merge.result == 'success' || needs.merge.result == 'skipped')
+    environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
+    permissions:
+      contents: read
+      packages: write
     steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Retag in ghcr: prod-previous <- (old prod-current), then prod-current <-
+      # target. First run (no prod-current yet) points both at the target.
+      - name: Promote prod-current / prod-previous
+        run: |
+          SHA="${{ needs.resolve.outputs.sha }}"
+          for image in platform-ui migrate container-worker; do
+            REPO="${{ env.IMAGE_PREFIX }}-${image}"
+            if docker manifest inspect "${REPO}:prod-current" >/dev/null 2>&1; then
+              echo "Rotating ${REPO}: prod-previous <- prod-current, prod-current <- ${SHA}"
+              docker buildx imagetools create --tag "${REPO}:prod-previous" "${REPO}:prod-current"
+              docker buildx imagetools create --tag "${REPO}:prod-current" "${REPO}:${SHA}"
+            else
+              echo "First run for ${REPO}: prod-current and prod-previous <- ${SHA}"
+              docker buildx imagetools create --tag "${REPO}:prod-current" "${REPO}:${SHA}"
+              docker buildx imagetools create --tag "${REPO}:prod-previous" "${REPO}:${SHA}"
+            fi
+          done
+
+      # If this SSH pull fails after the retag, prod-current already points at
+      # the new image while the box still runs the old one — an acceptable
+      # fix-forward state; re-dispatching this workflow (or the previous SHA)
+      # reconverges the box.
       - name: Deploy via SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy@${{ secrets.PROD_SERVER_IP }} "/opt/mediforce/scripts/deploy.sh"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key \
+            deploy@${{ secrets.PROD_SERVER_IP }} \
+            "/opt/mediforce/scripts/deploy.sh ${{ needs.resolve.outputs.sha }}"

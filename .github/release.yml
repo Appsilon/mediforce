@@ -1,0 +1,29 @@
+# GitHub auto-generated release notes configuration (ADR-0019).
+# Groups merged PRs by label and keeps dependency-bot noise in a collapsed
+# "Dependencies" section instead of the headline changes.
+changelog:
+  exclude:
+    authors:
+      - renovate
+      - renovate[bot]
+      - dependabot
+      - dependabot[bot]
+  categories:
+    - title: Features
+      labels:
+        - feature
+        - enhancement
+    - title: Fixes
+      labels:
+        - fix
+        - bug
+    - title: Documentation
+      labels:
+        - documentation
+        - docs
+    - title: Dependencies
+      labels:
+        - dependencies
+    - title: Other Changes
+      labels:
+        - "*"
