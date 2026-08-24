@@ -24,9 +24,36 @@ The header carries **Save**, **Save & Dry Run** and **Save & Start Run**. All
 three open a dialog that asks for a version name — a short note about what
 changed, which is what the version list shows later.
 
-**Workflow source code** opens the definition as JSON. Editing it there and
-applying is equivalent to editing the canvas; leaving without applying prompts
-first.
+## Pasting a definition as JSON
+
+**Workflow source code** opens the definition as JSON, live-updating as you edit
+the canvas. It also works the other way: paste a definition in, press **Apply JSON
+to canvas**, and the graph becomes yours to edit. This is the fastest way to start
+from a definition someone sent you, or to move a workflow between deployments
+without a git import.
+
+Applying is gated, so a paste either lands whole or is refused with a reason:
+
+- **Steps and transitions only.** Other authorable fields — title, metadata — are
+  page state, not canvas state. A paste that changes them is refused rather than
+  quietly dropping them, and points you at workspace settings.
+- **Schema first.** Each step and transition is validated, and the first problem
+  is named — `steps: ...` or `transitions: ...`.
+- **Then the graph.** A transition pointing at a step that does not exist, or a
+  step nothing reaches, is reported before anything is applied.
+
+What lands on the canvas is the normalised graph that passed those gates, not the
+raw text you pasted: verdict transitions are merged and the entry step is put
+first. Applying is one undo step, so a paste you did not mean is reversible.
+
+While the modal holds edits you have not applied, it warns — *"Unapplied changes
+— click 'Apply JSON to canvas' to keep them"* — and closing without applying
+prompts first.
+
+:::note Applying is not saving
+Apply puts the graph on the canvas. It is still unsaved, and still creates a new
+version only when you press Save.
+:::
 
 ## The AI assistant
 
