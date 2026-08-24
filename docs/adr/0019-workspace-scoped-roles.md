@@ -59,18 +59,45 @@ namespace-free `roles[0]` is deciding what people see.
 
 ## Decision
 
-### A role is held within a workspace
+### A role is held within a workspace, optionally narrowed to workflows
 
 `user_roles` gains a `namespace` column (FK → `workspaces.handle`, cascade
-delete); the primary key becomes `(uid, namespace, role)`. `UserDirectoryService`
-gains `getUsersByRoleInNamespace(role, namespace)`, and notification targeting
-uses it — every Workflow Run carries a `namespace`, so the caller always has one.
+delete) and a nullable `workflow_name`, uniquely keyed on
+`(uid, namespace, role, workflow_name)` with `NULLS NOT DISTINCT` (Postgres 16).
+`NULL` means *every workflow in the workspace* and is the default; a value
+narrows the grant to one workflow. `UserDirectoryService` gains
+`getUsersByRoleInNamespace(role, namespace, workflowName)`.
 
 Every access question this model answers is *"may this person act on **this**
 workflow's step"*, and workflows are owned by a workspace. Deployment-global
 roles mean holding `reviewer` in one workspace makes you a reviewer in all of
 them — for a platform whose isolation story is the workspace, that is the wrong
 default, and the one that gets harder to unwind as roles accumulate.
+
+The narrowing exists because the alternative is worse. "Alice reviews this
+workflow but not that one" can be expressed by naming roles more specifically —
+`tfl-reviewer`, `protocol-reviewer` — but that pushes one deployment's org chart
+into an artifact meant to travel: under
+[ADR-0013](./0013-workflow-packages-outside-platform-repo.md) a workflow package
+is imported elsewhere, and a WD naming `tfl-reviewer` has baked in a local
+convention where `reviewer` would have stated a functional requirement. It also
+scales badly — twenty workflows times three roles is sixty role names, and
+granting one person rights on five workflows becomes five grants of five
+different roles.
+
+Scoping inverts that at the cost of one nullable column: the definition stays
+generic and portable, the workspace stays specific. It also **degrades to the
+simple case** — the default grant is workspace-wide, so nothing about the model
+gets more complicated until someone actually needs narrowing.
+
+Two consequences follow from the scope column and are easy to miss:
+
+- **Notification targeting must carry the workflow**, or a grant scoped to
+  workflow A emails its holder about runs of workflow B — enforcement would be
+  narrowed while notifications leak.
+- **Deleting a workflow must drop grants scoped to it**, for the same reason
+  membership removal must drop the workspace's grants: an invisible row that
+  silently reactivates when the name is reused.
 
 ADR-0002's regression objection is real, and the migration narrows it rather
 than eliminating it. **Backfill each existing global row across the namespaces
@@ -92,7 +119,16 @@ own workspace — which is the point of the ADR.
 Roles stay **free-form strings**: no vocabulary table, no screen to manage one.
 An unknown role therefore cannot be a validation error — the vocabulary is open
 by construction. The pick-list the UI offers is computed from roles already held
-in the workspace, unioned with the `roles` declared on its workflow definitions.
+in the workspace, unioned with the `roles` declared on its workflow definitions,
+which already answers "what roles exist here" without new storage.
+
+A curated list was considered and rejected on the same portability ground as
+role-naming above. Its prize is typo prevention, which the computed pick-list
+(a grant can only pick a role that exists) and the authoring-time warning
+already deliver. Its cost is that an imported WD naming a role the deployment
+has never heard of — 23 definitions in this repo already use 8 such names — must
+be rejected, imported broken, or silently auto-create the entry, which is
+free-form with extra ceremony.
 
 ### Three verbs are gated by roles; `read` is not one of them
 
@@ -145,12 +181,15 @@ That reasoning holds unchanged. The division of labour:
 - **Wrapper layer** answers *may you see this row* — per-row, workspace reachability.
 - **Handlers** answer *may you take this action* — per-action, role capability.
 
-What this ADR adds is only the location: the predicate lands in the existing
-`packages/platform-api/src/auth.ts` beside `assertCallerIsNamespaceAdmin`, not in
-the new `predicates.ts` file ADR-0004 §8 sketched, because that is where the
-first handler-resident gate already lives. `CallerIdentity` carries the caller's
-roles per namespace, resolved once per request alongside `namespaceRoles` —
-which is the shape ADR-0004 §4 named as its own precondition.
+What this ADR adds is only the location and the shape:
+`assertCallerHoldsRole(caller, namespace, workflow, allowedRoles)` lands in the
+existing `packages/platform-api/src/auth.ts` beside
+`assertCallerIsNamespaceAdmin`, not in the new `predicates.ts` file ADR-0004 §8
+sketched, because that is where the first handler-resident gate already lives.
+One predicate serves all three verbs; `workflow` is what lets a scoped grant be
+honoured. `CallerIdentity` carries the caller's roles per namespace, resolved
+once per request alongside `namespaceRoles` — which is the shape ADR-0004 §4
+named as its own precondition.
 
 ## Considered options
 
