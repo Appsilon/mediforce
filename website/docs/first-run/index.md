@@ -50,6 +50,10 @@ working definition.
 **Import from git.** Point Mediforce at a repository and pick the workflows to
 import.
 
+**Ask the assistant.** The workflow editor has an AI assistant beside the canvas:
+describe the workflow you want and it builds the steps for you, which you then
+edit by hand. See [the assistant](../build/#the-ai-assistant).
+
 **Write one.** See [Building workflows](../build/).
 
 ## Register from the CLI

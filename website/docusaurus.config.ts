@@ -23,9 +23,14 @@ const config: Config = {
 
   onBrokenLinks: 'throw',
   onBrokenAnchors: 'throw',
-  markdown: { hooks: { onBrokenMarkdownLinks: 'throw' } },
+  markdown: {
+    format: 'mdx',
+    hooks: { onBrokenMarkdownLinks: 'throw' },
+  },
 
-  future: { v4: true },
+  // No `future: { v4: true }`. It stops `:::warning` blocks being parsed — they
+  // render as the literal text `:::warning` — so admonitions silently become
+  // noise on every page that uses one.
 
   // Offline search: the index ships with the build, so it needs no Algolia
   // account and works on whichever host we settle on — including a preview

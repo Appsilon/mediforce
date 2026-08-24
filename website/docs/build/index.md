@@ -28,6 +28,34 @@ changed, which is what the version list shows later.
 applying is equivalent to editing the canvas; leaving without applying prompts
 first.
 
+## The AI assistant
+
+Beside the canvas is an assistant that edits the workflow with you. Describe what
+you want — *"add a step where a medical writer reviews the draft, and send it back
+to the agent if they ask for changes"* — and it adds, updates and removes steps on
+the canvas.
+
+Its changes land on the canvas as ordinary edits. Nothing is saved until you save,
+undo reverses them like any other change, and you are free to adjust everything it
+did. When a change leaves the workflow unsaveable, the assistant says so rather
+than letting you discover it at save time — *"Heads up — this won't save yet"*,
+with the reason.
+
+Pick the model it uses from the settings beside the input. The list is filtered to
+models that support tool calling and carry enough context to hold your workflow;
+if none qualify, the picker says so and a larger-context model has to be added to
+the registry.
+
+The assistant edits the definition. It does not start runs, and it cannot create
+triggers — schedules and webhooks live in the Triggers tab.
+
+From the CLI:
+
+```bash
+pnpm exec mediforce assistant ask "add a QC review after the draft step" \
+  --canvas ./canvas.json --namespace acme
+```
+
 ## Steps
 
 Every step has a **type** and an **executor**.

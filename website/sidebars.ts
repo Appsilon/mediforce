@@ -19,9 +19,10 @@ const sidebars: SidebarsConfig = {
       label: 'Running workflows',
       collapsed: false,
       link: { type: 'doc', id: 'run/index' },
-      items: ['run/verify'],
+      items: ['run/verify', 'run/triggers'],
     },
     'agents/index',
+    'workspace/index',
     'gotchas/index',
     {
       type: 'category',

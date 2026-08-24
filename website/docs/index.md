@@ -17,10 +17,12 @@ you can inspect afterwards.
 |---|---|
 | Stand Mediforce up on your own infrastructure | [Install](install/) |
 | Get your first workflow running | [First run](first-run/) |
-| Build a workflow in the editor | [Building workflows](build/) |
+| Build a workflow in the editor, or have the assistant build it | [Building workflows](build/) |
 | Start runs, handle tasks, read results | [Running workflows](run/) |
 | Know which check answers which question | [Verifying a workflow](run/verify) |
 | Add agents, models and tools | [Agents and models](agents/) |
+| Schedule runs, or start them from a webhook | [Triggers](run/triggers) |
+| Manage members, sharing and monitoring | [Workspaces and admin](workspace/) |
 | Find out what bit you | [Gotchas](gotchas/) |
 | Look up a command or a step type | [CLI](reference/cli), [Capabilities](reference/capabilities) |
 
