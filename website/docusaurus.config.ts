@@ -2,11 +2,11 @@ import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 import { themes as prismThemes } from 'prism-react-renderer';
 
-// The pill in the navbar states which Mediforce this documentation describes, so
-// it reads from the package version rather than a second copy of the number.
-// Single-version docs on purpose: one Mediforce is deployed per environment, so
+// The pill states which Mediforce this documentation describes, so it reads the
+// version from the repository root — the platform's own version, not this site's.
+// Single-version docs on purpose: one Mediforce is registered per deployment, so
 // there is no older release to browse.
-const { version } = require('./package.json') as { version: string };
+const { version } = require('../package.json') as { version: string };
 
 const config: Config = {
   title: 'Mediforce Docs',
@@ -85,8 +85,8 @@ const config: Config = {
           title: 'Documentation',
           items: [
             { label: 'Home', to: '/' },
-            { label: 'Where to go', to: '/#where-to-go' },
-            { label: 'Concepts', to: '/concepts/theme-check' },
+            { label: 'Start here', to: '/#start-here' },
+            { label: 'Install', to: '/install/' },
           ],
         },
         {

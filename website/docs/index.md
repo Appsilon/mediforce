@@ -1,23 +1,24 @@
 ---
-title: Mediforce documentation
-sidebar_position: 1
+title: Mediforce
+slug: /
+sidebar_position: 0
 ---
 
-# Mediforce documentation
+# Mediforce
 
-Mediforce is a workflow and agent orchestration platform for pharma. This site
-is the engineering and workflow-authoring documentation for the version named in
-the pill at the top right.
+Mediforce runs the work that gets clinical and regulatory documents produced,
+reviewed and signed off: a **workflow** is a graph of **steps**, each step is
+done by a person, a script, a built-in action or an agent, and every execution is
+a **run** you can inspect afterwards.
 
-## Where to go
+## Start here
 
-| I want to… | Section |
+| You want to | Go to |
 |---|---|
-| Get the app running the first time | Start |
-| Build a workflow, end to end | Guides |
-| Look up what a workflow *can* do | Reference |
-| Know why the code is shaped the way it is | Decisions |
+| Stand up Mediforce on your own infrastructure | [Install](install/) |
+| Get your first workflow running | First run |
+| Build a workflow in the editor | Building workflows |
+| Understand what bit you | Gotchas |
 
-Sections arrive as the repository documentation is ported. The scaffold carries
-one page per visual element so the theme can be checked before the content
-moves.
+Sections beyond Install are being written. The pill at the top right names the
+Mediforce version this documentation describes.

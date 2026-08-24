@@ -1,6 +1,7 @@
 {
   "name": "mediforce",
   "private": true,
+  "version": "1.0.0",
   "type": "module",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
