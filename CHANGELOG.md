@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-08-23]
+
 ### Fixed
 - `prod.mediforce.ai` no longer 525s at Cloudflare: Caddy now auto-provisions TLS certs and proxies for an optional `DOMAIN_ALIASES` list alongside the primary `DOMAIN`, so the new production hostname works while `phuse.mediforce.ai` keeps serving for backward compatibility [#1198](https://github.com/Appsilon/mediforce/pull/1198).
 - Google SSO no longer bounces sign-in from `prod.mediforce.ai` over to `phuse.mediforce.ai`: `AUTH_URL`, `NEXT_PUBLIC_APP_URL`, and `DOMAIN`/`DOMAIN_ALIASES` on the prod server were still pinned to `phuse.mediforce.ai`, so the OAuth `redirect_uri` and the CSRF cookie's host disagreed whenever a login started on `prod.mediforce.ai`. Repinned to `prod.mediforce.ai` as canonical on the server, and `.env.example` now documents the requirement so the next multi-domain setup doesn't repeat it [#1198](https://github.com/Appsilon/mediforce/pull/1198).
