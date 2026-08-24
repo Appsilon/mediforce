@@ -622,8 +622,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // The user's steps: add a block from the toolbar, then save.
     await page.getByRole('button', { name: 'Add Block', exact: true }).click();
-    await expect(page.getByTestId('executor-option-human')).toBeVisible({ timeout: 5_000 });
-    await page.getByTestId('executor-option-human').click();
+    await (await executorButton(page, 'human')).click();
 
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
@@ -647,8 +646,7 @@ test.describe('Workflow Editor Journey', () => {
     await page.getByPlaceholder('Add a workflow description…').fill('Save and Dry Run namespace parity');
 
     await page.getByRole('button', { name: 'Add Block', exact: true }).click();
-    await expect(page.getByTestId('executor-option-human')).toBeVisible({ timeout: 5_000 });
-    await page.getByTestId('executor-option-human').click();
+    await (await executorButton(page, 'human')).click();
 
     // Save & Dry Run saves and then starts, so the run has to be created in the
     // namespace the save targeted. Starting it in the route namespace instead
