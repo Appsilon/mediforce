@@ -43,13 +43,17 @@ against source:
    and `WorkflowEngine.advanceStep` calls it, but `rbacService` is the engine's
    optional 4th constructor argument and production passes `undefined`. Any
    member of a workspace can claim and complete any human task.
-3. **Role-based inbox filtering already ships, by accident.** The NextAuth
+3. **No workflow mutation is gated.** `register-workflow`, `delete-workflow`,
+   `archive-workflow`, `transfer-workflow`, `set-visibility` and `copy-workflow`
+   check workspace membership and nothing else — not even owner/admin. Any
+   member can delete or re-register any workflow in the workspace.
+4. **Role-based inbox filtering already ships, by accident.** The NextAuth
    `session` callback puts the flat global list on `session.user.roles`,
    `useViewerIdentity` returns **`roles[0]`**, and the Human actions page pivots
    its whole inbox on that one string — so a user holding two roles sees only
    the first one's queue, off a value with no workspace context at all.
 
-Fact 3 is the one ADR-0002 did not weigh, and it is why the scoping question
+Fact 4 is the one ADR-0002 did not weigh, and it is why the scoping question
 cannot be deferred any further: the moment roles carry authority, a
 namespace-free `roles[0]` is deciding what people see.
 
@@ -89,6 +93,45 @@ Roles stay **free-form strings**: no vocabulary table, no screen to manage one.
 An unknown role therefore cannot be a validation error — the vocabulary is open
 by construction. The pick-list the UI offers is computed from roles already held
 in the workspace, unioned with the `roles` declared on its workflow definitions.
+
+### Three verbs are gated by roles; `read` is not one of them
+
+The same role predicate gates three actions, at two levels:
+
+| Verb | Level | Gate |
+|---|---|---|
+| `run` — start a run | workflow | workflow `allowedRoles` |
+| `edit` — register a version, archive, delete, transfer, set visibility | workflow | workflow `allowedRoles` |
+| `act` — claim and complete a human task | step | `step.allowedRoles` |
+
+**`read` is deliberately not gated.** Every member of a workspace sees every
+workflow in it, and `visibility` keeps its existing meaning as the
+*cross-workspace* shelf. Hiding a workflow intra-workspace would mean hiding
+everything that hangs off it — its runs, tasks, and audit events — across three
+wrapper classes, which is a large surface where a missed query leaks rather than
+merely annoys. The value did not justify it: a member who can see a workflow but
+cannot run or edit it is a legible state, and an unreadable one is not worth the
+blast radius.
+
+Step-level gating stays **on the Workflow Definition**, where the author writes
+it, and accepts multiple free-form roles. This keeps a workflow package portable
+under [ADR-0013](./0013-workflow-packages-outside-platform-repo.md): the WD
+declares *"a `reviewer` does this step"* and travels with that intent, while the
+workspace separately binds `reviewer` to people. An operational override that
+contradicted the definition would give the same step two answers and make the WD
+stop describing the process it runs — unacceptable in a regulated audit trail.
+
+Workflow-level `run`/`edit` access is **not** on the definition. Like
+`visibility` it is mutable and operational, so it lives in a side table keyed by
+`(namespace, workflow)`. Putting it in the versioned document would mean
+registering v8 silently rewrites permissions, and would hand the design LLM a
+field that grants authority.
+
+Both levels grant through **roles, never by naming a user** — a role with one
+member expresses "only Krystian may edit this" without a second mechanism.
+Administering workflow access is a Membership privilege (owner/admin), so no
+workflow-ownership concept is introduced; `WorkflowDefinition` has no `createdBy`
+and nothing exists to backfill one from.
 
 ### Where the check lives — confirming ADR-0004, not re-deciding it
 
@@ -145,7 +188,7 @@ Binding:
 
 Implications the implementation issues must resolve, not decided here:
 
-- **`session.user.roles` cannot stay a flat array** (fact 3). The `session`
+- **`session.user.roles` cannot stay a flat array** (fact 4). The `session`
   callback runs on every session read with no route params, so it has nothing to
   scope to. Either it carries a `handle → roles` map, or the browser reads roles
   per workspace instead. Whichever wins, the current `roles[0]` inbox pivot
@@ -188,11 +231,12 @@ Implications the implementation issues must resolve, not decided here:
 ## Out of scope
 
 - **Per-user ACLs on workflows or steps.** Access is granted through roles, never
-  by naming a user in the definition. `assignedTo` already pre-assigns a task to
-  a person and is unaffected.
+  by naming a user; a single-member role covers the "only this person" case.
+  `assignedTo` already pre-assigns a task to a person and is unaffected.
 - **Role hierarchies or inheritance** (`approver` implies `reviewer`). Flat sets.
-- **Hiding workflows a member cannot start.** Listing stays governed by
-  `visibility`; this ADR gates actions, not shelves.
+- **Workflow ownership / `createdBy`.** Not introduced; workflow access is
+  administered by workspace owner/admin. Revisit only if per-creator control is
+  actually asked for.
 - **Renaming `workspace_members.role` to `membership`** — still deferred.
 - **The `roles` field on the Workflow Definition envelope**, which declares a
   vocabulary rather than granting anything. Whether it survives now that role
