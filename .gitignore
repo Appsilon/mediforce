@@ -28,6 +28,9 @@ apps/*/secrets/
 
 # claude
 .claude/settings.local.json
+# Local preview-tool scaffolding. Untracked twice already; ignoring it stops the
+# next `git add -A` from staging it again.
+.claude/launch.json
 memory/
 CLAUDE.local.md
 
