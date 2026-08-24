@@ -248,10 +248,15 @@ _Avoid_: "Role" alone — that's overloaded with process-domain roles below.
 
 **Roles** *(process-domain, plural)*:
 Functional roles a User holds for workflow purposes — e.g. `reviewer`, `PI`,
-`approver`. Roles are Deployment-global and drive task assignment, Step access,
-and notifications.
+`approver`. Free-form strings; there is no fixed vocabulary. Roles are
+Deployment-global and drive task assignment, Step access (`allowedRoles`), and
+notification targeting.
 _Avoid_: confusing with Membership. Membership governs a Workspace; Roles
 describe workflow function across the Deployment.
+_Note_: less of this is live than the entry suggests — nothing writes
+`user_roles`, and `allowedRoles` is declarative only. Scoping Roles to a
+Workspace is proposed, not decided, in
+[ADR-0019](docs/adr/0019-workspace-scoped-roles.md).
 
 **Caller Identity** *(per-request authorization subject)*:
 The authorization subject resolved for one request: either a signed-in User
