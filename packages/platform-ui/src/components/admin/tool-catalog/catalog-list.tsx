@@ -18,9 +18,6 @@ export function CatalogList({ entries, selectedId, onSelect }: CatalogListProps)
           <Wrench className="h-5 w-5 text-muted-foreground" />
         </div>
         <p className="text-sm text-muted-foreground">No catalog entries yet.</p>
-        <p className="text-xs text-muted-foreground">
-          Add your first to enable stdio MCP servers for agents.
-        </p>
       </div>
     );
   }

@@ -9,7 +9,14 @@ test.describe('Agent Oversight Journey', () => {
     trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/agents`);
     await expect(page.getByText('Custom Agents')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Custom configuration for foundation models')).toBeVisible();
+    await expect(page.getByText('Reusable agent configurations that workflow steps call by id')).toBeVisible();
+    // The definition lives in a popover beside the title — click it open, since
+    // a closed Radix popover renders nothing into the DOM.
+    await page.getByRole('button', { name: 'What is an agent?' }).click();
+    await expect(
+      page.getByText(/An agent is a reusable configuration a workflow step calls by id/),
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
     await expect(page.getByRole('link', { name: 'New Agent', exact: true })).toBeVisible();
 
     // Run history lives on Monitoring → Agents, not on the Agents catalog page.
@@ -78,7 +85,9 @@ test.describe('Agent Oversight Journey', () => {
     await expect(page.getByText('Custom Agents')).toBeVisible({ timeout: 10_000 });
     await page.getByRole('link', { name: 'New Agent', exact: true }).click();
     await page.waitForURL(`**/${TEST_ORG_HANDLE}/agents/new`, { timeout: 20_000 });
-    await expect(page.getByText('Register a new AI agent and configure its capabilities.')).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.getByText(/An agent is a reusable configuration workflow steps call by id/),
+    ).toBeVisible({ timeout: 10_000 });
 
     // Agents accumulate across runs against a shared database, so the name has
     // to be unique or the catalog assertion matches an earlier run's card.
@@ -92,9 +101,14 @@ test.describe('Agent Oversight Journey', () => {
 
     await page.getByRole('button', { name: /save new agent/i }).click();
 
-    // The created agent is scoped to the current workspace, so it shows up in
-    // the catalog the user lands on.
-    await page.waitForURL(`**/${TEST_ORG_HANDLE}/agents`, { timeout: 20_000 });
+    // Creating lands on the new agent's Configure page — MCP servers can only
+    // be bound once the agent is persisted, so that is where the flow continues.
+    await page.waitForURL(`**/${TEST_ORG_HANDLE}/agents/definitions/**`, { timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: 'MCP Servers' })).toBeVisible({ timeout: 20_000 });
+
+    // The created agent is scoped to the current workspace, so it also shows up
+    // in the catalog.
+    await page.goto(`/${TEST_ORG_HANDLE}/agents`);
     await expect(page.getByRole('heading', { name: agentName })).toBeVisible({ timeout: 10_000 });
   });
 });

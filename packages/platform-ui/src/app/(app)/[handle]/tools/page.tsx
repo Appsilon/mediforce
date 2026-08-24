@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { AgentDefinition, ToolCatalogEntry } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
+import { ConceptPopover } from '@/components/ui/concept-intro';
 import { routes } from '@/lib/routes';
 import { apiFetch } from '@/lib/api-fetch';
 import { mediforce } from '@/lib/mediforce';
@@ -227,10 +228,24 @@ export default function ToolsPage() {
     <div className="flex flex-1 flex-col p-6">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-headline font-semibold">Tools</h1>
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-xl font-headline font-semibold">Tools</h1>
+            <ConceptPopover label="What is a tool?">
+              <p>
+                <strong>A tool is an MCP server — an external tool host an agent can call while it runs.</strong>{' '}
+                <span className="font-medium text-foreground">Stdio</span> servers are commands the platform launches
+                alongside the agent; an admin curates them in the tool catalog and agents reference an entry by its
+                id. <span className="font-medium text-foreground">HTTP</span> servers are remote endpoints any member
+                binds directly to an agent.
+              </p>
+              <p>
+                An agent reaches only the servers bound to it, and a workflow step can narrow that set further —
+                never widen it.
+              </p>
+            </ConceptPopover>
+          </div>
           <p className="text-sm text-muted-foreground mt-0.5">
-            External capabilities available to agents in @{handle}. Admins curate the stdio catalog; any member can bind
-            HTTP MCPs to agents.
+            MCP servers available to agents in @{handle}.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -254,10 +269,10 @@ export default function ToolsPage() {
           )}
           <Link
             href={`/${handle}/agents`}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
           >
             <Plug className="h-3.5 w-3.5" />
-            Add HTTP binding
+            Bind to an agent
           </Link>
         </div>
       </div>
