@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 const listToolCatalogMock = vi.fn();
 const apiFetchMock = vi.fn();
@@ -52,6 +53,8 @@ describe('AdminToolCatalogPage', () => {
 
   it('explains what a catalog entry is before offering to create one', async () => {
     render(<AdminToolCatalogPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'What is a catalog entry?' }));
 
     expect(
       await screen.findByText(/A catalog entry is a stdio MCP server you have approved for/),

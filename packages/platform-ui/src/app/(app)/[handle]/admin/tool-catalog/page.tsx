@@ -9,7 +9,7 @@ import { apiFetch } from '@/lib/api-fetch';
 import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { adminBackHref } from '@/lib/routes';
-import { ConceptIntro } from '@/components/ui/concept-intro';
+import { ConceptPopover } from '@/components/ui/concept-intro';
 import { CatalogList } from '@/components/admin/tool-catalog/catalog-list';
 import { CatalogForm } from '@/components/admin/tool-catalog/catalog-form';
 import { DeleteCatalogEntryDialog } from '@/components/admin/tool-catalog/delete-catalog-entry-dialog';
@@ -172,7 +172,19 @@ export default function AdminToolCatalogPage() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="flex-1">
-            <h1 className="text-xl font-semibold">Tool catalog</h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-xl font-semibold">Tool catalog</h1>
+              <ConceptPopover label="What is a catalog entry?">
+                <p>
+                  <strong>A catalog entry is a stdio MCP server you have approved for @{handle}</strong> — the
+                  command to launch, its arguments and its environment, stored once under an id.
+                </p>
+                <p>
+                  Agents bind to an entry by that id and cannot spell out a command of their own, so what runs inside
+                  an agent stays whatever admins put here.
+                </p>
+              </ConceptPopover>
+            </div>
             <p className="text-sm text-muted-foreground">
               Curated stdio MCP servers available to agents in @{handle}.
             </p>
@@ -185,19 +197,6 @@ export default function AdminToolCatalogPage() {
             <Plus className="h-3.5 w-3.5" />
             New catalog entry
           </button>
-        </div>
-
-        <div className="mb-6">
-          <ConceptIntro>
-            <p>
-              <strong>A catalog entry is a stdio MCP server you have approved for @{handle}</strong> — the command to
-              launch, its arguments and its environment, stored once under an id.
-            </p>
-            <p>
-              Agents bind to an entry by that id and cannot spell out a command of their own, so what runs inside an
-              agent stays whatever admins put here.
-            </p>
-          </ConceptIntro>
         </div>
 
         {listError !== null && (

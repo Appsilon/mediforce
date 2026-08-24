@@ -10,9 +10,13 @@ test.describe('Agent Oversight Journey', () => {
     await page.goto(`/${TEST_ORG_HANDLE}/agents`);
     await expect(page.getByText('Custom Agents')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('Reusable agent configurations that workflow steps call by id')).toBeVisible();
+    // The definition lives in a popover beside the title — click it open, since
+    // a closed Radix popover renders nothing into the DOM.
+    await page.getByRole('button', { name: 'What is an agent?' }).click();
     await expect(
       page.getByText(/An agent is a reusable configuration a workflow step calls by id/),
     ).toBeVisible();
+    await page.keyboard.press('Escape');
     await expect(page.getByRole('link', { name: 'New Agent', exact: true })).toBeVisible();
 
     // Run history lives on Monitoring → Agents, not on the Agents catalog page.

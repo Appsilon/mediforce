@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 const listToolCatalogMock = vi.fn();
 const apiFetchMock = vi.fn();
@@ -47,6 +48,8 @@ beforeEach(() => {
 describe('ToolsPage', () => {
   it('explains what a tool is before offering to configure one', async () => {
     render(<ToolsPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'What is a tool?' }));
 
     expect(
       await screen.findByText(/A tool is an MCP server/),

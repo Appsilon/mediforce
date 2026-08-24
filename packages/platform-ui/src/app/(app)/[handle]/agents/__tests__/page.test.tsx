@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 const apiFetchMock = vi.fn();
 
@@ -29,6 +30,8 @@ beforeEach(() => {
 describe('AgentsPage', () => {
   it('explains what an agent is before offering to create one', async () => {
     render(<AgentsPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'What is an agent?' }));
 
     expect(
       await screen.findByText(/An agent is a reusable configuration a workflow step calls by id/),
