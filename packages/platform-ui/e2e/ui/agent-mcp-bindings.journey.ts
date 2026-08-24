@@ -18,7 +18,10 @@ test.describe('Agent MCP Bindings Journey', () => {
     trackPageErrors(page);
 
     await page.goto(`/${TEST_ORG_HANDLE}/agents/definitions/claude-code-agent`);
-    await expect(page.getByText(/edit this ai agent/i)).toBeVisible({ timeout: 30_000 });
+    // Gate on the form's submit control, not on prose: the editor renders a
+    // skeleton until the definition resolves, so Save changes appearing is
+    // the load signal, and it survives copy edits to the page header.
+    await expect(page.getByRole('button', { name: /save changes/i })).toBeVisible({ timeout: 30_000 });
 
     // MCP Servers section visible (any kind — no warning copy)
     const mcpHeading = page.getByRole('heading', { name: /mcp servers/i });

@@ -20,7 +20,7 @@ test.describe('Tool Catalog Journey', () => {
 
     // Admins see the "Manage catalog" shortcut.
     await expect(page.getByRole('link', { name: /manage catalog/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /add http binding/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /bind to an agent/i })).toBeVisible();
 
     // Search filters entries by id.
     await page.getByPlaceholder('Search tools...').click();

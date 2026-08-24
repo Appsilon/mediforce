@@ -59,7 +59,10 @@ test.describe('Agent MCP OAuth Journey', () => {
 
     // ── Open the fixture agent with the pre-bound OAuth binding ──────────
     await page.goto(`/${TEST_ORG_HANDLE}/agents/definitions/${OAUTH_AGENT_ID}`);
-    await expect(page.getByText(/edit this ai agent/i)).toBeVisible({ timeout: 15_000 });
+    // Gate on the form's submit control, not on prose: the editor renders a
+    // skeleton until the definition resolves, so Save changes appearing is
+    // the load signal, and it survives copy edits to the page header.
+    await expect(page.getByRole('button', { name: /save changes/i })).toBeVisible({ timeout: 15_000 });
 
     const mcpHeading = page.getByRole('heading', { name: /mcp servers/i });
     await expect(mcpHeading).toBeVisible();

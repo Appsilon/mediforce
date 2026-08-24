@@ -20,10 +20,12 @@ vi.mock('@/hooks/use-namespace-role', () => ({
   useNamespaceRole: () => ({ role: 'owner', canAdmin: true, loading: false }),
 }));
 
+vi.mock('@/contexts/auth-context', () => ({
+  useAuth: () => ({ user: { id: 'user-1' }, loading: false }),
+}));
+
 vi.mock('next/navigation', () => ({
   useParams: () => ({ handle: 'acme' }),
-  useRouter: () => ({ replace: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('next/link', () => ({
@@ -32,7 +34,7 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-import AdminToolCatalogPage from '../page';
+import ToolsPage from '../page';
 
 beforeEach(() => {
   listToolCatalogMock.mockResolvedValue({ entries: [] });
@@ -42,22 +44,15 @@ beforeEach(() => {
   });
 });
 
-describe('AdminToolCatalogPage', () => {
-  it('renders one New catalog entry button when the catalog is empty', async () => {
-    render(<AdminToolCatalogPage />);
-
-    expect(await screen.findByText('No catalog entries yet.')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'New catalog entry' })).toHaveLength(1);
-  });
-
-  it('explains what a catalog entry is before offering to create one', async () => {
-    render(<AdminToolCatalogPage />);
+describe('ToolsPage', () => {
+  it('explains what a tool is before offering to configure one', async () => {
+    render(<ToolsPage />);
 
     expect(
-      await screen.findByText(/A catalog entry is a stdio MCP server you have approved for/),
+      await screen.findByText(/A tool is an MCP server/),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/cannot spell out a command of their own/),
+      screen.getByText(/a workflow step can narrow that set further — never/),
     ).toBeInTheDocument();
   });
 });

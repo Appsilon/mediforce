@@ -219,6 +219,9 @@ A reusable, mutable agent configuration: system prompt plus MCP server
 bindings. Workflow Steps reference Agents; one Agent can power many Steps and
 is not versioned today.
 _Avoid_: Agent Definition (legacy code term; there is no versioned definition).
+_Note_: 
+Agent: only `systemPrompt` reaches the prompt (as `agentIdentityPrompt`), and
+Skills are step-level (`step.agent.skillsDir`).
 
 **MCP Server**:
 External tool host (stdio or HTTP) accessible to an agent via Model Context

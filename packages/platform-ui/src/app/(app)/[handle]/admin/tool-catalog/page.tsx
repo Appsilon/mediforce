@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api-fetch';
 import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { adminBackHref } from '@/lib/routes';
+import { ConceptIntro } from '@/components/ui/concept-intro';
 import { CatalogList } from '@/components/admin/tool-catalog/catalog-list';
 import { CatalogForm } from '@/components/admin/tool-catalog/catalog-form';
 import { DeleteCatalogEntryDialog } from '@/components/admin/tool-catalog/delete-catalog-entry-dialog';
@@ -186,6 +187,19 @@ export default function AdminToolCatalogPage() {
           </button>
         </div>
 
+        <div className="mb-6">
+          <ConceptIntro>
+            <p>
+              <strong>A catalog entry is a stdio MCP server you have approved for @{handle}</strong> — the command to
+              launch, its arguments and its environment, stored once under an id.
+            </p>
+            <p>
+              Agents bind to an entry by that id and cannot spell out a command of their own, so what runs inside an
+              agent stays whatever admins put here.
+            </p>
+          </ConceptIntro>
+        </div>
+
         {listError !== null && (
           <div className="mb-4 rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {listError}
@@ -207,11 +221,11 @@ export default function AdminToolCatalogPage() {
             {mode.kind === 'idle' && (
               <div className="flex h-full flex-col items-center justify-center gap-2 py-12 text-center">
                 <p className="text-sm font-medium">
-                  {entries.length === 0 ? 'No catalog entries yet.' : 'Select an entry to edit.'}
+                  {entries.length === 0 ? 'Nothing to edit yet.' : 'Select an entry to edit.'}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {entries.length === 0
-                    ? 'Add your first entry to get started.'
+                    ? 'Click “New catalog entry” above to add your first.'
                     : 'Or click “New catalog entry” above to add another.'}
                 </p>
               </div>

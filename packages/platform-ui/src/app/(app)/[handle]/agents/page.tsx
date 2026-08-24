@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation';
 import { getModelDisplayName } from '@/lib/agent-models';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
+import { ConceptIntro } from '@/components/ui/concept-intro';
 import type { LucideIcon } from 'lucide-react';
 import type { AgentDefinition } from '@mediforce/platform-core';
 
@@ -287,7 +288,7 @@ export default function AgentsPage() {
         <div>
           <h1 className="text-2xl font-bold">Custom Agents</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Custom configuration for foundation models
+            Reusable agent configurations that workflow steps call by id
           </p>
         </div>
         <Link
@@ -301,6 +302,17 @@ export default function AgentsPage() {
           New Agent
         </Link>
       </div>
+
+      <ConceptIntro>
+        <p>
+          <strong>An agent is a reusable configuration a workflow step calls by id</strong> — a system prompt plus
+          the MCP servers that step is allowed to reach. One agent can power many steps, and agents are not
+          versioned, so editing one changes every step that already references it.
+        </p>
+        <p>
+          The model a run uses is chosen per step in the workflow definition, not on the agent.
+        </p>
+      </ConceptIntro>
 
       <AgentCatalog handle={handle} />
     </div>
