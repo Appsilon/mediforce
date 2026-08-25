@@ -20,12 +20,19 @@ on:
       - 'website/**'
       # The navbar version pill reads `version` from the root manifest.
       - 'package.json'
+      # The install below is frozen, so the lockfile and the workspace layout
+      # decide what this site is built from — a dependency refresh that touches
+      # no page still changes the build, and this is the only job that runs it.
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
       - '.github/workflows/pages.yml'
   pull_request:
     paths:
       - 'docs/**'
       - 'website/**'
       - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -69,9 +76,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      # Nothing else in CI builds this: the root `tsc -b` has no `website`
-      # reference, so on a pull request this step is the only thing standing
-      # between a broken docs build and the live site.
+      # `docusaurus build` transpiles without type-checking, and the root
+      # `tsc -b` has no `website` reference, so this is the only thing in CI
+      # that type-checks the package.
+      - name: Type-check the documentation site
+        run: pnpm --filter @mediforce/website typecheck
+
+      # Nothing else in CI builds this either, so on a pull request the two
+      # steps together are all that stands between a broken docs build and the
+      # live site.
       - name: Build the documentation site
         run: pnpm --filter @mediforce/website build
 

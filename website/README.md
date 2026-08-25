@@ -42,8 +42,10 @@ every asset path 404s.
 
 Two consequences worth knowing. A broken build here blocks a marketing-site
 deploy, because they publish as one artifact. And on a pull request that
-workflow builds the site without deploying it, which is the only thing that
-type-checks this package — the root `tsc -b` has no `website` reference.
+workflow builds the site without deploying it — the only place either the build
+or `typecheck` runs in CI, since the root `tsc -b` has no `website` reference
+and `docusaurus build` transpiles without checking types (which is what
+`tsconfig.json` says at the top of the file, and why the workflow runs both).
 
 ## Theming
 
