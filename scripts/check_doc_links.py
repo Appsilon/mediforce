@@ -15,6 +15,11 @@ External URLs, `mailto:`, pure `#anchor` targets, fenced code blocks, and
 placeholder paths (`<name>`, globs) are out of scope; anchors and query strings
 are stripped before the existence check.
 
+Under `website/` a link target is resolved the way Docusaurus resolves it: the
+extension is optional, and a directory means its `index.md`. `[Verify](../run/verify)`
+is a live link there and a broken one anywhere else, because GitHub — which
+renders every other Markdown file in this repo — does not fill in the extension.
+
 A document declaring `status: historical` (or, for an ADR, `status: superseded`)
 in its frontmatter is skipped entirely: it records a past state of the repo, so
 its references are expected to point at files that have since been deleted.
@@ -31,6 +36,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 SKIP_DIRS = {".git", "node_modules", ".next", "dist", "build", ".turbo", "coverage"}
+
+# Docusaurus resolves an extensionless target and a directory to a page; every
+# other Markdown file in the repo is read on GitHub, which does not.
+DOCUSAURUS_ROOT = "website/"
+DOCUSAURUS_SUFFIXES = (".md", ".mdx", "/index.md", "/index.mdx")
 
 # Records of a past repo state — their references are meant to be frozen, not live.
 SKIP_FILES = {"CHANGELOG.md"}
@@ -55,10 +65,21 @@ ADR_STATUS_RE = re.compile(
 AUDIENCES = {"everyone", "engineers", "workflow-authors", "operators", "agents"}
 
 
+def is_build_output(rel: Path) -> bool:
+    """`build`, `dist` and friends name generated directories — but `build` is
+    also a legitimate docs section (`website/docs/build/`), so the name only
+    counts until the first `docs/` segment."""
+    parts = rel.parts
+    return any(
+        part in SKIP_DIRS and "docs" not in parts[:index]
+        for index, part in enumerate(parts)
+    )
+
+
 def markdown_files() -> list[Path]:
     files = []
     for path in REPO_ROOT.rglob("*.md"):
-        if any(part in SKIP_DIRS for part in path.relative_to(REPO_ROOT).parts):
+        if is_build_output(path.relative_to(REPO_ROOT)):
             continue
         files.append(path)
     return sorted(files)
@@ -188,6 +209,14 @@ def check_routing() -> list[str]:
     ]
 
 
+def link_exists(resolved: Path, linking_file: Path) -> bool:
+    if resolved.exists():
+        return True
+    if not linking_file.as_posix().startswith(DOCUSAURUS_ROOT):
+        return False
+    return any(Path(f"{resolved}{suffix}").exists() for suffix in DOCUSAURUS_SUFFIXES)
+
+
 def check_file(path: Path) -> list[str]:
     text = path.read_text(encoding="utf-8")
     rel = path.relative_to(REPO_ROOT)
@@ -213,7 +242,7 @@ def check_file(path: Path) -> list[str]:
                 continue
             base = REPO_ROOT if cleaned.startswith("/") else path.parent
             resolved = (base / cleaned.lstrip("/")).resolve()
-            if not resolved.exists():
+            if not link_exists(resolved, rel):
                 problems.append(f"{rel}:{line_no}: broken link -> {target}")
 
         for target in BACKTICK_PATH_RE.findall(line):

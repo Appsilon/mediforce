@@ -37,5 +37,14 @@ and Space Grotesk headings. The page is the workflow canvas: a dotted ground at
 step nodes floating on it. Change a colour in the app and change it here too, or
 the two drift.
 
+## Link checking
+
+`pnpm check:docs` link-checks these pages along with the rest of the repo, and
+resolves their targets the way Docusaurus does: an extensionless target such as
+`../run/verify` and a bare directory both work here and nowhere else in the
+repo. Nothing under `website/docs/` has to declare the `status` / `audience` /
+`last_reviewed` frontmatter `docs/` requires, and none of it is walked for
+reachability from `docs/README.md` — this sidebar routes a reader here.
+
 Search is `@easyops-cn/docusaurus-search-local`: the index ships inside the
 build, so it needs no Algolia account and works on preview deploys.
