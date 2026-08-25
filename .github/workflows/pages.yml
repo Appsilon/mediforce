@@ -78,11 +78,18 @@ jobs:
       - name: Mount the documentation at /docs
         run: cp -r website/build _site/docs
 
+      # Jekyll does not carry `docs/CNAME` into its output, and that file is
+      # what keeps the site on mediforce.ai instead of a `github.io` URL. The
+      # Pages setting holds the domain too, so this is belt-and-braces — but
+      # the artifact is the half we control from here.
+      - name: Keep the custom domain in the artifact
+        run: cp docs/CNAME _site/CNAME
+
       # One page from each half. The failure this catches is a composed site
       # that publishes successfully with half its content missing.
       - name: Check both sites reached the artifact
         run: |
-          for page in index.html README.html security.html \
+          for page in index.html README.html security.html CNAME \
                       docs/index.html docs/install/index.html; do
             test -f "_site/$page" || {
               echo "::error::_site/$page missing — composed site incomplete"
