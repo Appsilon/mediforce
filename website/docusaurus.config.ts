@@ -13,10 +13,13 @@ const config: Config = {
   tagline: 'Workflow and agent orchestration for pharma',
   favicon: 'img/favicon.ico',
 
-  // Set for the eventual host; a wrong value only affects absolute URLs in
-  // sitemap/canonical tags, not local development.
-  url: 'https://docs.mediforce.ai',
-  baseUrl: '/',
+  // Served as a path on the marketing site rather than a `docs.` subdomain: a
+  // repository gets one GitHub Pages site and mediforce.ai already holds it.
+  // `.github/workflows/pages.yml` composes the two into one artifact, so this
+  // baseUrl is what makes the built asset and anchor paths line up with where
+  // that workflow mounts the site.
+  url: 'https://mediforce.ai',
+  baseUrl: '/docs/',
 
   organizationName: 'Appsilon',
   projectName: 'mediforce',

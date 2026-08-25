@@ -1,0 +1,108 @@
+name: Pages
+
+# mediforce.ai and the product documentation ship as one GitHub Pages site:
+# the marketing pages at the root, the Docusaurus build under `/docs`. A repo
+# gets one Pages site, so a `docs.mediforce.ai` subdomain would have needed a
+# second host; mounting the docs on a path keeps both on the one we have.
+#
+# This replaces GitHub's legacy Pages builder, which published `main:/docs`
+# directly. Switching the Pages source to "GitHub Actions" is what makes this
+# workflow the thing that serves mediforce.ai — until then it only proves the
+# artifact builds.
+#
+# The two path lists are duplicated because GitHub Actions does not expand
+# YAML anchors; `ci.yml` and `docs.yml` duplicate theirs for the same reason.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'website/**'
+      # The navbar version pill reads `version` from the root manifest.
+      - 'package.json'
+      - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'website/**'
+      - 'package.json'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  # Never cancel a deploy that is already writing to the live site; redundant
+  # PR builds are free to go.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      # Reproduces what the legacy builder does today. Every `.md` under
+      # `docs/` is rendered to HTML and is already live — `docs/README.md`
+      # serves as mediforce.ai/README — so publishing `docs/` as plain static
+      # files would keep the `.html` pages and 404 every Markdown one.
+      - name: Build the marketing site with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./docs
+          destination: ./_site
+
+      # That action runs in a container as root, so its output is root-owned
+      # and the later copy would be denied.
+      - name: Take ownership of the Jekyll output
+        run: sudo chown -R "$(id -u):$(id -g)" _site
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Nothing else in CI builds this: the root `tsc -b` has no `website`
+      # reference, so on a pull request this step is the only thing standing
+      # between a broken docs build and the live site.
+      - name: Build the documentation site
+        run: pnpm --filter @mediforce/website build
+
+      - name: Mount the documentation at /docs
+        run: cp -r website/build _site/docs
+
+      # One page from each half. The failure this catches is a composed site
+      # that publishes successfully with half its content missing.
+      - name: Check both sites reached the artifact
+        run: |
+          for page in index.html README.html security.html \
+                      docs/index.html docs/install/index.html; do
+            test -f "_site/$page" || {
+              echo "::error::_site/$page missing — composed site incomplete"
+              exit 1
+            }
+          done
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: ./_site
+
+  deploy:
+    # Pull requests build the artifact but must not publish it.
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
