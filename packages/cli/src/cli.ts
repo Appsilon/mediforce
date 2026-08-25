@@ -75,6 +75,7 @@ import { coworkChatCommand } from './commands/cowork-chat';
 import { usersMeCommand } from './commands/users-me';
 import { usersClearMustChangePasswordCommand } from './commands/users-clear-must-change-password';
 import { namespaceGetCommand } from './commands/namespace-get';
+import { namespaceListMembersCommand } from './commands/namespace-list-members';
 import { namespaceCreateCommand } from './commands/namespace-create';
 import { agentRunListCommand } from './commands/agent-run-list';
 import { agentRunGetCommand } from './commands/agent-run-get';
@@ -227,6 +228,7 @@ export const TREE: Record<string, BranchEntry> = {
     description: 'Workspaces (get, create, update, delete, reset, leave, members)',
     leaves: {
       get: { description: 'Fetch a namespace + member list', fn: namespaceGetCommand },
+      'list-members': { description: 'List members with their process roles (reviewer, PI, …)', fn: namespaceListMembersCommand },
       create: { description: 'Create an organization namespace', fn: namespaceCreateCommand },
       update: { description: 'Edit display name / bio / icon', fn: namespaceUpdateCommand },
       delete: { description: 'Delete a workspace (owner only, cascades members; not personal)', fn: namespaceDeleteCommand },

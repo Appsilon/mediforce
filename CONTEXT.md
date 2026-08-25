@@ -258,8 +258,9 @@ _Avoid_: confusing with Membership. Both are per-Workspace and both are called
 administers the Workspace, Roles (`user_roles.role`) describe workflow
 function.
 _Note_: Roles can now be granted (`mediforce namespace set-member-roles`,
-`PUT /api/namespaces/:handle/members/:uid/roles`), but `allowedRoles` is still
-declarative — nothing enforces it yet
+`PUT /api/namespaces/:handle/members/:uid/roles`) and read back
+(`mediforce namespace list-members`, `GET /api/users/members`), but
+`allowedRoles` is still declarative — nothing enforces it yet
 ([#1249](https://github.com/Appsilon/mediforce/issues/1249)).
 
 **Caller Identity** *(per-request authorization subject)*:

@@ -205,7 +205,8 @@ Create the first user directly — an `auth_users` row with a bcrypt
 `packages/platform-ui/.env.example`) — or configure OIDC against the customer's
 IdP and let them sign in. Process-domain roles start empty and are granted
 per workspace by its owner or admins — `mediforce namespace set-member-roles
-<handle> <uid> --roles reviewer,approver` ([ADR-0019](../adr/0019-workspace-scoped-roles.md)).
+<handle> <uid> --roles reviewer,approver`, read back with `mediforce namespace
+list-members <handle>` ([ADR-0019](../adr/0019-workspace-scoped-roles.md)).
 Nothing enforces them yet, so an install that grants none still works: a
 `step.allowedRoles` is declarative until
 [#1249](https://github.com/Appsilon/mediforce/issues/1249) lands.
