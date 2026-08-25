@@ -235,7 +235,9 @@ MUST require writing `/output/result.json`.
 
 Use CM3/L3 for Mediforce's built-in agent approve/revise loop. L3 revision keys
 off the literal `approve` and `revise` verdicts; custom verdict keys belong on a
-separate human `type: review` step.
+separate human `type: review` step, which keeps working for existing workflows —
+but per [ADR-0014](../adr/0014-control-mode-ui-concept.md) the designer no longer
+offers that type for new steps, so reach for CM3 when authoring.
 
 Human review steps MUST define explicit `verdicts`. Use `requiresComment: true`
 for revise/reject-style verdicts.

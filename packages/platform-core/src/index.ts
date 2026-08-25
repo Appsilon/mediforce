@@ -503,6 +503,10 @@ export type { RepoCloneTarget } from './utils/repo-url';
 export { getWorkflowStatus, type WorkflowStatus } from './utils/workflow-status';
 export { toSlug, uniqueSlug } from './utils/slug';
 
+// Pre-made blocks — shared by the Add Block picker and the workflow assistant.
+export { BLOCK_PRESETS, BLOCK_CATEGORIES } from './blocks/block-presets';
+export type { BlockPreset, BlockPresetPayload, BlockCategory } from './blocks/block-presets';
+
 // Workflow examples — shared loader for MCP tool, tests, and build scripts.
 // Uses Node.js fs/path so NOT exported from this barrel (breaks browser bundles).
 // Import directly: import { loadWorkflowExamples } from '@mediforce/platform-core/workflow-examples'

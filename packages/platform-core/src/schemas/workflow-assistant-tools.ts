@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { WorkflowStepSchema } from './workflow-definition';
+import { BLOCK_PRESETS } from '../blocks/block-presets';
 
 const ACTION_KIND_ALIASES: Record<string, 'http' | 'reshape' | 'email' | 'spawn' | 'wait'> = {
   sendemail: 'email', mail: 'email', notify: 'email', notification: 'email',
@@ -78,11 +79,42 @@ function verdictsRequireDecisionType(
   }
 }
 
-export const AddStepToolSchema = StepConfigSchema.extend({
+const PRESET_BY_ID = new Map(BLOCK_PRESETS.map((preset) => [preset.id, preset]));
+
+// Non-empty by construction; `block-presets.test.ts` pins that the catalog has
+// entries and that their ids are unique.
+const BLOCK_PRESET_IDS = BLOCK_PRESETS.map((preset) => preset.id) as [string, ...string[]];
+
+/**
+ * Merge a named block preset underneath the call's own fields.
+ *
+ * This is what makes "the same block whether the user clicked it or asked for it"
+ * a property of the code rather than an instruction in the prompt: `presetId`
+ * resolves to the exact payload the Add Block panel inserts, and anything the
+ * assistant states explicitly (a name, a real recipient) still wins over it.
+ */
+function resolvePreset(val: unknown): unknown {
+  if (val === null || typeof val !== 'object' || Array.isArray(val)) return val;
+  const call = val as Record<string, unknown>;
+  if (typeof call.presetId !== 'string') return val;
+  const preset = PRESET_BY_ID.get(call.presetId);
+  // An unknown id falls through to the enum below, which names the valid ones.
+  if (preset === undefined) return val;
+  return { ...preset.payload, ...call };
+}
+
+/** The field shape, before preset resolution — exported so callers can inspect it. */
+export const AddStepToolFieldsSchema = StepConfigSchema.extend({
+  presetId: z.enum(BLOCK_PRESET_IDS).optional(),
   insertAfterId: z.string().nullable().optional(),
   insertBeforeId: z.string().nullable().optional(),
   clientId: z.string().optional(),
-}).superRefine(verdictsRequireDecisionType);
+});
+
+export const AddStepToolSchema = z.preprocess(
+  resolvePreset,
+  AddStepToolFieldsSchema.superRefine(verdictsRequireDecisionType),
+);
 export type AddStepTool = z.infer<typeof AddStepToolSchema>;
 
 export const UpdateStepToolSchema = StepConfigSchema.partial().extend({

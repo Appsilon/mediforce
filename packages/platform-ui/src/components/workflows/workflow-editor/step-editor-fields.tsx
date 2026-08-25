@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Info } from 'lucide-react';
-import * as Tooltip from '@radix-ui/react-tooltip';
+import { HoverTooltip } from './hover-tooltip';
 import { cn } from '@/lib/utils';
 
 export const inputBase = 'w-full bg-muted/60 text-sm rounded-xl border-0 focus:ring-2 focus:ring-primary/30 focus:outline-none px-3 py-2 transition-colors';
@@ -27,31 +27,12 @@ export function humanizeToken(raw: string): string {
 }
 
 function FieldTooltip({ text }: { text: string }) {
-  // Radix portals the content out of the step editor's `overflow-y-auto`
-  // sidebar and flips on collision, so long tooltips (e.g. the Docker image
-  // help) are no longer clipped by the scroll container or the viewport edge.
   return (
-    <Tooltip.Provider delayDuration={150}>
-      <Tooltip.Root>
-        <Tooltip.Trigger asChild>
-          <span className="inline-flex items-center shrink-0" data-testid="field-tooltip-trigger">
-            <Info className="h-3.5 w-3.5 text-muted-foreground/40 hover:text-primary/60 cursor-help transition-colors" />
-          </span>
-        </Tooltip.Trigger>
-        <Tooltip.Portal>
-          <Tooltip.Content
-            side="left"
-            align="center"
-            sideOffset={6}
-            collisionPadding={8}
-            className="z-[9999] max-w-xs rounded-lg bg-popover border border-border shadow-md px-2.5 py-2 text-xs text-popover-foreground leading-relaxed"
-          >
-            {text}
-            <Tooltip.Arrow className="fill-popover" />
-          </Tooltip.Content>
-        </Tooltip.Portal>
-      </Tooltip.Root>
-    </Tooltip.Provider>
+    <HoverTooltip content={text}>
+      <span className="inline-flex items-center shrink-0" data-testid="field-tooltip-trigger">
+        <Info className="h-3.5 w-3.5 text-muted-foreground/40 hover:text-primary/60 cursor-help transition-colors" />
+      </span>
+    </HoverTooltip>
   );
 }
 
