@@ -139,6 +139,11 @@ services:
       # directory must exist before first launch:
       #   sudo mkdir -p /var/lib/mediforce
       - MEDIFORCE_DATA_DIR=/var/lib/mediforce
+      # Task-attachment ceiling (ADR-0003 §4). Read by platform-api's upload
+      # handler, which runs inside this service; unset means the 100 MiB
+      # default, and a larger value is clamped back down to it. Without this
+      # line the knob is settable in `.env` and never reaches the process.
+      - MEDIFORCE_ATTACHMENT_MAX_BYTES=${MEDIFORCE_ATTACHMENT_MAX_BYTES:-}
       # Boot refuses to start without an email provider unless this is true.
       - MEDIFORCE_DISABLE_EMAIL=${MEDIFORCE_DISABLE_EMAIL:-}
       - EMAIL_PROVIDER=${EMAIL_PROVIDER:-}
