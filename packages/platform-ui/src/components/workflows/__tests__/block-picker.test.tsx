@@ -3,7 +3,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { BlockPicker } from '../block-picker';
-import { CM_ROWS, STEP_TYPE_OPTIONS } from '@/lib/block-presets';
+import { EXECUTOR_SECTIONS, STEP_TYPE_OPTIONS } from '@/lib/block-presets';
 import { BLOCK_PRESETS } from '@mediforce/platform-core';
 import type { NewStepPayload } from '@/lib/control-mode';
 
@@ -46,11 +46,12 @@ function stepTypeButton(value: string): HTMLElement {
   return screen.getByTestId(`step-type-option-${value}`);
 }
 
-/** Opens the control-mode card holding `optionId`, then returns that option. */
+/** Opens the executor card holding `optionId`, then returns that option. */
 function executorOption(optionId: string): HTMLElement {
-  const row = CM_ROWS.find((candidate) => candidate.buttons.some((btn) => btn.id === optionId));
-  if (row === undefined) throw new Error(`no control-mode row holds ${optionId}`);
-  openSection(row.cm);
+  const section = EXECUTOR_SECTIONS.find((candidate) =>
+    candidate.options.some((option) => option.id === optionId));
+  if (section === undefined) throw new Error(`no executor section holds ${optionId}`);
+  openSection(section.id);
   return optionButton(optionId);
 }
 
@@ -73,7 +74,7 @@ describe('BlockPicker step type guidance (#1186)', () => {
   it('keeps the step type in the header card, visible whatever is folded', () => {
     renderFullTier();
 
-    openSection('CM2');
+    openSection('agent');
 
     expect(screen.getByTestId('step-type-option-creation')).toBeInTheDocument();
     expect(screen.getByTestId('step-type-option-decision')).toBeInTheDocument();
@@ -85,9 +86,9 @@ describe('BlockPicker executor guidance (#1186)', () => {
   it('explains every executor option, not just its name', () => {
     renderFullTier();
 
-    for (const row of CM_ROWS) {
-      for (const button of row.buttons) {
-        expect(executorOption(button.id)).toHaveTextContent(button.purpose);
+    for (const section of EXECUTOR_SECTIONS) {
+      for (const option of section.options) {
+        expect(executorOption(option.id)).toHaveTextContent(option.purpose);
       }
     }
   });
@@ -103,17 +104,35 @@ describe('BlockPicker executor guidance (#1186)', () => {
     expect(executorOption('autonomous-agent')).toHaveTextContent(/no approval/i);
   });
 
-  it('gives every control mode its own card, folded shut until asked for', () => {
+  it('splits Full into two cards, folded shut until asked for', () => {
     renderFullTier();
 
+    expect(screen.getByTestId('section-no-agent')).toHaveTextContent('No agent');
+    expect(screen.getByTestId('section-agent')).toHaveTextContent('Agent');
     expect(screen.queryByTestId('executor-option-cowork')).not.toBeInTheDocument();
 
-    openSection('CM2');
+    openSection('agent');
     expect(screen.getByTestId('executor-option-cowork')).toBeInTheDocument();
 
-    openSection('CM0');
+    openSection('no-agent');
     expect(screen.queryByTestId('executor-option-cowork')).not.toBeInTheDocument();
     expect(screen.getByTestId('executor-option-script')).toBeInTheDocument();
+  });
+
+  it('gathers every mode that runs an agent into the Agent card', () => {
+    renderFullTier();
+
+    openSection('agent');
+    for (const id of ['assist', 'cowork', 'human-review', 'autonomous-agent']) {
+      expect(optionButton(id)).toBeInTheDocument();
+    }
+    expect(screen.queryByTestId('executor-option-human')).not.toBeInTheDocument();
+
+    openSection('no-agent');
+    for (const id of ['human', 'script', 'action']) {
+      expect(optionButton(id)).toBeInTheDocument();
+    }
+    expect(screen.queryByTestId('executor-option-autonomous-agent')).not.toBeInTheDocument();
   });
 
   it('adds the executor the clicked option describes', () => {
@@ -149,6 +168,19 @@ describe('BlockPicker executor guidance (#1186)', () => {
 
     fireEvent.click(assist);
     expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it('greys Assist alone, leaving the modes it now shares a card with selectable', () => {
+    const onAdd = vi.fn();
+    renderFullTier(onAdd);
+
+    openSection('agent');
+    for (const id of ['cowork', 'human-review', 'autonomous-agent']) {
+      expect(optionButton(id)).not.toHaveAttribute('aria-disabled');
+    }
+
+    fireEvent.click(optionButton('cowork'));
+    expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ executor: 'cowork' }));
   });
 });
 

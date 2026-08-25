@@ -64,22 +64,22 @@ function stepTypeButton(page: import('@playwright/test').Page, type: 'creation' 
 }
 
 /**
- * Switches to the Full tier and opens the control-mode card holding `executor`,
- * then returns that option.
+ * Switches to the Full tier and opens the card holding `executor`, then returns
+ * that option.
  *
- * The picker opens on Simple (pre-made blocks); executors live in Full, where
- * each control mode is its own card and one folds open at a time. 'agent' maps
- * to "Autonomous agent" (CM4).
+ * The picker opens on Simple (pre-made blocks); executors live in Full, which
+ * folds into two cards — No agent, and Agent for every mode that runs one —
+ * with one open at a time. 'agent' maps to "Autonomous agent" (CM4).
  */
 async function executorButton(
   page: import('@playwright/test').Page,
   executor: 'human' | 'agent' | 'script' | 'cowork',
 ) {
   const options = {
-    human:  { id: 'human',             section: 'CM0' },
-    script: { id: 'script',            section: 'CM0' },
-    cowork: { id: 'cowork',            section: 'CM2' },
-    agent:  { id: 'autonomous-agent',  section: 'CM4' },
+    human:  { id: 'human',             section: 'no-agent' },
+    script: { id: 'script',            section: 'no-agent' },
+    cowork: { id: 'cowork',            section: 'agent' },
+    agent:  { id: 'autonomous-agent',  section: 'agent' },
   } as const;
   const { id, section } = options[executor];
 

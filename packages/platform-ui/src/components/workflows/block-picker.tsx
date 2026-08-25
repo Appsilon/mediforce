@@ -1,15 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { User, Bot, Terminal, PenLine, GitBranch, Search, Mail, Plus, X } from 'lucide-react';
+import { User, Bot, Terminal, PenLine, GitBranch, Mail, Plus, X } from 'lucide-react';
 import { BLOCK_PRESETS, BLOCK_CATEGORIES, type BlockCategory, type BlockPreset } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { useCapabilities } from '@/hooks/use-capabilities';
 import { CollapsibleCard } from './workflow-editor/collapsible-card';
 import { HoverTooltip } from './workflow-editor/hover-tooltip';
-import { CONTROL_MODE_LABELS, CONTROL_MODE_NUMBER, CONTROL_MODE_DISABLED, getControlMode, type ControlMode, type NewStepPayload } from '@/lib/control-mode';
+import { CONTROL_MODE_DISABLED, getControlMode, type NewStepPayload } from '@/lib/control-mode';
 import { STEP_STYLES, STEP_TYPE_CONFIG, ExecutorIcon, getExecutorLabel } from './workflow-diagram';
-import { CM_ROWS, STEP_TYPE_OPTIONS, type CMRow } from '@/lib/block-presets';
+import { EXECUTOR_SECTIONS, STEP_TYPE_OPTIONS, type ExecutorSection } from '@/lib/block-presets';
 
 type Tier = 'simple' | 'full';
 
@@ -37,12 +37,6 @@ const CATEGORY_ICON: Record<BlockCategory, React.ComponentType<{ className?: str
   control: GitBranch,
 };
 
-// Inverse of CONTROL_MODE_NUMBER (control mode → CM label), derived so the two
-// never drift.
-const CM_TO_CONTROL_MODE = Object.fromEntries(
-  (Object.entries(CONTROL_MODE_NUMBER) as [ControlMode, string][]).map(([mode, cm]) => [cm, mode]),
-) as Record<CMRow['cm'], ControlMode>;
-
 const STEP_TYPE_ACTIVE: Record<string, string> = {
   blue:   'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
   purple: 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700',
@@ -55,13 +49,11 @@ const STEP_TYPE_HOVER: Record<string, string> = {
 
 // Keyed by colour, not by control mode — both tiers label their section cards
 // the same way, so both read from these.
-const CM_LABEL_COLOR: Record<string, string> = {
+const SECTION_LABEL_COLOR: Record<string, string> = {
   orange: 'text-orange-600 dark:text-orange-400',
   yellow: 'text-yellow-600 dark:text-yellow-400',
   pink:   'text-pink-600 dark:text-pink-400',
-  lime:   'text-lime-600 dark:text-lime-400',
   teal:   'text-teal-600 dark:text-teal-400',
-  indigo: 'text-indigo-600 dark:text-indigo-400',
   violet: 'text-violet-600 dark:text-violet-400',
 };
 
@@ -69,41 +61,14 @@ const ICON_COLOR: Record<string, string> = {
   orange: 'text-orange-400 dark:text-orange-500',
   yellow: 'text-yellow-500 dark:text-yellow-400',
   pink:   'text-pink-500 dark:text-pink-400',
-  lime:   'text-lime-500 dark:text-lime-400',
   teal:   'text-teal-500 dark:text-teal-400',
-  indigo: 'text-indigo-500 dark:text-indigo-400',
   violet: 'text-violet-500 dark:text-violet-400',
 };
 
-function CMRowIcon({ cm, color }: { cm: CMRow['cm']; color: string }) {
-  const iconCls = cn('h-3.5 w-3.5', ICON_COLOR[color]);
-  if (cm === 'CM0') return <User className={iconCls} />;
-  if (cm === 'CM1') return (
-    <>
-      <User className={cn(iconCls, 'shrink-0')} />
-      <span className="relative inline-flex shrink-0">
-        <Bot className={iconCls} />
-        <Search className={cn('absolute -bottom-0.5 -right-1.5 h-2 w-2', ICON_COLOR[color])} strokeWidth={2.5} />
-      </span>
-    </>
-  );
-  if (cm === 'CM2') return (
-    <>
-      <User className={cn(iconCls, 'shrink-0')} />
-      <Bot className={cn(iconCls, 'shrink-0')} />
-    </>
-  );
-  if (cm === 'CM3') return (
-    <>
-      <Bot className={cn(iconCls, 'shrink-0')} />
-      <span className="relative inline-flex shrink-0">
-        <User className={iconCls} />
-        <Search className={cn('absolute -bottom-0.5 -right-1.5 h-2 w-2', ICON_COLOR[color])} strokeWidth={2.5} />
-      </span>
-    </>
-  );
-  return <Bot className={iconCls} />;
-}
+const SECTION_ICON: Record<ExecutorSection['id'], React.ComponentType<{ className?: string }>> = {
+  'no-agent': User,
+  'agent': Bot,
+};
 
 type Props = {
   onAdd: (payload: NewStepPayload) => void;
@@ -195,7 +160,7 @@ export function BlockPicker({ onAdd, onClose, insertingOnEdge = false }: Props) 
 
   const switchTier = (next: Tier) => {
     setTier(next);
-    setOpenSection(next === 'simple' ? BLOCK_CATEGORIES[0] : CM_ROWS[0].cm);
+    setOpenSection(next === 'simple' ? BLOCK_CATEGORIES[0] : EXECUTOR_SECTIONS[0].id);
   };
 
   const handleAdd = (payload: Omit<NewStepPayload, 'type'>) => {
@@ -291,7 +256,7 @@ export function BlockPicker({ onAdd, onClose, insertingOnEdge = false }: Props) 
             titleNode={
               <>
                 <CategoryIcon className={cn('h-3.5 w-3.5 shrink-0', ICON_COLOR[color])} />
-                <span className={cn('text-[11px] font-bold shrink-0', CM_LABEL_COLOR[color])}>
+                <span className={cn('text-[11px] font-bold shrink-0', SECTION_LABEL_COLOR[color])}>
                   {CATEGORY_LABELS[category]}
                 </span>
               </>
@@ -334,42 +299,43 @@ export function BlockPicker({ onAdd, onClose, insertingOnEdge = false }: Props) 
         );
       })}
 
-      {/* One card per control mode, so Full folds the same way Simple does. */}
-      {tier === 'full' && CM_ROWS.map((row) => {
-        const controlMode = CM_TO_CONTROL_MODE[row.cm];
-        const disabled = CONTROL_MODE_DISABLED[controlMode];
+      {/* Two cards — agentless executors, then every mode that runs an agent —
+          so Full folds the same way Simple does. */}
+      {tier === 'full' && EXECUTOR_SECTIONS.map((section) => {
+        const SectionIcon = SECTION_ICON[section.id];
         return (
           <CollapsibleCard
-            key={row.cm}
-            testId={`section-${row.cm}`}
+            key={section.id}
+            testId={`section-${section.id}`}
             fill={false}
-            open={isOpen(row.cm)}
-            onToggle={() => toggle(row.cm)}
+            open={isOpen(section.id)}
+            onToggle={() => toggle(section.id)}
             titleNode={
               <>
-                <span className="flex items-center gap-0.5 shrink-0">
-                  <CMRowIcon cm={row.cm} color={row.color} />
-                </span>
-                <span className={cn('text-[11px] font-bold shrink-0', CM_LABEL_COLOR[row.color])}>
-                  {CONTROL_MODE_LABELS[controlMode]}
+                <SectionIcon className={cn('h-3.5 w-3.5 shrink-0', ICON_COLOR[section.color])} />
+                <span className={cn('text-[11px] font-bold shrink-0', SECTION_LABEL_COLOR[section.color])}>
+                  {section.label}
                 </span>
               </>
             }
           >
             <div className="space-y-2">
-              {row.buttons.map((btn) => {
+              {section.options.map((option) => {
+                // Per option, not per card: Assist is the only mode still
+                // unimplemented, and it now sits beside three that are not.
+                const disabled = CONTROL_MODE_DISABLED[option.mode];
                 return (
                   <OptionButton
-                    key={btn.id}
-                    testId={`executor-option-${btn.id}`}
+                    key={option.id}
+                    testId={`executor-option-${option.id}`}
                     disabled={disabled}
-                    onPick={() => handleAdd(btn.payload)}
-                    description={btn.purpose}
+                    onPick={() => handleAdd(option.payload)}
+                    description={option.purpose}
                   >
                     <BlockNodePreview
-                      label={btn.label}
-                      executor={btn.payload.executor}
-                      autonomyLevel={btn.payload.autonomyLevel}
+                      label={option.label}
+                      executor={option.payload.executor}
+                      autonomyLevel={option.payload.autonomyLevel}
                       stepType={pendingType}
                       dimmed={disabled}
                     />
