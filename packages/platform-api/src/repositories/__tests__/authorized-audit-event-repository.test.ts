@@ -22,6 +22,7 @@ function userCaller(uid: string, namespaces: readonly string[]): CallerIdentity 
     uid,
     namespaces: new Set(namespaces),
     namespaceRoles: new Map(namespaces.map((handle) => [handle, 'member' as const])),
+    namespaceProcessRoles: new Map(),
     isSystemActor: false,
   };
 }

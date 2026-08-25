@@ -15,6 +15,7 @@ const userInNsA: CallerIdentity = {
   uid: 'u-1',
   namespaces: new Set(['ns-a']),
   namespaceRoles: new Map([['ns-a', 'member']]),
+  namespaceProcessRoles: new Map(),
   isSystemActor: false,
 };
 
@@ -80,6 +81,7 @@ describe('assertCallerIsNamespaceAdmin', () => {
       uid: 'u',
       namespaces: new Set(roles.map(([handle]) => handle)),
       namespaceRoles: new Map(roles),
+      namespaceProcessRoles: new Map(),
       isSystemActor: false,
     };
   }
@@ -112,6 +114,7 @@ describe('assertCallerCanAdminDockerImages', () => {
       uid: 'u',
       namespaces: new Set(roles.map(([handle]) => handle)),
       namespaceRoles: new Map(roles),
+      namespaceProcessRoles: new Map(),
       isSystemActor: false,
     };
   }

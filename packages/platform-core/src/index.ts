@@ -303,6 +303,7 @@ export type {
   UserDirectoryService,
   DirectoryUser,
   UserAuthMetadata,
+  RoleGrant,
   AgentRunRepository,
   ListAgentRunsOptions,
   ListAgentRunsPage,
@@ -422,6 +423,7 @@ export {
   InMemoryAgentOAuthTokenRepository,
   InMemoryAgentRunRepository,
   InMemoryPlatformSettingsRepository,
+  InMemoryUserDirectoryService,
   // Test factories
   buildProcessDefinition,
   buildProcessInstance,

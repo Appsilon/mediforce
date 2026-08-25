@@ -1,13 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { Namespace, NamespaceMember, UserDirectoryService } from '@mediforce/platform-core';
-import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
+import { InMemoryNamespaceRepo, createTestScope, stubUserDirectory, userCaller } from '../../../testing/index';
 import { getNamespace } from '../get-namespace';
 import { NotFoundError } from '../../../errors';
 
-const directoryWithOwnerEmail: UserDirectoryService = {
-  async getUsersByRole() {
-    return [];
-  },
+const directoryWithOwnerEmail: UserDirectoryService = stubUserDirectory({
   async getUserMetadata(uid: string) {
     if (uid !== 'uid-owner') return null;
     return {
@@ -17,7 +14,7 @@ const directoryWithOwnerEmail: UserDirectoryService = {
       photoURL: null,
     };
   },
-};
+});
 
 const ACME: Namespace = {
   handle: 'acme',

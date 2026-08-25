@@ -11,8 +11,52 @@ export interface UserAuthMetadata {
   photoURL: string | null;
 }
 
+/**
+ * One process-domain role grant (ADR-0019). `workflowName: null` — the default
+ * — means every workflow in the workspace; a value narrows the grant to that
+ * one workflow.
+ */
+export interface RoleGrant {
+  readonly role: string;
+  readonly workflowName: string | null;
+}
+
 export interface UserDirectoryService {
-  getUsersByRole(role: string): Promise<DirectoryUser[]>;
+  /**
+   * Holders of `role` in `namespace` who may act on `workflowName`: grants
+   * scoped to that workflow plus workspace-wide ones (`workflowName: null`).
+   *
+   * Every consumer must pass the workflow it is acting on. Resolving a role
+   * without one would email a holder scoped to workflow A about runs of
+   * workflow B — enforcement narrowed while notifications leak (ADR-0019).
+   */
+  getUsersByRoleInNamespace(
+    role: string,
+    namespace: string,
+    workflowName: string,
+  ): Promise<DirectoryUser[]>;
+  /**
+   * Roles `uid` holds in `namespace`. Without `workflowName`, every role the
+   * user holds anywhere in the workspace; with one, the roles that resolve for
+   * that workflow (workspace-wide grants included). De-duplicated.
+   */
+  getRolesForUser(uid: string, namespace: string, workflowName?: string): Promise<string[]>;
+  /**
+   * Replace `uid`'s grants in `namespace` wholesale. Idempotent; an empty
+   * `grants` clears them. Full replace rather than add/remove so the caller
+   * states the end state and two concurrent edits cannot interleave into a set
+   * neither asked for.
+   */
+  setRolesForUser(uid: string, namespace: string, grants: readonly RoleGrant[]): Promise<void>;
+  /**
+   * Drop every grant narrowed to `workflowName` in `namespace`. Called when a
+   * workflow is deleted: a grant that outlives its workflow is invisible until
+   * the name is reused, at which point it silently reactivates (ADR-0019).
+   * Workspace-wide grants are untouched.
+   */
+  clearRolesForWorkflow(namespace: string, workflowName: string): Promise<void>;
+  /** Every role held in `namespace`, de-duplicated — the workspace's role vocabulary. */
+  getRolesInNamespace(namespace: string): Promise<string[]>;
   resolveUser?(identifier: string): Promise<DirectoryUser | null>;
   getUserMetadata(uid: string): Promise<UserAuthMetadata | null>;
 }

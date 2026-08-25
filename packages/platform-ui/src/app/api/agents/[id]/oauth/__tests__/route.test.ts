@@ -12,6 +12,10 @@ const mockGetMembershipsForUser = vi.fn();
 vi.mock('@mediforce/platform-infra', () => ({
   getSharedPostgresClient: () => ({ db: {} }),
   resolveSessionUserId: (...args: unknown[]) => mockResolveSessionUserId(...args),
+  // `resolveCallerIdentity` resolves the caller's process roles alongside
+  // their memberships (ADR-0019). No route under test reads them, so an
+  // empty map is the honest stub.
+  getWorkspaceProcessRoles: async () => new Map(),
 }));
 
 vi.mock('@/lib/platform-services', () => ({

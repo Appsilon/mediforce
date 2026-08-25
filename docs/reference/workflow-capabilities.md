@@ -222,7 +222,7 @@ A workflow can push notifications to roles on lifecycle events, via
 | `event` | Fires when | Dispatch |
 |---------|-----------|----------|
 | `task_assigned` | a human task is created/assigned | resolved to role members and sent via `NotificationService` ([`notification-service.ts`](../../packages/platform-core/src/interfaces/notification-service.ts)) |
-| `agent_escalation` | an agent run escalates to a human | dispatched in [`workflow-engine.ts`](../../packages/workflow-engine/src/engine/workflow-engine.ts) (`getUsersByRole` → `NotificationService.send`) |
+| `agent_escalation` | an agent run escalates to a human | dispatched in [`workflow-engine.ts`](../../packages/workflow-engine/src/engine/workflow-engine.ts) (`getUsersByRoleInNamespace` → `NotificationService.send`, so a role grant narrowed to another workflow is not notified — ADR-0019) |
 
 Channel + address shape is `NotificationTargetSchema` (`email` / `webhook`) in
 the same file.

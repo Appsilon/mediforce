@@ -12,6 +12,7 @@ import type { Database } from '../client';
 import { workspaces, workspaceMembers } from '../schema/workspace';
 import { agents } from '../schema/agent-definition';
 import { toolCatalogEntries } from '../schema/tool-catalog';
+import { userRoles } from '../schema/user-role';
 
 /**
  * Postgres-backed NamespaceRepository (ADR-0001).
@@ -163,14 +164,25 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
     // Postgres membership lives entirely in `workspace_members`; there is no
     // `users/{uid}.organizations` denormalisation to keep in sync (that was a
     // Firestore-only mirror). Deleting the join-table row IS the org removal.
-    await this.db
-      .delete(workspaceMembers)
-      .where(
-        and(
-          eq(workspaceMembers.workspace, handle),
-          eq(workspaceMembers.uid, uid),
-        ),
-      );
+    //
+    // The user's process-domain roles in this workspace go with it, in the
+    // same transaction (ADR-0019). `user_roles.namespace` cascades on
+    // workspace *deletion*, which is a different event — without this, Bob
+    // leaves, his `reviewer` grant survives unreachable, and re-adding him six
+    // months later silently restores a role nobody granted.
+    await this.db.transaction(async (tx) => {
+      await tx
+        .delete(workspaceMembers)
+        .where(
+          and(
+            eq(workspaceMembers.workspace, handle),
+            eq(workspaceMembers.uid, uid),
+          ),
+        );
+      await tx
+        .delete(userRoles)
+        .where(and(eq(userRoles.namespace, handle), eq(userRoles.uid, uid)));
+    });
   }
 
   async setMemberRole(

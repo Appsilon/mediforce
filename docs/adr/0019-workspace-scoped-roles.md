@@ -6,12 +6,17 @@ last_reviewed: 2026-08-21
 
 # ADR-0019: Process roles are workspace-scoped
 
-> **Nothing here is built.** This ADR decides how roles *should* work; no part
-> of it ships. Today `user_roles` is Deployment-global with no write path, and
-> `step.allowedRoles` is declarative — any workspace member can claim and
-> complete any human task. Implementation is tracked by the epic,
-> [#1246](https://github.com/Appsilon/mediforce/issues/1246); this line changes
-> to "Implemented" when the ADR is promoted to `finalized`.
+> **Partly built.** The storage model below ships as of
+> [#1248](https://github.com/Appsilon/mediforce/issues/1248): `user_roles` is
+> workspace-scoped with an optional `workflow_name`, owner/admin can grant
+> roles via CLI and API, notification targeting is namespace- and
+> workflow-scoped, and both cascades (membership removal, workflow deletion)
+> are in place. **Enforcement is not.** `step.allowedRoles` is still
+> declarative — any workspace member can claim and complete any human task —
+> and no workflow mutation is gated
+> ([#1249](https://github.com/Appsilon/mediforce/issues/1249)). The rest of the
+> epic is [#1246](https://github.com/Appsilon/mediforce/issues/1246); this line
+> changes to "Implemented" when the ADR is promoted to `finalized`.
 
 **Date:** 2026-08-21
 **Deciders:** Krystian Zieliński
@@ -39,6 +44,8 @@ against source:
 1. **No one can grant a role.** The table is written by the one-time
    `seed-user-roles` migration and by `PostgresInviteService.seedInvite`, whose
    only caller — the `inviteUser` handler — passes `roles: []` hardcoded.
+   *(Resolved by [#1248](https://github.com/Appsilon/mediforce/issues/1248):
+   `setNamespaceMemberRoles` + `mediforce namespace set-member-roles`.)*
 2. **`step.allowedRoles` is not enforced.** `RbacService` implements the check
    and `WorkflowEngine.advanceStep` calls it, but `rbacService` is the engine's
    optional 4th constructor argument and production passes `undefined`. Any

@@ -84,6 +84,7 @@ import { namespaceResetCommand } from './commands/namespace-reset';
 import { namespaceLeaveCommand } from './commands/namespace-leave';
 import { namespaceRemoveMemberCommand } from './commands/namespace-remove-member';
 import { namespaceSetMemberRoleCommand } from './commands/namespace-set-member-role';
+import { namespaceSetMemberRolesCommand } from './commands/namespace-set-member-roles';
 import { processesAgentEventsCommand } from './commands/processes-agent-events';
 import { configSetCommand } from './commands/config-set';
 import { configGetCommand } from './commands/config-get';
@@ -232,7 +233,8 @@ export const TREE: Record<string, BranchEntry> = {
       reset: { description: 'Delete every workflow in a workspace, keep the workspace', fn: namespaceResetCommand },
       leave: { description: 'Leave a workspace (self-remove)', fn: namespaceLeaveCommand },
       'remove-member': { description: 'Remove a member from a workspace', fn: namespaceRemoveMemberCommand },
-      'set-member-role': { description: 'Flip a member to admin|member', fn: namespaceSetMemberRoleCommand },
+      'set-member-role': { description: 'Flip a member to admin|member (workspace membership)', fn: namespaceSetMemberRoleCommand },
+      'set-member-roles': { description: 'Set a member\'s process roles (reviewer, PI, …)', fn: namespaceSetMemberRolesCommand },
     },
   },
   processes: {

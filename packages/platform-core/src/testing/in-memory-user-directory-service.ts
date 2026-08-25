@@ -1,6 +1,7 @@
 import type {
   UserDirectoryService,
   DirectoryUser,
+  RoleGrant,
   UserAuthMetadata,
 } from '../interfaces/user-directory-service';
 
@@ -11,33 +12,104 @@ export interface InMemoryDirectoryUser {
   readonly image?: string | null;
 }
 
+interface StoredGrant {
+  readonly uid: string;
+  readonly namespace: string;
+  readonly role: string;
+  readonly workflowName: string | null;
+}
+
 /**
- * In-memory double for the global-`user_roles` UserDirectoryService
- * (ADR-0002 PR1). Mirrors `PostgresUserDirectoryService`: `getUsersByRole`
- * inner-joins roles to users (a role row for an unknown uid yields nothing),
+ * In-memory double for the workspace-scoped `user_roles` UserDirectoryService
+ * (ADR-0019). Mirrors `PostgresUserDirectoryService`: role reads inner-join to
+ * users (a grant for an unknown uid yields nothing), a `workflowName: null`
+ * grant answers for every workflow in the workspace, and
  * `getUserMetadata.lastSignInTime` is always `null` (no sign-in record before
- * NextAuth sessions). The Postgres backend MUST satisfy the same contract.
+ * NextAuth sessions). The Postgres backend MUST satisfy the same contract —
+ * `user-directory-parity.test.ts` runs both against it.
  */
 export class InMemoryUserDirectoryService implements UserDirectoryService {
   private readonly users = new Map<string, InMemoryDirectoryUser>();
-  private readonly roles: { uid: string; role: string }[] = [];
+  private grants: StoredGrant[] = [];
 
   addUser(user: InMemoryDirectoryUser): void {
     this.users.set(user.uid, user);
   }
 
-  addRole(uid: string, role: string): void {
-    if (!this.roles.some((r) => r.uid === uid && r.role === role)) {
-      this.roles.push({ uid, role });
+  addRole(uid: string, namespace: string, role: string, workflowName: string | null = null): void {
+    const exists = this.grants.some(
+      (grant) =>
+        grant.uid === uid &&
+        grant.namespace === namespace &&
+        grant.role === role &&
+        grant.workflowName === workflowName,
+    );
+    if (!exists) this.grants.push({ uid, namespace, role, workflowName });
+  }
+
+  async getUsersByRoleInNamespace(
+    role: string,
+    namespace: string,
+    workflowName: string,
+  ): Promise<DirectoryUser[]> {
+    const uids = new Set(
+      this.grants
+        .filter(
+          (grant) =>
+            grant.role === role &&
+            grant.namespace === namespace &&
+            (grant.workflowName === null || grant.workflowName === workflowName),
+        )
+        .map((grant) => grant.uid),
+    );
+    return [...uids]
+      .map((uid) => this.users.get(uid))
+      .filter((user): user is InMemoryDirectoryUser => user !== undefined)
+      .map(toDirectoryUser);
+  }
+
+  async getRolesForUser(uid: string, namespace: string, workflowName?: string): Promise<string[]> {
+    return [
+      ...new Set(
+        this.grants
+          .filter(
+            (grant) =>
+              grant.uid === uid &&
+              grant.namespace === namespace &&
+              (workflowName === undefined ||
+                grant.workflowName === null ||
+                grant.workflowName === workflowName),
+          )
+          .map((grant) => grant.role),
+      ),
+    ];
+  }
+
+  async setRolesForUser(
+    uid: string,
+    namespace: string,
+    grants: readonly RoleGrant[],
+  ): Promise<void> {
+    this.grants = this.grants.filter(
+      (grant) => grant.uid !== uid || grant.namespace !== namespace,
+    );
+    for (const grant of grants) {
+      this.addRole(uid, namespace, grant.role, grant.workflowName);
     }
   }
 
-  async getUsersByRole(role: string): Promise<DirectoryUser[]> {
-    return this.roles
-      .filter((r) => r.role === role)
-      .map((r) => this.users.get(r.uid))
-      .filter((u): u is InMemoryDirectoryUser => u !== undefined)
-      .map(toDirectoryUser);
+  async clearRolesForWorkflow(namespace: string, workflowName: string): Promise<void> {
+    this.grants = this.grants.filter(
+      (grant) => grant.namespace !== namespace || grant.workflowName !== workflowName,
+    );
+  }
+
+  async getRolesInNamespace(namespace: string): Promise<string[]> {
+    return [
+      ...new Set(
+        this.grants.filter((grant) => grant.namespace === namespace).map((grant) => grant.role),
+      ),
+    ];
   }
 
   async resolveUser(identifier: string): Promise<DirectoryUser | null> {

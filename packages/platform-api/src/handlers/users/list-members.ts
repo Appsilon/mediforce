@@ -15,14 +15,16 @@ import type {
  *
  * `email` (contact / PII) and `lastSignInTime` (activity) are manager fields,
  * gated to owner/admin (and apiKey) callers: a plain member receives `null`
- * for both on every row. The roster — name, avatar, role and join date —
- * stays visible to all members so collaboration still works.
+ * for both on every row. The roster — name, avatar, membership, join date and
+ * process `roles` (ADR-0019) — stays visible to all members so collaboration
+ * still works: a member has to be able to see who the reviewer is.
  *
  * apiKey callers bypass the membership gate (server-to-server trust).
  *
  * When `scope.system.userDirectory` is `null` (no directory wired — only the
  * in-memory test scope hits this), each member is returned with
- * `email: null` and `lastSignInTime: null`. The list itself still resolves.
+ * `email: null`, `lastSignInTime: null` and `roles: []`. The list itself
+ * still resolves.
  */
 export async function listNamespaceMembers(
   input: ListNamespaceMembersInput,
@@ -40,22 +42,30 @@ export async function listNamespaceMembers(
 
   if (directory === null) {
     return {
-      members: memberDocs.map((doc) => withAuth(doc, null, canSeeManagerFields)),
+      members: memberDocs.map((doc) => withAuth(doc, null, [], canSeeManagerFields)),
     };
   }
 
   const authData = await Promise.all(
     memberDocs.map((doc) => directory.getUserMetadata(doc.uid).catch(() => null)),
   );
+  const roles = await Promise.all(
+    memberDocs.map((doc) =>
+      directory.getRolesForUser(doc.uid, input.namespace).catch(() => [] as string[]),
+    ),
+  );
 
   return {
-    members: memberDocs.map((doc, index) => withAuth(doc, authData[index], canSeeManagerFields)),
+    members: memberDocs.map((doc, index) =>
+      withAuth(doc, authData[index], roles[index] ?? [], canSeeManagerFields),
+    ),
   };
 }
 
 function withAuth(
   doc: Awaited<ReturnType<CallerScope['workspaces']['getMembers']>>[number],
   metadata: { email: string | null; displayName?: string | null; lastSignInTime: string | null; photoURL?: string | null } | null,
+  roles: readonly string[],
   canSeeManagerFields: boolean,
 ): NamespaceMemberWithAuth {
   const docDisplayName = typeof doc.displayName === 'string' && doc.displayName.length > 0
@@ -67,5 +77,6 @@ function withAuth(
     displayName: docDisplayName ?? metadata?.displayName ?? null,
     email: canSeeManagerFields ? metadata?.email ?? null : null,
     lastSignInTime: canSeeManagerFields ? metadata?.lastSignInTime ?? null : null,
+    roles: [...roles],
   };
 }
