@@ -44,15 +44,31 @@ export interface UserDirectoryService {
   /**
    * Replace `uid`'s grants in `namespace` wholesale. Idempotent; an empty
    * `grants` clears them. Full replace rather than add/remove so the caller
-   * states the end state and two concurrent edits cannot interleave into a set
-   * neither asked for.
+   * states the end state.
+   *
+   * Two guarantees the caller cannot provide for itself, so they live here:
+   *
+   * - **Serialized per `(uid, namespace)`.** Full replace only means "the set
+   *   the caller asked for" if replaces do not interleave. Two admins editing
+   *   the same member concurrently would otherwise both delete the set they
+   *   each read and then insert their own, leaving the union — a set neither
+   *   of them requested, holding roles neither of them granted.
+   * - **The target must be a member**, checked under the same lock. Roles
+   *   compose with Membership by AND (ADR-0019), so a grant to a non-member
+   *   authorises nothing — but it survives invisibly and silently takes
+   *   effect if that person is ever re-added. A caller's own pre-check cannot
+   *   close this: a removal committing between the check and the write
+   *   recreates exactly the grant the removal cascade just deleted.
+   *
+   * Throws `MemberNotInNamespaceError` when `uid` is not a member.
    */
   setRolesForUser(uid: string, namespace: string, grants: readonly RoleGrant[]): Promise<void>;
   /**
-   * Drop every grant narrowed to `workflowName` in `namespace`. Called when a
-   * workflow is deleted: a grant that outlives its workflow is invisible until
-   * the name is reused, at which point it silently reactivates (ADR-0019).
-   * Workspace-wide grants are untouched.
+   * Drop every grant narrowed to `workflowName` in `namespace`. Called on the
+   * two events that free the name — the workflow being deleted, and it being
+   * transferred out to another workspace: a grant that outlives its workflow
+   * is invisible until the name is reused, at which point it silently
+   * reactivates (ADR-0019). Workspace-wide grants are untouched.
    */
   clearRolesForWorkflow(namespace: string, workflowName: string): Promise<void>;
   /** Every role held in `namespace`, de-duplicated — the workspace's role vocabulary. */

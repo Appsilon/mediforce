@@ -5,12 +5,12 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { UserDirectoryService } from '@mediforce/platform-core';
+import { MemberNotInNamespaceError, type UserDirectoryService } from '@mediforce/platform-core';
 import { InMemoryUserDirectoryService } from '@mediforce/platform-core/testing';
 import { PostgresUserDirectoryService } from '../../auth/postgres-user-directory-service';
 import { authUsers } from '../schema/auth-user';
 import { userRoles } from '../schema/user-role';
-import { workspaces } from '../schema/workspace';
+import { workspaces, workspaceMembers } from '../schema/workspace';
 import * as schema from '../schema/index';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -37,6 +37,8 @@ interface SeedUser {
   displayName?: string | null;
   image?: string | null;
   grants: SeedGrant[];
+  /** Member of both workspaces unless this says otherwise. */
+  member?: boolean;
 }
 
 /**
@@ -44,6 +46,10 @@ interface SeedUser {
  * to one workflow; Bob holds `reviewer` in one workspace only; Carol holds
  * nothing. That is the smallest fixture that can tell workspace scoping,
  * workflow narrowing, and "no grant at all" apart (ADR-0019).
+ *
+ * All three are members of both workspaces, because `setRolesForUser` refuses
+ * to grant to a non-member. `DAVE` is the deliberate exception: a real user
+ * who belongs to neither, so the refusal has someone to refuse.
  */
 const FIXTURE: SeedUser[] = [
   {
@@ -65,6 +71,7 @@ const FIXTURE: SeedUser[] = [
     grants: [{ role: 'reviewer', namespace: WS_A, workflowName: null }],
   },
   { uid: 'u3', email: 'carol@x.com', grants: [] },
+  { uid: 'u4', email: 'dave@x.com', grants: [], member: false },
 ];
 
 const ALICE = { uid: 'u1', email: 'alice@x.com', displayName: 'Alice' };
@@ -156,6 +163,28 @@ function contract(name: string, build: () => Promise<UserDirectoryService>) {
       expect(await dir.getUsersByRoleInNamespace('reviewer', WS_A, OTHERFLOW)).toEqual([ALICE]);
     });
 
+    it('setRolesForUser refuses a non-member, leaving the workspace untouched', async () => {
+      // A grant to a non-member authorises nothing today, but survives
+      // invisibly and reactivates the day they are added (ADR-0019).
+      await expect(
+        dir.setRolesForUser('u4', WS_A, [{ role: 'reviewer', workflowName: null }]),
+      ).rejects.toBeInstanceOf(MemberNotInNamespaceError);
+
+      expect(await dir.getRolesForUser('u4', WS_A)).toEqual([]);
+      expect(byUid(await dir.getUsersByRoleInNamespace('reviewer', WS_A, OTHERFLOW))).toEqual([
+        ALICE,
+        BOB,
+      ]);
+    });
+
+    it('setRolesForUser refuses a member of another workspace', async () => {
+      // Membership is per workspace: holding it in WS_B does not make u2
+      // grantable in a workspace they never joined.
+      await expect(
+        dir.setRolesForUser('u2', 'ws-never-joined', [{ role: 'reviewer', workflowName: null }]),
+      ).rejects.toBeInstanceOf(MemberNotInNamespaceError);
+    });
+
     it('clearRolesForWorkflow drops narrowed grants and keeps workspace-wide ones', async () => {
       await dir.clearRolesForWorkflow(WS_A, TEALFLOW);
 
@@ -194,6 +223,10 @@ contract('InMemoryUserDirectoryService', async () => {
   const dir = new InMemoryUserDirectoryService();
   for (const u of FIXTURE) {
     dir.addUser({ uid: u.uid, email: u.email, displayName: u.displayName, image: u.image });
+    if (u.member !== false) {
+      dir.addMember(u.uid, WS_A);
+      dir.addMember(u.uid, WS_B);
+    }
     for (const grant of u.grants) {
       dir.addRole(u.uid, grant.namespace, grant.role, grant.workflowName);
     }
@@ -232,7 +265,7 @@ describe.skipIf(skipPg)('PostgresUserDirectoryService (parity)', () => {
 
   async function resetAndSeed(): Promise<void> {
     await testClient.unsafe(
-      `TRUNCATE TABLE "${schemaName}"."user_roles", "${schemaName}"."auth_users", "${schemaName}"."workspaces" CASCADE`,
+      `TRUNCATE TABLE "${schemaName}"."user_roles", "${schemaName}"."workspace_members", "${schemaName}"."auth_users", "${schemaName}"."workspaces" CASCADE`,
     );
     await db.insert(workspaces).values(
       [WS_A, WS_B].map((handle) => ({
@@ -249,6 +282,11 @@ describe.skipIf(skipPg)('PostgresUserDirectoryService (parity)', () => {
         image: u.image ?? null,
       })),
     );
+    await db.insert(workspaceMembers).values(
+      FIXTURE.filter((u) => u.member !== false).flatMap((u) =>
+        [WS_A, WS_B].map((workspace) => ({ workspace, uid: u.uid, role: 'member' })),
+      ),
+    );
     const grants = FIXTURE.flatMap((u) =>
       u.grants.map((grant) => ({
         uid: u.uid,
@@ -263,5 +301,49 @@ describe.skipIf(skipPg)('PostgresUserDirectoryService (parity)', () => {
   contract('PostgresUserDirectoryService', async () => {
     await resetAndSeed();
     return new PostgresUserDirectoryService(db);
+  });
+
+  // Postgres only: the in-memory double is serial by construction, so it can
+  // never reproduce this.
+  //
+  // READ COMMITTED gives every statement a fresh snapshot, so two replaces
+  // running at once each delete the set they saw and then insert their own,
+  // and the member ends up holding the union — a role from each admin,
+  // matching neither request. Firing both with `Promise.all` does not prove
+  // it: the pool opens its second connection lazily, so the first replace is
+  // usually done before the second one has a socket. This drives the
+  // interleave instead of hoping for it — an outer transaction holds the
+  // member's row exactly as an in-flight replace would, and the replace under
+  // test has to queue behind it rather than run alongside.
+  it('queues a full replace behind the transaction already holding that member', async () => {
+    await resetAndSeed();
+    const dir = new PostgresUserDirectoryService(db);
+
+    let releaseHolder!: () => void;
+    const holderReleased = new Promise<void>((resolve) => {
+      releaseHolder = resolve;
+    });
+    const holder = testClient.begin(async (tx) => {
+      await tx`SELECT 1 FROM "workspace_members" WHERE "workspace" = ${WS_A} AND "uid" = 'u3' FOR UPDATE`;
+      await holderReleased;
+    });
+
+    let settled = false;
+    const replace = dir
+      .setRolesForUser('u3', WS_A, [{ role: 'reviewer', workflowName: null }])
+      .then(() => {
+        settled = true;
+      });
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    // Still waiting on the row. Without the lock it would have finished long
+    // ago — which is exactly how both replaces get to insert.
+    expect(settled).toBe(false);
+
+    releaseHolder();
+    await holder;
+    await replace;
+
+    expect(await dir.getRolesForUser('u3', WS_A)).toEqual(['reviewer']);
   });
 });

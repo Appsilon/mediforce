@@ -1,13 +1,15 @@
 import { and, eq, isNull, or } from 'drizzle-orm';
-import type {
-  UserDirectoryService,
-  DirectoryUser,
-  RoleGrant,
-  UserAuthMetadata,
+import {
+  MemberNotInNamespaceError,
+  type UserDirectoryService,
+  type DirectoryUser,
+  type RoleGrant,
+  type UserAuthMetadata,
 } from '@mediforce/platform-core';
 import type { Database } from '../postgres/client';
 import { authUsers } from '../postgres/schema/auth-user';
 import { userRoles } from '../postgres/schema/user-role';
+import { workspaceMembers } from '../postgres/schema/workspace';
 
 /**
  * Postgres-backed UserDirectoryService (ADR-0002 §5, ADR-0019).
@@ -65,6 +67,22 @@ export class PostgresUserDirectoryService implements UserDirectoryService {
    * Full replace in one transaction: a reader between the delete and the
    * insert would otherwise see the member holding no roles at all, which is
    * exactly the window an enforcement check would fail closed in.
+   *
+   * The transaction opens by taking the member's `workspace_members` row
+   * `FOR UPDATE`, which buys both halves of the contract at once:
+   *
+   * - **Serialization.** READ COMMITTED does not give full replace its
+   *     meaning on its own — each statement takes a fresh snapshot, so two
+   *     concurrent replaces each delete the rows they saw and then insert
+   *     their own, and the table ends up holding the union. Blocking on one
+   *     row makes the second replace re-read after the first commits and
+   *     genuinely overwrite it.
+   * - **Membership.** `user_roles` has no FK to `(namespace, uid)` — a
+   *     workflow-narrowed grant is not a child of the membership row — so
+   *     nothing but this lock stops a grant being written for someone a
+   *     concurrent `removeMemberWithOrganizations` just removed. That removal
+   *     deletes this very row inside its own transaction, so the two paths
+   *     contend on it and the loser sees no row.
    */
   async setRolesForUser(
     uid: string,
@@ -72,6 +90,13 @@ export class PostgresUserDirectoryService implements UserDirectoryService {
     grants: readonly RoleGrant[],
   ): Promise<void> {
     await this.db.transaction(async (tx) => {
+      const membership = await tx
+        .select({ uid: workspaceMembers.uid })
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspace, namespace), eq(workspaceMembers.uid, uid)))
+        .for('update');
+      if (membership.length === 0) throw new MemberNotInNamespaceError(uid, namespace);
+
       await tx
         .delete(userRoles)
         .where(and(eq(userRoles.uid, uid), eq(userRoles.namespace, namespace)));

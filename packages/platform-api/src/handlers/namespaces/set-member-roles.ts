@@ -1,3 +1,4 @@
+import { MemberNotInNamespaceError } from '@mediforce/platform-core';
 import { assertCallerIsNamespaceAdmin } from '../../auth';
 import { emitAudit } from '../../audit-helpers';
 import { NotFoundError, PreconditionFailedError } from '../../errors';
@@ -23,6 +24,13 @@ import type {
  * That is the same failure the removal cascade exists to prevent, so the
  * grant path refuses to create it.
  *
+ * That check is not made here. A `getMember` call before the write is a
+ * check the storage layer can invalidate before it runs: a removal committing
+ * in between recreates exactly the grant the removal cascade just deleted.
+ * `setRolesForUser` therefore checks membership under the same lock it does
+ * the replace under, and this handler only translates the refusal — one
+ * check, at the only place it can be atomic.
+ *
  * Roles stay free-form strings: the vocabulary is open by construction, so an
  * unknown role is not a validation error here.
  */
@@ -35,11 +43,6 @@ export async function setNamespaceMemberRoles(
   const namespace = await scope.workspaces.getNamespace(input.handle);
   if (namespace === null) throw new NotFoundError(`Namespace "${input.handle}" not found`);
 
-  const member = await scope.workspaces.getMember(input.handle, input.uid);
-  if (member === null) {
-    throw new NotFoundError(`Member '${input.uid}' not in namespace '${input.handle}'`);
-  }
-
   const directory = scope.system.userDirectory;
   if (directory === null) {
     throw new PreconditionFailedError(
@@ -49,7 +52,12 @@ export async function setNamespaceMemberRoles(
   }
 
   const previous = await directory.getRolesForUser(input.uid, input.handle);
-  await directory.setRolesForUser(input.uid, input.handle, input.grants);
+  try {
+    await directory.setRolesForUser(input.uid, input.handle, input.grants);
+  } catch (error) {
+    if (error instanceof MemberNotInNamespaceError) throw new NotFoundError(error.message);
+    throw error;
+  }
 
   await emitAudit(scope.system.audit, scope.caller, {
     action: 'namespace.member_roles_updated',

@@ -4,6 +4,7 @@ import type {
   RoleGrant,
   UserAuthMetadata,
 } from '../interfaces/user-directory-service';
+import { MemberNotInNamespaceError } from '../errors';
 
 export interface InMemoryDirectoryUser {
   readonly uid: string;
@@ -27,13 +28,24 @@ interface StoredGrant {
  * `getUserMetadata.lastSignInTime` is always `null` (no sign-in record before
  * NextAuth sessions). The Postgres backend MUST satisfy the same contract —
  * `user-directory-parity.test.ts` runs both against it.
+ *
+ * `addRole` and `addMember` are the seeding backdoors, standing in for the
+ * parity fixture's direct inserts. Only `setRolesForUser` — the product write
+ * path — enforces membership, exactly as Postgres does: the invariant lives on
+ * the write, not on the table.
  */
 export class InMemoryUserDirectoryService implements UserDirectoryService {
   private readonly users = new Map<string, InMemoryDirectoryUser>();
+  private readonly members = new Set<string>();
   private grants: StoredGrant[] = [];
 
   addUser(user: InMemoryDirectoryUser): void {
     this.users.set(user.uid, user);
+  }
+
+  /** Seed membership, so `setRolesForUser` has a member to grant to. */
+  addMember(uid: string, namespace: string): void {
+    this.members.add(memberKey(uid, namespace));
   }
 
   addRole(uid: string, namespace: string, role: string, workflowName: string | null = null): void {
@@ -90,6 +102,9 @@ export class InMemoryUserDirectoryService implements UserDirectoryService {
     namespace: string,
     grants: readonly RoleGrant[],
   ): Promise<void> {
+    if (!this.members.has(memberKey(uid, namespace))) {
+      throw new MemberNotInNamespaceError(uid, namespace);
+    }
     this.grants = this.grants.filter(
       (grant) => grant.uid !== uid || grant.namespace !== namespace,
     );
@@ -132,6 +147,10 @@ export class InMemoryUserDirectoryService implements UserDirectoryService {
       photoURL: user.image ?? null,
     };
   }
+}
+
+function memberKey(uid: string, namespace: string): string {
+  return `${namespace}\u0000${uid}`;
 }
 
 function toDirectoryUser(user: InMemoryDirectoryUser): DirectoryUser {

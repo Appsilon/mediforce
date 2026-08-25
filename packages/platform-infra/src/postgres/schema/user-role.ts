@@ -14,9 +14,16 @@ import { workspaces } from './workspace';
  * `workflow_name` deliberately has no foreign key: a workflow is identified by
  * `(namespace, name)` across every version, so there is no single row to point
  * at. The cascade it would have bought is done explicitly in the
- * `deleteWorkflow` handler, and the membership cascade in
- * `removeMemberWithOrganizations` — both matter because a surviving grant is
- * invisible until the name (or the person) comes back.
+ * `deleteWorkflow` and `transferWorkflowNamespace` handlers — the two ways a
+ * name leaves a workspace — and the membership cascade in
+ * `removeMemberWithOrganizations`. All three matter because a surviving grant
+ * is invisible until the name (or the person) comes back.
+ *
+ * `(namespace, uid)` has no foreign key to `workspace_members` either: the
+ * grant is not a child row of the membership, and half this table's rows are
+ * narrowed to a workflow the membership knows nothing about. The invariant is
+ * enforced on the write instead — `setRolesForUser` takes the membership row
+ * `FOR UPDATE`, which is also what serializes concurrent full replaces.
  *
  * Uniqueness is `NULLS NOT DISTINCT` (Postgres 15+) so two workspace-wide
  * grants of the same role collapse to one row; a plain UNIQUE would treat

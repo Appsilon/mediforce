@@ -39,6 +39,12 @@ describe('setNamespaceMemberRoles handler', () => {
     auditRepo = new InMemoryAuditRepository();
     directory = new InMemoryUserDirectoryService();
     directory.addUser({ uid: 'uid-member', email: 'member@acme.test' });
+    // Membership is what `setRolesForUser` checks under its own lock, so the
+    // directory double carries the same roster the repo was seeded with.
+    for (const uid of ['uid-owner', 'uid-admin', 'uid-member']) {
+      directory.addMember(uid, HANDLE);
+    }
+    directory.addMember('uid-member', OTHER_HANDLE);
   });
 
   function scopeFor(caller = ownerCaller) {
@@ -141,6 +147,30 @@ describe('setNamespaceMemberRoles handler', () => {
         scopeFor(),
       ),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('404s when the target stops being a member between the read and the write', async () => {
+    // The repo still lists uid-ghost; storage does not. That is the shape of a
+    // removal committing mid-request — the window a `getMember` pre-check in
+    // this handler could not have closed. The refusal has to come from the
+    // write, and it has to reach the caller as the same 404.
+    namespaceRepo.seedMember(HANDLE, {
+      uid: 'uid-ghost',
+      role: 'member',
+      joinedAt: '2026-01-05T00:00:00.000Z',
+    });
+
+    await expect(
+      setNamespaceMemberRoles(
+        { handle: HANDLE, uid: 'uid-ghost', grants: [{ role: 'reviewer', workflowName: null }] },
+        scopeFor(),
+      ),
+    ).rejects.toBeInstanceOf(NotFoundError);
+
+    expect(await directory.getRolesForUser('uid-ghost', HANDLE)).toEqual([]);
+    expect(auditRepo.getAll().filter((e) => e.action === 'namespace.member_roles_updated')).toEqual(
+      [],
+    );
   });
 
   it('fails loudly when no user directory is wired', async () => {

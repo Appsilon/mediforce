@@ -1,5 +1,6 @@
 // Cross-backend domain errors
 export {
+  MemberNotInNamespaceError,
   WorkflowDefinitionVersionAlreadyExistsError,
   WorkflowDefinitionVersionNotFoundError,
 } from './errors';
