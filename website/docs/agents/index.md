@@ -16,16 +16,16 @@ copy.
 Create them under **Agents** in the workspace, or from the CLI:
 
 ```bash
-pnpm exec mediforce agent create --namespace acme
-pnpm exec mediforce agent list --namespace acme
-pnpm exec mediforce agent get my-agent --namespace acme
+pnpm exec mediforce agent create --file ./my-agent.json --namespace acme
+pnpm exec mediforce agent list
+pnpm exec mediforce agent get <agent-id>
 ```
 
 An agent needs, at minimum, a name and a model. Visibility works like a
 workflow's: private to the workspace, or public and readable across workspaces.
 
 ```bash
-pnpm exec mediforce agent set-visibility my-agent --visibility public --namespace acme
+pnpm exec mediforce agent set-visibility <agent-id> --visibility public
 ```
 
 ## Models
@@ -37,10 +37,12 @@ and capability under **Models**.
 ```bash
 pnpm exec mediforce model list
 pnpm exec mediforce model sync
-pnpm exec mediforce model validate my-workflow --namespace acme
+pnpm exec mediforce model validate anthropic/claude-sonnet-4,openai/gpt-4o
 ```
 
-A model a workflow names but the registry does not know is reported by the
+`model validate` takes the model IDs themselves, comma-separated, and reports
+which of them the registry knows. A model a workflow names but the registry does
+not know is also reported by the
 [readiness check](../run/verify#2-workflow-readiness-check) before you start.
 
 ## Credits
@@ -49,7 +51,7 @@ Agent steps spend money. The deployment holds one OpenRouter key, injected into
 step containers as `DOCKER_OPENROUTER_API_KEY`.
 
 ```bash
-pnpm exec mediforce system credits
+pnpm exec mediforce system credits --namespace acme
 pnpm exec mediforce system status
 ```
 
@@ -74,7 +76,7 @@ is open, and only becomes the step's output when the session is finalized — so
 unfinished conversation never leaks into the next step.
 
 ```bash
-pnpm exec mediforce cowork list --namespace acme
+pnpm exec mediforce cowork list --status active
 pnpm exec mediforce cowork chat <session-id>
 ```
 

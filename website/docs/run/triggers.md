@@ -38,13 +38,19 @@ A payload is validated against the workflow's declared input contract, so a
 schedule that would start a run the workflow rejects is refused when you save it,
 not at 3am.
 
+Schedules are five-field, **UTC**, and land on the quarter hour: minute values
+must be `0`, `15`, `30` or `45`, because a heartbeat sweeps due triggers every
+15 minutes. `*/5 * * * *` is refused at save with the minutes it objects to,
+rather than accepted and then quietly firing a third as often as you asked.
+
 ## Webhook
 
 A webhook trigger exposes a path and starts a run when called. Paths must start
-with `/` and contain URL-safe characters only.
+with `/` and contain URL-safe characters only, and `POST` is the only method.
 
 ```bash
-pnpm exec mediforce config test-webhook
+pnpm exec mediforce workflow trigger-add my-workflow \
+  --trigger intake --type webhook --path /intake --namespace acme
 ```
 
 ## Run input
@@ -62,10 +68,21 @@ A cron trigger's static payload is the same contract filled in ahead of time.
 
 ## From the CLI
 
+Triggers are their own family of subcommands, one per verb:
+
 ```bash
-pnpm exec mediforce workflow trigger my-workflow --namespace acme
-pnpm exec mediforce run start my-workflow --namespace acme
+pnpm exec mediforce workflow trigger-list my-workflow --namespace acme
+pnpm exec mediforce workflow trigger-add my-workflow --trigger nightly \
+  --type cron --schedule "0 2 * * *" --payload '{"region":"eu"}' --namespace acme
+pnpm exec mediforce workflow trigger-update my-workflow --trigger nightly \
+  --schedule "0 3 * * *" --namespace acme
+pnpm exec mediforce workflow trigger-stop my-workflow --trigger nightly --namespace acme
+pnpm exec mediforce run start --workflow my-workflow --namespace acme
 ```
+
+`trigger-start` re-enables a stopped trigger, `trigger-remove` deletes one, and
+`trigger-export` / `trigger-import` move a workflow's triggers between
+deployments as a file.
 
 :::note Triggers are not part of the definition
 The assistant cannot create them, importing a workflow does not bring its

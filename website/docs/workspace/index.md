@@ -22,9 +22,9 @@ Invite from settings; a newly invited person appears in the members table withou
 a reload.
 
 ```bash
-pnpm exec mediforce namespace set-member-role --namespace acme
-pnpm exec mediforce namespace remove-member --namespace acme
-pnpm exec mediforce namespace leave --namespace acme
+pnpm exec mediforce namespace set-member-role --handle acme --uid <uid> --role admin
+pnpm exec mediforce namespace remove-member --handle acme --uid <uid>
+pnpm exec mediforce namespace leave --handle acme
 ```
 
 ## Sharing workflows
@@ -35,7 +35,7 @@ able to see before you hand the link over.
 
 ```bash
 pnpm exec mediforce workflow set-visibility my-workflow --visibility public --namespace acme
-pnpm exec mediforce workflow copy my-workflow --namespace acme
+pnpm exec mediforce workflow copy my-workflow --target-namespace beta
 ```
 
 Copying brings the definition into another workspace. It does not bring the
@@ -57,7 +57,8 @@ deployment is a peer: you register a workflow into each rather than promoting it
 between them.
 
 ```bash
-pnpm exec mediforce workflow import --namespace acme
+pnpm exec mediforce workflow import --repo https://github.com/Appsilon/mediforce \
+  --path docs/workflow-examples/01-linear-pipeline.wd.json --namespace acme
 ```
 
 ## Command palette
@@ -71,6 +72,6 @@ Resetting a workspace empties it. Deleting removes it. Both are in settings, bot
 ask first.
 
 ```bash
-pnpm exec mediforce namespace reset --namespace acme
-pnpm exec mediforce namespace delete --namespace acme
+pnpm exec mediforce namespace reset --handle acme
+pnpm exec mediforce namespace delete --handle acme
 ```

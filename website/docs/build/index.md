@@ -80,7 +80,7 @@ From the CLI:
 
 ```bash
 pnpm exec mediforce assistant ask "add a QC review after the draft step" \
-  --canvas ./canvas.json --namespace acme
+  --definition ./canvas.json --namespace acme
 ```
 
 ## Steps
@@ -92,6 +92,7 @@ The type says what the step contributes to the run:
 | Type | What it does |
 |---|---|
 | `creation` | Produces a result later steps can read. Most steps. |
+| `review` | A human business review with explicit verdicts. |
 | `decision` | Produces no result; only picks which branch runs next. |
 | `terminal` | Ends the run. |
 
@@ -135,7 +136,7 @@ person approves or asks for a revision, and a revision sends it back to the
 agent.
 
 `L3` revision keys off the literal `approve` and `revise` verdicts. Custom
-verdict keys belong on a separate human review step.
+verdict keys belong on a separate human `review` step.
 
 ## Branches and verdicts
 
@@ -153,7 +154,8 @@ or per workflow and encrypted at rest. Steps reference the name; the value is
 never in the definition, so a definition stays safe to export and import.
 
 ```bash
-pnpm exec mediforce secret set OPENAI_KEY --namespace acme
+printf '%s' "$OPENAI_KEY" | \
+  pnpm exec mediforce secret set --key OPENAI_KEY --stdin --namespace acme
 pnpm exec mediforce secret list --namespace acme
 ```
 

@@ -62,7 +62,7 @@ The CLI talks to the same API as the app and authenticates with the
 `PLATFORM_API_KEY` you set at install.
 
 ```bash
-pnpm exec mediforce workflow register ./my-workflow.wd.json --namespace acme
+pnpm exec mediforce workflow register --file ./my-workflow.wd.json --namespace acme
 ```
 
 Registering **validates the definition's schema** and stores a new immutable
@@ -70,7 +70,7 @@ version. It executes nothing. That is the first of four gates — see
 [Verifying a workflow](../run/verify).
 
 ```bash
-pnpm exec mediforce workflow list --namespace acme
+pnpm exec mediforce workflow list
 pnpm exec mediforce workflow get my-workflow --namespace acme
 ```
 
@@ -85,7 +85,7 @@ you; **Start anyway** is offered.
 From the CLI:
 
 ```bash
-pnpm exec mediforce run start my-workflow --namespace acme
+pnpm exec mediforce run start --workflow my-workflow --namespace acme
 pnpm exec mediforce run watch <run-id>
 ```
 

@@ -11,8 +11,9 @@ Things that surprise people, and what to do instead.
 ## A Dry Run is not a sandbox
 
 Only `agent` and `script` steps are mocked. Everything else executes for real: an
-`email` action sends the mail, an `http` action hits the endpoint, a `spawn`
-action starts real runs.
+`email` action sends the mail, an `http` action hits the endpoint. `spawn` is the
+one action that knows about dry runs — its children inherit the parent's dry-run
+mode — but their own `email` and `http` actions still fire.
 
 **Instead:** before dry-running a workflow with outward-facing actions, point them
 somewhere safe — a test recipient, a staging endpoint. Or accept that the side

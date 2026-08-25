@@ -13,6 +13,7 @@ A quick map of the pieces a definition may use.
 | Type | Produces a result | Purpose |
 |---|---|---|
 | `creation` | yes | The ordinary step — later steps read what it produced |
+| `review` | yes | A human business review carrying its own verdicts |
 | `decision` | no | Chooses which branch runs next |
 | `terminal` | no | Ends the run |
 
@@ -33,7 +34,7 @@ A quick map of the pieces a definition may use.
 | `http` | Calls an endpoint | **yes** |
 | `email` | Sends mail | **yes** |
 | `reshape` | Rewrites earlier results into a new shape | yes |
-| `spawn` | Starts other workflow runs | **yes** |
+| `spawn` | Starts other workflow runs | children inherit the parent's dry-run mode |
 | `wait` | Pauses until a deadline | yes |
 
 ## Autonomy levels

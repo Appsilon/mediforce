@@ -20,8 +20,8 @@ and then start, so you never run a version you did not mean to save.
 From the CLI:
 
 ```bash
-pnpm exec mediforce run start my-workflow --namespace acme
-pnpm exec mediforce run start my-workflow --namespace acme --dry-run
+pnpm exec mediforce run start --workflow my-workflow --namespace acme
+pnpm exec mediforce run start --workflow my-workflow --namespace acme --dry-run
 ```
 
 ## Statuses
@@ -44,9 +44,10 @@ The run waits. The assignee claims it, does the work, and submits a **verdict**
 from the ones the step declares — with a comment when the step requires one.
 
 ```bash
-pnpm exec mediforce task list --namespace acme
+pnpm exec mediforce task list --role medical-writer
 pnpm exec mediforce task claim <task-id>
-pnpm exec mediforce task complete <task-id> --verdict approve
+pnpm exec mediforce task complete <task-id> \
+  --payload '{"kind":"verdict","verdict":"approve"}'
 ```
 
 Reviewers can attach files to a task. `MEDIFORCE_ATTACHMENT_MAX_BYTES` caps the

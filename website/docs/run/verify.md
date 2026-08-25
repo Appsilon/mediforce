@@ -58,13 +58,17 @@ reaches a terminal step.
 It never answers "does the agent do what I want?" — only a real run does.
 
 ```bash
-pnpm exec mediforce run start my-workflow --namespace acme --dry-run
+pnpm exec mediforce run start --workflow my-workflow --namespace acme --dry-run
 ```
 
 :::danger A Dry Run is not a sandbox
-Only `agent` and `script` steps are mocked. An `email` action **sends the mail**.
-An `http` action **hits the endpoint**. A `spawn` action **starts real runs**. If
-a workflow emails a regulator, a Dry Run emails the regulator.
+Only `agent` and `script` steps are mocked. An `email` action **sends the mail**
+and an `http` action **hits the endpoint**. If a workflow emails a regulator, a
+Dry Run emails the regulator.
+
+`spawn` is the one exception: a child run inherits its parent's dry-run mode, so
+fan-out under a Dry Run produces child Dry Runs — real runs, with their own agent
+and script steps mocked, and their own actions firing for real.
 :::
 
 ## 4. Run
