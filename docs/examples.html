@@ -7,12 +7,12 @@
   <meta name="description" content="Ready-to-use workflow patterns. Each example is CI-tested and demonstrates a building block you can combine and adapt." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&family=Space+Grotesk:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #FFFFFF; --bg-dark: #F8F9FA; --bg-card: #F8F9FA;
-      --accent: #0D9488; --accent-dim: rgba(13,148,136,0.08); --accent-dark: #0F766E;
+      --accent: hsl(161 94% 30%); --accent-dim: hsl(161 94% 30% / 0.08); --accent-dark: hsl(161 94% 24%);
       --text: #111827; --text-80: #374151; --text-60: #6B7280; --text-50: #9CA3AF;
       --text-30: #E5E7EB; --border: #E5E7EB;
       --human: #EA580C; --human-dim: rgba(234,88,12,0.1);
@@ -49,7 +49,7 @@
       border: 1px solid var(--border); border-radius: 0.75rem;
       overflow: hidden; background: var(--bg); transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .tutorial-card:hover { border-color: var(--accent); box-shadow: 0 4px 24px rgba(13,148,136,0.08); }
+    .tutorial-card:hover { border-color: var(--accent); box-shadow: 0 4px 24px hsl(161 94% 30% / 0.08); }
 
     .card-header {
       padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid var(--border);
@@ -116,7 +116,7 @@
       transition: background 0.15s, color 0.15s;
     }
     .copy-btn:hover { background: #334155; color: #E2E8F0; }
-    .copy-btn.copied { background: rgba(13,148,136,0.2); color: var(--accent); border-color: rgba(13,148,136,0.3); }
+    .copy-btn.copied { background: hsl(161 94% 30% / 0.2); color: var(--accent); border-color: hsl(161 94% 30% / 0.3); }
     .copy-btn svg { width: 0.75rem; height: 0.75rem; }
 
     .feature-flag-banner {
@@ -124,6 +124,7 @@
       text-align: center; font-size: 0.8125rem; font-weight: 500; color: #92400E;
     }
   </style>
+  <link rel="stylesheet" href="theme.css" />
 </head>
 <body>
   <script src="nav.js"></script>

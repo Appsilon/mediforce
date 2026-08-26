@@ -6,12 +6,12 @@
   <title>FDA/EMA AI Principles - Mediforce</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #FFFFFF; --bg-2: #F8F9FA; --bg-3: #F1F3F5;
-      --accent: #0D9488;
+      --accent: hsl(161 94% 30%);
       --text: #111827; --text-2: #374151; --text-3: #6B7280; --text-4: #9CA3AF;
       --border: #E5E7EB;
     }
@@ -58,7 +58,7 @@
     .hero-doc-overlay a:hover { opacity: 1; }
 
 /* Principle colors - 5 cycling */
-    .color-teal    { --pc: #0D9488; --pc-bg: rgba(13,148,136,0.05); }
+    .color-teal    { --pc: hsl(161 94% 30%); --pc-bg: hsl(161 94% 30% / 0.05); }
     .color-blue    { --pc: #2563EB; --pc-bg: rgba(37,99,235,0.05); }
     .color-purple  { --pc: #7C3AED; --pc-bg: rgba(124,58,237,0.05); }
     .color-amber   { --pc: #D97706; --pc-bg: rgba(217,119,6,0.05); }
@@ -179,7 +179,7 @@
     /* About */
     .about { padding: 48px 0; border-top: 1px solid var(--border); }
     .about h2 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
-    .about p { font-size: 14px; color: var(--text-2); line-height: 1.7; margin-bottom: 10px; max-width: 600px; }
+    .about p { font-size: 14px; color: var(--text-2); line-height: 1.7; margin-bottom: 10px; }
 
     /* Footer */
     footer { border-top: 1px solid var(--border); padding: 20px 0; }
@@ -201,7 +201,7 @@
       max-width: 68rem; margin: 0 auto;
       display: flex; align-items: center; justify-content: space-between;
       flex-wrap: wrap; gap: 0.75rem;
-      padding: 1.5rem; font-size: 0.8125rem; color: var(--text-40, #D1D5DB);
+      padding: 1.5rem; font-size: 0.8125rem; color: var(--text-60);
     }
     .footer-links { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
     .footer-links a { transition: color 0.15s; color: inherit; text-decoration: none; }
@@ -210,6 +210,12 @@
       .footer-inner { flex-direction: column; align-items: center; text-align: center; }
       .footer-links { justify-content: center; }
     }
+  </style>
+  <link rel="stylesheet" href="theme.css" />
+  <style>
+    /* A document, not a canvas: keeps the flat white ground it had before
+       docs/theme.css. */
+    body { background-color: var(--bg-card); background-image: none; }
   </style>
 </head>
 <body>

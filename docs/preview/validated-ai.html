@@ -12,9 +12,9 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #FFFFFF; --bg-2: #F8F9FA; --bg-3: #F1F3F5;
-      --accent: #0D9488;
-      --accent-dim: rgba(13,148,136,0.06);
-      --accent-border: rgba(13,148,136,0.18);
+      --accent: hsl(161 94% 30%);
+      --accent-dim: hsl(161 94% 30% / 0.06);
+      --accent-border: hsl(161 94% 30% / 0.18);
       --purple: #7C3AED;
       --purple-dim: rgba(124,58,237,0.06);
       --purple-border: rgba(124,58,237,0.18);
@@ -32,7 +32,7 @@
     }
     html { scroll-behavior: smooth; }
     body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; -webkit-font-smoothing: antialiased; }
-    ::selection { background: rgba(13,148,136,0.15); }
+    ::selection { background: hsl(161 94% 30% / 0.15); }
     a { color: var(--accent); text-decoration: none; }
     .w { max-width: 780px; margin: 0 auto; padding: 0 32px; }
 
@@ -130,7 +130,7 @@
     .dh-item { padding: 8px 10px; border-radius: 6px; background: rgba(124,58,237,0.04); border: 1px solid rgba(124,58,237,0.12); }
     .dh-item h5 { font-size: 11px; font-weight: 600; color: #7C3AED; margin-bottom: 1px; }
     .dh-item p { font-size: 10px; color: var(--text-3); line-height: 1.4; margin: 0; }
-    .diagram-inner { border: 1px solid var(--accent-border); border-radius: 8px; padding: 16px 14px 12px; position: relative; background: rgba(13,148,136,0.03); }
+    .diagram-inner { border: 1px solid var(--accent-border); border-radius: 8px; padding: 16px 14px 12px; position: relative; background: hsl(161 94% 30% / 0.03); }
     .diagram-inner-label { position: absolute; top: -10px; left: 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); background: #FFFFFF; padding: 0 8px; }
     .diagram-inner-label span { font-weight: 400; text-transform: none; letter-spacing: 0; opacity: 0.6; margin-left: 4px; }
     .diagram-flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); }

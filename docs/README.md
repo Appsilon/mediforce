@@ -14,10 +14,16 @@ New here: [`../GETTING-STARTED.md`](../GETTING-STARTED.md), then
 [`start/dev-quickref.md`](start/dev-quickref.md).
 
 > This folder also serves the public website at **mediforce.ai**: the `.html`
-> files and `nav.js` at this level, plus `CNAME`, `setup/`, `case-studies/`,
-> `preview/`, `images/`, `features/` and the loose images. Those back live URLs
-> and never move. GitHub Pages serves `index.html`; GitHub renders this README
-> when you browse the folder. Everything below is engineering documentation.
+> files, `nav.js` and `theme.css` at this level, plus `CNAME`, `setup/`,
+> `case-studies/`, `preview/`, `images/`, `features/` and the loose images. Those
+> back live URLs and never move. GitHub Pages serves `index.html`; GitHub renders
+> this README when you browse the folder. Everything below is engineering
+> documentation.
+>
+> `theme.css` holds the shared palette, copied from the app's `globals.css`, and
+> every page links it **after** its own `<style>` so it wins the cascade. A page
+> that needs to opt out of the dotted ground adds a third `<style>` after that
+> link — see `fda-principles.html`.
 
 ## Routing table
 
