@@ -204,9 +204,10 @@ Create the first user directly — an `auth_users` row with a bcrypt
 `password_hash` (see `ENABLE_PASSWORD_AUTH` in
 `packages/platform-ui/.env.example`) — or configure OIDC against the customer's
 IdP and let them sign in. Process-domain roles start empty and are granted
-per workspace by its owner or admins — `mediforce namespace set-member-roles
-<handle> <uid> --roles reviewer,approver`, read back with `mediforce namespace
-list-members <handle>` ([ADR-0019](../adr/0019-workspace-scoped-roles.md)).
+per workspace by its owner or admins — from the **Roles** table in
+`/<handle>/settings`, or `mediforce namespace set-member-roles <handle> <uid>
+--roles reviewer,approver`, read back with `mediforce namespace list-members
+<handle>` ([ADR-0019](../adr/0019-workspace-scoped-roles.md)).
 A step that declares `allowedRoles` is claimable only by someone holding one
 of those Roles, so grant them before a run reaches such a step — an
 unheld role fails closed rather than opening the step. Workflows that declare

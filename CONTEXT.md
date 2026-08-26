@@ -260,8 +260,10 @@ _Avoid_: confusing with Membership. Both are per-Workspace and both are called
 "role" in the schema — Membership (`workspace_members.role`) governs who
 administers the Workspace, Roles (`user_roles.role`) describe workflow
 function.
-_Note_: Roles are granted (`mediforce namespace set-member-roles`,
-`PUT /api/namespaces/:handle/members/:uid/roles`), read back
+_Note_: Roles are granted from the **Roles** table in workspace settings
+(separate from the members table's **Membership** column, which is a different
+thing), from the CLI (`mediforce namespace set-member-roles`) or over the API
+(`PUT /api/namespaces/:handle/members/:uid/roles`), read back
 (`mediforce namespace list-members`, `GET /api/users/members`), and enforced on
 task claim and complete against the run's pinned Workflow Definition.
 

@@ -63,6 +63,14 @@ export class PostgresUserDirectoryService implements UserDirectoryService {
     return rows.map((row) => row.role);
   }
 
+  async getGrantsForUser(uid: string, namespace: string): Promise<RoleGrant[]> {
+    const rows = await this.db
+      .select({ role: userRoles.role, workflowName: userRoles.workflowName })
+      .from(userRoles)
+      .where(and(eq(userRoles.uid, uid), eq(userRoles.namespace, namespace)));
+    return rows.map((row) => ({ role: row.role, workflowName: row.workflowName }));
+  }
+
   /**
    * Full replace in one transaction: a reader between the delete and the
    * insert would otherwise see the member holding no roles at all, which is

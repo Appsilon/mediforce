@@ -24,6 +24,12 @@ function formatLastSignIn(isoString: string): string {
   });
 }
 
+/**
+ * **Membership** — who administers the workspace. Not to be confused with the
+ * **Roles** table below this one, which is what a member *does* in a process
+ * (`reviewer`, `PI`): a member is `admin` *and* holds `reviewer`. The column is
+ * headed "Membership" rather than "Role" for exactly that reason.
+ */
 function RoleBadge({ role }: { role: NamespaceMember['role'] }) {
   const styles: Record<NamespaceMember['role'], string> = {
     owner: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
@@ -86,7 +92,7 @@ export function MembersTable({
             {canManageMembers && (
               <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Email</th>
             )}
-            <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Role</th>
+            <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Membership</th>
             <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Joined</th>
             {canManageMembers && (
               <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Last sign in</th>
@@ -133,7 +139,7 @@ export function MembersTable({
                   </td>
                 )}
 
-                {/* Role */}
+                {/* Membership — owner / admin / member */}
                 <td className="px-4 py-3 whitespace-nowrap">
                   {isOwner && member.role !== 'owner' ? (
                     <button

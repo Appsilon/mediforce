@@ -9,11 +9,15 @@ last_reviewed: 2026-08-27
 > **Partly built.** The storage model below ships as of
 > [#1248](https://github.com/Appsilon/mediforce/issues/1248): `user_roles` is
 > workspace-scoped with an optional `workflow_name`, owner/admin can grant
-> roles via CLI and API, notification targeting is namespace- and
+> roles via workspace settings, CLI and API, notification targeting is namespace- and
 > workflow-scoped, and all three cascades (membership removal, workflow
 > deletion, workflow transfer) are in place — membership is checked by the
-> write itself, under the lock that also serializes concurrent replaces. The
-> **`act` verb** ships as of
+> write itself, under the lock that also serializes concurrent replaces.
+> [#1250](https://github.com/Appsilon/mediforce/issues/1250) adds the screen: a
+> **Roles** table in workspace settings (`Member | Role | Workflows`, one row
+> per assignment), editable by owner/admin, offering the pick-list described
+> below (roles held in the workspace, unioned with the `roles` its workflow
+> definitions declare). The **`act` verb** ships as of
 > [#1249](https://github.com/Appsilon/mediforce/issues/1249):
 > `assertCallerHoldsRole` lives in `packages/platform-api/src/auth.ts` and gates
 > task claim and complete, reading `allowedRoles` off the run's pinned

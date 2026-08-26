@@ -53,7 +53,8 @@ export async function seedPostgresNamespace(
     //   fixture    – test, tenant-a, tenant-b
     //   journeys   – other, acme-labs, invited-personal, bio-clear-labs,
     //                bio-clear-owner, journey-user, bootstrap-journey,
-    //                branding-personal, role-gate-org, role-gate-org-2
+    //                branding-personal, role-gate-org, role-gate-org-2,
+    //                member-roles-labs
     //   patterns   – journey-org-* (create-workspace.journey, timestamp suffix),
     //                branding-org-* (namespace-branding.journey, per-test org),
     //                import-org-* (workflow-import.journey, per-test org),
@@ -83,6 +84,7 @@ export async function seedPostgresNamespace(
       'branding-personal',
       'role-gate-org',
       'role-gate-org-2',
+      'member-roles-labs',
     ];
     await sql`
       DELETE FROM workspaces
@@ -655,6 +657,41 @@ export async function seedPostgresOrganizationNamespace(
       INSERT INTO workspace_members (workspace, uid, role, joined_at)
       VALUES (${handle}, ${ownerUid}, 'owner', now())
       ON CONFLICT (workspace, uid) DO NOTHING
+    `;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * Add a non-owner `workspace_members` row to an already-seeded workspace.
+ *
+ * `seedPostgresOrganizationNamespace` seeds the owner only, which is enough for
+ * every journey that acts on the workspace itself. A journey about the members
+ * table needs a second person to act *on* — the owner's own row is the one the
+ * UI holds back from self-demotion, so it cannot stand in.
+ *
+ * Idempotent: re-running upserts the membership rather than colliding on the
+ * `(workspace, uid)` primary key.
+ */
+export async function seedPostgresWorkspaceMember(
+  handle: string,
+  uid: string,
+  role: 'admin' | 'member',
+  displayName: string,
+): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to seed Postgres for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await sql`
+      INSERT INTO workspace_members (workspace, uid, role, display_name, joined_at)
+      VALUES (${handle}, ${uid}, ${role}, ${displayName}, now())
+      ON CONFLICT (workspace, uid) DO UPDATE SET
+        role = EXCLUDED.role,
+        display_name = EXCLUDED.display_name
     `;
   } finally {
     await sql.end({ timeout: 5 });

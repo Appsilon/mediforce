@@ -97,6 +97,12 @@ export class InMemoryUserDirectoryService implements UserDirectoryService {
     ];
   }
 
+  async getGrantsForUser(uid: string, namespace: string): Promise<RoleGrant[]> {
+    return this.grants
+      .filter((grant) => grant.uid === uid && grant.namespace === namespace)
+      .map((grant) => ({ role: grant.role, workflowName: grant.workflowName }));
+  }
+
   async setRolesForUser(
     uid: string,
     namespace: string,

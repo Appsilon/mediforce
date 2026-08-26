@@ -12,6 +12,7 @@ import { WorkspaceAdministrationSection } from '@/components/namespace/settings/
 import { WorkspaceDangerZone } from '@/components/namespace/settings/workspace-danger-zone';
 import { WorkspaceMembersSection } from '@/components/namespace/settings/workspace-members-section';
 import { WorkspaceProfileSection } from '@/components/namespace/settings/workspace-profile-section';
+import { WorkspaceRolesSection } from '@/components/namespace/settings/workspace-roles-section';
 import { WorkspaceSecretsSection } from '@/components/namespace/settings/workspace-secrets-section';
 
 export default function WorkspaceConfigPage() {
@@ -103,6 +104,15 @@ export default function WorkspaceConfigPage() {
           isOwner={isOwner}
           currentUserId={user?.id}
           inviterName={user?.name ?? user?.email ?? undefined}
+          onError={setDangerError}
+        />
+
+        {/* Roles sit under Members and read the same roster: a role is held by
+            a member, so the list it is granted from has to be above it. */}
+        <WorkspaceRolesSection
+          handle={handle}
+          members={members}
+          canManageMembers={canManageMembers}
           onError={setDangerError}
         />
 

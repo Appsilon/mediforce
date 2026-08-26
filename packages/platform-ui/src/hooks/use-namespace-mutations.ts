@@ -6,12 +6,15 @@ import type {
   DeleteNamespaceOutput,
   GetMeOutput,
   GetNamespaceOutput,
+  ListNamespaceMembersOutput,
   LeaveNamespaceInput,
   LeaveNamespaceOutput,
   RemoveNamespaceMemberInput,
   RemoveNamespaceMemberOutput,
   ResetNamespaceInput,
   ResetNamespaceOutput,
+  SetNamespaceMemberRolesInput,
+  SetNamespaceMemberRolesOutput,
   UpdateNamespaceInput,
   UpdateNamespaceMemberRoleInput,
   UpdateNamespaceMemberRoleOutput,
@@ -127,6 +130,65 @@ export function useUpdateMemberRole(handle: string) {
           members: prev.members.map((m) => (m.uid === data.member.uid ? data.member : m)),
         };
       });
+    },
+  });
+}
+
+/**
+ * PUT /api/namespaces/:handle/members/:uid/roles — replace a member's process
+ * role grants (ADR-0019). Note the plural: `useUpdateMemberRole` above flips
+ * **Membership** (owner/admin/member), this sets **Roles** (`reviewer`, `PI`)
+ * — both live on a member and mean different things.
+ *
+ * Optimistic patch on the members roster rather than `['namespace', handle]`:
+ * grants ride on `users.listMembers`, and `namespaces.get`'s member rows carry
+ * Membership only. `onSuccess` writes the server's echo over the guess and
+ * invalidates, so a concurrent admin's replace is picked up on the refetch
+ * rather than papered over by the local end state.
+ */
+export function useSetMemberRoles(handle: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    SetNamespaceMemberRolesOutput,
+    Error,
+    SetNamespaceMemberRolesInput,
+    { restore: () => void }
+  >({
+    mutationFn: (input) => mediforce.namespaces.setMemberRoles(input),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: queryKeys.namespaceMembers(handle) });
+      const { restore } = snapshotCache(qc, [queryKeys.namespaceMembers(handle)]);
+      qc.setQueryData<ListNamespaceMembersOutput | undefined>(
+        queryKeys.namespaceMembers(handle),
+        (prev) => {
+          if (prev === undefined) return prev;
+          return {
+            ...prev,
+            members: prev.members.map((member) =>
+              member.uid === input.uid ? { ...member, grants: input.grants } : member,
+            ),
+          };
+        },
+      );
+      return { restore };
+    },
+    onError: (_err, _input, ctx) => {
+      ctx?.restore();
+    },
+    onSuccess: (data) => {
+      qc.setQueryData<ListNamespaceMembersOutput | undefined>(
+        queryKeys.namespaceMembers(handle),
+        (prev) => {
+          if (prev === undefined) return prev;
+          return {
+            ...prev,
+            members: prev.members.map((member) =>
+              member.uid === data.uid ? { ...member, grants: data.grants } : member,
+            ),
+          };
+        },
+      );
+      void qc.invalidateQueries({ queryKey: queryKeys.namespaceMembers(handle) });
     },
   });
 }

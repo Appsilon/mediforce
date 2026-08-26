@@ -5,7 +5,12 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MemberNotInNamespaceError, type UserDirectoryService } from '@mediforce/platform-core';
+import {
+  MemberNotInNamespaceError,
+  formatRoleGrant,
+  type RoleGrant,
+  type UserDirectoryService,
+} from '@mediforce/platform-core';
 import { InMemoryUserDirectoryService } from '@mediforce/platform-core/testing';
 import { PostgresUserDirectoryService } from '../../auth/postgres-user-directory-service';
 import { authUsers } from '../schema/auth-user';
@@ -82,6 +87,7 @@ function byUid<T extends { uid: string }>(rows: T[]): T[] {
 }
 
 const sorted = (roles: string[]): string[] => [...roles].sort();
+const sortedGrants = (grants: RoleGrant[]): string[] => grants.map(formatRoleGrant).sort();
 
 /**
  * Shared UserDirectoryService contract (ADR-0002 PR1; workspace-scoped roles
@@ -130,6 +136,19 @@ function contract(name: string, build: () => Promise<UserDirectoryService>) {
         'reviewer',
       ]);
       expect(await dir.getRolesForUser('u1', WS_A, OTHERFLOW)).toEqual(['reviewer']);
+    });
+
+    it('getGrantsForUser keeps the workflow each grant is narrowed to', async () => {
+      // `getRolesForUser` flattens `approver@tealflow` to `approver`, which is
+      // right for a gate that already knows the workflow. The settings editor
+      // writes back a full replace, so reading it flat would silently widen
+      // that grant to the whole workspace on the next save (#1250).
+      expect(sortedGrants(await dir.getGrantsForUser('u1', WS_A))).toEqual([
+        `approver@${TEALFLOW}`,
+        'reviewer',
+      ]);
+      expect(sortedGrants(await dir.getGrantsForUser('u1', WS_B))).toEqual(['reviewer']);
+      expect(await dir.getGrantsForUser('u3', WS_A)).toEqual([]);
     });
 
     it('getRolesInNamespace is the workspace vocabulary, de-duplicated', async () => {

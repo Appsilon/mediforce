@@ -1,6 +1,7 @@
 import { callerIsNamespaceAdmin } from '../../auth';
 import { NotFoundError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
+import type { RoleGrantInput } from '../../contract/namespaces';
 import type {
   ListNamespaceMembersInput,
   ListNamespaceMembersOutput,
@@ -16,14 +17,15 @@ import type {
  * `email` (contact / PII) and `lastSignInTime` (activity) are manager fields,
  * gated to owner/admin (and apiKey) callers: a plain member receives `null`
  * for both on every row. The roster — name, avatar, membership, join date and
- * process `roles` (ADR-0019) — stays visible to all members so collaboration
- * still works: a member has to be able to see who the reviewer is.
+ * process role `grants` (ADR-0019) — stays visible to all members so
+ * collaboration still works: a member has to be able to see who the reviewer
+ * is.
  *
  * apiKey callers bypass the membership gate (server-to-server trust).
  *
  * When `scope.system.userDirectory` is `null` (no directory wired — only the
  * in-memory test scope hits this), each member is returned with
- * `email: null`, `lastSignInTime: null` and `roles: []`. The list itself
+ * `email: null`, `lastSignInTime: null` and `grants: []`. The list itself
  * still resolves.
  */
 export async function listNamespaceMembers(
@@ -49,15 +51,15 @@ export async function listNamespaceMembers(
   const authData = await Promise.all(
     memberDocs.map((doc) => directory.getUserMetadata(doc.uid).catch(() => null)),
   );
-  const roles = await Promise.all(
+  const grants = await Promise.all(
     memberDocs.map((doc) =>
-      directory.getRolesForUser(doc.uid, input.namespace).catch(() => [] as string[]),
+      directory.getGrantsForUser(doc.uid, input.namespace).catch(() => [] as RoleGrantInput[]),
     ),
   );
 
   return {
     members: memberDocs.map((doc, index) =>
-      withAuth(doc, authData[index], roles[index] ?? [], canSeeManagerFields),
+      withAuth(doc, authData[index], grants[index] ?? [], canSeeManagerFields),
     ),
   };
 }
@@ -65,7 +67,7 @@ export async function listNamespaceMembers(
 function withAuth(
   doc: Awaited<ReturnType<CallerScope['workspaces']['getMembers']>>[number],
   metadata: { email: string | null; displayName?: string | null; lastSignInTime: string | null; photoURL?: string | null } | null,
-  roles: readonly string[],
+  grants: readonly RoleGrantInput[],
   canSeeManagerFields: boolean,
 ): NamespaceMemberWithAuth {
   const docDisplayName = typeof doc.displayName === 'string' && doc.displayName.length > 0
@@ -77,6 +79,6 @@ function withAuth(
     displayName: docDisplayName ?? metadata?.displayName ?? null,
     email: canSeeManagerFields ? metadata?.email ?? null : null,
     lastSignInTime: canSeeManagerFields ? metadata?.lastSignInTime ?? null : null,
-    roles: [...roles],
+    grants: [...grants],
   };
 }

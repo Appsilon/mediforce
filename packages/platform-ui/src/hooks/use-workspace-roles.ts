@@ -1,0 +1,77 @@
+'use client';
+
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { mediforce } from '@/lib/mediforce';
+import { stopRetryOn4xx } from '@/lib/retry';
+import { useNamespaceMembers } from './use-namespace-members';
+
+export interface UseWorkspaceRolesResult {
+  /** The workspace's role vocabulary, sorted, de-duplicated. */
+  roles: string[];
+  /** Workflow names in the workspace, sorted — the scopes a grant can narrow to. */
+  workflowNames: string[];
+  loading: boolean;
+}
+
+/**
+ * The workspace's process-role vocabulary (ADR-0019): roles already granted to
+ * its members, unioned with the `roles` its workflow definitions declare.
+ *
+ * There is no vocabulary table and there deliberately never will be — roles are
+ * free-form strings so an imported workflow package can name one this
+ * deployment has never heard of. This union is what stands in for that table:
+ * it answers "what roles exist here" off storage that already exists, and it
+ * carries both directions the vocabulary grows from. A declared-but-unheld role
+ * is the more important half — it is the one an admin has to grant before the
+ * step that names it can be acted on, and the one a typo silently strands.
+ *
+ * A pick-list, never a validator: the editor still accepts free text, because
+ * granting `reviewer` before any workflow declares it is a legitimate first
+ * move and this list would otherwise refuse it.
+ *
+ * `workflowNames` rides along because it comes off the same fetch and the
+ * editor needs it for the scope control next to the role — a grant narrowed to
+ * a workflow that does not exist is the invisible row ADR-0019's cascades exist
+ * to prevent.
+ */
+export function useWorkspaceRoles(
+  handle: string,
+  options: { enabled?: boolean } = {},
+): UseWorkspaceRolesResult {
+  // Only an editor needs the vocabulary, and the workflow list it is unioned
+  // from is not free — a plain member reading the roster should not pay for a
+  // pick-list they are not offered.
+  const enabled = handle !== '' && options.enabled !== false;
+  const { members, loading: membersLoading } = useNamespaceMembers(handle);
+
+  const workflows = useQuery({
+    queryKey: ['workflows', 'roles', enabled ? handle : '__noop__'] as const,
+    queryFn: async () => {
+      const result = await mediforce.workflows.list({ namespace: handle });
+      return result.definitions;
+    },
+    enabled,
+    retry: stopRetryOn4xx,
+  });
+
+  const groups = workflows.data;
+
+  const roles = useMemo(() => {
+    const union = new Set<string>();
+    for (const member of members) {
+      for (const grant of member.grants) union.add(grant.role);
+    }
+    for (const group of groups ?? []) {
+      for (const role of group.definition?.roles ?? []) union.add(role);
+    }
+    return [...union].sort();
+  }, [members, groups]);
+
+  const workflowNames = useMemo(
+    () => [...new Set((groups ?? []).map((group) => group.name))].sort(),
+    [groups],
+  );
+
+  return { roles, workflowNames, loading: membersLoading || workflows.isLoading };
+}

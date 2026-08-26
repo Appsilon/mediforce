@@ -1,4 +1,4 @@
-import { MemberNotInNamespaceError } from '@mediforce/platform-core';
+import { MemberNotInNamespaceError, formatRoleGrant } from '@mediforce/platform-core';
 import { assertCallerIsNamespaceAdmin } from '../../auth';
 import { emitAudit } from '../../audit-helpers';
 import { NotFoundError, PreconditionFailedError } from '../../errors';
@@ -75,7 +75,5 @@ export async function setNamespaceMemberRoles(
 
 function describe(grants: SetNamespaceMemberRolesInput['grants']): string {
   if (grants.length === 0) return 'none';
-  return grants
-    .map((grant) => (grant.workflowName === null ? grant.role : `${grant.role}@${grant.workflowName}`))
-    .join(', ');
+  return grants.map(formatRoleGrant).join(', ');
 }

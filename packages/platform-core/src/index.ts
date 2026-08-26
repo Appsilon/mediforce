@@ -324,6 +324,8 @@ export type {
   EmailProviderInfo,
 } from './interfaces/index';
 
+export { formatRoleGrant } from './interfaces/index';
+
 export { encodeCursor, decodeCursor } from './cursors/cursor';
 export {
   encodeAgentRunCursor,
