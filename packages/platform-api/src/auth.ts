@@ -23,6 +23,24 @@ export type CallerIdentity =
       readonly namespaces: ReadonlySet<string>;
       readonly namespaceRoles: ReadonlyMap<string, NamespaceRole>;
       /**
+       * The caller's process-domain Roles per namespace (ADR-0019) —
+       * `reviewer`, `PI`, `approver`: what they do in a process, as opposed to
+       * `namespaceRoles` above, which is Membership. Both are per-workspace
+       * and mean different things; `CONTEXT.md` draws the same distinction.
+       *
+       * Resolved once per request alongside `namespaceRoles` so the role gate
+       * (#1249) costs no second round-trip. Workspace-wide grants only: a
+       * grant narrowed to one workflow is not carried here, because the gate
+       * needs the workflow in hand to honour it and only has that inside the
+       * handler.
+       *
+       * A namespace absent from the map means "holds no roles there", not
+       * "unknown" — every namespace the caller is a member of is populated.
+       * apiKey callers have no entry at all: they are `isSystemActor` and
+       * bypass.
+       */
+      readonly namespaceProcessRoles: ReadonlyMap<string, ReadonlySet<string>>;
+      /**
        * The database-session token this request authenticated with, when the
        * boundary resolved one from the session cookie. Handlers must not use
        * it as an identity (the uid is that); its single purpose is letting a

@@ -6,12 +6,18 @@ last_reviewed: 2026-08-21
 
 # ADR-0019: Process roles are workspace-scoped
 
-> **Nothing here is built.** This ADR decides how roles *should* work; no part
-> of it ships. Today `user_roles` is Deployment-global with no write path, and
-> `step.allowedRoles` is declarative — any workspace member can claim and
-> complete any human task. Implementation is tracked by the epic,
-> [#1246](https://github.com/Appsilon/mediforce/issues/1246); this line changes
-> to "Implemented" when the ADR is promoted to `finalized`.
+> **Partly built.** The storage model below ships as of
+> [#1248](https://github.com/Appsilon/mediforce/issues/1248): `user_roles` is
+> workspace-scoped with an optional `workflow_name`, owner/admin can grant
+> roles via CLI and API, notification targeting is namespace- and
+> workflow-scoped, and all three cascades (membership removal, workflow
+> deletion, workflow transfer) are in place — membership is checked by the
+> write itself, under the lock that also serializes concurrent replaces. **Enforcement is not.** `step.allowedRoles` is still
+> declarative — any workspace member can claim and complete any human task —
+> and no workflow mutation is gated
+> ([#1249](https://github.com/Appsilon/mediforce/issues/1249)). The rest of the
+> epic is [#1246](https://github.com/Appsilon/mediforce/issues/1246); this line
+> changes to "Implemented" when the ADR is promoted to `finalized`.
 
 **Date:** 2026-08-21
 **Deciders:** Krystian Zieliński
@@ -39,6 +45,8 @@ against source:
 1. **No one can grant a role.** The table is written by the one-time
    `seed-user-roles` migration and by `PostgresInviteService.seedInvite`, whose
    only caller — the `inviteUser` handler — passes `roles: []` hardcoded.
+   *(Resolved by [#1248](https://github.com/Appsilon/mediforce/issues/1248):
+   `setNamespaceMemberRoles` + `mediforce namespace set-member-roles`.)*
 2. **`step.allowedRoles` is not enforced.** `RbacService` implements the check
    and `WorkflowEngine.advanceStep` calls it, but `rbacService` is the engine's
    optional 4th constructor argument and production passes `undefined`. Any
@@ -253,7 +261,21 @@ Implications the implementation issues must resolve, not decided here:
   — but it is not harmless: it survives `removeNamespaceMember` / `leaveNamespace`
   and silently reactivates if the person is ever re-added. The `namespace` FK
   cascades on workspace *deletion*, which is a different event. Delete the rows
-  in the same transaction as the membership. →
+  in the same transaction as the membership — and refuse to write the same row
+  from the other end: `setRolesForUser` takes the member's `workspace_members`
+  row `FOR UPDATE` before it replaces anything, so a removal committing
+  mid-request cannot recreate the grant the cascade just deleted. That lock is
+  also what makes "full replace" mean what it says. Under READ COMMITTED two
+  admins editing the same member each delete the set they read and insert their
+  own, leaving the union — a set neither of them asked for, holding roles
+  neither of them granted. →
+  [#1248](https://github.com/Appsilon/mediforce/issues/1248)
+- **A workflow leaving a workspace must drop the grants narrowed to it.**
+  Deletion is one way the name comes free; transferring the workflow to another
+  workspace is the other. Grants do not travel with it — their holders need not
+  be members of the destination, and copying them there is the cross-workspace
+  leak this ADR exists to prevent — so `transferWorkflowNamespace` clears them
+  in the source, exactly as `deleteWorkflow` does. →
   [#1248](https://github.com/Appsilon/mediforce/issues/1248)
 - **A declared role with zero holders strands every run that reaches it.** Today
   23 workflow definitions in this repo already declare `allowedRoles` across 8

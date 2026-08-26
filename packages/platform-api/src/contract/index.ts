@@ -552,6 +552,10 @@ export {
   UpdateNamespaceMemberRoleInputSchema,
   UpdateNamespaceMemberRoleBodySchema,
   UpdateNamespaceMemberRoleOutputSchema,
+  RoleGrantSchema,
+  SetNamespaceMemberRolesInputSchema,
+  SetNamespaceMemberRolesBodySchema,
+  SetNamespaceMemberRolesOutputSchema,
   type GetNamespaceInput,
   type GetNamespaceOutput,
   type CreateNamespaceInput,
@@ -568,6 +572,9 @@ export {
   type RemoveNamespaceMemberOutput,
   type UpdateNamespaceMemberRoleInput,
   type UpdateNamespaceMemberRoleOutput,
+  type RoleGrantInput,
+  type SetNamespaceMemberRolesInput,
+  type SetNamespaceMemberRolesOutput,
 } from './namespaces';
 
 export {

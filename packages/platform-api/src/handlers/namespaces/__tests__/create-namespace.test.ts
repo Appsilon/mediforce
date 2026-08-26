@@ -1,21 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
 import type { UserDirectoryService } from '@mediforce/platform-core';
-import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
+import { InMemoryNamespaceRepo, createTestScope, stubUserDirectory, userCaller } from '../../../testing/index';
 import { createNamespace } from '../create-namespace';
 import { ConflictError, ForbiddenError } from '../../../errors';
 
 function directoryWithMetadata(
   map: ReadonlyMap<string, { email: string | null; displayName: string | null; lastSignInTime: string | null; photoURL: string | null }>,
 ): UserDirectoryService {
-  return {
-    async getUsersByRole() {
-      return [];
-    },
+  return stubUserDirectory({
     async getUserMetadata(uid: string) {
       return map.get(uid) ?? null;
     },
-  };
+  });
 }
 
 describe('createNamespace handler', () => {

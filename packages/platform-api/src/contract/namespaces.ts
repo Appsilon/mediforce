@@ -146,3 +146,40 @@ export const UpdateNamespaceMemberRoleOutputSchema = z.object({
 });
 export type UpdateNamespaceMemberRoleInput = z.infer<typeof UpdateNamespaceMemberRoleInputSchema>;
 export type UpdateNamespaceMemberRoleOutput = z.infer<typeof UpdateNamespaceMemberRoleOutputSchema>;
+
+/**
+ * PUT /api/namespaces/:handle/members/:uid/roles — owner/admin replaces a
+ * member's process-domain roles in the workspace (ADR-0019).
+ *
+ * Note the plural. `PATCH .../members/:uid` (singular `role`) is **Membership**
+ * — owner / admin / member, who administers the workspace. This is **Roles** —
+ * `reviewer`, `PI`, `approver`, what someone does in a process. `CONTEXT.md`
+ * draws the same distinction; both live on a member and mean different things.
+ *
+ * Roles are free-form strings by construction (ADR-0019): the vocabulary is
+ * open, so an unknown role is not a validation error. `workflowName: null` —
+ * the default — grants across every workflow in the workspace; naming one
+ * narrows the grant to it. Full replace: the `grants` array is the member's
+ * end state, and an empty array clears their roles.
+ */
+export const RoleGrantSchema = z.object({
+  role: z.string().min(1).max(64),
+  workflowName: z.string().min(1).max(128).nullable().default(null),
+});
+
+export const SetNamespaceMemberRolesBodySchema = z.object({
+  grants: z.array(RoleGrantSchema).max(64),
+});
+export const SetNamespaceMemberRolesInputSchema = SetNamespaceMemberRolesBodySchema.extend({
+  handle: HandleSchema,
+  uid: z.string().min(1),
+});
+export const SetNamespaceMemberRolesOutputSchema = z.object({
+  handle: HandleSchema,
+  uid: z.string().min(1),
+  grants: z.array(RoleGrantSchema),
+});
+
+export type RoleGrantInput = z.infer<typeof RoleGrantSchema>;
+export type SetNamespaceMemberRolesInput = z.infer<typeof SetNamespaceMemberRolesInputSchema>;
+export type SetNamespaceMemberRolesOutput = z.infer<typeof SetNamespaceMemberRolesOutputSchema>;

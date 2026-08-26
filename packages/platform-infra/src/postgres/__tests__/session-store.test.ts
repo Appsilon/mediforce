@@ -8,11 +8,13 @@ import { fileURLToPath } from 'node:url';
 import {
   resolveSessionUserId,
   getUserRoles,
+  getWorkspaceProcessRoles,
   createDatabaseSession,
   SESSION_TTL_MS,
 } from '../../auth/session-store';
 import { authUsers } from '../schema/auth-user';
 import { userRoles } from '../schema/user-role';
+import { workspaces } from '../schema/workspace';
 import * as schema from '../schema/index';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -52,12 +54,17 @@ describe.skipIf(skipPg)('session-store', () => {
 
   beforeEach(async () => {
     await testClient.unsafe(
-      `TRUNCATE TABLE "${schemaName}"."auth_sessions", "${schemaName}"."user_roles", "${schemaName}"."auth_users" CASCADE`,
+      `TRUNCATE TABLE "${schemaName}"."auth_sessions", "${schemaName}"."user_roles", "${schemaName}"."auth_users", "${schemaName}"."workspaces" CASCADE`,
     );
   });
 
   async function seedUser(id: string, email: string): Promise<void> {
     await db.insert(authUsers).values({ id, email });
+  }
+
+  /** `user_roles.namespace` is an FK, so a grant needs its workspace to exist. */
+  async function seedWorkspace(handle: string): Promise<void> {
+    await db.insert(workspaces).values({ handle, type: 'organization', displayName: handle });
   }
 
   it('resolves a live session token to its user id', async () => {
@@ -102,13 +109,41 @@ describe.skipIf(skipPg)('session-store', () => {
     expect(await resolveSessionUserId(db, token)).toBeNull();
   });
 
-  it('returns the user global process roles, empty when none', async () => {
+  it('getUserRoles unions the roles held across every workspace', async () => {
     await seedUser('u4', 'u4@x.com');
+    await seedWorkspace('ws-a');
+    await seedWorkspace('ws-b');
     expect(await getUserRoles(db, 'u4')).toEqual([]);
     await db.insert(userRoles).values([
-      { uid: 'u4', role: 'reviewer' },
-      { uid: 'u4', role: 'approver' },
+      { uid: 'u4', role: 'reviewer', namespace: 'ws-a', workflowName: null },
+      { uid: 'u4', role: 'approver', namespace: 'ws-a', workflowName: null },
+      // Held in a second workspace, and de-duplicated into the flat session
+      // array — which is exactly why that array has to stop being flat (#1251).
+      { uid: 'u4', role: 'reviewer', namespace: 'ws-b', workflowName: null },
     ]);
     expect((await getUserRoles(db, 'u4')).sort()).toEqual(['approver', 'reviewer']);
+  });
+
+  it('getWorkspaceProcessRoles groups by workspace and omits workflow-narrowed grants', async () => {
+    await seedUser('u5', 'u5@x.com');
+    await seedWorkspace('ws-a');
+    await seedWorkspace('ws-b');
+    await db.insert(userRoles).values([
+      { uid: 'u5', role: 'reviewer', namespace: 'ws-a', workflowName: null },
+      { uid: 'u5', role: 'approver', namespace: 'ws-b', workflowName: null },
+      // The map has nowhere to put the workflow, so carrying this grant would
+      // make it answer for every workflow in ws-a. It is left out on purpose.
+      { uid: 'u5', role: 'biostatistician', namespace: 'ws-a', workflowName: 'tealflow' },
+    ]);
+
+    const byWorkspace = await getWorkspaceProcessRoles(db, 'u5');
+
+    expect([...(byWorkspace.get('ws-a') ?? [])]).toEqual(['reviewer']);
+    expect([...(byWorkspace.get('ws-b') ?? [])]).toEqual(['approver']);
+  });
+
+  it('getWorkspaceProcessRoles is empty for a user with no grants', async () => {
+    await seedUser('u6', 'u6@x.com');
+    expect((await getWorkspaceProcessRoles(db, 'u6')).size).toBe(0);
   });
 });

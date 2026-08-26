@@ -1,5 +1,6 @@
 // Cross-backend domain errors
 export {
+  MemberNotInNamespaceError,
   WorkflowDefinitionVersionAlreadyExistsError,
   WorkflowDefinitionVersionNotFoundError,
 } from './errors';
@@ -303,6 +304,7 @@ export type {
   UserDirectoryService,
   DirectoryUser,
   UserAuthMetadata,
+  RoleGrant,
   AgentRunRepository,
   ListAgentRunsOptions,
   ListAgentRunsPage,
@@ -422,6 +424,7 @@ export {
   InMemoryAgentOAuthTokenRepository,
   InMemoryAgentRunRepository,
   InMemoryPlatformSettingsRepository,
+  InMemoryUserDirectoryService,
   // Test factories
   buildProcessDefinition,
   buildProcessInstance,
