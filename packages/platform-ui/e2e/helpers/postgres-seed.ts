@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TEST_ORG_HANDLE } from './constants';
-import { buildSeedData, AGENT_LOG_FILENAME, AGENT_LOG_FIXTURE_CONTENT } from './seed-data';
+import { buildSeedData, AGENT_LOG_FILENAME, AGENT_LOG_FIXTURE_CONTENT, SEEDED_DEFINITION_CREATED_AT } from './seed-data';
 
 // Matches LOGS_DIR in packages/platform-ui/src/app/api/step-logs/route.ts —
 // the AgentLogViewer pipeline reads step logs from this local tmp directory.
@@ -161,7 +161,7 @@ export async function seedPostgresNamespace(
           ${wd.notifications ? sql.json(wd.notifications as unknown) : null},
           ${wd.workspace ? sql.json(wd.workspace as unknown) : null},
           ${wd.metadata ? sql.json(wd.metadata as unknown) : null},
-          ${(wd.createdAt as string | undefined) ?? new Date().toISOString()}
+          ${(wd.createdAt as string | undefined) ?? SEEDED_DEFINITION_CREATED_AT}
         )
         ON CONFLICT (workspace, name, version) DO NOTHING
       `;
@@ -182,7 +182,7 @@ export async function seedPostgresNamespace(
       const key = `${namespace}\u0000${name}`;
       if (seededManualWorkflows.has(key)) continue;
       seededManualWorkflows.add(key);
-      const seededAt = (wd.createdAt as string | undefined) ?? new Date().toISOString();
+      const seededAt = (wd.createdAt as string | undefined) ?? SEEDED_DEFINITION_CREATED_AT;
       await sql`
         INSERT INTO triggers (
           namespace, workflow_name, trigger_name, type, enabled, config,
