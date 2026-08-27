@@ -17,7 +17,8 @@ import {
 /**
  * Contract for `GET /api/tasks`.
  *
- * Three axes, all optional. The handler picks the narrowest applicable path:
+ * Three base axes, all optional. The handler picks the narrowest applicable
+ * path:
  *   - `instanceId` — return tasks belonging to that process instance
  *   - `role`       — return tasks assigned to that role
  *   - neither      — caller-scope: every task whose parent run belongs to
@@ -26,7 +27,8 @@ import {
  *                    "my queue across the workspaces I belong to".
  *
  * `instanceId` and `role` are mutually exclusive; passing both is rejected.
- * `stepId` and `status[]` further narrow whichever base set is chosen.
+ * `stepId`, `status[]` and `actionable` further narrow whichever base set is
+ * chosen.
  */
 export const ListTasksInputSchema = z
   .object({
@@ -38,6 +40,24 @@ export const ListTasksInputSchema = z
     // semantics like `runs.list` — a namespace the caller isn't a member of
     // yields an empty list, not a 403.
     namespace: z.string().min(1).optional(),
+    /**
+     * `true` narrows the result to the tasks the caller can actually act on:
+     * assigned to them, or `pending` and unassigned with a step whose
+     * `allowedRoles` they hold for that workflow (or which declares none).
+     * Omitted returns what the axis returns today, byte for byte — the
+     * unfiltered view stays reachable, which is what makes narrowing the
+     * default inbox a choice rather than a regression (issue #1251).
+     *
+     * A system actor has no roles to hold and no inbox of its own, so
+     * `actionable` is a no-op for apiKey callers rather than an empty list.
+     *
+     * Accepts a real boolean (client callers) or the `'true'` / `'false'` a
+     * query string carries (the route adapter), so one schema serves both —
+     * see `ListRunsPageClientInputSchema` for what the alternative costs.
+     */
+    actionable: z
+      .union([z.boolean(), z.enum(['true', 'false']).transform((v) => v === 'true')])
+      .optional(),
   })
   .refine(
     (val) => !(val.instanceId !== undefined && val.role !== undefined),
@@ -58,6 +78,7 @@ interface ListTasksFilters {
   stepId?: string;
   status?: HumanTaskStatus[];
   namespace?: string;
+  actionable?: boolean;
 }
 
 /**

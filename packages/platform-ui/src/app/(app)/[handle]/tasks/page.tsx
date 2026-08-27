@@ -7,9 +7,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useViewerIdentity } from '@/hooks/use-viewer-identity';
 import {
   useMyActionableTasks,
-  useMyActionableTasksByRole,
   useMyCompletedTasks,
-  useCompletedTasksByRole,
   useMyCoworkSessions,
   useFinalizedCoworkSessions,
 } from '@/hooks/use-tasks';
@@ -74,6 +72,43 @@ function DisplayPopover({
   );
 }
 
+/**
+ * The escape hatch that makes the narrowed default a choice rather than a
+ * silent regression (AGENTS.md §12, issue #1251): the unfiltered workspace view
+ * someone sees today stays one click away.
+ */
+function ScopeToggle({
+  mineOnly,
+  onChange,
+}: {
+  mineOnly: boolean;
+  onChange: (mineOnly: boolean) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-md border p-0.5 text-sm">
+      {[
+        { mine: true, label: 'For me' },
+        { mine: false, label: 'All in workspace' },
+      ].map((option) => (
+        <button
+          key={option.label}
+          type="button"
+          aria-pressed={mineOnly === option.mine}
+          onClick={() => onChange(option.mine)}
+          className={cn(
+            'rounded px-2.5 py-1 transition-colors',
+            mineOnly === option.mine
+              ? 'bg-muted text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function TasksPage() {
   const { user } = useAuth();
   const [groupByFields, setGroupByFields] = React.useState<Set<GroupByField>>(
@@ -87,15 +122,14 @@ export default function TasksPage() {
     });
   }, []);
 
-  const { uid, role } = useViewerIdentity();
-  const roleActive = useMyActionableTasksByRole(role ?? undefined, uid);
-  const callerActive = useMyActionableTasks(uid);
-  const roleCompleted = useCompletedTasksByRole(role ?? undefined);
-  const callerCompleted = useMyCompletedTasks();
-  const activeTasks = role ? roleActive.data : callerActive.data;
-  const activeLoading = role ? roleActive.loading : callerActive.loading;
-  const completedTasks = role ? roleCompleted.data : callerCompleted.data;
-  const completedLoading = role ? roleCompleted.loading : callerCompleted.loading;
+  const { role } = useViewerIdentity();
+  const [mineOnly, setMineOnly] = React.useState(true);
+  const { data: activeTasks, loading: activeLoading } = useMyActionableTasks({
+    actionable: mineOnly,
+  });
+  const { data: completedTasks, loading: completedLoading } = useMyCompletedTasks({
+    actionable: mineOnly,
+  });
   const { data: activeCoworkSessions, loading: coworkLoading } = useMyCoworkSessions(role);
   const { data: finalizedCoworkSessions, loading: finalizedLoading } = useFinalizedCoworkSessions(role);
   const currentUserId = user?.id ?? '';
@@ -133,14 +167,9 @@ export default function TasksPage() {
         <div>
           <h1 className="text-xl font-headline font-semibold">Human actions</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {role ? (
-              <>
-                Tasks assigned to role:{' '}
-                <span className="font-medium text-foreground">{role}</span>
-              </>
-            ) : (
-              'All tasks'
-            )}
+            {mineOnly
+              ? 'Actions you can take — assigned to you, or open to a role you hold'
+              : 'Every action in the workspaces you belong to'}
           </p>
           {!loading && totalItemCount > 0 && (
             <p className="text-xs text-muted-foreground mt-1">
@@ -149,7 +178,10 @@ export default function TasksPage() {
             </p>
           )}
         </div>
-        <DisplayPopover activeFields={groupByFields} onToggle={toggleField} />
+        <div className="flex items-center gap-1">
+          <ScopeToggle mineOnly={mineOnly} onChange={setMineOnly} />
+          <DisplayPopover activeFields={groupByFields} onToggle={toggleField} />
+        </div>
       </div>
 
       <TaskGroupedView

@@ -30,8 +30,11 @@ export const queryKeys = {
     /** Every task in a workspace, optionally narrowed by status. */
     byNamespace: (namespace: string, filters?: { status?: HumanTaskStatus[] }) =>
       ['tasks', { namespace, ...filters }] as const,
-    /** Caller-scope axis: every task visible to the caller across roles + instances. */
-    forCaller: (filters?: { status?: HumanTaskStatus[] }) =>
+    /** Caller-scope axis: every task visible to the caller across roles +
+     *  instances, or — with `actionable` — only the ones they may act on.
+     *  `actionable` is part of the key: the two views are different server
+     *  answers and must not share a cache entry. */
+    forCaller: (filters?: { status?: HumanTaskStatus[]; actionable?: boolean }) =>
       ['tasks', { caller: 'me', ...filters }] as const,
   },
   task: (taskId: string) => ['task', taskId] as const,

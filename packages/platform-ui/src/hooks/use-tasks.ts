@@ -16,7 +16,6 @@ import { CRITICAL_LIVE_INTERVAL_MS, STANDARD_LIVE_INTERVAL_MS, TERMINAL_STATUSES
  */
 export function useMyActionableTasksByRole(
   assignedRole: string | undefined,
-  currentUserId?: string | null,
 ): { data: HumanTask[]; loading: boolean; error: Error | null } {
   const query = useQuery({
     queryKey: queryKeys.tasks.byRole(assignedRole ?? '', { status: [...ACTIONABLE_STATUSES] }),
@@ -33,20 +32,32 @@ export function useMyActionableTasksByRole(
     retry: stopRetryOn4xx,
   });
 
-  const filtered = useMemo(() => {
-    const tasks = query.data ?? [];
-    const notDeleted = tasks.filter((t) => !t.deleted);
-    if (currentUserId === undefined || currentUserId === null) return notDeleted;
-    return notDeleted.filter(
-      (t) => t.assignedUserId === null || t.assignedUserId === currentUserId,
-    );
-  }, [query.data, currentUserId]);
+  const filtered = useMemo(
+    () => (query.data ?? []).filter((t) => !t.deleted),
+    [query.data],
+  );
 
   return {
     data: filtered,
     loading: query.isLoading && assignedRole !== undefined && assignedRole.length > 0,
     error: (query.error as Error | null) ?? null,
   };
+}
+
+/**
+ * Who the caller-scope queues are for. `actionable: true` asks the server for
+ * the tasks the caller may act on — assigned to them, or pending with a step
+ * role they hold (issue #1251). Omitted (the default) returns every task in the
+ * workspaces they belong to, which is what the run-level "is this run waiting on
+ * a human?" maps want.
+ *
+ * The question is answered server-side because the browser cannot answer it:
+ * the step's `allowedRoles` lives on the run's pinned Workflow Definition, and
+ * every client-side attempt to mirror it from `HumanTask.assignedRole` has been
+ * wrong the same way (#1249).
+ */
+export interface CallerTaskScope {
+  actionable?: boolean;
 }
 
 /**
@@ -56,25 +67,23 @@ export function useMyActionableTasksByRole(
  * STANDARD LIVE per ADR-0006 §4.
  */
 export function useMyActionableTasks(
-  currentUserId?: string | null,
+  scope: CallerTaskScope = {},
 ): { data: HumanTask[]; loading: boolean; error: Error | null } {
+  const actionable = scope.actionable === true;
   const query = useQuery({
-    queryKey: queryKeys.tasks.forCaller({ status: [...ACTIONABLE_STATUSES] }),
+    queryKey: queryKeys.tasks.forCaller({ status: [...ACTIONABLE_STATUSES], actionable }),
     queryFn: async () => {
-      const result = await mediforce.tasks.list({ status: [...ACTIONABLE_STATUSES] });
+      const result = await mediforce.tasks.list({
+        status: [...ACTIONABLE_STATUSES],
+        ...(actionable ? { actionable: true } : {}),
+      });
       return result.tasks;
     },
     refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
     retry: stopRetryOn4xx,
   });
 
-  const filtered = useMemo(() => {
-    const tasks = (query.data ?? []).filter((t) => !t.deleted);
-    if (currentUserId === undefined || currentUserId === null) return tasks;
-    return tasks.filter(
-      (t) => t.assignedUserId === null || t.assignedUserId === currentUserId,
-    );
-  }, [query.data, currentUserId]);
+  const filtered = useMemo(() => (query.data ?? []).filter((t) => !t.deleted), [query.data]);
 
   return {
     data: filtered,
@@ -84,47 +93,23 @@ export function useMyActionableTasks(
 }
 
 /**
- * Role-scoped completed task list, react-query backed (STANDARD LIVE).
- * Sorts `completedAt` desc client-side — the API does not promise an order.
- */
-export function useCompletedTasksByRole(
-  assignedRole: string | undefined,
-): { data: HumanTask[]; loading: boolean; error: Error | null } {
-  const query = useQuery({
-    queryKey: queryKeys.tasks.byRole(assignedRole ?? '', { status: ['completed'] }),
-    queryFn: async () => {
-      if (assignedRole === undefined) throw new Error('unreachable: enabled gates this');
-      const result = await mediforce.tasks.list({
-        role: assignedRole,
-        status: ['completed'],
-      });
-      return result.tasks;
-    },
-    enabled: assignedRole !== undefined && assignedRole.length > 0,
-    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
-    retry: stopRetryOn4xx,
-  });
-
-  const filtered = useMemo(() => {
-    const tasks = (query.data ?? []).filter((t) => !t.deleted);
-    return [...tasks].sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
-  }, [query.data]);
-
-  return {
-    data: filtered,
-    loading: query.isLoading && assignedRole !== undefined && assignedRole.length > 0,
-    error: (query.error as Error | null) ?? null,
-  };
-}
-
-/**
  * Caller-scope completed task list (cross-role). STANDARD LIVE.
+ *
+ * `actionable: true` reads as "completed by me" here: a completed task is
+ * assigned to whoever claimed it, and the assignment branch of the server's
+ * predicate is the one that still applies once nothing is pending.
  */
-export function useMyCompletedTasks(): { data: HumanTask[]; loading: boolean; error: Error | null } {
+export function useMyCompletedTasks(
+  scope: CallerTaskScope = {},
+): { data: HumanTask[]; loading: boolean; error: Error | null } {
+  const actionable = scope.actionable === true;
   const query = useQuery({
-    queryKey: queryKeys.tasks.forCaller({ status: ['completed'] }),
+    queryKey: queryKeys.tasks.forCaller({ status: ['completed'], actionable }),
     queryFn: async () => {
-      const result = await mediforce.tasks.list({ status: ['completed'] });
+      const result = await mediforce.tasks.list({
+        status: ['completed'],
+        ...(actionable ? { actionable: true } : {}),
+      });
       return result.tasks;
     },
     refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),

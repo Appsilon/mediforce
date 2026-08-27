@@ -4,6 +4,7 @@ import {
   StepExecutionSchema,
   AgentEventSchema,
   RunNameEntrySchema,
+  RunDefinitionPinSchema,
   parseRow,
   encodeProcessInstanceCursor,
   decodeProcessInstanceCursor,
@@ -19,6 +20,7 @@ import {
   type WorkflowDisplayStatusCounts,
   type WorkflowRunSummaryResult,
   type RunNameEntry,
+  type RunDefinitionPin,
 } from '@mediforce/platform-core';
 import type { Database } from '../client';
 import {
@@ -417,6 +419,46 @@ export class PostgresProcessInstanceRepository
         ),
       );
     return rows.map((r) => RunNameEntrySchema.parse(r));
+  }
+
+  async getDefinitionPinsAll(instanceIds: readonly string[]): Promise<RunDefinitionPin[]> {
+    return this.selectDefinitionPins(instanceIds, undefined);
+  }
+
+  async getDefinitionPinsInNamespaces(
+    instanceIds: readonly string[],
+    allowed: readonly string[],
+  ): Promise<RunDefinitionPin[]> {
+    if (allowed.length === 0) return [];
+    return this.selectDefinitionPins(instanceIds, allowed);
+  }
+
+  private async selectDefinitionPins(
+    instanceIds: readonly string[],
+    allowed: readonly string[] | undefined,
+  ): Promise<RunDefinitionPin[]> {
+    if (instanceIds.length === 0) return [];
+    const scoped = inArray(processInstances.id, [...instanceIds]);
+    const rows = await this.db
+      .select({
+        id: processInstances.id,
+        namespace: processInstances.workspace,
+        definitionName: processInstances.definitionName,
+        definitionVersion: processInstances.definitionVersion,
+        createdAt: processInstances.createdAt,
+      })
+      .from(processInstances)
+      .where(
+        allowed === undefined
+          ? scoped
+          : and(scoped, inArray(processInstances.workspace, [...allowed])),
+      );
+    return rows.map((row) =>
+      parseRow(RunDefinitionPinSchema, {
+        ...row,
+        createdAt: row.createdAt.toISOString(),
+      }),
+    );
   }
 
   async getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]> {

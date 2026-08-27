@@ -18,7 +18,7 @@ vi.mock('../use-collection', () => ({
   useCollection: () => ({ data: [], loading: false, error: null }),
 }));
 
-const { useMyActionableTasksByRole, useMyActionableTasks, useCompletedTasksByRole, useMyCompletedTasks } = await import('../use-tasks');
+const { useMyActionableTasksByRole, useMyActionableTasks, useMyCompletedTasks } = await import('../use-tasks');
 
 describe('useMyActionableTasksByRole', () => {
   beforeEach(() => {
@@ -48,26 +48,7 @@ describe('useMyActionableTasksByRole', () => {
     expect(result.current.data.map((t) => t.id)).toEqual(['t1', 't2']);
   });
 
-  it('filters out tasks claimed by other users when currentUserId is set', async () => {
-    listMock.mockResolvedValue({
-      tasks: [
-        buildHumanTask({ id: 't1', assignedUserId: null }),
-        buildHumanTask({ id: 't2', assignedUserId: 'u-me' }),
-        buildHumanTask({ id: 't3', assignedUserId: 'u-other' }),
-      ],
-    });
-    const { wrapper } = createQueryWrapper();
-
-    const { result } = renderHook(
-      () => useMyActionableTasksByRole('reviewer', 'u-me'),
-      { wrapper },
-    );
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.data.map((t) => t.id)).toEqual(['t1', 't2']);
-  });
-
-  it('strips deleted tasks regardless of currentUserId', async () => {
+  it('strips deleted tasks', async () => {
     listMock.mockResolvedValue({
       tasks: [
         buildHumanTask({ id: 't1', deleted: true }),
@@ -96,25 +77,66 @@ describe('useMyActionableTasksByRole', () => {
   });
 });
 
-describe('useCompletedTasksByRole', () => {
+describe('useMyActionableTasks', () => {
   beforeEach(() => {
     listMock.mockReset();
   });
 
-  it('GETs with status=completed and sorts by completedAt desc', async () => {
+  it('asks for the whole workspace queue by default — the run-level maps need it', async () => {
+    listMock.mockResolvedValue({ tasks: [] });
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = renderHook(() => useMyActionableTasks(), { wrapper });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(listMock).toHaveBeenCalledWith({ status: ['pending', 'claimed'] });
+  });
+
+  it('asks for the actionable slice when the caller scopes it', async () => {
+    listMock.mockResolvedValue({ tasks: [] });
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = renderHook(() => useMyActionableTasks({ actionable: true }), { wrapper });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(listMock).toHaveBeenCalledWith({
+      status: ['pending', 'claimed'],
+      actionable: true,
+    });
+  });
+
+  /**
+   * Two different server answers; one cache entry between them would show the
+   * workspace view under the "For me" label after a toggle.
+   */
+  it('caches the two scopes apart', async () => {
+    listMock.mockResolvedValue({ tasks: [] });
+    const { wrapper } = createQueryWrapper();
+
+    const { result, rerender } = renderHook(
+      ({ actionable }: { actionable: boolean }) => useMyActionableTasks({ actionable }),
+      { wrapper, initialProps: { actionable: true } },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    rerender({ actionable: false });
+
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('drops soft-deleted tasks', async () => {
     listMock.mockResolvedValue({
       tasks: [
-        buildHumanTask({ id: 'older', completedAt: '2026-04-01T00:00:00.000Z' }),
-        buildHumanTask({ id: 'newer', completedAt: '2026-05-01T00:00:00.000Z' }),
+        buildHumanTask({ id: 't1', deleted: true }),
+        buildHumanTask({ id: 't2', deleted: false }),
       ],
     });
     const { wrapper } = createQueryWrapper();
 
-    const { result } = renderHook(() => useCompletedTasksByRole('reviewer'), { wrapper });
+    const { result } = renderHook(() => useMyActionableTasks(), { wrapper });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(listMock).toHaveBeenCalledWith({ role: 'reviewer', status: ['completed'] });
-    expect(result.current.data.map((t) => t.id)).toEqual(['newer', 'older']);
+    expect(result.current.data.map((t) => t.id)).toEqual(['t2']);
   });
 });
 
@@ -133,7 +155,6 @@ describe('polling stops on 4xx error (PRD §9 rule 4)', () => {
   it.each([
     ['useMyActionableTasksByRole', () => useMyActionableTasksByRole('reviewer')],
     ['useMyActionableTasks', () => useMyActionableTasks()],
-    ['useCompletedTasksByRole', () => useCompletedTasksByRole('reviewer')],
     ['useMyCompletedTasks', () => useMyCompletedTasks()],
   ] as const)('%s stops polling after a 4xx error', async (_name, hookFactory) => {
     listMock.mockRejectedValue(new ApiError(403, 'forbidden'));

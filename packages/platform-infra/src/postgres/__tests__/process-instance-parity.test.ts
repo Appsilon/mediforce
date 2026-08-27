@@ -255,6 +255,42 @@ function contract(
       expect(empty).toBeNull();
     });
 
+    it('getDefinitionPins projects the pin for many runs in one read', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      await registerWorkspace('ws-2');
+      const mine = await repo.create(
+        instanceFor('ws-1', { definitionName: 'vendor-review', definitionVersion: '3' }),
+      );
+      const other = await repo.create(instanceFor('ws-2'));
+
+      const pins = await repo.getDefinitionPinsAll([mine.id, other.id, 'inst-missing']);
+
+      // The missing id is simply absent — the gate decides what that means.
+      expect(pins.map((pin) => pin.id).sort()).toEqual([mine.id, other.id].sort());
+      const pinned = pins.find((pin) => pin.id === mine.id);
+      expect(pinned).toMatchObject({
+        namespace: 'ws-1',
+        definitionName: 'vendor-review',
+        definitionVersion: '3',
+        createdAt: mine.createdAt,
+      });
+    });
+
+    it('getDefinitionPinsInNamespaces drops runs outside the allowed set', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      await registerWorkspace('ws-2');
+      const mine = await repo.create(instanceFor('ws-1'));
+      const other = await repo.create(instanceFor('ws-2'));
+
+      const allowed = await repo.getDefinitionPinsInNamespaces([mine.id, other.id], ['ws-1']);
+      expect(allowed.map((pin) => pin.id)).toEqual([mine.id]);
+
+      const none = await repo.getDefinitionPinsInNamespaces([mine.id, other.id], []);
+      expect(none).toEqual([]);
+    });
+
     it('getByStatusAll / InNamespaces filter correctly', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');

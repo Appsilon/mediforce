@@ -58,10 +58,12 @@ export {
   InstanceStatusSchema,
   ProcessInstanceSchema,
   RunNameEntrySchema,
+  RunDefinitionPinSchema,
   WorkflowDisplayStatusSchema,
   type InstanceStatus,
   type ProcessInstance,
   type RunNameEntry,
+  type RunDefinitionPin,
   type WorkflowDisplayStatus,
 } from './process-instance';
 

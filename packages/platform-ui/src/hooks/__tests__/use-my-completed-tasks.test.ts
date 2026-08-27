@@ -61,6 +61,20 @@ describe('useMyCompletedTasks', () => {
     expect(listMock).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * The Human actions page's "For me" default. `actionable` must reach the
+   * wire — a page that renders the narrowed inbox while asking for the
+   * unfiltered one is the regression this flag exists to prevent (#1251).
+   */
+  it('asks the server for the actionable slice when scoped to the caller', async () => {
+    listMock.mockResolvedValue({ tasks: [] });
+    const { wrapper } = createQueryWrapper();
+    const { result } = renderHook(() => useMyCompletedTasks({ actionable: true }), { wrapper });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(listMock).toHaveBeenCalledWith({ status: ['completed'], actionable: true });
+  });
+
   it('returns a stable shape when the API returns an empty list', async () => {
     listMock.mockResolvedValue({ tasks: [] });
     const { wrapper } = createQueryWrapper();

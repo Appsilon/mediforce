@@ -212,8 +212,48 @@ export async function assertCallerHoldsRole(
   allowedRoles: readonly string[] | undefined,
   directory: ProcessRoleDirectory | null,
 ): Promise<void> {
-  if (allowedRoles === undefined || allowedRoles.length === 0) return;
-  if (caller.isSystemActor) return;
+  const grant = await resolveRoleGrant(caller, namespace, workflow, allowedRoles, directory);
+  if (grant.holds) return;
+
+  throw new ForbiddenError(
+    await roleDenialMessage(namespace, workflow, grant.required, grant.held, directory),
+    { namespace, workflow, requiredRoles: grant.required, heldRoles: grant.held },
+  );
+}
+
+/**
+ * The same predicate as `assertCallerHoldsRole`, answered rather than
+ * enforced — for the callers that are deciding what to *show* instead of
+ * whether to refuse (the actionable inbox, issue #1251).
+ *
+ * Sharing the predicate is the point: an inbox that computed "can act" its own
+ * way is how a UI ends up listing tasks the server then refuses, which is
+ * exactly the bug #1249 deleted from the run step page.
+ */
+export async function callerHoldsRole(
+  caller: CallerIdentity,
+  namespace: string,
+  workflow: string,
+  allowedRoles: readonly string[] | undefined,
+  directory: ProcessRoleDirectory | null,
+): Promise<boolean> {
+  const grant = await resolveRoleGrant(caller, namespace, workflow, allowedRoles, directory);
+  return grant.holds;
+}
+
+type RoleGrant =
+  | { readonly holds: true }
+  | { readonly holds: false; readonly required: string[]; readonly held: string[] };
+
+async function resolveRoleGrant(
+  caller: CallerIdentity,
+  namespace: string,
+  workflow: string,
+  allowedRoles: readonly string[] | undefined,
+  directory: ProcessRoleDirectory | null,
+): Promise<RoleGrant> {
+  if (allowedRoles === undefined || allowedRoles.length === 0) return { holds: true };
+  if (caller.isSystemActor) return { holds: true };
 
   // Nothing bounds `allowedRoles` at authoring time, and any member can register
   // a workflow, so the list a refusal walks is attacker-shaped input: deduplicate
@@ -221,7 +261,7 @@ export async function assertCallerHoldsRole(
   const required = [...new Set(allowedRoles)];
 
   const workspaceWide = caller.namespaceProcessRoles.get(namespace) ?? new Set<string>();
-  if (required.some((role) => workspaceWide.has(role))) return;
+  if (required.some((role) => workspaceWide.has(role))) return { holds: true };
 
   // Only a grant narrowed to this workflow can still admit, and `CallerIdentity`
   // has nowhere to carry one — so it costs a read, taken on the path that is
@@ -230,14 +270,40 @@ export async function assertCallerHoldsRole(
   const narrowed = directory === null
     ? null
     : await directory.getRolesForUser(caller.uid, namespace, workflow);
-  if (narrowed !== null && required.some((role) => narrowed.includes(role))) return;
+  if (narrowed !== null && required.some((role) => narrowed.includes(role))) {
+    return { holds: true };
+  }
 
-  const held = narrowed ?? [...workspaceWide];
+  return { holds: false, required, held: narrowed ?? [...workspaceWide] };
+}
 
-  throw new ForbiddenError(
-    await roleDenialMessage(namespace, workflow, required, held, directory),
-    { namespace, workflow, requiredRoles: required, heldRoles: held },
-  );
+/**
+ * A `ProcessRoleDirectory` that reads each `(uid, namespace, workflow)` at most
+ * once, sharing the in-flight promise between concurrent askers.
+ *
+ * The gate reads the directory once per refusal, which is right for one claim
+ * and wrong for an inbox: thirty tasks parked on the same gated workflow would
+ * otherwise be thirty identical reads. Request-scoped — build one per call,
+ * never cache across requests, or a grant made mid-session would keep being
+ * answered from before it existed.
+ */
+export function memoizeProcessRoleReads(
+  directory: ProcessRoleDirectory | null,
+): ProcessRoleDirectory | null {
+  if (directory === null) return null;
+  const inFlight = new Map<string, Promise<string[]>>();
+  return {
+    getRolesForUser: (uid, namespace, workflowName) => {
+      const key = JSON.stringify([uid, namespace, workflowName ?? null]);
+      const cached = inFlight.get(key);
+      if (cached !== undefined) return cached;
+      const pending = directory.getRolesForUser(uid, namespace, workflowName);
+      inFlight.set(key, pending);
+      return pending;
+    },
+    getUsersByRoleInNamespace: (role, namespace, workflowName) =>
+      directory.getUsersByRoleInNamespace(role, namespace, workflowName),
+  };
 }
 
 const ZERO_HOLDER_PROBE_LIMIT = 8;

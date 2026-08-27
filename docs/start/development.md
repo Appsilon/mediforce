@@ -213,6 +213,10 @@ of those Roles, so grant them before a run reaches such a step — an
 unheld role fails closed rather than opening the step. The step editor warns
 when a step names a role nobody holds *on that workflow*, and still saves it:
 writing the workflow before granting its roles is the normal order of work.
+The same rule decides what **Human actions** shows: it opens on the tasks the
+signed-in user can act on, so a run parked on a role nobody has been granted
+looks like an empty inbox. Switch that page to **All in workspace** to see it —
+the task is there, waiting for the grant.
 Workflows that declare none are unaffected.
 
 Passwords are per-install: there is no password recovery flow yet

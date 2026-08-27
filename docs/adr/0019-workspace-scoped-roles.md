@@ -21,8 +21,11 @@ last_reviewed: 2026-08-27
 > [#1249](https://github.com/Appsilon/mediforce/issues/1249):
 > `assertCallerHoldsRole` lives in `packages/platform-api/src/auth.ts` and gates
 > task claim and complete, reading `allowedRoles` off the run's pinned
-> definition; `RbacService` is deleted rather than switched on. The **`run` and
-> `edit` verbs are not gated yet** — any member can still start, register,
+> definition; `RbacService` is deleted rather than switched on.
+> [#1251](https://github.com/Appsilon/mediforce/issues/1251) turns the same
+> predicate into the Human actions inbox — `GET /api/tasks?actionable=true`,
+> with the workspace-wide view one toggle away — which retires the accidental
+> `roles[0]` pivot of fact 4. The **`run` and `edit` verbs are not gated yet** — any member can still start, register,
 > delete or transfer any workflow in the workspace (fact 3 below). The rest of
 > the epic is [#1246](https://github.com/Appsilon/mediforce/issues/1246); this
 > line changes to "Implemented" when those land and the ADR is promoted to
@@ -72,6 +75,11 @@ against source:
    `useViewerIdentity` returns **`roles[0]`**, and the Human actions page pivots
    its whole inbox on that one string — so a user holding two roles sees only
    the first one's queue, off a value with no workspace context at all.
+   *(Resolved by [#1251](https://github.com/Appsilon/mediforce/issues/1251):
+   the pivot is gone. The inbox asks the server —
+   `GET /api/tasks?actionable=true` — which answers with the same
+   `resolveStepGate` + `callerHoldsRole` predicate the claim is gated on, and
+   the page keeps an **All in workspace** toggle for the unfiltered view.)*
 
 Fact 4 is the one ADR-0002 did not weigh, and it is why the scoping question
 cannot be deferred any further: the moment roles carry authority, a
@@ -250,10 +258,16 @@ Implications the implementation issues must resolve, not decided here:
 - **`session.user.roles` cannot stay a flat array** (fact 4). The `session`
   callback runs on every session read with no route params, so it has nothing to
   scope to. Either it carries a `handle → roles` map, or the browser reads roles
-  per workspace instead. Whichever wins, the current `roles[0]` inbox pivot
-  changes behaviour, making it user-visible (AGENTS.md §12) rather than a
-  refactor. → [#1248](https://github.com/Appsilon/mediforce/issues/1248) /
-  [#1251](https://github.com/Appsilon/mediforce/issues/1251)
+  per workspace instead. **Settled by
+  [#1251](https://github.com/Appsilon/mediforce/issues/1251): neither.** The
+  browser stopped needing the answer — the inbox question is decided server-side,
+  where the run's pinned definition and the caller's scoped grants both are, so
+  the flat array carries no authority and the shape never had to change.
+  `session.user.roles` remains what
+  [#1248](https://github.com/Appsilon/mediforce/issues/1248) left it as: a
+  cross-workspace union, read by nothing that gates. The behaviour change it
+  predicted is real and is user-visible (AGENTS.md §12), which is what the
+  toggle covers.
 - **Where enforcement reads `allowedRoles` from.** `HumanTask.assignedRole` holds
   only `allowedRoles[0]`, so gating on it would enforce a rule the author did not
   write; the run's pinned Workflow Definition carries the full array and needs no

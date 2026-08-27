@@ -81,3 +81,31 @@ describe('ACTIONABLE_STATUSES', () => {
     ).toBe(true);
   });
 });
+
+/**
+ * One schema serves two callers with different wire shapes: the client passes
+ * a real boolean, the route adapter passes whatever the query string carried.
+ * Both must land on the same post-parse `boolean`, or the fork
+ * `ListRunsPageClientInputSchema` had to make would repeat here.
+ */
+describe('ListTasksInputSchema — actionable', () => {
+  it('accepts a boolean, as the client sends it', () => {
+    expect(ListTasksInputSchema.parse({ actionable: true }).actionable).toBe(true);
+  });
+
+  it("accepts the query string's 'true', as the route adapter sends it", () => {
+    expect(ListTasksInputSchema.parse({ actionable: 'true' }).actionable).toBe(true);
+  });
+
+  it("parses 'false' to false rather than to a truthy string", () => {
+    expect(ListTasksInputSchema.parse({ actionable: 'false' }).actionable).toBe(false);
+  });
+
+  it('leaves it undefined when absent — the unfiltered default', () => {
+    expect(ListTasksInputSchema.parse({}).actionable).toBeUndefined();
+  });
+
+  it('rejects a value that is neither', () => {
+    expect(ListTasksInputSchema.safeParse({ actionable: 'yes' }).success).toBe(false);
+  });
+});

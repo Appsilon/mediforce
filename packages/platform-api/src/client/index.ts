@@ -833,6 +833,10 @@ export class Mediforce {
           stepId: validated.stepId,
           status: validated.status,
           namespace: validated.namespace,
+          // Wire format is a string; the schema accepts both so one contract
+          // serves the client and the route adapter. Only `true` is sent —
+          // `false` and omitted mean the same thing to the handler.
+          actionable: validated.actionable === true ? 'true' : undefined,
         });
         const res = await this.request(`/api/tasks${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.list');
