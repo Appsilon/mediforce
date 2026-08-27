@@ -26,13 +26,17 @@ export const ListCoworkSessionsInputSchema = z.object({
   role: z.string().min(1).optional(),
   status: z.array(CoworkSessionStatusSchema).min(1).optional(),
   /**
-   * Narrows the caller-scope axis to one workspace, with the same intersection
-   * semantics as `tasks.list`: a namespace the caller is not a member of
-   * yields an empty list rather than a 403. The inbox renders sessions under a
-   * workspace handle and links each one beneath it, so an unscoped list sends
-   * a session from another workspace to a route that does not resolve there.
+   * Narrows the caller-scope axis to the named workspaces, with the same
+   * intersection semantics and one-or-many shape as `tasks.list` — the two
+   * feed one inbox, so a selection that means one thing there must mean the
+   * same thing here. The inbox renders sessions under a workspace handle and
+   * links each one beneath it, so an unscoped list sends a session from
+   * another workspace to a route that does not resolve there.
    */
-  namespace: z.string().min(1).optional(),
+  namespace: z
+    .union([z.string().min(1), z.array(z.string().min(1)).min(1)])
+    .transform((value) => (typeof value === 'string' ? [value] : value))
+    .optional(),
 });
 
 export const ListCoworkSessionsOutputSchema = z.object({

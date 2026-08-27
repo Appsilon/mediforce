@@ -36,10 +36,23 @@ export const ListTasksInputSchema = z
     role: z.string().min(1).optional(),
     stepId: z.string().min(1).optional(),
     status: z.array(HumanTaskStatusSchema).min(1).optional(),
-    // Narrows the `role` / caller-scope axes to one workspace. Intersection
-    // semantics like `runs.list` — a namespace the caller isn't a member of
-    // yields an empty list, not a 403.
-    namespace: z.string().min(1).optional(),
+    /**
+     * Narrows the `role` / caller-scope axes to the named workspaces.
+     * Intersection semantics like `runs.list`: a workspace the caller is not a
+     * member of contributes nothing, rather than turning the whole query into
+     * a 403 — so a selection that mixes workspaces the caller has since left
+     * degrades to the ones they still hold.
+     *
+     * Accepts one workspace or several, because the caller asking is a
+     * multi-select: the inbox opens on the workspace in the URL and lets a
+     * member widen to any set of the workspaces they belong to. A bare string
+     * (client callers, and the single `?namespace=x` a query string carries)
+     * normalises to a one-element list so the handler has one shape to read.
+     */
+    namespace: z
+      .union([z.string().min(1), z.array(z.string().min(1)).min(1)])
+      .transform((value) => (typeof value === 'string' ? [value] : value))
+      .optional(),
     /**
      * `true` narrows the result to the tasks the caller can actually act on:
      * assigned to them, or `pending` and unassigned with a step whose
@@ -77,7 +90,12 @@ export const ACTIONABLE_STATUSES: readonly HumanTaskStatus[] = ['pending', 'clai
 interface ListTasksFilters {
   stepId?: string;
   status?: HumanTaskStatus[];
-  namespace?: string;
+  /**
+   * Post-parse shape: always a list, because the schema normalises the single
+   * `?namespace=x` a query string carries into a one-element one. Callers pass
+   * a list; the handler and the repositories read one shape.
+   */
+  namespace?: readonly string[];
   actionable?: boolean;
 }
 

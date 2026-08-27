@@ -187,7 +187,7 @@ describe('listCoworkSessions — namespace axis', () => {
     const both = await listCoworkSessions({}, scope);
     expect(both.sessions.map((s) => s.id).sort()).toEqual(['sess-a', 'sess-b']);
 
-    const scoped = await listCoworkSessions({ namespace: 'team-alpha' }, scope);
+    const scoped = await listCoworkSessions({ namespace: ['team-alpha'] }, scope);
     expect(scoped.sessions.map((s) => s.id)).toEqual(['sess-a']);
   });
 
@@ -198,7 +198,7 @@ describe('listCoworkSessions — namespace axis', () => {
       caller: userCaller('uid-1', ['team-alpha']),
     });
 
-    const result = await listCoworkSessions({ namespace: 'team-beta' }, scope);
+    const result = await listCoworkSessions({ namespace: ['team-beta'] }, scope);
     expect(result.sessions).toEqual([]);
   });
 
@@ -217,7 +217,7 @@ describe('listCoworkSessions — namespace axis', () => {
     });
 
     const result = await listCoworkSessions(
-      { namespace: 'team-alpha', status: ['finalized'] },
+      { namespace: ['team-alpha'], status: ['finalized'] },
       scope,
     );
     expect(result.sessions.map((s) => s.id)).toEqual(['sess-a2']);

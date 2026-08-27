@@ -34,6 +34,21 @@ export abstract class AuthorizedScope {
     return typeof namespace === 'string' && this.caller.namespaces.has(namespace);
   }
 
+  /**
+   * The requested workspaces the caller may actually read, de-duplicated.
+   *
+   * Intersection, not refusal: a selection naming a workspace the caller has
+   * since left still answers for the rest, and one naming only workspaces they
+   * cannot read collapses to the empty list — the anti-enumeration shape a
+   * single-namespace filter already had. System actors are unrestricted.
+   */
+  protected narrowToMemberships(namespaces: readonly string[]): string[] {
+    const requested = [...new Set(namespaces)];
+    const caller = this.caller;
+    if (caller.isSystemActor) return requested;
+    return requested.filter((namespace) => caller.namespaces.has(namespace));
+  }
+
   protected assertNamespaceWrite(namespace: string | undefined): void {
     if (this.caller.isSystemActor) return;
     if (typeof namespace !== 'string' || !this.caller.namespaces.has(namespace)) {

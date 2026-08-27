@@ -187,7 +187,7 @@ describe('caller-scope queues, narrowed to one workspace', () => {
     const { wrapper } = createQueryWrapper();
 
     const { result } = renderHook(
-      () => useMyActionableTasks({ actionable: true, namespace: 'db' }),
+      () => useMyActionableTasks({ actionable: true, namespaces: ['db'] }),
       { wrapper },
     );
 
@@ -195,17 +195,17 @@ describe('caller-scope queues, narrowed to one workspace', () => {
     expect(listMock).toHaveBeenCalledWith({
       status: ['pending', 'claimed'],
       actionable: true,
-      namespace: 'db',
+      namespace: ['db'],
     });
   });
 
   it('passes the namespace through on the completed queue', async () => {
     const { wrapper } = createQueryWrapper();
 
-    const { result } = renderHook(() => useMyCompletedTasks({ namespace: 'db' }), { wrapper });
+    const { result } = renderHook(() => useMyCompletedTasks({ namespaces: ['db'] }), { wrapper });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(listMock).toHaveBeenCalledWith({ status: ['completed'], namespace: 'db' });
+    expect(listMock).toHaveBeenCalledWith({ status: ['completed'], namespace: ['db'] });
   });
 
   it('omits the namespace entirely when none is given', async () => {
@@ -225,16 +225,70 @@ describe('caller-scope queues, narrowed to one workspace', () => {
     const { wrapper } = createQueryWrapper();
 
     const { result, rerender } = renderHook(
-      ({ namespace }: { namespace: string }) => useMyActionableTasks({ namespace }),
-      { wrapper, initialProps: { namespace: 'db' } },
+      ({ namespaces }: { namespaces: string[] }) => useMyActionableTasks({ namespaces }),
+      { wrapper, initialProps: { namespaces: ['db'] } },
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    rerender({ namespace: 'other' });
+    rerender({ namespaces: ['other'] });
     await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
     expect(listMock).toHaveBeenLastCalledWith({
       status: ['pending', 'claimed'],
-      namespace: 'other',
+      namespace: ['other'],
     });
+  });
+});
+
+/**
+ * The multi-workspace selection the inbox filter produces (issue #1251
+ * follow-up): several workspaces are one question, not one request each.
+ */
+describe('caller-scope queues across several workspaces', () => {
+  beforeEach(() => {
+    listMock.mockReset();
+    listMock.mockResolvedValue({ tasks: [] });
+  });
+
+  it('asks once for the whole selection', async () => {
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = renderHook(
+      () => useMyActionableTasks({ actionable: true, namespaces: ['db', 'empty'] }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(listMock).toHaveBeenCalledTimes(1);
+    expect(listMock).toHaveBeenCalledWith({
+      status: ['pending', 'claimed'],
+      actionable: true,
+      namespace: ['db', 'empty'],
+    });
+  });
+
+  /**
+   * Widening the selection is a different server answer, so it must not be
+   * served from the narrower one's cache entry.
+   */
+  it('caches a widened selection apart from the narrow one', async () => {
+    const { wrapper } = createQueryWrapper();
+
+    const { result, rerender } = renderHook(
+      ({ namespaces }: { namespaces: string[] }) => useMyActionableTasks({ namespaces }),
+      { wrapper, initialProps: { namespaces: ['db'] } },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    rerender({ namespaces: ['db', 'empty'] });
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('omits the axis entirely for "All workspaces"', async () => {
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = renderHook(() => useMyActionableTasks({ actionable: true }), { wrapper });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(listMock).toHaveBeenCalledWith({ status: ['pending', 'claimed'], actionable: true });
   });
 });

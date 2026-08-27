@@ -67,7 +67,7 @@ export function useMonitoringData(handle: string | undefined): MonitoringData {
     queryKey: queryKeys.tasks.byNamespace(handle ?? '', { status: [...ACTIONABLE_STATUSES] }),
     queryFn: async () => {
       const result = await mediforce.tasks.list({
-        namespace: handle as string,
+        namespace: [handle as string],
         status: [...ACTIONABLE_STATUSES],
       });
       return result.tasks;

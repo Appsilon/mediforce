@@ -31,22 +31,25 @@ export class AuthorizedCoworkSessionRepository extends AuthorizedScope {
 
   /**
    * Caller-scope read: every session the caller is allowed to see. Optional
-   * `role` filter narrows to a single assigned role, `namespace` to a single
-   * workspace. System actors see the whole store; user callers see sessions
-   * whose parent run belongs to one of their namespaces.
+   * `role` filter narrows to a single assigned role, `namespaces` to a chosen
+   * set of workspaces. System actors see the whole store; user callers see
+   * sessions whose parent run belongs to one of their namespaces.
    *
-   * A `namespace` the caller is not a member of reads as the empty list, not a
-   * refusal — the same anti-enumeration shape as
-   * `AuthorizedHumanTaskRepository.listForCaller`.
+   * Workspaces the caller cannot read drop out via `narrowToMemberships`, the
+   * same rule `AuthorizedHumanTaskRepository.listForCaller` applies.
    */
-  list = async (filters?: { role?: string; namespace?: string }): Promise<CoworkSession[]> => {
+  list = async (filters?: {
+    role?: string;
+    namespaces?: readonly string[];
+  }): Promise<CoworkSession[]> => {
     const role = filters?.role;
-    const namespace = filters?.namespace;
-    if (namespace !== undefined) {
-      if (!this.caller.isSystemActor && !this.caller.namespaces.has(namespace)) return [];
+    const namespaces = filters?.namespaces;
+    if (namespaces !== undefined) {
+      const allowed = this.narrowToMemberships(namespaces);
+      if (allowed.length === 0) return [];
       return role !== undefined
-        ? this.raw.listByRoleInNamespaces(role, [namespace])
-        : this.raw.listInNamespaces([namespace]);
+        ? this.raw.listByRoleInNamespaces(role, allowed)
+        : this.raw.listInNamespaces(allowed);
     }
     if (this.caller.isSystemActor) {
       return role !== undefined ? this.raw.listByRoleAll(role) : this.raw.listAll();

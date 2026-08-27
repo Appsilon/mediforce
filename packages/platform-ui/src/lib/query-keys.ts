@@ -32,13 +32,13 @@ export const queryKeys = {
       ['tasks', { namespace, ...filters }] as const,
     /** Caller-scope axis: every task visible to the caller across roles +
      *  instances, or — with `actionable` — only the ones they may act on.
-     *  `actionable` and `namespace` are both part of the key: each names a
+     *  `actionable` and `namespaces` are both part of the key: each names a
      *  different server answer, and sharing a cache entry across either would
-     *  show one view under the other's label. */
+     *  show one selection's inbox under another's label. */
     forCaller: (filters?: {
       status?: HumanTaskStatus[];
       actionable?: boolean;
-      namespace?: string;
+      namespaces?: readonly string[];
     }) => ['tasks', { caller: 'me', ...filters }] as const,
   },
   task: (taskId: string) => ['task', taskId] as const,

@@ -191,10 +191,13 @@ Work item assigned to a human role inside a Workflow Run. Created when
 visible to all role-matching users until claimed).
 
 **Human actions** *(UI label)*:
-The task inbox page, scoped to the Workspace in the URL. Defaults to the Human
-Tasks the viewer can act on — assigned to them, or unclaimed on a step whose
-`allowedRoles` they hold in that Workspace — with an **All in workspace**
-toggle for every task in it. Navigating to a task item deep-links directly to
+The task inbox page. Opens scoped to the Workspace in the URL, with a
+workspace filter that widens it to any set of the Workspaces the viewer belongs
+to, or to all of them. Defaults to the Human Tasks the viewer can act on —
+assigned to them, or unclaimed on a step whose `allowedRoles` they hold in that
+Workspace — with an **All in workspace** toggle for every task in the
+selection. Each row links into the Workspace its own Run belongs to, not the
+one in the URL. Navigating to a task item deep-links directly to
 the owning Workflow Run Step view (not a separate task detail page). Previously
 labelled "New actions".
 _Avoid_: using "task inbox" or "task detail" for the unified step view — the step

@@ -109,3 +109,33 @@ describe('ListTasksInputSchema — actionable', () => {
     expect(ListTasksInputSchema.safeParse({ actionable: 'yes' }).success).toBe(false);
   });
 });
+
+/**
+ * The workspace axis carries one value from a query string and many from the
+ * inbox's multi-select, so one schema has to take both and hand the handler a
+ * single shape.
+ */
+describe('ListTasksInputSchema — the namespace axis takes one or many', () => {
+  it('normalises a bare string into a one-element list', () => {
+    const parsed = ListTasksInputSchema.parse({ namespace: 'db' });
+    expect(parsed.namespace).toEqual(['db']);
+  });
+
+  it('takes the list a multi-select produces unchanged', () => {
+    const parsed = ListTasksInputSchema.parse({ namespace: ['db', 'empty'] });
+    expect(parsed.namespace).toEqual(['db', 'empty']);
+  });
+
+  it('leaves it absent when the caller asks for every workspace', () => {
+    const parsed = ListTasksInputSchema.parse({});
+    expect(parsed.namespace).toBeUndefined();
+  });
+
+  it('rejects an empty selection — it has no answer the axis can give', () => {
+    expect(() => ListTasksInputSchema.parse({ namespace: [] })).toThrow();
+  });
+
+  it('rejects an empty workspace name', () => {
+    expect(() => ListTasksInputSchema.parse({ namespace: [''] })).toThrow();
+  });
+});

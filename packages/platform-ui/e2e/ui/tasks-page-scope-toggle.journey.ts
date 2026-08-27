@@ -34,6 +34,30 @@ test.describe('Human actions scope toggle', () => {
     await workspace.click();
 
     await expect(workspace).toHaveAttribute('aria-pressed', 'true');
+    // The page opens scoped to the workspace in the URL, so the wide view is
+    // "every action in the selection" — not the cross-workspace roll-up, which
+    // is what the workspace filter's "All workspaces" asks for.
+    await expect(page.getByText(/Every action in the selected workspaces/)).toBeVisible();
+  });
+
+  test('the workspace filter opens on the workspace in the URL and can widen to all', async ({
+    page,
+  }) => {
+    trackPageErrors(page);
+
+    await page.goto(`/${TEST_ORG_HANDLE}/tasks`);
+    await expect(page.getByRole('heading', { name: 'Human actions' })).toBeVisible({
+      timeout: 30_000,
+    });
+
+    // Default: the one workspace the reader navigated to, named on the trigger.
+    const filter = page.getByRole('button', { name: /workspace/i }).last();
+    await expect(filter).toBeVisible();
+
+    await page.getByRole('button', { name: 'All in workspace' }).click();
+    await filter.click();
+    await page.getByRole('button', { name: 'All workspaces' }).click();
+
     await expect(page.getByText(/Every action in the workspaces you belong to/)).toBeVisible();
   });
 });

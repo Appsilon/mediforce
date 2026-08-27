@@ -56,15 +56,16 @@ export function useMyActionableTasksByRole(
  * every client-side attempt to mirror it from `HumanTask.assignedRole` has been
  * wrong the same way (#1249).
  *
- * `namespace` narrows the axis to one workspace. A caller renders these queues
- * under a workspace handle and links each row beneath it, so an unscoped list
- * puts another workspace's tasks on the page and sends every one of them to a
- * workflow that does not exist under that handle. Omitted keeps the
- * cross-workspace roll-up for callers that genuinely want it.
+ * `namespaces` narrows the axis to the chosen workspaces. A caller renders
+ * these queues under a workspace handle and links each row beneath it, so an
+ * unscoped list puts another workspace's tasks on the page and sends every one
+ * of them to a workflow that does not exist under that handle. Omitted keeps
+ * the cross-workspace roll-up, which is what the inbox's "All workspaces"
+ * choice asks for.
  */
 export interface CallerTaskScope {
   actionable?: boolean;
-  namespace?: string;
+  namespaces?: readonly string[];
 }
 
 /**
@@ -77,14 +78,14 @@ export function useMyActionableTasks(
   scope: CallerTaskScope = {},
 ): { data: HumanTask[]; loading: boolean; error: Error | null } {
   const actionable = scope.actionable === true;
-  const namespace = scope.namespace;
+  const namespaces = scope.namespaces;
   const query = useQuery({
-    queryKey: queryKeys.tasks.forCaller({ status: [...ACTIONABLE_STATUSES], actionable, namespace }),
+    queryKey: queryKeys.tasks.forCaller({ status: [...ACTIONABLE_STATUSES], actionable, namespaces }),
     queryFn: async () => {
       const result = await mediforce.tasks.list({
         status: [...ACTIONABLE_STATUSES],
         ...(actionable ? { actionable: true } : {}),
-        ...(namespace !== undefined ? { namespace } : {}),
+        ...(namespaces !== undefined ? { namespace: [...namespaces] } : {}),
       });
       return result.tasks;
     },
@@ -112,14 +113,14 @@ export function useMyCompletedTasks(
   scope: CallerTaskScope = {},
 ): { data: HumanTask[]; loading: boolean; error: Error | null } {
   const actionable = scope.actionable === true;
-  const namespace = scope.namespace;
+  const namespaces = scope.namespaces;
   const query = useQuery({
-    queryKey: queryKeys.tasks.forCaller({ status: ['completed'], actionable, namespace }),
+    queryKey: queryKeys.tasks.forCaller({ status: ['completed'], actionable, namespaces }),
     queryFn: async () => {
       const result = await mediforce.tasks.list({
         status: ['completed'],
         ...(actionable ? { actionable: true } : {}),
-        ...(namespace !== undefined ? { namespace } : {}),
+        ...(namespaces !== undefined ? { namespace: [...namespaces] } : {}),
       });
       return result.tasks;
     },
@@ -265,15 +266,15 @@ export function useActiveCoworkSession(
  */
 export function useMyCoworkSessions(
   assignedRole: string | null,
-  namespace?: string,
+  namespaces?: readonly string[],
 ): { data: CoworkSession[]; loading: boolean; error: Error | null } {
   const query = useQuery({
-    queryKey: ['cowork', 'list', { role: assignedRole, status: ['active'], namespace }] as const,
+    queryKey: ['cowork', 'list', { role: assignedRole, status: ['active'], namespaces }] as const,
     queryFn: async () => {
       const result = await mediforce.cowork.list({
         role: assignedRole ?? undefined,
         status: ['active'],
-        ...(namespace !== undefined ? { namespace } : {}),
+        ...(namespaces !== undefined ? { namespace: [...namespaces] } : {}),
       });
       return result.sessions;
     },
@@ -298,15 +299,15 @@ export function useMyCoworkSessions(
  */
 export function useFinalizedCoworkSessions(
   assignedRole: string | null,
-  namespace?: string,
+  namespaces?: readonly string[],
 ): { data: CoworkSession[]; loading: boolean; error: Error | null } {
   const query = useQuery({
-    queryKey: ['cowork', 'list', { role: assignedRole, status: ['finalized'], namespace }] as const,
+    queryKey: ['cowork', 'list', { role: assignedRole, status: ['finalized'], namespaces }] as const,
     queryFn: async () => {
       const result = await mediforce.cowork.list({
         role: assignedRole ?? undefined,
         status: ['finalized'],
-        ...(namespace !== undefined ? { namespace } : {}),
+        ...(namespaces !== undefined ? { namespace: [...namespaces] } : {}),
       });
       return result.sessions;
     },
