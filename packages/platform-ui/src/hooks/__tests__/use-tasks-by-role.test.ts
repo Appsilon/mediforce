@@ -169,3 +169,72 @@ describe('polling stops on 4xx error (PRD §9 rule 4)', () => {
     expect(listMock).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * The inbox lives at `/[handle]/tasks`, so "which workspace" is part of the
+ * question it asks. Without it the caller-scope axis answers across every
+ * workspace the caller belongs to, and the page then links each row under the
+ * handle in the URL — a task from another workspace resolves to a workflow that
+ * does not exist there and 404s.
+ */
+describe('caller-scope queues, narrowed to one workspace', () => {
+  beforeEach(() => {
+    listMock.mockReset();
+    listMock.mockResolvedValue({ tasks: [] });
+  });
+
+  it('passes the namespace through on the actionable queue', async () => {
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = renderHook(
+      () => useMyActionableTasks({ actionable: true, namespace: 'db' }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(listMock).toHaveBeenCalledWith({
+      status: ['pending', 'claimed'],
+      actionable: true,
+      namespace: 'db',
+    });
+  });
+
+  it('passes the namespace through on the completed queue', async () => {
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = renderHook(() => useMyCompletedTasks({ namespace: 'db' }), { wrapper });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(listMock).toHaveBeenCalledWith({ status: ['completed'], namespace: 'db' });
+  });
+
+  it('omits the namespace entirely when none is given', async () => {
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = renderHook(() => useMyActionableTasks(), { wrapper });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(listMock).toHaveBeenCalledWith({ status: ['pending', 'claimed'] });
+  });
+
+  /**
+   * Two workspaces are two server answers; sharing a cache entry would show
+   * one workspace's queue under the other's handle after a switch.
+   */
+  it('caches two workspaces apart', async () => {
+    const { wrapper } = createQueryWrapper();
+
+    const { result, rerender } = renderHook(
+      ({ namespace }: { namespace: string }) => useMyActionableTasks({ namespace }),
+      { wrapper, initialProps: { namespace: 'db' } },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    rerender({ namespace: 'other' });
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
+    expect(listMock).toHaveBeenLastCalledWith({
+      status: ['pending', 'claimed'],
+      namespace: 'other',
+    });
+  });
+});

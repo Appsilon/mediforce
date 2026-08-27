@@ -151,3 +151,75 @@ describe('listCoworkSessions handler', () => {
     expect(result.sessions.map((s) => s.id)).toEqual(['sess-active']);
   });
 });
+
+/**
+ * The inbox renders sessions under a workspace handle and links each one
+ * beneath it, so an unscoped caller-scope list puts another workspace's
+ * sessions on the page and points every one of them at a route that does not
+ * resolve there.
+ */
+describe('listCoworkSessions — namespace axis', () => {
+  let coworkSessionRepo: InMemoryCoworkSessionRepository;
+  let instanceRepo: InMemoryProcessInstanceRepository;
+
+  beforeEach(async () => {
+    resetFactorySequence();
+    instanceRepo = new InMemoryProcessInstanceRepository();
+    coworkSessionRepo = new InMemoryCoworkSessionRepository(instanceRepo);
+
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-b', namespace: 'team-beta' }));
+    await coworkSessionRepo.create(
+      buildCoworkSession({ id: 'sess-a', processInstanceId: 'inst-a', status: 'active' }),
+    );
+    await coworkSessionRepo.create(
+      buildCoworkSession({ id: 'sess-b', processInstanceId: 'inst-b', status: 'active' }),
+    );
+  });
+
+  it('keeps only the named workspace for a member of both', async () => {
+    const scope = createTestScope({
+      coworkSessionRepo,
+      instanceRepo,
+      caller: userCaller('uid-1', ['team-alpha', 'team-beta']),
+    });
+
+    const both = await listCoworkSessions({}, scope);
+    expect(both.sessions.map((s) => s.id).sort()).toEqual(['sess-a', 'sess-b']);
+
+    const scoped = await listCoworkSessions({ namespace: 'team-alpha' }, scope);
+    expect(scoped.sessions.map((s) => s.id)).toEqual(['sess-a']);
+  });
+
+  it('reads a workspace the caller is not in as empty, not as a refusal', async () => {
+    const scope = createTestScope({
+      coworkSessionRepo,
+      instanceRepo,
+      caller: userCaller('uid-1', ['team-alpha']),
+    });
+
+    const result = await listCoworkSessions({ namespace: 'team-beta' }, scope);
+    expect(result.sessions).toEqual([]);
+  });
+
+  it('composes with the role and status filters', async () => {
+    await coworkSessionRepo.create(
+      buildCoworkSession({
+        id: 'sess-a2',
+        processInstanceId: 'inst-a',
+        status: 'finalized',
+      }),
+    );
+    const scope = createTestScope({
+      coworkSessionRepo,
+      instanceRepo,
+      caller: userCaller('uid-1', ['team-alpha', 'team-beta']),
+    });
+
+    const result = await listCoworkSessions(
+      { namespace: 'team-alpha', status: ['finalized'] },
+      scope,
+    );
+    expect(result.sessions.map((s) => s.id)).toEqual(['sess-a2']);
+  });
+});

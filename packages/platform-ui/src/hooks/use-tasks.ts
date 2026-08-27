@@ -55,9 +55,16 @@ export function useMyActionableTasksByRole(
  * the step's `allowedRoles` lives on the run's pinned Workflow Definition, and
  * every client-side attempt to mirror it from `HumanTask.assignedRole` has been
  * wrong the same way (#1249).
+ *
+ * `namespace` narrows the axis to one workspace. A caller renders these queues
+ * under a workspace handle and links each row beneath it, so an unscoped list
+ * puts another workspace's tasks on the page and sends every one of them to a
+ * workflow that does not exist under that handle. Omitted keeps the
+ * cross-workspace roll-up for callers that genuinely want it.
  */
 export interface CallerTaskScope {
   actionable?: boolean;
+  namespace?: string;
 }
 
 /**
@@ -70,12 +77,14 @@ export function useMyActionableTasks(
   scope: CallerTaskScope = {},
 ): { data: HumanTask[]; loading: boolean; error: Error | null } {
   const actionable = scope.actionable === true;
+  const namespace = scope.namespace;
   const query = useQuery({
-    queryKey: queryKeys.tasks.forCaller({ status: [...ACTIONABLE_STATUSES], actionable }),
+    queryKey: queryKeys.tasks.forCaller({ status: [...ACTIONABLE_STATUSES], actionable, namespace }),
     queryFn: async () => {
       const result = await mediforce.tasks.list({
         status: [...ACTIONABLE_STATUSES],
         ...(actionable ? { actionable: true } : {}),
+        ...(namespace !== undefined ? { namespace } : {}),
       });
       return result.tasks;
     },
@@ -103,12 +112,14 @@ export function useMyCompletedTasks(
   scope: CallerTaskScope = {},
 ): { data: HumanTask[]; loading: boolean; error: Error | null } {
   const actionable = scope.actionable === true;
+  const namespace = scope.namespace;
   const query = useQuery({
-    queryKey: queryKeys.tasks.forCaller({ status: ['completed'], actionable }),
+    queryKey: queryKeys.tasks.forCaller({ status: ['completed'], actionable, namespace }),
     queryFn: async () => {
       const result = await mediforce.tasks.list({
         status: ['completed'],
         ...(actionable ? { actionable: true } : {}),
+        ...(namespace !== undefined ? { namespace } : {}),
       });
       return result.tasks;
     },
@@ -254,13 +265,15 @@ export function useActiveCoworkSession(
  */
 export function useMyCoworkSessions(
   assignedRole: string | null,
+  namespace?: string,
 ): { data: CoworkSession[]; loading: boolean; error: Error | null } {
   const query = useQuery({
-    queryKey: ['cowork', 'list', { role: assignedRole, status: ['active'] }] as const,
+    queryKey: ['cowork', 'list', { role: assignedRole, status: ['active'], namespace }] as const,
     queryFn: async () => {
       const result = await mediforce.cowork.list({
         role: assignedRole ?? undefined,
         status: ['active'],
+        ...(namespace !== undefined ? { namespace } : {}),
       });
       return result.sessions;
     },
@@ -285,13 +298,15 @@ export function useMyCoworkSessions(
  */
 export function useFinalizedCoworkSessions(
   assignedRole: string | null,
+  namespace?: string,
 ): { data: CoworkSession[]; loading: boolean; error: Error | null } {
   const query = useQuery({
-    queryKey: ['cowork', 'list', { role: assignedRole, status: ['finalized'] }] as const,
+    queryKey: ['cowork', 'list', { role: assignedRole, status: ['finalized'], namespace }] as const,
     queryFn: async () => {
       const result = await mediforce.cowork.list({
         role: assignedRole ?? undefined,
         status: ['finalized'],
+        ...(namespace !== undefined ? { namespace } : {}),
       });
       return result.sessions;
     },

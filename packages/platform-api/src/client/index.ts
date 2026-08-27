@@ -990,6 +990,7 @@ export class Mediforce {
         const qs = toSearchParams({
           role: validated.role,
           status: validated.status,
+          namespace: validated.namespace,
         });
         const res = await this.request(`/api/cowork${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.cowork.list');

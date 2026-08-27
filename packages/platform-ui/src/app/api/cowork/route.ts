@@ -6,8 +6,9 @@ import { ListCoworkSessionsInputSchema } from '@mediforce/platform-api/contract'
  * GET /api/cowork
  *
  * Contract lives in `@mediforce/platform-api`. Accepted query params:
- *   - `role`   — narrow to an assigned role
- *   - `status` — repeatable; e.g. `?status=active&status=finalized`
+ *   - `role`      — narrow to an assigned role
+ *   - `status`    — repeatable; e.g. `?status=active&status=finalized`
+ *   - `namespace` — narrows the caller-scope axis to one workspace
  *   - (none)   — caller-scope axis: every session whose parent run belongs
  *                to a workspace the caller is a member of (system actors see
  *                every session)
@@ -24,6 +25,7 @@ export const GET = createRouteAdapter(
     return {
       role: params.get('role') ?? undefined,
       status: statuses.length > 0 ? statuses : undefined,
+      namespace: params.get('namespace') ?? undefined,
     };
   },
   listCoworkSessions,

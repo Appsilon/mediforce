@@ -4,6 +4,7 @@ import * as React from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { SlidersHorizontal, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useViewerIdentity } from '@/hooks/use-viewer-identity';
 import {
   useMyActionableTasks,
@@ -123,15 +124,25 @@ export default function TasksPage() {
   }, []);
 
   const { role } = useViewerIdentity();
+  // This page is mounted under a workspace handle and links every row beneath
+  // it, so the queues have to be asked for that workspace. Unscoped, the
+  // caller-scope axis answers across every workspace the caller belongs to, and
+  // a row from another one resolves to a workflow that does not exist here.
+  const handle = useHandleFromPath();
   const [mineOnly, setMineOnly] = React.useState(true);
   const { data: activeTasks, loading: activeLoading } = useMyActionableTasks({
     actionable: mineOnly,
+    namespace: handle,
   });
   const { data: completedTasks, loading: completedLoading } = useMyCompletedTasks({
     actionable: mineOnly,
+    namespace: handle,
   });
-  const { data: activeCoworkSessions, loading: coworkLoading } = useMyCoworkSessions(role);
-  const { data: finalizedCoworkSessions, loading: finalizedLoading } = useFinalizedCoworkSessions(role);
+  const { data: activeCoworkSessions, loading: coworkLoading } = useMyCoworkSessions(role, handle);
+  const { data: finalizedCoworkSessions, loading: finalizedLoading } = useFinalizedCoworkSessions(
+    role,
+    handle,
+  );
   const currentUserId = user?.id ?? '';
 
   const activeItems: ActionItem[] = React.useMemo(
@@ -169,7 +180,7 @@ export default function TasksPage() {
           <p className="text-sm text-muted-foreground mt-0.5">
             {mineOnly
               ? 'Actions you can take — assigned to you, or open to a role you hold'
-              : 'Every action in the workspaces you belong to'}
+              : 'Every action in this workspace'}
           </p>
           {!loading && totalItemCount > 0 && (
             <p className="text-xs text-muted-foreground mt-1">
