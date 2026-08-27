@@ -46,7 +46,7 @@ vi.mock('@/hooks/use-workspace-roles', () => ({
 }));
 
 vi.mock('@/hooks/use-namespace-members', () => ({
-  useNamespaceMembers: () => ({ members: rolesState.members, loading: false }),
+  useNamespaceMembers: () => ({ members: rolesState.members, loading: false, resolved: true }),
 }));
 
 import { StepEditor } from '../workflow-editor/step-editor';

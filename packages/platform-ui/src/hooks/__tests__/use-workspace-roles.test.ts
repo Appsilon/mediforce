@@ -71,19 +71,32 @@ describe('useWorkspaceRoles heldRoles', () => {
     expect(result.current.heldRoles).toEqual(['reviewer']);
   });
 
-  // An unread roster and an empty one are both `[]` here, so answering with the
-  // set while the fetch is in flight warns about every role on every step until
-  // it lands.
   it('stays unknown while the member roster is still in flight', async () => {
     const roster = deferred();
     listMembersMock.mockReturnValue(roster.promise);
     const { wrapper } = createQueryWrapper();
 
-    const { result } = renderHook(() => useWorkspaceRoles('acme'), { wrapper });
+    const { result } = renderHook(
+      () => useWorkspaceRoles('acme', { workflowName: 'tealflow' }),
+      { wrapper },
+    );
 
     expect(result.current.heldRoles).toBeNull();
 
     roster.resolve({ members: [] });
     await waitFor(() => expect(result.current.heldRoles).toEqual([]));
+  });
+
+  it('stays unknown after the member roster fails', async () => {
+    listMembersMock.mockRejectedValue(new ApiError(500, 'boom'));
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = renderHook(
+      () => useWorkspaceRoles('acme', { workflowName: 'tealflow' }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.heldRoles).toBeNull();
   });
 });

@@ -21,10 +21,11 @@ export interface UseWorkspaceRolesResult {
    * Answering `null` there left the new-workflow editor silent about a role
    * nobody holds — the editor where that typo gets made.
    *
-   * `null` is reserved for the roster not being in yet. An empty roster and an
-   * unread one are both `[]` to this hook, and rendering "we have not asked" as
-   * "nobody holds it" flags every role on every step for as long as the fetch
-   * takes.
+   * `null` is reserved for the member roster being unresolved — in flight, or
+   * failed. Neither is an answer, and neither is the same as "nobody holds
+   * anything": a caller warning about an unheld role has to keep them apart, or
+   * every step warns about every role for as long as the roster is slow, and
+   * forever after it errors.
    *
    * A grant narrowed to a *different* workflow is deliberately absent: it does
    * not let its holder act here, so counting it would silence the warning in
@@ -71,7 +72,7 @@ export function useWorkspaceRoles(
   // from is not free — a plain member reading the roster should not pay for a
   // pick-list they are not offered.
   const enabled = handle !== '' && options.enabled !== false;
-  const { members, loading: membersLoading } = useNamespaceMembers(handle);
+  const { members, loading: membersLoading, resolved: rosterResolved } = useNamespaceMembers(handle);
 
   const workflows = useQuery({
     queryKey: ['workflows', 'roles', enabled ? handle : '__noop__'] as const,
@@ -103,7 +104,7 @@ export function useWorkspaceRoles(
 
   const scope = options.workflowName;
   const heldRoles = useMemo(() => {
-    if (membersLoading) return null;
+    if (!rosterResolved) return null;
     const held = new Set<string>();
     for (const member of members) {
       for (const grant of member.grants) {
@@ -111,7 +112,7 @@ export function useWorkspaceRoles(
       }
     }
     return [...held].sort();
-  }, [members, scope, membersLoading]);
+  }, [members, scope, rosterResolved]);
 
   return {
     roles,
