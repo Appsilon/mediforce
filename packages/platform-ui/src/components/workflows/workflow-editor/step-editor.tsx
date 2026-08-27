@@ -4,6 +4,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
+import { useNamespaceMembers } from '@/hooks/use-namespace-members';
+import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
@@ -22,6 +24,7 @@ import { CoworkSection } from './cowork-section';
 import { StepDataFlow } from './step-data-flow';
 import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
+import { AllowedRolesField, AssignedToField } from './step-editor-roles';
 import { CollapsibleCard } from './collapsible-card';
 
 function friendlyFieldError(message: string): string {
@@ -156,8 +159,8 @@ const TIP = {
   databricksPollIntervalMs:'How often to poll the run state, in milliseconds. Default 10000.',
   databricksTimeoutMinutes:'Step timeout in minutes — the run is cancelled when exceeded. Default 30.',
 
-  allowedRoles:            'Roles that can claim and complete this task, comma-separated. Enforced: a member holding none of them is refused, and a role nobody in the workspace holds makes the step unclaimable. Leave empty to allow any workspace member.',
-  assignedTo:              'Pre-assign this human task to a specific user. Accepts a user id or an interpolated value like ${triggerPayload.userId}. Human steps only.',
+  allowedRoles:            'Roles that can claim and complete this task. Enforced: a member holding none of them is refused, and a role nobody holds on this workflow makes the step unclaimable. Pick from the roles this workspace already knows, or type a new one. Leave empty to allow any workspace member.',
+  assignedTo:              'Pre-assign this human task to a specific user. Pick a workspace member, or type an interpolated value like ${triggerPayload.userId} to assign per run. Human steps only.',
   continueOnError:         'When on, a failure of this step is logged as a warning and the workflow advances anyway instead of failing the whole run. Use for non-critical side-effects (e.g. a notification), never for a step later steps depend on.',
   uiComponent:             'Custom task body. "File upload" collects files; "Assignment table" and "Table editor" render their own views (configure their columns in the source editor). Default is the params form.',
   uiAcceptedTypes:         'Accepted file types, comma-separated — MIME types and/or extensions (e.g. text/csv, .csv, application/pdf). If empty, only PDFs are accepted.',
@@ -282,6 +285,16 @@ export function StepEditor({
   const isDecision = step.type === 'decision';
   const hasVerdicts = isReview || isDecision;
   const isTerminal = step.type === 'terminal';
+
+  // The workspace vocabulary and roster behind the two human-step role
+  // controls. `workflowName` scopes the "who can actually act here" question:
+  // a grant narrowed to another workflow does not let its holder claim this
+  // task, so it must not silence the unheld-role warning (#1252).
+  const { roles: workspaceRoles, heldRoles } = useWorkspaceRoles(handle, {
+    enabled: isHuman,
+    workflowName,
+  });
+  const { members } = useNamespaceMembers(handle);
 
   const httpAction    = step.action?.kind === 'http'    ? step.action : undefined;
   const reshapeAction = step.action?.kind === 'reshape' ? step.action : undefined;
@@ -1374,20 +1387,18 @@ export function StepEditor({
       {isHuman && (
         <FieldGroup>
           <FieldRow label="allowedRoles" tooltip={TIP.allowedRoles}>
-            <input
-              value={step.allowedRoles?.join(', ') ?? ''}
-              onChange={(e) => onChange({
-                allowedRoles: e.target.value ? e.target.value.split(',').map((r) => r.trim()).filter(Boolean) : undefined,
-              })}
-              className={ri}
+            <AllowedRolesField
+              value={step.allowedRoles ?? []}
+              vocabulary={workspaceRoles}
+              heldRoles={heldRoles}
+              onChange={(roles) => onChange({ allowedRoles: roles.length > 0 ? roles : undefined })}
             />
           </FieldRow>
           <FieldRow label="assignedTo" tooltip={TIP.assignedTo}>
-            <input
+            <AssignedToField
               value={step.assignedTo ?? ''}
-              onChange={(e) => onChange({ assignedTo: e.target.value || undefined })}
-              placeholder="user id or ${triggerPayload.userId}"
-              className={riMono}
+              members={members}
+              onChange={(assignedTo) => onChange({ assignedTo: assignedTo || undefined })}
             />
           </FieldRow>
         </FieldGroup>

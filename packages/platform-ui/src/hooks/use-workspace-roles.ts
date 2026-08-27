@@ -11,6 +11,20 @@ export interface UseWorkspaceRolesResult {
   roles: string[];
   /** Workflow names in the workspace, sorted — the scopes a grant can narrow to. */
   workflowNames: string[];
+  /**
+   * Roles at least one member can actually exercise on `options.workflowName`:
+   * held workspace-wide, or held under a grant narrowed to that workflow.
+   *
+   * `null` when no workflow was named — the question was not asked and has no
+   * answer, which is not the same as "nobody holds anything". A caller warning
+   * about an unheld role has to keep those apart, or every step in a workflow
+   * it forgot to name warns about every role.
+   *
+   * A grant narrowed to a *different* workflow is deliberately absent: it does
+   * not let its holder act here, so counting it would silence the warning in
+   * exactly the case the warning exists for (#1252).
+   */
+  heldRoles: string[] | null;
   loading: boolean;
   /**
    * Set when the workflow list could not be read. Distinct from an empty
@@ -45,7 +59,7 @@ export interface UseWorkspaceRolesResult {
  */
 export function useWorkspaceRoles(
   handle: string,
-  options: { enabled?: boolean } = {},
+  options: { enabled?: boolean; workflowName?: string } = {},
 ): UseWorkspaceRolesResult {
   // Only an editor needs the vocabulary, and the workflow list it is unioned
   // from is not free — a plain member reading the roster should not pay for a
@@ -81,9 +95,22 @@ export function useWorkspaceRoles(
     [groups],
   );
 
+  const scope = options.workflowName;
+  const heldRoles = useMemo(() => {
+    if (scope === undefined) return null;
+    const held = new Set<string>();
+    for (const member of members) {
+      for (const grant of member.grants) {
+        if (grant.workflowName === null || grant.workflowName === scope) held.add(grant.role);
+      }
+    }
+    return [...held].sort();
+  }, [members, scope]);
+
   return {
     roles,
     workflowNames,
+    heldRoles,
     loading: membersLoading || workflows.isLoading,
     error: (workflows.error as Error | null) ?? null,
   };

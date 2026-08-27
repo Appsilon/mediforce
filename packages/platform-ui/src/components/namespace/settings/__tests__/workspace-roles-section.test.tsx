@@ -18,6 +18,7 @@ vi.mock('@/hooks/use-workspace-roles', () => ({
 const WORKSPACE_ROLES: UseWorkspaceRolesResult = {
   roles: ['reviewer'],
   workflowNames: ['otherflow', 'tealflow'],
+  heldRoles: null,
   loading: false,
   error: null,
 };

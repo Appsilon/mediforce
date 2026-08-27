@@ -210,8 +210,10 @@ per workspace by its owner or admins — from the **Roles** table in
 <handle>` ([ADR-0019](../adr/0019-workspace-scoped-roles.md)).
 A step that declares `allowedRoles` is claimable only by someone holding one
 of those Roles, so grant them before a run reaches such a step — an
-unheld role fails closed rather than opening the step. Workflows that declare
-none are unaffected.
+unheld role fails closed rather than opening the step. The step editor warns
+when a step names a role nobody holds *on that workflow*, and still saves it:
+writing the workflow before granting its roles is the normal order of work.
+Workflows that declare none are unaffected.
 
 Passwords are per-install: there is no password recovery flow yet
 ([issue #1001](https://github.com/Appsilon/mediforce/issues/1001)), so an install
