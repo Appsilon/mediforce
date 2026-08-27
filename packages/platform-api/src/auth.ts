@@ -215,8 +215,13 @@ export async function assertCallerHoldsRole(
   if (allowedRoles === undefined || allowedRoles.length === 0) return;
   if (caller.isSystemActor) return;
 
+  // Nothing bounds `allowedRoles` at authoring time, and any member can register
+  // a workflow, so the list a refusal walks is attacker-shaped input: deduplicate
+  // it once here and every read below counts distinct roles, not repetitions.
+  const required = [...new Set(allowedRoles)];
+
   const workspaceWide = caller.namespaceProcessRoles.get(namespace) ?? new Set<string>();
-  if (allowedRoles.some((role) => workspaceWide.has(role))) return;
+  if (required.some((role) => workspaceWide.has(role))) return;
 
   // Only a grant narrowed to this workflow can still admit, and `CallerIdentity`
   // has nowhere to carry one — so it costs a read, taken on the path that is
@@ -225,15 +230,17 @@ export async function assertCallerHoldsRole(
   const narrowed = directory === null
     ? null
     : await directory.getRolesForUser(caller.uid, namespace, workflow);
-  if (narrowed !== null && allowedRoles.some((role) => narrowed.includes(role))) return;
+  if (narrowed !== null && required.some((role) => narrowed.includes(role))) return;
 
   const held = narrowed ?? [...workspaceWide];
 
   throw new ForbiddenError(
-    await roleDenialMessage(namespace, workflow, allowedRoles, held, directory),
-    { namespace, workflow, requiredRoles: [...allowedRoles], heldRoles: held },
+    await roleDenialMessage(namespace, workflow, required, held, directory),
+    { namespace, workflow, requiredRoles: required, heldRoles: held },
   );
 }
+
+const ZERO_HOLDER_PROBE_LIMIT = 8;
 
 /**
  * Why the caller was refused, in the words the person reading it needs.
@@ -242,6 +249,12 @@ export async function assertCallerHoldsRole(
  * everyone — correct (an approval gate that opens when unconfigured is worse
  * than a stuck run) but useless behind a generic 403, so that case names the
  * cause and the fix instead of the caller's own roles.
+ *
+ * Establishing that costs one directory read per required role, so a step
+ * listing more roles than `ZERO_HOLDER_PROBE_LIMIT` skips the probe and is
+ * refused with the caller's own roles instead. A hand-written step never
+ * reaches that many; a definition crafted to make one refusal fan out across
+ * the connection pool does.
  */
 async function roleDenialMessage(
   namespace: string,
@@ -256,7 +269,7 @@ async function roleDenialMessage(
     ? quoted(allowedRoles)
     : `any of ${quoted(allowedRoles)}`;
 
-  if (directory !== null) {
+  if (directory !== null && allowedRoles.length <= ZERO_HOLDER_PROBE_LIMIT) {
     const holders = await Promise.all(
       allowedRoles.map((role) =>
         directory.getUsersByRoleInNamespace(role, namespace, workflow),

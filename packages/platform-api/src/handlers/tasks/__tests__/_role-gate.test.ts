@@ -278,4 +278,83 @@ describe('assertCallerMayActOnTask', () => {
       assertCallerMayActOnTask(scopeFor(new Map(), directory), task),
     ).rejects.toThrow("This step requires 'reviewer'; you hold no roles in this workspace.");
   });
+  // Version numbering restarts at 1 once the last version leaves a workspace,
+  // so registering the transferred (or deleted) name again plants a definition
+  // an in-flight run's pin resolves to. Resolving is not enough: the pinned
+  // version cannot have been written after the run that pinned it.
+  it("refuses when the pin resolves to a workflow registered after the run started", async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: WORKFLOW,
+        namespace: NAMESPACE,
+        version: 3,
+        createdAt: '2026-06-01T10:00:00Z',
+        steps: [humanStep(), { id: 'done', name: 'Done', type: 'terminal', executor: 'human' }],
+        transitions: [{ from: 'approve', to: 'done' }],
+      }),
+    );
+    const task = await seedTask();
+
+    await expect(
+      assertCallerMayActOnTask(scopeFor(new Map()), task),
+    ).rejects.toThrow(/registered under the same name after this run started/);
+  });
+
+  it('admits on a pinned definition registered before the run', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: WORKFLOW,
+        namespace: NAMESPACE,
+        version: 3,
+        createdAt: '2026-01-01T10:00:00Z',
+        steps: [humanStep(), { id: 'done', name: 'Done', type: 'terminal', executor: 'human' }],
+        transitions: [{ from: 'approve', to: 'done' }],
+      }),
+    );
+    const task = await seedTask();
+
+    await expect(
+      assertCallerMayActOnTask(scopeFor(new Map()), task),
+    ).resolves.toBeUndefined();
+  });
+
+  // Nothing bounds `allowedRoles` at authoring time and any member can register
+  // a workflow, so the refusal path must not turn a crafted list into one
+  // directory read per entry.
+  it('probes a repeated role once when deciding nobody holds it', async () => {
+    await pinDefinition(humanStep(['reviewer', 'reviewer', 'reviewer']));
+    const task = await seedTask();
+    let probes = 0;
+    const directory = stubUserDirectory({
+      async getUsersByRoleInNamespace() {
+        probes += 1;
+        return [];
+      },
+    });
+
+    await expect(
+      assertCallerMayActOnTask(scopeFor(new Map(), directory), task),
+    ).rejects.toThrow(
+      "No one in this workspace holds 'reviewer'. An admin can assign it in workspace Settings → Members.",
+    );
+    expect(probes).toBe(1);
+  });
+
+  it('skips the zero-holder probe on a step naming more roles than the bound', async () => {
+    const manyRoles = Array.from({ length: 9 }, (_, index) => `role-${index}`);
+    await pinDefinition(humanStep(manyRoles));
+    const task = await seedTask();
+    let probes = 0;
+    const directory = stubUserDirectory({
+      async getUsersByRoleInNamespace() {
+        probes += 1;
+        return [];
+      },
+    });
+
+    await expect(
+      assertCallerMayActOnTask(scopeFor(new Map(), directory), task),
+    ).rejects.toThrow('you hold no roles in this workspace.');
+    expect(probes).toBe(0);
+  });
 });

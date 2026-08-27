@@ -17,7 +17,11 @@ import { loadPinnedDefinition } from '../_helpers';
  *   the workflow was transferred to another workspace and left the run's
  *   `namespace` on the source. Refuse: we cannot read what the author wrote,
  *   and un-gating a step by making its definition unreachable is a bypass
- *   anyone who can delete or transfer a workflow could take today.
+ *   anyone who can delete or transfer a workflow could take today. A version
+ *   that resolves but postdates the run is the same case wearing the pin's
+ *   name: version numbering restarts at 1 once the last version leaves a
+ *   workspace, so re-registering the name after a delete or a transfer plants
+ *   a definition an in-flight run's `v1` pin would otherwise resolve to.
  * - **The definition resolves but does not describe this step.** That is not an
  *   unknown — it is a definite "no restriction declared", so the step stays
  *   open exactly as before the gate existed.
@@ -31,11 +35,12 @@ export async function assertCallerMayActOnTask(
 
   const run = await scope.runs.getById(task.processInstanceId);
   const definition = run === null ? null : await loadPinnedDefinition(scope, run);
-  if (run === null || definition === null) {
+  if (run === null || definition === null || postdatesRun(definition, run)) {
     throw new ForbiddenError(
       'Cannot check who may act on this task: the workflow version this run is ' +
-        'pinned to is not readable in this workspace. It was deleted, or the ' +
-        'workflow was moved to another workspace.',
+        'pinned to is not readable in this workspace. It was deleted, moved to ' +
+        'another workspace, or replaced by a workflow registered under the same ' +
+        'name after this run started.',
       { taskId: task.id, processInstanceId: task.processInstanceId },
     );
   }
@@ -50,4 +55,20 @@ export async function assertCallerMayActOnTask(
     step.allowedRoles,
     scope.system.userDirectory,
   );
+}
+
+/**
+ * Whether the definition that answered the run's pin was registered after the
+ * run began — which the one the run pinned cannot have been.
+ *
+ * `createdAt` is optional on the schema (definitions written before it existed
+ * carry none), and an absent one is not evidence of a replacement, so it reads
+ * as the original.
+ */
+function postdatesRun(
+  definition: { readonly createdAt?: string },
+  run: { readonly createdAt: string },
+): boolean {
+  if (definition.createdAt === undefined) return false;
+  return Date.parse(definition.createdAt) > Date.parse(run.createdAt);
 }

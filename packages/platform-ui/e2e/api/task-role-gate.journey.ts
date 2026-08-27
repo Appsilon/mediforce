@@ -341,6 +341,22 @@ test.describe('Step allowedRoles gate — API E2E', () => {
     const res = await claim(request, taskId, callers.noRole);
     expect(res.status(), await res.text()).toBe(403);
     expect((await errorOf(res)).message).toContain('not readable in this workspace');
+
+    // Version numbering restarts at 1 once the last version leaves the
+    // workspace, so registering the name again plants an ungated definition the
+    // in-flight run's v1 pin resolves to. Refused all the same: a version
+    // written after the run started is not the version the run pinned.
+    const replacement = await request.post(
+      `/api/workflow-definitions?namespace=${ORG_HANDLE}`,
+      { headers: apiKeyHeaders(), data: workflowWith(TRANSFER_WD) },
+    );
+    expect(replacement.status(), await replacement.text()).toBe(201);
+
+    const afterReplacement = await claim(request, taskId, callers.noRole);
+    expect(afterReplacement.status(), await afterReplacement.text()).toBe(403);
+    expect((await errorOf(afterReplacement)).message).toContain(
+      'registered under the same name after this run started',
+    );
   });
 
   test('a holder claims and completes the task end to end', async ({ request }) => {
