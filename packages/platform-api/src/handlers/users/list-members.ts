@@ -27,6 +27,10 @@ import type {
  * in-memory test scope hits this), each member is returned with
  * `email: null`, `lastSignInTime: null` and `grants: []`. The list itself
  * still resolves.
+ *
+ * A directory that IS wired but fails is not the same case: metadata degrades
+ * to `null` per row, while a failed `getGrantsForUser` rejects the whole read
+ * rather than reporting an empty grant list the editor would then overwrite.
  */
 export async function listNamespaceMembers(
   input: ListNamespaceMembersInput,
@@ -51,10 +55,14 @@ export async function listNamespaceMembers(
   const authData = await Promise.all(
     memberDocs.map((doc) => directory.getUserMetadata(doc.uid).catch(() => null)),
   );
+  // No `.catch` here, unlike the metadata read above: `grants` is the read half
+  // of `setMemberRoles`, which is a full replace. A failed read degraded to `[]`
+  // would render as "holds no roles", and the next grant written from that row
+  // would ship only the new one — silently revoking every grant the failure hid.
+  // Missing contact details are cosmetic; a missing grant is destructive, so
+  // this read fails the whole roster rather than answering it wrong.
   const grants = await Promise.all(
-    memberDocs.map((doc) =>
-      directory.getGrantsForUser(doc.uid, input.namespace).catch(() => [] as RoleGrantInput[]),
-    ),
+    memberDocs.map((doc) => directory.getGrantsForUser(doc.uid, input.namespace)),
   );
 
   return {

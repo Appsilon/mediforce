@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import type { NamespaceMemberDetail } from '@/hooks/use-namespace-members';
+import type { UseWorkspaceRolesResult } from '@/hooks/use-workspace-roles';
 import { WorkspaceRolesSection } from '../workspace-roles-section';
 
 const setMemberRolesMock = vi.hoisted(() => vi.fn());
@@ -8,12 +9,18 @@ vi.mock('@/hooks/use-namespace-mutations', () => ({
   useSetMemberRoles: () => ({ mutateAsync: setMemberRolesMock }),
 }));
 
-const workspaceRolesMock = vi.hoisted(() =>
-  vi.fn(() => ({ roles: ['reviewer'], workflowNames: ['otherflow', 'tealflow'], loading: false })),
-);
+const workspaceRolesMock = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/use-workspace-roles', () => ({
   useWorkspaceRoles: () => workspaceRolesMock(),
 }));
+
+/** A resolved vocabulary — what every test gets unless it asks for another. */
+const WORKSPACE_ROLES: UseWorkspaceRolesResult = {
+  roles: ['reviewer'],
+  workflowNames: ['otherflow', 'tealflow'],
+  loading: false,
+  error: null,
+};
 
 function member(
   uid: string,
@@ -80,6 +87,8 @@ describe('WorkspaceRolesSection', () => {
   beforeEach(() => {
     setMemberRolesMock.mockReset();
     setMemberRolesMock.mockResolvedValue(undefined);
+    workspaceRolesMock.mockReset();
+    workspaceRolesMock.mockReturnValue(WORKSPACE_ROLES);
   });
 
   it('gives every assignment its own row, so member ↔ role ↔ workflows never has to be inferred', () => {
@@ -236,6 +245,61 @@ describe('WorkspaceRolesSection', () => {
     expect(all()).toBeChecked();
   });
 
+  it('locks the last named workflow, so narrowing cannot fall through into workspace-wide', async () => {
+    renderSection();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit workflows for approver for Alice' }));
+    const label = 'Workflows for approver for Alice';
+    const tealflow = () =>
+      within(screen.getByRole('group', { name: label })).getByRole('checkbox', {
+        name: 'tealflow',
+      });
+
+    // `approver` is narrowed to `tealflow` alone. Unchecking it would empty the
+    // list, and an empty list is what the write reads as workspace-wide — so
+    // the gesture that looks like narrowing further would grant the role
+    // everywhere. Revoking is the row's X, not the last checkbox.
+    expect(tealflow()).toBeDisabled();
+    fireEvent.click(tealflow());
+    expect(tealflow()).toBeChecked();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(setMemberRolesMock).not.toHaveBeenCalled());
+  });
+
+  it('holds the write controls until the workflow list resolves', () => {
+    workspaceRolesMock.mockReturnValue({
+      roles: [],
+      workflowNames: [],
+      loading: true,
+      error: null,
+    });
+    renderSection();
+
+    // Granting now would write the widest grant there is, because the narrower
+    // choices have not rendered yet.
+    expect(screen.getByRole('button', { name: /assign role/i })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Edit workflows for approver for Alice' }),
+    ).toBeDisabled();
+  });
+
+  it('says the workflow list failed rather than offering a workspace-wide grant', () => {
+    workspaceRolesMock.mockReturnValue({
+      roles: [],
+      workflowNames: [],
+      loading: false,
+      error: new Error('boom'),
+    });
+    renderSection();
+
+    // An empty scope list means two different things — "no workflows here" and
+    // "we could not find out" — and only one of them makes All workflows the
+    // honest answer.
+    expect(screen.getByRole('status')).toHaveTextContent(/could not load/i);
+    expect(screen.getByRole('button', { name: /assign role/i })).toBeDisabled();
+  });
+
   it('opens the scope control on what the row already holds', () => {
     renderSection();
 
@@ -253,9 +317,10 @@ describe('WorkspaceRolesSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit workflows for approver for Alice' }));
     // The control opens on what the row already holds, so re-narrowing means
-    // unchecking `tealflow` as well as checking `otherflow`.
-    toggleWorkflow('Workflows for approver for Alice', 'tealflow');
+    // unchecking `tealflow` as well as checking `otherflow` — in that order,
+    // because the last named workflow is locked until a replacement is picked.
     toggleWorkflow('Workflows for approver for Alice', 'otherflow');
+    toggleWorkflow('Workflows for approver for Alice', 'tealflow');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     // A full replace names the member's whole end state, so the untouched

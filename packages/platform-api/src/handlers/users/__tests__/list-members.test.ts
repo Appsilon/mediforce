@@ -130,6 +130,22 @@ describe('listNamespaceMembers handler', () => {
     });
   });
 
+  it('fails the read when a grant lookup errors rather than reporting no roles', async () => {
+    // The opposite call from the metadata test above, and deliberately so: the
+    // roster's `grants` are what the editor writes back as a full replace, so an
+    // error coalesced to `[]` would render as "holds no roles" and the next
+    // grant saved from that row would revoke the ones the failure hid.
+    const flaky: UserDirectoryService = stubUserDirectory({
+      async getGrantsForUser(uid: string) {
+        if (uid === 'uid-member') throw new Error('boom');
+        return [];
+      },
+    });
+    const scope = createTestScope({ namespaceRepo, userDirectory: flaky });
+
+    await expect(listNamespaceMembers({ namespace: 'alpha' }, scope)).rejects.toThrow('boom');
+  });
+
   it('keeps the workspace-scoped displayName when the member doc has one', async () => {
     directory = directoryWith(
       new Map([

@@ -12,6 +12,14 @@ export interface UseWorkspaceRolesResult {
   /** Workflow names in the workspace, sorted — the scopes a grant can narrow to. */
   workflowNames: string[];
   loading: boolean;
+  /**
+   * Set when the workflow list could not be read. Distinct from an empty
+   * `workflowNames`, and the editor has to keep them apart: "this workspace has
+   * no workflows" means every grant is workspace-wide by construction, while
+   * "we could not find out" means a grant written now would be workspace-wide
+   * because the narrower choices never rendered.
+   */
+  error: Error | null;
 }
 
 /**
@@ -73,5 +81,10 @@ export function useWorkspaceRoles(
     [groups],
   );
 
-  return { roles, workflowNames, loading: membersLoading || workflows.isLoading };
+  return {
+    roles,
+    workflowNames,
+    loading: membersLoading || workflows.isLoading,
+    error: (workflows.error as Error | null) ?? null,
+  };
 }

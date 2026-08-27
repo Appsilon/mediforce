@@ -21,6 +21,9 @@ const ROLE_OPTIONS_LIST_ID = 'workspace-role-options';
  */
 const PAGE_SIZES = [10, 25, 50, 100] as const;
 
+/** Whether the workflow list a grant can be narrowed to is known yet. */
+type ScopeStatus = 'loading' | 'error' | 'ready';
+
 /** One row: this member holds this role, on these workflows. */
 interface RoleAssignment {
   uid: string;
@@ -107,19 +110,37 @@ function sameGrants(a: readonly RoleGrantInput[], b: readonly RoleGrantInput[]):
  *
  * Naming a workflow clears it, and it cannot be unchecked directly: "no
  * workflows at all" is not a grant this model can express, so the only way out
- * of workspace-wide is to pick what replaces it.
+ * of workspace-wide is to pick what replaces it. The same rule locks the last
+ * named workflow — unchecking it would land back on the empty list, which the
+ * write reads as workspace-wide, so the gesture that looks like *narrowing
+ * further* would in fact grant the role everywhere. Revoking is the X on the
+ * row, not the last checkbox.
+ *
+ * `scopes` is three-valued rather than "a list that may be empty": an empty
+ * list from a workspace with no workflows means every grant is workspace-wide
+ * by construction, while an empty list because the read is in flight or failed
+ * means the narrower choices the admin would have picked never rendered.
  */
 function WorkflowCheckboxes({
   label,
   value,
   workflowNames,
+  scopes,
   onChange,
 }: {
   label: string;
   value: string[];
   workflowNames: string[];
+  scopes: ScopeStatus;
   onChange: (workflows: string[]) => void;
 }) {
+  if (scopes !== 'ready') {
+    return (
+      <span className="text-xs text-muted-foreground">
+        {scopes === 'loading' ? 'Loading workflows…' : 'Workflow list unavailable'}
+      </span>
+    );
+  }
   if (workflowNames.length === 0) {
     return <span className="text-xs text-muted-foreground">All workflows</span>;
   }
@@ -139,28 +160,40 @@ function WorkflowCheckboxes({
         />
         All workflows
       </label>
-      {workflowNames.map((name) => (
-        <label
-          key={name}
-          className="flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 text-xs hover:bg-muted"
-        >
-          <input
-            type="checkbox"
-            checked={value.includes(name)}
-            onChange={() =>
-              onChange(
-                value.includes(name)
-                  ? value.filter((held) => held !== name)
-                  : [...value, name],
-              )
+      {workflowNames.map((name) => {
+        const checked = value.includes(name);
+        const locked = checked && value.length === 1;
+        return (
+          <label
+            key={name}
+            title={
+              locked
+                ? `A role has to name at least one workflow — unchecking ${name} would grant it on every workflow. Remove the role to revoke it.`
+                : undefined
             }
-            className="h-3.5 w-3.5 shrink-0 accent-primary"
-          />
-          <span className="truncate" title={name}>
-            {name}
-          </span>
-        </label>
-      ))}
+            className={`flex items-center gap-1.5 rounded px-1 py-0.5 text-xs hover:bg-muted ${
+              locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={checked}
+              disabled={locked}
+              // Guarded here as well as by `disabled`, which only states the
+              // rule: the attribute stops the pointer, the guard is what makes
+              // the widening unreachable however the event arrives.
+              onChange={() => {
+                if (locked) return;
+                onChange(checked ? value.filter((held) => held !== name) : [...value, name]);
+              }}
+              className="h-3.5 w-3.5 shrink-0 accent-primary"
+            />
+            <span className="truncate" title={name}>
+              {name}
+            </span>
+          </label>
+        );
+      })}
     </div>
   );
 }
@@ -215,9 +248,19 @@ export function WorkspaceRolesSection({
   onError,
 }: WorkspaceRolesSectionProps) {
   const setMemberRoles = useSetMemberRoles(handle);
-  const { roles: workspaceRoles, workflowNames } = useWorkspaceRoles(handle, {
-    enabled: canManageMembers,
-  });
+  const {
+    roles: workspaceRoles,
+    workflowNames,
+    loading: scopesLoading,
+    error: scopesError,
+  } = useWorkspaceRoles(handle, { enabled: canManageMembers });
+
+  // Every write gate hangs off this, not off `workflowNames.length`: until the
+  // workflow list resolves the scope control can only offer "All workflows", so
+  // a Grant pressed here writes the widest grant there is while the narrower
+  // choices the admin was reaching for are still on their way — or, after a
+  // failed read, never coming.
+  const scopes: ScopeStatus = scopesError !== null ? 'error' : scopesLoading ? 'loading' : 'ready';
 
   const assignments = useMemo(() => toAssignments(members), [members]);
   const grantsOf = (uid: string): RoleGrantInput[] =>
@@ -302,7 +345,7 @@ export function WorkspaceRolesSection({
           <button
             type="button"
             onClick={() => { reset(); setAssigning(true); }}
-            disabled={busy || members.length === 0}
+            disabled={busy || members.length === 0 || scopes !== 'ready'}
             className="inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium hover:border-primary hover:text-primary transition-colors disabled:opacity-40"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -315,6 +358,13 @@ export function WorkspaceRolesSection({
         <span className="font-medium">PI</span>, <span className="font-medium">approver</span>.
         Separate from Membership above, which is who administers the workspace.
       </p>
+
+      {canManageMembers && scopes === 'error' && (
+        <p role="status" className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          Could not load this workspace&rsquo;s workflows, so a role cannot be narrowed to one
+          right now. Existing assignments below are unaffected. Reload to try again.
+        </p>
+      )}
 
       {/* Suggestions only — the role vocabulary is open by construction
           (ADR-0019), so a name no workflow declares yet still lands. */}
@@ -372,6 +422,7 @@ export function WorkspaceRolesSection({
                 label="Workflows for the new role"
                 value={draftWorkflows}
                 workflowNames={workflowNames}
+                scopes={scopes}
                 onChange={setDraftWorkflows}
               />
             </div>
@@ -381,7 +432,7 @@ export function WorkspaceRolesSection({
             <button
               type="button"
               onClick={submitAssign}
-              disabled={busy || newUid === '' || newRole.trim() === ''}
+              disabled={busy || newUid === '' || newRole.trim() === '' || scopes !== 'ready'}
               className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40"
             >
               Grant
@@ -490,6 +541,7 @@ export function WorkspaceRolesSection({
                             label={`Workflows for ${row.role} for ${row.memberName}`}
                             value={draftWorkflows}
                             workflowNames={workflowNames}
+                            scopes={scopes}
                             onChange={setDraftWorkflows}
                           />
                           <div className="flex flex-col gap-1">
@@ -501,7 +553,7 @@ export function WorkspaceRolesSection({
                                   withRole(grantsOf(row.uid), row.role, draftWorkflows),
                                 )
                               }
-                              disabled={rowBusy}
+                              disabled={rowBusy || scopes !== 'ready'}
                               className="rounded-md bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40"
                             >
                               Save
@@ -529,7 +581,7 @@ export function WorkspaceRolesSection({
                               setEditingKey(key);
                               setDraftWorkflows(row.workflows);
                             }}
-                            disabled={rowBusy || workflowNames.length === 0}
+                            disabled={rowBusy || scopes !== 'ready' || workflowNames.length === 0}
                             aria-label={`Edit workflows for ${row.role} for ${row.memberName}`}
                             className="rounded p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-40"
                           >
