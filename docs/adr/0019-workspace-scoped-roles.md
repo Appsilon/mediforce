@@ -1,7 +1,7 @@
 ---
-status: proposed
+status: accepted
 audience: engineers
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-27
 ---
 
 # ADR-0019: Process roles are workspace-scoped
@@ -12,19 +12,24 @@ last_reviewed: 2026-08-21
 > roles via CLI and API, notification targeting is namespace- and
 > workflow-scoped, and all three cascades (membership removal, workflow
 > deletion, workflow transfer) are in place — membership is checked by the
-> write itself, under the lock that also serializes concurrent replaces. **Enforcement is not.** `step.allowedRoles` is still
-> declarative — any workspace member can claim and complete any human task —
-> and no workflow mutation is gated
-> ([#1249](https://github.com/Appsilon/mediforce/issues/1249)). The rest of the
-> epic is [#1246](https://github.com/Appsilon/mediforce/issues/1246); this line
-> changes to "Implemented" when the ADR is promoted to `finalized`.
+> write itself, under the lock that also serializes concurrent replaces. The
+> **`act` verb** ships as of
+> [#1249](https://github.com/Appsilon/mediforce/issues/1249):
+> `assertCallerHoldsRole` lives in `packages/platform-api/src/auth.ts` and gates
+> task claim and complete, reading `allowedRoles` off the run's pinned
+> definition; `RbacService` is deleted rather than switched on. The **`run` and
+> `edit` verbs are not gated yet** — any member can still start, register,
+> delete or transfer any workflow in the workspace (fact 3 below). The rest of
+> the epic is [#1246](https://github.com/Appsilon/mediforce/issues/1246); this
+> line changes to "Implemented" when those land and the ADR is promoted to
+> `finalized`.
 
 **Date:** 2026-08-21
 **Deciders:** Krystian Zieliński
 **Issue:** [#1247](https://github.com/Appsilon/mediforce/issues/1247) (epic: [#1246](https://github.com/Appsilon/mediforce/issues/1246))
-**On acceptance, partially supersedes:** [ADR-0002](./0002-firebase-auth-to-nextauth.md)
-§5, second bullet (the global `user_roles` table). The rest of ADR-0002 stands,
-and stays fully binding until this ADR is accepted.
+**Partially supersedes:** [ADR-0002](./0002-firebase-auth-to-nextauth.md)
+§5, second bullet (the global `user_roles` table). The rest of ADR-0002 stands
+and remains fully binding.
 **Answers:** [ADR-0004](./0004-scoped-data-access-authorization.md) §4 and its
 "Out of scope — role enforcement at the HTTP API layer", which deferred this to
 "a later ADR that lands alongside or after ADR-0002".
@@ -50,7 +55,10 @@ against source:
 2. **`step.allowedRoles` is not enforced.** `RbacService` implements the check
    and `WorkflowEngine.advanceStep` calls it, but `rbacService` is the engine's
    optional 4th constructor argument and production passes `undefined`. Any
-   member of a workspace can claim and complete any human task.
+   member of a workspace can claim and complete any human task. *(Resolved by
+   [#1249](https://github.com/Appsilon/mediforce/issues/1249): the gate is
+   `assertCallerHoldsRole`, and `RbacService` and its constructor slot are
+   gone.)*
 3. **No workflow mutation is gated.** `register-workflow`, `delete-workflow`,
    `archive-workflow`, `transfer-workflow`, `set-visibility` and `copy-workflow`
    check workspace membership and nothing else — not even owner/admin. Any
@@ -251,7 +259,8 @@ Implications the implementation issues must resolve, not decided here:
   through the client-side `AuthService` (wrong side of the ADR-0005 boundary for
   a server authorization decision) and gates `advanceStep` — engine machinery
   running as the system actor — rather than the human action. →
-  [#1249](https://github.com/Appsilon/mediforce/issues/1249)
+  [#1249](https://github.com/Appsilon/mediforce/issues/1249) *(deleted, along
+  with the `AuthService` port it was the only consumer of)*
 - **A typo in `allowedRoles` produces a run nobody can advance** once the gate is
   live. The editor's role pick-list is not polish; it is what keeps the gate from
   becoming a footgun. →

@@ -207,9 +207,10 @@ IdP and let them sign in. Process-domain roles start empty and are granted
 per workspace by its owner or admins — `mediforce namespace set-member-roles
 <handle> <uid> --roles reviewer,approver`, read back with `mediforce namespace
 list-members <handle>` ([ADR-0019](../adr/0019-workspace-scoped-roles.md)).
-Nothing enforces them yet, so an install that grants none still works: a
-`step.allowedRoles` is declarative until
-[#1249](https://github.com/Appsilon/mediforce/issues/1249) lands.
+A step that declares `allowedRoles` is claimable only by someone holding one
+of those Roles, so grant them before a run reaches such a step — an
+unheld role fails closed rather than opening the step. Workflows that declare
+none are unaffected.
 
 Passwords are per-install: there is no password recovery flow yet
 ([issue #1001](https://github.com/Appsilon/mediforce/issues/1001)), so an install

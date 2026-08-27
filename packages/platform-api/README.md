@@ -44,6 +44,15 @@ role; data access is scoped through it rather than filtered afterwards
 that queries broadly and trims the result later has already read data the caller
 was not entitled to.
 
+**Role checks live in the handler, never in the wrapper.** The wrapper answers
+*may you see this row*; whether you may take an action is a per-action question
+the wrapper has no way to ask. Both predicates for it are in
+[`src/auth.ts`](src/auth.ts): `assertCallerIsNamespaceAdmin` for Membership, and
+`assertCallerHoldsRole(caller, namespace, workflow, allowedRoles, directory)`
+for the process-domain Roles of
+[ADR-0019](../../docs/adr/0019-workspace-scoped-roles.md). Pass the workflow —
+it is what lets a grant narrowed to one workflow be refused on another.
+
 **`getPlatformServices()` is the only composition root.** It wires repositories,
 the workflow engine, the plugin registry and the action registry. It lives here —
 not in `platform-ui`, whose `src/lib/platform-services.ts` is a re-export shim

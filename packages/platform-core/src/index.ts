@@ -284,8 +284,6 @@ export type {
   AuditRepository,
   GetByNamespaceOptions,
   GetByNamespacePage,
-  AuthService,
-  AuthUser,
   ProcessRepository,
   WorkflowDefinitionListResult,
   WorkflowDefinitionGroup,
@@ -413,7 +411,6 @@ export {
   InMemoryAgentEventRepository,
   InMemoryAuditRepository,
   InMemoryProcessRepository,
-  InMemoryAuthService,
   InMemoryProcessInstanceRepository,
   InMemoryHumanTaskRepository,
   InMemoryHandoffRepository,
@@ -475,7 +472,7 @@ export {
 } from './mcp/resolve-effective-mcp';
 
 // Collaboration (handoff registry, RBAC)
-export { handoffTypeRegistry, RbacService, RbacError } from './collaboration/index';
+export { handoffTypeRegistry } from './collaboration/index';
 export type { HandoffTypeRegistration } from './collaboration/index';
 
 // Interpolation (shared across workflow-engine + core-actions)

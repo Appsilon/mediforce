@@ -53,7 +53,7 @@ export async function seedPostgresNamespace(
     //   fixture    – test, tenant-a, tenant-b
     //   journeys   – other, acme-labs, invited-personal, bio-clear-labs,
     //                bio-clear-owner, journey-user, bootstrap-journey,
-    //                branding-personal
+    //                branding-personal, role-gate-org, role-gate-org-2
     //   patterns   – journey-org-* (create-workspace.journey, timestamp suffix),
     //                branding-org-* (namespace-branding.journey, per-test org),
     //                import-org-* (workflow-import.journey, per-test org),
@@ -81,6 +81,8 @@ export async function seedPostgresNamespace(
       'journey-user',
       'bootstrap-journey',
       'branding-personal',
+      'role-gate-org',
+      'role-gate-org-2',
     ];
     await sql`
       DELETE FROM workspaces

@@ -260,11 +260,10 @@ _Avoid_: confusing with Membership. Both are per-Workspace and both are called
 "role" in the schema — Membership (`workspace_members.role`) governs who
 administers the Workspace, Roles (`user_roles.role`) describe workflow
 function.
-_Note_: Roles can now be granted (`mediforce namespace set-member-roles`,
-`PUT /api/namespaces/:handle/members/:uid/roles`) and read back
-(`mediforce namespace list-members`, `GET /api/users/members`), but
-`allowedRoles` is still declarative — nothing enforces it yet
-([#1249](https://github.com/Appsilon/mediforce/issues/1249)).
+_Note_: Roles are granted (`mediforce namespace set-member-roles`,
+`PUT /api/namespaces/:handle/members/:uid/roles`), read back
+(`mediforce namespace list-members`, `GET /api/users/members`), and enforced on
+task claim and complete against the run's pinned Workflow Definition.
 
 **Caller Identity** *(per-request authorization subject)*:
 The authorization subject resolved for one request: either a signed-in User

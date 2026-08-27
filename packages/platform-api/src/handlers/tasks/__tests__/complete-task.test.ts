@@ -12,6 +12,7 @@ import { completeTask } from '../complete-task';
 import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../../errors';
 import {
   createTestScope,
+  processRepoForFixtureRuns,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
 import { noopRunKicker } from '../../../runtime/run-kicker';
@@ -62,9 +63,11 @@ describe('completeTask handler', () => {
   let humanTaskRepo: InMemoryHumanTaskRepository;
   let instanceRepo: InMemoryProcessInstanceRepository;
   let auditRepo: InMemoryAuditRepository;
+  let processRepo: Awaited<ReturnType<typeof processRepoForFixtureRuns>>;
 
   beforeEach(async () => {
     resetFactorySequence();
+    processRepo = await processRepoForFixtureRuns(['team-alpha']);
     instanceRepo = new InMemoryProcessInstanceRepository();
     humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
     auditRepo = new InMemoryAuditRepository(instanceRepo);
@@ -90,6 +93,7 @@ describe('completeTask handler', () => {
 
     const scope = createTestScope({
       humanTaskRepo,
+      processRepo,
       instanceRepo,
       auditRepo,
       runKicker: kicker,
@@ -129,6 +133,7 @@ describe('completeTask handler', () => {
 
     const scope = createTestScope({
       humanTaskRepo,
+      processRepo,
       instanceRepo,
       auditRepo,
       caller: userCaller('u-1', ['team-other']),
@@ -159,6 +164,7 @@ describe('completeTask handler', () => {
 
     const scope = createTestScope({
       humanTaskRepo,
+      processRepo,
       instanceRepo,
       auditRepo,
       caller: userCaller('u-1', ['team-alpha']),
@@ -194,6 +200,7 @@ describe('completeTask handler', () => {
     });
     const scope = createTestScope({
       humanTaskRepo,
+      processRepo,
       instanceRepo,
       auditRepo,
       caller: userCaller('u-intruder', ['team-alpha']),
@@ -226,6 +233,7 @@ describe('completeTask handler', () => {
     });
     const scope = createTestScope({
       humanTaskRepo,
+      processRepo,
       instanceRepo,
       auditRepo,
     });
@@ -252,6 +260,7 @@ describe('completeTask handler', () => {
     });
     const scope = createTestScope({
       humanTaskRepo,
+      processRepo,
       instanceRepo,
       auditRepo,
       caller: userCaller('u-1', ['team-alpha']),

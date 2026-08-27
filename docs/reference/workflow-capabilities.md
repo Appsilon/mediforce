@@ -122,7 +122,7 @@ shared sub-schemas (`StepUiSchema`, `StepParamSchema`, `VerdictSchema`,
 | Business verdicts | `verdicts` | `VerdictSchema`: `target` + `label`, `intent` (`success`/`danger`/`warning`/`neutral`), `requiresComment`. Defaults filled by [`verdicts.ts`](../../packages/platform-core/src/schemas/verdicts.ts). Routed by transition `when: verdict == "..."` |
 | Pick from a list | `selection` | `SelectionSchema`: a number (exact count) or `{ min, max }` range |
 | **Dynamic assignee** | `assignedTo` | `${...}`-interpolated user id; only valid on `executor: human`; the engine resolves it and marks the task `claimed` — [`workflow-engine.ts`](../../packages/workflow-engine/src/engine/workflow-engine.ts) |
-| Role gating | `allowedRoles` | **Declarative only today — nothing enforces it.** Any workspace member can claim and complete the task. Enforcement is proposed in [ADR-0019](../adr/0019-workspace-scoped-roles.md) and tracked by [#1249](https://github.com/Appsilon/mediforce/issues/1249). Note the engine copies only `allowedRoles[0]` into `HumanTask.assignedRole` |
+| Role gating | `allowedRoles` | **Enforced on claim and complete** ([ADR-0019](../adr/0019-workspace-scoped-roles.md)): the caller must hold one of the listed Roles in the run's workspace. Absent or empty means any workspace member, as before. Roles are granted per workspace (`mediforce namespace set-member-roles`), and a role nobody holds makes the step unclaimable by design — the 403 names the role and the fix. The gate reads the array off the run's pinned definition, not `HumanTask.assignedRole`, which only ever holds `allowedRoles[0]` |
 
 What a human task can *submit back* is a discriminated union in
 [`task-completion.ts`](../../packages/platform-core/src/schemas/task-completion.ts):

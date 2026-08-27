@@ -22,6 +22,8 @@ import {
   InMemoryUserProfileRepository,
   InMemoryTaskAttachmentRepository,
   InMemoryBlobStore,
+  buildProcessInstance,
+  buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
 import type {
   AgentRunRepository,
@@ -288,4 +290,30 @@ export function userCaller(
     namespaceProcessRoles: processRoles ?? new Map(),
     isSystemActor: false,
   };
+}
+
+/**
+ * A `processRepo` carrying the Workflow Definition that `buildProcessInstance()`
+ * runs are pinned to, in each of `namespaces`.
+ *
+ * Handler tests that act on a task need it. The step role gate resolves
+ * `allowedRoles` from the run's pinned definition and refuses when that cannot
+ * be read (ADR-0019), so a run built without one is a state production cannot
+ * produce and the gate is right to reject.
+ */
+export async function processRepoForFixtureRuns(
+  namespaces: readonly string[],
+): Promise<InMemoryProcessRepository> {
+  const repo = new InMemoryProcessRepository();
+  const pinned = buildProcessInstance();
+  for (const namespace of namespaces) {
+    await repo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: pinned.definitionName,
+        version: Number.parseInt(pinned.definitionVersion, 10),
+        namespace,
+      }),
+    );
+  }
+  return repo;
 }

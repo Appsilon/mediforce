@@ -1,6 +1,5 @@
 export type { AgentEventRepository } from './agent-event-repository';
 export type { AuditRepository, GetByNamespaceOptions, GetByNamespacePage } from './audit-repository';
-export type { AuthService, AuthUser } from './auth-service';
 export type { ProcessRepository, WorkflowDefinitionListResult, WorkflowDefinitionGroup } from './process-repository';
 export type {
   ProcessInstanceRepository,

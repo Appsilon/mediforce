@@ -534,7 +534,6 @@ describe('WorkflowEngine', () => {
         processRepo,
         instanceRepo,
         auditRepo,
-        undefined, // rbacService
         undefined, // handoffRepository
         undefined, // notificationService
         humanTaskRepo,
@@ -591,7 +590,6 @@ describe('WorkflowEngine', () => {
         auditRepo,
         undefined,
         undefined,
-        undefined,
         humanTaskRepo,
       );
 
@@ -635,7 +633,6 @@ describe('WorkflowEngine', () => {
         auditRepo,
         undefined,
         undefined,
-        undefined,
         failingRepo,
       );
 
@@ -663,7 +660,6 @@ describe('WorkflowEngine', () => {
         processRepo,
         instanceRepo,
         auditRepo,
-        undefined,
         undefined,
         undefined,
         humanTaskRepo,
@@ -732,7 +728,6 @@ describe('WorkflowEngine', () => {
         auditRepo,
         undefined,
         undefined,
-        undefined,
         humanTaskRepo,
       );
 
@@ -777,7 +772,6 @@ describe('WorkflowEngine', () => {
         processRepo,
         instanceRepo,
         auditRepo,
-        undefined,
         undefined,
         undefined,
         humanTaskRepo,
@@ -852,7 +846,6 @@ describe('WorkflowEngine', () => {
         auditRepo,
         undefined,
         undefined,
-        undefined,
         humanTaskRepo,
       );
 
@@ -893,7 +886,6 @@ describe('WorkflowEngine', () => {
         auditRepo,
         undefined,
         undefined,
-        undefined,
         humanTaskRepo,
       );
 
@@ -922,7 +914,7 @@ describe('WorkflowEngine', () => {
     it('copies options to HumanTask even when next step has no selection (e.g. assignment-table)', async () => {
       const humanTaskRepo = new InMemoryHumanTaskRepository();
       const tableEngine = new WorkflowEngine(
-        processRepo, instanceRepo, auditRepo, undefined, undefined, undefined,
+        processRepo, instanceRepo, auditRepo, undefined, undefined,
         humanTaskRepo,
       );
 
@@ -1038,7 +1030,6 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
     humanTaskRepo = new InMemoryHumanTaskRepository();
     engine = new WorkflowEngine(
       processRepo, instanceRepo, auditRepo,
-      undefined, // rbacService
       undefined, // handoffRepository
       undefined, // notificationService
       humanTaskRepo, // humanTaskRepository — needed for HumanTask creation on human step advance
@@ -1181,7 +1172,6 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
       auditRepo,
       undefined,
       undefined,
-      undefined,
       humanTaskRepo,
     );
 
@@ -1215,7 +1205,6 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      undefined,
       undefined,
       undefined,
       humanTaskRepo,

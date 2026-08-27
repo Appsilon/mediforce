@@ -69,7 +69,11 @@ import type {
 import type { CallerIdentity, NamespaceRole } from '@mediforce/platform-api/auth';
 import { Mediforce, ApiError } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
-import { InMemoryNamespaceRepo, createTestScope } from '@mediforce/platform-api/testing';
+import {
+  InMemoryNamespaceRepo,
+  createTestScope,
+  processRepoForFixtureRuns,
+} from '@mediforce/platform-api/testing';
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 
@@ -211,6 +215,7 @@ describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => 
     await instanceRepo.create(
       buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }),
     );
+    const processRepo = await processRepoForFixtureRuns(['team-alpha']);
 
     route = createRouteAdapter<typeof ClaimTaskInputSchema, { taskId: string }, { task: unknown }, { params: Promise<{ taskId: string }> }>(
       ClaimTaskInputSchema,
@@ -218,7 +223,8 @@ describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => 
       claimTask,
       {
         resolveCaller: async () => userCaller,
-        buildScope: (caller) => createTestScope({ caller, humanTaskRepo, instanceRepo }),
+        buildScope: (caller) =>
+          createTestScope({ caller, humanTaskRepo, instanceRepo, processRepo }),
       },
     );
 

@@ -156,7 +156,7 @@ const TIP = {
   databricksPollIntervalMs:'How often to poll the run state, in milliseconds. Default 10000.',
   databricksTimeoutMinutes:'Step timeout in minutes — the run is cancelled when exceeded. Default 30.',
 
-  allowedRoles:            'Roles that can claim this task, comma-separated. Leave empty to allow any signed-in user.',
+  allowedRoles:            'Roles that can claim and complete this task, comma-separated. Enforced: a member holding none of them is refused, and a role nobody in the workspace holds makes the step unclaimable. Leave empty to allow any workspace member.',
   assignedTo:              'Pre-assign this human task to a specific user. Accepts a user id or an interpolated value like ${triggerPayload.userId}. Human steps only.',
   continueOnError:         'When on, a failure of this step is logged as a warning and the workflow advances anyway instead of failing the whole run. Use for non-critical side-effects (e.g. a notification), never for a step later steps depend on.',
   uiComponent:             'Custom task body. "File upload" collects files; "Assignment table" and "Table editor" render their own views (configure their columns in the source editor). Default is the params form.',

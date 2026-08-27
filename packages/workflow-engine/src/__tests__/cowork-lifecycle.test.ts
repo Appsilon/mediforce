@@ -85,7 +85,6 @@ beforeEach(async () => {
     auditRepo,
     undefined,
     undefined,
-    undefined,
     humanTaskRepo,
     coworkSessionRepo,
   );

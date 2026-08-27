@@ -17,7 +17,7 @@ makes it the place a shared type belongs and a bad place for anything else.
 | `src/parser/` | YAML process-definition parsing |
 | `src/mcp/` | MCP server resolution and tool-catalog validation |
 | `src/validation/` | Cross-field workflow validation, graph and reference checks |
-| `src/collaboration/` | Handoff registry, `RbacService` |
+| `src/collaboration/` | Handoff registry |
 | `src/testing/` | In-memory repositories and `build*` factories |
 
 Three entry points: `.` for the domain surface, `./testing` for the doubles and

@@ -1,3 +1,4 @@
+import type { UserDirectoryService } from '@mediforce/platform-core';
 import { ForbiddenError } from './errors';
 
 /**
@@ -164,4 +165,110 @@ export function assertCallerIsNamespaceOwner(
   if (role !== 'owner') {
     throw new ForbiddenError();
   }
+}
+
+/**
+ * The two `UserDirectoryService` reads the process-role gate needs, narrowed to
+ * a structural port so this module keeps its no-service, no-framework promise
+ * and unit tests can fabricate one from a literal.
+ */
+export type ProcessRoleDirectory = Pick<
+  UserDirectoryService,
+  'getRolesForUser' | 'getUsersByRoleInNamespace'
+>;
+
+/**
+ * Throw `ForbiddenError` unless the caller holds one of `allowedRoles` for
+ * `workflow` in `namespace` — the process-role gate of ADR-0019, and the one
+ * predicate behind every verb the epic gates.
+ *
+ * - Absent or empty `allowedRoles` means "any workspace member", exactly as
+ *   before the gate existed. It is opt-in; unrestricted steps are untouched.
+ * - apiKey callers bypass: the engine, worker and CLI automation act as the
+ *   system, and a role is something a person holds.
+ * - There is deliberately **no owner/admin override**. An admin who needs to
+ *   act grants themselves the role first, which leaves an audit trail that a
+ *   silent bypass does not.
+ *
+ * `allowedRoles` must come from the run's pinned Workflow Definition, never
+ * from `HumanTask.assignedRole`: the engine copies only `allowedRoles[0]` into
+ * that column, so a step allowing `['reviewer', 'approver']` would enforce
+ * `reviewer` alone and silently drop the role the author also wrote.
+ *
+ * `workflow` is not decoration: a grant narrowed to workflow B must fail the
+ * gate on workflow A, and only the handler has the workflow in hand.
+ * `CallerIdentity` carries workspace-wide grants, so the common allow costs no
+ * round trip; a narrowed grant is resolved through `directory` on the path that
+ * is otherwise about to be refused. Test scopes pass no directory, and then
+ * only the workspace-wide set — already refused — is left to answer with.
+ *
+ * Per ADR-0004 §4 the wrapper layer does not consult roles; this
+ * handler-resident predicate is the only consumer.
+ */
+export async function assertCallerHoldsRole(
+  caller: CallerIdentity,
+  namespace: string,
+  workflow: string,
+  allowedRoles: readonly string[] | undefined,
+  directory: ProcessRoleDirectory | null,
+): Promise<void> {
+  if (allowedRoles === undefined || allowedRoles.length === 0) return;
+  if (caller.isSystemActor) return;
+
+  const workspaceWide = caller.namespaceProcessRoles.get(namespace) ?? new Set<string>();
+  if (allowedRoles.some((role) => workspaceWide.has(role))) return;
+
+  // Only a grant narrowed to this workflow can still admit, and `CallerIdentity`
+  // has nowhere to carry one — so it costs a read, taken on the path that is
+  // otherwise about to refuse. Without a directory there is nothing further to
+  // consult and the refusal above stands.
+  const narrowed = directory === null
+    ? null
+    : await directory.getRolesForUser(caller.uid, namespace, workflow);
+  if (narrowed !== null && allowedRoles.some((role) => narrowed.includes(role))) return;
+
+  const held = narrowed ?? [...workspaceWide];
+
+  throw new ForbiddenError(
+    await roleDenialMessage(namespace, workflow, allowedRoles, held, directory),
+    { namespace, workflow, requiredRoles: [...allowedRoles], heldRoles: held },
+  );
+}
+
+/**
+ * Why the caller was refused, in the words the person reading it needs.
+ *
+ * A step naming a role nobody in the workspace holds is unclaimable by
+ * everyone — correct (an approval gate that opens when unconfigured is worse
+ * than a stuck run) but useless behind a generic 403, so that case names the
+ * cause and the fix instead of the caller's own roles.
+ */
+async function roleDenialMessage(
+  namespace: string,
+  workflow: string,
+  allowedRoles: readonly string[],
+  held: readonly string[],
+  directory: ProcessRoleDirectory | null,
+): Promise<string> {
+  const quoted = (roles: readonly string[]): string =>
+    roles.map((role) => `'${role}'`).join(', ');
+  const required = allowedRoles.length === 1
+    ? quoted(allowedRoles)
+    : `any of ${quoted(allowedRoles)}`;
+
+  if (directory !== null) {
+    const holders = await Promise.all(
+      allowedRoles.map((role) =>
+        directory.getUsersByRoleInNamespace(role, namespace, workflow),
+      ),
+    );
+    if (holders.every((users) => users.length === 0)) {
+      const assign = allowedRoles.length === 1 ? 'it' : 'one';
+      return `No one in this workspace holds ${required}. An admin can assign ${assign} in workspace Settings → Members.`;
+    }
+  }
+
+  return held.length === 0
+    ? `This step requires ${required}; you hold no roles in this workspace.`
+    : `This step requires ${required}; you hold ${quoted(held)}.`;
 }

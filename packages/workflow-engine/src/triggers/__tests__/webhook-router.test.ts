@@ -79,7 +79,6 @@ function buildRouter(): WebhookRouter {
     new InMemoryAuditRepository(),
     undefined,
     undefined,
-    undefined,
     new InMemoryHumanTaskRepository(),
     new InMemoryCoworkSessionRepository(),
   );
