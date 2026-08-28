@@ -1,5 +1,5 @@
 import { test, expect } from '../helpers/test-fixtures';
-import { TEST_ORG_HANDLE } from '../helpers/constants';
+import { TEST_ORG_HANDLE, TEST_USER_DISPLAY_NAME } from '../helpers/constants';
 import { trackPageErrors } from '../helpers/page-errors';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -51,8 +51,13 @@ test.describe('Human actions scope toggle', () => {
     });
 
     // Default: the one workspace the reader navigated to, named on the trigger.
-    const filter = page.getByRole('button', { name: /workspace/i }).last();
-    await expect(filter).toBeVisible();
+    // The trigger carries a fixed accessible name because its visible label is
+    // the current selection — matching on the label would follow the state the
+    // test is about to change.
+    const filter = page.getByRole('button', { name: 'Filter by workspace' });
+    // TEST_ORG_HANDLE is the test user's personal workspace, so it is named
+    // after them.
+    await expect(filter).toHaveText(TEST_USER_DISPLAY_NAME);
 
     await page.getByRole('button', { name: 'All in workspace' }).click();
     await filter.click();
