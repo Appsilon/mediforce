@@ -22,6 +22,8 @@ export interface DefinitionGroup {
   versions: DefinitionVersion[];
   stepCount: number;
   hasManualTrigger: boolean;
+  /** Whether this caller may start a run — the workflow's `run` gate (ADR-0019). */
+  callerMayRun: boolean;
   externalSkillsRepo?: { url: string; commit?: string; auth?: string };
   url?: string;
   archived?: boolean;
@@ -84,6 +86,9 @@ export function useProcessDefinitions(includeCompletedRuns: boolean = true) {
           stepCount: def.steps.length,
           // Hand-start gate reads the triggers table (Issue #930).
           hasManualTrigger: g.manualStartEnabled,
+          // Run gate answered by the server on the same read (ADR-0019), so a
+          // catalog of thirty cards costs no extra request.
+          callerMayRun: g.callerMayRun,
           externalSkillsRepo: def.externalSkillsRepo,
           url: def.url,
           archived: def.archived,

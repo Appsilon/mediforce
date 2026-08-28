@@ -14,6 +14,7 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
+import { stubUserDirectory } from '../../../testing/stub-user-directory';
 import { fetchFromContainerWorker, isLocalAgentMode } from '../../system/_docker';
 
 vi.mock('../../system/_docker', async (importOriginal) => {
@@ -341,5 +342,65 @@ describe('registerWorkflow handler', () => {
     const events = auditRepo.getAll();
     expect(events).toHaveLength(1);
     expect(events[0].action).toBe('workflow.version_added');
+  });
+
+  /**
+   * ADR-0019's `edit` verb (#1253): registering a new version of an existing
+   * workflow is a change to it. Creating a workflow nobody has registered yet
+   * stays open — an unknown name has no access rows, so a plain member can
+   * still author.
+   */
+  describe('the edit gate', () => {
+    function registerBody(name: string) {
+      const body = buildWorkflowDefinition({ name, namespace: 'team-alpha' });
+      body.steps[1].agent = { image: 'test-image' };
+      const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
+      return { ...input, namespace: 'team-alpha' };
+    }
+
+    function gatedScope(processRoles: readonly string[]) {
+      return createTestScope({
+        processRepo,
+        auditRepo,
+        triggerRepo,
+        caller: userCaller(
+          'user-42',
+          ['team-alpha'],
+          undefined,
+          new Map([['team-alpha', new Set(processRoles)]]),
+        ),
+        userDirectory: stubUserDirectory(),
+      });
+    }
+
+    beforeEach(async () => {
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({ name: 'flow-gated', namespace: 'team-alpha', version: 1 }),
+      );
+      await processRepo.setWorkflowAccess('team-alpha', 'flow-gated', {
+        run: [],
+        edit: ['approver'],
+      });
+    });
+
+    it('refuses a new version from a member holding none of the edit roles', async () => {
+      await expect(
+        registerWorkflow(registerBody('flow-gated'), gatedScope([])),
+      ).rejects.toMatchObject({ code: 'forbidden' });
+
+      expect(await processRepo.getLatestWorkflowVersion('team-alpha', 'flow-gated')).toBe(1);
+    });
+
+    it('admits a holder', async () => {
+      const result = await registerWorkflow(registerBody('flow-gated'), gatedScope(['approver']));
+
+      expect(result).toMatchObject({ success: true, name: 'flow-gated', version: 2 });
+    });
+
+    it('leaves a brand-new name open to any member', async () => {
+      const result = await registerWorkflow(registerBody('flow-fresh'), gatedScope([]));
+
+      expect(result).toMatchObject({ success: true, name: 'flow-fresh', version: 1 });
+    });
   });
 });

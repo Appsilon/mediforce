@@ -111,6 +111,12 @@ export {
   ManifestEntrySchema,
   GetManifestInputSchema,
   GetManifestOutputSchema,
+  GetWorkflowAccessInputSchema,
+  GetWorkflowAccessOutputSchema,
+  WorkflowAccessCallerSchema,
+  SetWorkflowAccessBodySchema,
+  SetWorkflowAccessInputSchema,
+  SetWorkflowAccessOutputSchema,
   type CopyWorkflowInput,
   type CopyWorkflowOutput,
   type CopyWorkflowOptions,
@@ -127,6 +133,10 @@ export {
   type ManifestEntry,
   type GetManifestInput,
   type GetManifestOutput,
+  type GetWorkflowAccessInput,
+  type GetWorkflowAccessOutput,
+  type SetWorkflowAccessInput,
+  type SetWorkflowAccessOutput,
 } from './workflows';
 
 export {

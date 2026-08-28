@@ -222,6 +222,13 @@ export {
 } from './workflow-definition';
 
 export {
+  WorkflowAccessSchema,
+  OPEN_WORKFLOW_ACCESS,
+  isOpenWorkflowAccess,
+  type WorkflowAccess,
+} from './workflow-access';
+
+export {
   AddStepToolSchema,
   UpdateStepToolSchema,
   RemoveStepToolSchema,

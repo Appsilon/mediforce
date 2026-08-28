@@ -3,6 +3,11 @@ import type {
   WorkflowDefinitionListResult,
   WorkflowDefinitionGroup,
 } from '../index';
+import {
+  OPEN_WORKFLOW_ACCESS,
+  isOpenWorkflowAccess,
+  type WorkflowAccess,
+} from '../schemas/workflow-access';
 import type { WorkflowDefinition } from '../schemas/workflow-definition';
 
 /**
@@ -13,6 +18,7 @@ import type { WorkflowDefinition } from '../schemas/workflow-definition';
 export class InMemoryProcessRepository implements ProcessRepository {
   private workflowDefinitions = new Map<string, WorkflowDefinition>();
   private workflowDefaults = new Map<string, number>();
+  private workflowAccess = new Map<string, WorkflowAccess>();
 
   private compositeKey(namespace: string, name: string, version: string): string {
     return `${namespace}:${name}:${version}`;
@@ -149,6 +155,32 @@ export class InMemoryProcessRepository implements ProcessRepository {
     if (!found) throw new Error(`Workflow '${name}' not found`);
   }
 
+  async getWorkflowAccess(namespace: string, name: string): Promise<WorkflowAccess> {
+    return this.workflowAccess.get(`${namespace}:${name}`) ?? OPEN_WORKFLOW_ACCESS;
+  }
+
+  async listWorkflowAccess(
+    namespaces: readonly string[],
+  ): Promise<Map<string, WorkflowAccess>> {
+    const wanted = new Set(namespaces);
+    const found = new Map<string, WorkflowAccess>();
+    for (const [key, access] of this.workflowAccess) {
+      if (wanted.has(key.slice(0, key.indexOf(':')))) found.set(key, access);
+    }
+    return found;
+  }
+
+  async setWorkflowAccess(namespace: string, name: string, access: WorkflowAccess): Promise<void> {
+    const key = `${namespace}:${name}`;
+    // Mirrors Postgres: access granting nothing is stored as absence, so
+    // "open to every member" reads the same however it got there.
+    if (isOpenWorkflowAccess(access)) {
+      this.workflowAccess.delete(key);
+      return;
+    }
+    this.workflowAccess.set(key, { run: [...access.run], edit: [...access.edit] });
+  }
+
   async setWorkflowDeleted(namespace: string, name: string, deleted: boolean): Promise<void> {
     for (const [key, def] of this.workflowDefinitions) {
       if (def.name === name && def.namespace === namespace) {
@@ -197,6 +229,7 @@ export class InMemoryProcessRepository implements ProcessRepository {
   /** Test helper: clear all stored data */
   clear(): void {
     this.workflowDefinitions.clear();
+    this.workflowAccess.clear();
   }
 
   /** Test helper: get counts of stored items */

@@ -51,7 +51,11 @@ the wrapper has no way to ask. Both predicates for it are in
 `assertCallerHoldsRole(caller, namespace, workflow, allowedRoles, directory)`
 for the process-domain Roles of
 [ADR-0019](../../docs/adr/0019-workspace-scoped-roles.md). Pass the workflow —
-it is what lets a grant narrowed to one workflow be refused on another.
+it is what lets a grant narrowed to one workflow be refused on another. All
+three of the epic's verbs go through that one predicate: `act` via
+`handlers/tasks/_role-gate.ts` (the step's `allowedRoles`), `run` and `edit` via
+`handlers/workflows/_access-gate.ts` (the workflow's Access rows). A handler
+that needs a fourth calls the predicate rather than writing a fifth check.
 
 **`getPlatformServices()` is the only composition root.** It wires repositories,
 the workflow engine, the plugin registry and the action registry. It lives here —

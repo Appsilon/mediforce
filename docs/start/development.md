@@ -1,7 +1,7 @@
 ---
 status: living
 audience: engineers
-last_reviewed: 2026-08-19
+last_reviewed: 2026-08-28
 ---
 
 # Development Guide
@@ -217,7 +217,18 @@ The same rule decides what **Human actions** shows: it opens on the tasks the
 signed-in user can act on, so a run parked on a role nobody has been granted
 looks like an empty inbox. Switch that page to **All in workspace** to see it —
 the task is there, waiting for the grant.
-Workflows that declare none are unaffected.
+
+A workflow's own **Access** tab is the same idea one level up: it names the
+Roles that may `run` it (start a run) and the Roles that may `edit` it —
+register a version, archive, delete, transfer, change visibility, move the
+default version. Owner/admin set it; `mediforce workflow access <name>
+--namespace <handle>` reads it back. A member who holds neither sees the
+controls greyed out with the reason on them — Start on the Runs tab, and Save,
+Edit and the workflow's ⋯ menu for `edit` — rather than a 403 arriving as a raw
+error once they click. Cron and webhook firings are
+unaffected: they run as the system, and a Role is something a person holds.
+Workflows and steps that declare none of this are unaffected — an empty list
+means any member of the workspace, which is where every workflow starts.
 
 Passwords are per-install: there is no password recovery flow yet
 ([issue #1001](https://github.com/Appsilon/mediforce/issues/1001)), so an install

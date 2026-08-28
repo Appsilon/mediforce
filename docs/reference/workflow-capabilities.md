@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-08-19
+last_reviewed: 2026-08-28
 ---
 
 # Workflow capabilities
@@ -122,7 +122,7 @@ shared sub-schemas (`StepUiSchema`, `StepParamSchema`, `VerdictSchema`,
 | Business verdicts | `verdicts` | `VerdictSchema`: `target` + `label`, `intent` (`success`/`danger`/`warning`/`neutral`), `requiresComment`. Defaults filled by [`verdicts.ts`](../../packages/platform-core/src/schemas/verdicts.ts). Routed by transition `when: verdict == "..."` |
 | Pick from a list | `selection` | `SelectionSchema`: a number (exact count) or `{ min, max }` range |
 | **Dynamic assignee** | `assignedTo` | `${...}`-interpolated user id; only valid on `executor: human`; the engine resolves it and marks the task `claimed` — [`workflow-engine.ts`](../../packages/workflow-engine/src/engine/workflow-engine.ts) |
-| Role gating | `allowedRoles` | **Enforced on claim and complete** ([ADR-0019](../adr/0019-workspace-scoped-roles.md)): the caller must hold one of the listed Roles in the run's workspace. Absent or empty means any workspace member, as before. Roles are granted per workspace (`mediforce namespace set-member-roles`), and a role nobody holds makes the step unclaimable by design — the 403 names the role and the fix. The gate reads the array off the run's pinned definition, not `HumanTask.assignedRole`, which only ever holds `allowedRoles[0]` |
+| Role gating | `allowedRoles` | **Enforced on claim and complete** ([ADR-0019](../adr/0019-workspace-scoped-roles.md)): the caller must hold one of the listed Roles in the run's workspace. Absent or empty means any workspace member, as before. Roles are granted per workspace (`mediforce namespace set-member-roles`), and a role nobody holds makes the step unclaimable by design — the 403 names the role and the fix. The gate reads the array off the run's pinned definition, not `HumanTask.assignedRole`, which only ever holds `allowedRoles[0]`. This is the *step* gate; who may start or change the workflow at all is the Access tab — see "Three things called roles" |
 
 What a human task can *submit back* is a discriminated union in
 [`task-completion.ts`](../../packages/platform-core/src/schemas/task-completion.ts):
@@ -295,7 +295,7 @@ Beyond `steps` / `transitions`, on `WorkflowDefinitionBaseSchema` in
 | Capability | Field | Notes |
 |-----------|-------|-------|
 | Listing visibility | `visibility` = `public` \| `private` (default `private`) | `WorkflowVisibilitySchema` |
-| Declared roles | `roles` | role names used by `allowedRoles` / `assignedTo` / notifications |
+| Declared roles | `roles` | **Declares a vocabulary; grants nothing.** See "Three things called roles" below |
 | Run-wide / per-step config | `env` (workflow + step level) | non-secret config; values may reference `{{SECRET_NAME}}` |
 | Agent context preamble | `preamble` | prepended context for agent steps |
 | Git-import provenance (no runtime effect) | `source` (`WorkflowSourceSchema`, `{url, path, commit}`) | informational only — see [ADR-0009](../adr/0009-workflow-import-scope-boundary.md) |
@@ -305,3 +305,25 @@ Beyond `steps` / `transitions`, on `WorkflowDefinitionBaseSchema` in
 
 The authorable surface (what the design LLM may emit) is `WorkflowAuthorableSchema`
 in the same file — server-managed and lifecycle fields are excluded by construction.
+
+### Three things called roles — and only two of them grant anything
+
+The word appears three times around a workflow, and they are not the same thing
+([ADR-0019](../adr/0019-workspace-scoped-roles.md)):
+
+| | Where it lives | What it does |
+|---|---|---|
+| `roles` | the WD envelope, **authored** | *Declares* the role names this workflow expects — `["reviewer", "biostatistician"]`. Grants nobody anything, gates nothing, and is checked by no code path. Its one job is telling a deployment that imports this package what to grant, which is why it survives: the role pick-list in the editor is the union of roles already granted in the workspace with the ones definitions declare |
+| `step.allowedRoles` | each human step, **authored** | Who may claim and complete *that step*. **Enforced** on claim and complete. Travels with the package, because "a reviewer does this step" is a property of the process |
+| Access tab (`run` / `edit`) | the workflow's **Access** tab, operational | Who may start a run of this workflow, and who may change it (register a version, archive, delete, transfer, set visibility, move the default version). **Enforced.** Deliberately *not* in the WD: it is mutable and local, and registering v8 must not silently rewrite permissions |
+
+Who actually *holds* a role is none of the three: roles are granted per member,
+per workspace (optionally narrowed to one workflow), from workspace **Settings →
+Members**, `mediforce namespace set-member-roles`, or
+`PUT /api/namespaces/:handle/members/:uid/roles`.
+
+Empty or absent means "any workspace member" at every level, so a workflow that
+sets none of this behaves exactly as it did before roles were enforced. A role
+nobody holds is the opposite: the gate naming it is closed to everyone, which is
+correct (an approval control that opens when unconfigured is the worse failure)
+and is why both the step editor and the Access tab warn about it.

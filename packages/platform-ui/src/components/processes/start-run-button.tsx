@@ -3,7 +3,6 @@
 import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Popover from '@radix-ui/react-popover';
-import * as Tooltip from '@radix-ui/react-tooltip';
 import { useRouter } from 'next/navigation';
 import { Play, FlaskConical, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound, FileInput, ExternalLink } from 'lucide-react';
 import { useWorkflowVersions, useWorkflowVersion } from '@/hooks/use-workflow-versions';
@@ -12,7 +11,9 @@ import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
 import { useStartRun } from '@/hooks/use-run-mutations';
 import { useWorkflowSecretKeysContext } from '@/hooks/use-workflow-secret-keys';
+import { describeRoles, useWorkflowAccess } from '@/hooks/use-workflow-access';
 import { VersionLabel } from '@/components/ui/version-label';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useOpenRouterCredits } from '@/hooks/use-openrouter-credits';
@@ -28,6 +29,13 @@ interface StartRunButtonProps {
   version?: number;
   showVersionPicker?: boolean;
   hasManualTrigger?: boolean;
+  /**
+   * Whether this caller holds the workflow's `run` roles (ADR-0019), when the
+   * caller already knows — the catalog gets it on the same read that returned
+   * the card, so a list of thirty does not become thirty requests. Left
+   * undefined, the button asks the server itself.
+   */
+  mayRun?: boolean;
   archived?: boolean;
   label?: string;
   disabled?: boolean;
@@ -63,6 +71,7 @@ export function StartRunButton({
   version,
   showVersionPicker,
   hasManualTrigger = true,
+  mayRun: mayRunFromCaller,
   archived = false,
   label,
   disabled = false,
@@ -79,6 +88,16 @@ export function StartRunButton({
   const preflightName = preflightEnabled ? workflowName : '';
   const { versions: definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowVersions(preflightName, handle);
   const { images: dockerImages, isAvailable: dockerAvailable, isLoading: dockerLoading } = useDockerImages();
+  // ADR-0019 `run`. Asked of the server rather than derived here: a grant
+  // narrowed to this workflow is not in the session, so a locally computed
+  // answer would grey the button out for people the gate would have admitted.
+  // `null` while unresolved leaves the button enabled — the server refuses if
+  // it must, and hiding the action on an unanswered read is the worse error.
+  const { access: workflowAccess, caller: accessCaller } = useWorkflowAccess(handle, preflightName, {
+    enabled: mayRunFromCaller === undefined,
+  });
+  const mayRun = mayRunFromCaller ?? accessCaller?.mayRun ?? null;
+  const runRoles = workflowAccess?.run ?? [];
   const openRouterCredits = useOpenRouterCredits();
   const adminContact = useNamespaceAdminContact(handle);
   const [starting, setStarting] = React.useState(false);
@@ -279,7 +298,9 @@ export function StartRunButton({
       ? 'Manual trigger is stopped — start it in the Triggers tab to run this workflow by hand'
       : effectiveVersion === 0 && !onBeforeStart
         ? 'No workflow version available'
-        : null;
+        : mayRun === false
+          ? `Starting this workflow is restricted to ${describeRoles(runRoles)} — see the Access tab`
+          : null;
   const isDisabled = disabledReason !== null || starting || preflightLoading || runningBeforeStart || disabled;
   const tooltip = preflightLoading
     ? 'Checking workflow readiness...'
@@ -551,34 +572,6 @@ export function StartRunButton({
   );
 }
 
-/**
- * Wraps a control in a zero-delay tooltip. Renders children untouched when there
- * is no `label` (e.g. the button is enabled). Uses the wrapper as the trigger so
- * the tooltip still shows over a **disabled** button — a disabled `<button>`
- * swallows its own hover events, and the native `title` tooltip both misses that
- * and only appears after the browser's ~1s delay.
- */
-function InstantTooltip({ label, children }: { label?: string; children: React.ReactNode }) {
-  if (label === undefined || label === '') return <>{children}</>;
-  return (
-    <Tooltip.Provider delayDuration={0}>
-      <Tooltip.Root>
-        <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
-        <Tooltip.Portal>
-          <Tooltip.Content
-            side="top"
-            sideOffset={6}
-            className="z-50 max-w-xs rounded-lg border bg-popover px-3 py-2 text-xs shadow-md animate-in fade-in-0 zoom-in-95"
-          >
-            {label}
-            <Tooltip.Arrow className="fill-popover" />
-          </Tooltip.Content>
-        </Tooltip.Portal>
-      </Tooltip.Root>
-    </Tooltip.Provider>
-  );
-}
-
 function formatStepList(names: string[], max: number = 3): string {
   if (names.length <= max) return names.join(', ');
   return `${names.slice(0, max).join(', ')}, +${String(names.length - max)} more`;
@@ -620,3 +613,4 @@ function WarningGroup({ title, warnings }: { title: string; warnings: PreflightW
     </div>
   );
 }
+

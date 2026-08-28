@@ -86,6 +86,12 @@ export const queryKeys = {
   workflowVersions: (namespace: string, name: string) =>
     ['workflow-versions', namespace, name] as const,
 
+  /** Who may run and who may edit a workflow, plus what that means for the
+   *  caller (workflows.getAccess, ADR-0019). Keyed per workflow because the
+   *  answer is per workflow — a grant narrowed to one does not carry. */
+  workflowAccess: (namespace: string, name: string) =>
+    ['workflow-access', namespace, name] as const,
+
   /** Live trigger rows for a workflow (triggers.list), reflecting the unified
    *  `triggers` table's enabled/schedule state (ADR-0011). */
   workflowTriggers: (namespace: string, name: string) =>

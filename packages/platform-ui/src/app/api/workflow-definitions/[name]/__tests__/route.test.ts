@@ -7,12 +7,19 @@ const mockGetIdsByDefName = vi.fn();
 const mockSoftDeleteByDefName = vi.fn();
 const mockSetDeletedTasksByInstanceIds = vi.fn();
 const mockAuditAppend = vi.fn();
+const mockSetWorkflowAccess = vi.fn();
+/** No gate configured — the state every workflow is in until an admin sets one. */
+const mockGetWorkflowAccess = vi.fn().mockResolvedValue({ run: [], edit: [] });
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     processRepo: {
       countInstancesByDefinitionName: mockCountInstances,
       setWorkflowDeleted: mockSetDeleted,
+      // ADR-0019 cascade: deleting a workflow clears its run/edit gates, or
+      // the next registration of the name inherits them.
+      setWorkflowAccess: mockSetWorkflowAccess,
+      getWorkflowAccess: mockGetWorkflowAccess,
     },
     instanceRepo: {
       getIdsByDefinitionName: mockGetIdsByDefName,

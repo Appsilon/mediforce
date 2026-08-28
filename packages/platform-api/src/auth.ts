@@ -178,6 +178,14 @@ export type ProcessRoleDirectory = Pick<
 >;
 
 /**
+ * What the refusal calls the thing being refused — "This step requires
+ * 'reviewer'". Defaults to the step gate, the first and most common caller;
+ * the workflow-level verbs (#1253) name themselves instead, because a person
+ * denied the Start button is not looking at a step.
+ */
+const DEFAULT_ROLE_GATE_SUBJECT = 'This step';
+
+/**
  * Throw `ForbiddenError` unless the caller holds one of `allowedRoles` for
  * `workflow` in `namespace` — the process-role gate of ADR-0019, and the one
  * predicate behind every verb the epic gates.
@@ -211,12 +219,20 @@ export async function assertCallerHoldsRole(
   workflow: string,
   allowedRoles: readonly string[] | undefined,
   directory: ProcessRoleDirectory | null,
+  options: { readonly subject?: string } = {},
 ): Promise<void> {
   const grant = await resolveRoleGrant(caller, namespace, workflow, allowedRoles, directory);
   if (grant.holds) return;
 
   throw new ForbiddenError(
-    await roleDenialMessage(namespace, workflow, grant.required, grant.held, directory),
+    await roleDenialMessage(
+      namespace,
+      workflow,
+      grant.required,
+      grant.held,
+      directory,
+      options.subject ?? DEFAULT_ROLE_GATE_SUBJECT,
+    ),
     { namespace, workflow, requiredRoles: grant.required, heldRoles: grant.held },
   );
 }
@@ -328,6 +344,7 @@ async function roleDenialMessage(
   allowedRoles: readonly string[],
   held: readonly string[],
   directory: ProcessRoleDirectory | null,
+  subject: string,
 ): Promise<string> {
   const quoted = (roles: readonly string[]): string =>
     roles.map((role) => `'${role}'`).join(', ');
@@ -348,6 +365,6 @@ async function roleDenialMessage(
   }
 
   return held.length === 0
-    ? `This step requires ${required}; you hold no roles in this workspace.`
-    : `This step requires ${required}; you hold ${quoted(held)}.`;
+    ? `${subject} requires ${required}; you hold no roles in this workspace.`
+    : `${subject} requires ${required}; you hold ${quoted(held)}.`;
 }

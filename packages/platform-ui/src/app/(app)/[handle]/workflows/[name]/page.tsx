@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, EyeOff, Copy, Link2 } from 'lucide-react';
+import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, EyeOff, Copy, Link2, ShieldCheck } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
@@ -26,6 +26,9 @@ import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useWorkflowDefinitionApi } from '@/hooks/use-workflows-api';
 import { WorkflowSecretsEditor } from '@/components/workflows/workflow-secrets-editor';
+import { WorkflowAccessPanel } from '@/components/workflows/workflow-access-panel';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
 import { TriggersPanel } from './TriggersPanel';
 
 export default function ProcessDefinitionPage() {
@@ -226,9 +229,15 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const searchParams = useSearchParams();
   const decodedName = decodeURIComponent(name);
 
+  // ADR-0019 `edit`. Every control below that the verb covers is greyed out
+  // with the reason on it rather than left to fail at the server — a 403 there
+  // arrives as a raw error next to whatever else the page was complaining
+  // about, which is how a permission problem reads as a broken button.
+  const { mayEdit, reason: editReason } = useWorkflowEditGate(handle, decodedName);
+
   const tabParam = searchParams.get('tab');
   const initialTab =
-    tabParam === 'secrets' || tabParam === 'triggers' ? tabParam : 'runs';
+    tabParam === 'secrets' || tabParam === 'triggers' || tabParam === 'access' ? tabParam : 'runs';
   const setupKeys = searchParams.get('setup')?.split(',').filter(Boolean) ?? [];
   const [activeTab, setActiveTab] = React.useState(initialTab);
   // Lifted out of AllRunsPanel (controlled props) so the header/tab run count
@@ -486,6 +495,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-full mt-1 z-10 min-w-[160px] rounded-md border bg-popover p-1 shadow-md">
+                <InstantTooltip label={editReason}>
                 <button
                   onClick={async () => {
                     const willArchive = !latest?.archived;
@@ -503,11 +513,11 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                       router.push(`/${handle}`);
                     }
                   }}
-                  disabled={archiving}
+                  disabled={archiving || !mayEdit}
                   className={cn(
                     'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors',
                     'hover:bg-accent hover:text-accent-foreground',
-                    archiving && 'opacity-50 pointer-events-none',
+                    (archiving || !mayEdit) && 'opacity-50 pointer-events-none',
                   )}
                 >
                   {latest?.archived ? (
@@ -522,7 +532,9 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                     </>
                   )}
                 </button>
+                </InstantTooltip>
 
+                <InstantTooltip label={editReason}>
                 <button
                   onClick={async () => {
                     setMenuOpen(false);
@@ -532,11 +544,11 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                       await updateVisibility('private');
                     }
                   }}
-                  disabled={togglingVisibility}
+                  disabled={togglingVisibility || !mayEdit}
                   className={cn(
                     'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors',
                     'hover:bg-accent hover:text-accent-foreground',
-                    togglingVisibility && 'opacity-50 pointer-events-none',
+                    (togglingVisibility || !mayEdit) && 'opacity-50 pointer-events-none',
                   )}
                 >
                   {isPrivate ? (
@@ -545,20 +557,25 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                     <><EyeOff className="h-3.5 w-3.5" />Make private</>
                   )}
                 </button>
+                </InstantTooltip>
 
+                <InstantTooltip label={editReason}>
                 <button
                   onClick={() => {
                     setMenuOpen(false);
                     setTransferOpen(true);
                   }}
+                  disabled={!mayEdit}
                   className={cn(
                     'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors',
                     'hover:bg-accent hover:text-accent-foreground',
+                    !mayEdit && 'opacity-50 pointer-events-none',
                   )}
                 >
                   <ArrowRightLeft className="h-3.5 w-3.5" />
                   Transfer
                 </button>
+                </InstantTooltip>
 
                 <button
                   onClick={() => {
@@ -579,19 +596,23 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
 
                 <div className="my-1 border-t" />
 
+                <InstantTooltip label={editReason}>
                 <button
                   onClick={() => {
                     setMenuOpen(false);
                     setDeleteDialogOpen(true);
                   }}
+                  disabled={!mayEdit}
                   className={cn(
                     'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors',
                     'text-destructive hover:bg-destructive/10',
+                    !mayEdit && 'opacity-50 pointer-events-none',
                   )}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Delete
                 </button>
+                </InstantTooltip>
               </div>
             )}
             </div>
@@ -602,7 +623,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
       {/* Tabs */}
       <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex flex-1 flex-col">
         <Tabs.List className="flex border-b px-6 gap-0">
-          {['runs', 'definitions', 'triggers', 'secrets'].map((tab) => (
+          {['runs', 'definitions', 'triggers', 'secrets', 'access'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
@@ -611,7 +632,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 'text-muted-foreground border-transparent',
                 'data-[state=active]:text-foreground data-[state=active]:border-primary',
                 'hover:text-foreground',
-                (tab === 'secrets' || tab === 'triggers') && 'flex items-center gap-1.5',
+                (tab === 'secrets' || tab === 'triggers' || tab === 'access') && 'flex items-center gap-1.5',
               )}
             >
               {tab === 'runs'
@@ -620,7 +641,9 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                   ? <><KeyRound className="h-3.5 w-3.5" />Secrets</>
                   : tab === 'triggers'
                     ? <><Clock className="h-3.5 w-3.5" />Triggers</>
-                    : 'Definitions'}
+                    : tab === 'access'
+                      ? <><ShieldCheck className="h-3.5 w-3.5" />Access</>
+                      : 'Definitions'}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
@@ -676,6 +699,12 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 suggestedKeys={setupKeys}
               />
             )}
+          </div>
+        </Tabs.Content>
+        {/* Access tab */}
+        <Tabs.Content value="access" className="flex-1 p-6">
+          <div className="max-w-2xl">
+            <WorkflowAccessPanel handle={handle} workflowName={decodedName} />
           </div>
         </Tabs.Content>
       </Tabs.Root>

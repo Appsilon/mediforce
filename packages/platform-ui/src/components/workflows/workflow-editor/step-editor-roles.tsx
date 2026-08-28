@@ -1,28 +1,15 @@
 'use client';
 
-import { useState } from 'react';
-import { AlertTriangle, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { inputBase, inputBaseMono } from './step-editor-fields';
+import { AlertTriangle } from 'lucide-react';
+import { RoleMultiSelect } from '../role-multi-select';
+import { inputBaseMono } from './step-editor-fields';
 
-const ROLE_SUGGESTIONS_ID = 'step-allowed-role-options';
 const ASSIGNEE_SUGGESTIONS_ID = 'step-assignee-options';
 
 /**
- * `allowedRoles` as chips plus a suggesting text field.
- *
- * A comma-separated text box made `reviewr` indistinguishable from `reviewer`
- * until a run stalled on a task nobody could claim (#1249 enforces the gate).
- * Chips make each role a thing you can see and delete; the suggestions make the
- * spelling that already exists the easiest one to pick.
- *
- * Free entry survives on purpose: the role vocabulary is open by construction
- * (ADR-0019), and authoring a step for a role no one has been granted yet is
- * the normal order of work. So the list suggests, and never refuses.
- *
- * Comma still splits on commit, so a value pasted from the old control — or
- * from a `.wd.json` — lands as the roles it names rather than as one role with
- * commas in its name.
+ * A step's `allowedRoles`: the shared role multi-select, plus the warning only
+ * a step can give — nobody holds this role for this workflow, so a run that
+ * reaches this step will park on it forever (#1249 enforces the gate).
  */
 export function AllowedRolesField({
   value,
@@ -41,70 +28,17 @@ export function AllowedRolesField({
   heldRoles: string[] | null;
   onChange: (roles: string[]) => void;
 }) {
-  const [draft, setDraft] = useState('');
-
   const unheld = heldRoles === null ? [] : value.filter((role) => !heldRoles.includes(role));
-
-  function commitDraft() {
-    const added = draft
-      .split(',')
-      .map((role) => role.trim())
-      .filter((role) => role !== '' && !value.includes(role));
-    setDraft('');
-    if (added.length > 0) onChange([...value, ...added]);
-  }
 
   return (
     <div className="space-y-2">
-      {value.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {value.map((role) => {
-            const missing = unheld.includes(role);
-            return (
-              <span
-                key={role}
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium',
-                  missing
-                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
-                    : 'bg-muted text-foreground',
-                )}
-              >
-                {role}
-                <button
-                  type="button"
-                  aria-label={`Remove role ${role}`}
-                  onClick={() => onChange(value.filter((held) => held !== role))}
-                  className="opacity-50 hover:opacity-100 transition-opacity"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            );
-          })}
-        </div>
-      )}
-
-      <input
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commitDraft}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            commitDraft();
-          }
-        }}
-        list={ROLE_SUGGESTIONS_ID}
-        aria-label="Add an allowed role"
-        placeholder="add a role"
-        className={inputBase}
+      <RoleMultiSelect
+        value={value}
+        vocabulary={vocabulary}
+        onChange={onChange}
+        inputLabel="Add an allowed role"
+        highlighted={unheld}
       />
-      <datalist id={ROLE_SUGGESTIONS_ID}>
-        {vocabulary.map((role) => (
-          <option key={role} value={role} />
-        ))}
-      </datalist>
 
       {unheld.length > 0 && (
         <div className="flex items-start gap-1.5">

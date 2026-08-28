@@ -1,9 +1,11 @@
 import type {
   ProcessRepository,
+  WorkflowAccess,
   WorkflowDefinition,
   WorkflowDefinitionGroup,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
+import { ForbiddenError } from '../errors';
 import { AuthorizedScope } from './authorized-repository';
 
 /**
@@ -104,6 +106,40 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
   ): Promise<void> => {
     this.assertNamespaceWrite(namespace);
     await this.raw.setWorkflowVisibility(name, namespace, visibility);
+  };
+
+  /**
+   * Who may run and who may edit this workflow (ADR-0019).
+   *
+   * Refuses rather than answering for a caller who cannot see the workspace.
+   * Every other read here degrades to `null` / `[]` so a non-member cannot
+   * tell "exists elsewhere" from "does not exist", but this value is consumed
+   * by the run and edit gates: an empty answer means *open*, so degrading
+   * would turn an unreachable workspace into an ungated one.
+   */
+  getAccess = async (namespace: string, name: string): Promise<WorkflowAccess> => {
+    if (!this.canSeeNamespace(namespace)) throw new ForbiddenError();
+    return this.raw.getWorkflowAccess(namespace, name);
+  };
+
+  /**
+   * The same read for a whole listing, narrowed to the workspaces the caller
+   * is a member of. Absent from the returned map means "no gate configured",
+   * which every caller reads as open — so narrowing here cannot widen anything.
+   */
+  listAccess = async (
+    namespaces: readonly string[],
+  ): Promise<Map<string, WorkflowAccess>> => {
+    return this.raw.listWorkflowAccess(this.narrowToMemberships(namespaces));
+  };
+
+  setAccess = async (
+    namespace: string,
+    name: string,
+    access: WorkflowAccess,
+  ): Promise<void> => {
+    this.assertNamespaceWrite(namespace);
+    await this.raw.setWorkflowAccess(namespace, name, access);
   };
 
   setDefaultVersion = async (

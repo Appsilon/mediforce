@@ -64,6 +64,9 @@ export {
   WorkflowWorkspaceSchema,
   WorkflowStepSchema,
   WorkflowVisibilitySchema,
+  WorkflowAccessSchema,
+  OPEN_WORKFLOW_ACCESS,
+  isOpenWorkflowAccess,
   WorkflowAuthorableSchema,
   SERVER_MANAGED_WORKFLOW_FIELDS,
   WorkflowSourceSchema,
@@ -203,6 +206,7 @@ export type {
   WorkflowWorkspace,
   WorkflowStep,
   WorkflowVisibility,
+  WorkflowAccess,
   WorkflowSource,
   WorkflowDefinition,
   WorkflowTemplate,
@@ -475,7 +479,7 @@ export {
   type ResolvedHttpMcpServer,
 } from './mcp/resolve-effective-mcp';
 
-// Collaboration (handoff registry, RBAC)
+// Collaboration (handoff registry)
 export { handoffTypeRegistry } from './collaboration/index';
 export type { HandoffTypeRegistration } from './collaboration/index';
 

@@ -45,7 +45,8 @@ storage key.
 **Workflow**:
 A named, reusable process. Identified by `(namespace, name)`. Owns many
 versioned **Workflow Definitions**, a default-version pointer, visibility,
-archive state. The named thing users create, edit, share, and run.
+archive state, and **Workflow Access**. The named thing users create, edit,
+share, and run.
 _Avoid_: "Workflow" used loosely for one version (= Workflow Definition) or
 for one execution (= Workflow Run).
 
@@ -261,7 +262,8 @@ Functional roles a User holds for workflow purposes — e.g. `reviewer`, `PI`,
 **within one Workspace** and optionally narrowed to a single Workflow
 ([ADR-0019](docs/adr/0019-workspace-scoped-roles.md)); an unnarrowed grant
 covers every Workflow in that Workspace. Roles drive task assignment, Step
-access (`allowedRoles`), and notification targeting.
+access (`allowedRoles`), Workflow Access (`run` / `edit`), and notification
+targeting.
 _Avoid_: confusing with Membership. Both are per-Workspace and both are called
 "role" in the schema — Membership (`workspace_members.role`) governs who
 administers the Workspace, Roles (`user_roles.role`) describe workflow
@@ -271,7 +273,22 @@ _Note_: Roles are granted from the **Roles** table in workspace settings
 thing), from the CLI (`mediforce namespace set-member-roles`) or over the API
 (`PUT /api/namespaces/:handle/members/:uid/roles`), read back
 (`mediforce namespace list-members`, `GET /api/users/members`), and enforced on
-task claim and complete against the run's pinned Workflow Definition.
+task claim and complete against the run's pinned Workflow Definition, and on
+starting or changing a Workflow against its Workflow Access.
+
+**Workflow Access** *(workflow governance level)*:
+Which **Roles** may `run` a Workflow (start a run) and which may `edit` it
+(register a version, archive, delete, transfer, set visibility, move the
+default version) — the workflow's **Access** tab
+([ADR-0019](docs/adr/0019-workspace-scoped-roles.md)). Stored per
+`(namespace, name)` beside the Workflow, never inside a Workflow Definition:
+registering a new version must not silently rewrite permissions. Administered
+by workspace owner/admin. An empty list means any member of the Workspace,
+which is every Workflow's starting state.
+_Avoid_: confusing with `visibility`, which is the *cross-workspace* read
+shelf — every member of the owning Workspace sees every Workflow in it
+regardless of Access. And with the Workflow Definition's `roles` field, which
+declares role names and grants nothing.
 
 **Caller Identity** *(per-request authorization subject)*:
 The authorization subject resolved for one request: either a signed-in User
