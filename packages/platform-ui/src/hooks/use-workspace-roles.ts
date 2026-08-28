@@ -15,10 +15,16 @@ export interface UseWorkspaceRolesResult {
    * Roles at least one member can actually exercise on `options.workflowName`:
    * held workspace-wide, or held under a grant narrowed to that workflow.
    *
-   * `null` when no workflow was named — the question was not asked and has no
-   * answer, which is not the same as "nobody holds anything". A caller warning
-   * about an unheld role has to keep those apart, or every step in a workflow
-   * it forgot to name warns about every role.
+   * Omitting `workflowName` is a question with an answer, not the absence of
+   * one: a workflow being authored has no name yet, so no grant can be
+   * narrowed to it and the workspace-wide grants are exactly what reaches it.
+   * Answering `null` there left the new-workflow editor silent about a role
+   * nobody holds — the editor where that typo gets made.
+   *
+   * `null` is reserved for the roster not being in yet. An empty roster and an
+   * unread one are both `[]` to this hook, and rendering "we have not asked" as
+   * "nobody holds it" flags every role on every step for as long as the fetch
+   * takes.
    *
    * A grant narrowed to a *different* workflow is deliberately absent: it does
    * not let its holder act here, so counting it would silence the warning in
@@ -97,7 +103,7 @@ export function useWorkspaceRoles(
 
   const scope = options.workflowName;
   const heldRoles = useMemo(() => {
-    if (scope === undefined) return null;
+    if (membersLoading) return null;
     const held = new Set<string>();
     for (const member of members) {
       for (const grant of member.grants) {
@@ -105,7 +111,7 @@ export function useWorkspaceRoles(
       }
     }
     return [...held].sort();
-  }, [members, scope]);
+  }, [members, scope, membersLoading]);
 
   return {
     roles,
