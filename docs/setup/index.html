@@ -16,9 +16,9 @@
       --bg: #F8FAFC;
       --card: #FFFFFF;
       --dark: #0F172A;
-      --accent: #0D9488;
-      --accent-hover: #0F766E;
-      --accent-light: rgba(13,148,136,0.08);
+      --accent: hsl(161 94% 30%);
+      --accent-hover: hsl(161 94% 24%);
+      --accent-light: hsl(161 94% 30% / 0.08);
       --text: #1E293B;
       --text-secondary: #64748B;
       --text-muted: #94A3B8;
@@ -43,7 +43,7 @@
     /* Security banner */
     .security-banner {
       background: var(--accent-light);
-      border-bottom: 1px solid rgba(13,148,136,0.15);
+      border-bottom: 1px solid hsl(161 94% 30% / 0.15);
       padding: 10px 24px;
       text-align: center;
       font-size: 13px;
@@ -180,7 +180,7 @@
     .field input:focus, .field textarea:focus, .field select:focus {
       outline: none;
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(13,148,136,0.1);
+      box-shadow: 0 0 0 3px hsl(161 94% 30% / 0.1);
     }
     .field input.error, .field textarea.error {
       border-color: var(--error);

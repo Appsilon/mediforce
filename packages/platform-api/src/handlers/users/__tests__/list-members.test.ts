@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { NamespaceMember, UserDirectoryService } from '@mediforce/platform-core';
-import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
+import { InMemoryNamespaceRepo, createTestScope, stubUserDirectory, userCaller } from '../../../testing/index';
 import { listNamespaceMembers } from '../list-members';
 import { NotFoundError } from '../../../errors';
 
@@ -15,16 +15,13 @@ function directoryWith(
     { email: string | null; displayName?: string | null; lastSignInTime: string | null; photoURL?: string | null } | null
   >,
 ): UserDirectoryService {
-  return {
-    async getUsersByRole() {
-      return [];
-    },
+  return stubUserDirectory({
     async getUserMetadata(uid: string) {
       const entry = map.has(uid) ? map.get(uid) ?? null : null;
       if (entry === null) return null;
       return { displayName: entry.displayName ?? null, email: entry.email, lastSignInTime: entry.lastSignInTime, photoURL: entry.photoURL ?? null };
     },
-  };
+  });
 }
 
 describe('listNamespaceMembers handler', () => {
@@ -115,15 +112,12 @@ describe('listNamespaceMembers handler', () => {
   });
 
   it('coalesces a transient directory error per uid to null fields', async () => {
-    const flaky: UserDirectoryService = {
-      async getUsersByRole() {
-        return [];
-      },
+    const flaky: UserDirectoryService = stubUserDirectory({
       async getUserMetadata(uid: string) {
         if (uid === 'uid-member') throw new Error('boom');
         return { email: 'owner@alpha.test', displayName: null, lastSignInTime: null, photoURL: null };
       },
-    };
+    });
     const scope = createTestScope({ namespaceRepo, userDirectory: flaky });
 
     const result = await listNamespaceMembers({ namespace: 'alpha' }, scope);

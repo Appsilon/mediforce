@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ADR-0019 — dumb, pull-only deploy. Takes a ref (release tag or SHA), checks it
+# ADR-0020 — dumb, pull-only deploy. Takes a ref (release tag or SHA), checks it
 # out ONLY to get the matching compose file + migration SQL, then pulls the
 # pinned images and brings the stack up. The running version is decided by the
 # image tag (:prod-current on prod, :latest on staging via the overlay), NOT by

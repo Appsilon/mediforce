@@ -311,4 +311,41 @@ describe.skipIf(skipPg)('PostgresNamespaceRepository (parity)', () => {
     // the dead handle; the private one goes with its workspace.
     expect(surviving).toEqual([{ id: 'public-agent', namespace: null }]);
   });
+
+  // Postgres-specific: the ADR-0019 role cascade. The in-memory contract cannot
+  // see it — process roles live in `user_roles`, which no `NamespaceRepository`
+  // method reads. A grant that outlives the membership is unreachable (roles
+  // compose with Membership by AND) but not harmless: it silently reactivates
+  // if the person is ever re-added.
+  it('removeMemberWithOrganizations deletes that user’s roles in the workspace only', async () => {
+    await testClient.unsafe(
+      `TRUNCATE TABLE "${schemaName}"."user_roles", "${schemaName}"."auth_users", "${schemaName}"."workspace_members", "${schemaName}"."workspaces" CASCADE`,
+    );
+    const db = drizzle(testClient, { schema });
+    const repo = new PostgresNamespaceRepository(db);
+    await repo.createNamespace(nsBase({ handle: 'leaver-org' }));
+    await repo.createNamespace(nsBase({ handle: 'other-org' }));
+    await repo.addMember('leaver-org', memberBase({ uid: 'bob' }));
+    await repo.addMember('other-org', memberBase({ uid: 'bob' }));
+    await repo.addMember('leaver-org', memberBase({ uid: 'ann' }));
+    await testClient`INSERT INTO auth_users (id, email) VALUES ('bob', 'bob@x.com'), ('ann', 'ann@x.com')`;
+    await testClient`
+      INSERT INTO user_roles (uid, role, namespace, workflow_name) VALUES
+        ('bob', 'reviewer', 'leaver-org', NULL),
+        ('bob', 'approver', 'leaver-org', 'tealflow'),
+        ('bob', 'reviewer', 'other-org', NULL),
+        ('ann', 'reviewer', 'leaver-org', NULL)
+    `;
+
+    await repo.removeMemberWithOrganizations('leaver-org', 'bob');
+
+    const remaining = await testClient<{ uid: string; role: string; namespace: string }[]>`
+      SELECT uid, role, namespace FROM user_roles ORDER BY uid, namespace, role
+    `;
+    // Bob keeps the workspace he is still in; Ann is untouched.
+    expect(remaining).toEqual([
+      { uid: 'ann', role: 'reviewer', namespace: 'leaver-org' },
+      { uid: 'bob', role: 'reviewer', namespace: 'other-org' },
+    ]);
+  });
 });

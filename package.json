@@ -1,6 +1,7 @@
 {
   "name": "mediforce",
   "private": true,
+  "version": "1.0.0",
   "type": "module",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
@@ -38,14 +39,14 @@
     "overrides": {
       "axios": ">=1.15.0",
       "protobufjs": "8.7.2",
-      "hono": "4.13.2",
-      "@hono/node-server": "2.1.0",
+      "hono": "4.13.3",
+      "@hono/node-server": "2.1.1",
       "fast-xml-parser": "5.10.1",
       "node-forge": "1.4.0",
       "follow-redirects": "1.16.0",
       "brace-expansion": "5.0.9",
       "@tootallnate/once": "3.0.1",
-      "next": "16.3.0",
+      "next": "16.3.1",
       "@auth/core": "0.41.3",
       "vite": "8.2.1"
     },

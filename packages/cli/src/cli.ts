@@ -75,6 +75,7 @@ import { coworkChatCommand } from './commands/cowork-chat';
 import { usersMeCommand } from './commands/users-me';
 import { usersClearMustChangePasswordCommand } from './commands/users-clear-must-change-password';
 import { namespaceGetCommand } from './commands/namespace-get';
+import { namespaceListMembersCommand } from './commands/namespace-list-members';
 import { namespaceCreateCommand } from './commands/namespace-create';
 import { agentRunListCommand } from './commands/agent-run-list';
 import { agentRunGetCommand } from './commands/agent-run-get';
@@ -84,6 +85,7 @@ import { namespaceResetCommand } from './commands/namespace-reset';
 import { namespaceLeaveCommand } from './commands/namespace-leave';
 import { namespaceRemoveMemberCommand } from './commands/namespace-remove-member';
 import { namespaceSetMemberRoleCommand } from './commands/namespace-set-member-role';
+import { namespaceSetMemberRolesCommand } from './commands/namespace-set-member-roles';
 import { processesAgentEventsCommand } from './commands/processes-agent-events';
 import { configSetCommand } from './commands/config-set';
 import { configGetCommand } from './commands/config-get';
@@ -226,13 +228,15 @@ export const TREE: Record<string, BranchEntry> = {
     description: 'Workspaces (get, create, update, delete, reset, leave, members)',
     leaves: {
       get: { description: 'Fetch a namespace + member list', fn: namespaceGetCommand },
+      'list-members': { description: 'List members with their process roles (reviewer, PI, …)', fn: namespaceListMembersCommand },
       create: { description: 'Create an organization namespace', fn: namespaceCreateCommand },
       update: { description: 'Edit display name / bio / icon', fn: namespaceUpdateCommand },
       delete: { description: 'Delete a workspace (owner only, cascades members; not personal)', fn: namespaceDeleteCommand },
       reset: { description: 'Delete every workflow in a workspace, keep the workspace', fn: namespaceResetCommand },
       leave: { description: 'Leave a workspace (self-remove)', fn: namespaceLeaveCommand },
       'remove-member': { description: 'Remove a member from a workspace', fn: namespaceRemoveMemberCommand },
-      'set-member-role': { description: 'Flip a member to admin|member', fn: namespaceSetMemberRoleCommand },
+      'set-member-role': { description: 'Flip a member to admin|member (workspace membership)', fn: namespaceSetMemberRoleCommand },
+      'set-member-roles': { description: 'Set a member\'s process roles (reviewer, PI, …)', fn: namespaceSetMemberRolesCommand },
     },
   },
   processes: {

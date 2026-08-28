@@ -1,0 +1,186 @@
+/*
+ * Mediforce documentation theme.
+ *
+ * The palette, radius and fonts are the app's own, copied from
+ * packages/platform-ui/src/app/globals.css and tailwind.config.ts so the docs
+ * and the product read as one system. The page itself is the workflow canvas:
+ * a dotted ground (react-flow's Dots variant, gap 24 / size 1) with white cards
+ * floating on it, the way step nodes sit on the editor canvas.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+:root {
+  /* --primary: 161 94% 30% — the app's single source of truth for action green. */
+  --ifm-color-primary: hsl(161 94% 30%);
+  --ifm-color-primary-dark: hsl(161 94% 26%);
+  --ifm-color-primary-darker: hsl(161 94% 24%);
+  --ifm-color-primary-darkest: hsl(161 94% 20%);
+  --ifm-color-primary-light: hsl(161 94% 34%);
+  --ifm-color-primary-lighter: hsl(161 94% 38%);
+  --ifm-color-primary-lightest: hsl(161 94% 44%);
+
+  --mf-background: hsl(0 0% 98%);
+  --mf-card: hsl(0 0% 100%);
+  --mf-border: hsl(214.3 31.8% 91.4%);
+  --mf-muted-foreground: hsl(215.4 16.3% 46.9%);
+  --mf-primary-subtle: hsl(152 81% 96%);
+  --mf-dot: hsl(214.3 31.8% 88%);
+
+  --ifm-background-color: var(--mf-background);
+  --ifm-font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
+  --ifm-heading-font-family: 'Space Grotesk', 'Inter', sans-serif;
+  --ifm-global-radius: 0.5rem;
+  --ifm-code-font-size: 92%;
+  --ifm-navbar-background-color: var(--mf-card);
+  --ifm-navbar-shadow: inset 0 -1px 0 var(--mf-border);
+  --docusaurus-highlighted-code-line-bg: var(--mf-primary-subtle);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: hsl(158 64% 52%);
+  --ifm-color-primary-dark: hsl(158 64% 46%);
+  --ifm-color-primary-darker: hsl(158 64% 42%);
+  --ifm-color-primary-darkest: hsl(158 64% 36%);
+  --ifm-color-primary-light: hsl(158 64% 58%);
+  --ifm-color-primary-lighter: hsl(158 64% 62%);
+  --ifm-color-primary-lightest: hsl(158 64% 70%);
+
+  --mf-background: hsl(222.2 84% 4.9%);
+  --mf-card: hsl(222.2 84% 7%);
+  --mf-border: hsl(217.2 32.6% 17.5%);
+  --mf-muted-foreground: hsl(215 20.2% 65.1%);
+  --mf-primary-subtle: hsl(158 30% 14%);
+  --mf-dot: hsl(217.2 32.6% 22%);
+
+  --docusaurus-highlighted-code-line-bg: var(--mf-primary-subtle);
+}
+
+/* The canvas ground. gap 24 / size 1 matches <Background variant={Dots} /> in
+   workflow-diagram.tsx, so the docs sit on the same grid as the editor. */
+main {
+  background-color: var(--mf-background);
+  background-image: radial-gradient(circle at center, var(--mf-dot) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Article body as a floating white card, like a step node on the canvas. */
+.theme-doc-markdown,
+.theme-doc-version-banner {
+  background: var(--mf-card);
+  border: 1.5px solid var(--mf-border);
+  border-radius: 0.75rem;
+  padding: 1.75rem 2rem;
+  box-shadow: 0 1px 2px hsl(222 47% 11% / 0.04);
+}
+
+.theme-doc-sidebar-container {
+  background: var(--mf-card);
+  border-right: 1px solid var(--mf-border);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--ifm-heading-font-family);
+  letter-spacing: -0.01em;
+}
+
+/* The version pill: which Mediforce these docs describe. */
+.version-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--ifm-color-primary);
+  border-radius: 999px;
+  background: var(--mf-primary-subtle);
+  color: var(--ifm-color-primary-darkest);
+  font-family: var(--ifm-heading-font-family);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+[data-theme='dark'] .version-pill {
+  color: var(--ifm-color-primary-lightest);
+}
+
+/*
+ * Previous/next pagination as workflow nodes. Same recipe as a step node in
+ * workflow-diagram.tsx: white card, 1.5px border, rounded-xl, and a shadow that
+ * only appears on hover ('hover:shadow-md' there), so moving between pages feels
+ * like moving along a workflow.
+ */
+.pagination-nav__link {
+  background: var(--mf-card);
+  border: 1.5px solid var(--mf-border);
+  border-radius: 0.75rem;
+  padding: 0.9rem 1.1rem;
+  box-shadow: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.pagination-nav__link:hover {
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 4px 6px -1px hsl(222 47% 11% / 0.1), 0 2px 4px -2px hsl(222 47% 11% / 0.1);
+  text-decoration: none;
+}
+
+/* The step node prints its type above its name in a small caps label. */
+.pagination-nav__sublabel {
+  color: var(--mf-muted-foreground);
+  font-family: var(--ifm-heading-font-family);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pagination-nav__label {
+  font-family: var(--ifm-heading-font-family);
+  font-weight: 600;
+}
+
+.pagination-nav__link:hover .pagination-nav__label {
+  color: var(--ifm-color-primary);
+}
+
+/* Footer columns share the page evenly instead of bunching at the left. */
+.footer .row {
+  justify-content: space-between;
+}
+
+.footer__title {
+  font-family: var(--ifm-heading-font-family);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mf-muted-foreground);
+}
+
+.footer__link-item {
+  color: var(--ifm-font-color-base);
+}
+
+.footer__copyright {
+  color: var(--mf-muted-foreground);
+  font-size: 0.8125rem;
+}
+
+/* Tables and code blocks read as cards too, matching the app's panels. */
+.theme-doc-markdown table {
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid var(--mf-border);
+}
+
+.theme-doc-markdown table thead tr {
+  background: var(--mf-primary-subtle);
+  border-bottom: 1px solid var(--mf-border);
+}
+
+.footer--light {
+  background: var(--mf-card);
+  border-top: 1px solid var(--mf-border);
+}

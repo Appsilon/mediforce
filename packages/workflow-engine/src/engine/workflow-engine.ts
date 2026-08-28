@@ -238,6 +238,8 @@ export class WorkflowEngine {
           stepId: instance.currentStepId!,
           assignedRole: handoff.assignedRole,
           entityId: handoff.id,
+          namespace: definition.namespace,
+          workflowName: definition.name,
         });
       }
 
@@ -806,6 +808,8 @@ export class WorkflowEngine {
       stepId: string;
       assignedRole: string;
       entityId: string;
+      namespace: string;
+      workflowName: string;
       assigneeUserId?: string | null;
       assigneeEmail?: string | null;
     },
@@ -819,8 +823,15 @@ export class WorkflowEngine {
         targets.push({ channel: 'email', address });
       }
     };
+    // Workspace- AND workflow-scoped (ADR-0019). A grant narrowed to workflow
+    // A must not put its holder on workflow B's notification list — that would
+    // narrow enforcement while leaking emails.
     for (const role of config.roles) {
-      const users = await this.userDirectoryService.getUsersByRole(role);
+      const users = await this.userDirectoryService.getUsersByRoleInNamespace(
+        role,
+        context.namespace,
+        context.workflowName,
+      );
       for (const user of users) {
         addTarget(user.email);
       }
@@ -891,6 +902,8 @@ export class WorkflowEngine {
       stepId: context.stepId,
       assignedRole: context.assignedRole,
       entityId: context.taskId,
+      namespace: definition.namespace,
+      workflowName: definition.name,
       assigneeUserId: context.assigneeUserId,
       assigneeEmail: context.assigneeEmail,
     });

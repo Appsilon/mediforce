@@ -9,6 +9,7 @@ export { buildUserRolesSeed } from './auth/seed-user-roles';
 export {
   resolveSessionUserId,
   getUserRoles,
+  getWorkspaceProcessRoles,
   createDatabaseSession,
   recordSignIn,
   deleteUserSessions,

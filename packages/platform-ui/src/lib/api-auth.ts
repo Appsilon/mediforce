@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getSharedPostgresClient, resolveSessionUserId } from '@mediforce/platform-infra';
+import {
+  getSharedPostgresClient,
+  getWorkspaceProcessRoles,
+  resolveSessionUserId,
+} from '@mediforce/platform-infra';
 import type { NamespaceRepository } from '@mediforce/platform-core';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { getSessionCookieFromHeader } from './session-cookie';
@@ -55,11 +59,24 @@ export async function resolveCallerIdentity(
   }
 
   const memberships = await namespaceRepo.getMembershipsForUser(uid);
+  // Membership and process roles are independent reads, so resolve them
+  // together: ADR-0019 wants the caller's roles on hand without the role gate
+  // paying a second round-trip per request.
+  const processRoles = await getWorkspaceProcessRoles(db, uid);
   return {
     kind: 'user',
     uid,
     namespaces: new Set(memberships.map((m) => m.handle)),
     namespaceRoles: new Map(memberships.map((m) => [m.handle, m.role] as const)),
+    // Roles compose with Membership by AND (ADR-0019), so a grant in a
+    // workspace the user is no longer a member of authorises nothing. The
+    // removal cascade drops those rows, and this filter keeps a stale one from
+    // reaching a handler if it ever survives.
+    namespaceProcessRoles: new Map(
+      memberships
+        .map((m) => [m.handle, processRoles.get(m.handle) ?? new Set<string>()] as const)
+        .filter(([, roles]) => roles.size > 0),
+    ),
     // Carried so a handler that revokes the user's sessions (password change)
     // can spare the one making the request.
     sessionToken,

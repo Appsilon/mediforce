@@ -41,7 +41,19 @@ Selecting a node surfaces its configuration in the right sidebar. Once the AI As
 "Add Block" (bottom toolbar) places an unconnected node anywhere on the canvas. The "+" edge button connects a new node inline at a specific position. Neither replaces the other.
 
 **Block presets — show what is possible.**
-A thin mapping layer (`lib/block-presets.ts`) groups the step executors into control-mode rows (CM0–CM4) plus a creation/decision step-type toggle, each with sensible defaults and descriptions. No new schema is introduced — it is a lookup table that makes the picker legible and communicates the platform's capabilities to new users.
+A thin mapping layer (`lib/block-presets.ts`) groups the step executors into two sections — **No agent** (human, script, action) and **Agent** (the CM1–CM4 modes) — plus a creation/decision step-type toggle, each with sensible defaults and descriptions. The split is by the question an author answers first, *does this step run an agent?*; how much human control an agent step keeps is then a choice made inside one card rather than across four. No new schema is introduced — it is a lookup table that makes the picker legible and communicates the platform's capabilities to new users.
+
+**The picker has two tiers, because "which executor?" is the wrong first question for most steps.**
+The executor sections above answer *who does the work*. That is the right question once you know the shape of the step, and the wrong one when the author simply wants to send an email. So the picker opens on **Simple** — capability-shaped blocks ("Send email", "Call an API", "Route by condition") — with **Full**, the executor sections, one click away.
+
+A Simple block emits a step that is already structurally correct: it carries its own `type`, its action `kind`, its script `runtime`, so the classes of mistake that previously required a trip to the golden rules cannot happen. It deliberately does not invent author-specific values — a recipient, a URL, a target workflow are declared as gaps and left empty for the editor's existing step-error highlighting to surface.
+
+This catalog lives in `platform-core` (`blocks/block-presets.ts`), not the UI, because the workflow assistant builds from the same list: a step the author could have added from the panel comes out the same whether they clicked it or asked for it. That is the one reason the catalog is not simply a second UI lookup table beside `lib/block-presets.ts`, which stays in the UI because only the picker reads it.
+
+**Availability is reported, not assumed — and only where the platform can actually know.**
+A block the deployment cannot run is shown greyed with the reason, rather than hidden or offered and left to fail mid-run. `GET /api/capabilities` derives this server-side, so the browser learns "email works, over SMTP" and never which env vars are set.
+
+Only deployment-wide facts qualify. Email does, through `emailProviderInfo`. Agent availability deliberately does not: the model key reaches the runner through `DOCKER_*`-prefixed host env and through workflow or namespace secrets, so no deployment-wide check can see it, and a check that guessed would grey blocks on a deployment where they work. Greying something that works is worse than offering something whose run reports a real error.
 
 **Does not run on the workflow engine.**
 The designer is a standalone UI feature. It does not require a running workflow engine session, a cowork workflow, or a BullMQ job to function. UI-level components (e.g. the chat shell from the cowork view) may be reused where appropriate, but there is no engine dependency at design time.
@@ -89,7 +101,10 @@ The assistant's tools split by what they act on, and that boundary decides where
 - The Co-Work Workflow Designer Workflow is deprecated as a workflow creation path and will be removed once the in-canvas AI Assistant (Phase 4) lands; it still ships in this phase because the AI Assistant pane is a placeholder shell.
 - `workflow-editor-canvas.tsx` is restructured: the two-column split layout is replaced with a full-width canvas + right sidebar.
 - `step-editor.tsx` is rendered inside the right sidebar. Its field logic is preserved, with one deliberate control change: the autonomy-level `<select>` becomes a pill toggle (L2/L3/L4). No field semantics change.
-- `lib/block-presets.ts` is the only new abstraction introduced at this stage.
+- Two preset catalogs now exist and mean different things: `lib/block-presets.ts` (UI-only, the executor sections behind the Full tier) and `platform-core/src/blocks/block-presets.ts` (shared with the workflow assistant, behind the Simple tier). The file names still collide, though the UI export now says what it holds (`EXECUTOR_SECTIONS`); renaming the file would remove the rest of the ambiguity.
+- The designer gains a server dependency it did not have: `GET /api/capabilities`, its contract, a `mediforce.capabilities.get()` client method and a `useCapabilities` hook. The picker degrades to offering everything when that read fails, so the dependency is soft.
+- Two UI primitives were extracted rather than added: `CollapsibleCard` out of `step-editor.tsx` and `HoverTooltip` out of `step-editor-fields.tsx`, both now shared with the picker so the two views fold and explain themselves identically.
+- **Open:** whether the two tiers are the end state. Simple covers the common cases and Full covers everything, so nothing forces a choice today — but if Simple is meant to win, Full's removal is a later decision this ADR does not make, and the tiers must be kept from drifting in the meantime. The first drift already happened: capability gating was briefly derived per-tier and had to be unified.
 - All existing step types (agent, script, human, cowork, action, decision) and all control modes (CM0–CM4) remain fully supported.
 - All workflow creation and editing goes through this designer exclusively.
 
@@ -98,7 +113,7 @@ The assistant's tools split by what they act on, and that boundary decides where
 ```
 Step 0  lib/block-presets.ts — mapping file only, no UI
 Phase 1 Layout restructure — full-width canvas + right sidebar shell
-Phase 2 Add Block button + block picker popover wired to presets
+Phase 2 Add Block button + block picker wired to presets (Simple + Full tiers)
 Phase 3 Step config in right sidebar — validate all step types render correctly
 Phase 4 AI Assistant shell → capability wiring (canvas mutations from chat, see "AI Assistant — reuse from the Co-Work Workflow Designer Workflow" above for what's reused vs. built new)
 ```

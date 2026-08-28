@@ -46,6 +46,7 @@ describe('setPassword handler', () => {
       uid,
       namespaces: new Set<string>(),
       namespaceRoles: new Map(),
+      namespaceProcessRoles: new Map(),
       sessionToken,
       isSystemActor: false,
     };

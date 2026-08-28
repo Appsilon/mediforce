@@ -3,7 +3,7 @@
 # Usage:
 #   docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml up -d
 #
-# ADR-0019 — production pins the app images to :prod-current (promoted via
+# ADR-0020 — production pins the app images to :prod-current (promoted via
 # GitHub Releases). Staging auto-deploys from `main` and must track the moving
 # :latest tag instead, so this overlay overrides the image tag back to :latest
 # for the three app services (image: is a scalar, later file wins on merge).

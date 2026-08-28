@@ -1,6 +1,8 @@
+import { BLOCK_PRESETS } from '../../blocks/block-presets';
 import { describe, it, expect } from 'vitest';
 import {
   AddStepToolSchema,
+  AddStepToolFieldsSchema,
   UpdateStepToolSchema,
   RemoveStepToolSchema,
   ListModelsToolSchema,
@@ -141,14 +143,14 @@ describe('AddStepToolSchema', () => {
   });
 
   it('omits only machine-managed fields (id/plugin/metadata/stepParams)', () => {
-    const shape = AddStepToolSchema.shape;
+    const shape = AddStepToolFieldsSchema.shape;
     for (const field of ['plugin', 'metadata', 'stepParams'] as const) {
       expect(field in shape).toBe(false);
     }
   });
 
   it('exposes the user-authorable fields the assistant previously lacked, for parity with hand-editing', () => {
-    const shape = AddStepToolSchema.shape;
+    const shape = AddStepToolFieldsSchema.shape;
     for (const field of ['ui', 'assignedTo', 'continueOnError'] as const) {
       expect(field in shape).toBe(true);
     }
@@ -236,5 +238,54 @@ describe('ListModelsToolSchema', () => {
 
   it('parses an optional preference hint', () => {
     expect(ListModelsToolSchema.safeParse({ preference: 'cheap' }).success).toBe(true);
+  });
+});
+
+describe('add_step presetId', () => {
+  it('resolves a preset into the exact payload the picker inserts', () => {
+    // `wait` declares no gaps, so the id alone is a complete step.
+    const result = AddStepToolSchema.safeParse({ presetId: 'wait', name: 'Hold for review' });
+    expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
+
+    const preset = BLOCK_PRESETS.find((candidate) => candidate.id === 'wait');
+    const step = result.data as Record<string, unknown>;
+    expect(step.executor).toBe(preset?.payload.executor);
+    expect(step.action).toEqual(preset?.payload.action);
+    expect(step.name).toBe('Hold for review');
+  });
+
+  it('refuses a preset whose declared gap is unfilled, rather than sending an empty recipient', () => {
+    // The picker may insert this and let the editor flag it; the assistant is
+    // held to a working step, so it has to supply the value or ask for it.
+    const result = AddStepToolSchema.safeParse({ presetId: 'send-email', name: 'Notify safety' });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('"to"');
+  });
+
+  it('accepts the same preset once the gap is filled, keeping its other defaults', () => {
+    const result = AddStepToolSchema.safeParse({
+      presetId: 'send-email',
+      name: 'Notify safety',
+      action: { kind: 'email', config: { to: 'safety@example.com', subject: 'Update', body: 'Body' } },
+    });
+    expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
+    expect((result.data as Record<string, unknown>).executor).toBe('action');
+  });
+
+  it('needs no executor of its own — the preset supplies it', () => {
+    const result = AddStepToolSchema.safeParse({ presetId: 'route-by-condition', name: 'Route' });
+    expect(result.success).toBe(true);
+    expect((result.data as Record<string, unknown>).type).toBe('decision');
+  });
+
+  it('names the valid ids when given one that does not exist', () => {
+    const result = AddStepToolSchema.safeParse({ presetId: 'send-a-fax', name: 'X', executor: 'human' });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('send-email');
+  });
+
+  it('still accepts a hand-built step with no presetId', () => {
+    const result = AddStepToolSchema.safeParse({ type: 'creation', executor: 'agent', name: 'Draft' });
+    expect(result.success).toBe(true);
   });
 });

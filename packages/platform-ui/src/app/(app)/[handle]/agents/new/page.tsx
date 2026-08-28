@@ -13,6 +13,7 @@ import {
 import { mediforce } from '@/lib/mediforce';
 import { FOUNDATION_MODELS } from '@/lib/agent-models';
 import { cn } from '@/lib/utils';
+import { ConceptIntro } from '@/components/ui/concept-intro';
 import type { LucideIcon } from 'lucide-react';
 
 const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
@@ -56,7 +57,7 @@ export default function NewAgentPage() {
     setSaving(true);
     setError(null);
     try {
-      await mediforce.agents.create({
+      const { agent } = await mediforce.agents.create({
         kind: 'plugin',
         name: name.trim(),
         iconName: selectedIcon,
@@ -68,7 +69,9 @@ export default function NewAgentPage() {
         namespace: handle,
         visibility: 'private',
       });
-      router.push(`/${handle}/agents`);
+      // Bindings need a persisted agent, so creation continues into the page
+      // that owns them rather than dead-ending on the catalog.
+      router.push(`/${handle}/agents/definitions/${agent.id}`);
     } catch (err) {
       setError(
         err instanceof Error
@@ -94,12 +97,17 @@ export default function NewAgentPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl">
-      <div>
-        <p className="text-sm text-muted-foreground">
-          Register a new AI agent and configure its capabilities. Only the agent
-          name and the foundation model are required.
+      <ConceptIntro>
+        <p>
+          <strong>An agent is a reusable configuration workflow steps call by id</strong> — its system prompt and its
+          MCP server bindings are the parts a run consumes. Name, description and input/output text are how people
+          recognise it when wiring a step.
         </p>
-      </div>
+        <p>
+          Only the agent name and the foundation model are required. MCP servers are bound from this agent&apos;s
+          Configure page once it exists.
+        </p>
+      </ConceptIntro>
 
       <div className="space-y-6">
 
@@ -222,6 +230,9 @@ export default function NewAgentPage() {
               </div>
             )}
           </div>
+          <p className="text-xs text-muted-foreground">
+            Recorded on the agent for reference. A run takes its model from the workflow step that calls the agent.
+          </p>
         </div>
 
         {/* 6. System prompt */}

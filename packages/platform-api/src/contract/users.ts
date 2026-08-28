@@ -82,6 +82,18 @@ export const NamespaceMemberWithAuthSchema = NamespaceMemberSchema.extend({
    * either "never signed in" or "caller not privileged to see it".
    */
   lastSignInTime: z.string().nullable(),
+  /**
+   * The member's process-domain roles in THIS workspace (ADR-0019) — what they
+   * do in a process (`reviewer`, `PI`), not the Membership `role` above.
+   * De-duplicated across grants, so a role narrowed to two workflows appears
+   * once; the per-workflow narrowing is not part of the roster view.
+   *
+   * Deliberately NOT a manager field: knowing who the reviewer is, is what a
+   * member needs to route work, so it ships with the roster (name, avatar,
+   * membership, join date) rather than with `email` / `lastSignInTime`. Empty
+   * when no directory is wired.
+   */
+  roles: z.array(z.string()),
 });
 
 export const ListNamespaceMembersOutputSchema = z.object({

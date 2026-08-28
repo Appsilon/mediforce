@@ -161,6 +161,15 @@ export {
 } from './email-status';
 
 export {
+  GetCapabilitiesInputSchema,
+  GetCapabilitiesOutputSchema,
+  CapabilityStatusSchema,
+  type GetCapabilitiesInput,
+  type GetCapabilitiesOutput,
+  type CapabilityStatus,
+} from './capabilities';
+
+export {
   ListAgentsInputSchema,
   ListAgentsOutputSchema,
   GetAgentInputSchema,
@@ -543,6 +552,10 @@ export {
   UpdateNamespaceMemberRoleInputSchema,
   UpdateNamespaceMemberRoleBodySchema,
   UpdateNamespaceMemberRoleOutputSchema,
+  RoleGrantSchema,
+  SetNamespaceMemberRolesInputSchema,
+  SetNamespaceMemberRolesBodySchema,
+  SetNamespaceMemberRolesOutputSchema,
   type GetNamespaceInput,
   type GetNamespaceOutput,
   type CreateNamespaceInput,
@@ -559,6 +572,9 @@ export {
   type RemoveNamespaceMemberOutput,
   type UpdateNamespaceMemberRoleInput,
   type UpdateNamespaceMemberRoleOutput,
+  type RoleGrantInput,
+  type SetNamespaceMemberRolesInput,
+  type SetNamespaceMemberRolesOutput,
 } from './namespaces';
 
 export {

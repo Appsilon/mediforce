@@ -17,6 +17,7 @@ services:
       - "443:443"
     environment:
       - DOMAIN=${DOMAIN:-localhost}
+      - DOMAIN_ALIASES=${DOMAIN_ALIASES:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
@@ -58,7 +59,7 @@ services:
   # service_completed_successfully so the app boot never races a
   # half-applied schema.
   migrate:
-    # ADR-0019 — prod is pull-only. The image is the pinned :prod-current the
+    # ADR-0020 — prod is pull-only. The image is the pinned :prod-current the
     # deploy promoted; there is no on-box build.
     image: ghcr.io/appsilon/mediforce-migrate:prod-current
     restart: "no"
@@ -69,7 +70,7 @@ services:
         condition: service_healthy
 
   platform-ui:
-    # ADR-0019 — prod pulls the pinned :prod-current image; no on-box build.
+    # ADR-0020 — prod pulls the pinned :prod-current image; no on-box build.
     image: ghcr.io/appsilon/mediforce-platform-ui:prod-current
     restart: unless-stopped
     mem_limit: ${PLATFORM_UI_MEM_LIMIT:-2g}
@@ -85,7 +86,7 @@ services:
       # injected at container start by docker-entrypoint.sh (replaces the
       # __NEXT_PUBLIC_APP_URL__ placeholder). NEXT_PUBLIC_GIT_SHA is
       # deployment-invariant and baked into the image at CI build time
-      # (ADR-0019), so it is not passed here.
+      # (ADR-0020), so it is not passed here.
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
       # --- Authentication: NextAuth / Auth.js v5 (ADR-0002) ---
       # Server-side only. `instrumentation-node.ts` refuses to boot without
@@ -128,6 +129,11 @@ services:
       # directory must exist before first launch:
       #   sudo mkdir -p /var/lib/mediforce
       - MEDIFORCE_DATA_DIR=/var/lib/mediforce
+      # Task-attachment ceiling (ADR-0003 §4). Read by platform-api's upload
+      # handler, which runs inside this service; unset means the 100 MiB
+      # default, and a larger value is clamped back down to it. Without this
+      # line the knob is settable in `.env` and never reaches the process.
+      - MEDIFORCE_ATTACHMENT_MAX_BYTES=${MEDIFORCE_ATTACHMENT_MAX_BYTES:-}
       # Boot refuses to start without an email provider unless this is true.
       - MEDIFORCE_DISABLE_EMAIL=${MEDIFORCE_DISABLE_EMAIL:-}
       - EMAIL_PROVIDER=${EMAIL_PROVIDER:-}
@@ -155,7 +161,7 @@ services:
         condition: service_completed_successfully
 
   container-worker:
-    # ADR-0019 — prod pulls the pinned :prod-current image; no on-box build.
+    # ADR-0020 — prod pulls the pinned :prod-current image; no on-box build.
     image: ghcr.io/appsilon/mediforce-container-worker:prod-current
     restart: unless-stopped
     mem_limit: ${AGENT_WORKER_MEM_LIMIT:-1280m}

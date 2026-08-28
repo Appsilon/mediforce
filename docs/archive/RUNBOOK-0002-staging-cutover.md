@@ -9,7 +9,7 @@ last_reviewed: 2026-07-23
 Operational runbook for switching **staging** (`staging.mediforce.ai`) from
 Firebase Auth to NextAuth (ADR-0002). This is the one-time cutover procedure.
 
-> **Historical note (ADR-0019).** This cutover ran on the pre-ADR-0019 deploy
+> **Historical note (ADR-0020).** This cutover ran on the pre-ADR-0020 deploy
 > mechanism, which is why the commands below invoke `scripts/deploy-staging.sh`
 > and its `--no-cache` on-box build. That script has since been retired and
 > unified into `scripts/deploy.sh` (staging now pulls `:latest` via the

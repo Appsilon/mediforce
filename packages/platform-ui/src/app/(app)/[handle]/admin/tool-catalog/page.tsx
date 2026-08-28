@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api-fetch';
 import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { adminBackHref } from '@/lib/routes';
+import { ConceptPopover } from '@/components/ui/concept-intro';
 import { CatalogList } from '@/components/admin/tool-catalog/catalog-list';
 import { CatalogForm } from '@/components/admin/tool-catalog/catalog-form';
 import { DeleteCatalogEntryDialog } from '@/components/admin/tool-catalog/delete-catalog-entry-dialog';
@@ -171,7 +172,19 @@ export default function AdminToolCatalogPage() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="flex-1">
-            <h1 className="text-xl font-semibold">Tool catalog</h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-xl font-semibold">Tool catalog</h1>
+              <ConceptPopover label="What is a catalog entry?">
+                <p>
+                  <strong>A catalog entry is a stdio MCP server you have approved for @{handle}</strong> — the
+                  command to launch, its arguments and its environment, stored once under an id.
+                </p>
+                <p>
+                  Agents bind to an entry by that id and cannot spell out a command of their own, so what runs inside
+                  an agent stays whatever admins put here.
+                </p>
+              </ConceptPopover>
+            </div>
             <p className="text-sm text-muted-foreground">
               Curated stdio MCP servers available to agents in @{handle}.
             </p>
@@ -207,11 +220,11 @@ export default function AdminToolCatalogPage() {
             {mode.kind === 'idle' && (
               <div className="flex h-full flex-col items-center justify-center gap-2 py-12 text-center">
                 <p className="text-sm font-medium">
-                  {entries.length === 0 ? 'No catalog entries yet.' : 'Select an entry to edit.'}
+                  {entries.length === 0 ? 'Nothing to edit yet.' : 'Select an entry to edit.'}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {entries.length === 0
-                    ? 'Add your first entry to get started.'
+                    ? 'Click “New catalog entry” above to add your first.'
                     : 'Or click “New catalog entry” above to add another.'}
                 </p>
               </div>

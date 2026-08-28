@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 import type { AgentDefinition } from '@mediforce/platform-core';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
+import { ConceptIntro } from '@/components/ui/concept-intro';
 
 const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
   { icon: Bot,      label: 'Bot'      },
@@ -136,11 +137,13 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl">
-      <div>
-        <p className="text-sm text-muted-foreground">
-          Edit this AI agent&apos;s configuration and capabilities.
+      <ConceptIntro>
+        <p>
+          <strong>An agent is a reusable configuration workflow steps call by id</strong> — its system prompt and its
+          MCP server bindings are the parts a run consumes. Agents are not versioned, so a change here applies to
+          every step that already references this one.
         </p>
-      </div>
+      </ConceptIntro>
 
       {loadingDef ? (
         <FormSkeleton />
@@ -298,6 +301,9 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
                 </div>
               )}
             </div>
+            <p className="text-xs text-muted-foreground">
+              Recorded on the agent for reference. A run takes its model from the workflow step that calls the agent.
+            </p>
           </div>
 
           {/* MCP Servers — bindings persisted separately via /mcp-servers endpoints */}

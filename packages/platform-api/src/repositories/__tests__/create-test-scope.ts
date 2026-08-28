@@ -265,11 +265,16 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
  * pass an explicit `roles` map. This default keeps every pre-Phase-2.6 test
  * site (which never knew about roles) working without modification while
  * still producing a fully-shaped `CallerIdentity.namespaceRoles`.
+ *
+ * `processRoles` is the separate ADR-0019 dimension — the process-domain roles
+ * (`reviewer`, `PI`) the caller holds per workspace. Empty by default: a
+ * caller holds no process roles unless a test grants some.
  */
 export function userCaller(
   uid: string,
   namespaces: readonly string[],
   roles?: ReadonlyMap<string, 'owner' | 'admin' | 'member'>,
+  processRoles?: ReadonlyMap<string, ReadonlySet<string>>,
 ): CallerIdentity {
   const namespaceRoles = new Map<string, 'owner' | 'admin' | 'member'>();
   for (const handle of namespaces) {
@@ -280,6 +285,7 @@ export function userCaller(
     uid,
     namespaces: new Set(namespaces),
     namespaceRoles,
+    namespaceProcessRoles: processRoles ?? new Map(),
     isSystemActor: false,
   };
 }

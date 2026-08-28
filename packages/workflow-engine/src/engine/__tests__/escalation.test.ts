@@ -5,33 +5,30 @@ import {
   InMemoryAuditRepository,
   InMemoryHandoffRepository,
   NoopNotificationService,
+  InMemoryUserDirectoryService,
 } from '@mediforce/platform-core';
-import type {
-  WorkflowDefinition,
-  StepConfig,
-  UserDirectoryService,
-  DirectoryUser,
-} from '@mediforce/platform-core';
+import type { WorkflowDefinition, StepConfig } from '@mediforce/platform-core';
 import { WorkflowEngine } from '../workflow-engine';
 import type { StepActor, AgentRunResult } from '../../index';
 
-// In-memory test double for UserDirectoryService (not exported, test-only)
-class InMemoryUserDirectoryService implements UserDirectoryService {
-  private users: Array<{ role: string; uid: string; email: string }> = [];
+const WORKFLOW_NAMESPACE = 'test';
 
-  addUser(role: string, uid: string, email: string): void {
-    this.users.push({ role, uid, email });
+/**
+ * The shared in-memory directory (`@mediforce/platform-core/testing`), seeded
+ * for one workspace. Every grant is workspace-wide (`workflowName: null`), so
+ * these notification tests keep asserting what they always asserted: role
+ * membership decides who is emailed. Scoping a grant to one workflow is
+ * covered where it belongs — the directory's own parity contract.
+ */
+function directoryWith(
+  ...grants: ReadonlyArray<readonly [role: string, uid: string, email: string]>
+): InMemoryUserDirectoryService {
+  const directory = new InMemoryUserDirectoryService();
+  for (const [role, uid, email] of grants) {
+    directory.addUser({ uid, email });
+    directory.addRole(uid, WORKFLOW_NAMESPACE, role);
   }
-
-  async getUsersByRole(role: string): Promise<DirectoryUser[]> {
-    return this.users
-      .filter((u) => u.role === role)
-      .map((u) => ({ uid: u.uid, email: u.email }));
-  }
-
-  async getUserMetadata(): Promise<null> {
-    return null;
-  }
+  return directory;
 }
 
 // A 2-step workflow: agent-step -> done
@@ -238,8 +235,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
   // --- Test 4: NotificationService.send() called with resolved targets on escalation ---
 
   it('calls NotificationService.send() with agent_escalation event when both services injected', async () => {
-    const userDirectoryService = new InMemoryUserDirectoryService();
-    userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
+    const userDirectoryService = directoryWith(['reviewer', 'uid-r1', 'reviewer@example.com']);
 
     const engine = new WorkflowEngine(
       processRepo,
@@ -340,8 +336,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
   // --- Test 7: Notification targets resolved from roles ---
 
   it('resolves roles to email targets and sends notification with concrete targets', async () => {
-    const userDirectoryService = new InMemoryUserDirectoryService();
-    userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
+    const userDirectoryService = directoryWith(['reviewer', 'uid-r1', 'reviewer@example.com']);
 
     const engine = new WorkflowEngine(
       processRepo,
@@ -400,8 +395,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
   // --- Test 9: Notification failure propagates (fatal) ---
 
   it('propagates notification failure as advanceStep failure (fatal — no catch)', async () => {
-    const userDirectoryService = new InMemoryUserDirectoryService();
-    userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
+    const userDirectoryService = directoryWith(['reviewer', 'uid-r1', 'reviewer@example.com']);
 
     const failingNotificationService = {
       sent: [] as Array<{ event: unknown; targets: unknown[] }>,
@@ -433,8 +427,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
   // --- Test 10: No notification when no escalation config in ProcessConfig ---
 
   it('skips notification gracefully when definition has no agent_escalation notifications', async () => {
-    const userDirectoryService = new InMemoryUserDirectoryService();
-    userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
+    const userDirectoryService = directoryWith(['reviewer', 'uid-r1', 'reviewer@example.com']);
 
     // Definition without notifications
     const noNotifDef: WorkflowDefinition = {

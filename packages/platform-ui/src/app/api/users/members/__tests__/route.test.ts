@@ -8,11 +8,17 @@ import { NextRequest } from 'next/server';
 
 const mockGetMembers = vi.fn();
 const mockGetUserMetadata = vi.fn();
+const mockGetRolesForUser = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     namespaceRepo: { getMembers: mockGetMembers },
-    userDirectory: { getUserMetadata: mockGetUserMetadata },
+    // `listNamespaceMembers` also reads each member's process roles for the
+    // roster (ADR-0019), so the directory stub has to answer that too.
+    userDirectory: {
+      getUserMetadata: mockGetUserMetadata,
+      getRolesForUser: mockGetRolesForUser,
+    },
     instanceRepo: { getById: vi.fn() },
     auditRepo: { append: vi.fn() },
     toolCatalogRepo: {},
@@ -82,6 +88,7 @@ describe('GET /api/users/members', () => {
       email: 'member@alpha.test',
       lastSignInTime: '2026-05-01T00:00:00.000Z',
     });
+    mockGetRolesForUser.mockResolvedValue(['reviewer']);
   });
 
   it('[DATA] returns members with auth metadata for apiKey caller', async () => {
