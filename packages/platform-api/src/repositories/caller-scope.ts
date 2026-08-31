@@ -1,6 +1,7 @@
 import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
 import type {
   AuditRepository,
+  AutoJoinRule,
   BlobStore,
   CredentialsRepository,
   EmailProviderInfo,
@@ -164,4 +165,10 @@ export interface SystemServices {
    * `setPassword` refuses outright when it is `false`.
    */
   readonly passwordAuthEnabled: boolean;
+  /**
+   * Domain -> workspace auto-join rules (`AUTO_JOIN_WORKSPACES`), resolved
+   * at wiring time. Empty = off. Read only by `getMe`, which is the one
+   * place a signed-in user's memberships are reconciled.
+   */
+  readonly autoJoinWorkspaces: readonly AutoJoinRule[];
 }
