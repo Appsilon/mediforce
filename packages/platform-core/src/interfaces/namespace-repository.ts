@@ -58,6 +58,17 @@ export interface NamespaceRepository {
    */
   setMemberRole(handle: string, uid: string, role: NamespaceMember['role']): Promise<void>;
   /**
+   * Whether `uid` was previously removed from `handle`, which bars them from
+   * being re-added by domain-based auto-join (`AUTO_JOIN_WORKSPACES`).
+   *
+   * The tombstone is written by `removeMemberWithOrganizations` and cleared by
+   * `addMember` / the invite path, each in the same transaction as the
+   * membership write — so `leave` means leave, an admin's removal sticks, and
+   * an explicit re-invite still works. Nothing else consults it: this is not a
+   * membership check.
+   */
+  isAutoJoinBlocked(handle: string, uid: string): Promise<boolean>;
+  /**
    * Cascade delete: deletes every member doc, arrayRemoves the handle from
    * each member's `users/{uid}.organizations`, then deletes the namespace
    * doc. Firestore impl uses a single `WriteBatch`; capacity ~500 ops, so

@@ -112,6 +112,11 @@ const primaryWebServer = {
   env: {
     ENABLE_PASSWORD_AUTH: 'true',
     AUTH_SECRET: process.env.AUTH_SECRET ?? E2E_AUTH_SECRET,
+    // Domain auto-join fixture for `auto-join-workspace.journey.ts`. The
+    // domain is deliberately NOT `mediforce.dev` (every other fixture user's
+    // address): a rule on that domain would silently enrol the whole suite's
+    // users into the workspace and skew every roster assertion.
+    AUTO_JOIN_WORKSPACES: 'autojoin.mediforce.dev:autojoin-journey-org',
     ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {}),
   },
   port: testPort,

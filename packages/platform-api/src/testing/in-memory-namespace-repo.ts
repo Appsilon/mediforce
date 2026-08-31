@@ -17,6 +17,8 @@ export class InMemoryNamespaceRepo implements NamespaceRepository {
   readonly namespaces = new Map<string, Namespace>();
   readonly members = new Map<string, NamespaceMember[]>();
   readonly userOrganizations = new Map<string, string[]>();
+  /** `${handle}\u0000${uid}` of members removed — see `isAutoJoinBlocked`. */
+  readonly autoJoinBlocks = new Set<string>();
 
   /** Seed a namespace doc without touching the member subcollection. */
   seedNamespace(namespace: Namespace): void {
@@ -69,6 +71,7 @@ export class InMemoryNamespaceRepo implements NamespaceRepository {
   }
   async addMember(handle: string, member: NamespaceMember): Promise<void> {
     this.seedMember(handle, member);
+    this.autoJoinBlocks.delete(`${handle}\u0000${member.uid}`);
   }
   async removeMember(handle: string, uid: string): Promise<void> {
     const list = this.members.get(handle) ?? [];
@@ -78,6 +81,10 @@ export class InMemoryNamespaceRepo implements NamespaceRepository {
     await this.removeMember(handle, uid);
     const orgs = this.userOrganizations.get(uid) ?? [];
     this.userOrganizations.set(uid, orgs.filter((h) => h !== handle));
+    this.autoJoinBlocks.add(`${handle}\u0000${uid}`);
+  }
+  async isAutoJoinBlocked(handle: string, uid: string): Promise<boolean> {
+    return this.autoJoinBlocks.has(`${handle}\u0000${uid}`);
   }
   async setMemberRole(handle: string, uid: string, role: NamespaceMember['role']): Promise<void> {
     const list = this.members.get(handle) ?? [];
