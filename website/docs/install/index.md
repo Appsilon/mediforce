@@ -73,11 +73,41 @@ refuses to start rather than serve a deployment nobody can use.
 | `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | off | One IdP per deployment — Keycloak, Entra, Okta. `OIDC_DISPLAY_NAME` names the button |
 | `ENABLE_MAGIC_LINK` | off | Passwordless email links. Needs a working mail transport |
 | `ALLOWED_EMAIL_DOMAINS` | unset | Comma-separated allowlist, enforced across **every** provider |
+| `AUTO_JOIN_WORKSPACES` | unset | `domain:handle` pairs — everyone at a domain joins that workspace as `member` |
 
 :::warning Google without an allowlist lets anyone in
 `ALLOWED_EMAIL_DOMAINS` is what stops any Google account on earth signing in.
 If you enable Google, set it — for example `ALLOWED_EMAIL_DOMAINS=acme.com`.
 :::
+
+### Putting a whole company in one workspace
+
+By default a new sign-in gets only a personal workspace, and joining a shared
+one takes an invite each time. `AUTO_JOIN_WORKSPACES` removes that step for a
+domain you control:
+
+```bash
+AUTO_JOIN_WORKSPACES=acme.com:acme
+```
+
+Everyone signing in at `acme.com` becomes a `member` of the `acme` workspace on
+their next page load — including people who signed in before you set it. Several
+pairs are comma-separated, and a domain may feed more than one workspace.
+
+This is a different decision from the allowlist above. `ALLOWED_EMAIL_DOMAINS`
+decides who may sign in at all; `AUTO_JOIN_WORKSPACES` decides where they land
+once they have. Deployments commonly name the same domain in both.
+
+Three things worth knowing before you turn it on:
+
+- **Everyone lands as `member`.** Promoting someone to `admin` is the workspace
+  owner's call, and the promotion sticks — auto-join never touches an existing
+  membership.
+- **Removal is permanent.** Someone an admin removes, or who leaves, is not
+  re-added on their next visit. An explicit invite brings them back.
+- **Everyone gets everything.** Members see every workflow, run, and audit
+  event in the workspace. Workspace secrets stay owner/admin-only. Auto-joining
+  a large domain is a real widening of who can see the workspace's contents.
 
 ### Email
 

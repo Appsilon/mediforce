@@ -51,7 +51,7 @@ interface MembersTableProps {
   currentUserId: string | undefined;
   resendingUid: string | null;
   onResendInvite: (memberUid: string) => void;
-  onToggleRole: (memberUid: string, currentRole: string) => void;
+  onRoleChange: (memberUid: string, role: 'admin' | 'member') => void;
   onRemoveMember: (memberUid: string) => void;
 }
 
@@ -63,7 +63,7 @@ export function MembersTable({
   currentUserId,
   resendingUid,
   onResendInvite,
-  onToggleRole,
+  onRoleChange,
   onRemoveMember,
 }: MembersTableProps) {
   if (members.length === 0) {
@@ -136,14 +136,17 @@ export function MembersTable({
                 {/* Role */}
                 <td className="px-4 py-3 whitespace-nowrap">
                   {isOwner && member.role !== 'owner' ? (
-                    <button
-                      type="button"
-                      onClick={() => onToggleRole(member.uid, member.role)}
-                      title={`Click to change to ${member.role === 'admin' ? 'member' : 'admin'}`}
-                      className="cursor-pointer"
+                    <select
+                      aria-label={`Role for ${member.displayName ?? member.uid}`}
+                      value={member.role}
+                      onChange={(event) =>
+                        onRoleChange(member.uid, event.target.value as 'admin' | 'member')
+                      }
+                      className="rounded-md border bg-background px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-ring"
                     >
-                      <RoleBadge role={member.role} />
-                    </button>
+                      <option value="member">member</option>
+                      <option value="admin">admin</option>
+                    </select>
                   ) : (
                     <RoleBadge role={member.role} />
                   )}
