@@ -43,3 +43,26 @@ export const workspaceMembers = pgTable(
     uidIdx: index('workspace_members_uid_idx').on(table.uid),
   }),
 );
+
+/**
+ * Removals remembered so domain-based auto-join (`AUTO_JOIN_WORKSPACES`)
+ * cannot silently undo them — see migration 0043 for why this is its own
+ * table rather than a soft-delete flag on `workspaceMembers`.
+ *
+ * A row is written whenever a member is removed or leaves, and dropped when
+ * someone is explicitly added back; both happen in the same transaction as
+ * the membership write they accompany.
+ */
+export const workspaceAutojoinBlocks = pgTable(
+  'workspace_autojoin_blocks',
+  {
+    workspace: text('workspace')
+      .notNull()
+      .references(() => workspaces.handle, { onDelete: 'cascade' }),
+    uid: text('uid').notNull(),
+    blockedAt: timestamp('blocked_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.workspace, table.uid] }),
+  }),
+);

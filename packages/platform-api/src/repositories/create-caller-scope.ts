@@ -24,6 +24,7 @@ import type {
   UserDirectoryService,
   UserProfileRepository,
   WorkflowSecretsRepository,
+  AutoJoinRule,
 } from '@mediforce/platform-core';
 import type {
   CronTrigger,
@@ -94,6 +95,7 @@ export interface CallerScopeServices {
   readonly platformSettingsRepo: PlatformSettingsRepository;
   readonly emailProviderInfo: EmailProviderInfo | null;
   readonly passwordAuthEnabled: boolean;
+  readonly autoJoinWorkspaces: readonly AutoJoinRule[];
 }
 
 /**
@@ -167,6 +169,7 @@ export function createCallerScope(
       platformSettings: services.platformSettingsRepo,
       emailProviderInfo: services.emailProviderInfo,
       passwordAuthEnabled: services.passwordAuthEnabled,
+      autoJoinWorkspaces: services.autoJoinWorkspaces,
     },
   };
 }

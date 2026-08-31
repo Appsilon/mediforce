@@ -307,7 +307,14 @@
       "idx": 43,
       "version": "7",
       "when": 1784720152310,
-      "tag": "0043_workflow_access",
+      "tag": "0043_workspace_autojoin_blocks",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1784720152311,
+      "tag": "0044_workflow_access",
       "breakpoints": true
     }
   ]

@@ -64,7 +64,8 @@ import {
   isLocalAgentMode,
   type DockerImagesService,
 } from './docker-images-service';
-import { isPasswordAuthEnabled } from '@mediforce/platform-core';
+import { isPasswordAuthEnabled, parseAutoJoinWorkspaces } from '@mediforce/platform-core';
+import type { AutoJoinRule } from '@mediforce/platform-core';
 import { sendWorkspaceNotificationEmail, sendInviteSetupEmail } from './invite-emails';
 import { normalizeBaseUrl, resolveInviteAppUrl } from '../contract/config';
 import type {
@@ -155,6 +156,9 @@ export interface PlatformServices {
   /** `isPasswordAuthEnabled(ENABLE_PASSWORD_AUTH)`, resolved once at wiring
    *  time so handlers never read `process.env`. */
   passwordAuthEnabled: boolean;
+  /** `parseAutoJoinWorkspaces(AUTO_JOIN_WORKSPACES)`, resolved once at wiring
+   *  time. Empty = the feature is off, which is the default. */
+  autoJoinWorkspaces: readonly AutoJoinRule[];
 }
 
 /** Invite-activation links live for 7 days — long enough for a colleague to
@@ -318,6 +322,7 @@ export function getPlatformServices(): PlatformServices {
   const userDirectoryService: UserDirectoryService = new PostgresUserDirectoryService(pg);
 
   const passwordAuthEnabled = isPasswordAuthEnabled(process.env.ENABLE_PASSWORD_AUTH);
+  const autoJoinWorkspaces = parseAutoJoinWorkspaces(process.env.AUTO_JOIN_WORKSPACES);
 
   const engine = new WorkflowEngine(
     processRepo,
@@ -431,6 +436,7 @@ export function getPlatformServices(): PlatformServices {
     dockerImages,
     userDirectory: userDirectoryService,
     passwordAuthEnabled,
+    autoJoinWorkspaces,
   };
 
   if (!seedingStarted) {
