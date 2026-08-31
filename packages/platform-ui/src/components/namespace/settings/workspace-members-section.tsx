@@ -96,11 +96,10 @@ export function WorkspaceMembersSection({
     }
   }
 
-  async function handleToggleRole(memberUid: string, currentRole: string) {
+  async function handleRoleChange(memberUid: string, role: 'admin' | 'member') {
     onError(null);
-    const nextRole: 'admin' | 'member' = currentRole === 'admin' ? 'member' : 'admin';
     try {
-      await updateMemberRole.mutateAsync({ handle, uid: memberUid, role: nextRole });
+      await updateMemberRole.mutateAsync({ handle, uid: memberUid, role });
       await refreshMembers();
     } catch (err: unknown) {
       onError(err instanceof Error ? err.message : 'Failed to update member role.');
@@ -205,7 +204,7 @@ export function WorkspaceMembersSection({
         currentUserId={currentUserId}
         resendingUid={resendingUid}
         onResendInvite={handleResendInvite}
-        onToggleRole={handleToggleRole}
+        onRoleChange={handleRoleChange}
         onRemoveMember={handleRemoveMember}
       />
 

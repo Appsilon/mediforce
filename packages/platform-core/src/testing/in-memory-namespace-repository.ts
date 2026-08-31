@@ -18,6 +18,8 @@ import type { NamespaceRepository } from '../interfaces/namespace-repository';
 export class InMemoryNamespaceRepository implements NamespaceRepository {
   private readonly namespaces = new Map<string, Namespace>();
   private readonly members = new Map<string, Map<string, NamespaceMember>>();
+  /** `${handle}\u0000${uid}` of members removed — see `isAutoJoinBlocked`. */
+  private readonly autoJoinBlocks = new Set<string>();
 
   async getNamespace(handle: string): Promise<Namespace | null> {
     const ns = this.namespaces.get(handle);
@@ -67,6 +69,7 @@ export class InMemoryNamespaceRepository implements NamespaceRepository {
     const bucket = this.members.get(handle) ?? new Map<string, NamespaceMember>();
     bucket.set(parsed.uid, { ...parsed });
     this.members.set(handle, bucket);
+    this.autoJoinBlocks.delete(blockKey(handle, parsed.uid));
   }
 
   async removeMember(handle: string, uid: string): Promise<void> {
@@ -77,6 +80,11 @@ export class InMemoryNamespaceRepository implements NamespaceRepository {
     // In-memory double has no `users/{uid}.organizations` mirror to keep in
     // sync — the namespace-side delete is sufficient for tests.
     this.members.get(handle)?.delete(uid);
+    this.autoJoinBlocks.add(blockKey(handle, uid));
+  }
+
+  async isAutoJoinBlocked(handle: string, uid: string): Promise<boolean> {
+    return this.autoJoinBlocks.has(blockKey(handle, uid));
   }
 
   async setMemberRole(
@@ -137,4 +145,8 @@ export class InMemoryNamespaceRepository implements NamespaceRepository {
     this.namespaces.clear();
     this.members.clear();
   }
+}
+
+function blockKey(handle: string, uid: string): string {
+  return `${handle}\u0000${uid}`;
 }

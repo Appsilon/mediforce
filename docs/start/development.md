@@ -29,6 +29,7 @@ Auth is NextAuth / Auth.js v5 with Postgres-backed database sessions
 | `ENABLE_PASSWORD_AUTH` | `true` enables the email + password (Credentials) provider — simplest local path |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google sign-in provider (optional) |
 | `ALLOWED_EMAIL_DOMAINS` | Comma-separated email-domain allowlist (optional) |
+| `AUTO_JOIN_WORKSPACES` | `domain:handle` pairs — everyone at a domain joins that workspace as `member` (optional) |
 | `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | Customer SSO, dormant until `OIDC_ISSUER` is set |
 | `OPENROUTER_API_KEY` | OpenRouter API key (for agent LLM calls) |
 | `PLATFORM_API_KEY` | Platform API key (server-to-server `X-Api-Key`) |
@@ -170,6 +171,7 @@ a safe default.
 | `AUTH_SECRET` | Session signing. `openssl rand -hex 32`. |
 | `NEXT_PUBLIC_APP_URL` | Public origin of this deployment (e.g. `https://app.example.com`). `APP_BASE_URL` **auto-derives from it** in compose — set only this one. |
 | `ALLOWED_EMAIL_DOMAINS` | Comma-separated domain allowlist. Mandatory with any OAuth/OIDC provider on (boot-fails if empty) — otherwise any account at the IdP could sign in. |
+| `AUTO_JOIN_WORKSPACES` | Comma-separated `domain:handle` pairs, e.g. `acme.com:acme`. Everyone signing in at a listed domain becomes a `member` of that workspace on their next page load. Unset = nobody is auto-joined. Not the same knob as the allowlist above: that decides who may sign in, this decides where they land. Someone removed from the workspace, or who left it, is **not** re-added — only an explicit invite brings them back. |
 
 **Auth providers — enable at least one:**
 
