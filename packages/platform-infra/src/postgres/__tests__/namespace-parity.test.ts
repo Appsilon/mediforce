@@ -127,6 +127,48 @@ function contract(name: string, factory: () => Promise<NamespaceRepository>) {
       ).resolves.toBeUndefined();
     });
 
+    it('isAutoJoinBlocked is false for someone who was never removed', async () => {
+      await repo.createNamespace(nsBase());
+      await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
+      expect(await repo.isAutoJoinBlocked('appsilon', 'user-1')).toBe(false);
+    });
+
+    it('removeMemberWithOrganizations tombstones the uid against auto-join', async () => {
+      await repo.createNamespace(nsBase());
+      await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
+      await repo.removeMemberWithOrganizations('appsilon', 'user-1');
+      expect(await repo.isAutoJoinBlocked('appsilon', 'user-1')).toBe(true);
+    });
+
+    it('the tombstone is per workspace and per uid', async () => {
+      await repo.createNamespace(nsBase());
+      await repo.createNamespace(nsBase({ handle: 'other' }));
+      await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
+      await repo.addMember('other', memberBase({ uid: 'user-1' }));
+      await repo.addMember('appsilon', memberBase({ uid: 'user-2' }));
+      await repo.removeMemberWithOrganizations('appsilon', 'user-1');
+
+      expect(await repo.isAutoJoinBlocked('appsilon', 'user-1')).toBe(true);
+      expect(await repo.isAutoJoinBlocked('other', 'user-1')).toBe(false);
+      expect(await repo.isAutoJoinBlocked('appsilon', 'user-2')).toBe(false);
+    });
+
+    it('addMember clears the tombstone, so an explicit re-add sticks', async () => {
+      await repo.createNamespace(nsBase());
+      await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
+      await repo.removeMemberWithOrganizations('appsilon', 'user-1');
+      await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
+      expect(await repo.isAutoJoinBlocked('appsilon', 'user-1')).toBe(false);
+    });
+
+    it('tombstoning is idempotent across repeated removals', async () => {
+      await repo.createNamespace(nsBase());
+      await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
+      await repo.removeMemberWithOrganizations('appsilon', 'user-1');
+      await repo.removeMemberWithOrganizations('appsilon', 'user-1');
+      expect(await repo.isAutoJoinBlocked('appsilon', 'user-1')).toBe(true);
+    });
+
     it('setMemberRole updates an existing member; no-op when absent', async () => {
       await repo.createNamespace(nsBase());
       await repo.addMember('appsilon', memberBase({ uid: 'user-1', role: 'member' }));

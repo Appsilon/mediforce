@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Database } from '../postgres/client';
 import { authAccounts } from '../postgres/schema/auth-account';
 import { authSessions } from '../postgres/schema/auth-session';
 import { authUsers } from '../postgres/schema/auth-user';
 import { userRoles } from '../postgres/schema/user-role';
-import { workspaceMembers } from '../postgres/schema/workspace';
+import { workspaceMembers, workspaceAutojoinBlocks } from '../postgres/schema/workspace';
 
 export interface SeedInviteInput {
   readonly email: string;
@@ -81,6 +81,18 @@ export class PostgresInviteService {
           target: [workspaceMembers.workspace, workspaceMembers.uid],
           set: { role: input.membership },
         });
+
+      // An explicit invite outranks a past removal: clear the auto-join
+      // tombstone (migration 0043) so re-inviting someone who was removed
+      // sticks, and so their next `leave` starts from a clean slate.
+      await tx
+        .delete(workspaceAutojoinBlocks)
+        .where(
+          and(
+            eq(workspaceAutojoinBlocks.workspace, input.workspaceHandle),
+            eq(workspaceAutojoinBlocks.uid, uid),
+          ),
+        );
 
       for (const role of input.roles ?? []) {
         await tx

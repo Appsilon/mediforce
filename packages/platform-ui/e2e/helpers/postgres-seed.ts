@@ -758,3 +758,29 @@ export async function deletePostgresAgentOAuthToken(
     await sql.end({ timeout: 5 });
   }
 }
+
+/**
+ * Return a user to "never been in this workspace": drop their membership AND
+ * the auto-join tombstone a removal leaves behind (migration 0043).
+ *
+ * Direct SQL because the API cannot express this state — every removal
+ * endpoint writes a tombstone by design, and the invite that clears one also
+ * re-adds the member. Only a fresh colleague is in this state, and a journey
+ * re-running against the shared database has to fabricate it.
+ */
+export async function clearPostgresWorkspaceMembership(
+  handle: string,
+  uid: string,
+): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to seed Postgres for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await sql`DELETE FROM workspace_members WHERE workspace = ${handle} AND uid = ${uid}`;
+    await sql`DELETE FROM workspace_autojoin_blocks WHERE workspace = ${handle} AND uid = ${uid}`;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
