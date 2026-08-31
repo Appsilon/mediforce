@@ -114,6 +114,12 @@ services:
       # provider (ADR-0002 §4a). With Google on, this is what stops any Google
       # account on earth signing in.
       - ALLOWED_EMAIL_DOMAINS=${ALLOWED_EMAIL_DOMAINS:-}
+      # Domain -> workspace auto-join, as `domain:handle` pairs, e.g.
+      # `appsilon.com:appsilon`. Everyone signing in at a listed domain becomes
+      # a `member` of the mapped workspace on their next page load. Distinct
+      # from ALLOWED_EMAIL_DOMAINS above: that one gates who may sign in, this
+      # one gates where they land. Unset = nobody is auto-joined.
+      - AUTO_JOIN_WORKSPACES=${AUTO_JOIN_WORKSPACES:-}
       - ENABLE_PASSWORD_AUTH=${ENABLE_PASSWORD_AUTH:-}
       - ENABLE_MAGIC_LINK=${ENABLE_MAGIC_LINK:-}
       # Customer SSO — dormant until OIDC_ISSUER is set.

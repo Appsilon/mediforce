@@ -9,7 +9,7 @@ import {
   type NamespaceRepository,
 } from '@mediforce/platform-core';
 import type { Database } from '../client';
-import { workspaces, workspaceMembers } from '../schema/workspace';
+import { workspaces, workspaceMembers, workspaceAutojoinBlocks } from '../schema/workspace';
 import { agents } from '../schema/agent-definition';
 import { toolCatalogEntries } from '../schema/tool-catalog';
 import { userRoles } from '../schema/user-role';
@@ -135,18 +135,32 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       avatarUrl: parsed.avatarUrl ?? null,
       joinedAt: new Date(parsed.joinedAt),
     };
-    await this.db
-      .insert(workspaceMembers)
-      .values(values)
-      .onConflictDoUpdate({
-        target: [workspaceMembers.workspace, workspaceMembers.uid],
-        set: {
-          role: values.role,
-          displayName: values.displayName,
-          avatarUrl: values.avatarUrl,
-          joinedAt: values.joinedAt,
-        },
-      });
+    // Adding someone back is the deliberate reversal of having removed them,
+    // so it clears the auto-join tombstone in the same transaction — otherwise
+    // a re-invited colleague would carry a block row that silently bites the
+    // next time they leave.
+    await this.db.transaction(async (tx) => {
+      await tx
+        .insert(workspaceMembers)
+        .values(values)
+        .onConflictDoUpdate({
+          target: [workspaceMembers.workspace, workspaceMembers.uid],
+          set: {
+            role: values.role,
+            displayName: values.displayName,
+            avatarUrl: values.avatarUrl,
+            joinedAt: values.joinedAt,
+          },
+        });
+      await tx
+        .delete(workspaceAutojoinBlocks)
+        .where(
+          and(
+            eq(workspaceAutojoinBlocks.workspace, handle),
+            eq(workspaceAutojoinBlocks.uid, parsed.uid),
+          ),
+        );
+    });
   }
 
   async removeMember(handle: string, uid: string): Promise<void> {
@@ -182,7 +196,30 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       await tx
         .delete(userRoles)
         .where(and(eq(userRoles.namespace, handle), eq(userRoles.uid, uid)));
+      // Remember the removal so domain-based auto-join cannot re-add them on
+      // their next page load (migration 0043). Same transaction as the delete:
+      // a crash between the two would leave them removed but un-tombstoned,
+      // which is exactly the silent re-join this prevents. Written regardless
+      // of whether the workspace auto-joins anyone — inert if it does not.
+      await tx
+        .insert(workspaceAutojoinBlocks)
+        .values({ workspace: handle, uid })
+        .onConflictDoNothing();
     });
+  }
+
+  async isAutoJoinBlocked(handle: string, uid: string): Promise<boolean> {
+    const rows = await this.db
+      .select({ uid: workspaceAutojoinBlocks.uid })
+      .from(workspaceAutojoinBlocks)
+      .where(
+        and(
+          eq(workspaceAutojoinBlocks.workspace, handle),
+          eq(workspaceAutojoinBlocks.uid, uid),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
   }
 
   async setMemberRole(
