@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-08-23]
+
 ### Fixed
 - A workspace owner can find the control that changes a member's role. It was the role badge itself wrapped in a `<button>` whose only affordance was a `title` tooltip — no dropdown, no chevron — so the feature read as absent to everyone who had not been told it was there. It is now a labelled `<select>`, which also replaces the toggle semantics: picking `admin` sets `admin` instead of flipping to whatever the other value happened to be. Still owner-only, matching `updateNamespaceMemberRole`'s `assertCallerIsNamespaceOwner` gate — the UI was never stricter than the API, it was just invisible [#1288](https://github.com/Appsilon/mediforce/pull/1288).
 - `MEDIFORCE_ATTACHMENT_MAX_BYTES` now reaches the process that reads it. The knob was documented in `.env.example` and honoured by [`_limits.ts`](packages/platform-api/src/handlers/tasks/attachments/_limits.ts), but [`docker-compose.prod.yml`](docker-compose.prod.yml) never forwarded it to `platform-ui` — the service hosting the upload handler — so lowering the attachment ceiling on a deployment silently did nothing and every upload kept the 100 MiB default. Forwarded as `${MEDIFORCE_ATTACHMENT_MAX_BYTES:-}`, which staging inherits through its overlay; unset still means the default, since the resolver treats an empty value as absent.
