@@ -295,6 +295,20 @@
       "when": 1784720152308,
       "tag": "0041_process_instance_trigger_context",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1784720152309,
+      "tag": "0042_workspace_scoped_user_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1784720152310,
+      "tag": "0043_workspace_autojoin_blocks",
+      "breakpoints": true
     }
   ]
 }

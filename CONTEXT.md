@@ -219,6 +219,9 @@ A reusable, mutable agent configuration: system prompt plus MCP server
 bindings. Workflow Steps reference Agents; one Agent can power many Steps and
 is not versioned today.
 _Avoid_: Agent Definition (legacy code term; there is no versioned definition).
+_Note_: 
+Agent: only `systemPrompt` reaches the prompt (as `agentIdentityPrompt`), and
+Skills are step-level (`step.agent.skillsDir`).
 
 **MCP Server**:
 External tool host (stdio or HTTP) accessible to an agent via Model Context
@@ -248,10 +251,20 @@ _Avoid_: "Role" alone — that's overloaded with process-domain roles below.
 
 **Roles** *(process-domain, plural)*:
 Functional roles a User holds for workflow purposes — e.g. `reviewer`, `PI`,
-`approver`. Roles are Deployment-global and drive task assignment, Step access,
-and notifications.
-_Avoid_: confusing with Membership. Membership governs a Workspace; Roles
-describe workflow function across the Deployment.
+`approver`. Free-form strings; there is no fixed vocabulary. A Role is held
+**within one Workspace** and optionally narrowed to a single Workflow
+([ADR-0019](docs/adr/0019-workspace-scoped-roles.md)); an unnarrowed grant
+covers every Workflow in that Workspace. Roles drive task assignment, Step
+access (`allowedRoles`), and notification targeting.
+_Avoid_: confusing with Membership. Both are per-Workspace and both are called
+"role" in the schema — Membership (`workspace_members.role`) governs who
+administers the Workspace, Roles (`user_roles.role`) describe workflow
+function.
+_Note_: Roles can now be granted (`mediforce namespace set-member-roles`,
+`PUT /api/namespaces/:handle/members/:uid/roles`) and read back
+(`mediforce namespace list-members`, `GET /api/users/members`), but
+`allowedRoles` is still declarative — nothing enforces it yet
+([#1249](https://github.com/Appsilon/mediforce/issues/1249)).
 
 **Caller Identity** *(per-request authorization subject)*:
 The authorization subject resolved for one request: either a signed-in User

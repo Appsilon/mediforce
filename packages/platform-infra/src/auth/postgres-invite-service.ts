@@ -1,17 +1,22 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Database } from '../postgres/client';
 import { authAccounts } from '../postgres/schema/auth-account';
 import { authSessions } from '../postgres/schema/auth-session';
 import { authUsers } from '../postgres/schema/auth-user';
 import { userRoles } from '../postgres/schema/user-role';
-import { workspaceMembers } from '../postgres/schema/workspace';
+import { workspaceMembers, workspaceAutojoinBlocks } from '../postgres/schema/workspace';
 
 export interface SeedInviteInput {
   readonly email: string;
   readonly displayName?: string;
   readonly workspaceHandle: string;
   readonly membership: 'owner' | 'admin' | 'member';
+  /**
+   * Process-domain roles to grant in `workspaceHandle` (ADR-0019), across
+   * every workflow in it. Distinct from `membership` above: that is who
+   * administers the workspace, these are what the invitee does in a process.
+   */
   readonly roles?: readonly string[];
 }
 
@@ -22,11 +27,13 @@ export interface SeededInvite {
 }
 
 /**
- * Postgres seed-based invite (PLAN-0002 §3.1; global roles per ADR-0002 §5).
+ * Postgres seed-based invite (PLAN-0002 §3.1; workspace-scoped roles per
+ * ADR-0019).
  *
  * Replaces the Firebase create-user-with-temp-password flow. An invite
  * pre-seeds an `auth_users` row + the invitee's `workspace_members`
- * membership + any global `user_roles`, all in one transaction. No temp
+ * membership + any `user_roles` grants in that workspace, all in one
+ * transaction. No temp
  * password and no magic-link email — the invitee signs in later via Google
  * verified-email auto-link (ADR-0002 §4b) onto the pre-seeded row, or by
  * setting a password.
@@ -75,11 +82,23 @@ export class PostgresInviteService {
           set: { role: input.membership },
         });
 
+      // An explicit invite outranks a past removal: clear the auto-join
+      // tombstone (migration 0043) so re-inviting someone who was removed
+      // sticks, and so their next `leave` starts from a clean slate.
+      await tx
+        .delete(workspaceAutojoinBlocks)
+        .where(
+          and(
+            eq(workspaceAutojoinBlocks.workspace, input.workspaceHandle),
+            eq(workspaceAutojoinBlocks.uid, uid),
+          ),
+        );
+
       for (const role of input.roles ?? []) {
         await tx
           .insert(userRoles)
-          .values({ uid, role })
-          .onConflictDoNothing({ target: [userRoles.uid, userRoles.role] });
+          .values({ uid, role, namespace: input.workspaceHandle, workflowName: null })
+          .onConflictDoNothing();
       }
 
       return { uid, isExisting };

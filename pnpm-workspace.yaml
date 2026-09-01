@@ -2,6 +2,7 @@ packages:
   - 'packages/*'
   - 'apps/*'
   - 'apps/examples/*'
+  - 'website'
 
 # Several transitive packages declare peers we intentionally resolve differently.
 strictPeerDependencies: false

@@ -12,9 +12,9 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #FFFFFF; --bg-2: #F8F9FA; --bg-3: #F1F3F5;
-      --accent: #0D9488;
-      --accent-dim: rgba(13,148,136,0.06);
-      --accent-border: rgba(13,148,136,0.18);
+      --accent: hsl(161 94% 30%);
+      --accent-dim: hsl(161 94% 30% / 0.06);
+      --accent-border: hsl(161 94% 30% / 0.18);
 
       --purple: #7C3AED;
       --purple-dim: rgba(124,58,237,0.06);
@@ -33,7 +33,7 @@
     }
     html { scroll-behavior: smooth; }
     body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; -webkit-font-smoothing: antialiased; }
-    ::selection { background: rgba(13,148,136,0.15); }
+    ::selection { background: hsl(161 94% 30% / 0.15); }
     a { color: var(--accent); text-decoration: none; }
     .w { max-width: 780px; margin: 0 auto; padding: 0 32px; }
 

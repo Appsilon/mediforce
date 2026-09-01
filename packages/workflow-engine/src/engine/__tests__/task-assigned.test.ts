@@ -5,52 +5,30 @@ import {
   InMemoryAuditRepository,
   InMemoryHumanTaskRepository,
   NoopNotificationService,
+  InMemoryUserDirectoryService,
 } from '@mediforce/platform-core';
-import type {
-  WorkflowDefinition,
-  UserDirectoryService,
-  DirectoryUser,
-} from '@mediforce/platform-core';
+import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { WorkflowEngine } from '../workflow-engine';
 import type { StepActor } from '../../index';
 
-class InMemoryUserDirectoryService implements UserDirectoryService {
-  private users: Array<{ role: string; uid: string; email: string }> = [];
+const WORKFLOW_NAMESPACE = 'test';
 
-  addUser(role: string, uid: string, email: string): void {
-    this.users.push({ role, uid, email });
+/**
+ * The shared in-memory directory (`@mediforce/platform-core/testing`), seeded
+ * for one workspace. Every grant is workspace-wide (`workflowName: null`), so
+ * these notification tests keep asserting what they always asserted: role
+ * membership decides who is emailed. Scoping a grant to one workflow is
+ * covered where it belongs — the directory's own parity contract.
+ */
+function directoryWith(
+  ...grants: ReadonlyArray<readonly [role: string, uid: string, email: string]>
+): InMemoryUserDirectoryService {
+  const directory = new InMemoryUserDirectoryService();
+  for (const [role, uid, email] of grants) {
+    directory.addUser({ uid, email });
+    directory.addRole(uid, WORKFLOW_NAMESPACE, role);
   }
-
-  async getUsersByRole(role: string): Promise<DirectoryUser[]> {
-    return this.users
-      .filter((u) => u.role === role)
-      .map((u) => ({ uid: u.uid, email: u.email }));
-  }
-
-  async resolveUser(identifier: string): Promise<DirectoryUser | null> {
-    const match = this.users.find(
-      (u) => u.uid === identifier || u.email === identifier,
-    );
-    return match ? { uid: match.uid, email: match.email } : null;
-  }
-
-  async getUserMetadata(
-    uid: string,
-  ): Promise<{
-    email: string | null;
-    displayName: string | null;
-    lastSignInTime: string | null;
-    photoURL: string | null;
-  } | null> {
-    const match = this.users.find((u) => u.uid === uid);
-    if (!match) return null;
-    return {
-      email: match.email,
-      displayName: null,
-      lastSignInTime: null,
-      photoURL: null,
-    };
-  }
+  return directory;
 }
 
 const humanProcessDef: WorkflowDefinition = {
@@ -96,8 +74,7 @@ describe('WorkflowEngine — task_assigned notification dispatch', () => {
   });
 
   it('dispatches task_assigned notification to resolved role members when a human task is created', async () => {
-    const userDirectoryService = new InMemoryUserDirectoryService();
-    userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
+    const userDirectoryService = directoryWith(['reviewer', 'uid-r1', 'reviewer@example.com']);
 
     const engine = new WorkflowEngine(
       processRepo,
@@ -152,10 +129,8 @@ describe('WorkflowEngine — task_assigned notification dispatch', () => {
     };
     await processRepo.saveWorkflowDefinition(assignedProcessDef);
 
-    const userDirectoryService = new InMemoryUserDirectoryService();
-    userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
     // Assignee is NOT a member of the 'reviewer' role.
-    userDirectoryService.addUser('operator', 'uid-a1', 'assignee@example.com');
+    const userDirectoryService = directoryWith(['reviewer', 'uid-r1', 'reviewer@example.com'], ['operator', 'uid-a1', 'assignee@example.com']);
 
     const engine = new WorkflowEngine(
       processRepo,
@@ -200,8 +175,7 @@ describe('WorkflowEngine — task_assigned notification dispatch', () => {
     };
     await processRepo.saveWorkflowDefinition(emptyRolesDef);
 
-    const userDirectoryService = new InMemoryUserDirectoryService();
-    userDirectoryService.addUser('creator', 'user-1', 'creator@example.com');
+    const userDirectoryService = directoryWith(['creator', 'user-1', 'creator@example.com']);
 
     const engine = new WorkflowEngine(
       processRepo,
@@ -234,8 +208,7 @@ describe('WorkflowEngine — task_assigned notification dispatch', () => {
   });
 
   it('does not dispatch task_assigned when the workflow declares no such notification', async () => {
-    const userDirectoryService = new InMemoryUserDirectoryService();
-    userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
+    const userDirectoryService = directoryWith(['reviewer', 'uid-r1', 'reviewer@example.com']);
 
     const noNotifDef: WorkflowDefinition = {
       ...humanProcessDef,
@@ -306,9 +279,7 @@ describe('WorkflowEngine — task_assigned notification dispatch', () => {
   // value (uid or email), resolved to an email here.
   describe('dispatchTaskAssignedNotification (shared with auto-runner)', () => {
     it('notifies role members and the assignee for an already-current human step', async () => {
-      const userDirectoryService = new InMemoryUserDirectoryService();
-      userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
-      userDirectoryService.addUser('operator', 'uid-a1', 'assignee@example.com');
+      const userDirectoryService = directoryWith(['reviewer', 'uid-r1', 'reviewer@example.com'], ['operator', 'uid-a1', 'assignee@example.com']);
 
       const engine = new WorkflowEngine(
         processRepo,
@@ -345,8 +316,7 @@ describe('WorkflowEngine — task_assigned notification dispatch', () => {
     });
 
     it('is a no-op when the workflow declares no task_assigned notification', async () => {
-      const userDirectoryService = new InMemoryUserDirectoryService();
-      userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
+      const userDirectoryService = directoryWith(['reviewer', 'uid-r1', 'reviewer@example.com']);
 
       const engine = new WorkflowEngine(
         processRepo,

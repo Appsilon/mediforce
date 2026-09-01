@@ -1,7 +1,7 @@
 #!/usr/bin/env npx tsx
 /**
  * One-time keep-uid seed: Firebase Auth users -> Postgres `auth_users`
- * (verified email) + global `user_roles` (ADR-0002 §4, §7).
+ * (verified email) + `user_roles` (ADR-0002 §4, §7).
  *
  * ADR-0002 §7 keeps the Firebase uid as `auth_users.id` (text), so this is a
  * SEED, not a remap — no uid column anywhere is rewritten. For each Firebase
@@ -10,10 +10,15 @@
  *      email_verified=now())`. `email_verified` is what lets the first Google
  *      sign-in LINK by verified email onto the pre-existing uid (§4b) instead
  *      of minting a new one — the whole point of keeping the uid.
- *   - one `user_roles(uid, role)` row per `customClaims.roles` entry (global,
- *      §5) so `getUsersByRole` escalation targeting keeps working. Uses the
- *      SAME pure mapping (`buildUserRolesSeed`) the L2 tests pin against the
- *      Firebase filter.
+ *   - one `user_roles` row per `customClaims.roles` entry, using the SAME pure
+ *      mapping (`buildUserRolesSeed`) the L2 tests pin against the Firebase
+ *      filter. A Firebase custom claim carries no workspace, so each role is
+ *      fanned across the workspaces that user already belongs to and left
+ *      unnarrowed (`workflow_name` NULL) — the same rule migration `0042`
+ *      applies to rows seeded before it (ADR-0019, which supersedes the global
+ *      table §5 chose). A user in no workspace gets no roles: a role that
+ *      reaches no workspace authorises nothing and would only leak
+ *      notifications.
  *
  * Input is a Firebase CLI export file, NOT the Admin SDK — the NextAuth cutover
  * removed all Firebase Admin wiring from the codebase. The operator produces the
@@ -36,6 +41,9 @@
  * PR1-seeded row without it is upgraded); `user_roles` uses ON CONFLICT DO
  * NOTHING. Safe to re-run.
  *
+ * Historical — the staging cutover ran this and is done. Do not run it against
+ * a new deployment (`docs/start/development.md`).
+ *
  * Usage:
  *   npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts users.json
  *   npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts users.json --apply
@@ -49,6 +57,7 @@ import type { FirebaseUserExport } from '../../packages/platform-infra/src/auth/
 import { getSharedPostgresClient } from '../../packages/platform-infra/src/postgres/client';
 import { authUsers } from '../../packages/platform-infra/src/postgres/schema/auth-user';
 import { userRoles } from '../../packages/platform-infra/src/postgres/schema/user-role';
+import { workspaceMembers } from '../../packages/platform-infra/src/postgres/schema/workspace';
 
 /**
  * Shape of `firebase auth:export`. Only the fields the seed needs are pinned;
@@ -159,10 +168,28 @@ async function main(): Promise<void> {
       .onConflictDoUpdate({ target: authUsers.id, set: { emailVerified: now } });
   }
   if (seed.userRoles.length > 0) {
-    await db
-      .insert(userRoles)
-      .values([...seed.userRoles])
-      .onConflictDoNothing({ target: [userRoles.uid, userRoles.role] });
+    // ADR-0019: a role is held within a workspace, so a claim with no workspace
+    // has to be fanned across the ones its holder is in before it can be
+    // written at all.
+    const memberships = await db
+      .select({ uid: workspaceMembers.uid, workspace: workspaceMembers.workspace })
+      .from(workspaceMembers);
+    const workspacesByUid = new Map<string, string[]>();
+    for (const row of memberships) {
+      workspacesByUid.set(row.uid, [...(workspacesByUid.get(row.uid) ?? []), row.workspace]);
+    }
+    const scoped = seed.userRoles.flatMap((row) =>
+      (workspacesByUid.get(row.uid) ?? []).map((workspace) => ({
+        uid: row.uid,
+        role: row.role,
+        namespace: workspace,
+        workflowName: null,
+      })),
+    );
+    console.log(`user_roles rows after workspace fan-out: ${scoped.length}`);
+    if (scoped.length > 0) {
+      await db.insert(userRoles).values(scoped).onConflictDoNothing();
+    }
   }
   console.log('\nApplied. Re-running is a no-op (ON CONFLICT DO NOTHING).');
 }

@@ -34,6 +34,16 @@ export async function transferWorkflowNamespace(
     input.targetNamespace,
   );
 
+  // ADR-0019: grants narrowed to `(sourceNamespace, name)` do not follow the
+  // workflow. Copying them would hand a role to people who are not members of
+  // the target workspace — the leak the ADR rejects — and leaving them puts
+  // the source name back in circulation with live permissions attached to it:
+  // whoever registers that name next silently inherits reviewers nobody
+  // granted. Same reasoning as `deleteWorkflow`, same call. Workspace-wide
+  // grants in the source (`workflowName: null`) are untouched — they were
+  // never about this workflow.
+  await scope.system.userDirectory?.clearRolesForWorkflow(input.sourceNamespace, input.name);
+
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,

@@ -1157,7 +1157,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       parts.push(this.context.workflowDefinition.preamble);
     }
 
-    // 0b. Agent identity + skills from AgentDefinition (resolved by platform-ui)
+    // 0b. Agent identity (systemPrompt) from AgentDefinition (resolved by platform-ui)
     if (isWorkflowAgentContext(this.context) && this.context.agentIdentityPrompt) {
       parts.push(this.context.agentIdentityPrompt);
     }

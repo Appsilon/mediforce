@@ -131,6 +131,7 @@ import {
   SynthesizeVoiceArtifactInputSchema,
   SynthesizeVoiceArtifactOutputSchema,
   ListPluginsOutputSchema,
+  GetCapabilitiesOutputSchema,
   ClaimTaskInputSchema,
   ClaimTaskOutputSchema,
   RecordTaskViewedInputSchema,
@@ -209,6 +210,9 @@ import {
   UpdateNamespaceMemberRoleInputSchema,
   UpdateNamespaceMemberRoleBodySchema,
   UpdateNamespaceMemberRoleOutputSchema,
+  SetNamespaceMemberRolesInputSchema,
+  SetNamespaceMemberRolesBodySchema,
+  SetNamespaceMemberRolesOutputSchema,
   type ListNamespaceMembersInput,
   type ListNamespaceMembersOutput,
   type InviteUserInput,
@@ -237,6 +241,8 @@ import {
   type RemoveNamespaceMemberOutput,
   type UpdateNamespaceMemberRoleInput,
   type UpdateNamespaceMemberRoleOutput,
+  type SetNamespaceMemberRolesInput,
+  type SetNamespaceMemberRolesOutput,
   DeleteDockerImageInputSchema,
   DeleteDockerImageOutputSchema,
   type DeleteDockerImageInput,
@@ -425,6 +431,7 @@ import {
   type SynthesizeVoiceArtifactInput,
   type SynthesizeVoiceArtifactOutput,
   type ListPluginsOutput,
+  type GetCapabilitiesOutput,
   ListAgentRunsInputSchema,
   ListAgentRunsOutputSchema,
   GetAgentRunInputSchema,
@@ -597,6 +604,10 @@ export class Mediforce {
     ) => Promise<SynthesizeVoiceArtifactOutput>;
   };
 
+  readonly capabilities: {
+    /** What this deployment can actually run, derived server-side. */
+    get(): Promise<GetCapabilitiesOutput>;
+  };
   readonly plugins: {
     list: () => Promise<ListPluginsOutput>;
   };
@@ -756,6 +767,7 @@ export class Mediforce {
     leave: (input: LeaveNamespaceInput) => Promise<LeaveNamespaceOutput>;
     removeMember: (input: RemoveNamespaceMemberInput) => Promise<RemoveNamespaceMemberOutput>;
     updateMemberRole: (input: UpdateNamespaceMemberRoleInput) => Promise<UpdateNamespaceMemberRoleOutput>;
+    setMemberRoles: (input: SetNamespaceMemberRolesInput) => Promise<SetNamespaceMemberRolesOutput>;
   };
 
   readonly agentRuns: {
@@ -1034,6 +1046,14 @@ export class Mediforce {
           SynthesizeVoiceArtifactOutputSchema,
           'mediforce.cowork.voiceSynthesize',
         );
+      },
+    };
+
+    this.capabilities = {
+      get: async () => {
+        const res = await this.request('/api/capabilities');
+        const body = await parseJsonOrThrow(res, 'mediforce.capabilities.get');
+        return GetCapabilitiesOutputSchema.parse(body);
       },
     };
 
@@ -2087,6 +2107,17 @@ export class Mediforce {
           body,
           UpdateNamespaceMemberRoleOutputSchema,
           'mediforce.namespaces.updateMemberRole',
+        );
+      },
+      setMemberRoles: async (input) => {
+        const validated = SetNamespaceMemberRolesInputSchema.parse(input);
+        const body = SetNamespaceMemberRolesBodySchema.parse(validated);
+        return this.sendJson(
+          'PUT',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}/members/${encodeURIComponent(validated.uid)}/roles`,
+          body,
+          SetNamespaceMemberRolesOutputSchema,
+          'mediforce.namespaces.setMemberRoles',
         );
       },
     };

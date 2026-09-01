@@ -1,4 +1,4 @@
-import { and, eq, gt, ne } from 'drizzle-orm';
+import { and, eq, gt, isNull, ne } from 'drizzle-orm';
 import type { Database } from '../postgres/client';
 import { authSessions } from '../postgres/schema/auth-session';
 import { authUsers } from '../postgres/schema/auth-user';
@@ -41,13 +41,52 @@ export async function resolveSessionUserId(
 }
 
 /**
- * Global process-domain roles for a user (`user_roles`, PLAN-0002 §1.4). Feeds
- * the NextAuth `session` callback so the browser's `useViewerIdentity` reads
- * `session.user.roles` instead of the old Firebase custom claim.
+ * Every process-domain role the user holds, across every workspace, flattened
+ * and de-duplicated. Feeds the NextAuth `session` callback, which runs on each
+ * session read with no route params — so it has no workspace to scope itself
+ * to (ADR-0019 fact 4).
+ *
+ * The flat array is therefore a **union**, and `useViewerIdentity`'s `roles[0]`
+ * pivot is deciding what people see off a value with no workspace context. The
+ * shape has to change — a `handle → roles` map on the session, or roles read
+ * per workspace and dropped from the session entirely. That decision belongs
+ * to the inbox that consumes it: #1251. Server-side authorization does not use
+ * this function; it reads `CallerIdentity.namespaceProcessRoles`, which is
+ * scoped.
  */
 export async function getUserRoles(db: Database, uid: string): Promise<string[]> {
-  const rows = await db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.uid, uid));
+  const rows = await db
+    .selectDistinct({ role: userRoles.role })
+    .from(userRoles)
+    .where(eq(userRoles.uid, uid));
   return rows.map((r) => r.role);
+}
+
+/**
+ * The user's workspace-wide process roles, grouped by workspace (ADR-0019).
+ * Resolved once per request into `CallerIdentity.namespaceProcessRoles` so the
+ * role gate costs no second round-trip.
+ *
+ * Grants narrowed to a single workflow are deliberately excluded: this map has
+ * nowhere to put the workflow, and a narrowed role flattened into it would
+ * answer for every workflow in the workspace. The gate resolves those with the
+ * workflow in hand.
+ */
+export async function getWorkspaceProcessRoles(
+  db: Database,
+  uid: string,
+): Promise<Map<string, Set<string>>> {
+  const rows = await db
+    .selectDistinct({ namespace: userRoles.namespace, role: userRoles.role })
+    .from(userRoles)
+    .where(and(eq(userRoles.uid, uid), isNull(userRoles.workflowName)));
+  const byNamespace = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const roles = byNamespace.get(row.namespace) ?? new Set<string>();
+    roles.add(row.role);
+    byNamespace.set(row.namespace, roles);
+  }
+  return byNamespace;
 }
 
 /**

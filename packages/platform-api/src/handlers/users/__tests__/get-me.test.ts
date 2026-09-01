@@ -1,20 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { UserDirectoryService } from '@mediforce/platform-core';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
-import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
+import { InMemoryNamespaceRepo, createTestScope, stubUserDirectory, userCaller } from '../../../testing/index';
 import { getMe } from '../get-me';
 import { ForbiddenError, ValidationError } from '../../../errors';
 
 function directoryWith(uid: string, metadata: { email: string | null; displayName: string | null }): UserDirectoryService {
-  return {
-    async getUsersByRole() {
-      return [];
-    },
+  return stubUserDirectory({
     async getUserMetadata(requested: string) {
       if (requested !== uid) return null;
       return { ...metadata, lastSignInTime: null, photoURL: null };
     },
-  };
+  });
 }
 
 describe('getMe handler', () => {

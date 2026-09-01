@@ -42,7 +42,7 @@ const COLORS = {
   label: { forward: '#64748b', back: '#b45309' },
 } as const;
 
-const STEP_STYLES: Record<string, { bg: string; border: string; activeBorder: string; activeRing: string }> = {
+export const STEP_STYLES: Record<string, { bg: string; border: string; activeBorder: string; activeRing: string }> = {
   creation: {
     bg: 'bg-white dark:bg-slate-900',
     border: 'border-blue-200 dark:border-blue-800',
@@ -69,7 +69,7 @@ const STEP_STYLES: Record<string, { bg: string; border: string; activeBorder: st
   },
 };
 
-const STEP_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
+export const STEP_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
   creation: { label: 'Creation', color: 'text-blue-500 dark:text-blue-400' },
   review:   { label: 'Review',   color: 'text-amber-500 dark:text-amber-400' },
   decision: { label: 'Decision', color: 'text-purple-500 dark:text-purple-400' },
@@ -80,7 +80,7 @@ const STEP_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
 // Custom nodes
 // ---------------------------------------------------------------------------
 
-function ExecutorIcon({ executor, autonomyLevel }: { executor: string; autonomyLevel?: string }) {
+export function ExecutorIcon({ executor, autonomyLevel }: { executor: string; autonomyLevel?: string }) {
   const mode = getControlMode(executor, autonomyLevel);
   if (executor === 'script') return <Terminal className="h-3.5 w-3.5 shrink-0 text-yellow-500 dark:text-yellow-400" />;
   if (executor === 'action') return <Zap className="h-3.5 w-3.5 shrink-0 text-pink-500 dark:text-pink-400" />;
@@ -106,7 +106,7 @@ function ExecutorIcon({ executor, autonomyLevel }: { executor: string; autonomyL
   return <User className="h-3.5 w-3.5 shrink-0 text-orange-500 dark:text-orange-400" />;
 }
 
-function getExecutorLabel(executor: string, mode: ControlMode): string {
+export function getExecutorLabel(executor: string, mode: ControlMode): string {
   if (executor === 'human') return 'Human';
   if (executor === 'script') return 'Script';
   if (executor === 'action') return 'Action';

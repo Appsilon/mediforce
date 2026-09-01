@@ -114,6 +114,12 @@ services:
       # provider (ADR-0002 §4a). With Google on, this is what stops any Google
       # account on earth signing in.
       - ALLOWED_EMAIL_DOMAINS=${ALLOWED_EMAIL_DOMAINS:-}
+      # Domain -> workspace auto-join, as `domain:handle` pairs, e.g.
+      # `appsilon.com:appsilon`. Everyone signing in at a listed domain becomes
+      # a `member` of the mapped workspace on their next page load. Distinct
+      # from ALLOWED_EMAIL_DOMAINS above: that one gates who may sign in, this
+      # one gates where they land. Unset = nobody is auto-joined.
+      - AUTO_JOIN_WORKSPACES=${AUTO_JOIN_WORKSPACES:-}
       - ENABLE_PASSWORD_AUTH=${ENABLE_PASSWORD_AUTH:-}
       - ENABLE_MAGIC_LINK=${ENABLE_MAGIC_LINK:-}
       # Customer SSO — dormant until OIDC_ISSUER is set.
@@ -139,6 +145,11 @@ services:
       # directory must exist before first launch:
       #   sudo mkdir -p /var/lib/mediforce
       - MEDIFORCE_DATA_DIR=/var/lib/mediforce
+      # Task-attachment ceiling (ADR-0003 §4). Read by platform-api's upload
+      # handler, which runs inside this service; unset means the 100 MiB
+      # default, and a larger value is clamped back down to it. Without this
+      # line the knob is settable in `.env` and never reaches the process.
+      - MEDIFORCE_ATTACHMENT_MAX_BYTES=${MEDIFORCE_ATTACHMENT_MAX_BYTES:-}
       # Boot refuses to start without an email provider unless this is true.
       - MEDIFORCE_DISABLE_EMAIL=${MEDIFORCE_DISABLE_EMAIL:-}
       - EMAIL_PROVIDER=${EMAIL_PROVIDER:-}

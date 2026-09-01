@@ -4,6 +4,7 @@ import {
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
   InMemoryTriggerRepository,
+  InMemoryUserDirectoryService,
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
@@ -18,6 +19,7 @@ describe('transferWorkflowNamespace handler', () => {
   let processRepo: InMemoryProcessRepository;
   let auditRepo: InMemoryAuditRepository;
   let triggerRepo: InMemoryTriggerRepository;
+  let directory: InMemoryUserDirectoryService;
 
   beforeEach(() => {
     resetFactorySequence();
@@ -25,6 +27,7 @@ describe('transferWorkflowNamespace handler', () => {
     const instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository(instanceRepo);
     triggerRepo = new InMemoryTriggerRepository();
+    directory = new InMemoryUserDirectoryService();
   });
 
   function buildScope(namespaces = ['team-alpha']) {
@@ -32,6 +35,7 @@ describe('transferWorkflowNamespace handler', () => {
       processRepo,
       auditRepo,
       triggerRepo,
+      userDirectory: directory,
       caller: userCaller('user-42', namespaces),
     });
   }
@@ -93,6 +97,30 @@ describe('transferWorkflowNamespace handler', () => {
     // Enabled state and fire cursor survive the move so the schedule is intact.
     expect(moved[0].enabled).toBe(true);
     expect(moved[0].type === 'cron' && moved[0].lastTriggeredAt).toBe('2026-07-01T03:00:00.000Z');
+  });
+
+  it('transferWorkflowNamespace drops role grants narrowed to the workflow it moves out', async () => {
+    // ADR-0019: the source name is free again after the move. A grant left
+    // pointing at it is invisible until someone registers that name, and then
+    // hands them a reviewer nobody granted. Grants do not follow the workflow
+    // either — the holders need not be members of the target workspace.
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'flow-move', version: 1, namespace: 'team-alpha' }),
+    );
+    directory.addUser({ uid: 'user-7', email: 'seven@x.test' });
+    directory.addRole('user-7', 'team-alpha', 'approver', 'flow-move');
+    directory.addRole('user-7', 'team-alpha', 'reviewer', null);
+    const scope = buildScope(['team-alpha', 'team-beta']);
+
+    await transferWorkflowNamespace(
+      { name: 'flow-move', sourceNamespace: 'team-alpha', targetNamespace: 'team-beta' },
+      scope,
+    );
+
+    // The narrowed grant is gone; the workspace-wide one was never about this
+    // workflow and stays. Nothing was created in the target.
+    expect(await directory.getRolesForUser('user-7', 'team-alpha')).toEqual(['reviewer']);
+    expect(await directory.getRolesForUser('user-7', 'team-beta')).toEqual([]);
   });
 
   it('transferWorkflowNamespace rejects when caller lacks membership on the source namespace', async () => {

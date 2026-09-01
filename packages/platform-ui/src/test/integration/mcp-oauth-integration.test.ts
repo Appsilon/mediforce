@@ -95,6 +95,10 @@ vi.mock('@/lib/platform-services', () => ({
 vi.mock('@mediforce/platform-infra', () => ({
   getSharedPostgresClient: () => ({ db: {} }),
   resolveSessionUserId: (...args: unknown[]) => mockResolveSessionUserId(...args),
+  // `resolveCallerIdentity` resolves the caller's process roles alongside
+  // their memberships (ADR-0019). No route under test reads them, so an
+  // empty map is the honest stub.
+  getWorkspaceProcessRoles: async () => new Map(),
 }));
 
 // Route handlers imported AFTER vi.mock declarations so they resolve the

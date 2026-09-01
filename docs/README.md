@@ -14,10 +14,16 @@ New here: [`../GETTING-STARTED.md`](../GETTING-STARTED.md), then
 [`start/dev-quickref.md`](start/dev-quickref.md).
 
 > This folder also serves the public website at **mediforce.ai**: the `.html`
-> files and `nav.js` at this level, plus `CNAME`, `setup/`, `case-studies/`,
-> `preview/`, `images/`, `features/` and the loose images. Those back live URLs
-> and never move. GitHub Pages serves `index.html`; GitHub renders this README
-> when you browse the folder. Everything below is engineering documentation.
+> files, `nav.js` and `theme.css` at this level, plus `CNAME`, `setup/`,
+> `case-studies/`, `preview/`, `images/`, `features/` and the loose images. Those
+> back live URLs and never move. GitHub Pages serves `index.html`; GitHub renders
+> this README when you browse the folder. Everything below is engineering
+> documentation.
+>
+> `theme.css` holds the shared palette, copied from the app's `globals.css`, and
+> every page links it **after** its own `<style>` so it wins the cascade. A page
+> that needs to opt out of the dotted ground adds a third `<style>` after that
+> link — see `fda-principles.html`.
 
 ## Routing table
 
@@ -53,6 +59,7 @@ Every engineering doc, what it is for, and how far to trust it.
 | Read the cowork streaming exploration | [`research/cowork-streaming.md`](research/cowork-streaming.md) | engineers | draft |
 | Read the Layer 2 score exploration | [`research/layer2-scores-research.md`](research/layer2-scores-research.md) | engineers | draft |
 | Cite finished work | [`archive/`](archive/) | engineers | historical |
+| Change the product docs site | [`../website/README.md`](../website/README.md) | everyone | living |
 
 **`archive/` is not guidance.** Executed ADR implementation plans
 (`PLAN-NNNN`), the staging-cutover runbook, the completed headless-migration
@@ -107,6 +114,12 @@ backticked `docs/`/`skills/` path that does not resolve, on invalid or missing
 frontmatter, and on an active doc missing from the table above. It checks
 structure, never whether prose is *true* — that is `AGENTS.md` rule 11 and
 `/sync-docs`.
+
+It link-checks every Markdown file in the repo, not only this folder. Under
+[`website/`](../website/README.md) it resolves targets the way Docusaurus does —
+the extension is optional, a directory means its `index.md` — because those pages
+are served, not read on GitHub. Everywhere else an extensionless link is broken,
+since GitHub does not fill the extension in.
 
 It runs in both workflows, because a link breaks from both sides: docs-only PRs
 skip [`ci.yml`](../.github/workflows/ci.yml) entirely, and a code-only PR that

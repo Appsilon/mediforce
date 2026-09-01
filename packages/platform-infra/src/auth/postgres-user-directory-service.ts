@@ -1,22 +1,23 @@
-import { eq } from 'drizzle-orm';
-import type {
-  UserDirectoryService,
-  DirectoryUser,
-  UserAuthMetadata,
+import { and, eq, isNull, or } from 'drizzle-orm';
+import {
+  MemberNotInNamespaceError,
+  type UserDirectoryService,
+  type DirectoryUser,
+  type RoleGrant,
+  type UserAuthMetadata,
 } from '@mediforce/platform-core';
 import type { Database } from '../postgres/client';
 import { authUsers } from '../postgres/schema/auth-user';
 import { userRoles } from '../postgres/schema/user-role';
+import { workspaceMembers } from '../postgres/schema/workspace';
 
 /**
- * Postgres-backed UserDirectoryService (ADR-0002 §5, PLAN-0002 §3.1).
- * Replaces FirebaseUserDirectoryService behind the same port — no consumer
- * (`workflow-engine` escalation, `caller-scope`) changes.
+ * Postgres-backed UserDirectoryService (ADR-0002 §5, ADR-0019).
  *
- * `getUsersByRole` reads the GLOBAL `user_roles` table (no namespace scope),
- * matching today's Firebase `customClaims.roles` semantics — an empty table
- * silently stops escalation notifications, so the one-time seed
- * (`seed-user-roles`) MUST run when this goes live.
+ * Role reads are workspace-scoped: a grant lives in one workspace and, when
+ * `workflow_name` is set, in one workflow of it. Every role query therefore
+ * carries both dimensions — resolving a role without the workflow would let a
+ * grant scoped to workflow A answer for workflow B.
  *
  * `getUserMetadata.lastSignInTime` reads `auth_users.last_sign_in_at`, stamped
  * by `recordSignIn` on every sign-in. Migrated users show `null` until they
@@ -27,13 +28,98 @@ import { userRoles } from '../postgres/schema/user-role';
 export class PostgresUserDirectoryService implements UserDirectoryService {
   constructor(private readonly db: Database) {}
 
-  async getUsersByRole(role: string): Promise<DirectoryUser[]> {
+  async getUsersByRoleInNamespace(
+    role: string,
+    namespace: string,
+    workflowName: string,
+  ): Promise<DirectoryUser[]> {
     const rows = await this.db
-      .select({ uid: authUsers.id, email: authUsers.email, name: authUsers.name })
+      .selectDistinct({ uid: authUsers.id, email: authUsers.email, name: authUsers.name })
       .from(userRoles)
       .innerJoin(authUsers, eq(userRoles.uid, authUsers.id))
-      .where(eq(userRoles.role, role));
+      .where(
+        and(
+          eq(userRoles.role, role),
+          eq(userRoles.namespace, namespace),
+          or(isNull(userRoles.workflowName), eq(userRoles.workflowName, workflowName)),
+        ),
+      );
     return rows.map(toDirectoryUser);
+  }
+
+  async getRolesForUser(
+    uid: string,
+    namespace: string,
+    workflowName?: string,
+  ): Promise<string[]> {
+    const scope =
+      workflowName === undefined
+        ? undefined
+        : or(isNull(userRoles.workflowName), eq(userRoles.workflowName, workflowName));
+    const rows = await this.db
+      .selectDistinct({ role: userRoles.role })
+      .from(userRoles)
+      .where(and(eq(userRoles.uid, uid), eq(userRoles.namespace, namespace), scope));
+    return rows.map((row) => row.role);
+  }
+
+  /**
+   * Full replace in one transaction: a reader between the delete and the
+   * insert would otherwise see the member holding no roles at all, which is
+   * exactly the window an enforcement check would fail closed in.
+   *
+   * The transaction opens by taking the member's `workspace_members` row
+   * `FOR UPDATE`, which buys both halves of the contract at once:
+   *
+   * - **Serialization.** READ COMMITTED does not give full replace its
+   *     meaning on its own — each statement takes a fresh snapshot, so two
+   *     concurrent replaces each delete the rows they saw and then insert
+   *     their own, and the table ends up holding the union. Blocking on one
+   *     row makes the second replace re-read after the first commits and
+   *     genuinely overwrite it.
+   * - **Membership.** `user_roles` has no FK to `(namespace, uid)` — a
+   *     workflow-narrowed grant is not a child of the membership row — so
+   *     nothing but this lock stops a grant being written for someone a
+   *     concurrent `removeMemberWithOrganizations` just removed. That removal
+   *     deletes this very row inside its own transaction, so the two paths
+   *     contend on it and the loser sees no row.
+   */
+  async setRolesForUser(
+    uid: string,
+    namespace: string,
+    grants: readonly RoleGrant[],
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const membership = await tx
+        .select({ uid: workspaceMembers.uid })
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspace, namespace), eq(workspaceMembers.uid, uid)))
+        .for('update');
+      if (membership.length === 0) throw new MemberNotInNamespaceError(uid, namespace);
+
+      await tx
+        .delete(userRoles)
+        .where(and(eq(userRoles.uid, uid), eq(userRoles.namespace, namespace)));
+      if (grants.length === 0) return;
+      await tx
+        .insert(userRoles)
+        .values(grants.map((grant) => ({ uid, namespace, role: grant.role, workflowName: grant.workflowName })))
+        .onConflictDoNothing();
+    });
+  }
+
+  async clearRolesForWorkflow(namespace: string, workflowName: string): Promise<void> {
+    await this.db
+      .delete(userRoles)
+      .where(and(eq(userRoles.namespace, namespace), eq(userRoles.workflowName, workflowName)));
+  }
+
+  async getRolesInNamespace(namespace: string): Promise<string[]> {
+    const rows = await this.db
+      .selectDistinct({ role: userRoles.role })
+      .from(userRoles)
+      .where(eq(userRoles.namespace, namespace));
+    return rows.map((row) => row.role);
   }
 
   async resolveUser(identifier: string): Promise<DirectoryUser | null> {

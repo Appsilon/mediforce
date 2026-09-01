@@ -76,7 +76,7 @@ appendix can capture what actually shipped vs the original decision body.
 | [0001](./0001-firestore-to-postgres.md) | Move primary datastore from Firestore to self-hosted Postgres (+ [PLAN](../archive/PLAN-0001.md)) | Accepted |
 | [0002](./0002-firebase-auth-to-nextauth.md) | Move authentication from Firebase Auth to NextAuth (Auth.js v5) (+ [PLAN](../archive/PLAN-0002.md), [RUNBOOK](../archive/RUNBOOK-0002-staging-cutover.md)) | Accepted |
 | [0003](./0003-remove-firebase-storage.md) | Remove Firebase Storage: delete uploaded-skills, task attachments to a BlobStore (+ [PLAN](../archive/PLAN-0003.md)) | Proposed |
-| [0004](./0004-scoped-data-access-authorization.md) | Authorization enforcement moves to a scoped data-access layer | Finalized |
+| [0004](./0004-scoped-data-access-authorization.md) | Authorization enforcement moves to a scoped data-access layer (§4 role-enforcement deferral taken up by proposed [0019](./0019-workspace-scoped-roles.md)) | Finalized |
 | [0005](./0005-headless-platform-api-ui-separation.md) | Headless platform: API/UI separation | Accepted |
 | [0006](./0006-client-side-server-state.md) | Client-side server-state management | Accepted |
 | [0007](./0007-llm-evaluation-observability.md) | LLM evaluation & observability: layered model, hybrid system of record | Accepted |
@@ -91,3 +91,4 @@ appendix can capture what actually shipped vs the original decision body.
 | [0016](./0016-unified-canvas-first-workflow-designer.md) | Unified canvas-first workflow designer (+ [PLAN](../archive/PLAN-0016.md)) | Proposed |
 | [0017](./0017-retire-llm-maintained-wiki.md) | Retire the LLM-maintained wiki; docs live next to what they describe (+ [PLAN](../archive/PLAN-0017.md), executed) | Accepted |
 | [0018](./0018-fan-out-is-child-workflows.md) | Fan-out over sub-graphs is child workflows; the engine stays linear | Accepted |
+| [0019](./0019-workspace-scoped-roles.md) | Process roles are workspace-scoped (would partially supersede [0002](./0002-firebase-auth-to-nextauth.md) §5) | Proposed |

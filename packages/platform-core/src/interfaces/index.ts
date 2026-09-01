@@ -16,7 +16,7 @@ export type { BlobStore } from './blob-store';
 export type { HandoffRepository } from './handoff-repository';
 export type { NotificationService, NotificationEvent, NotificationTarget } from './notification-service';
 export type { SendEmailParams, SendEmailResult, SendEmailFn, EmailProviderInfo } from './email-service';
-export type { UserDirectoryService, DirectoryUser, UserAuthMetadata } from './user-directory-service';
+export type { UserDirectoryService, DirectoryUser, UserAuthMetadata, RoleGrant } from './user-directory-service';
 export type {
   AgentRunRepository,
   ListAgentRunsOptions,

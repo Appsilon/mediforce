@@ -21,3 +21,21 @@ export class WorkflowDefinitionVersionNotFoundError extends Error {
     this.name = 'WorkflowDefinitionVersionNotFoundError';
   }
 }
+
+/**
+ * A process-domain role grant was written for someone who is not a member of
+ * the workspace (ADR-0019). Roles compose with Membership by AND, so such a
+ * grant authorises nothing today — but it survives invisibly and silently
+ * takes effect the day that person is added, which is the same failure the
+ * membership cascade exists to prevent.
+ *
+ * Thrown by `setRolesForUser` itself rather than left to the caller's
+ * pre-check: the check and the write have to be one atomic step, or a
+ * concurrent removal lands between them.
+ */
+export class MemberNotInNamespaceError extends Error {
+  constructor(uid: string, namespace: string) {
+    super(`Member '${uid}' not in namespace '${namespace}'`);
+    this.name = 'MemberNotInNamespaceError';
+  }
+}

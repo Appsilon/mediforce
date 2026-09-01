@@ -1,0 +1,93 @@
+/*
+ * mediforce.ai shared theme.
+ *
+ * Palette, radius and fonts are copied from
+ * packages/platform-ui/src/app/globals.css and tailwind.config.ts — the same
+ * source website/src/css/custom.css copies for the docs site.
+ *
+ * Every page carried its own :root before this file, under a private set of
+ * names (--bg-2, --bg-3, --bg-dark, --bg-card), which is how a stale teal, a
+ * stale mint and a stale Discord blurple each survived in a different corner.
+ * Those names are aliased below rather than renamed across seven files.
+ *
+ * Load this AFTER a page's own <style>: same specificity, later wins.
+ */
+
+:root {
+  /* --primary: 161 94% 30% in the app — the one source for action green. */
+  --accent: hsl(161 94% 30%);
+  --accent-dark: hsl(161 94% 26%);
+  --accent-darker: hsl(161 94% 20%);
+  --accent-dim: hsl(152 81% 96%);
+
+  /* The dotted page ground is its own token, not --bg: every page already used
+     --bg for white card surfaces, and --bg-dark/--bg-2/--bg-3 for the greys
+     layered on top of them. Those roles are preserved below. */
+  --ground: hsl(0 0% 98%);
+  --bg: hsl(0 0% 100%);
+  --bg-card: hsl(0 0% 100%);
+  --bg-dark: hsl(0 0% 98%);
+  --bg-2: hsl(0 0% 98%);
+  --bg-3: hsl(0 0% 96%);
+  --dot: hsl(214.3 31.8% 88%);
+
+  --border: hsl(214.3 31.8% 91.4%);
+  --border-light: hsl(214.3 31.8% 88%);
+
+  /* Slate ramp, as the app's tokens are cut from. --text-40 is a hairline
+     value; body copy needs --text-60 or darker to clear 4.5:1. */
+  --text: hsl(222.2 84% 4.9%);
+  --text-90: hsl(217.2 32.6% 17.5%);
+  --text-80: hsl(215.3 25% 26.7%);
+  --text-70: hsl(215.3 19.3% 34.5%);
+  --text-60: hsl(215.4 16.3% 46.9%);
+  --text-50: hsl(215 20.2% 65.1%);
+  --text-40: hsl(213 27% 84%);
+  --text-30: hsl(214.3 31.8% 91.4%);
+
+  /* Executor colours, matching getExecutorIcon in workflow-diagram.tsx:
+     human orange-500, script amber, autonomous agent violet-500. */
+  --human: #F97316;
+  --human-dim: rgba(249,115,22,0.1);
+  --script: #B45309;
+  --script-dim: rgba(251,191,36,0.15);
+  --agent: #8B5CF6;
+  --agent-dim: rgba(139,92,246,0.1);
+}
+
+/* gap 24 / size 1 matches <Background variant={Dots} gap={24} size={1} /> in
+   workflow-diagram.tsx. On <body> rather than tagged sections: anything with an
+   opaque background masks the dots and becomes a panel, which is the
+   alternation. */
+body {
+  background-color: var(--ground);
+  background-image: radial-gradient(circle at center, var(--dot) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.section--alt {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+/* The step-node recipe from workflow-diagram.tsx, reused by the docs site. */
+.why-item,
+.regulated-item,
+.problem-item,
+.hero-video-frame {
+  border-width: 1.5px;
+  background: var(--bg-card);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.why-item:hover,
+.regulated-item:hover,
+.problem-item:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 6px -1px hsl(222 47% 11% / 0.1), 0 2px 4px -2px hsl(222 47% 11% / 0.1);
+}

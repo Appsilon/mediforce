@@ -127,6 +127,48 @@ function contract(name: string, factory: () => Promise<NamespaceRepository>) {
       ).resolves.toBeUndefined();
     });
 
+    it('isAutoJoinBlocked is false for someone who was never removed', async () => {
+      await repo.createNamespace(nsBase());
+      await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
+      expect(await repo.isAutoJoinBlocked('appsilon', 'user-1')).toBe(false);
+    });
+
+    it('removeMemberWithOrganizations tombstones the uid against auto-join', async () => {
+      await repo.createNamespace(nsBase());
+      await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
+      await repo.removeMemberWithOrganizations('appsilon', 'user-1');
+      expect(await repo.isAutoJoinBlocked('appsilon', 'user-1')).toBe(true);
+    });
+
+    it('the tombstone is per workspace and per uid', async () => {
+      await repo.createNamespace(nsBase());
+      await repo.createNamespace(nsBase({ handle: 'other' }));
+      await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
+      await repo.addMember('other', memberBase({ uid: 'user-1' }));
+      await repo.addMember('appsilon', memberBase({ uid: 'user-2' }));
+      await repo.removeMemberWithOrganizations('appsilon', 'user-1');
+
+      expect(await repo.isAutoJoinBlocked('appsilon', 'user-1')).toBe(true);
+      expect(await repo.isAutoJoinBlocked('other', 'user-1')).toBe(false);
+      expect(await repo.isAutoJoinBlocked('appsilon', 'user-2')).toBe(false);
+    });
+
+    it('addMember clears the tombstone, so an explicit re-add sticks', async () => {
+      await repo.createNamespace(nsBase());
+      await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
+      await repo.removeMemberWithOrganizations('appsilon', 'user-1');
+      await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
+      expect(await repo.isAutoJoinBlocked('appsilon', 'user-1')).toBe(false);
+    });
+
+    it('tombstoning is idempotent across repeated removals', async () => {
+      await repo.createNamespace(nsBase());
+      await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
+      await repo.removeMemberWithOrganizations('appsilon', 'user-1');
+      await repo.removeMemberWithOrganizations('appsilon', 'user-1');
+      expect(await repo.isAutoJoinBlocked('appsilon', 'user-1')).toBe(true);
+    });
+
     it('setMemberRole updates an existing member; no-op when absent', async () => {
       await repo.createNamespace(nsBase());
       await repo.addMember('appsilon', memberBase({ uid: 'user-1', role: 'member' }));
@@ -310,5 +352,42 @@ describe.skipIf(skipPg)('PostgresNamespaceRepository (parity)', () => {
     // The public agent survives (other workspaces may reference it) but loses
     // the dead handle; the private one goes with its workspace.
     expect(surviving).toEqual([{ id: 'public-agent', namespace: null }]);
+  });
+
+  // Postgres-specific: the ADR-0019 role cascade. The in-memory contract cannot
+  // see it — process roles live in `user_roles`, which no `NamespaceRepository`
+  // method reads. A grant that outlives the membership is unreachable (roles
+  // compose with Membership by AND) but not harmless: it silently reactivates
+  // if the person is ever re-added.
+  it('removeMemberWithOrganizations deletes that user’s roles in the workspace only', async () => {
+    await testClient.unsafe(
+      `TRUNCATE TABLE "${schemaName}"."user_roles", "${schemaName}"."auth_users", "${schemaName}"."workspace_members", "${schemaName}"."workspaces" CASCADE`,
+    );
+    const db = drizzle(testClient, { schema });
+    const repo = new PostgresNamespaceRepository(db);
+    await repo.createNamespace(nsBase({ handle: 'leaver-org' }));
+    await repo.createNamespace(nsBase({ handle: 'other-org' }));
+    await repo.addMember('leaver-org', memberBase({ uid: 'bob' }));
+    await repo.addMember('other-org', memberBase({ uid: 'bob' }));
+    await repo.addMember('leaver-org', memberBase({ uid: 'ann' }));
+    await testClient`INSERT INTO auth_users (id, email) VALUES ('bob', 'bob@x.com'), ('ann', 'ann@x.com')`;
+    await testClient`
+      INSERT INTO user_roles (uid, role, namespace, workflow_name) VALUES
+        ('bob', 'reviewer', 'leaver-org', NULL),
+        ('bob', 'approver', 'leaver-org', 'tealflow'),
+        ('bob', 'reviewer', 'other-org', NULL),
+        ('ann', 'reviewer', 'leaver-org', NULL)
+    `;
+
+    await repo.removeMemberWithOrganizations('leaver-org', 'bob');
+
+    const remaining = await testClient<{ uid: string; role: string; namespace: string }[]>`
+      SELECT uid, role, namespace FROM user_roles ORDER BY uid, namespace, role
+    `;
+    // Bob keeps the workspace he is still in; Ann is untouched.
+    expect(remaining).toEqual([
+      { uid: 'ann', role: 'reviewer', namespace: 'leaver-org' },
+      { uid: 'bob', role: 'reviewer', namespace: 'other-org' },
+    ]);
   });
 });

@@ -150,6 +150,9 @@ export const queryKeys = {
   modelRegistry: {
     list: () => ['model-registry'] as const,
   },
+  capabilities: {
+    get: () => ['capabilities'] as const,
+  },
   /** Workspace-wide audit trail (Monitoring → Users / Tasks tabs) —
    *  keyset-paginated, server-side filtered by action set + actor +
    *  date range. Each tab passes its own `actions` slice, so the two

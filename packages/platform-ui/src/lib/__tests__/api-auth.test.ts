@@ -3,10 +3,12 @@ import { NextResponse } from 'next/server';
 
 const mockResolveSessionUserId = vi.fn();
 const mockGetMembershipsForUser = vi.fn();
+const mockGetWorkspaceProcessRoles = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getSharedPostgresClient: () => ({ db: {} }),
   resolveSessionUserId: (...args: unknown[]) => mockResolveSessionUserId(...args),
+  getWorkspaceProcessRoles: (...args: unknown[]) => mockGetWorkspaceProcessRoles(...args),
 }));
 
 const SESSION_COOKIE = { cookie: 'authjs.session-token=session-token-abc' };
@@ -30,6 +32,9 @@ function makeRequest(headers: Record<string, string>): Request {
 describe('resolveCallerIdentity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Holding no process roles is the default state; the tests that care
+    // override it.
+    mockGetWorkspaceProcessRoles.mockResolvedValue(new Map());
     process.env.PLATFORM_API_KEY = 'test-api-key';
     delete process.env.PLATFORM_ADMIN_API_KEY;
   });
@@ -92,10 +97,55 @@ describe('resolveCallerIdentity', () => {
         ['org-b', 'admin'],
         ['org-c', 'member'],
       ]),
+      namespaceProcessRoles: new Map(),
       isSystemActor: false,
       // Carried so a password change can revoke every session except this one.
       sessionToken: 'session-token-abc',
     });
+  });
+
+  it('carries the caller’s process roles per namespace, omitting the empty ones', async () => {
+    mockResolveSessionUserId.mockResolvedValue('user-1');
+    mockGetMembershipsForUser.mockResolvedValue([
+      { handle: 'org-a', role: 'owner' },
+      { handle: 'org-b', role: 'member' },
+    ]);
+    mockGetWorkspaceProcessRoles.mockResolvedValue(
+      new Map([['org-a', new Set(['reviewer', 'approver'])]]),
+    );
+
+    const result = (await resolveCallerIdentity(
+      makeRequest(SESSION_COOKIE),
+      fakeNamespaceRepo,
+    )) as Extract<CallerIdentity, { kind: 'user' }>;
+
+    // Absent means "holds no roles there", not "unknown" — org-b is a
+    // membership with no grants, so it gets no entry rather than an empty set.
+    expect(result.namespaceProcessRoles).toEqual(
+      new Map([['org-a', new Set(['reviewer', 'approver'])]]),
+    );
+    expect(mockGetWorkspaceProcessRoles).toHaveBeenCalledWith({}, 'user-1');
+  });
+
+  it('drops process roles for a workspace the caller is no longer a member of', async () => {
+    // Roles compose with Membership by AND (ADR-0019). The removal cascade
+    // deletes these rows, so a grant surviving here is already a bug — this
+    // filter keeps it from reaching a handler if one ever does.
+    mockResolveSessionUserId.mockResolvedValue('user-1');
+    mockGetMembershipsForUser.mockResolvedValue([{ handle: 'org-a', role: 'member' }]);
+    mockGetWorkspaceProcessRoles.mockResolvedValue(
+      new Map([
+        ['org-a', new Set(['reviewer'])],
+        ['org-gone', new Set(['approver'])],
+      ]),
+    );
+
+    const result = (await resolveCallerIdentity(
+      makeRequest(SESSION_COOKIE),
+      fakeNamespaceRepo,
+    )) as Extract<CallerIdentity, { kind: 'user' }>;
+
+    expect(result.namespaceProcessRoles).toEqual(new Map([['org-a', new Set(['reviewer'])]]));
   });
 
   it('rejects wrong API key and falls through to the session check', async () => {
