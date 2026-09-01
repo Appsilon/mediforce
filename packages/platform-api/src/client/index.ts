@@ -39,6 +39,10 @@ import {
   ArchiveAllOutputSchema,
   SetVisibilityInputSchema,
   SetVisibilityOutputSchema,
+  GetWorkflowAccessInputSchema,
+  GetWorkflowAccessOutputSchema,
+  SetWorkflowAccessInputSchema,
+  SetWorkflowAccessOutputSchema,
   CopyWorkflowInputSchema,
   CopyWorkflowOutputSchema,
   SetDefaultVersionInputSchema,
@@ -295,6 +299,10 @@ import {
   type ArchiveAllOutput,
   type SetVisibilityInput,
   type SetVisibilityOutput,
+  type GetWorkflowAccessInput,
+  type GetWorkflowAccessOutput,
+  type SetWorkflowAccessInput,
+  type SetWorkflowAccessOutput,
   type CopyWorkflowInput,
   type CopyWorkflowOutput,
   type CopyWorkflowOptions,
@@ -632,6 +640,9 @@ export class Mediforce {
     archiveVersion: (input: ArchiveVersionInput, options: { namespace: string }) => Promise<ArchiveVersionOutput>;
     archiveAll: (input: ArchiveAllInput, options: { namespace: string }) => Promise<ArchiveAllOutput>;
     setVisibility: (input: SetVisibilityInput, options: { namespace: string }) => Promise<SetVisibilityOutput>;
+    /** Who may run and who may edit this workflow, plus what that means for the caller (ADR-0019). */
+    getAccess: (input: GetWorkflowAccessInput) => Promise<GetWorkflowAccessOutput>;
+    setAccess: (input: SetWorkflowAccessInput) => Promise<SetWorkflowAccessOutput>;
     copy: (input: CopyWorkflowInput, options: CopyWorkflowOptions & { sourceNamespace?: string }) => Promise<CopyWorkflowOutput>;
     setDefaultVersion: (input: SetDefaultVersionInput) => Promise<SetDefaultVersionOutput>;
     delete: (input: DeleteWorkflowInput) => Promise<DeleteWorkflowOutput>;
@@ -833,6 +844,10 @@ export class Mediforce {
           stepId: validated.stepId,
           status: validated.status,
           namespace: validated.namespace,
+          // Wire format is a string; the schema accepts both so one contract
+          // serves the client and the route adapter. Only `true` is sent —
+          // `false` and omitted mean the same thing to the handler.
+          actionable: validated.actionable === true ? 'true' : undefined,
         });
         const res = await this.request(`/api/tasks${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.list');
@@ -986,6 +1001,7 @@ export class Mediforce {
         const qs = toSearchParams({
           role: validated.role,
           status: validated.status,
+          namespace: validated.namespace,
         });
         const res = await this.request(`/api/cowork${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.cowork.list');
@@ -1186,6 +1202,26 @@ export class Mediforce {
           { visibility: validated.visibility },
           SetVisibilityOutputSchema,
           'mediforce.workflows.setVisibility',
+        );
+      },
+      getAccess: async (input) => {
+        const v = GetWorkflowAccessInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace });
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(v.name)}/access${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.getAccess');
+        return GetWorkflowAccessOutputSchema.parse(body);
+      },
+      setAccess: (input) => {
+        const v = SetWorkflowAccessInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace });
+        return this.sendJson(
+          'PUT',
+          `/api/workflow-definitions/${encodeURIComponent(v.name)}/access${qs}`,
+          { access: v.access },
+          SetWorkflowAccessOutputSchema,
+          'mediforce.workflows.setAccess',
         );
       },
       setDefaultVersion: (input) => {

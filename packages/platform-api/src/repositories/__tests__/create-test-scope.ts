@@ -22,9 +22,12 @@ import {
   InMemoryUserProfileRepository,
   InMemoryTaskAttachmentRepository,
   InMemoryBlobStore,
+  buildProcessInstance,
+  buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
 import type {
   AgentRunRepository,
+  AutoJoinRule,
   BlobStore,
   EmailProviderInfo,
   HumanTaskRepository,
@@ -73,6 +76,9 @@ const stubNamespaceRepo: NamespaceRepository = {
   },
   async setMemberRole() {
     /* no-op */
+  },
+  async isAutoJoinBlocked() {
+    return false;
   },
   async deleteNamespaceCascade() {
     /* no-op */
@@ -190,6 +196,7 @@ export interface TestScopeOverrides {
   readonly inviteNotificationService?: InviteNotificationService | null;
   readonly dockerImages?: DockerImagesService | null;
   readonly namespaceRepo?: NamespaceRepository;
+  readonly autoJoinWorkspaces?: readonly AutoJoinRule[];
   readonly userProfileRepo?: UserProfileRepository;
   readonly credentialsRepo?: CredentialsRepository;
   readonly userDirectory?: UserDirectoryService | null;
@@ -253,6 +260,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     dockerImages: overrides.dockerImages ?? null,
     userDirectory: overrides.userDirectory ?? null,
     emailProviderInfo: overrides.emailProviderInfo ?? null,
+    autoJoinWorkspaces: overrides.autoJoinWorkspaces ?? [],
     passwordAuthEnabled: overrides.passwordAuthEnabled ?? true,
   };
   return createCallerScope(services, caller);
@@ -288,4 +296,30 @@ export function userCaller(
     namespaceProcessRoles: processRoles ?? new Map(),
     isSystemActor: false,
   };
+}
+
+/**
+ * A `processRepo` carrying the Workflow Definition that `buildProcessInstance()`
+ * runs are pinned to, in each of `namespaces`.
+ *
+ * Handler tests that act on a task need it. The step role gate resolves
+ * `allowedRoles` from the run's pinned definition and refuses when that cannot
+ * be read (ADR-0019), so a run built without one is a state production cannot
+ * produce and the gate is right to reject.
+ */
+export async function processRepoForFixtureRuns(
+  namespaces: readonly string[],
+): Promise<InMemoryProcessRepository> {
+  const repo = new InMemoryProcessRepository();
+  const pinned = buildProcessInstance();
+  for (const namespace of namespaces) {
+    await repo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: pinned.definitionName,
+        version: Number.parseInt(pinned.definitionVersion, 10),
+        namespace,
+      }),
+    );
+  }
+  return repo;
 }

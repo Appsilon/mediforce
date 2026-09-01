@@ -1,6 +1,7 @@
 import type { StepExecution } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
+import { loadPinnedDefinition } from '../_helpers';
 import type {
   GetProcessStepsInput,
   GetProcessStepsOutput,
@@ -24,14 +25,7 @@ export async function getProcessSteps(
     throw new NotFoundError(`Process instance ${instanceId} not found`);
   }
 
-  const versionNum = Number.parseInt(instance.definitionVersion, 10);
-  const definition = Number.isFinite(versionNum)
-    ? await scope.workflowDefinitions.get(
-        instance.namespace ?? '',
-        instance.definitionName,
-        versionNum,
-      )
-    : null;
+  const definition = await loadPinnedDefinition(scope, instance);
 
   if (definition === null) {
     throw new NotFoundError(

@@ -10,6 +10,7 @@ export interface ApiDefinitionItem {
   latestVersion: number;
   defaultVersion: number;
   manualStartEnabled?: boolean;
+  callerMayRun?: boolean;
   definition: {
     name: string;
     version: number;
@@ -45,6 +46,8 @@ export function mapApiToDefinitionGroups(
         stepCount: def.steps.length,
         // Hand-start gate reads the triggers table (Issue #930).
         hasManualTrigger: item.manualStartEnabled ?? false,
+        // Absent means "no gate", which is what an ungated workflow answers.
+        callerMayRun: item.callerMayRun ?? true,
         externalSkillsRepo: def.externalSkillsRepo,
         url: def.url,
         archived: def.archived,

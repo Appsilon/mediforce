@@ -191,6 +191,7 @@ export function ProcessCard({
               workflowName={definition.name}
               showVersionPicker
               hasManualTrigger={definition.hasManualTrigger}
+              mayRun={definition.callerMayRun}
               archived={definition.archived === true}
             />
           )}

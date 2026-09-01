@@ -1,3 +1,4 @@
+import { OPEN_WORKFLOW_ACCESS } from '@mediforce/platform-core';
 import type {
   DeleteWorkflowInput,
   DeleteWorkflowOutput,
@@ -5,6 +6,7 @@ import type {
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
+import { assertCallerMayEditWorkflow } from './_access-gate';
 
 /**
  * Soft-deletes a workflow definition and cascades the soft-delete to all
@@ -28,6 +30,14 @@ export async function deleteWorkflow(
       `Run count changed (expected ${input.expectedRunCount}, found ${actualRunCount}). Please try again.`,
     );
   }
+
+  // ADR-0019 `edit`. Deletion is the most dangerous member of the verb and was
+  // open to any member of the workspace until this landed. It runs *after* the
+  // race guard, keeping the convention that an existence-shaped answer beats a
+  // permission-shaped one: a non-member's read of the run count is 0, so they
+  // still get the same 409 they got before this gate existed rather than a 403
+  // that would tell them the workflow is there.
+  await assertCallerMayEditWorkflow(scope, input.namespace, input.name);
 
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
@@ -53,6 +63,11 @@ export async function deleteWorkflow(
   // it silently reactivates the day someone registers the name afresh.
   // Workspace-wide grants (`workflowName: null`) are untouched.
   await scope.system.userDirectory?.clearRolesForWorkflow(input.namespace, input.name);
+
+  // ADR-0019: the workflow's own access rows go the same way and for the same
+  // reason — whoever registers this name next would otherwise inherit a `run`
+  // and `edit` gate nobody configured for their workflow.
+  await scope.workflowDefinitions.setAccess(input.namespace, input.name, OPEN_WORKFLOW_ACCESS);
 
   if (actualRunCount > 0) {
     const instanceIds = await scope.runs.getIdsByDefinitionName(input.namespace, input.name);

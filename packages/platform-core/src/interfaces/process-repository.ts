@@ -1,3 +1,4 @@
+import type { WorkflowAccess } from '../schemas/workflow-access';
 import type { WorkflowDefinition } from '../schemas/workflow-definition';
 
 export interface WorkflowDefinitionGroup {
@@ -47,6 +48,30 @@ export interface ProcessRepository {
   setVersionArchived(namespace: string, name: string, version: number, archived: boolean): Promise<void>;
 
   setWorkflowVisibility(name: string, namespace: string, visibility: 'public' | 'private'): Promise<void>;
+
+  /**
+   * Who may run and who may edit `(namespace, name)` — ADR-0019's workflow
+   * level. Answers `OPEN_WORKFLOW_ACCESS` for an unconfigured or unknown name:
+   * absent access is "any workspace member", never a refusal.
+   */
+  getWorkflowAccess(namespace: string, name: string): Promise<WorkflowAccess>;
+  /**
+   * Replace both role lists in one write. Full replace, like every other role
+   * write in the epic. Access that grants nothing is stored as no row, so
+   * "open to every member" has one representation and the delete / transfer
+   * cascades are this same call.
+   */
+  setWorkflowAccess(namespace: string, name: string, access: WorkflowAccess): Promise<void>;
+  /**
+   * Every configured workflow's access across `namespaces`, keyed
+   * `"namespace:name"`. Workflows with no gate are simply absent — the map is
+   * the exception list, not the roster.
+   *
+   * One read for a whole listing. The workspace home page renders a Start
+   * button per card, and asking per card is the N+1 the `manualStartEnabled`
+   * gate above already refused to be.
+   */
+  listWorkflowAccess(namespaces: readonly string[]): Promise<Map<string, WorkflowAccess>>;
   setWorkflowDeleted(namespace: string, name: string, deleted: boolean): Promise<void>;
   isWorkflowNameDeleted(namespace: string, name: string): Promise<boolean>;
   countInstancesByDefinitionName(namespace: string, name: string): Promise<number>;

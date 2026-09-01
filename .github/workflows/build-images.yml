@@ -2,7 +2,7 @@ name: Build & Push Docker Images
 
 on:
   # main → :latest (staging tracks this). Release/tag builds are owned by
-  # deploy-production.yml (ADR-0020), so this workflow no longer fires on v*
+  # deploy-production.yml (ADR-0021), so this workflow no longer fires on v*
   # tags — a Release must not repoint :latest or double-build.
   push:
     branches: [main]
@@ -59,7 +59,7 @@ jobs:
           target: runner
           platforms: ${{ matrix.platform }}
           push: true
-          # ADR-0020 — bake the git SHA into the image so the version badge is
+          # ADR-0021 — bake the git SHA into the image so the version badge is
           # correct without any runtime injection or on-box build-arg plumbing.
           build-args: |
             NEXT_PUBLIC_GIT_SHA=${{ env.GIT_SHA_SHORT }}

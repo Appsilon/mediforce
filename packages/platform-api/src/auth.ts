@@ -1,3 +1,7 @@
+import type {
+  RoleGrant as ProcessRoleGrant,
+  UserDirectoryService,
+} from '@mediforce/platform-core';
 import { ForbiddenError } from './errors';
 
 /**
@@ -164,4 +168,230 @@ export function assertCallerIsNamespaceOwner(
   if (role !== 'owner') {
     throw new ForbiddenError();
   }
+}
+
+/**
+ * The two `UserDirectoryService` reads the process-role gate needs, narrowed to
+ * a structural port so this module keeps its no-service, no-framework promise
+ * and unit tests can fabricate one from a literal.
+ */
+export type ProcessRoleDirectory = Pick<
+  UserDirectoryService,
+  'getRolesForUser' | 'getUsersByRoleInNamespace'
+>;
+
+/**
+ * What the refusal calls the thing being refused — "This step requires
+ * 'reviewer'". Defaults to the step gate, the first and most common caller;
+ * the workflow-level verbs (#1253) name themselves instead, because a person
+ * denied the Start button is not looking at a step.
+ */
+const DEFAULT_ROLE_GATE_SUBJECT = 'This step';
+
+/**
+ * Throw `ForbiddenError` unless the caller holds one of `allowedRoles` for
+ * `workflow` in `namespace` — the process-role gate of ADR-0019, and the one
+ * predicate behind every verb the epic gates.
+ *
+ * - Absent or empty `allowedRoles` means "any workspace member", exactly as
+ *   before the gate existed. It is opt-in; unrestricted steps are untouched.
+ * - apiKey callers bypass: the engine, worker and CLI automation act as the
+ *   system, and a role is something a person holds.
+ * - There is deliberately **no owner/admin override**. An admin who needs to
+ *   act grants themselves the role first, which leaves an audit trail that a
+ *   silent bypass does not.
+ *
+ * `allowedRoles` must come from the run's pinned Workflow Definition, never
+ * from `HumanTask.assignedRole`: the engine copies only `allowedRoles[0]` into
+ * that column, so a step allowing `['reviewer', 'approver']` would enforce
+ * `reviewer` alone and silently drop the role the author also wrote.
+ *
+ * `workflow` is not decoration: a grant narrowed to workflow B must fail the
+ * gate on workflow A, and only the handler has the workflow in hand.
+ * `CallerIdentity` carries workspace-wide grants, so the common allow costs no
+ * round trip; a narrowed grant is resolved through `directory` on the path that
+ * is otherwise about to be refused. Test scopes pass no directory, and then
+ * only the workspace-wide set — already refused — is left to answer with.
+ *
+ * Per ADR-0004 §4 the wrapper layer does not consult roles; this
+ * handler-resident predicate is the only consumer.
+ */
+export async function assertCallerHoldsRole(
+  caller: CallerIdentity,
+  namespace: string,
+  workflow: string,
+  allowedRoles: readonly string[] | undefined,
+  directory: ProcessRoleDirectory | null,
+  options: { readonly subject?: string } = {},
+): Promise<void> {
+  const grant = await resolveRoleGrant(caller, namespace, workflow, allowedRoles, directory);
+  if (grant.holds) return;
+
+  throw new ForbiddenError(
+    await roleDenialMessage(
+      namespace,
+      workflow,
+      grant.required,
+      grant.held,
+      directory,
+      options.subject ?? DEFAULT_ROLE_GATE_SUBJECT,
+    ),
+    { namespace, workflow, requiredRoles: grant.required, heldRoles: grant.held },
+  );
+}
+
+/**
+ * The same predicate as `assertCallerHoldsRole`, answered rather than
+ * enforced — for the callers that are deciding what to *show* instead of
+ * whether to refuse (the actionable inbox, issue #1251).
+ *
+ * Sharing the predicate is the point: an inbox that computed "can act" its own
+ * way is how a UI ends up listing tasks the server then refuses, which is
+ * exactly the bug #1249 deleted from the run step page.
+ */
+export async function callerHoldsRole(
+  caller: CallerIdentity,
+  namespace: string,
+  workflow: string,
+  allowedRoles: readonly string[] | undefined,
+  directory: ProcessRoleDirectory | null,
+): Promise<boolean> {
+  const grant = await resolveRoleGrant(caller, namespace, workflow, allowedRoles, directory);
+  return grant.holds;
+}
+
+type RoleGrant =
+  | { readonly holds: true }
+  | { readonly holds: false; readonly required: string[]; readonly held: string[] };
+
+async function resolveRoleGrant(
+  caller: CallerIdentity,
+  namespace: string,
+  workflow: string,
+  allowedRoles: readonly string[] | undefined,
+  directory: ProcessRoleDirectory | null,
+): Promise<RoleGrant> {
+  if (allowedRoles === undefined || allowedRoles.length === 0) return { holds: true };
+  if (caller.isSystemActor) return { holds: true };
+
+  // Nothing bounds `allowedRoles` at authoring time, and any member can register
+  // a workflow, so the list a refusal walks is attacker-shaped input: deduplicate
+  // it once here and every read below counts distinct roles, not repetitions.
+  const required = [...new Set(allowedRoles)];
+
+  const workspaceWide = caller.namespaceProcessRoles.get(namespace) ?? new Set<string>();
+  if (required.some((role) => workspaceWide.has(role))) return { holds: true };
+
+  // Only a grant narrowed to this workflow can still admit, and `CallerIdentity`
+  // has nowhere to carry one — so it costs a read, taken on the path that is
+  // otherwise about to refuse. Without a directory there is nothing further to
+  // consult and the refusal above stands.
+  const narrowed = directory === null
+    ? null
+    : await directory.getRolesForUser(caller.uid, namespace, workflow);
+  if (narrowed !== null && required.some((role) => narrowed.includes(role))) {
+    return { holds: true };
+  }
+
+  return { holds: false, required, held: narrowed ?? [...workspaceWide] };
+}
+
+/**
+ * A `ProcessRoleDirectory` that reads one user's grants in a workspace **once**
+ * and answers every workflow from that one read, sharing the in-flight promise
+ * between concurrent askers.
+ *
+ * The gate reads the directory once per refusal, which is right for one claim
+ * and wrong for a list: thirty tasks parked on gated workflows, or a catalog of
+ * thirty workflows carrying the default access every new one is seeded with
+ * (ADR-0020), would otherwise be thirty reads for a caller who holds nothing
+ * workspace-wide. Keying on `(uid, namespace)` rather than on the workflow is
+ * what collapses them — `getGrantsForUser` already returns each grant with the
+ * workflow it is narrowed to, so per-workflow answers are a filter, not a
+ * query.
+ *
+ * A grant narrowed to a *different* workflow must still not admit here, which
+ * is why this filters on `workflowName` rather than reusing the unscoped
+ * `getRolesForUser(uid, namespace)` — that one is a superset and would silence
+ * the very refusal #1252 exists for.
+ *
+ * Request-scoped — build one per call, never cache across requests, or a grant
+ * made mid-session would keep being answered from before it existed.
+ */
+export function memoizeProcessRoleReads(
+  directory: UserDirectoryService | null,
+): ProcessRoleDirectory | null {
+  if (directory === null) return null;
+  const inFlight = new Map<string, Promise<ProcessRoleGrant[]>>();
+
+  const grantsFor = (uid: string, namespace: string): Promise<ProcessRoleGrant[]> => {
+    const key = JSON.stringify([uid, namespace]);
+    const cached = inFlight.get(key);
+    if (cached !== undefined) return cached;
+    const pending = directory.getGrantsForUser(uid, namespace);
+    inFlight.set(key, pending);
+    return pending;
+  };
+
+  return {
+    getRolesForUser: async (uid, namespace, workflowName) => {
+      const grants = await grantsFor(uid, namespace);
+      const reaching = grants.filter(
+        (grant) =>
+          workflowName === undefined ||
+          grant.workflowName === null ||
+          grant.workflowName === workflowName,
+      );
+      return [...new Set(reaching.map((grant) => grant.role))];
+    },
+    getUsersByRoleInNamespace: (role, namespace, workflowName) =>
+      directory.getUsersByRoleInNamespace(role, namespace, workflowName),
+  };
+}
+
+const ZERO_HOLDER_PROBE_LIMIT = 8;
+
+/**
+ * Why the caller was refused, in the words the person reading it needs.
+ *
+ * A step naming a role nobody in the workspace holds is unclaimable by
+ * everyone — correct (an approval gate that opens when unconfigured is worse
+ * than a stuck run) but useless behind a generic 403, so that case names the
+ * cause and the fix instead of the caller's own roles.
+ *
+ * Establishing that costs one directory read per required role, so a step
+ * listing more roles than `ZERO_HOLDER_PROBE_LIMIT` skips the probe and is
+ * refused with the caller's own roles instead. A hand-written step never
+ * reaches that many; a definition crafted to make one refusal fan out across
+ * the connection pool does.
+ */
+async function roleDenialMessage(
+  namespace: string,
+  workflow: string,
+  allowedRoles: readonly string[],
+  held: readonly string[],
+  directory: ProcessRoleDirectory | null,
+  subject: string,
+): Promise<string> {
+  const quoted = (roles: readonly string[]): string =>
+    roles.map((role) => `'${role}'`).join(', ');
+  const required = allowedRoles.length === 1
+    ? quoted(allowedRoles)
+    : `any of ${quoted(allowedRoles)}`;
+
+  if (directory !== null && allowedRoles.length <= ZERO_HOLDER_PROBE_LIMIT) {
+    const holders = await Promise.all(
+      allowedRoles.map((role) =>
+        directory.getUsersByRoleInNamespace(role, namespace, workflow),
+      ),
+    );
+    if (holders.every((users) => users.length === 0)) {
+      const assign = allowedRoles.length === 1 ? 'it' : 'one';
+      return `No one in this workspace holds ${required}. An admin can assign ${assign} in workspace Settings → Members.`;
+    }
+  }
+
+  return held.length === 0
+    ? `${subject} requires ${required}; you hold no roles in this workspace.`
+    : `${subject} requires ${required}; you hold ${quoted(held)}.`;
 }

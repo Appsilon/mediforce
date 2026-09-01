@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { UserDirectoryService } from '@mediforce/platform-core';
-import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
+import {
+  InMemoryAuditRepository,
+  InMemoryUserDirectoryService,
+} from '@mediforce/platform-core/testing';
 import { InMemoryNamespaceRepo, createTestScope, stubUserDirectory, userCaller } from '../../../testing/index';
 import { getMe } from '../get-me';
 import { ForbiddenError, ValidationError } from '../../../errors';
@@ -91,6 +94,56 @@ describe('getMe handler', () => {
     const events = auditRepo.getAll().filter((e) => e.action === 'user.personal_namespace_created');
     expect(events).toHaveLength(1);
     expect(events[0]?.entityId).toBe('alice');
+  });
+
+  it('grants the owner workflow-manager on the workspace it bootstraps', async () => {
+    // ADR-0020: the same grant `createNamespace` writes for an organization.
+    // A personal workspace is the one workspace nobody creates by hand, so
+    // without this its owner holds the role only where migration 0046 reached
+    // — and a workspace bootstrapped after that migration ran has no holder of
+    // the role every gated list and every restricted step names.
+    const directory = new InMemoryUserDirectoryService();
+    directory.addUser({ uid: 'uid-1', email: 'alice@example.test', displayName: 'Alice' });
+    directory.addMember('uid-1', 'alice');
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      userDirectory: directory,
+      caller: userCaller('uid-1', []),
+    });
+
+    await getMe({}, scope);
+
+    expect(await directory.getGrantsForUser('uid-1', 'alice')).toEqual([
+      { role: 'workflow-manager', workflowName: null },
+    ]);
+    const created = auditRepo.getAll().find((e) => e.action === 'user.personal_namespace_created');
+    expect(created?.outputSnapshot).toMatchObject({ ownerRoleGranted: true });
+  });
+
+  it('still returns the profile when the role grant fails, and says so in the audit trail', async () => {
+    // Every signed-in client blocks on this read before it can render, so a
+    // directory that refuses the grant must cost the role, not the session.
+    const directory = stubUserDirectory({
+      async getUserMetadata() {
+        return { email: 'alice@example.test', displayName: 'Alice', lastSignInTime: null, photoURL: null };
+      },
+      async grantRole() {
+        throw new Error('directory unavailable');
+      },
+    });
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      userDirectory: directory,
+      caller: userCaller('uid-1', []),
+    });
+
+    const result = await getMe({}, scope);
+
+    expect(result.namespaces[0]?.handle).toBe('alice');
+    const created = auditRepo.getAll().find((e) => e.action === 'user.personal_namespace_created');
+    expect(created?.outputSnapshot).toMatchObject({ ownerRoleGranted: false });
   });
 
   it('does not create or emit when personal namespace already exists', async () => {

@@ -32,6 +32,18 @@ function minutesAgo(n: number): string {
   return new Date(Date.now() - n * 60_000).toISOString();
 }
 
+// `created_at` for every seeded Workflow Definition. A run can only pin a
+// definition that already exists, so each fixture definition has to predate
+// each fixture run — the step role gate reads that ordering to tell the
+// definition a run pinned from one registered under the same name after the
+// run started, and refuses the task when the definition looks like the later
+// one (`postdatesRun`, platform-api `handlers/tasks/_role-gate.ts`).
+// One shared anchor rather than a per-definition "looks old" timestamp: those
+// had to be kept older than every run pinning them by hand, and were not.
+// The oldest fixture runs reach ~42 days back (`minutesAgo(60_000 + …)`
+// below), so this sits well beyond that.
+export const SEEDED_DEFINITION_CREATED_AT = minutesAgo(90_000);
+
 // Local-dev-only: gives the Agents-tab "Log" column something real to show
 // via the actual AgentLogViewer pipeline (an AgentEvent announcing a log
 // file path, which /api/step-logs reads from disk) instead of mocking the
@@ -1792,7 +1804,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { from: 'generate-data', to: 'summarize' },
         { from: 'summarize', to: 'done' },
       ],
-      createdAt: twoDaysAgo,
+      createdAt: SEEDED_DEFINITION_CREATED_AT,
     },
     'test:Supply Chain Review:1': {
       name: 'Supply Chain Review',
@@ -1819,7 +1831,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { from: 'human-review', to: 'manager-approval' },
         { from: 'manager-approval', to: 'archived' },
       ],
-      createdAt: twoDaysAgo,
+      createdAt: SEEDED_DEFINITION_CREATED_AT,
     },
     'test:Share by Link Test:1': {
       name: 'Share by Link Test',
@@ -1831,7 +1843,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'start', to: 'done' }],
-      createdAt: twoDaysAgo,
+      createdAt: SEEDED_DEFINITION_CREATED_AT,
     },
     'test:Data Quality Review:2': {
       name: 'Data Quality Review',
@@ -1848,7 +1860,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { from: 'verify-data-quality', to: 'review-results' },
         { from: 'review-results', to: 'done' },
       ],
-      createdAt: threeDaysAgo,
+      createdAt: SEEDED_DEFINITION_CREATED_AT,
     },
     // Backs `proc-agent-runs-page-journey` (see `processInstances` above,
     // added earlier this session for agent-runs-page.journey.ts's L3 API
@@ -1870,7 +1882,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'step-running', to: 'done' }],
-      createdAt: fourHoursAgo,
+      createdAt: SEEDED_DEFINITION_CREATED_AT,
     },
     // Backs `proc-monitoring-loadmore-agents` (see `processInstances` above)
     // — exists only so `GET /api/processes/:id/steps` (called per row by
@@ -1889,7 +1901,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'step-monitoring-loadmore', to: 'done' }],
-      createdAt: minutesAgo(50_000),
+      createdAt: SEEDED_DEFINITION_CREATED_AT,
     },
   };
 

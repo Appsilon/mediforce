@@ -19,6 +19,11 @@ export const taskListCommand = defineCommand({
     status: enumArg(['pending', 'claimed', 'completed', 'cancelled'] as const, {
       description: 'Filter by status (repeat for multiple)',
     }),
+    actionable: {
+      type: 'boolean',
+      description:
+        'Keep only tasks the caller may act on: assigned to them, or pending with a step role they hold',
+    },
   },
   async run({ args, output, mediforce, jsonMode }) {
     const role = args.role;
@@ -33,6 +38,7 @@ export const taskListCommand = defineCommand({
     const filters = {
       ...(stepId !== undefined ? { stepId } : {}),
       ...(status !== undefined ? { status } : {}),
+      ...(args.actionable === true ? { actionable: true } : {}),
     };
     const input =
       instanceId !== undefined

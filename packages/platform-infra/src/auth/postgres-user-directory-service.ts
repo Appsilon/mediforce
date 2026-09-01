@@ -63,6 +63,14 @@ export class PostgresUserDirectoryService implements UserDirectoryService {
     return rows.map((row) => row.role);
   }
 
+  async getGrantsForUser(uid: string, namespace: string): Promise<RoleGrant[]> {
+    const rows = await this.db
+      .select({ role: userRoles.role, workflowName: userRoles.workflowName })
+      .from(userRoles)
+      .where(and(eq(userRoles.uid, uid), eq(userRoles.namespace, namespace)));
+    return rows.map((row) => ({ role: row.role, workflowName: row.workflowName }));
+  }
+
   /**
    * Full replace in one transaction: a reader between the delete and the
    * insert would otherwise see the member holding no roles at all, which is
@@ -104,6 +112,22 @@ export class PostgresUserDirectoryService implements UserDirectoryService {
       await tx
         .insert(userRoles)
         .values(grants.map((grant) => ({ uid, namespace, role: grant.role, workflowName: grant.workflowName })))
+        .onConflictDoNothing();
+    });
+  }
+
+  async grantRole(uid: string, namespace: string, grant: RoleGrant): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const membership = await tx
+        .select({ uid: workspaceMembers.uid })
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspace, namespace), eq(workspaceMembers.uid, uid)))
+        .for('update');
+      if (membership.length === 0) throw new MemberNotInNamespaceError(uid, namespace);
+
+      await tx
+        .insert(userRoles)
+        .values({ uid, namespace, role: grant.role, workflowName: grant.workflowName })
         .onConflictDoNothing();
     });
   }

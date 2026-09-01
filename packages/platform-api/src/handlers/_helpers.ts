@@ -1,3 +1,4 @@
+import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { NotFoundError } from '../errors';
 import { PLATFORM_BASE_URL_SETTING_KEY, normalizeBaseUrl } from '../contract/config';
 import type { CallerScope } from '../repositories/index';
@@ -62,4 +63,26 @@ export async function resolvePersonalNamespace(
     (n) => n.type === 'personal' && n.linkedUserId === uid,
   );
   return personal?.handle ?? namespaces[0]?.handle ?? null;
+}
+
+/**
+ * The Workflow Definition version a run is pinned to, or `null` when it cannot
+ * be read — the version was deleted, or the workflow was transferred to another
+ * workspace and left the run's `namespace` pointing at the source.
+ *
+ * `parseInt` rather than `Number`: legacy runs carry versions like `'1.0.0'`,
+ * and truncating to the major is how they have always resolved. Callers decide
+ * what `null` means — a 404 for a read, a refusal for an authorization gate.
+ */
+export async function loadPinnedDefinition(
+  scope: CallerScope,
+  run: {
+    readonly namespace?: string;
+    readonly definitionName: string;
+    readonly definitionVersion: string;
+  },
+): Promise<WorkflowDefinition | null> {
+  const version = Number.parseInt(run.definitionVersion, 10);
+  if (!Number.isFinite(version)) return null;
+  return scope.workflowDefinitions.get(run.namespace ?? '', run.definitionName, version);
 }

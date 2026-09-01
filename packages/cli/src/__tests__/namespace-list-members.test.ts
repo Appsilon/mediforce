@@ -15,7 +15,10 @@ const OWNER = {
   email: 'krystian@example.com',
   lastSignInTime: '2026-08-24T10:00:00.000Z',
   joinedAt: '2026-06-22T08:49:20.194Z',
-  roles: ['reviewer', 'analyst'],
+  grants: [
+    { role: 'reviewer', workflowName: null },
+    { role: 'analyst', workflowName: 'tealflow' },
+  ],
 };
 
 const PLAIN_MEMBER = {
@@ -25,7 +28,7 @@ const PLAIN_MEMBER = {
   email: null,
   lastSignInTime: null,
   joinedAt: '2026-08-01T00:00:00.000Z',
-  roles: [],
+  grants: [],
 };
 
 describe('namespace list-members command', () => {
@@ -53,8 +56,10 @@ describe('namespace list-members command', () => {
     expect(code).toBe(0);
     const text = output.stdoutLines.join('\n');
     expect(text).toMatch(/Members of krystian-zielinski \(2\)/);
-    // Process roles are sorted, so the output is stable across grant order.
-    expect(text).toMatch(/analyst, reviewer/);
+    // Process roles are sorted, so the output is stable across grant order,
+    // and a grant narrowed to one workflow prints as `role@workflow` — bare,
+    // it would be indistinguishable from a workspace-wide `analyst`.
+    expect(text).toMatch(/analyst@tealflow, reviewer/);
     expect(text).toMatch(/Krystian Zielinski/);
   });
 
@@ -98,9 +103,12 @@ describe('namespace list-members command', () => {
     });
     expect(code).toBe(0);
     const parsed = JSON.parse(output.stdoutLines.join('\n')) as {
-      members: Array<{ uid: string; roles: string[] }>;
+      members: Array<{ uid: string; grants: Array<{ role: string; workflowName: string | null }> }>;
     };
-    expect(parsed.members[0]!.roles).toEqual(['reviewer', 'analyst']);
+    expect(parsed.members[0]!.grants).toEqual([
+      { role: 'reviewer', workflowName: null },
+      { role: 'analyst', workflowName: 'tealflow' },
+    ]);
   });
 
   it('reports an empty roster rather than printing a bare header', async () => {

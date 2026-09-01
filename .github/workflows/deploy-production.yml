@@ -1,6 +1,6 @@
 name: Deploy to Production
 
-# ADR-0020 — production deploys from immutable, pinned images promoted through
+# ADR-0021 — production deploys from immutable, pinned images promoted through
 # moving tags (:prod-current / :prod-previous), triggered by publishing a
 # GitHub Release. workflow_dispatch(ref) is the escape hatch for rollback or a
 # deliberate SHA at a chosen moment.
@@ -134,7 +134,7 @@ jobs:
           target: runner
           platforms: ${{ matrix.platform }}
           push: true
-          # ADR-0020 — bake the git SHA into the image; no runtime injection.
+          # ADR-0021 — bake the git SHA into the image; no runtime injection.
           build-args: |
             NEXT_PUBLIC_GIT_SHA=${{ needs.resolve.outputs.sha_short }}
           tags: |

@@ -14,7 +14,8 @@ in-process coverage; product features also require L3 API E2E coverage.
 
 | Change | Test location |
 |---|---|
-| Transition, expression, trigger, RBAC, or step routing | `packages/workflow-engine/src/**/__tests__/` |
+| Transition, expression, trigger, or step routing | `packages/workflow-engine/src/**/__tests__/` |
+| Role enforcement (`allowedRoles`, workflow `run` / `edit`) | `packages/platform-api/src/handlers/**/__tests__/` — the gate is handler-resident (ADR-0019); the engine runs as the system actor and holds no roles |
 | End-to-end engine state change or recovery | `packages/workflow-engine/src/__tests__/integration.test.ts` |
 | Plugin behaviour or output parsing | `packages/agent-runtime/src/**/__tests__/` |
 | Handler behaviour or Zod contract | `packages/platform-api/src/handlers/**/__tests__/` |

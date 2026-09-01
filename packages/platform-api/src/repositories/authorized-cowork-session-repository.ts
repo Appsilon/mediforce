@@ -31,12 +31,26 @@ export class AuthorizedCoworkSessionRepository extends AuthorizedScope {
 
   /**
    * Caller-scope read: every session the caller is allowed to see. Optional
-   * `role` filter narrows to a single assigned role. System actors see the
-   * whole store; user callers see sessions whose parent run belongs to one of
-   * their namespaces.
+   * `role` filter narrows to a single assigned role, `namespaces` to a chosen
+   * set of workspaces. System actors see the whole store; user callers see
+   * sessions whose parent run belongs to one of their namespaces.
+   *
+   * Workspaces the caller cannot read drop out via `narrowToMemberships`, the
+   * same rule `AuthorizedHumanTaskRepository.listForCaller` applies.
    */
-  list = async (filters?: { role?: string }): Promise<CoworkSession[]> => {
+  list = async (filters?: {
+    role?: string;
+    namespaces?: readonly string[];
+  }): Promise<CoworkSession[]> => {
     const role = filters?.role;
+    const namespaces = filters?.namespaces;
+    if (namespaces !== undefined) {
+      const allowed = this.narrowToMemberships(namespaces);
+      if (allowed.length === 0) return [];
+      return role !== undefined
+        ? this.raw.listByRoleInNamespaces(role, allowed)
+        : this.raw.listInNamespaces(allowed);
+    }
     if (this.caller.isSystemActor) {
       return role !== undefined ? this.raw.listByRoleAll(role) : this.raw.listAll();
     }

@@ -103,3 +103,27 @@ export const RunNameEntrySchema = ProcessInstanceSchema.pick({
 });
 
 export type RunNameEntry = z.infer<typeof RunNameEntrySchema>;
+
+/**
+ * Projected view of the Workflow Definition version a run is pinned to, plus
+ * the run's own `createdAt`. Everything the process-role gate needs to decide
+ * who may act on a run's human tasks — and nothing else, so resolving the gate
+ * for a whole inbox never pulls the `variables` / `triggerPayload` /
+ * `previousRun` jsonb blobs the full run shape carries.
+ *
+ * `createdAt` is not decoration: a pinned version that resolves but postdates
+ * the run is a replacement registered under the same name, which the gate
+ * refuses (see `_role-gate.ts`).
+ *
+ * `namespace` stays optional exactly as it is on the run — pre-namespace rows
+ * carry none, and the gate treats that as unreadable rather than defaulting.
+ */
+export const RunDefinitionPinSchema = ProcessInstanceSchema.pick({
+  id: true,
+  namespace: true,
+  definitionName: true,
+  definitionVersion: true,
+  createdAt: true,
+});
+
+export type RunDefinitionPin = z.infer<typeof RunDefinitionPinSchema>;

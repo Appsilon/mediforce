@@ -19,6 +19,9 @@ vi.mock('@/lib/mediforce', () => ({
       resendInvite: (...args: unknown[]) => resendInviteMock(...args),
       invite: (...args: unknown[]) => inviteMock(...args),
     },
+    // `useWorkspaceRoles` unions the roles the workspace's workflows declare
+    // into the members table's pick-list; this page asserts nothing about it.
+    workflows: { list: async () => ({ definitions: [] }) },
   },
 }));
 
@@ -60,6 +63,7 @@ vi.mock('@/hooks/use-namespace-mutations', () => {
     useLeaveNamespace: stub,
     useRemoveMember: stub,
     useUpdateMemberRole: stub,
+    useSetMemberRoles: stub,
     useUpdateNamespace: stub,
   };
 });
@@ -78,6 +82,7 @@ function member(overrides: Partial<NamespaceMemberWithAuth> & Pick<NamespaceMemb
     email: `${overrides.uid}@acme.dev`,
     lastSignInTime: null,
     joinedAt: '2026-01-01T00:00:00.000Z',
+    grants: [],
     ...overrides,
   };
 }

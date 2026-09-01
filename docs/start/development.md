@@ -1,7 +1,7 @@
 ---
 status: living
 audience: engineers
-last_reviewed: 2026-08-19
+last_reviewed: 2026-08-28
 ---
 
 # Development Guide
@@ -29,6 +29,7 @@ Auth is NextAuth / Auth.js v5 with Postgres-backed database sessions
 | `ENABLE_PASSWORD_AUTH` | `true` enables the email + password (Credentials) provider — simplest local path |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google sign-in provider (optional) |
 | `ALLOWED_EMAIL_DOMAINS` | Comma-separated email-domain allowlist (optional) |
+| `AUTO_JOIN_WORKSPACES` | `domain:handle` pairs — everyone at a domain joins that workspace as `member` (optional) |
 | `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | Customer SSO, dormant until `OIDC_ISSUER` is set |
 | `OPENROUTER_API_KEY` | OpenRouter API key (for agent LLM calls) |
 | `PLATFORM_API_KEY` | Platform API key (server-to-server `X-Api-Key`) |
@@ -170,6 +171,7 @@ a safe default.
 | `AUTH_SECRET` | Session signing. `openssl rand -hex 32`. |
 | `NEXT_PUBLIC_APP_URL` | Public origin of this deployment (e.g. `https://app.example.com`). `APP_BASE_URL` **auto-derives from it** in compose — set only this one. |
 | `ALLOWED_EMAIL_DOMAINS` | Comma-separated domain allowlist. Mandatory with any OAuth/OIDC provider on (boot-fails if empty) — otherwise any account at the IdP could sign in. |
+| `AUTO_JOIN_WORKSPACES` | Comma-separated `domain:handle` pairs, e.g. `acme.com:acme`. Everyone signing in at a listed domain becomes a `member` of that workspace on their next page load. Unset = nobody is auto-joined. Not the same knob as the allowlist above: that decides who may sign in, this decides where they land. Someone removed from the workspace, or who left it, is **not** re-added — only an explicit invite brings them back. |
 
 **Auth providers — enable at least one:**
 
@@ -203,13 +205,54 @@ emulator to provision. Every install is greenfield: nothing to export or migrate
 Create the first user directly — an `auth_users` row with a bcrypt
 `password_hash` (see `ENABLE_PASSWORD_AUTH` in
 `packages/platform-ui/.env.example`) — or configure OIDC against the customer's
-IdP and let them sign in. Process-domain roles start empty and are granted
-per workspace by its owner or admins — `mediforce namespace set-member-roles
-<handle> <uid> --roles reviewer,approver`, read back with `mediforce namespace
-list-members <handle>` ([ADR-0019](../adr/0019-workspace-scoped-roles.md)).
-Nothing enforces them yet, so an install that grants none still works: a
-`step.allowedRoles` is declarative until
-[#1249](https://github.com/Appsilon/mediforce/issues/1249) lands.
+IdP and let them sign in. Process-domain roles are granted
+per workspace by its owner or admins — from the **Roles** table in
+`/<handle>/settings`, or `mediforce namespace set-member-roles <handle> <uid>
+--roles reviewer,approver`, read back with `mediforce namespace list-members
+<handle>` ([ADR-0019](../adr/0019-workspace-scoped-roles.md)). A workspace
+starts with one grant: its owner holds `workflow-manager`, one of the four
+built-in roles — `editor`, `executor`, `reviewer`, `workflow-manager` — that
+every pick-list offers
+([ADR-0020](../adr/0020-built-in-roles-and-default-workflow-access.md)).
+A step that declares `allowedRoles` is claimable only by someone holding one
+of those Roles, so grant them before a run reaches such a step — an
+unheld role fails closed rather than opening the step. The step editor warns
+when a step names a role nobody holds *on that workflow*, and still saves it:
+writing the workflow before granting its roles is the normal order of work.
+The same rule decides what **Human actions** shows: it opens on the tasks the
+signed-in user can act on, so a run parked on a role nobody has been granted
+looks like an empty inbox. Switch that page to **All in workspace** to see it —
+the task is there, waiting for the grant.
+
+A workflow's own **Access** tab is the same idea one level up: it names the
+Roles that may `run` it (start a run) and the Roles that may `edit` it —
+register a version, archive, delete, transfer, change visibility, move the
+default version. Owner/admin set it; `mediforce workflow access <name>
+--namespace <handle>` reads it back. A member who holds neither sees the
+controls greyed out with the reason on them — Start on the Runs tab, and Save,
+Edit and the workflow's ⋯ menu for `edit` — rather than a 403 arriving as a raw
+error once they click. Cron and webhook firings are
+unaffected: they run as the system, and a Role is something a person holds.
+An empty list still means any member of the workspace, and that is where a
+workflow registered by the CLI, an import or the seeded builtins stays.
+
+A workflow **created in the UI** starts somewhere else: its first version is
+registered with `run: [executor, workflow-manager]` and
+`edit: [editor, workflow-manager]` already on the Access tab, and a human block
+added in the editor starts at `allowedRoles: [reviewer, workflow-manager]`. So
+granting somebody `executor` is enough to let them run what this workspace
+builds, without opening a tab per workflow. Nothing recognises those names in
+the gate — they are on the lists, so the lists remain the whole answer.
+
+Those two are a **floor** rather than a starting point: restricting a verb on
+the Access tab always keeps the built-in role that carries it, and the way back
+to "any member" is that verb's restrict toggle. A restricted human step has the
+same floor, narrowed to one role — `workflow-manager` can pick up any manual
+step, including one an imported package restricted to a name this deployment
+has never granted. A workspace's owner always holds
+`workflow-manager`, and whoever registers a workflow holds it on that workflow —
+between them, a gate is never one nobody in the workspace can pass. Workflows
+registered before this are untouched and stay open.
 
 Passwords are per-install: there is no password recovery flow yet
 ([issue #1001](https://github.com/Appsilon/mediforce/issues/1001)), so an install

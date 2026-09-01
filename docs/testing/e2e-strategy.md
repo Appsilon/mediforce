@@ -49,6 +49,14 @@ that writes must use a fixture no other journey reads, or create uniquely named
 data. Reset persistent state at the start when a retry would otherwise see the
 previous attempt's changes.
 
+A fixture run must be created **after** the Workflow Definition it pins, the
+order production can only produce. The step role gate reads that ordering to
+tell a run's own definition from one registered under the same name after the
+run started, and refuses the task when the definition looks like the later one.
+Seeded definitions share one anchor, `SEEDED_DEFINITION_CREATED_AT`, that sits
+well before the oldest fixture run; a new run fixture older than that has to
+move the anchor back rather than date around it.
+
 ## Run
 
 `DATABASE_URL` must point to local Postgres. The full suite applies migrations,

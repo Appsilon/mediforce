@@ -1,3 +1,4 @@
+import { formatRoleGrant } from '@mediforce/platform-core';
 import { defineCommand } from '../define-command';
 import { printJson } from '../output';
 
@@ -15,6 +16,12 @@ import { printJson } from '../output';
  * feature turns on: MEMBERSHIP is `owner|admin|member` (who administers the
  * workspace), PROCESS ROLES is `reviewer|PI|approver` (what they do in a
  * process).
+ *
+ * A grant narrowed to one workflow prints as `role@workflow` — the same
+ * notation `set-member-roles` writes into the audit trail. Printing it bare
+ * would render "reviewer everywhere" and "reviewer on tealflow only"
+ * identically, which is the wrong-scope-invisible failure this command exists
+ * to catch, one dimension down.
  */
 export const namespaceListMembersCommand = defineCommand({
   name: 'mediforce namespace list-members',
@@ -41,7 +48,7 @@ export const namespaceListMembersCommand = defineCommand({
     const rows = result.members.map((member) => ({
       membership: member.role,
       uid: member.uid,
-      roles: [...member.roles].sort().join(', ') || '(none)',
+      roles: member.grants.map(formatRoleGrant).sort().join(', ') || '(none)',
       name: member.displayName ?? '',
     }));
 

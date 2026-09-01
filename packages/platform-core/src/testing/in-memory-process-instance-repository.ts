@@ -15,7 +15,12 @@ import {
   type WorkflowDisplayStatusCounts,
   type WorkflowRunSummaryResult,
 } from '../index';
-import { RunNameEntrySchema, type RunNameEntry } from '../schemas/process-instance';
+import {
+  RunNameEntrySchema,
+  RunDefinitionPinSchema,
+  type RunNameEntry,
+  type RunDefinitionPin,
+} from '../schemas/process-instance';
 
 const ACTIVE_STATUSES: ReadonlySet<InstanceStatus> = new Set([
   'running',
@@ -239,6 +244,21 @@ export class InMemoryProcessInstanceRepository
     return [...this.instances.values()]
       .filter((i) => i.deleted !== true && i.namespace === namespace)
       .map((i) => RunNameEntrySchema.parse({ id: i.id, definitionName: i.definitionName }));
+  }
+
+  async getDefinitionPinsAll(instanceIds: readonly string[]): Promise<RunDefinitionPin[]> {
+    return instanceIds
+      .map((id) => this.instances.get(id))
+      .filter((instance): instance is ProcessInstance => instance !== undefined)
+      .map((instance) => RunDefinitionPinSchema.parse(instance));
+  }
+
+  async getDefinitionPinsInNamespaces(
+    instanceIds: readonly string[],
+    allowed: readonly string[],
+  ): Promise<RunDefinitionPin[]> {
+    const pins = await this.getDefinitionPinsAll(instanceIds);
+    return pins.filter((pin) => allowed.includes(pin.namespace ?? ''));
   }
 
   private applyListFilters(

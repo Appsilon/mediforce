@@ -74,7 +74,7 @@ export function HumanStepView({
   const bodyEntry = resolveTaskBody(task);
   const BodyComponent = bodyEntry.Component;
   const bodyIsWide = bodyEntry.hidesContextPanel === true;
-  const readOnly = access.kind === 'claimed-by-other' || access.kind === 'role-mismatch';
+  const readOnly = access.kind === 'claimed-by-other';
 
   const body = (
     <fieldset
@@ -159,17 +159,6 @@ function AccessBanner({
             />
           </p>
           <p className="text-xs mt-0.5 opacity-80">Only the claimant can act on this task.</p>
-        </div>
-      </div>
-    );
-  }
-  if (access.kind === 'role-mismatch') {
-    return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 px-4 py-3 flex items-start gap-2.5 text-sm text-amber-800 dark:text-amber-300">
-        <Lock className="h-4 w-4 mt-0.5 shrink-0" />
-        <div>
-          <p className="font-medium">Requires role: {access.requiredRole}</p>
-          <p className="text-xs mt-0.5 opacity-80">This task is assigned to a different role.</p>
         </div>
       </div>
     );

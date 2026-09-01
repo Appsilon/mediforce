@@ -1,9 +1,10 @@
 import postgres from 'postgres';
+import { WORKFLOW_MANAGER_ROLE } from '@mediforce/platform-core';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TEST_ORG_HANDLE } from './constants';
-import { buildSeedData, AGENT_LOG_FILENAME, AGENT_LOG_FIXTURE_CONTENT } from './seed-data';
+import { buildSeedData, AGENT_LOG_FILENAME, AGENT_LOG_FIXTURE_CONTENT, SEEDED_DEFINITION_CREATED_AT } from './seed-data';
 
 // Matches LOGS_DIR in packages/platform-ui/src/app/api/step-logs/route.ts —
 // the AgentLogViewer pipeline reads step logs from this local tmp directory.
@@ -53,12 +54,22 @@ export async function seedPostgresNamespace(
     //   fixture    – test, tenant-a, tenant-b
     //   journeys   – other, acme-labs, invited-personal, bio-clear-labs,
     //                bio-clear-owner, journey-user, bootstrap-journey,
-    //                branding-personal
+    //                branding-personal, role-gate-org, role-gate-org-2,
+    //                member-roles-labs, personal-manager (the workspace
+    //                default-workflow-access.journey has GET /api/users/me
+    //                bootstrap for it, so each run asserts the write rather
+    //                than the row a previous run left)
     //   patterns   – journey-org-* (create-workspace.journey, timestamp suffix),
     //                branding-org-* (namespace-branding.journey, per-test org),
     //                import-org-* (workflow-import.journey, per-test org),
     //                journey-examples-* (import-example-workflows.journey, timestamp suffix),
-    //                tool-catalog-empty-* (admin-tool-catalog.journey, timestamp suffix)
+    //                tool-catalog-empty-* (admin-tool-catalog.journey, timestamp suffix),
+    //                invitee-password-off* (invite-password-gate.journey — the
+    //                  personal workspace `ensurePersonalNamespace` bootstraps
+    //                  for the invitee outlives the `deleteAuthUser` teardown,
+    //                  and its handle suffixing gives up after 16 collisions,
+    //                  so leaving them behind fails the journey on the 17th
+    //                  local run while CI's fresh database stays green)
     //
     // Agents use ON DELETE SET NULL for workspace removal, and built-in agents
     // have no workspace FK at all, so reset the seeded IDs explicitly before
@@ -81,6 +92,10 @@ export async function seedPostgresNamespace(
       'journey-user',
       'bootstrap-journey',
       'branding-personal',
+      'role-gate-org',
+      'role-gate-org-2',
+      'member-roles-labs',
+      'personal-manager',
     ];
     await sql`
       DELETE FROM workspaces
@@ -90,6 +105,7 @@ export async function seedPostgresNamespace(
          OR handle LIKE 'import-org-%'
          OR handle LIKE 'journey-examples-%'
          OR handle LIKE 'tool-catalog-empty-%'
+         OR handle LIKE 'invitee-password-off%'
     `;
 
     // ── 1. workspaces ───────────────────────────────────────────────────────
@@ -159,7 +175,7 @@ export async function seedPostgresNamespace(
           ${wd.notifications ? sql.json(wd.notifications as unknown) : null},
           ${wd.workspace ? sql.json(wd.workspace as unknown) : null},
           ${wd.metadata ? sql.json(wd.metadata as unknown) : null},
-          ${(wd.createdAt as string | undefined) ?? new Date().toISOString()}
+          ${(wd.createdAt as string | undefined) ?? SEEDED_DEFINITION_CREATED_AT}
         )
         ON CONFLICT (workspace, name, version) DO NOTHING
       `;
@@ -180,7 +196,7 @@ export async function seedPostgresNamespace(
       const key = `${namespace}\u0000${name}`;
       if (seededManualWorkflows.has(key)) continue;
       seededManualWorkflows.add(key);
-      const seededAt = (wd.createdAt as string | undefined) ?? new Date().toISOString();
+      const seededAt = (wd.createdAt as string | undefined) ?? SEEDED_DEFINITION_CREATED_AT;
       await sql`
         INSERT INTO triggers (
           namespace, workflow_name, trigger_name, type, enabled, config,
@@ -585,12 +601,17 @@ export async function seedPostgresUserProfile(
 }
 
 /**
- * Seed a personal `workspaces` row + its owner `workspace_members` row.
+ * Seed a personal `workspaces` row + its owner `workspace_members` row, and
+ * the owner's workspace-wide `workflow-manager` grant.
  * Replaces the former Firestore `namespaces/{handle}` +
  * `namespaces/{handle}/members/{uid}` writes for journeys that pre-seed an
  * extra workspace (e.g. the invited user's personal namespace) so the
  * post-sign-in redirect resolves to a known handle instead of relying on the
  * lazy bootstrap in GET /api/users/me.
+ *
+ * The grant is what that bootstrap writes (ADR-0020), so a fixture without it
+ * is a workspace shape production cannot produce — same reasoning as
+ * `seedPostgresOrganizationNamespace` below.
  *
  * Idempotent via ON CONFLICT DO NOTHING.
  */
@@ -615,17 +636,33 @@ export async function seedPostgresPersonalNamespace(
       VALUES (${handle}, ${uid}, 'owner', now())
       ON CONFLICT (workspace, uid) DO NOTHING
     `;
+    // Skipped when the uid has no `auth_users` row, for the reason
+    // `seedPostgresOrganizationNamespace` guards the same way.
+    await sql`
+      INSERT INTO user_roles (uid, role, namespace, workflow_name)
+      SELECT ${uid}, ${WORKFLOW_MANAGER_ROLE}, ${handle}, NULL
+      WHERE EXISTS (SELECT 1 FROM auth_users WHERE id = ${uid})
+      ON CONFLICT DO NOTHING
+    `;
   } finally {
     await sql.end({ timeout: 5 });
   }
 }
 
 /**
- * Seed an organization `workspaces` row plus an owner `workspace_members` row.
+ * Seed an organization `workspaces` row plus an owner `workspace_members` row,
+ * and the owner's workspace-wide `workflow-manager` grant.
  * Replaces the former Firestore `namespaces/{handle}` (type organization) +
  * `namespaces/{handle}/members/{uid}` writes — the legacy `users/{uid}`
  * doc's `organizations` array is not carried over (org membership now derives
  * solely from `workspace_members`, per the user-profile schema note).
+ *
+ * The grant is not an extra: `createNamespace` writes it for every workspace a
+ * person creates (ADR-0020), so a fixture without it is a workspace shape
+ * production cannot produce — an owner locked out of every gated workflow they
+ * own. Migration 0046 back-fills it for rows that predate ADR-0020, which is
+ * why omitting it here was invisible on a developer database and only failed
+ * against CI's fresh one.
  *
  * Pass `bio` to pre-populate the optional workspace bio (the bio-clear journey
  * needs a non-empty starting value to clear).
@@ -653,6 +690,50 @@ export async function seedPostgresOrganizationNamespace(
       INSERT INTO workspace_members (workspace, uid, role, joined_at)
       VALUES (${handle}, ${ownerUid}, 'owner', now())
       ON CONFLICT (workspace, uid) DO NOTHING
+    `;
+    // Skipped when the uid has no `auth_users` row: several journeys seed a
+    // workspace for a synthetic owner they never sign in as, and `user_roles`
+    // has an FK to `auth_users`. Migration 0046 guards the same way.
+    await sql`
+      INSERT INTO user_roles (uid, role, namespace, workflow_name)
+      SELECT ${ownerUid}, ${WORKFLOW_MANAGER_ROLE}, ${handle}, NULL
+      WHERE EXISTS (SELECT 1 FROM auth_users WHERE id = ${ownerUid})
+      ON CONFLICT DO NOTHING
+    `;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * Add a non-owner `workspace_members` row to an already-seeded workspace.
+ *
+ * `seedPostgresOrganizationNamespace` seeds the owner only, which is enough for
+ * every journey that acts on the workspace itself. A journey about the members
+ * table needs a second person to act *on* — the owner's own row is the one the
+ * UI holds back from self-demotion, so it cannot stand in.
+ *
+ * Idempotent: re-running upserts the membership rather than colliding on the
+ * `(workspace, uid)` primary key.
+ */
+export async function seedPostgresWorkspaceMember(
+  handle: string,
+  uid: string,
+  role: 'admin' | 'member',
+  displayName: string,
+): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to seed Postgres for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await sql`
+      INSERT INTO workspace_members (workspace, uid, role, display_name, joined_at)
+      VALUES (${handle}, ${uid}, ${role}, ${displayName}, now())
+      ON CONFLICT (workspace, uid) DO UPDATE SET
+        role = EXCLUDED.role,
+        display_name = EXCLUDED.display_name
     `;
   } finally {
     await sql.end({ timeout: 5 });
@@ -754,6 +835,32 @@ export async function deletePostgresAgentOAuthToken(
         AND agent_id = ${agentId}
         AND server_name = ${serverName}
     `;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * Return a user to "never been in this workspace": drop their membership AND
+ * the auto-join tombstone a removal leaves behind (migration 0043).
+ *
+ * Direct SQL because the API cannot express this state — every removal
+ * endpoint writes a tombstone by design, and the invite that clears one also
+ * re-adds the member. Only a fresh colleague is in this state, and a journey
+ * re-running against the shared database has to fabricate it.
+ */
+export async function clearPostgresWorkspaceMembership(
+  handle: string,
+  uid: string,
+): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to seed Postgres for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await sql`DELETE FROM workspace_members WHERE workspace = ${handle} AND uid = ${uid}`;
+    await sql`DELETE FROM workspace_autojoin_blocks WHERE workspace = ${handle} AND uid = ${uid}`;
   } finally {
     await sql.end({ timeout: 5 });
   }
