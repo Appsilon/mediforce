@@ -1,4 +1,9 @@
-import type { ProcessInstance, RunNameEntry, WorkflowDisplayStatus } from '../schemas/process-instance';
+import type {
+  ProcessInstance,
+  RunDefinitionPin,
+  RunNameEntry,
+  WorkflowDisplayStatus,
+} from '../schemas/process-instance';
 import type { StepExecution } from '../schemas/step-execution';
 import type { InstanceStatus } from '../schemas/process-instance';
 
@@ -155,6 +160,27 @@ export interface ProcessInstanceRepository {
    * rather than defaulting.
    */
   listDefinitionNames(namespace: string): Promise<RunNameEntry[]>;
+
+  /**
+   * Projected `RunDefinitionPin` view of the named runs — which Workflow
+   * Definition version each is pinned to, and when it started.
+   *
+   * Backs the process-role gate when it has to answer for many tasks at once
+   * (the actionable inbox, issue #1251): thirty tasks across three workflows
+   * resolve in one read instead of thirty. Projects five columns rather than
+   * `SELECT *` so the gate never pulls the large `variables` /
+   * `trigger_payload` / `previous_run` jsonb blobs it has no use for.
+   *
+   * Missing ids are simply absent from the result — callers decide what an
+   * unresolved run means (the gate treats it as unreadable, and refuses).
+   */
+  getDefinitionPinsAll(instanceIds: readonly string[]): Promise<RunDefinitionPin[]>;
+  /** Namespace-scoped variant — pins only for runs whose workspace is in
+   *  `allowed`; out-of-scope ids come back absent, same as missing ones. */
+  getDefinitionPinsInNamespaces(
+    instanceIds: readonly string[],
+    allowed: readonly string[],
+  ): Promise<RunDefinitionPin[]>;
 
   getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]>;
   getByStatusInNamespaces(status: InstanceStatus, allowed: readonly string[]): Promise<ProcessInstance[]>;

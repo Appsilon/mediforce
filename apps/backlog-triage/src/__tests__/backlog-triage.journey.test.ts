@@ -57,7 +57,7 @@ describe('backlog-triage journey', () => {
       humanTaskRepo = new InMemoryHumanTaskRepository();
       engine = new WorkflowEngine(
         processRepo, instanceRepo, auditRepo,
-        undefined, undefined, undefined,
+        undefined, undefined,
         humanTaskRepo,
       );
       wd = loadWorkflowDefinition();

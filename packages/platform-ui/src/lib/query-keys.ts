@@ -30,9 +30,16 @@ export const queryKeys = {
     /** Every task in a workspace, optionally narrowed by status. */
     byNamespace: (namespace: string, filters?: { status?: HumanTaskStatus[] }) =>
       ['tasks', { namespace, ...filters }] as const,
-    /** Caller-scope axis: every task visible to the caller across roles + instances. */
-    forCaller: (filters?: { status?: HumanTaskStatus[] }) =>
-      ['tasks', { caller: 'me', ...filters }] as const,
+    /** Caller-scope axis: every task visible to the caller across roles +
+     *  instances, or — with `actionable` — only the ones they may act on.
+     *  `actionable` and `namespaces` are both part of the key: each names a
+     *  different server answer, and sharing a cache entry across either would
+     *  show one selection's inbox under another's label. */
+    forCaller: (filters?: {
+      status?: HumanTaskStatus[];
+      actionable?: boolean;
+      namespaces?: readonly string[];
+    }) => ['tasks', { caller: 'me', ...filters }] as const,
   },
   task: (taskId: string) => ['task', taskId] as const,
 
@@ -78,6 +85,12 @@ export const queryKeys = {
   /** Version metadata list for a workflow in a namespace (workflows.versions). */
   workflowVersions: (namespace: string, name: string) =>
     ['workflow-versions', namespace, name] as const,
+
+  /** Who may run and who may edit a workflow, plus what that means for the
+   *  caller (workflows.getAccess, ADR-0019). Keyed per workflow because the
+   *  answer is per workflow — a grant narrowed to one does not carry. */
+  workflowAccess: (namespace: string, name: string) =>
+    ['workflow-access', namespace, name] as const,
 
   /** Live trigger rows for a workflow (triggers.list), reflecting the unified
    *  `triggers` table's enabled/schedule state (ADR-0011). */

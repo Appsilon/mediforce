@@ -17,6 +17,7 @@ import {
   PreconditionFailedError,
 } from '../../errors';
 import { actorFromCaller, loadOr404 } from '../_helpers';
+import { assertCallerMayActOnTask } from './_role-gate';
 
 export async function completeTask(
   input: CompleteTaskInput,
@@ -49,6 +50,7 @@ async function loadTaskContext(
   ) {
     throw new ForbiddenError('Task is claimed by another user');
   }
+  await assertCallerMayActOnTask(scope, task);
   const actor = actorFromCaller(scope);
   // Fall back to the task's prior assignee for apiKey callers so the audit
   // trail reflects the human who claimed the task, not 'api-user'.

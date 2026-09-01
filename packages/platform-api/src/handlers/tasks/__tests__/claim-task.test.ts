@@ -16,6 +16,7 @@ import {
 } from '../../../errors';
 import {
   createTestScope,
+  processRepoForFixtureRuns,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
 
@@ -36,9 +37,11 @@ describe('claimTask handler', () => {
   let humanTaskRepo: InMemoryHumanTaskRepository;
   let instanceRepo: InMemoryProcessInstanceRepository;
   let auditRepo: InMemoryAuditRepository;
+  let processRepo: Awaited<ReturnType<typeof processRepoForFixtureRuns>>;
 
   beforeEach(async () => {
     resetFactorySequence();
+    processRepo = await processRepoForFixtureRuns(['team-alpha']);
     instanceRepo = new InMemoryProcessInstanceRepository();
     humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
     auditRepo = new InMemoryAuditRepository(instanceRepo);
@@ -57,6 +60,7 @@ describe('claimTask handler', () => {
       );
       const scope = createTestScope({
         humanTaskRepo,
+        processRepo,
         instanceRepo,
         auditRepo,
         caller: userCaller('u-1', ['team-alpha']),
@@ -80,6 +84,7 @@ describe('claimTask handler', () => {
       );
       const scope = createTestScope({
         humanTaskRepo,
+        processRepo,
         instanceRepo,
         auditRepo,
         caller: userCaller('u-1', ['team-alpha']),
@@ -121,6 +126,7 @@ describe('claimTask handler', () => {
       );
       const scope = createTestScope({
         humanTaskRepo,
+        processRepo,
         instanceRepo,
         auditRepo,
         caller: userCaller('u-1', ['team-alpha']),
@@ -139,6 +145,7 @@ describe('claimTask handler', () => {
     it('throws NotFoundError when the task does not exist', async () => {
       const scope = createTestScope({
         humanTaskRepo,
+        processRepo,
         instanceRepo,
         auditRepo,
         caller: userCaller('u-1', ['team-alpha']),
@@ -159,6 +166,7 @@ describe('claimTask handler', () => {
       );
       const scope = createTestScope({
         humanTaskRepo,
+        processRepo,
         instanceRepo,
         auditRepo,
         caller: userCaller('u-1', ['team-alpha']),
@@ -182,6 +190,7 @@ describe('claimTask handler', () => {
       );
       const scope = createTestScope({
         humanTaskRepo,
+        processRepo,
         instanceRepo,
         auditRepo,
         // default caller in createTestScope is apiKey

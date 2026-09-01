@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { CheckSquare, X, Loader2, AlertTriangle, EyeOff } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useProcessNameMap } from '@/hooks/use-agent-runs';
+import { useProcessRunMap, type RunLocation } from '@/hooks/use-agent-runs';
 import { useUserDisplayNames } from '@/hooks/use-users';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
@@ -141,7 +141,7 @@ function TaskRow({
   currentUserId,
   currentUserName,
   userNames,
-  processNameMap,
+  processRunMap,
   showWorkflow,
 }: {
   item: ActionItem;
@@ -150,7 +150,7 @@ function TaskRow({
   currentUserId: string;
   currentUserName?: string | null;
   userNames: Map<string, string>;
-  processNameMap: Map<string, string>;
+  processRunMap: Map<string, RunLocation>;
   showWorkflow: boolean;
 }) {
   const handle = useHandleFromPath();
@@ -167,19 +167,24 @@ function TaskRow({
   const description = getItemDescription(item);
   const muted = isItemCompleted(item);
   const instanceId = getItemProcessInstanceId(item);
-  const workflowName = processNameMap.get(instanceId);
+  const run = processRunMap.get(instanceId);
+  const workflowName = run?.definitionName;
+  // The row's own workspace. Falling back to the page handle keeps a row whose
+  // run has not loaded yet pointing somewhere sane; the task redirect corrects
+  // it once the run resolves.
+  const rowHandle = run?.namespace ?? handle;
   const status = getStatusInfo(item);
 
   const definitionName = item.kind === 'task' ? workflowName : undefined;
   const taskHref =
     item.kind === 'cowork'
-      ? routes.cowork(handle, item.data.id)
+      ? routes.cowork(rowHandle, item.data.id)
       : definitionName !== undefined
-        ? routes.workflowRunStep(handle, definitionName, instanceId, item.data.stepId)
-        : routes.task(handle, item.data.id);
+        ? routes.workflowRunStep(rowHandle, definitionName, instanceId, item.data.stepId)
+        : routes.task(rowHandle, item.data.id);
 
-  const workflowHref = workflowName ? routes.workflow(handle, workflowName) : null;
-  const runHref = workflowName ? routes.workflowRun(handle, workflowName, instanceId) : null;
+  const workflowHref = workflowName ? routes.workflow(rowHandle, workflowName) : null;
+  const runHref = workflowName ? routes.workflowRun(rowHandle, workflowName, instanceId) : null;
 
   return (
     <tr className={cn('transition-colors', selected ? 'bg-primary/5' : 'hover:bg-muted/20', muted && 'opacity-60')}>
@@ -242,6 +247,18 @@ function TaskRow({
           <span className="font-mono text-xs text-muted-foreground">{instanceId.slice(0, 8)}</span>
         )}
       </TD>
+      <TD className="w-[110px] text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+        {formatAbsoluteDate(getItemCreatedAt(item))}
+      </TD>
+      <TD className="w-[110px] text-xs tabular-nums whitespace-nowrap">
+        {deadline ? (
+          <span className={deadline.overdue ? 'text-red-500 dark:text-red-400 font-medium' : 'text-muted-foreground'}>
+            {deadline.text}
+          </span>
+        ) : (
+          <span className="text-muted-foreground/30">—</span>
+        )}
+      </TD>
       <TD className="w-[180px]">
         {assigneeName ? (
           <div className="flex items-center gap-2 min-w-0">
@@ -262,18 +279,6 @@ function TaskRow({
           <span className="text-muted-foreground/40 text-xs">Unassigned</span>
         )}
       </TD>
-      <TD className="w-[110px] text-xs text-muted-foreground tabular-nums whitespace-nowrap">
-        {formatAbsoluteDate(getItemCreatedAt(item))}
-      </TD>
-      <TD className="w-[110px] text-xs tabular-nums whitespace-nowrap">
-        {deadline ? (
-          <span className={deadline.overdue ? 'text-red-500 dark:text-red-400 font-medium' : 'text-muted-foreground'}>
-            {deadline.text}
-          </span>
-        ) : (
-          <span className="text-muted-foreground/30">—</span>
-        )}
-      </TD>
     </tr>
   );
 }
@@ -286,7 +291,7 @@ interface TaskTableProps {
   currentUserId: string;
   currentUserName?: string | null;
   userNames: Map<string, string>;
-  processNameMap: Map<string, string>;
+  processRunMap: Map<string, RunLocation>;
   showWorkflow: boolean;
 }
 
@@ -298,7 +303,7 @@ function TaskTable({
   currentUserId,
   currentUserName,
   userNames,
-  processNameMap,
+  processRunMap,
   showWorkflow,
 }: TaskTableProps) {
   const ids = items.map(getItemId);
@@ -322,9 +327,9 @@ function TaskTable({
             <TH className="hidden md:table-cell">Description</TH>
             {showWorkflow && <TH className="hidden lg:table-cell">Workflow</TH>}
             <TH>Run ID</TH>
-            <TH>Assignee</TH>
             <TH>Created</TH>
             <TH>Deadline</TH>
+            <TH>Assignee</TH>
           </tr>
         </thead>
         <tbody>
@@ -337,7 +342,7 @@ function TaskTable({
               currentUserId={currentUserId}
               currentUserName={currentUserName}
               userNames={userNames}
-              processNameMap={processNameMap}
+              processRunMap={processRunMap}
               showWorkflow={showWorkflow}
             />
           ))}
@@ -412,9 +417,9 @@ function LoadingSkeleton() {
           <div className="h-3 bg-muted rounded w-32 hidden md:block" />
           <div className="h-3 bg-muted rounded w-24 hidden lg:block" />
           <div className="h-3 bg-muted rounded w-16" />
-          <div className="h-6 w-6 rounded-full bg-muted shrink-0" />
           <div className="h-3 bg-muted rounded w-20" />
           <div className="h-3 bg-muted rounded w-16" />
+          <div className="h-6 w-6 rounded-full bg-muted shrink-0" />
         </div>
       ))}
     </div>
@@ -442,6 +447,7 @@ export function TaskGroupedView({
   currentUserId,
   currentUserName,
   groupByFields,
+  namespaces,
 }: {
   activeItems: ActionItem[];
   completedItems: ActionItem[];
@@ -449,9 +455,20 @@ export function TaskGroupedView({
   currentUserId: string;
   currentUserName?: string | null;
   groupByFields: Set<GroupByField>;
+  /**
+   * The workspaces the listed items were fetched from. Each row links into the
+   * workspace its own run belongs to, so the lookup has to span the same set —
+   * a row whose run is missing from it would fall back to the handle in the URL
+   * and resolve to a workflow that does not exist there.
+   */
+  namespaces?: readonly string[];
 }) {
   const handle = useHandleFromPath();
-  const processNameMap = useProcessNameMap(handle);
+  const lookupHandles = React.useMemo(
+    () => (namespaces !== undefined && namespaces.length > 0 ? namespaces : [handle]),
+    [namespaces, handle],
+  );
+  const processRunMap = useProcessRunMap(lookupHandles);
   const userNames = useUserDisplayNames(handle);
   const qc = useQueryClient();
   const cancelMutation = useBulkCancelRuns();
@@ -523,7 +540,7 @@ export function TaskGroupedView({
     currentUserId,
     currentUserName,
     userNames,
-    processNameMap,
+    processRunMap,
   };
 
   if (loading) return <LoadingSkeleton />;
@@ -537,7 +554,7 @@ export function TaskGroupedView({
     const byDef = new Map<string, ActionItem[]>();
     for (const item of allItems) {
       const instanceId = getItemProcessInstanceId(item);
-      const name = processNameMap.get(instanceId) ?? instanceId.slice(0, 8);
+      const name = processRunMap.get(instanceId)?.definitionName ?? instanceId.slice(0, 8);
       const group = byDef.get(name) ?? [];
       group.push(item);
       byDef.set(name, group);

@@ -1,6 +1,7 @@
 import type {
   ProcessInstance,
   ProcessInstanceRepository,
+  RunDefinitionPin,
   RunNameEntry,
   StepExecution,
   InstanceStatus,
@@ -68,6 +69,23 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
    */
   listDefinitionNames = async (namespace: string): Promise<RunNameEntry[]> =>
     this.canSeeNamespace(namespace) ? this.raw.listDefinitionNames(namespace) : [];
+
+  /**
+   * Batched `RunDefinitionPin` read — which Workflow Definition version each
+   * of `instanceIds` is pinned to. Same system-actor / namespace-scoped
+   * routing as `getById`, and the same contract for a run the caller cannot
+   * see: absent from the result rather than an error.
+   *
+   * The process-role gate resolves `allowedRoles` off the pinned definition,
+   * so answering it for a whole inbox would otherwise be one `getById` per
+   * task (issue #1251).
+   */
+  getDefinitionPins = async (
+    instanceIds: readonly string[],
+  ): Promise<RunDefinitionPin[]> =>
+    this.caller.isSystemActor
+      ? this.raw.getDefinitionPinsAll(instanceIds)
+      : this.raw.getDefinitionPinsInNamespaces(instanceIds, [...this.caller.namespaces]);
 
   getByStatus = async (status: InstanceStatus): Promise<ProcessInstance[]> =>
     this.caller.isSystemActor

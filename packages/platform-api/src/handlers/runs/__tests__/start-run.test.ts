@@ -13,6 +13,7 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
+import { stubUserDirectory } from '../../../testing/stub-user-directory';
 import { noopRunKicker } from '../../../runtime/run-kicker';
 
 /**
@@ -391,5 +392,104 @@ describe('startRun handler', () => {
     ).rejects.toBeInstanceOf(ForbiddenError);
 
     expect(fireWorkflow).not.toHaveBeenCalled();
+  });
+
+  /**
+   * ADR-0019's `run` verb (#1253). The workflow's role list is the first
+   * permission `POST /api/processes` has ever had, so the case that matters
+   * most is the one where nothing is configured: every existing workflow must
+   * keep starting for every member, or this ships as a deployment-wide outage.
+   */
+  describe('the run gate', () => {
+    async function scopeFor(
+      processRoles: readonly string[],
+      fireWorkflow: ReturnType<typeof vi.fn>,
+    ) {
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({ name: 'gated', namespace: 'team-alpha', version: 1 }),
+      );
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-gated', namespace: 'team-alpha' }));
+      const scope = createTestScope({
+        processRepo,
+        instanceRepo,
+        auditRepo,
+        caller: userCaller(
+          'u-1',
+          ['team-alpha'],
+          undefined,
+          new Map([['team-alpha', new Set(processRoles)]]),
+        ),
+        userDirectory: stubUserDirectory(),
+      });
+      Object.assign(scope.system, { manualTrigger: { fireWorkflow } });
+      return scope;
+    }
+
+    const start = (scope: ReturnType<typeof createTestScope>) =>
+      startRun(
+        {
+          namespace: 'team-alpha',
+          definitionName: 'gated',
+          triggerName: 'manual',
+          triggeredBy: 'u-1',
+        },
+        scope,
+      );
+
+    it('refuses a member who holds none of the workflow\'s run roles', async () => {
+      const fireWorkflow = vi.fn();
+      const scope = await scopeFor([], fireWorkflow);
+      await processRepo.setWorkflowAccess('team-alpha', 'gated', { run: ['reviewer'], edit: [] });
+
+      await expect(start(scope)).rejects.toBeInstanceOf(ForbiddenError);
+      expect(fireWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('admits a holder of one of them', async () => {
+      const fireWorkflow = vi
+        .fn()
+        .mockResolvedValue({ instanceId: 'inst-gated', status: 'created' as const });
+      const scope = await scopeFor(['reviewer'], fireWorkflow);
+      await processRepo.setWorkflowAccess('team-alpha', 'gated', {
+        run: ['approver', 'reviewer'],
+        edit: [],
+      });
+
+      await expect(start(scope)).resolves.toMatchObject({ run: { id: 'inst-gated' } });
+    });
+
+    it('leaves a workflow with no access rows startable by any member', async () => {
+      const fireWorkflow = vi
+        .fn()
+        .mockResolvedValue({ instanceId: 'inst-gated', status: 'created' as const });
+      const scope = await scopeFor([], fireWorkflow);
+
+      await expect(start(scope)).resolves.toMatchObject({ run: { id: 'inst-gated' } });
+    });
+
+    it('does not gate on the edit list', async () => {
+      const fireWorkflow = vi
+        .fn()
+        .mockResolvedValue({ instanceId: 'inst-gated', status: 'created' as const });
+      const scope = await scopeFor([], fireWorkflow);
+      await processRepo.setWorkflowAccess('team-alpha', 'gated', { run: [], edit: ['approver'] });
+
+      await expect(start(scope)).resolves.toMatchObject({ run: { id: 'inst-gated' } });
+    });
+
+    it('bypasses the system actor, so cron and webhook firings are unaffected', async () => {
+      const fireWorkflow = vi
+        .fn()
+        .mockResolvedValue({ instanceId: 'inst-gated', status: 'created' as const });
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({ name: 'gated', namespace: 'team-alpha', version: 1 }),
+      );
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-gated', namespace: 'team-alpha' }));
+      await processRepo.setWorkflowAccess('team-alpha', 'gated', { run: ['reviewer'], edit: [] });
+      const scope = createTestScope({ processRepo, instanceRepo, auditRepo });
+      Object.assign(scope.system, { manualTrigger: { fireWorkflow } });
+
+      await expect(start(scope)).resolves.toMatchObject({ run: { id: 'inst-gated' } });
+    });
   });
 });

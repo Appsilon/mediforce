@@ -28,6 +28,27 @@ vi.mock('@/app/actions/workflow-secrets', () => ({
   getWorkflowSecretKeys: () => Promise.resolve([]),
 }));
 
+// The role controls read the workspace vocabulary and roster. Mutable so a test
+// can hand the editor a specific set of grants; reset in beforeEach.
+const rolesState = vi.hoisted(() => ({
+  workspaceRoles: { roles: [], workflowNames: [], heldRoles: null, loading: false, error: null } as {
+    roles: string[];
+    workflowNames: string[];
+    heldRoles: string[] | null;
+    loading: boolean;
+    error: Error | null;
+  },
+  members: [] as { uid: string; displayName: string | null }[],
+}));
+
+vi.mock('@/hooks/use-workspace-roles', () => ({
+  useWorkspaceRoles: () => rolesState.workspaceRoles,
+}));
+
+vi.mock('@/hooks/use-namespace-members', () => ({
+  useNamespaceMembers: () => ({ members: rolesState.members, loading: false, resolved: true }),
+}));
+
 import { StepEditor } from '../workflow-editor/step-editor';
 
 // ---------------------------------------------------------------------------
@@ -64,6 +85,10 @@ const dockerImages: DockerImageInfo[] = [
 describe('StepEditor', () => {
   beforeEach(() => {
     pluginState.plugins = [];
+    rolesState.workspaceRoles = {
+      roles: [], workflowNames: [], heldRoles: null, loading: false, error: null,
+    };
+    rolesState.members = [];
   });
 
   it('[REGRESSION #1025] does not change a new step id while its name is being typed', () => {
@@ -673,6 +698,191 @@ describe('StepEditor', () => {
       );
 
       expect(screen.queryByTestId('step-data-flow')).not.toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Human step: allowedRoles picker and assignedTo combobox (#1252)
+  // -------------------------------------------------------------------------
+
+  describe('human step roles', () => {
+    /** Renders a human step's Advanced card, where both role controls live. */
+    function renderRoles(step: Partial<WorkflowStep> = {}, workflowName = 'tealflow') {
+      const onChange = vi.fn();
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'human', ...step })}
+          allSteps={[]}
+          workflowName={workflowName}
+          onChange={onChange}
+        />,
+      );
+      expandCard('Advanced');
+      return { onChange };
+    }
+
+    function addRole(text: string) {
+      const input = screen.getByLabelText('Add an allowed role');
+      fireEvent.change(input, { target: { value: text } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+    }
+
+    it('renders each authored role as its own chip rather than a comma-joined string', () => {
+      renderRoles({ allowedRoles: ['reviewer', 'approver'] });
+
+      expect(screen.getByText('reviewer')).toBeInTheDocument();
+      expect(screen.getByText('approver')).toBeInTheDocument();
+    });
+
+    it('round-trips a picked role into allowedRoles', () => {
+      rolesState.workspaceRoles = {
+        roles: ['approver', 'reviewer'], workflowNames: ['tealflow'],
+        heldRoles: ['approver', 'reviewer'], loading: false, error: null,
+      };
+      const { onChange } = renderRoles({ allowedRoles: ['reviewer'] });
+
+      addRole('approver');
+
+      expect(onChange).toHaveBeenCalledWith({ allowedRoles: ['reviewer', 'approver'] });
+    });
+
+    it('accepts a role nobody holds yet — the vocabulary is a pick-list, not a validator', () => {
+      rolesState.workspaceRoles = {
+        roles: ['reviewer'], workflowNames: ['tealflow'], heldRoles: ['reviewer'],
+        loading: false, error: null,
+      };
+      const { onChange } = renderRoles();
+
+      addRole('principal-investigator');
+
+      expect(onChange).toHaveBeenCalledWith({ allowedRoles: ['principal-investigator'] });
+    });
+
+    it('offers the workspace vocabulary as suggestions', () => {
+      rolesState.workspaceRoles = {
+        roles: ['approver', 'reviewer'], workflowNames: ['tealflow'],
+        heldRoles: ['approver'], loading: false, error: null,
+      };
+      renderRoles();
+
+      const listId = screen.getByLabelText('Add an allowed role').getAttribute('list');
+      const options = document.querySelectorAll(`#${listId} option`);
+      expect([...options].map((option) => option.getAttribute('value'))).toEqual(['approver', 'reviewer']);
+    });
+
+    it('drops allowedRoles entirely when the last chip is removed', () => {
+      const { onChange } = renderRoles({ allowedRoles: ['reviewer'] });
+
+      fireEvent.click(screen.getByLabelText('Remove role reviewer'));
+
+      expect(onChange).toHaveBeenCalledWith({ allowedRoles: undefined });
+    });
+
+    it('warns about a role nobody holds, without blocking the edit', () => {
+      rolesState.workspaceRoles = {
+        roles: ['reviewer'], workflowNames: ['tealflow'], heldRoles: [],
+        loading: false, error: null,
+      };
+      const { onChange } = renderRoles({ allowedRoles: ['reviewer'] });
+
+      expect(screen.getByText(/no one holds/i)).toHaveTextContent('reviewer');
+
+      // Authoring a role before granting it is legitimate, so the warning has
+      // to leave the field writable — including for a second unheld role.
+      addRole('approver');
+      expect(onChange).toHaveBeenCalledWith({ allowedRoles: ['reviewer', 'approver'] });
+    });
+
+    it('says the step is blocked only when no listed role is held', () => {
+      // ADR-0020 seeds every new human step with `reviewer, workflow-manager`,
+      // and most workspaces have no reviewer — so on the common step the
+      // warning has to name what is missing without claiming a stall that the
+      // held role prevents.
+      rolesState.workspaceRoles = {
+        roles: ['reviewer', 'workflow-manager'],
+        workflowNames: ['tealflow'],
+        heldRoles: ['workflow-manager'],
+        loading: false,
+        error: null,
+      };
+      renderRoles({ allowedRoles: ['reviewer', 'workflow-manager'] });
+
+      const warning = screen.getByText(/no one holds/i);
+      expect(warning).toHaveTextContent('reviewer');
+      expect(warning).toHaveTextContent('only "workflow-manager" can act on this step');
+      expect(warning).not.toHaveTextContent('will block');
+    });
+
+    it('does not call a step blocked when a workflow-manager can reach it', () => {
+      // ADR-0020: a restricted step admits `workflow-manager` whether or not
+      // the author wrote it, so an imported step naming only `engineer` is
+      // reachable in a workspace that has one.
+      rolesState.workspaceRoles = {
+        roles: ['engineer', 'workflow-manager'],
+        workflowNames: ['tealflow'],
+        heldRoles: ['workflow-manager'],
+        loading: false,
+        error: null,
+      };
+      renderRoles({ allowedRoles: ['engineer'] });
+
+      const warning = screen.getByText(/no one holds/i);
+      expect(warning).toHaveTextContent('engineer');
+      expect(warning).not.toHaveTextContent('will block');
+    });
+
+    it('[REGRESSION #1252] a holder scoped to another workflow does not silence the warning', () => {
+      // `heldRoles` is already scoped to this workflow by the hook, so a grant
+      // narrowed to `otherflow` never reaches it.
+      rolesState.workspaceRoles = {
+        roles: ['reviewer'], workflowNames: ['otherflow', 'tealflow'], heldRoles: [],
+        loading: false, error: null,
+      };
+      renderRoles({ allowedRoles: ['reviewer'] });
+
+      expect(screen.getByText(/no one holds/i)).toBeInTheDocument();
+    });
+
+    it('stays quiet when somebody does hold the role here', () => {
+      rolesState.workspaceRoles = {
+        roles: ['reviewer'], workflowNames: ['tealflow'], heldRoles: ['reviewer'],
+        loading: false, error: null,
+      };
+      renderRoles({ allowedRoles: ['reviewer'] });
+
+      expect(screen.queryByText(/no one holds/i)).not.toBeInTheDocument();
+    });
+
+    it('stays quiet while the roster is still unknown — absence of an answer is not a "no"', () => {
+      rolesState.workspaceRoles = {
+        roles: [], workflowNames: [], heldRoles: null, loading: true, error: null,
+      };
+      renderRoles({ allowedRoles: ['reviewer'] });
+
+      expect(screen.queryByText(/no one holds/i)).not.toBeInTheDocument();
+    });
+
+    it('keeps an interpolation template in assignedTo through an edit', () => {
+      rolesState.members = [{ uid: 'uid-alice', displayName: 'Alice' }];
+      const { onChange } = renderRoles({ assignedTo: '${triggerPayload.userId}' });
+
+      const input = screen.getByLabelText('Assign this task to') as HTMLInputElement;
+      expect(input.value).toBe('${triggerPayload.userId}');
+
+      fireEvent.change(input, { target: { value: '${triggerPayload.reviewerId}' } });
+      expect(onChange).toHaveBeenCalledWith({ assignedTo: '${triggerPayload.reviewerId}' });
+    });
+
+    it('offers workspace members as assignee suggestions', () => {
+      rolesState.members = [
+        { uid: 'uid-alice', displayName: 'Alice' },
+        { uid: 'uid-bob', displayName: null },
+      ];
+      renderRoles();
+
+      const listId = screen.getByLabelText('Assign this task to').getAttribute('list');
+      const options = document.querySelectorAll(`#${listId} option`);
+      expect([...options].map((option) => option.getAttribute('value'))).toEqual(['uid-alice', 'uid-bob']);
     });
   });
 });

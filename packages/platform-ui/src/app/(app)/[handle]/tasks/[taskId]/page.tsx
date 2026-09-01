@@ -4,19 +4,19 @@ import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTask } from '@/hooks/use-task';
 import { useProcessInstance } from '@/hooks/use-process-instances';
-import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 
 /**
  * Thin redirect: human tasks are displayed as run steps (the merged human
  * step view), so a task deep-link resolves the owning run and forwards to
- * `routes.workflowRunStep`. Kept so emails, bookmarks, and the inbox's
- * loading-state fallback links keep working.
+ * `routes.workflowRunStep` **in the run's own workspace**. Kept so emails,
+ * bookmarks, and the inbox's fallback links keep working — including the ones
+ * pointing at a task in a workspace other than the one the link was built
+ * under.
  */
 export default function TaskRedirectPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const router = useRouter();
-  const handle = useHandleFromPath();
   const { task, loading, error, notFound } = useTask(taskId);
   const {
     data: instance,
@@ -25,13 +25,22 @@ export default function TaskRedirectPage() {
     error: instanceError,
   } = useProcessInstance(task?.processInstanceId ?? null);
 
+  // The run's own workspace, never the handle in the URL. A task reached from
+  // an inbox showing more than one workspace — or from a bookmark typed under
+  // the wrong handle — otherwise forwards to a workflow that does not exist
+  // there, and the destination 404s.
   React.useEffect(() => {
-    if (task && instance) {
+    if (task && instance && instance.namespace !== undefined) {
       router.replace(
-        routes.workflowRunStep(handle, instance.definitionName, task.processInstanceId, task.stepId),
+        routes.workflowRunStep(
+          instance.namespace,
+          instance.definitionName,
+          task.processInstanceId,
+          task.stepId,
+        ),
       );
     }
-  }, [task, instance, handle, router]);
+  }, [task, instance, router]);
 
   if (notFound) {
     return (

@@ -6,6 +6,7 @@ import {
   NamespaceTypeSchema,
   WorkspaceLogoSchema,
 } from '@mediforce/platform-core';
+import { RoleGrantSchema } from './namespaces';
 
 export const GetMeInputSchema = z
   .object({
@@ -83,17 +84,19 @@ export const NamespaceMemberWithAuthSchema = NamespaceMemberSchema.extend({
    */
   lastSignInTime: z.string().nullable(),
   /**
-   * The member's process-domain roles in THIS workspace (ADR-0019) — what they
-   * do in a process (`reviewer`, `PI`), not the Membership `role` above.
-   * De-duplicated across grants, so a role narrowed to two workflows appears
-   * once; the per-workflow narrowing is not part of the roster view.
+   * The member's process-domain role grants in THIS workspace (ADR-0019) —
+   * what they do in a process (`reviewer`, `PI`), not the Membership `role`
+   * above. Each grant keeps its `workflowName`, so `reviewer` everywhere and
+   * `reviewer` narrowed to `tealflow` stay distinguishable: the roster is the
+   * read half of `setMemberRoles`, which is a full replace, and an editor that
+   * wrote back a flattened list would silently widen every narrowed grant.
    *
    * Deliberately NOT a manager field: knowing who the reviewer is, is what a
    * member needs to route work, so it ships with the roster (name, avatar,
    * membership, join date) rather than with `email` / `lastSignInTime`. Empty
    * when no directory is wired.
    */
-  roles: z.array(z.string()),
+  grants: z.array(RoleGrantSchema),
 });
 
 export const ListNamespaceMembersOutputSchema = z.object({

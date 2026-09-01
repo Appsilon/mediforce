@@ -7,6 +7,7 @@ import type {
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
+import { assertCallerMayEditWorkflow } from './_access-gate';
 
 interface ArchiveAllScoped extends ArchiveAllInput {
   namespace: string;
@@ -25,6 +26,10 @@ export async function archiveWorkflow(
     input.name,
   );
   if (latestVersion === 0) throw new NotFoundError(`Workflow '${input.name}' not found`);
+
+  // ADR-0019 `edit`. Archiving is not a lesser act than editing — an archived
+  // workflow is not runnable — so it answers to the same list.
+  await assertCallerMayEditWorkflow(scope, input.namespace, input.name);
 
   await scope.workflowDefinitions.setArchived(input.namespace, input.name, input.archived);
 
@@ -49,6 +54,8 @@ export async function archiveWorkflowVersion(
   input: ArchiveVersionScoped,
   scope: CallerScope,
 ): Promise<ArchiveVersionOutput> {
+  await assertCallerMayEditWorkflow(scope, input.namespace, input.name);
+
   // Wrapper throws raw error from infra layer when version is missing; surface
   // as NotFoundError for consistency with the legacy inline route.
   try {

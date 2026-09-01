@@ -87,7 +87,6 @@ describe('WorkflowEngine.completeHumanTask', () => {
       auditRepo,
       undefined,
       undefined,
-      undefined,
       humanTaskRepo,
     );
 

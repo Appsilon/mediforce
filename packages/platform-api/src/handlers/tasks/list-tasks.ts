@@ -1,11 +1,16 @@
 import type { HumanTask, HumanTaskStatus } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
 import type { ListTasksInput, ListTasksOutput } from '../../contract/tasks';
+import { filterActionable } from './_actionable';
 
 /**
  * List tasks visible to the caller. Workspace gating is enforced by the
  * `scope.tasks` wrapper: it filters out tasks whose parent run belongs to a
  * workspace the caller isn't a member of (apiKey callers bypass).
+ *
+ * `actionable: true` narrows further, to the tasks the caller may act on —
+ * see `filterActionable`. Omitting it returns what this handler has always
+ * returned.
  *
  * Input validation is the adapter's job. Output validation is the contract's
  * job (the Zod schema is the source of truth — handlers conform by type, not
@@ -16,7 +21,11 @@ export async function listTasks(
   scope: CallerScope,
 ): Promise<ListTasksOutput> {
   const base = await selectBase(input, scope);
-  return { tasks: applyFilters(base, input) };
+  const narrowed = applyFilters(base, input);
+  // Ordered deliberately: `actionable` is the only filter that costs reads, so
+  // it runs on what the free filters left, never on the whole workspace.
+  if (input.actionable !== true) return { tasks: narrowed };
+  return { tasks: await filterActionable(narrowed, scope) };
 }
 
 async function selectBase(

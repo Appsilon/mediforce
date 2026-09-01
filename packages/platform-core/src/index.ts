@@ -28,6 +28,7 @@ export {
   InstanceStatusSchema,
   ProcessInstanceSchema,
   RunNameEntrySchema,
+  RunDefinitionPinSchema,
   WorkflowDisplayStatusSchema,
   StepExecutionStatusSchema,
   GateResultSchema,
@@ -63,6 +64,19 @@ export {
   WorkflowWorkspaceSchema,
   WorkflowStepSchema,
   WorkflowVisibilitySchema,
+  WorkflowAccessSchema,
+  OPEN_WORKFLOW_ACCESS,
+  isOpenWorkflowAccess,
+  BUILTIN_ROLES,
+  WORKFLOW_MANAGER_ROLE,
+  DEFAULT_WORKFLOW_ACCESS,
+  DEFAULT_STEP_ALLOWED_ROLES,
+  builtinRoleIds,
+  builtinRolesWithVerb,
+  findBuiltinRole,
+  withBuiltinAccessFloor,
+  withBuiltinStepFloor,
+  pinnedRolesForVerb,
   WorkflowAuthorableSchema,
   SERVER_MANAGED_WORKFLOW_FIELDS,
   WorkflowSourceSchema,
@@ -166,6 +180,7 @@ export type {
   InstanceStatus,
   ProcessInstance,
   RunNameEntry,
+  RunDefinitionPin,
   WorkflowDisplayStatus,
   StepExecutionStatus,
   GateResult,
@@ -201,6 +216,9 @@ export type {
   WorkflowWorkspace,
   WorkflowStep,
   WorkflowVisibility,
+  WorkflowAccess,
+  BuiltinRole,
+  RoleVerb,
   WorkflowSource,
   WorkflowDefinition,
   WorkflowTemplate,
@@ -284,8 +302,6 @@ export type {
   AuditRepository,
   GetByNamespaceOptions,
   GetByNamespacePage,
-  AuthService,
-  AuthUser,
   ProcessRepository,
   WorkflowDefinitionListResult,
   WorkflowDefinitionGroup,
@@ -325,6 +341,8 @@ export type {
   SendEmailFn,
   EmailProviderInfo,
 } from './interfaces/index';
+
+export { formatRoleGrant } from './interfaces/index';
 
 export { encodeCursor, decodeCursor } from './cursors/cursor';
 export {
@@ -413,7 +431,6 @@ export {
   InMemoryAgentEventRepository,
   InMemoryAuditRepository,
   InMemoryProcessRepository,
-  InMemoryAuthService,
   InMemoryProcessInstanceRepository,
   InMemoryHumanTaskRepository,
   InMemoryHandoffRepository,
@@ -474,8 +491,8 @@ export {
   type ResolvedHttpMcpServer,
 } from './mcp/resolve-effective-mcp';
 
-// Collaboration (handoff registry, RBAC)
-export { handoffTypeRegistry, RbacService, RbacError } from './collaboration/index';
+// Collaboration (handoff registry)
+export { handoffTypeRegistry } from './collaboration/index';
 export type { HandoffTypeRegistration } from './collaboration/index';
 
 // Interpolation (shared across workflow-engine + core-actions)

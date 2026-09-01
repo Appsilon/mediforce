@@ -1,9 +1,11 @@
+import { memoizeProcessRoleReads } from '../../auth';
 import type { CallerScope } from '../../repositories/index';
 import type {
   ListWorkflowsInput,
   ListWorkflowsOutput,
   WorkflowDefinitionGroupSummary,
 } from '../../contract/workflows';
+import { resolveCallerWorkflowVerbs } from './_access-gate';
 
 /**
  * List workflow definitions visible to the caller, grouped by name with the
@@ -29,6 +31,17 @@ export async function listWorkflows(
   const manualStartByWorkflow = new Set(
     enabledManual.map((t) => `${t.namespace}:${t.workflowName}`),
   );
+
+  // Same shape for the run gate (ADR-0019): one read of the workflows that
+  // have one, then a map lookup per card. A workflow absent from the map has
+  // no gate, and `resolveCallerWorkflowVerbs` answers `true` for it without
+  // touching the role directory — so the common catalog costs one query total.
+  // The memo shares the read a narrowed grant needs between the cards that ask
+  // the same `(workspace, workflow)` question.
+  const accessByWorkflow = await scope.workflowDefinitions.listAccess(
+    [...new Set(inScope.map((group) => group.namespace))],
+  );
+  const roleDirectory = memoizeProcessRoleReads(scope.system.userDirectory);
 
   // One run summary per card. The summaries come from count() aggregations +
   // a bounded latest-3 query (no full-collection read), so fanning out here
@@ -58,6 +71,17 @@ export async function listWorkflows(
         }
       }
 
+      const access = accessByWorkflow.get(`${group.namespace}:${group.name}`);
+      const { mayRun } = access === undefined
+        ? { mayRun: true }
+        : await resolveCallerWorkflowVerbs(
+            scope.caller,
+            roleDirectory,
+            group.namespace,
+            group.name,
+            access,
+          );
+
       return {
         namespace: group.namespace,
         name: group.name,
@@ -66,6 +90,7 @@ export async function listWorkflows(
         definition: latest,
         runSummary: { ...rawSummary, stepsByVersion },
         manualStartEnabled: manualStartByWorkflow.has(`${group.namespace}:${group.name}`),
+        callerMayRun: mayRun,
       };
     }),
   );

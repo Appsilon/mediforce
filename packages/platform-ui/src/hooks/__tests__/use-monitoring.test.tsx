@@ -89,7 +89,7 @@ describe('useMonitoringData', () => {
     // instead — a real SQL aggregation, not a client-side tally).
     expect(summaryMock).toHaveBeenCalledWith({ handle: 'team-alpha' });
     expect(tasksListMock).toHaveBeenCalledWith(
-      expect.objectContaining({ namespace: 'team-alpha', status: ['pending', 'claimed'] }),
+      expect.objectContaining({ namespace: ['team-alpha'], status: ['pending', 'claimed'] }),
     );
   });
 

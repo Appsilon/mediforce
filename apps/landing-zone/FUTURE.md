@@ -18,7 +18,7 @@ Items deferred from v0.1 scope. Re-evaluate when phase noted starts.
 
 **v0.1:** Zero auth (demo mode).
 
-**Future:** Reuse platform-core RBAC. Role `data-manager` per study in config (`approver: "filip@appsilon.com"`). Manager override role for cross-study escalations.
+**Future:** Reuse the platform's process roles (ADR-0019 — `user_roles`, granted per workspace, enforced by `assertCallerHoldsRole`). Role `data-manager` per study in config (`approver: "filip@appsilon.com"`). Manager override role for cross-study escalations.
 
 ## Multi-study overview dashboard
 

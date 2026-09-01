@@ -5,6 +5,7 @@ import type {
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
+import { assertCallerMayEditWorkflow } from './_access-gate';
 
 interface ScopedInput extends SetVisibilityInput {
   namespace: string;
@@ -21,6 +22,10 @@ export async function setWorkflowVisibility(
   if (latestVersion === 0) {
     throw new NotFoundError(`Workflow '${input.name}' not found`);
   }
+
+  // ADR-0019 `edit` — after the 404, so a gated workflow and a missing one
+  // still look the same to someone who may not touch either.
+  await assertCallerMayEditWorkflow(scope, input.namespace, input.name);
 
   await scope.workflowDefinitions.setVisibility(input.namespace, input.name, input.visibility);
 

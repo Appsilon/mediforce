@@ -22,7 +22,7 @@ function buildExecution(overrides: Partial<StepExecution> = {}): StepExecution {
   };
 }
 
-const viewer = { uid: 'u-reviewer', role: 'reviewer' };
+const viewer = { uid: 'u-reviewer' };
 
 describe('resolveStepView', () => {
   it('returns not-executed when there are no tasks and no execution', () => {
@@ -39,7 +39,7 @@ describe('resolveStepView', () => {
     expect(view).toEqual({ kind: 'execution-results' });
   });
 
-  it('returns an actionable human-step view for a pending task matching the viewer role', () => {
+  it('returns an actionable human-step view for a pending task', () => {
     const task = buildHumanTask({ status: 'pending', assignedRole: 'reviewer' });
     const view = resolveStepView({ tasks: [task], execution: null, viewer });
     expect(view).toEqual({
@@ -69,13 +69,17 @@ describe('resolveStepView', () => {
     });
   });
 
-  it('locks a pending task assigned to a different role', () => {
+  // Role gating is the server's answer, not this resolver's: `assignedRole`
+  // holds only `allowedRoles[0]`, so locking on it refuses a legitimate holder
+  // of the step's second allowed role. The gate enforces the real array and
+  // returns a 403 naming what is required and what the caller holds.
+  it('leaves a task naming another role actionable, deferring to the server gate', () => {
     const task = buildHumanTask({ status: 'pending', assignedRole: 'principal-investigator' });
     const view = resolveStepView({ tasks: [task], execution: null, viewer });
     expect(view).toEqual({
       kind: 'human-step',
       task,
-      access: { kind: 'role-mismatch', requiredRole: 'principal-investigator' },
+      access: { kind: 'actionable' },
     });
   });
 

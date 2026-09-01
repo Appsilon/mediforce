@@ -32,6 +32,7 @@ import { runLogsCommand } from './commands/run-logs';
 import { runWatchCommand } from './commands/run-watch';
 import { workflowArchiveCommand } from './commands/workflow-archive';
 import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility';
+import { workflowAccessCommand, workflowSetAccessCommand } from './commands/workflow-access';
 import { workflowCopyCommand } from './commands/workflow-copy';
 import { workflowDeleteCommand } from './commands/workflow-delete';
 import {
@@ -117,7 +118,7 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   workflow: {
-    description: 'Workflow definitions (register, list, get, copy, archive, delete, visibility)',
+    description: 'Workflow definitions (register, list, get, copy, archive, delete, visibility, access)',
     leaves: {
       register: { description: 'Register a workflow definition from a JSON file', fn: workflowRegisterCommand },
       validate: { description: 'Validate a workflow definition JSON file against the schema', fn: workflowValidateCommand },
@@ -130,6 +131,8 @@ export const TREE: Record<string, BranchEntry> = {
       },
       get: { description: 'Fetch a workflow definition', fn: workflowGetCommand },
       'set-visibility': { description: 'Set workflow visibility (public|private)', fn: workflowSetVisibilityCommand },
+      access: { description: 'Show who may run and who may edit a workflow', fn: workflowAccessCommand },
+      'set-access': { description: 'Set who may run and who may edit a workflow', fn: workflowSetAccessCommand },
       copy: { description: 'Copy workflow to another namespace', fn: workflowCopyCommand },
       archive: { description: 'Archive/unarchive workflow versions', fn: workflowArchiveCommand },
       delete: { description: 'Soft-delete a workflow + cascade', fn: workflowDeleteCommand },

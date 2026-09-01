@@ -41,6 +41,8 @@ describe('mapApiToDefinitionGroups', () => {
       }],
       stepCount: 3,
       hasManualTrigger: true,
+      // The public profile read carries no gate, and no gate means open.
+      callerMayRun: true,
       externalSkillsRepo: { url: 'https://github.com/example/repo' },
       url: undefined,
       archived: undefined,

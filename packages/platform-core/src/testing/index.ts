@@ -1,7 +1,6 @@
 export { InMemoryAgentEventRepository } from './in-memory-agent-event-repository';
 export { InMemoryAuditRepository } from './in-memory-audit-repository';
 export { InMemoryProcessRepository } from './in-memory-process-repository';
-export { InMemoryAuthService } from './in-memory-auth-service';
 export { InMemoryProcessInstanceRepository } from './in-memory-process-instance-repository';
 export { InMemoryHumanTaskRepository } from './in-memory-human-task-repository';
 export { InMemoryTaskAttachmentRepository } from './in-memory-task-attachment-repository';

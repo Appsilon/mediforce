@@ -58,10 +58,12 @@ export {
   InstanceStatusSchema,
   ProcessInstanceSchema,
   RunNameEntrySchema,
+  RunDefinitionPinSchema,
   WorkflowDisplayStatusSchema,
   type InstanceStatus,
   type ProcessInstance,
   type RunNameEntry,
+  type RunDefinitionPin,
   type WorkflowDisplayStatus,
 } from './process-instance';
 
@@ -218,6 +220,28 @@ export {
   type WaitActionConfig,
   type ActionConfig,
 } from './workflow-definition';
+
+export {
+  WorkflowAccessSchema,
+  OPEN_WORKFLOW_ACCESS,
+  isOpenWorkflowAccess,
+  type WorkflowAccess,
+} from './workflow-access';
+
+export {
+  BUILTIN_ROLES,
+  WORKFLOW_MANAGER_ROLE,
+  DEFAULT_WORKFLOW_ACCESS,
+  DEFAULT_STEP_ALLOWED_ROLES,
+  builtinRoleIds,
+  builtinRolesWithVerb,
+  findBuiltinRole,
+  withBuiltinAccessFloor,
+  withBuiltinStepFloor,
+  pinnedRolesForVerb,
+  type BuiltinRole,
+  type RoleVerb,
+} from './builtin-roles';
 
 export {
   AddStepToolSchema,

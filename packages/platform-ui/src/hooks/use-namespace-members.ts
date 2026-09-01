@@ -12,6 +12,14 @@ export type NamespaceMemberDetail = NamespaceMemberWithAuth & { id: string };
 export interface UseNamespaceMembersResult {
   members: NamespaceMemberDetail[];
   loading: boolean;
+  /**
+   * Whether `members` is the roster the server returned, as opposed to the
+   * empty array this hook shows while the read is in flight, after it failed,
+   * or with no handle to read. A caller that reasons about what the roster does
+   * NOT contain has to keep those apart — "nobody holds this role" and "we have
+   * not been told yet" are the same empty list and mean opposite things.
+   */
+  resolved: boolean;
 }
 
 const ROLE_ORDER: Record<string, number> = { owner: 0, admin: 1, member: 2 };
@@ -46,5 +54,5 @@ export function useNamespaceMembers(handle: string): UseNamespaceMembersResult {
     [fetched],
   );
 
-  return { members, loading: query.isLoading };
+  return { members, loading: query.isLoading, resolved: query.isSuccess };
 }

@@ -45,7 +45,8 @@ storage key.
 **Workflow**:
 A named, reusable process. Identified by `(namespace, name)`. Owns many
 versioned **Workflow Definitions**, a default-version pointer, visibility,
-archive state. The named thing users create, edit, share, and run.
+archive state, and **Workflow Access**. The named thing users create, edit,
+share, and run.
 _Avoid_: "Workflow" used loosely for one version (= Workflow Definition) or
 for one execution (= Workflow Run).
 
@@ -191,9 +192,15 @@ Work item assigned to a human role inside a Workflow Run. Created when
 visible to all role-matching users until claimed).
 
 **Human actions** *(UI label)*:
-The task inbox page listing all pending Human Tasks for the current user. Navigating
-to a task item deep-links directly to the owning Workflow Run Step view (not a
-separate task detail page). Previously labelled "New actions".
+The task inbox page. Opens scoped to the Workspace in the URL, with a
+workspace filter that widens it to any set of the Workspaces the viewer belongs
+to, or to all of them. Defaults to the Human Tasks the viewer can act on —
+assigned to them, or unclaimed on a step whose `allowedRoles` they hold in that
+Workspace — with an **All in workspace** toggle for every task in the
+selection. Each row links into the Workspace its own Run belongs to, not the
+one in the URL. Navigating to a task item deep-links directly to
+the owning Workflow Run Step view (not a separate task detail page). Previously
+labelled "New actions".
 _Avoid_: using "task inbox" or "task detail" for the unified step view — the step
 view is the canonical surface for human work, not a standalone task page.
 
@@ -255,16 +262,64 @@ Functional roles a User holds for workflow purposes — e.g. `reviewer`, `PI`,
 **within one Workspace** and optionally narrowed to a single Workflow
 ([ADR-0019](docs/adr/0019-workspace-scoped-roles.md)); an unnarrowed grant
 covers every Workflow in that Workspace. Roles drive task assignment, Step
-access (`allowedRoles`), and notification targeting.
+access (`allowedRoles`), Workflow Access (`run` / `edit`), and notification
+targeting.
 _Avoid_: confusing with Membership. Both are per-Workspace and both are called
 "role" in the schema — Membership (`workspace_members.role`) governs who
 administers the Workspace, Roles (`user_roles.role`) describe workflow
 function.
-_Note_: Roles can now be granted (`mediforce namespace set-member-roles`,
-`PUT /api/namespaces/:handle/members/:uid/roles`) and read back
-(`mediforce namespace list-members`, `GET /api/users/members`), but
-`allowedRoles` is still declarative — nothing enforces it yet
-([#1249](https://github.com/Appsilon/mediforce/issues/1249)).
+_Note_: Roles are granted from the **Roles** table in workspace settings
+(separate from the members table's **Membership** column, which is a different
+thing), from the CLI (`mediforce namespace set-member-roles`) or over the API
+(`PUT /api/namespaces/:handle/members/:uid/roles`), read back
+(`mediforce namespace list-members`, `GET /api/users/members`), and enforced on
+task claim and complete against the run's pinned Workflow Definition, and on
+starting or changing a Workflow against its Workflow Access.
+_Note_: Four **Built-in Roles** ship with every deployment — see below.
+
+**Built-in Roles** *(the starting set)*:
+`editor`, `executor`, `reviewer` and `workflow-manager`
+([ADR-0020](docs/adr/0020-built-in-roles-and-default-workflow-access.md)).
+Ordinary Roles in every respect — free-form strings, granted and revoked like
+any other. What makes them built-in is that the platform writes them into the
+ordinary places by default: a Workflow's first version is registered with
+`run: [executor, workflow-manager]` / `edit: [editor, workflow-manager]`, a
+human Step added in the editor starts at `allowedRoles: [reviewer,
+workflow-manager]`, and all four are always offered in the role pick-lists.
+`workflow-manager` is the union of the other three, not a rank above them.
+The defaults are a **floor**. A restricted Workflow verb always admits the
+built-in roles that carry it, so `run: [qa-lead]` is stored as
+`[executor, workflow-manager, qa-lead]` and the Access tab shows those two as
+locked; a restricted Step always admits `workflow-manager`, applied where the
+gate reads rather than written into the Workflow Definition, which travels.
+`reviewer` gets no such standing — it is an ordinary Role that authored
+definitions name, and its `act` verb shows up only as the default a new human
+Step is seeded with. An unrestricted verb or Step stays open to any member.
+_Avoid_: calling them reserved or protected — nothing rejects a Role named
+`editor` from a different source, and nothing in the gate treats these four
+specially. A built-in Role holds a privilege only where a list names it; the
+floor is what puts it there.
+_Note_: A Workspace's owner always holds `workflow-manager` — granted at
+creation and re-established on every write from the Roles table, where its row
+has no Remove control. Whoever registers a Workflow holds it narrowed to that
+Workflow. Both exist so a seeded gate is never one nobody can pass.
+
+**Workflow Access** *(workflow governance level)*:
+Which **Roles** may `run` a Workflow (start a run) and which may `edit` it
+(register a version, archive, delete, transfer, set visibility, move the
+default version) — the workflow's **Access** tab
+([ADR-0019](docs/adr/0019-workspace-scoped-roles.md)). Stored per
+`(namespace, name)` beside the Workflow, never inside a Workflow Definition:
+registering a new version must not silently rewrite permissions. Administered
+by workspace owner/admin. An empty list means any member of the Workspace —
+the state of every Workflow that predates
+[ADR-0020](docs/adr/0020-built-in-roles-and-default-workflow-access.md), and of
+every one registered by automation; a Workflow a person creates starts from the
+Built-in Roles' defaults instead.
+_Avoid_: confusing with `visibility`, which is the *cross-workspace* read
+shelf — every member of the owning Workspace sees every Workflow in it
+regardless of Access. And with the Workflow Definition's `roles` field, which
+declares role names and grants nothing.
 
 **Caller Identity** *(per-request authorization subject)*:
 The authorization subject resolved for one request: either a signed-in User

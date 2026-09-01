@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
+import {
+  InMemoryAuditRepository,
+  InMemoryUserDirectoryService,
+} from '@mediforce/platform-core/testing';
 import type { UserDirectoryService } from '@mediforce/platform-core';
 import { InMemoryNamespaceRepo, createTestScope, stubUserDirectory, userCaller } from '../../../testing/index';
 import { createNamespace } from '../create-namespace';
@@ -51,6 +54,51 @@ describe('createNamespace handler', () => {
     expect(events).toHaveLength(1);
     expect(events[0]?.entityId).toBe('acme');
     expect(events[0]?.actorId).toBe('uid-marek');
+  });
+
+  it('grants the owner workflow-manager so the workspace has one from minute one', async () => {
+    const directory = new InMemoryUserDirectoryService();
+    directory.addUser({ uid: 'uid-marek', email: 'marek@example.com' });
+    directory.addMember('uid-marek', 'acme');
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      userDirectory: directory,
+      caller: userCaller('uid-marek', []),
+    });
+
+    await createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope);
+
+    // ADR-0020: the default access every workflow created here is seeded with
+    // names `workflow-manager`, so a workspace with no holder of it would open
+    // with a gate nobody but each workflow's own author could pass.
+    expect(await directory.getGrantsForUser('uid-marek', 'acme')).toEqual([
+      { role: 'workflow-manager', workflowName: null },
+    ]);
+    const created = auditRepo.getAll().find((e) => e.action === 'namespace.created');
+    expect(created?.outputSnapshot).toMatchObject({ ownerRoleGranted: true });
+  });
+
+  it('still creates the workspace when the role grant fails, and says so in the audit trail', async () => {
+    // The workspace is already written by the time the grant runs, so a
+    // failure must not turn a created workspace into a 500 and a retry that
+    // can only 409.
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      userDirectory: stubUserDirectory({
+        async grantRole() {
+          throw new Error('directory unavailable');
+        },
+      }),
+      caller: userCaller('uid-marek', []),
+    });
+
+    const result = await createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope);
+
+    expect(result.namespace.handle).toBe('acme');
+    const created = auditRepo.getAll().find((e) => e.action === 'namespace.created');
+    expect(created?.outputSnapshot).toMatchObject({ ownerRoleGranted: false });
   });
 
   it('persists optional bio when provided', async () => {

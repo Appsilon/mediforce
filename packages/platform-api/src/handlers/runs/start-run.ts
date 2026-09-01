@@ -3,6 +3,7 @@ import { ManualTriggerNotDeclaredError } from '@mediforce/workflow-engine';
 import type { StartRunInput, StartRunOutput } from '../../contract/runs';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, ForbiddenError, NotFoundError, HandlerError } from '../../errors';
+import { assertCallerMayRunWorkflow } from '../workflows/_access-gate';
 
 // Engine's createInstance + startInstance emit instance.created /
 // instance.started; handler does NOT double-emit.
@@ -47,6 +48,14 @@ export async function startRun(
   if (!scope.caller.isSystemActor && !scope.caller.namespaces.has(definition.namespace)) {
     throw new ForbiddenError();
   }
+
+  // ADR-0019 `run`: membership above says the caller may reach this workflow,
+  // this says they may start it. After the 404 and the membership check so a
+  // non-member still cannot tell "gated" from "does not exist", and before the
+  // payload validation so a refusal reads as a refusal rather than as a
+  // complaint about the fields. System actors bypass inside the gate, which is
+  // what leaves cron and webhook firings unaffected.
+  await assertCallerMayRunWorkflow(scope, definition.namespace, definition.name);
 
   // Unconditional (ADR-0012): `triggerInput` is the workflow's *total* input
   // contract, so an empty contract means "this workflow takes no input" and a

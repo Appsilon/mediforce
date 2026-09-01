@@ -329,7 +329,6 @@ export function getPlatformServices(): PlatformServices {
     instanceRepo,
     auditRepo,
     undefined,
-    undefined,
     notificationService,
     humanTaskRepo,
     coworkSessionRepo,
