@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertTriangle } from 'lucide-react';
+import { withBuiltinStepFloor } from '@mediforce/platform-core';
 import { RoleMultiSelect } from '../role-multi-select';
 import { inputBaseMono } from './step-editor-fields';
 
@@ -16,6 +17,12 @@ const ASSIGNEE_SUGGESTIONS_ID = 'step-assignee-options';
  * allowing `reviewer` and `workflow-manager` in a workspace with no reviewers
  * is reachable, not stranded — the pair ADR-0020 seeds every new human step
  * with, and a claim of "this step will block" would be false on all of them.
+ *
+ * The reachable set is `withBuiltinStepFloor(value)`, not `value`: a restricted
+ * step admits `workflow-manager` whether or not its author wrote it, so a
+ * workspace with one is never stranded on a step. The chips still show only
+ * what the author wrote — the floor is the platform's, not part of the
+ * definition this editor saves.
  */
 export function AllowedRolesField({
   value,
@@ -34,9 +41,11 @@ export function AllowedRolesField({
   heldRoles: string[] | null;
   onChange: (roles: string[]) => void;
 }) {
+  const effective = withBuiltinStepFloor(value);
   const unheld = heldRoles === null ? [] : value.filter((role) => !heldRoles.includes(role));
-  const blocked = value.length > 0 && unheld.length === value.length;
-  const reachableBy = value.filter((role) => !unheld.includes(role));
+  const reachableBy =
+    heldRoles === null ? [] : effective.filter((role) => heldRoles.includes(role));
+  const blocked = value.length > 0 && unheld.length > 0 && reachableBy.length === 0;
 
   return (
     <div className="space-y-2">

@@ -183,7 +183,8 @@ describe('assertCallerMayActOnTask', () => {
     await expect(
       assertCallerMayActOnTask(scopeFor(new Map(), stubUserDirectory()), task),
     ).rejects.toThrow(
-      "No one in this workspace holds 'reviewer'. An admin can assign it in workspace Settings → Members.",
+      "No one in this workspace holds any of 'reviewer', 'workflow-manager'. " +
+        'An admin can assign one in workspace Settings → Members.',
     );
   });
 
@@ -201,7 +202,48 @@ describe('assertCallerMayActOnTask', () => {
 
     await expect(
       assertCallerMayActOnTask(scopeFor(new Map(), directory), task),
-    ).rejects.toThrow("This step requires 'reviewer'; you hold 'author'.");
+    // The refusal names `workflow-manager` too, because holding it would have
+    // admitted them (ADR-0020) — a message that hid the role that opens the
+    // step would send the reader to ask for the wrong grant.
+    ).rejects.toThrow(
+      "This step requires any of 'reviewer', 'workflow-manager'; you hold 'author'.",
+    );
+  });
+
+  it('lets a workflow-manager act on a step whose author never named them', async () => {
+    // The `testse` case: a step restricted to `engineer` refused the workspace
+    // owner, who holds `workflow-manager` — the role whose whole meaning is
+    // "can act on this workflow's manual steps" (ADR-0020).
+    await pinDefinition(humanStep(['engineer']));
+    const task = await seedTask();
+
+    await expect(
+      assertCallerMayActOnTask(
+        scopeFor(new Map([[NAMESPACE, new Set(['workflow-manager'])]])),
+        task,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it('does not extend the same standing to reviewer', async () => {
+    // `reviewer` is an ordinary process role that authored definitions already
+    // name; standing authority for it would let a grant made for one step
+    // claim every other one (AGENTS.md §12).
+    await pinDefinition(humanStep(['engineer']));
+    const task = await seedTask();
+
+    await expect(
+      assertCallerMayActOnTask(scopeFor(new Map([[NAMESPACE, new Set(['reviewer'])]])), task),
+    ).rejects.toThrow(ForbiddenError);
+  });
+
+  it('leaves an ungated step ungated rather than raising it to the floor', async () => {
+    await pinDefinition(humanStep([]));
+    const task = await seedTask();
+
+    // No `allowedRoles` is "any workspace member", and a floor there would gate
+    // a step that is open today.
+    await expect(assertCallerMayActOnTask(scopeFor(new Map()), task)).resolves.toBeUndefined();
   });
 
   it('bypasses the gate for a system actor', async () => {
@@ -261,7 +303,8 @@ describe('assertCallerMayActOnTask', () => {
     await expect(
       assertCallerMayActOnTask(scopeFor(new Map(), stubUserDirectory()), task),
     ).rejects.toThrow(
-      "No one in this workspace holds any of 'reviewer', 'approver'. An admin can assign one in workspace Settings → Members.",
+      "No one in this workspace holds any of 'reviewer', 'approver', 'workflow-manager'. " +
+        'An admin can assign one in workspace Settings → Members.',
     );
   });
 
@@ -276,7 +319,9 @@ describe('assertCallerMayActOnTask', () => {
 
     await expect(
       assertCallerMayActOnTask(scopeFor(new Map(), directory), task),
-    ).rejects.toThrow("This step requires 'reviewer'; you hold no roles in this workspace.");
+    ).rejects.toThrow(
+      "This step requires any of 'reviewer', 'workflow-manager'; you hold no roles in this workspace.",
+    );
   });
   // Version numbering restarts at 1 once the last version leaves a workspace,
   // so registering the transferred (or deleted) name again plants a definition
@@ -335,9 +380,12 @@ describe('assertCallerMayActOnTask', () => {
     await expect(
       assertCallerMayActOnTask(scopeFor(new Map(), directory), task),
     ).rejects.toThrow(
-      "No one in this workspace holds 'reviewer'. An admin can assign it in workspace Settings → Members.",
+      "No one in this workspace holds any of 'reviewer', 'workflow-manager'. " +
+        'An admin can assign one in workspace Settings → Members.',
     );
-    expect(probes).toBe(1);
+    // Three `reviewer` entries and the floor's `workflow-manager`: two distinct
+    // roles, two probes.
+    expect(probes).toBe(2);
   });
 
   it('skips the zero-holder probe on a step naming more roles than the bound', async () => {

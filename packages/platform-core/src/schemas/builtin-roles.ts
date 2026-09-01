@@ -131,6 +131,34 @@ export function pinnedRolesForVerb(verb: RoleVerb): string[] {
   return builtinRolesWithVerb(verb);
 }
 
+/**
+ * The same floor for a **restricted human step**: `workflow-manager` can act on
+ * one whatever its author wrote.
+ *
+ * Applied where the gate reads rather than written into the list, unlike
+ * `run` / `edit` above. `step.allowedRoles` is authored data inside a versioned
+ * document that travels between deployments (ADR-0013) — rewriting it would
+ * put this platform's vocabulary into somebody else's workflow package, and
+ * would not reach the imported package naming `engineer` that is exactly the
+ * case this exists for.
+ *
+ * **Only `workflow-manager`**, though `reviewer` carries `act` too. `reviewer`
+ * is an ordinary process role that 23 definitions in this repo already name in
+ * `allowedRoles`; giving it standing authority would let somebody granted it
+ * for one step claim every other one — a privilege escalation on existing
+ * grants (AGENTS.md §12). `workflow-manager` is a name this platform
+ * introduced, held by nobody before it existed, and "can act on its manual
+ * steps" is what it says it means. `reviewer` keeps its `act` verb where it is
+ * honest: as the role a new human step is seeded to allow.
+ *
+ * An empty list is left empty — no `allowedRoles` is "any workspace member",
+ * and a floor there would gate a step that is open today.
+ */
+export function withBuiltinStepFloor(allowedRoles: readonly string[]): string[] {
+  if (allowedRoles.length === 0) return [];
+  return [...new Set([...allowedRoles, WORKFLOW_MANAGER_ROLE])];
+}
+
 function raiseToFloor(roles: readonly string[], verb: RoleVerb): string[] {
   if (roles.length === 0) return [];
   return [...new Set([...pinnedRolesForVerb(verb), ...roles])];

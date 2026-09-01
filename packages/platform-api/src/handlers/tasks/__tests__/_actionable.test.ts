@@ -165,6 +165,17 @@ describe('listTasks — actionable axis', () => {
       expect(result.tasks.map((task) => task.id)).toEqual(['t-gated']);
     });
 
+    it('keeps a gated task for a workflow-manager the step never named', async () => {
+      const holdsManager = new Map([[NAMESPACE, new Set(['workflow-manager'])]]);
+
+      // The inbox reads the same `resolveStepGate` the claim is gated on, so
+      // the standing role of ADR-0020 reaches both or neither — a task the
+      // server would let them complete has to be listed as theirs.
+      const result = await listTasks({ actionable: true }, scopeFor(HOLDER, holdsManager));
+
+      expect(result.tasks.map((task) => task.id)).toEqual(['t-gated']);
+    });
+
     it('keeps a task whose step declares no allowedRoles', async () => {
       await seedRun('inst-open', OPEN_WORKFLOW);
       await seedTask({ id: 't-open', processInstanceId: 'inst-open' });

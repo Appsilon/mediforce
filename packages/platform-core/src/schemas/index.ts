@@ -237,6 +237,7 @@ export {
   builtinRolesWithVerb,
   findBuiltinRole,
   withBuiltinAccessFloor,
+  withBuiltinStepFloor,
   pinnedRolesForVerb,
   type BuiltinRole,
   type RoleVerb,

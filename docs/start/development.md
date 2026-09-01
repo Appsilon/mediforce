@@ -246,7 +246,10 @@ the gate — they are on the lists, so the lists remain the whole answer.
 
 Those two are a **floor** rather than a starting point: restricting a verb on
 the Access tab always keeps the built-in role that carries it, and the way back
-to "any member" is that verb's restrict toggle. A workspace's owner always holds
+to "any member" is that verb's restrict toggle. A restricted human step has the
+same floor, narrowed to one role — `workflow-manager` can pick up any manual
+step, including one an imported package restricted to a name this deployment
+has never granted. A workspace's owner always holds
 `workflow-manager`, and whoever registers a workflow holds it on that workflow —
 between them, a gate is never one nobody in the workspace can pass. Workflows
 registered before this are untouched and stay open.

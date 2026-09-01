@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   BUILTIN_ROLES,
   withBuiltinAccessFloor,
+  withBuiltinStepFloor,
   DEFAULT_STEP_ALLOWED_ROLES,
   DEFAULT_WORKFLOW_ACCESS,
   WORKFLOW_MANAGER_ROLE,
@@ -76,5 +77,26 @@ describe('withBuiltinAccessFloor', () => {
   it('does not duplicate a built-in the list already names', () => {
     expect(withBuiltinAccessFloor({ run: ['workflow-manager', 'executor'], edit: [] }).run)
       .toEqual(['executor', 'workflow-manager']);
+  });
+});
+
+describe('withBuiltinStepFloor', () => {
+  it('leaves an unrestricted step open', () => {
+    expect(withBuiltinStepFloor([])).toEqual([]);
+  });
+
+  it('adds workflow-manager to a step its author restricted', () => {
+    expect(withBuiltinStepFloor(['engineer'])).toEqual(['engineer', 'workflow-manager']);
+  });
+
+  it('adds nothing else, reviewer included', () => {
+    // `reviewer` carries `act` as the role a new human step is *seeded* to
+    // allow. Standing authority for it would widen every grant the 23
+    // definitions naming it already depend on (AGENTS.md §12).
+    expect(withBuiltinStepFloor(['engineer'])).not.toContain('reviewer');
+  });
+
+  it('does not duplicate a step that already names it', () => {
+    expect(withBuiltinStepFloor(['workflow-manager'])).toEqual(['workflow-manager']);
   });
 });

@@ -350,8 +350,22 @@ On the Access tab the built-ins are a **floor**, not just a starting point: a
 verb you restrict always keeps the built-in roles that carry it, so restricting
 `run` to `qa-lead` stores `[executor, workflow-manager, qa-lead]` and the tab
 shows those two as locked chips. The way back to "any member" is the verb's
-**restrict** toggle, not removing chips. A step's `allowedRoles` has no floor —
-that list travels with the package, so it stays entirely the author's.
+**restrict** toggle, not removing chips.
+
+A restricted **step** has a floor too, and it is exactly one role:
+`workflow-manager` can act on any human step, whatever its `allowedRoles` say.
+An imported package whose step allows `engineer` is still actionable by a
+workflow manager. The floor is applied where the gate reads rather than written
+into the list, because `allowedRoles` travels with the package and rewriting it
+would put this deployment's vocabulary into someone else's workflow — the chips
+in the step editor stay exactly what the author wrote. `reviewer` gets no such
+standing despite carrying `act`: it is an ordinary process role that authored
+definitions already name, and widening it would let a grant made for one step
+claim every other one. Its `act` verb shows up where it is honest — as the role
+a new human step is seeded to allow.
+
+An empty `allowedRoles` is untouched in both cases: no restriction means any
+workspace member, and a floor there would gate a step that is open today.
 
 Two exceptions keep this deployable: a workflow **registered by automation**
 (the CLI, an import, the seeded builtins) stays open, because a system actor

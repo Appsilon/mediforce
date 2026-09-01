@@ -813,6 +813,24 @@ describe('StepEditor', () => {
       expect(warning).not.toHaveTextContent('will block');
     });
 
+    it('does not call a step blocked when a workflow-manager can reach it', () => {
+      // ADR-0020: a restricted step admits `workflow-manager` whether or not
+      // the author wrote it, so an imported step naming only `engineer` is
+      // reachable in a workspace that has one.
+      rolesState.workspaceRoles = {
+        roles: ['engineer', 'workflow-manager'],
+        workflowNames: ['tealflow'],
+        heldRoles: ['workflow-manager'],
+        loading: false,
+        error: null,
+      };
+      renderRoles({ allowedRoles: ['engineer'] });
+
+      const warning = screen.getByText(/no one holds/i);
+      expect(warning).toHaveTextContent('engineer');
+      expect(warning).not.toHaveTextContent('will block');
+    });
+
     it('[REGRESSION #1252] a holder scoped to another workflow does not silence the warning', () => {
       // `heldRoles` is already scoped to this workflow by the hook, so a grant
       // narrowed to `otherflow` never reaches it.

@@ -88,6 +88,26 @@ registered by automation, and raising it would gate what is open today
 tab needs an explicit "restrict this verb" control: with the floor unremovable,
 clearing chips one at a time can no longer be the way back to open.
 
+**A restricted step has the same floor, narrowed to one role.**
+`workflow-manager` can act on any human step whatever its `allowedRoles` say,
+because "can act on its manual steps" is what the role means and a workflow
+manager who cannot complete a step is not one. Here the floor is applied where
+the gate reads (`resolveStepGate`, so the claim gate and the actionable inbox
+get it from one place) rather than written into the list, because
+`allowedRoles` is authored data inside a versioned document that travels
+between deployments (ADR-0013): rewriting it would put this platform's
+vocabulary into someone else's package, and would not reach the imported step
+naming `engineer` that is the case this exists for.
+
+`reviewer` gets no standing on `act` despite carrying the verb, and this is the
+asymmetry the `run`/`edit` floor does not have. `reviewer` is an ordinary
+process role that 23 definitions in this repo already name; standing authority
+for it would let somebody granted it for one step claim every other one — the
+escalation this ADR rejected the override reading over. `workflow-manager` is a
+name this platform introduced and nobody held before it existed, so it carries
+no such history. `reviewer`'s `act` verb survives where it is honest: as the
+role a new human step is seeded to allow.
+
 The cost is real and is accepted: a workflow cannot be restricted to `qa-lead`
 *instead of* the built-ins, only in addition to them. Excluding somebody from
 one workflow means not granting them `executor`. That is the price of the
@@ -174,10 +194,11 @@ membership removal has just cascaded away.
   (AGENTS.md §13).
 - **Plain members.** `workflow-manager` carries edit and delete across the
   whole workspace; seeding it to everyone would make the gate decorative.
-- **Steps that are not `executor: 'human'`.** An L3 agent step's approval is a
-  human task and `allowedRoles` would gate it, but defaulting that would decide
-  who may approve agent output in every new workflow — a bigger call than "who
-  picks up manual work" and not the one being made here.
+- **Seeding `allowedRoles` on steps that are not `executor: 'human'`.** An L3
+  agent step's approval is a human task, so the step floor reaches it — a
+  workflow manager can approve one — but the editor does not write
+  `[reviewer, workflow-manager]` into it. Deciding who may approve agent output
+  in every new workflow is a bigger call than "who picks up manual work".
 - **Copies.** A copy that stays in the workspace already inherits its source's
   access (ADR-0019); one that leaves carries nothing and lands open, for the
   reason grants do not travel across workspaces.
@@ -229,6 +250,9 @@ User-visible changes (AGENTS.md §12), accepted deliberately:
   workspace — and only rows that already restricted are touched.
 - **A human block added in the editor arrives with `allowedRoles` filled in.**
   The author sees it in the step editor and can clear it back to "any member".
+- **An existing restricted step now also admits `workflow-manager`.** No
+  definition is rewritten — the floor is applied at the gate — so what changes
+  is who a restricted step admits, not what any workflow package says.
 - **The step editor's unheld-role warning no longer claims a step will block
   when another listed role is held.** It was already inaccurate; the seeded
   pair is what would have made it wrong on nearly every new step.

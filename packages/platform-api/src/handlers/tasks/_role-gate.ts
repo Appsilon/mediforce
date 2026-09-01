@@ -1,4 +1,4 @@
-import type { HumanTask, WorkflowDefinition } from '@mediforce/platform-core';
+import { withBuiltinStepFloor, type HumanTask, type WorkflowDefinition } from '@mediforce/platform-core';
 import { assertCallerHoldsRole } from '../../auth';
 import { ForbiddenError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
@@ -31,6 +31,11 @@ export const UNREADABLE_DEFINITION_MESSAGE =
  * - **The definition resolves but does not describe this step.** That is not an
  *   unknown — it is a definite "no restriction declared", so the step stays
  *   open exactly as before the gate existed.
+ *
+ * A restricted step also admits `workflow-manager` (ADR-0020), which is why
+ * the roles this returns are not always the roles the author wrote. See
+ * `withBuiltinStepFloor` for why that floor is applied here rather than
+ * written into the definition.
  */
 export async function assertCallerMayActOnTask(
   scope: CallerScope,
@@ -91,15 +96,14 @@ export function resolveStepGate(
 
   const step = definition.steps.find((candidate) => candidate.id === task.stepId);
   if (step === undefined) return { kind: 'open' };
-  if (step.allowedRoles === undefined || step.allowedRoles.length === 0) {
-    return { kind: 'open' };
-  }
+  const allowedRoles = withBuiltinStepFloor(step.allowedRoles ?? []);
+  if (allowedRoles.length === 0) return { kind: 'open' };
 
   return {
     kind: 'restricted',
     namespace: definition.namespace,
     workflow: definition.name,
-    allowedRoles: step.allowedRoles,
+    allowedRoles,
   };
 }
 

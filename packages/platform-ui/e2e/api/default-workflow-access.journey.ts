@@ -34,6 +34,8 @@ const ORG_HANDLE = 'default-access-org';
 const AUTHORED_WD = 'default-access-authored';
 /** Registered by the API key — the control that must stay open. */
 const AUTOMATED_WD = 'default-access-automated';
+/** Its human step is restricted to a role nobody in the workspace holds. */
+const GATED_STEP_WD = 'default-access-gated-step';
 
 interface Persona {
   readonly email: string;
@@ -62,7 +64,7 @@ function ensureFixture(request: APIRequestContext): Promise<Callers> {
   return fixture;
 }
 
-function workflowNamed(name: string): Record<string, unknown> {
+function workflowNamed(name: string, allowedRoles?: string[]): Record<string, unknown> {
   return {
     name,
     title: name,
@@ -72,6 +74,7 @@ function workflowNamed(name: string): Record<string, unknown> {
         name: 'Act',
         type: 'review',
         executor: 'human',
+        ...(allowedRoles === undefined ? {} : { allowedRoles }),
         verdicts: { approve: { target: 'done' } },
       },
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
@@ -84,10 +87,11 @@ function register(
   request: APIRequestContext,
   name: string,
   headers: Record<string, string>,
+  allowedRoles?: string[],
 ) {
   return request.post(`/api/workflow-definitions?namespace=${ORG_HANDLE}`, {
     headers,
-    data: workflowNamed(name),
+    data: workflowNamed(name, allowedRoles),
   });
 }
 
@@ -100,13 +104,14 @@ async function registerOnce(
   request: APIRequestContext,
   name: string,
   headers: Record<string, string>,
+  allowedRoles?: string[],
 ): Promise<void> {
   const existing = await request.get(
     `/api/workflow-definitions/${encodeURIComponent(name)}?namespace=${ORG_HANDLE}`,
     { headers: apiKeyHeaders() },
   );
   if (existing.status() === 200) return;
-  const res = await register(request, name, headers);
+  const res = await register(request, name, headers, allowedRoles);
   expect(res.status(), await res.text()).toBe(201);
 }
 
@@ -140,6 +145,21 @@ function startRun(request: APIRequestContext, name: string, caller: UserCaller) 
   });
 }
 
+/** The run's human task, once the engine has created it. */
+async function waitForActTask(request: APIRequestContext, runId: string): Promise<string> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const res = await request.get(`/api/tasks?instanceId=${runId}`, { headers: apiKeyHeaders() });
+    if (res.status() === 200) {
+      const { tasks } = (await res.json()) as { tasks: Array<{ id: string; stepId: string }> };
+      const task = tasks.find((candidate) => candidate.stepId === 'act');
+      if (task !== undefined) return task.id;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error(`Timed out waiting for the 'act' task of run ${runId}`);
+}
+
 async function buildFixture(request: APIRequestContext): Promise<Callers> {
   await seedPostgresOrganizationNamespace(ORG_HANDLE, TEST_USER_ID, 'Default Access Org');
 
@@ -170,6 +190,7 @@ async function buildFixture(request: APIRequestContext): Promise<Callers> {
 
   await registerOnce(request, AUTHORED_WD, sessionCookieHeaders(callers.author));
   await registerOnce(request, AUTOMATED_WD, apiKeyHeaders());
+  await registerOnce(request, GATED_STEP_WD, sessionCookieHeaders(callers.author), ['engineer']);
 
   return callers;
 }
@@ -282,6 +303,25 @@ test.describe('Default workflow access — API E2E', () => {
     // is open today, which is the one thing this must never do.
     const started = await startRun(request, AUTOMATED_WD, callers.colleague);
     expect(started.status(), await started.text()).toBe(201);
+  });
+
+  test('a workflow-manager can act on a step its author restricted to someone else', async ({
+    request,
+  }) => {
+    const callers = await ensureFixture(request);
+
+    const started = await startRun(request, GATED_STEP_WD, callers.author);
+    expect(started.status(), await started.text()).toBe(201);
+    const { run } = (await started.json()) as { run: { id: string } };
+    const taskId = await waitForActTask(request, run.id);
+
+    // The `testse` case end to end: the step allows `engineer` and the author
+    // holds only `workflow-manager` on this workflow, which is the whole point
+    // of the role (ADR-0020).
+    const claimed = await request.post(`/api/tasks/${taskId}/claim`, {
+      headers: sessionCookieHeaders(callers.author),
+    });
+    expect(claimed.status(), await claimed.text()).toBe(200);
   });
 
   test('a workflow registered by automation stays open to every member', async ({ request }) => {

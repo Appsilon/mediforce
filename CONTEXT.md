@@ -287,10 +287,14 @@ ordinary places by default: a Workflow's first version is registered with
 human Step added in the editor starts at `allowedRoles: [reviewer,
 workflow-manager]`, and all four are always offered in the role pick-lists.
 `workflow-manager` is the union of the other three, not a rank above them.
-On a Workflow the default is a **floor**: a restricted verb always admits the
+The defaults are a **floor**. A restricted Workflow verb always admits the
 built-in roles that carry it, so `run: [qa-lead]` is stored as
 `[executor, workflow-manager, qa-lead]` and the Access tab shows those two as
-locked. An unrestricted verb stays open to any member.
+locked; a restricted Step always admits `workflow-manager`, applied where the
+gate reads rather than written into the Workflow Definition, which travels.
+`reviewer` gets no such standing — it is an ordinary Role that authored
+definitions name, and its `act` verb shows up only as the default a new human
+Step is seeded with. An unrestricted verb or Step stays open to any member.
 _Avoid_: calling them reserved or protected — nothing rejects a Role named
 `editor` from a different source, and nothing in the gate treats these four
 specially. A built-in Role holds a privilege only where a list names it; the

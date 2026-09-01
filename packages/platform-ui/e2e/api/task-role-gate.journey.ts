@@ -301,7 +301,12 @@ test.describe('Step allowedRoles gate — API E2E', () => {
 
     expect(res.status(), await res.text()).toBe(403);
     const error = await errorOf(res);
-    expect(error.message).toContain("No one in this workspace holds 'gate-nobody'");
+    // The floor's `workflow-manager` is named too, and has no holder here
+    // either — a refusal that hid the role which would have opened the step
+    // sends the reader to ask for the wrong grant (ADR-0020).
+    expect(error.message).toContain(
+      "No one in this workspace holds any of 'gate-nobody', 'workflow-manager'",
+    );
     expect(error.message).toContain('Settings');
   });
 
