@@ -153,7 +153,10 @@ The seeded lists name roles the people involved need not hold. Two grants close
 that, and they are part of the decision rather than implementation detail:
 
 - **A workspace's owner holds `workflow-manager`**, and keeps it. Granted when
-  the workspace is created, backfilled for existing workspaces by migrations
+  the workspace is created — by `createNamespace` for an organization and by the
+  `GET /api/users/me` bootstrap for a personal workspace, which is the one
+  workspace nobody creates by hand and so has its own write — backfilled for
+  existing workspaces by migrations
   0045 (owners and admins) and 0046 (owners), and — because the Roles table
   writes a full replace — re-established by `setNamespaceMemberRoles` on every
   write rather than seeded once. Seeding once was not enough for the same

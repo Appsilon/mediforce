@@ -293,7 +293,7 @@ test.describe('Step allowedRoles gate — API E2E', () => {
     expect(res.status(), await res.text()).toBe(200);
   });
 
-  test('a role nobody holds fails closed, naming the cause and the fix', async ({ request }) => {
+  test('a role nobody holds fails closed, naming the role that would open it', async ({ request }) => {
     const callers = await ensureFixture(request);
     const taskId = await startTask(request, ORPHAN_ROLE_WD);
 
@@ -301,13 +301,18 @@ test.describe('Step allowedRoles gate — API E2E', () => {
 
     expect(res.status(), await res.text()).toBe(403);
     const error = await errorOf(res);
-    // The floor's `workflow-manager` is named too, and has no holder here
-    // either — a refusal that hid the role which would have opened the step
-    // sends the reader to ask for the wrong grant (ADR-0020).
-    expect(error.message).toContain(
-      "No one in this workspace holds any of 'gate-nobody', 'workflow-manager'",
-    );
-    expect(error.message).toContain('Settings');
+    // The floor's `workflow-manager` is named alongside the step's own role: a
+    // refusal that hid the role which would have opened the step sends the
+    // reader to ask for the wrong grant (ADR-0020).
+    //
+    // Not the "no one in this workspace holds" wording any more, and that is
+    // the point of ADR-0020 rather than a weaker assertion. The owner holds
+    // `workflow-manager` in every real workspace, so a *restricted* list can
+    // no longer reach zero holders — the branch that says so is reachable only
+    // where a workspace has no owner grant at all, which is where it is
+    // covered (`handlers/tasks/__tests__/_role-gate.test.ts`).
+    expect(error.message).toContain("requires any of 'gate-nobody', 'workflow-manager'");
+    expect(error.message).toContain("you hold 'gate-reviewer'");
   });
 
   test('complete is gated too — the same caller the claim refused cannot finish the task', async ({

@@ -339,3 +339,81 @@ test.describe('Default workflow access — API E2E', () => {
     expect(started.status(), await started.text()).toBe(201);
   });
 });
+
+/**
+ * The same feature on the one workspace nobody creates by hand.
+ *
+ * A personal workspace is bootstrapped by `GET /api/users/me`, not by
+ * `createNamespace`, so its owner's `workflow-manager` has to be written on
+ * that path — and for a while was written on neither: migration 0046 reached
+ * the workspaces that already existed, and nothing reached the ones
+ * bootstrapped after it ran. Its own describe block because the fixture is a
+ * user with no workspace at all, which the org fixture above cannot express.
+ */
+test.describe('Personal workspace built-in access — API E2E', () => {
+  const SOLO = {
+    email: 'personal-manager@mediforce.dev',
+    password: 'personalmanager123456',
+  } as const;
+  /** Registered by the API key, so nothing about this workflow grants anything. */
+  const IMPORTED_WD = 'personal-manager-imported';
+
+  test('the owner of a bootstrapped personal workspace can act on a step restricted to someone else', async ({
+    request,
+  }) => {
+    const caller: UserCaller = {
+      uid: await createTestUser(SOLO.email, SOLO.password, 'Personal Manager'),
+      sessionCookie: await signInAndGetSessionCookie(SOLO.email, SOLO.password),
+    };
+
+    // The bootstrap itself — this is the write under test.
+    const me = await request.get('/api/users/me', { headers: sessionCookieHeaders(caller) });
+    expect(me.status(), await me.text()).toBe(200);
+    const { namespaces } = (await me.json()) as {
+      namespaces: Array<{ handle: string; type: string }>;
+    };
+    const personal = namespaces.find((namespace) => namespace.type === 'personal');
+    if (personal === undefined) throw new Error('GET /api/users/me bootstrapped no personal workspace');
+    const handle = personal.handle;
+
+    const roster = await request.get(`/api/users/members?namespace=${handle}`, {
+      headers: sessionCookieHeaders(caller),
+    });
+    expect(roster.status(), await roster.text()).toBe(200);
+    const { members } = (await roster.json()) as {
+      members: Array<{ uid: string; grants: Array<{ role: string; workflowName: string | null }> }>;
+    };
+    expect(members.find((member) => member.uid === caller.uid)?.grants).toContainEqual({
+      role: 'workflow-manager',
+      workflowName: null,
+    });
+
+    // What the grant is for. An imported workflow whose step names a role from
+    // somebody else's deployment is gated by the step floor (ADR-0020), and
+    // the API key that registered it granted its owner nothing — so this claim
+    // passes on the workspace-wide grant or not at all.
+    const registered = await request.post(`/api/workflow-definitions?namespace=${handle}`, {
+      headers: apiKeyHeaders(),
+      data: workflowNamed(IMPORTED_WD, ['engineer']),
+    });
+    expect(registered.status(), await registered.text()).toBe(201);
+
+    const started = await request.post('/api/processes', {
+      headers: sessionCookieHeaders(caller),
+      data: {
+        namespace: handle,
+        definitionName: IMPORTED_WD,
+        triggeredBy: 'default-access-journey',
+        triggerName: 'Start',
+      },
+    });
+    expect(started.status(), await started.text()).toBe(201);
+    const { run } = (await started.json()) as { run: { id: string } };
+
+    const taskId = await waitForActTask(request, run.id);
+    const claimed = await request.post(`/api/tasks/${taskId}/claim`, {
+      headers: sessionCookieHeaders(caller),
+    });
+    expect(claimed.status(), await claimed.text()).toBe(200);
+  });
+});

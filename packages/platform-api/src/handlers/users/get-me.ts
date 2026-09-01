@@ -1,4 +1,4 @@
-import { autoJoinHandlesForEmail } from '@mediforce/platform-core';
+import { WORKFLOW_MANAGER_ROLE, autoJoinHandlesForEmail } from '@mediforce/platform-core';
 import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
 import { ForbiddenError, ValidationError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
@@ -184,6 +184,23 @@ async function ensurePersonalNamespace(
 
   await scope.workspaces.createNamespaceWithOwner({ namespace, ownerMember });
 
+  // ADR-0020: the grant `createNamespace` writes for an organization, on the
+  // one workspace nobody creates by hand. Without it the owner holds the role
+  // only where migration 0046 reached, so a workspace bootstrapped after that
+  // migration ran has nobody holding the role every gated list and every
+  // restricted step names — and a workflow registered here by the CLI whose
+  // step restricts `reviewer` is one its own owner cannot pick up.
+  //
+  // Best-effort, and reported in the audit entry rather than swallowed: every
+  // signed-in client blocks on this read before it can render, so a directory
+  // that refuses the grant must cost the role, not the session.
+  const ownerRoleGranted = scope.system.userDirectory === null
+    ? false
+    : await scope.system.userDirectory
+        .grantRole(user.uid, handle, { role: WORKFLOW_MANAGER_ROLE, workflowName: null })
+        .then(() => true)
+        .catch(() => false);
+
   await scope.system.audit.append({
     actorId: user.uid,
     actorType: 'user',
@@ -192,7 +209,7 @@ async function ensurePersonalNamespace(
     description: `Personal namespace '${handle}' bootstrapped for user '${user.uid}'`,
     timestamp: now,
     inputSnapshot: { uid: user.uid },
-    outputSnapshot: { handle, type: 'personal' },
+    outputSnapshot: { handle, type: 'personal', ownerRoleGranted },
     basis: 'Lazy bootstrap on GET /api/users/me',
     entityType: 'namespace',
     entityId: handle,
