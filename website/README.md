@@ -13,7 +13,7 @@ pnpm --filter @mediforce/website serve    # serve the built site
 
 **Do not move `docs/` at the repository root into here without moving its
 guards.** That folder also serves **mediforce.ai** from GitHub Pages — the
-`.html` files, `nav.js`, `CNAME`, `setup/`, `case-studies/`, `preview/`,
+`.html` files, `nav.js`, `CNAME`, `setup/`, `case-studies/`,
 `features/` and `images/` back live URLs, and so does every `.md` in it, which
 Jekyll renders (`docs/README.md` is live at `mediforce.ai/README`).
 `scripts/check_doc_links.py` fails the build on a doc unreachable from the

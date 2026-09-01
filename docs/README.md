@@ -15,7 +15,7 @@ New here: [`../GETTING-STARTED.md`](../GETTING-STARTED.md), then
 
 > This folder also serves the public website at **mediforce.ai**: the `.html`
 > files, `nav.js` and `theme.css` at this level, plus `CNAME`, `robots.txt`, `sitemap.xml`, `setup/`,
-> `case-studies/`, `preview/`, `images/`, `features/` and the loose images. Those
+> `case-studies/`, `images/`, `features/` and the loose images. Those
 > back live URLs and never move. GitHub Pages serves `index.html`; GitHub renders
 > this README when you browse the folder. Everything below is engineering
 > documentation.
