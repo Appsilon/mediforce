@@ -380,11 +380,12 @@ test.describe('Workflow run/edit access — API E2E', () => {
     expect(copied.status(), await copied.text()).toBe(201);
 
     // ...and the copy is gated exactly as its source was, or copy would be a
-    // one-call bypass of the run gate.
+    // one-call bypass of the run gate. The source carries its built-in floor
+    // (ADR-0020), so the copy carries the same one.
     const readback = await request.get(accessUrl(copyName), { headers: apiKeyHeaders() });
     expect(((await readback.json()) as { access: unknown }).access).toEqual({
-      run: [RUN_ROLE],
-      edit: [EDIT_ROLE],
+      run: ['executor', 'workflow-manager', RUN_ROLE],
+      edit: ['editor', 'workflow-manager', EDIT_ROLE],
     });
     expect((await startRun(request, copyName, callers.noRole)).status()).toBe(403);
   });
@@ -452,7 +453,10 @@ test.describe('Workflow run/edit access — API E2E', () => {
       access: { run: string[]; edit: string[] };
       caller: { mayRun: boolean; mayEdit: boolean };
     };
-    expect(seen.access).toEqual({ run: [RUN_ROLE], edit: [EDIT_ROLE] });
+    expect(seen.access).toEqual({
+      run: ['executor', 'workflow-manager', RUN_ROLE],
+      edit: ['editor', 'workflow-manager', EDIT_ROLE],
+    });
     expect(seen.caller).toEqual({ mayRun: false, mayEdit: false });
 
     // The same read, by someone who holds `run`, answers differently — the

@@ -342,10 +342,16 @@ built-in roles and writes them into the two enforced places as defaults:
 Registering a workflow's **first version** seeds its Access tab with
 `run: [executor, workflow-manager]` and `edit: [editor, workflow-manager]`, and
 adding a human block in the editor starts its `allowedRoles` at
-`[reviewer, workflow-manager]`. Both are ordinary values on the two lists above
-— visible, editable, and clearable back to "any member". Nothing recognises
-these names in the gate itself, so a role holds a privilege only where a list
-names it.
+`[reviewer, workflow-manager]`. Both are ordinary values on the two lists above,
+and nothing recognises these names in the gate itself — a role holds a privilege
+only where a list names it.
+
+On the Access tab the built-ins are a **floor**, not just a starting point: a
+verb you restrict always keeps the built-in roles that carry it, so restricting
+`run` to `qa-lead` stores `[executor, workflow-manager, qa-lead]` and the tab
+shows those two as locked chips. The way back to "any member" is the verb's
+**restrict** toggle, not removing chips. A step's `allowedRoles` has no floor —
+that list travels with the package, so it stays entirely the author's.
 
 Two exceptions keep this deployable: a workflow **registered by automation**
 (the CLI, an import, the seeded builtins) stays open, because a system actor

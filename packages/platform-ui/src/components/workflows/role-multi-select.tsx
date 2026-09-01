@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { X } from 'lucide-react';
+import { Lock, X } from 'lucide-react';
 import { findBuiltinRole } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { inputBase } from './workflow-editor/step-editor-fields';
@@ -31,6 +31,7 @@ export function RoleMultiSelect({
   inputLabel,
   placeholder = 'add a role',
   highlighted = [],
+  locked = [],
   disabled = false,
 }: {
   value: string[];
@@ -46,6 +47,18 @@ export function RoleMultiSelect({
    * colours the chips.
    */
   highlighted?: readonly string[];
+  /**
+   * Roles this list cannot drop — rendered without a remove control and shown
+   * first. The workflow Access tab's built-in floor (ADR-0020) is the only
+   * caller: a gated verb always admits the built-in roles that carry it, and a
+   * chip that can be taken away would say otherwise.
+   *
+   * Deliberately not used for a step's `allowedRoles`. That list is authored
+   * data that travels with the package (ADR-0013), and pinning a platform role
+   * name into it unremovably would put this deployment's vocabulary in someone
+   * else's workflow.
+   */
+  locked?: readonly string[];
   /** Render the current set without the controls to change it. */
   disabled?: boolean;
 }) {
@@ -70,6 +83,7 @@ export function RoleMultiSelect({
           {value.map((role) => (
             <span
               key={role}
+              title={locked.includes(role) ? `${role} always has this` : undefined}
               className={cn(
                 'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium',
                 highlighted.includes(role)
@@ -77,8 +91,11 @@ export function RoleMultiSelect({
                   : 'bg-muted text-foreground',
               )}
             >
+              {locked.includes(role) && (
+                <Lock className="h-2.5 w-2.5 opacity-50" strokeWidth={2.5} aria-hidden />
+              )}
               {role}
-              {!disabled && (
+              {!disabled && !locked.includes(role) && (
                 <button
                   type="button"
                   aria-label={`Remove role ${role}`}

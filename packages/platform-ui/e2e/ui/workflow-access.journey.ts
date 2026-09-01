@@ -22,18 +22,29 @@ import { trackPageErrors } from '../helpers/page-errors';
 const OWNER_EMAIL = 'workflow-access-owner@mediforce.dev';
 const OWNER_PASSWORD = 'WorkflowAccess123!';
 const OWNER_DISPLAY_NAME = 'Access Owner';
+/**
+ * A plain member of the same workspace, holding nothing.
+ *
+ * The owner cannot play this part any more: they hold `workflow-manager`
+ * permanently and every restricted list keeps it (ADR-0020), so a control
+ * greyed out for them would be a bug rather than the gate working. Refusal is
+ * now something only a member can be shown.
+ */
+const MEMBER_EMAIL = 'workflow-access-member@mediforce.dev';
+const MEMBER_PASSWORD = 'WorkflowAccessMember123!';
+const MEMBER_DISPLAY_NAME = 'Access Member';
 const HANDLE = 'workflow-access-labs';
 const WORKFLOW = 'access-tab-flow';
 /** A role this workspace has granted to nobody — including the owner. */
 const UNHELD_ROLE = 'access-tab-reviewer';
 
 /** The describe clears storage state, so each test signs in for itself. */
-async function signIn(page: Page): Promise<void> {
+async function signIn(page: Page, email = OWNER_EMAIL, password = OWNER_PASSWORD): Promise<void> {
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: 'Mediforce' })).toBeVisible({ timeout: 10_000 });
   await page.getByLabel('Email').click();
-  await page.getByLabel('Email').fill(OWNER_EMAIL);
-  await page.getByLabel('Password').fill(OWNER_PASSWORD);
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: /^sign in$/i }).click();
   await page.waitForURL(new RegExp(`/(workspace-selection|${HANDLE})`), { timeout: 30_000 });
 }
@@ -46,6 +57,13 @@ test.describe('Workflow Access tab journey', () => {
   test.beforeAll(async ({ request }) => {
     const ownerUid = await createTestUser(OWNER_EMAIL, OWNER_PASSWORD, OWNER_DISPLAY_NAME);
     await seedPostgresOrganizationNamespace(HANDLE, ownerUid, 'Workflow Access Labs');
+
+    await createTestUser(MEMBER_EMAIL, MEMBER_PASSWORD, MEMBER_DISPLAY_NAME);
+    const invited = await request.post('/api/users/invite', {
+      headers: apiKeyHeaders(),
+      data: { email: MEMBER_EMAIL, namespaceHandle: HANDLE, role: 'member' },
+    });
+    expect([201, 409]).toContain(invited.status());
 
     const existing = await request.get(
       `/api/workflow-definitions/${WORKFLOW}?namespace=${HANDLE}`,
@@ -83,7 +101,7 @@ test.describe('Workflow Access tab journey', () => {
     expect(cleared.status(), await cleared.text()).toBe(200);
   });
 
-  test('an admin gates Run on a role nobody holds → Start goes grey with the reason', async ({
+  test('an admin gates Run on a role nobody holds → it persists, and still admits them', async ({
     page,
   }) => {
     trackPageErrors(page);
@@ -99,6 +117,13 @@ test.describe('Workflow Access tab journey', () => {
     // that could equally mean "nobody may do this".
     await expect(page.getByText('Any member of this workspace can start a run.')).toBeVisible();
 
+    // The list is offered only once the verb is restricted — restricting is
+    // its own decision now that the built-in floor cannot be cleared chip by
+    // chip (ADR-0020).
+    await page.getByLabel('Restrict who can run it').check();
+    await expect(page.getByText(/"executor" and "workflow-manager" always can start a run/))
+      .toBeVisible();
+
     const roleField = page.getByLabel('Add a role that may run this workflow');
     await roleField.fill(UNHELD_ROLE);
     await roleField.press('Enter');
@@ -111,7 +136,7 @@ test.describe('Workflow Access tab journey', () => {
 
     // The gate now names a role with no holder, which closes it to everyone —
     // the one state an admin can create by accident and never see.
-    await expect(page.getByText(new RegExp(`Nobody holds "${UNHELD_ROLE}"`))).toBeVisible();
+    await expect(page.getByText(new RegExp(`Nobody holds .*"${UNHELD_ROLE}"`))).toBeVisible();
 
     // The reload is the assertion: a cache write that never reached Postgres
     // renders the identical chip until this point.
@@ -123,16 +148,32 @@ test.describe('Workflow Access tab journey', () => {
       timeout: 30_000,
     });
 
-    // The owner administers the gate but does not hold the role, and there is
-    // deliberately no owner/admin override (ADR-0019): an admin who needs to
-    // run it grants themselves the role, which leaves an audit trail.
+    // The owner is not locked out by the gate they just wrote: `workflow-manager`
+    // is on every restricted list (ADR-0020) and they hold it permanently. This
+    // is the roles-demo failure, encoded — a workflow gated on one project role
+    // used to leave the workspace's owner unable to start what they own.
+    await page.goto(`/${HANDLE}/workflows/${WORKFLOW}`);
+    await expect(page.getByRole('button', { name: /start run/i }).first()).toHaveAttribute(
+      'aria-disabled',
+      'false',
+      { timeout: 30_000 },
+    );
+  });
+
+  test('a member without the run role is refused at the button, not at the server', async ({
+    page,
+  }) => {
+    trackPageErrors(page);
+
+    await signIn(page, MEMBER_EMAIL, MEMBER_PASSWORD);
+
+    // The gate the previous test wrote is still in place, and this is who it
+    // is for: a member holding none of the roles on it.
     await page.goto(`/${HANDLE}/workflows/${WORKFLOW}`);
     const startButton = page.getByRole('button', { name: /start run/i }).first();
     await expect(startButton).toHaveAttribute('aria-disabled', 'true', { timeout: 30_000 });
     await startButton.hover();
-    await expect(page.getByText(new RegExp(`restricted to '${UNHELD_ROLE}'`))).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(page.getByText(new RegExp(`restricted to`))).toBeVisible({ timeout: 10_000 });
   });
 
   test('a member without the edit role is refused at the controls, not at the server', async ({
@@ -141,15 +182,16 @@ test.describe('Workflow Access tab journey', () => {
   }) => {
     trackPageErrors(page);
 
-    // Gate `edit` on a role nobody holds. The signed-in owner administers the
-    // gate and is subject to it — ADR-0019 has no owner override on purpose.
+    // Gate `edit` on a role nobody holds, and look at it as a member. The
+    // owner holds `workflow-manager`, which the stored list keeps, so they are
+    // not who a refusal is shown to any more (ADR-0020).
     const gated = await request.put(
       `/api/workflow-definitions/${WORKFLOW}/access?namespace=${HANDLE}`,
       { headers: apiKeyHeaders(), data: { access: { run: [], edit: [UNHELD_ROLE] } } },
     );
     expect(gated.status(), await gated.text()).toBe(200);
 
-    await signIn(page);
+    await signIn(page, MEMBER_EMAIL, MEMBER_PASSWORD);
     await page.goto(`/${HANDLE}/workflows/${WORKFLOW}`);
     await page.getByRole('tab', { name: 'Definitions' }).click();
     await expect(page.getByRole('link', { name: 'Edit' })).toHaveAttribute(
@@ -175,7 +217,7 @@ test.describe('Workflow Access tab journey', () => {
     await expect(save).toBeDisabled({ timeout: 30_000 });
     await save.hover();
     await expect(
-      page.getByText(new RegExp(`Changing this workflow is restricted to '${UNHELD_ROLE}'`)),
+      page.getByText(/Changing this workflow is restricted to/),
     ).toBeVisible({ timeout: 10_000 });
   });
 });

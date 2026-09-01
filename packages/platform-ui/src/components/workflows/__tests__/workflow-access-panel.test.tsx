@@ -104,6 +104,9 @@ describe('WorkflowAccessPanel', () => {
   it('saves both lists as one full replace', async () => {
     renderPanel();
 
+    // `edit` is unrestricted, so its list is offered only once the verb is
+    // restricted — and restricting it seeds the built-in floor.
+    fireEvent.click(screen.getByLabelText('Restrict who can change it'));
     fireEvent.change(screen.getByLabelText('Add a role that may edit this workflow'), {
       target: { value: 'approver' },
     });
@@ -113,7 +116,50 @@ describe('WorkflowAccessPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save access' }));
 
     await waitFor(() => {
-      expect(saveMock).toHaveBeenCalledWith({ run: ['reviewer'], edit: ['approver'] });
+      expect(saveMock).toHaveBeenCalledWith({
+        run: ['reviewer'],
+        edit: ['editor', 'workflow-manager', 'approver'],
+      });
+    });
+  });
+
+  it('restricting a verb starts it at the built-in floor', () => {
+    renderPanel();
+
+    fireEvent.click(screen.getByLabelText('Restrict who can change it'));
+
+    // ADR-0020: a restricted verb always admits the built-in roles that carry
+    // it, so the list opens with them rather than empty.
+    expect(screen.getByText(/"editor" and "workflow-manager" always can change/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Remove role editor' })).toBeNull();
+  });
+
+  it('offers no way to take a built-in role off a restricted list', () => {
+    accessMock.mockReturnValue({
+      access: { run: ['executor', 'workflow-manager', 'reviewer'], edit: [] },
+      caller: { mayRun: true, mayEdit: true },
+      loading: false,
+      error: null,
+    });
+    renderPanel();
+
+    // A chip that could be removed would claim a restriction the server
+    // re-adds on the next write — the tab has to show what the gate enforces.
+    expect(screen.queryByRole('button', { name: 'Remove role executor' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove role workflow-manager' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove role reviewer' })).toBeTruthy();
+  });
+
+  it('clearing the restriction is what opens a verb back up', async () => {
+    renderPanel();
+
+    fireEvent.click(screen.getByLabelText('Restrict who can run it'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save access' }));
+
+    // The only route back to "any member", now that the floor cannot be
+    // emptied one chip at a time.
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledWith({ run: [], edit: [] });
     });
   });
 

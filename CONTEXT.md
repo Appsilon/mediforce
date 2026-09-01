@@ -287,12 +287,18 @@ ordinary places by default: a Workflow's first version is registered with
 human Step added in the editor starts at `allowedRoles: [reviewer,
 workflow-manager]`, and all four are always offered in the role pick-lists.
 `workflow-manager` is the union of the other three, not a rank above them.
+On a Workflow the default is a **floor**: a restricted verb always admits the
+built-in roles that carry it, so `run: [qa-lead]` is stored as
+`[executor, workflow-manager, qa-lead]` and the Access tab shows those two as
+locked. An unrestricted verb stays open to any member.
 _Avoid_: calling them reserved or protected — nothing rejects a Role named
 `editor` from a different source, and nothing in the gate treats these four
-specially. A built-in Role holds a privilege only where a list names it.
-_Note_: A Workspace's owner holds `workflow-manager` from creation, and
-whoever registers a Workflow holds it narrowed to that Workflow — otherwise the
-seeded lists would gate a Workflow against roles nobody holds.
+specially. A built-in Role holds a privilege only where a list names it; the
+floor is what puts it there.
+_Note_: A Workspace's owner always holds `workflow-manager` — granted at
+creation and re-established on every write from the Roles table, where its row
+has no Remove control. Whoever registers a Workflow holds it narrowed to that
+Workflow. Both exist so a seeded gate is never one nobody can pass.
 
 **Workflow Access** *(workflow governance level)*:
 Which **Roles** may `run` a Workflow (start a run) and which may `edit` it

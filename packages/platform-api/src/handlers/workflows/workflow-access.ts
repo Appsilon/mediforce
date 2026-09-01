@@ -1,3 +1,4 @@
+import { withBuiltinAccessFloor } from '@mediforce/platform-core';
 import type {
   GetWorkflowAccessInput,
   GetWorkflowAccessOutput,
@@ -53,6 +54,13 @@ export async function getWorkflowAccess(
  * Roles stay free-form strings, so a list naming a role nobody holds is not a
  * validation error here — it is a legitimate authoring order, and the Access
  * tab warns about it beside the members who hold each role.
+ *
+ * A **gated** list is raised to its built-in floor before it is stored
+ * (ADR-0020): restricting `run` at all still admits `executor` and
+ * `workflow-manager`. Normalised here rather than validated, because a refusal
+ * would make the CLI and the API answer differently from the tab, which cannot
+ * express the state being refused. An empty list is left empty — that is "any
+ * member", and raising it would gate what is open.
  */
 export async function setWorkflowAccess(
   input: SetWorkflowAccessInput,
@@ -62,13 +70,14 @@ export async function setWorkflowAccess(
   await assertWorkflowExists(input.namespace, input.name, scope);
 
   const previous = await scope.workflowDefinitions.getAccess(input.namespace, input.name);
-  await scope.workflowDefinitions.setAccess(input.namespace, input.name, input.access);
+  const access = withBuiltinAccessFloor(input.access);
+  await scope.workflowDefinitions.setAccess(input.namespace, input.name, access);
 
   await emitAudit(scope.system.audit, scope.caller, {
     action: 'workflow.access_changed',
     description:
       `Workflow '${input.name}' access set to ` +
-      `run: [${describe(input.access.run)}], edit: [${describe(input.access.edit)}]`,
+      `run: [${describe(access.run)}], edit: [${describe(access.edit)}]`,
     inputSnapshot: { namespace: input.namespace, name: input.name, access: input.access },
     outputSnapshot: { previousAccess: previous },
     basis: 'Owner/admin set workflow run/edit access via API',
@@ -77,14 +86,17 @@ export async function setWorkflowAccess(
     namespace: input.namespace,
   });
 
+  // The stored value, not the requested one: the floor may have added roles,
+  // and a screen that rendered its own request back would show a list the gate
+  // does not enforce until the next reload.
   const caller = await resolveCallerWorkflowVerbs(
     scope.caller,
     scope.system.userDirectory,
     input.namespace,
     input.name,
-    input.access,
+    access,
   );
-  return { namespace: input.namespace, name: input.name, access: input.access, caller };
+  return { namespace: input.namespace, name: input.name, access, caller };
 }
 
 /**

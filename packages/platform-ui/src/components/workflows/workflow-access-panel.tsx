@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import type { WorkflowAccess } from '@mediforce/platform-core';
+import { pinnedRolesForVerb, type WorkflowAccess } from '@mediforce/platform-core';
 import { RoleMultiSelect } from './role-multi-select';
 import { useNamespaceMembers } from '@/hooks/use-namespace-members';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
@@ -17,6 +17,8 @@ const VERBS = [
     label: 'Run',
     covers: 'Starting a run of this workflow.',
     openLabel: 'Any member of this workspace can start a run.',
+    restrictLabel: 'Restrict who can run it',
+    pinnedLabel: 'can start a run',
     inputLabel: 'Add a role that may run this workflow',
   },
   {
@@ -25,9 +27,21 @@ const VERBS = [
     covers:
       'Registering a version, archiving, deleting, transferring, changing visibility, and moving the default version.',
     openLabel: 'Any member of this workspace can change this workflow.',
+    restrictLabel: 'Restrict who can change it',
+    pinnedLabel: 'can change this workflow',
     inputLabel: 'Add a role that may edit this workflow',
   },
 ];
+
+/**
+ * The built-in roles a gated verb always admits (ADR-0020), phrased for the
+ * hint under its list.
+ */
+function describePinned(roles: readonly string[]): string {
+  const quoted = roles.map((role) => `"${role}"`);
+  if (quoted.length <= 1) return quoted.join('');
+  return `${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}`;
+}
 
 /**
  * The workflow **Access** tab (ADR-0019, issue #1253) — the epic's workflow
@@ -123,32 +137,64 @@ export function WorkflowAccessPanel({
       <div>
         <h2 className="text-sm font-semibold">Access</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Which roles may run and which may change this workflow. Leaving a list empty means any
-          member of the workspace can do it — which is how every workflow starts. Everyone in the
-          workspace can see this workflow either way.
+          Which roles may run and which may change this workflow. Unrestricted means any member of
+          the workspace can do it. Restricting a verb always keeps the built-in role that carries
+          it, so a workflow can be opened to more people but never closed to its executors or
+          editors. Everyone in the workspace can see this workflow either way.
         </p>
       </div>
 
       <div className="space-y-5">
-        {VERBS.map((verb) => (
-          <div key={verb.key} className="space-y-1.5">
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm font-medium">{verb.label}</span>
-              <span className="text-[11px] text-muted-foreground">{verb.covers}</span>
+        {VERBS.map((verb) => {
+          const pinned = pinnedRolesForVerb(verb.key);
+          // An empty list *is* "any member" — the same state the storage keeps
+          // and the gate reads. The checkbox names it rather than leaving the
+          // reader to infer it from an empty box, which matters more now that
+          // the restricted state can never be emptied one chip at a time.
+          const restricted = current[verb.key].length > 0;
+          return (
+            <div key={verb.key} className="space-y-1.5">
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm font-medium">{verb.label}</span>
+                <span className="text-[11px] text-muted-foreground">{verb.covers}</span>
+              </div>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={restricted}
+                  disabled={!canAdmin}
+                  onChange={(event) =>
+                    setDraft({
+                      ...current,
+                      [verb.key]: event.target.checked ? pinned : [],
+                    })
+                  }
+                  className="h-3.5 w-3.5"
+                />
+                <span>{verb.restrictLabel}</span>
+              </label>
+              {restricted ? (
+                <>
+                  <RoleMultiSelect
+                    value={current[verb.key]}
+                    vocabulary={vocabulary}
+                    onChange={(roles) => setDraft({ ...current, [verb.key]: roles })}
+                    inputLabel={verb.inputLabel}
+                    highlighted={unheld}
+                    locked={pinned}
+                    disabled={!canAdmin}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    {describePinned(pinned)} always {verb.pinnedLabel}. Clear the restriction to
+                    open this to every member of the workspace.
+                  </p>
+                </>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">{verb.openLabel}</p>
+              )}
             </div>
-            <RoleMultiSelect
-              value={current[verb.key]}
-              vocabulary={vocabulary}
-              onChange={(roles) => setDraft({ ...current, [verb.key]: roles })}
-              inputLabel={verb.inputLabel}
-              highlighted={unheld}
-              disabled={!canAdmin}
-            />
-            {current[verb.key].length === 0 && (
-              <p className="text-[11px] text-muted-foreground">{verb.openLabel}</p>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {unheld.length > 0 && (

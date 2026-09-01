@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   BUILTIN_ROLES,
+  withBuiltinAccessFloor,
   DEFAULT_STEP_ALLOWED_ROLES,
   DEFAULT_WORKFLOW_ACCESS,
   WORKFLOW_MANAGER_ROLE,
@@ -46,5 +47,34 @@ describe('built-in roles', () => {
 
   it('has no answer for a role it does not define', () => {
     expect(findBuiltinRole('biostatistician')).toBeNull();
+  });
+});
+
+describe('withBuiltinAccessFloor', () => {
+  it('leaves an unrestricted verb open', () => {
+    // The one thing this must never do: raising an empty list would gate every
+    // workflow that predates ADR-0020 and every one automation registers.
+    expect(withBuiltinAccessFloor({ run: [], edit: [] })).toEqual({ run: [], edit: [] });
+  });
+
+  it('adds the verb’s built-in roles to a list that restricts', () => {
+    expect(withBuiltinAccessFloor({ run: ['qa-lead'], edit: [] })).toEqual({
+      run: ['executor', 'workflow-manager', 'qa-lead'],
+      edit: [],
+    });
+  });
+
+  it('raises each verb only to its own roles', () => {
+    // `editor` has no business in a `run` list — the floor is per verb, not a
+    // block of every built-in name.
+    const raised = withBuiltinAccessFloor({ run: ['qa-lead'], edit: ['qa-lead'] });
+
+    expect(raised.run).not.toContain('editor');
+    expect(raised.edit).not.toContain('executor');
+  });
+
+  it('does not duplicate a built-in the list already names', () => {
+    expect(withBuiltinAccessFloor({ run: ['workflow-manager', 'executor'], edit: [] }).run)
+      .toEqual(['executor', 'workflow-manager']);
   });
 });

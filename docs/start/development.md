@@ -242,11 +242,14 @@ registered with `run: [executor, workflow-manager]` and
 added in the editor starts at `allowedRoles: [reviewer, workflow-manager]`. So
 granting somebody `executor` is enough to let them run what this workspace
 builds, without opening a tab per workflow. Nothing recognises those names in
-the gate — they are on the lists, so the lists remain the whole answer, and
-clearing one puts the workflow back to "any member". Whoever registers a
-workflow holds `workflow-manager` on it, which is what keeps the seeded `edit`
-list from refusing them their own next Save. Workflows that existed before this
-are untouched.
+the gate — they are on the lists, so the lists remain the whole answer.
+
+Those two are a **floor** rather than a starting point: restricting a verb on
+the Access tab always keeps the built-in role that carries it, and the way back
+to "any member" is that verb's restrict toggle. A workspace's owner always holds
+`workflow-manager`, and whoever registers a workflow holds it on that workflow —
+between them, a gate is never one nobody in the workspace can pass. Workflows
+registered before this are untouched and stay open.
 
 Passwords are per-install: there is no password recovery flow yet
 ([issue #1001](https://github.com/Appsilon/mediforce/issues/1001)), so an install

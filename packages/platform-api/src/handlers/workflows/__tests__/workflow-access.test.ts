@@ -10,6 +10,7 @@ import type { CallerScope } from '../../../repositories/index';
 import { stubUserDirectory } from '../../../testing/stub-user-directory';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { getWorkflowAccess, setWorkflowAccess } from '../workflow-access';
+import { assertCallerMayEditWorkflow, assertCallerMayRunWorkflow } from '../_access-gate';
 import { archiveWorkflow, archiveWorkflowVersion } from '../archive-workflow';
 import { deleteWorkflow } from '../delete-workflow';
 import { setDefaultWorkflowVersion } from '../set-default-version';
@@ -147,15 +148,46 @@ describe('workflow access (ADR-0019 #1253)', () => {
         buildScope({ membership: 'admin' }),
       );
 
-      expect(result.access).toEqual({ run: ['reviewer'], edit: ['approver'] });
-      expect(await processRepo.getWorkflowAccess(NAMESPACE, WORKFLOW)).toEqual({
-        run: ['reviewer'],
-        edit: ['approver'],
-      });
+      // Raised to the built-in floor of ADR-0020: restricting a verb keeps the
+      // built-in roles that carry it. The stored value and the returned one are
+      // the same, or the tab would render a list the gate does not enforce.
+      const stored = { run: ['executor', 'workflow-manager', 'reviewer'], edit: ['editor', 'workflow-manager', 'approver'] };
+      expect(result.access).toEqual(stored);
+      expect(await processRepo.getWorkflowAccess(NAMESPACE, WORKFLOW)).toEqual(stored);
       const events = auditRepo.getAll();
       expect(events).toHaveLength(1);
       expect(events[0].action).toBe('workflow.access_changed');
       expect(events[0].actorId).toBe('user-42');
+      expect(events[0].description).toContain('executor');
+    });
+
+    it('a gated workflow still admits the built-in role its list never named', async () => {
+      await setWorkflowAccess(
+        { namespace: NAMESPACE, name: WORKFLOW, access: { run: ['reviewer'], edit: ['reviewer'] } },
+        buildScope({ membership: 'admin' }),
+      );
+
+      // The roles-demo case: a workflow gated by hand on `reviewer` alone left
+      // the workspace owner unable to run or change the thing they own.
+      const manager = buildScope({ membership: 'member', processRoles: ['workflow-manager'] });
+      await expect(
+        assertCallerMayRunWorkflow(manager, NAMESPACE, WORKFLOW),
+      ).resolves.toBeUndefined();
+      await expect(
+        assertCallerMayEditWorkflow(manager, NAMESPACE, WORKFLOW),
+      ).resolves.toBeUndefined();
+    });
+
+    it('leaves an unrestricted verb open rather than raising it to the floor', async () => {
+      const result = await setWorkflowAccess(
+        { namespace: NAMESPACE, name: WORKFLOW, access: { run: [], edit: ['approver'] } },
+        buildScope({ membership: 'admin' }),
+      );
+
+      // AGENTS.md §12: an empty list is "any member", and a floor applied there
+      // would gate every workflow that is open today.
+      expect(result.access.run).toEqual([]);
+      expect(result.access.edit).toContain('editor');
     });
 
     it('refuses a plain member, even one who holds edit', async () => {

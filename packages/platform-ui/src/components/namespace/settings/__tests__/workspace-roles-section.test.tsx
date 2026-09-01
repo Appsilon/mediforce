@@ -40,6 +40,15 @@ function member(
   };
 }
 
+/** The workspace's owner, whose `workflow-manager` this table cannot revoke. */
+function owner(
+  uid: string,
+  displayName: string,
+  grants: NamespaceMemberDetail['grants'],
+): NamespaceMemberDetail {
+  return { ...member(uid, displayName, grants), role: 'owner' };
+}
+
 const MEMBERS = [
   member('uid-alice', 'Alice', [
     { role: 'reviewer', workflowName: null },
@@ -450,5 +459,50 @@ describe('WorkspaceRolesSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove reviewer from Alice' }));
 
     await waitFor(() => expect(onError).toHaveBeenCalledWith('nope'));
+  });
+});
+
+describe('the owner’s workflow-manager', () => {
+  beforeEach(() => {
+    workspaceRolesMock.mockReturnValue(WORKSPACE_ROLES);
+    setMemberRolesMock.mockReset();
+    setMemberRolesMock.mockResolvedValue(undefined);
+  });
+
+  it('shows no Remove or Edit control on it', () => {
+    renderSection({
+      members: [owner('uid-owner', 'Olivia', [{ role: 'workflow-manager', workflowName: null }])],
+    });
+
+    // ADR-0020: the server re-adds it on every write, so a control that looked
+    // like it revoked the role would be a button that silently does nothing.
+    expect(screen.queryByRole('button', { name: 'Remove workflow-manager from Olivia' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Edit workflows for workflow-manager for Olivia' }),
+    ).toBeNull();
+    expect(screen.getByText('The owner always holds this')).toBeTruthy();
+  });
+
+  it('leaves the owner’s other roles revocable', () => {
+    renderSection({
+      members: [
+        owner('uid-owner', 'Olivia', [
+          { role: 'workflow-manager', workflowName: null },
+          { role: 'reviewer', workflowName: null },
+        ]),
+      ],
+    });
+
+    expect(screen.getByRole('button', { name: 'Remove reviewer from Olivia' })).toBeTruthy();
+  });
+
+  it('is revocable for anyone who is not the owner', () => {
+    renderSection({
+      members: [member('uid-alice', 'Alice', [{ role: 'workflow-manager', workflowName: null }])],
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Remove workflow-manager from Alice' }),
+    ).toBeTruthy();
   });
 });

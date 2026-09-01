@@ -236,6 +236,8 @@ export {
   builtinRoleIds,
   builtinRolesWithVerb,
   findBuiltinRole,
+  withBuiltinAccessFloor,
+  pinnedRolesForVerb,
   type BuiltinRole,
   type RoleVerb,
 } from './builtin-roles';

@@ -1,11 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, Plus, ShieldCheck, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lock, Pencil, Plus, ShieldCheck, X } from 'lucide-react';
 import type { RoleGrantInput } from '@mediforce/platform-api/contract';
 import type { NamespaceMemberDetail } from '@/hooks/use-namespace-members';
 import { useSetMemberRoles } from '@/hooks/use-namespace-mutations';
-import { findBuiltinRole } from '@mediforce/platform-core';
+import { WORKFLOW_MANAGER_ROLE, findBuiltinRole } from '@mediforce/platform-core';
 import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 
 const ROLE_OPTIONS_LIST_ID = 'workspace-role-options';
@@ -32,6 +32,14 @@ interface RoleAssignment {
   role: string;
   /** Workflows the role is narrowed to. Empty means every workflow. */
   workflows: string[];
+  /**
+   * The workspace owner's `workflow-manager` (ADR-0020), which they hold
+   * whatever this table is asked to write. Shown without its Edit and Remove
+   * controls rather than with controls the server would undo: the owner is the
+   * one seat that cannot be removed or demoted, so it is what guarantees a
+   * workspace always has somebody who can reach a workflow anybody made.
+   */
+  locked: boolean;
 }
 
 /**
@@ -63,6 +71,7 @@ function toAssignments(members: readonly NamespaceMemberDetail[]): RoleAssignmen
         memberName: member.displayName ?? member.uid,
         role,
         workflows: [...workflows].sort(),
+        locked: member.role === 'owner' && role === WORKFLOW_MANAGER_ROLE,
       });
     }
   }
@@ -573,7 +582,13 @@ export function WorkspaceRolesSection({
                       )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      {canManageMembers && !editing && (
+                      {canManageMembers && row.locked && (
+                        <div className="flex items-center justify-end gap-1.5 text-[11px] text-muted-foreground">
+                          <Lock className="h-3 w-3" strokeWidth={2.5} aria-hidden />
+                          <span>The owner always holds this</span>
+                        </div>
+                      )}
+                      {canManageMembers && !row.locked && !editing && (
                         <div className="flex items-center justify-end gap-1">
                           <button
                             type="button"

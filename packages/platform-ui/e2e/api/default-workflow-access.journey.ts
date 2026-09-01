@@ -111,6 +111,16 @@ async function registerOnce(
 }
 
 
+/** The lists a person-registered workflow is seeded with. */
+const DEFAULT_ACCESS = {
+  run: ['executor', 'workflow-manager'],
+  edit: ['editor', 'workflow-manager'],
+};
+
+function accessUrl(name: string): string {
+  return `/api/workflow-definitions/${encodeURIComponent(name)}/access?namespace=${ORG_HANDLE}`;
+}
+
 function readAccess(request: APIRequestContext, name: string, caller: UserCaller) {
   return request.get(
     `/api/workflow-definitions/${encodeURIComponent(name)}/access?namespace=${ORG_HANDLE}`,
@@ -177,10 +187,7 @@ test.describe('Default workflow access — API E2E', () => {
       access: { run: string[]; edit: string[] };
       caller: { mayRun: boolean; mayEdit: boolean };
     };
-    expect(body.access).toEqual({
-      run: ['executor', 'workflow-manager'],
-      edit: ['editor', 'workflow-manager'],
-    });
+    expect(body.access).toEqual(DEFAULT_ACCESS);
     // The author holds `workflow-manager` narrowed to this workflow, so the
     // screen offers both verbs rather than greying out controls the server
     // would in fact allow.
@@ -228,6 +235,53 @@ test.describe('Default workflow access — API E2E', () => {
     // Still not an editor: the verbs are separate grants.
     const edited = await register(request, AUTHORED_WD, sessionCookieHeaders(callers.colleague));
     expect(edited.status(), await edited.text()).toBe(403);
+  });
+
+  test('restricting a verb by hand still admits the built-in role that carries it', async ({ request }) => {
+    const callers = await ensureFixture(request);
+
+    // What a demo workspace did: gate the workflow on one project role and
+    // discover the workspace owner can no longer touch what they own.
+    const gated = await request.put(accessUrl(AUTHORED_WD), {
+      headers: apiKeyHeaders(),
+      data: { access: { run: ['qa-lead'], edit: ['qa-lead'] } },
+    });
+    expect(gated.status(), await gated.text()).toBe(200);
+    expect((await gated.json()) as { access: unknown }).toMatchObject({
+      access: {
+        run: ['executor', 'workflow-manager', 'qa-lead'],
+        edit: ['editor', 'workflow-manager', 'qa-lead'],
+      },
+    });
+
+    // The author holds `workflow-manager` on this workflow and nothing else,
+    // so this passes only because the floor was applied to the stored row.
+    const started = await startRun(request, AUTHORED_WD, callers.author);
+    expect(started.status(), await started.text()).toBe(201);
+
+    const restored = await request.put(accessUrl(AUTHORED_WD), {
+      headers: apiKeyHeaders(),
+      data: { access: DEFAULT_ACCESS },
+    });
+    expect(restored.status(), await restored.text()).toBe(200);
+  });
+
+  test('an unrestricted verb is left open rather than raised to the floor', async ({ request }) => {
+    const callers = await ensureFixture(request);
+
+    const opened = await request.put(accessUrl(AUTOMATED_WD), {
+      headers: apiKeyHeaders(),
+      data: { access: { run: [], edit: [] } },
+    });
+    expect(opened.status(), await opened.text()).toBe(200);
+    expect((await opened.json()) as { access: unknown }).toMatchObject({
+      access: { run: [], edit: [] },
+    });
+
+    // AGENTS.md §12: a floor on an empty list would gate every workflow that
+    // is open today, which is the one thing this must never do.
+    const started = await startRun(request, AUTOMATED_WD, callers.colleague);
+    expect(started.status(), await started.text()).toBe(201);
   });
 
   test('a workflow registered by automation stays open to every member', async ({ request }) => {

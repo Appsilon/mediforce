@@ -74,6 +74,8 @@ export {
   builtinRoleIds,
   builtinRolesWithVerb,
   findBuiltinRole,
+  withBuiltinAccessFloor,
+  pinnedRolesForVerb,
   WorkflowAuthorableSchema,
   SERVER_MANAGED_WORKFLOW_FIELDS,
   WorkflowSourceSchema,

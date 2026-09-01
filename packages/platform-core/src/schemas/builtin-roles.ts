@@ -99,3 +99,39 @@ export const DEFAULT_WORKFLOW_ACCESS: WorkflowAccess = {
 
 /** What a human step added in the editor starts out allowing. */
 export const DEFAULT_STEP_ALLOWED_ROLES: string[] = builtinRolesWithVerb('act');
+
+/**
+ * Raise a workflow's access lists to the floor its built-in roles set: a
+ * **gated** verb always admits the built-in roles that carry it.
+ *
+ * The Access tab shows these as locked chips, and this is what makes that
+ * honest — the gate reads the stored list and nothing else, so a list the
+ * screen says cannot drop `executor` has to actually contain it however it
+ * was written (the CLI and the API reach the same storage).
+ *
+ * An **empty list is left empty**. That is "any workspace member", the state
+ * of every workflow that predates ADR-0020 and of every one registered by
+ * automation, and raising it to a floor would gate what is open today
+ * (AGENTS.md §12) — the one change this must never make.
+ *
+ * The consequence is deliberate and is the cost of the guarantee: a workflow
+ * cannot be restricted to `qa-lead` *instead of* the built-ins, only in
+ * addition to them. Excluding an `executor` from one workflow means not
+ * granting them `executor`.
+ */
+export function withBuiltinAccessFloor(access: WorkflowAccess): WorkflowAccess {
+  return {
+    run: raiseToFloor(access.run, 'run'),
+    edit: raiseToFloor(access.edit, 'edit'),
+  };
+}
+
+/** The roles a gated `verb` always admits, in the order the Access tab shows them. */
+export function pinnedRolesForVerb(verb: RoleVerb): string[] {
+  return builtinRolesWithVerb(verb);
+}
+
+function raiseToFloor(roles: readonly string[], verb: RoleVerb): string[] {
+  if (roles.length === 0) return [];
+  return [...new Set([...pinnedRolesForVerb(verb), ...roles])];
+}
