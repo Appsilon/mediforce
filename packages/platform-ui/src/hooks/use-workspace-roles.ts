@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { builtinRoleIds } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { stopRetryOn4xx } from '@/lib/retry';
 import { useNamespaceMembers } from './use-namespace-members';
@@ -59,6 +60,11 @@ export interface UseWorkspaceRolesResult {
  * granting `reviewer` before any workflow declares it is a legitimate first
  * move and this list would otherwise refuse it.
  *
+ * The built-ins (ADR-0020) are in the union unconditionally, before anyone
+ * holds one: they are what a new workflow's access lists and a new human step
+ * already name, so a workspace that has granted nothing would otherwise offer
+ * an empty pick-list beside a gate quoting names it does not suggest.
+ *
  * `workflowNames` rides along because it comes off the same fetch and the
  * editor needs it for the scope control next to the role — a grant narrowed to
  * a workflow that does not exist is the invisible row ADR-0019's cascades exist
@@ -87,7 +93,7 @@ export function useWorkspaceRoles(
   const groups = workflows.data;
 
   const roles = useMemo(() => {
-    const union = new Set<string>();
+    const union = new Set<string>(builtinRoleIds());
     for (const member of members) {
       for (const grant of member.grants) union.add(grant.role);
     }

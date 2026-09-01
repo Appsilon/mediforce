@@ -15,6 +15,7 @@ import {
 import { actorFromCaller } from '../_helpers';
 import { assertCallerMayEditWorkflow } from './_access-gate';
 import { checkRetiredModels } from './retired-model-check';
+import { seedDefaultWorkflowAccess } from './_seed-access';
 import { seedManualTrigger } from './_seed-triggers';
 import { isLocalAgentMode, fetchFromContainerWorker, fetchFromLocalDocker } from '../system/_docker';
 
@@ -118,6 +119,14 @@ export async function registerWorkflow(
   // hand-startable by default (Issue #930). Cron/webhook triggers are created
   // separately via the triggers table — definitions are trigger-free (Issue #932).
   await seedManualTrigger(scope, input.namespace, definition.name);
+
+  // ADR-0020: v1 of a workflow a person created starts out gated by the
+  // built-in roles, with its creator granted `workflow-manager` on it. Later
+  // versions leave the lists alone — they belong to the workspace's admins by
+  // then, and an empty pair is a deliberate "open to every member".
+  if (nextVersion === 1) {
+    await seedDefaultWorkflowAccess(scope, input.namespace, definition.name);
+  }
 
   const warnings: RegistrationWarning[] = [];
 

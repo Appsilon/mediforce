@@ -1,4 +1,4 @@
-import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
+import { WORKFLOW_MANAGER_ROLE, type Namespace, type NamespaceMember } from '@mediforce/platform-core';
 import { ConflictError, ForbiddenError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type {
@@ -59,6 +59,21 @@ export async function createNamespace(
 
   await scope.workspaces.createNamespaceWithOwner({ namespace, ownerMember });
 
+  // ADR-0020: the owner holds `workflow-manager` from the first minute, so the
+  // default access every workflow created here is seeded with has somebody who
+  // can pass it. Without this the first person to create a workflow would be
+  // its only manager and the owner could not touch it.
+  //
+  // Best-effort, and reported in the audit entry rather than swallowed: the
+  // workspace is already written by now, so failing the request would leave a
+  // real workspace behind a 500 and a retry that can only 409.
+  const ownerRoleGranted = scope.system.userDirectory === null
+    ? false
+    : await scope.system.userDirectory
+        .grantRole(uid, input.handle, { role: WORKFLOW_MANAGER_ROLE, workflowName: null })
+        .then(() => true)
+        .catch(() => false);
+
   await scope.system.audit.append({
     actorId: uid,
     actorType: 'user',
@@ -67,7 +82,7 @@ export async function createNamespace(
     description: `User '${uid}' created namespace '${input.handle}'`,
     timestamp: now,
     inputSnapshot: { handle: input.handle, displayName: input.displayName },
-    outputSnapshot: { handle: input.handle, type: 'organization' },
+    outputSnapshot: { handle: input.handle, type: 'organization', ownerRoleGranted },
     basis: 'User created workspace via API',
     entityType: 'namespace',
     entityId: input.handle,

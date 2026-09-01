@@ -27,6 +27,9 @@ export function stubUserDirectory(
     async setRolesForUser() {
       // no-op
     },
+    async grantRole() {
+      // no-op
+    },
     async clearRolesForWorkflow() {
       // no-op
     },

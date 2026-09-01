@@ -205,11 +205,15 @@ emulator to provision. Every install is greenfield: nothing to export or migrate
 Create the first user directly — an `auth_users` row with a bcrypt
 `password_hash` (see `ENABLE_PASSWORD_AUTH` in
 `packages/platform-ui/.env.example`) — or configure OIDC against the customer's
-IdP and let them sign in. Process-domain roles start empty and are granted
+IdP and let them sign in. Process-domain roles are granted
 per workspace by its owner or admins — from the **Roles** table in
 `/<handle>/settings`, or `mediforce namespace set-member-roles <handle> <uid>
 --roles reviewer,approver`, read back with `mediforce namespace list-members
-<handle>` ([ADR-0019](../adr/0019-workspace-scoped-roles.md)).
+<handle>` ([ADR-0019](../adr/0019-workspace-scoped-roles.md)). A workspace
+starts with one grant: its owner holds `workflow-manager`, one of the four
+built-in roles — `editor`, `executor`, `reviewer`, `workflow-manager` — that
+every pick-list offers
+([ADR-0020](../adr/0020-built-in-roles-and-default-workflow-access.md)).
 A step that declares `allowedRoles` is claimable only by someone holding one
 of those Roles, so grant them before a run reaches such a step — an
 unheld role fails closed rather than opening the step. The step editor warns
@@ -229,8 +233,20 @@ controls greyed out with the reason on them — Start on the Runs tab, and Save,
 Edit and the workflow's ⋯ menu for `edit` — rather than a 403 arriving as a raw
 error once they click. Cron and webhook firings are
 unaffected: they run as the system, and a Role is something a person holds.
-Workflows and steps that declare none of this are unaffected — an empty list
-means any member of the workspace, which is where every workflow starts.
+An empty list still means any member of the workspace, and that is where a
+workflow registered by the CLI, an import or the seeded builtins stays.
+
+A workflow **created in the UI** starts somewhere else: its first version is
+registered with `run: [executor, workflow-manager]` and
+`edit: [editor, workflow-manager]` already on the Access tab, and a human block
+added in the editor starts at `allowedRoles: [reviewer, workflow-manager]`. So
+granting somebody `executor` is enough to let them run what this workspace
+builds, without opening a tab per workflow. Nothing recognises those names in
+the gate — they are on the lists, so the lists remain the whole answer, and
+clearing one puts the workflow back to "any member". Whoever registers a
+workflow holds `workflow-manager` on it, which is what keeps the seeded `edit`
+list from refusing them their own next Save. Workflows that existed before this
+are untouched.
 
 Passwords are per-install: there is no password recovery flow yet
 ([issue #1001](https://github.com/Appsilon/mediforce/issues/1001)), so an install

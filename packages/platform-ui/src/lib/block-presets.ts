@@ -1,3 +1,4 @@
+import { DEFAULT_STEP_ALLOWED_ROLES } from '@mediforce/platform-core';
 import { CONTROL_MODE_LABELS, type ControlMode, type NewStepPayload } from '@/lib/control-mode';
 
 export type ExecutorOption = {
@@ -59,7 +60,10 @@ export const EXECUTOR_SECTIONS: ExecutorSection[] = [
         label: 'Human',
         purpose: 'Input, accountability, approval, rejection, classification. Work a person has to sign for.',
         mode: 'no-agent',
-        payload: { executor: 'human' },
+        // ADR-0020: a step a person picks up starts out allowing the roles that
+        // may act. A default in the step editor, clearable back to any member —
+        // the pre-made human blocks carry the same one.
+        payload: { executor: 'human', allowedRoles: DEFAULT_STEP_ALLOWED_ROLES },
       },
       {
         id: 'script',
@@ -87,7 +91,7 @@ export const EXECUTOR_SECTIONS: ExecutorSection[] = [
         label: 'Assist',
         purpose: 'A person does the work and an agent reviews it. Coming soon.',
         mode: 'assist',
-        payload: { executor: 'human' },
+        payload: { executor: 'human', allowedRoles: DEFAULT_STEP_ALLOWED_ROLES },
       },
       {
         id: 'cowork',

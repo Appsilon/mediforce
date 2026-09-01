@@ -1,3 +1,4 @@
+import { DEFAULT_STEP_ALLOWED_ROLES } from '../schemas/builtin-roles';
 import type { WorkflowStep } from '../schemas/workflow-definition';
 
 /**
@@ -15,6 +16,11 @@ import type { WorkflowStep } from '../schemas/workflow-definition';
  * None emits `type: 'review'`: those steps keep working, but per ADR-0014 the
  * designer stops offering the type for new ones, so approval belongs on an agent
  * step at L3.
+ *
+ * The human blocks carry `DEFAULT_STEP_ALLOWED_ROLES` (ADR-0020) — a default
+ * the author sees in the step editor and can widen or clear, not a rule. An
+ * imported package's own `allowedRoles` are untouched, and a step saved with an
+ * empty list stays open to every member exactly as before.
  */
 
 export const BLOCK_CAPABILITY_KEYS = ['email'] as const;
@@ -60,6 +66,7 @@ export const BLOCK_PRESETS: BlockPreset[] = [
     payload: {
       type: 'creation',
       executor: 'human',
+      allowedRoles: DEFAULT_STEP_ALLOWED_ROLES,
       params: [
         { name: 'notes', type: 'textarea', required: true, description: 'What the workflow needs from you' },
       ],
@@ -163,6 +170,7 @@ export const BLOCK_PRESETS: BlockPreset[] = [
     payload: {
       type: 'decision',
       executor: 'human',
+      allowedRoles: DEFAULT_STEP_ALLOWED_ROLES,
     },
   },
   {

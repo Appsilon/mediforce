@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { stubUserDirectory } from '../testing/stub-user-directory';
 import {
   assertNamespaceAccess,
+  memoizeProcessRoleReads,
   assertCallerCanAdminDockerImages,
   assertCallerIsNamespaceAdmin,
   callerCanAccess,
@@ -143,5 +145,62 @@ describe('assertCallerCanAdminDockerImages', () => {
 
   it('rejects a user with no memberships at all', () => {
     expect(() => assertCallerCanAdminDockerImages(user([]))).toThrow(ForbiddenError);
+  });
+});
+
+describe('memoizeProcessRoleReads', () => {
+  /**
+   * Grants read once per `(uid, namespace)` and filtered per workflow in
+   * memory. Since ADR-0020 every workflow a person creates carries access
+   * rows, so a catalog of thirty asks the gate thirty times about the same
+   * caller — one query, not thirty.
+   */
+  function countingDirectory() {
+    const calls: string[] = [];
+    const directory = stubUserDirectory({
+      async getGrantsForUser(uid: string, namespace: string) {
+        calls.push(`${uid}:${namespace}`);
+        return [
+          { role: 'executor', workflowName: null },
+          { role: 'workflow-manager', workflowName: 'tealflow' },
+        ];
+      },
+    });
+    return { calls, memoized: memoizeProcessRoleReads(directory) };
+  }
+
+  it('reads one workspace once however many workflows ask', async () => {
+    const { calls, memoized } = countingDirectory();
+
+    await memoized?.getRolesForUser('u-1', 'ns-a', 'tealflow');
+    await memoized?.getRolesForUser('u-1', 'ns-a', 'otherflow');
+    await memoized?.getRolesForUser('u-1', 'ns-a');
+
+    expect(calls).toEqual(['u-1:ns-a']);
+  });
+
+  it('keeps a grant narrowed to another workflow out of the answer', async () => {
+    const { memoized } = countingDirectory();
+
+    // The #1252 regression: answering the unscoped superset here would admit a
+    // holder of `workflow-manager@tealflow` on `otherflow`.
+    expect(await memoized?.getRolesForUser('u-1', 'ns-a', 'otherflow')).toEqual(['executor']);
+    expect(await memoized?.getRolesForUser('u-1', 'ns-a', 'tealflow')).toEqual([
+      'executor',
+      'workflow-manager',
+    ]);
+  });
+
+  it('answers with every role held when no workflow is named', async () => {
+    const { memoized } = countingDirectory();
+
+    expect(await memoized?.getRolesForUser('u-1', 'ns-a')).toEqual([
+      'executor',
+      'workflow-manager',
+    ]);
+  });
+
+  it('is null without a directory, so the gate refuses rather than reads', () => {
+    expect(memoizeProcessRoleReads(null)).toBeNull();
   });
 });

@@ -2,6 +2,7 @@
 
 import { useId, useState } from 'react';
 import { X } from 'lucide-react';
+import { findBuiltinRole } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { inputBase } from './workflow-editor/step-editor-fields';
 
@@ -109,9 +110,11 @@ export function RoleMultiSelect({
             placeholder={placeholder}
             className={inputBase}
           />
+          {/* The built-ins carry a privilege, so the suggestion says what it
+              is — `executor` is not self-explanatory next to `biostatistician`. */}
           <datalist id={suggestionsId}>
             {vocabulary.map((role) => (
-              <option key={role} value={role} />
+              <option key={role} value={role} label={findBuiltinRole(role)?.description} />
             ))}
           </datalist>
         </>

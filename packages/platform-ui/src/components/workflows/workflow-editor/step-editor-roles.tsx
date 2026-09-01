@@ -10,6 +10,12 @@ const ASSIGNEE_SUGGESTIONS_ID = 'step-assignee-options';
  * A step's `allowedRoles`: the shared role multi-select, plus the warning only
  * a step can give — nobody holds this role for this workflow, so a run that
  * reaches this step will park on it forever (#1249 enforces the gate).
+ *
+ * An unheld role and a blocked step are different facts, and the warning says
+ * which one it found. `allowedRoles` admits on **any** listed role, so a step
+ * allowing `reviewer` and `workflow-manager` in a workspace with no reviewers
+ * is reachable, not stranded — the pair ADR-0020 seeds every new human step
+ * with, and a claim of "this step will block" would be false on all of them.
  */
 export function AllowedRolesField({
   value,
@@ -29,6 +35,8 @@ export function AllowedRolesField({
   onChange: (roles: string[]) => void;
 }) {
   const unheld = heldRoles === null ? [] : value.filter((role) => !heldRoles.includes(role));
+  const blocked = value.length > 0 && unheld.length === value.length;
+  const reachableBy = value.filter((role) => !unheld.includes(role));
 
   return (
     <div className="space-y-2">
@@ -44,8 +52,15 @@ export function AllowedRolesField({
         <div className="flex items-start gap-1.5">
           <AlertTriangle className="h-3 w-3 mt-0.5 text-amber-500 shrink-0" strokeWidth={2} />
           <span className="text-[11px] text-amber-600 dark:text-amber-400">
-            No one holds {unheld.map((role) => `"${role}"`).join(', ')} for this workflow; this step
-            will block until someone is granted {unheld.length === 1 ? 'it' : 'one of them'}.
+            No one holds {unheld.map((role) => `"${role}"`).join(', ')} for this workflow
+            {blocked ? (
+              <>
+                ; this step will block until someone is granted{' '}
+                {unheld.length === 1 ? 'it' : 'one of them'}.
+              </>
+            ) : (
+              <>, so only {reachableBy.map((role) => `"${role}"`).join(', ')} can act on this step.</>
+            )}
           </span>
         </div>
       )}

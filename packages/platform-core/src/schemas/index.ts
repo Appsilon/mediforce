@@ -229,6 +229,18 @@ export {
 } from './workflow-access';
 
 export {
+  BUILTIN_ROLES,
+  WORKFLOW_MANAGER_ROLE,
+  DEFAULT_WORKFLOW_ACCESS,
+  DEFAULT_STEP_ALLOWED_ROLES,
+  builtinRoleIds,
+  builtinRolesWithVerb,
+  findBuiltinRole,
+  type BuiltinRole,
+  type RoleVerb,
+} from './builtin-roles';
+
+export {
   AddStepToolSchema,
   UpdateStepToolSchema,
   RemoveStepToolSchema,

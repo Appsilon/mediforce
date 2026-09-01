@@ -275,6 +275,24 @@ thing), from the CLI (`mediforce namespace set-member-roles`) or over the API
 (`mediforce namespace list-members`, `GET /api/users/members`), and enforced on
 task claim and complete against the run's pinned Workflow Definition, and on
 starting or changing a Workflow against its Workflow Access.
+_Note_: Four **Built-in Roles** ship with every deployment — see below.
+
+**Built-in Roles** *(the starting set)*:
+`editor`, `executor`, `reviewer` and `workflow-manager`
+([ADR-0020](docs/adr/0020-built-in-roles-and-default-workflow-access.md)).
+Ordinary Roles in every respect — free-form strings, granted and revoked like
+any other. What makes them built-in is that the platform writes them into the
+ordinary places by default: a Workflow's first version is registered with
+`run: [executor, workflow-manager]` / `edit: [editor, workflow-manager]`, a
+human Step added in the editor starts at `allowedRoles: [reviewer,
+workflow-manager]`, and all four are always offered in the role pick-lists.
+`workflow-manager` is the union of the other three, not a rank above them.
+_Avoid_: calling them reserved or protected — nothing rejects a Role named
+`editor` from a different source, and nothing in the gate treats these four
+specially. A built-in Role holds a privilege only where a list names it.
+_Note_: A Workspace's owner holds `workflow-manager` from creation, and
+whoever registers a Workflow holds it narrowed to that Workflow — otherwise the
+seeded lists would gate a Workflow against roles nobody holds.
 
 **Workflow Access** *(workflow governance level)*:
 Which **Roles** may `run` a Workflow (start a run) and which may `edit` it
@@ -283,8 +301,11 @@ default version) — the workflow's **Access** tab
 ([ADR-0019](docs/adr/0019-workspace-scoped-roles.md)). Stored per
 `(namespace, name)` beside the Workflow, never inside a Workflow Definition:
 registering a new version must not silently rewrite permissions. Administered
-by workspace owner/admin. An empty list means any member of the Workspace,
-which is every Workflow's starting state.
+by workspace owner/admin. An empty list means any member of the Workspace —
+the state of every Workflow that predates
+[ADR-0020](docs/adr/0020-built-in-roles-and-default-workflow-access.md), and of
+every one registered by automation; a Workflow a person creates starts from the
+Built-in Roles' defaults instead.
 _Avoid_: confusing with `visibility`, which is the *cross-workspace* read
 shelf — every member of the owning Workspace sees every Workflow in it
 regardless of Access. And with the Workflow Definition's `roles` field, which

@@ -1,4 +1,7 @@
-import type { UserDirectoryService } from '@mediforce/platform-core';
+import type {
+  RoleGrant as ProcessRoleGrant,
+  UserDirectoryService,
+} from '@mediforce/platform-core';
 import { ForbiddenError } from './errors';
 
 /**
@@ -294,28 +297,52 @@ async function resolveRoleGrant(
 }
 
 /**
- * A `ProcessRoleDirectory` that reads each `(uid, namespace, workflow)` at most
- * once, sharing the in-flight promise between concurrent askers.
+ * A `ProcessRoleDirectory` that reads one user's grants in a workspace **once**
+ * and answers every workflow from that one read, sharing the in-flight promise
+ * between concurrent askers.
  *
  * The gate reads the directory once per refusal, which is right for one claim
- * and wrong for an inbox: thirty tasks parked on the same gated workflow would
- * otherwise be thirty identical reads. Request-scoped — build one per call,
- * never cache across requests, or a grant made mid-session would keep being
- * answered from before it existed.
+ * and wrong for a list: thirty tasks parked on gated workflows, or a catalog of
+ * thirty workflows carrying the default access every new one is seeded with
+ * (ADR-0020), would otherwise be thirty reads for a caller who holds nothing
+ * workspace-wide. Keying on `(uid, namespace)` rather than on the workflow is
+ * what collapses them — `getGrantsForUser` already returns each grant with the
+ * workflow it is narrowed to, so per-workflow answers are a filter, not a
+ * query.
+ *
+ * A grant narrowed to a *different* workflow must still not admit here, which
+ * is why this filters on `workflowName` rather than reusing the unscoped
+ * `getRolesForUser(uid, namespace)` — that one is a superset and would silence
+ * the very refusal #1252 exists for.
+ *
+ * Request-scoped — build one per call, never cache across requests, or a grant
+ * made mid-session would keep being answered from before it existed.
  */
 export function memoizeProcessRoleReads(
-  directory: ProcessRoleDirectory | null,
+  directory: UserDirectoryService | null,
 ): ProcessRoleDirectory | null {
   if (directory === null) return null;
-  const inFlight = new Map<string, Promise<string[]>>();
+  const inFlight = new Map<string, Promise<ProcessRoleGrant[]>>();
+
+  const grantsFor = (uid: string, namespace: string): Promise<ProcessRoleGrant[]> => {
+    const key = JSON.stringify([uid, namespace]);
+    const cached = inFlight.get(key);
+    if (cached !== undefined) return cached;
+    const pending = directory.getGrantsForUser(uid, namespace);
+    inFlight.set(key, pending);
+    return pending;
+  };
+
   return {
-    getRolesForUser: (uid, namespace, workflowName) => {
-      const key = JSON.stringify([uid, namespace, workflowName ?? null]);
-      const cached = inFlight.get(key);
-      if (cached !== undefined) return cached;
-      const pending = directory.getRolesForUser(uid, namespace, workflowName);
-      inFlight.set(key, pending);
-      return pending;
+    getRolesForUser: async (uid, namespace, workflowName) => {
+      const grants = await grantsFor(uid, namespace);
+      const reaching = grants.filter(
+        (grant) =>
+          workflowName === undefined ||
+          grant.workflowName === null ||
+          grant.workflowName === workflowName,
+      );
+      return [...new Set(reaching.map((grant) => grant.role))];
     },
     getUsersByRoleInNamespace: (role, namespace, workflowName) =>
       directory.getUsersByRoleInNamespace(role, namespace, workflowName),

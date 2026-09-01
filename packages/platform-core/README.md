@@ -11,7 +11,7 @@ makes it the place a shared type belongs and a bad place for anything else.
 
 | Directory | Holds |
 |---|---|
-| `src/schemas/` | Domain schemas — `WorkflowDefinition`, `ProcessInstance`, `StepExecution`, `HumanTask`, `AgentRun`, triggers, actions, MCP bindings |
+| `src/schemas/` | Domain schemas — `WorkflowDefinition`, `ProcessInstance`, `StepExecution`, `HumanTask`, `AgentRun`, triggers, actions, MCP bindings, and the built-in roles whose verbs the default workflow access and step `allowedRoles` derive from ([ADR-0020](../../docs/adr/0020-built-in-roles-and-default-workflow-access.md)) |
 | `src/interfaces/` | Repository and service contracts the infra layer implements |
 | `src/repositories/` | Repository-side shared types |
 | `src/parser/` | YAML process-definition parsing |

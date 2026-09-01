@@ -204,6 +204,31 @@ function contract(name: string, build: () => Promise<UserDirectoryService>) {
       ).rejects.toBeInstanceOf(MemberNotInNamespaceError);
     });
 
+    it('grantRole adds one grant and keeps the ones already held', async () => {
+      await dir.grantRole('u1', WS_A, { role: 'workflow-manager', workflowName: OTHERFLOW });
+
+      expect(sortedGrants(await dir.getGrantsForUser('u1', WS_A))).toEqual([
+        'approver@tealflow',
+        'reviewer',
+        'workflow-manager@otherflow',
+      ]);
+    });
+
+    it('grantRole is idempotent', async () => {
+      const grant = { role: 'workflow-manager', workflowName: null };
+      await dir.grantRole('u3', WS_A, grant);
+      await dir.grantRole('u3', WS_A, grant);
+
+      expect(await dir.getGrantsForUser('u3', WS_A)).toEqual([grant]);
+    });
+
+    it('grantRole refuses a non-member', async () => {
+      await expect(
+        dir.grantRole('u4', WS_A, { role: 'workflow-manager', workflowName: null }),
+      ).rejects.toBeInstanceOf(MemberNotInNamespaceError);
+      expect(await dir.getRolesInNamespace(WS_A)).not.toContain('workflow-manager');
+    });
+
     it('clearRolesForWorkflow drops narrowed grants and keeps workspace-wide ones', async () => {
       await dir.clearRolesForWorkflow(WS_A, TEALFLOW);
 

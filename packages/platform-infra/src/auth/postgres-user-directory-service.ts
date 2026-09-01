@@ -116,6 +116,22 @@ export class PostgresUserDirectoryService implements UserDirectoryService {
     });
   }
 
+  async grantRole(uid: string, namespace: string, grant: RoleGrant): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const membership = await tx
+        .select({ uid: workspaceMembers.uid })
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspace, namespace), eq(workspaceMembers.uid, uid)))
+        .for('update');
+      if (membership.length === 0) throw new MemberNotInNamespaceError(uid, namespace);
+
+      await tx
+        .insert(userRoles)
+        .values({ uid, namespace, role: grant.role, workflowName: grant.workflowName })
+        .onConflictDoNothing();
+    });
+  }
+
   async clearRolesForWorkflow(namespace: string, workflowName: string): Promise<void> {
     await this.db
       .delete(userRoles)

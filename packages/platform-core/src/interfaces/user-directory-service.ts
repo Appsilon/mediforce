@@ -84,6 +84,24 @@ export interface UserDirectoryService {
    */
   setRolesForUser(uid: string, namespace: string, grants: readonly RoleGrant[]): Promise<void>;
   /**
+   * Add one grant, leaving every other grant `uid` holds in `namespace`
+   * untouched. Idempotent — granting a role already held changes nothing.
+   *
+   * The additive sibling of `setRolesForUser`, and not expressible in terms of
+   * it: read-modify-write through a full replace re-opens exactly the
+   * interleaving that method's lock exists to close, and it would resurrect
+   * grants a concurrent removal had just cascaded away. Membership is checked
+   * under the same lock, for the same reason.
+   *
+   * Its callers grant on behalf of the platform rather than of an admin —
+   * `workflow-manager` to a workspace's owner and to whoever registers a
+   * workflow (ADR-0020) — where the alternative is a default gate nobody can
+   * pass.
+   *
+   * Throws `MemberNotInNamespaceError` when `uid` is not a member.
+   */
+  grantRole(uid: string, namespace: string, grant: RoleGrant): Promise<void>;
+  /**
    * Drop every grant narrowed to `workflowName` in `namespace`. Called on the
    * two events that free the name — the workflow being deleted, and it being
    * transferred out to another workspace: a grant that outlives its workflow

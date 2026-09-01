@@ -327,3 +327,29 @@ sets none of this behaves exactly as it did before roles were enforced. A role
 nobody holds is the opposite: the gate naming it is closed to everyone, which is
 correct (an approval control that opens when unconfigured is the worse failure)
 and is why both the step editor and the Access tab warn about it.
+
+**Nothing starts empty any more, for a workflow a person creates.**
+[ADR-0020](../adr/0020-built-in-roles-and-default-workflow-access.md) ships four
+built-in roles and writes them into the two enforced places as defaults:
+
+| Role | May |
+|---|---|
+| `executor` | start runs |
+| `editor` | change the workflow |
+| `reviewer` | act on its human steps |
+| `workflow-manager` | all three |
+
+Registering a workflow's **first version** seeds its Access tab with
+`run: [executor, workflow-manager]` and `edit: [editor, workflow-manager]`, and
+adding a human block in the editor starts its `allowedRoles` at
+`[reviewer, workflow-manager]`. Both are ordinary values on the two lists above
+— visible, editable, and clearable back to "any member". Nothing recognises
+these names in the gate itself, so a role holds a privilege only where a list
+names it.
+
+Two exceptions keep this deployable: a workflow **registered by automation**
+(the CLI, an import, the seeded builtins) stays open, because a system actor
+has no uid to grant the matching role to, and **workflows that predate
+ADR-0020** are untouched. The person who registers a workflow is granted
+`workflow-manager` narrowed to it, which is what stops the seeded `edit` list
+from refusing them their own second Save.

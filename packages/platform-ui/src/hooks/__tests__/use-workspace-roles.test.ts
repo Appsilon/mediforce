@@ -32,6 +32,28 @@ describe('useWorkspaceRoles heldRoles', () => {
     listWorkflowsMock.mockResolvedValue({ definitions: [] });
   });
 
+  it('offers the built-in roles before anyone in the workspace holds one', async () => {
+    listMembersMock.mockResolvedValue({ members: [] });
+
+    const { wrapper } = createQueryWrapper();
+    const { result } = renderHook(() => useWorkspaceRoles('acme'), { wrapper });
+
+    // ADR-0020: a new workflow's access lists and a new human step already
+    // name these, so an empty pick-list beside them would leave the author
+    // typing names the gate quotes back at them.
+    await waitFor(() =>
+      expect(result.current.roles).toEqual([
+        'editor',
+        'executor',
+        'reviewer',
+        'workflow-manager',
+      ]),
+    );
+    // Offering a role is not holding it — the step warning depends on the two
+    // staying apart.
+    await waitFor(() => expect(result.current.heldRoles).toEqual([]));
+  });
+
   it('answers with the roles the roster actually holds on the named workflow', async () => {
     listMembersMock.mockResolvedValue({
       members: [

@@ -30,9 +30,9 @@ interface StoredGrant {
  * `user-directory-parity.test.ts` runs both against it.
  *
  * `addRole` and `addMember` are the seeding backdoors, standing in for the
- * parity fixture's direct inserts. Only `setRolesForUser` — the product write
- * path — enforces membership, exactly as Postgres does: the invariant lives on
- * the write, not on the table.
+ * parity fixture's direct inserts. Only the product write paths —
+ * `setRolesForUser` and `grantRole` — enforce membership, exactly as Postgres
+ * does: the invariant lives on the write, not on the table.
  */
 export class InMemoryUserDirectoryService implements UserDirectoryService {
   private readonly users = new Map<string, InMemoryDirectoryUser>();
@@ -117,6 +117,13 @@ export class InMemoryUserDirectoryService implements UserDirectoryService {
     for (const grant of grants) {
       this.addRole(uid, namespace, grant.role, grant.workflowName);
     }
+  }
+
+  async grantRole(uid: string, namespace: string, grant: RoleGrant): Promise<void> {
+    if (!this.members.has(memberKey(uid, namespace))) {
+      throw new MemberNotInNamespaceError(uid, namespace);
+    }
+    this.addRole(uid, namespace, grant.role, grant.workflowName);
   }
 
   async clearRolesForWorkflow(namespace: string, workflowName: string): Promise<void> {

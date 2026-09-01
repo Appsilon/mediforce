@@ -141,10 +141,10 @@ describe('listTasks — actionable axis', () => {
 
     it('drops it for a holder whose grant is narrowed to another workflow', async () => {
       const directory = stubUserDirectory({
-        // What a grant on `vendor-intake` answers when asked about
-        // `vendor-review`: nothing.
-        async getRolesForUser(_uid, _namespace, workflowName) {
-          return workflowName === OPEN_WORKFLOW ? ['reviewer'] : [];
+        // A `reviewer` grant on `vendor-intake` has nothing to say about
+        // `vendor-review`.
+        async getGrantsForUser() {
+          return [{ role: 'reviewer', workflowName: OPEN_WORKFLOW }];
         },
       });
 
@@ -155,8 +155,8 @@ describe('listTasks — actionable axis', () => {
 
     it('keeps it for a holder whose grant is narrowed to this workflow', async () => {
       const directory = stubUserDirectory({
-        async getRolesForUser(_uid, _namespace, workflowName) {
-          return workflowName === REVIEW_WORKFLOW ? ['reviewer'] : [];
+        async getGrantsForUser() {
+          return [{ role: 'reviewer', workflowName: REVIEW_WORKFLOW }];
         },
       });
 
@@ -282,8 +282,8 @@ describe('listTasks — actionable axis', () => {
         await seedTask({ id: `t-${index}-b`, processInstanceId: `inst-${index}` });
       }
 
-      const getRolesForUser = vi.fn(async () => [] as string[]);
-      const scope = scopeFor(OUTSIDER, undefined, stubUserDirectory({ getRolesForUser }));
+      const getGrantsForUser = vi.fn(async () => []);
+      const scope = scopeFor(OUTSIDER, undefined, stubUserDirectory({ getGrantsForUser }));
       const pins = vi.spyOn(scope.runs, 'getDefinitionPins');
       const definitions = vi.spyOn(scope.workflowDefinitions, 'get');
 
@@ -300,8 +300,10 @@ describe('listTasks — actionable axis', () => {
       expect(pins.mock.calls[0]?.[0]).toHaveLength(5);
       // Five runs, two distinct pinned versions.
       expect(definitions).toHaveBeenCalledTimes(2);
-      // Six gated tasks, one `(workspace, workflow)` question between them.
-      expect(getRolesForUser).toHaveBeenCalledTimes(1);
+      // Six gated tasks, one `(uid, workspace)` read between them: the memoized
+      // directory reads the caller's grants once and answers every workflow
+      // from that, so the count no longer grows with the gated workflows either.
+      expect(getGrantsForUser).toHaveBeenCalledTimes(1);
     });
   });
 });

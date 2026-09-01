@@ -92,3 +92,4 @@ appendix can capture what actually shipped vs the original decision body.
 | [0017](./0017-retire-llm-maintained-wiki.md) | Retire the LLM-maintained wiki; docs live next to what they describe (+ [PLAN](../archive/PLAN-0017.md), executed) | Accepted |
 | [0018](./0018-fan-out-is-child-workflows.md) | Fan-out over sub-graphs is child workflows; the engine stays linear | Accepted |
 | [0019](./0019-workspace-scoped-roles.md) | Process roles are workspace-scoped (partially supersedes [0002](./0002-firebase-auth-to-nextauth.md) §5) | Accepted |
+| [0020](./0020-built-in-roles-and-default-workflow-access.md) | Built-in roles carry their privilege as a default, not as an override (extends [0019](./0019-workspace-scoped-roles.md)) | Accepted |

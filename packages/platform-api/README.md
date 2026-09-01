@@ -57,6 +57,15 @@ three of the epic's verbs go through that one predicate: `act` via
 `handlers/workflows/_access-gate.ts` (the workflow's Access rows). A handler
 that needs a fourth calls the predicate rather than writing a fifth check.
 
+**The built-in roles are data, not a branch in the gate.** The four roles of
+[ADR-0020](../../docs/adr/0020-built-in-roles-and-default-workflow-access.md)
+reach the predicate the same way every other role does — by being written into
+the lists it reads. `handlers/workflows/_seed-access.ts` does that on a
+workflow's first version, together with the narrowed `workflow-manager` grant
+that keeps the seeded `edit` list from refusing the author their own next Save.
+Nothing in `auth.ts` knows these names, and nothing should: a role that held
+authority the Access tab does not show would make the tab a partial answer.
+
 **`getPlatformServices()` is the only composition root.** It wires repositories,
 the workflow engine, the plugin registry and the action registry. It lives here —
 not in `platform-ui`, whose `src/lib/platform-services.ts` is a re-export shim

@@ -793,6 +793,26 @@ describe('StepEditor', () => {
       expect(onChange).toHaveBeenCalledWith({ allowedRoles: ['reviewer', 'approver'] });
     });
 
+    it('says the step is blocked only when no listed role is held', () => {
+      // ADR-0020 seeds every new human step with `reviewer, workflow-manager`,
+      // and most workspaces have no reviewer — so on the common step the
+      // warning has to name what is missing without claiming a stall that the
+      // held role prevents.
+      rolesState.workspaceRoles = {
+        roles: ['reviewer', 'workflow-manager'],
+        workflowNames: ['tealflow'],
+        heldRoles: ['workflow-manager'],
+        loading: false,
+        error: null,
+      };
+      renderRoles({ allowedRoles: ['reviewer', 'workflow-manager'] });
+
+      const warning = screen.getByText(/no one holds/i);
+      expect(warning).toHaveTextContent('reviewer');
+      expect(warning).toHaveTextContent('only "workflow-manager" can act on this step');
+      expect(warning).not.toHaveTextContent('will block');
+    });
+
     it('[REGRESSION #1252] a holder scoped to another workflow does not silence the warning', () => {
       // `heldRoles` is already scoped to this workflow by the hook, so a grant
       // narrowed to `otherflow` never reaches it.

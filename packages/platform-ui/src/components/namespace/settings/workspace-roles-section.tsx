@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Pencil, Plus, ShieldCheck, X } from 'lucide-
 import type { RoleGrantInput } from '@mediforce/platform-api/contract';
 import type { NamespaceMemberDetail } from '@/hooks/use-namespace-members';
 import { useSetMemberRoles } from '@/hooks/use-namespace-mutations';
+import { findBuiltinRole } from '@mediforce/platform-core';
 import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 
 const ROLE_OPTIONS_LIST_ID = 'workspace-role-options';
@@ -370,7 +371,7 @@ export function WorkspaceRolesSection({
           (ADR-0019), so a name no workflow declares yet still lands. */}
       <datalist id={ROLE_OPTIONS_LIST_ID}>
         {workspaceRoles.map((role) => (
-          <option key={role} value={role} />
+          <option key={role} value={role} label={findBuiltinRole(role)?.description} />
         ))}
       </datalist>
 
