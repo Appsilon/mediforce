@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://mediforce.ai/sitemap.xml
+Sitemap: https://mediforce.ai/docs/sitemap.xml
