@@ -146,6 +146,25 @@ describe('buildImageFromRepo', () => {
     expect(buildLabel(args, 'mediforce.build.dockerfile')).toBe('container/Dockerfile');
   });
 
+  it('labels no dockerfile when the step named none, matching what the tag hashed', async () => {
+    execSyncMock.mockReturnValue(Buffer.from(''));
+
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: '/tmp/test-repo.git',
+      commit: 'abc123',
+    });
+
+    const args = buildArgs();
+    // The build still needs a concrete path...
+    expect(args).toContain('/tmp/mediforce-build-abc/Dockerfile');
+    // ...but `deriveBuildTag` hashed `dockerfile ?? ''`, so labelling the
+    // resolved default would make the image claim a Dockerfile its own tag
+    // never saw, and an Image Catalog entry keyed on `(repo, dockerfile)`
+    // could not match it (ADR-0021 decision 1).
+    expect(buildLabel(args, 'mediforce.build.dockerfile')).toBeUndefined();
+  });
+
   it('labels the image with repo, workflow, namespace and the OCI equivalents', async () => {
     execSyncMock.mockReturnValue(Buffer.from(''));
 
