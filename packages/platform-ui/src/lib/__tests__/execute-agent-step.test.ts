@@ -139,12 +139,13 @@ vi.mock('@/app/actions/namespace-secrets', () => ({
   getNamespaceSecretsForRuntime: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock('@/lib/resolve-agent-identity', () => ({
-  resolveAgentIdentity: vi.fn().mockResolvedValue(undefined),
+vi.mock('@/lib/resolve-agent-defaults', () => ({
+  resolveAgentDefaults: vi.fn().mockResolvedValue({}),
 }));
 
 // Import after mock setup
 import { executeAgentStep } from '../execute-agent-step';
+import { resolveAgentDefaults } from '@/lib/resolve-agent-defaults';
 
 describe('executeAgentStep', () => {
   const workflowDefinition: WorkflowDefinition = buildWorkflowDefinition({
@@ -324,6 +325,75 @@ describe('executeAgentStep', () => {
       await executeAgentStep('inst-wf-001', 'gather-data', step, {}, 'user-1');
 
       expect(mockPluginRegistry.get).toHaveBeenCalledWith('databricks-job');
+    });
+  });
+
+  // ---- Model resolution ----
+
+  describe('model resolution', () => {
+    const agentStep: WorkflowStep = {
+      id: 'gather-data',
+      name: 'Gather Data',
+      type: 'creation',
+      executor: 'agent',
+      autonomyLevel: 'L2',
+      agentId: 'cdisc-author',
+    };
+
+    // resolveMcpForStep resolves the same agentId against the real repo mock
+    // and throws when the reference is rotten, so give it something to find.
+    beforeEach(() => {
+      mockAgentDefinitionRepo.getById.mockResolvedValue({ id: 'cdisc-author', mcpServers: {} });
+    });
+
+    it('[DATA] falls back to the agent definition model when the step sets none', async () => {
+      vi.mocked(resolveAgentDefaults).mockResolvedValueOnce({ model: 'anthropic/claude-opus-4' });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', agentStep, {}, 'user-1');
+
+      const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+      expect(contextArg.step.agent.model).toBe('anthropic/claude-opus-4');
+    });
+
+    it('[DATA] keeps the step model when the step overrides the agent definition', async () => {
+      vi.mocked(resolveAgentDefaults).mockResolvedValueOnce({ model: 'anthropic/claude-opus-4' });
+      const stepWithModel: WorkflowStep = { ...agentStep, agent: { model: 'openai/gpt-5' } };
+
+      await executeAgentStep('inst-wf-001', 'gather-data', stepWithModel, {}, 'user-1');
+
+      const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+      expect(contextArg.step.agent.model).toBe('openai/gpt-5');
+    });
+
+    it('[DATA] leaves the model unset when neither step nor agent definition has one', async () => {
+      vi.mocked(resolveAgentDefaults).mockResolvedValueOnce({});
+
+      await executeAgentStep('inst-wf-001', 'gather-data', agentStep, {}, 'user-1');
+
+      const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+      expect(contextArg.step.agent?.model).toBeUndefined();
+    });
+
+    it('[DATA] preserves the other step.agent fields when filling the model in', async () => {
+      vi.mocked(resolveAgentDefaults).mockResolvedValueOnce({ model: 'anthropic/claude-opus-4' });
+      const stepWithSkill: WorkflowStep = { ...agentStep, agent: { skill: 'author-sdtm', timeoutMinutes: 12 } };
+
+      await executeAgentStep('inst-wf-001', 'gather-data', stepWithSkill, {}, 'user-1');
+
+      const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+      expect(contextArg.step.agent).toMatchObject({
+        skill: 'author-sdtm',
+        timeoutMinutes: 12,
+        model: 'anthropic/claude-opus-4',
+      });
+    });
+
+    it('[DATA] does not consult the agent definition when the step has no agentId', async () => {
+      const stepNoAgentId: WorkflowStep = { ...agentStep, agentId: undefined };
+
+      await executeAgentStep('inst-wf-001', 'gather-data', stepNoAgentId, {}, 'user-1');
+
+      expect(resolveAgentDefaults).not.toHaveBeenCalled();
     });
   });
 

@@ -302,7 +302,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              Recorded on the agent for reference. A run takes its model from the workflow step that calls the agent.
+              Used by every workflow step that calls this agent, unless the step sets its own model.
             </p>
           </div>
 

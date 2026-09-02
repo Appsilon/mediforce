@@ -24,7 +24,7 @@ import {
 } from '@mediforce/platform-core';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
-import { resolveAgentIdentity } from './resolve-agent-identity';
+import { resolveAgentDefaults } from './resolve-agent-defaults';
 
 export interface WorkflowAgentStepResult {
   instanceId: string;
@@ -159,12 +159,18 @@ export async function executeAgentStep(
       })
     : undefined;
 
-  // Resolve agent identity prompt (systemPrompt) from the AgentDefinition.
-  // Returns undefined when step has no agentId or agent has no systemPrompt.
-  let agentIdentityPrompt: string | undefined;
-  if (!reapTimedOut && workflowStep.agentId !== undefined) {
-    agentIdentityPrompt = await resolveAgentIdentity(workflowStep.agentId, agentDefinitionRepo);
-  }
+  // Resolve what the step inherits from its AgentDefinition: the identity
+  // prompt (systemPrompt) and the model. Empty when the step has no agentId.
+  const agentDefaults = !reapTimedOut && workflowStep.agentId !== undefined
+    ? await resolveAgentDefaults(workflowStep.agentId, agentDefinitionRepo)
+    : {};
+  const agentIdentityPrompt = agentDefaults.identityPrompt;
+
+  // The step's own model wins; the agent's foundationModel is the fallback, so
+  // picking an agent picks its model unless the step deliberately overrides it.
+  const resolvedStep: WorkflowStep = agentDefaults.model !== undefined && workflowStep.agent?.model === undefined
+    ? { ...workflowStep, agent: { ...workflowStep.agent, model: agentDefaults.model } }
+    : workflowStep;
 
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,
@@ -174,7 +180,7 @@ export async function executeAgentStep(
     stepInput: mergedInput,
     autonomyLevel,
     workflowDefinition,
-    step: workflowStep,
+    step: resolvedStep,
     llm: llmClient,
     workflowSecrets,
     namespaceSecretKeys: new Set(Object.keys(namespaceSecrets)),
