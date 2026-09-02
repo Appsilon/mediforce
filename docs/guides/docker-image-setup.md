@@ -69,7 +69,8 @@ Minimal base images (`alpine`, `scratch`, distroless) ship none of this. `alpine
 
 - `mediforce images list` — the **Image Catalog**: the images your namespace
   offers for steps, one row per source, each with a sentence saying what it is
-  for ([ADR-0021](../adr/0021-image-catalog.md)). Curated and per-namespace.
+  for and a cached probe of each version's runtimes and agent suitability
+  ([ADR-0021](../adr/0021-image-catalog.md)). Curated and per-namespace.
 - `mediforce system images` — the raw Docker daemon listing: every image on the
   host, `postgres` and dangling layers included. Deployment-wide and ops-facing;
   the one to reach for when hunting disk, not when choosing a step image.

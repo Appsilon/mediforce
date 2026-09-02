@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
 import { DEFAULT_AGENT_IMAGE, uniqueName, uniqueSlug } from '@mediforce/platform-core';
-import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
+import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, ImageCapabilities } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
@@ -80,16 +80,18 @@ function pickerImageValue(image: string): string {
   return image === `${DEFAULT_AGENT_IMAGE}:latest` ? DEFAULT_AGENT_IMAGE : image;
 }
 
-/**
- * Agent images sorted with the golden image first — it is the one image
- * guaranteed to carry an agent CLI, and every other discovered image (a bare
- * `alpine`, a language runtime) fails at container start for an agent step.
- */
-function agentImageOptions(images: DockerImageInfo[]): Array<{ img: DockerImageInfo; label: string }> {
+function agentImageOptions(
+  images: DockerImageInfo[],
+  capabilitiesByImageId: Record<string, ImageCapabilities>,
+): Array<{ img: DockerImageInfo; label: string }> {
   return images
+    .filter((img) => {
+      const capabilities = capabilitiesByImageId[img.id];
+      return capabilities?.status !== 'known' || capabilities.agentCapable;
+    })
     .map((img) => {
-      const value = pickerImageValue(imageRef(img));
-      const recommended = value === DEFAULT_AGENT_IMAGE;
+      const capabilities = capabilitiesByImageId[img.id];
+      const recommended = capabilities?.status === 'known' && capabilities.agentCapable;
       return { img, recommended, label: recommended ? `★ ${imageRef(img)}` : imageRef(img) };
     })
     .sort((a, b) => Number(b.recommended) - Number(a.recommended));
@@ -240,6 +242,7 @@ export function StepEditor({
   errors,
   imageWarning,
   dockerImages,
+  imageCapabilities = {},
   workflowExternalSkillsRepo,
 }: {
   step: WorkflowStep;
@@ -250,6 +253,7 @@ export function StepEditor({
   errors?: Record<string, string>;
   imageWarning?: string;
   dockerImages?: DockerImageInfo[];
+  imageCapabilities?: Record<string, ImageCapabilities>;
   workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
 }) {
   const isNewStep = step.id.startsWith('new-step-');
@@ -795,11 +799,11 @@ export function StepEditor({
                   className={rs}
                 >
                   <option value="">{agentBlankOptionLabel}</option>
-                  {agentImageOptions(dockerImages).map(({ img, label }) => (
+                  {agentImageOptions(dockerImages, imageCapabilities).map(({ img, label }) => (
                     <option key={img.id} value={pickerImageValue(imageRef(img))}>{label}</option>
                   ))}
-                  {step.agent?.image && !dockerImages.some(
-                    (img) => pickerImageValue(imageRef(img)) === pickerImageValue(step.agent?.image ?? ''),
+                  {step.agent?.image && !agentImageOptions(dockerImages, imageCapabilities).some(
+                    ({ img }) => pickerImageValue(imageRef(img)) === pickerImageValue(step.agent?.image ?? ''),
                   ) && (
                     <option value={step.agent.image}>{step.agent.image}</option>
                   )}

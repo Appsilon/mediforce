@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ImageCapabilityCacheSchema } from './image-capabilities';
 
 /**
  * Where an entry's image comes from. This is the entry's key (ADR-0021
@@ -69,6 +70,7 @@ export const ImageCatalogEntrySchema = z
       .min(1, 'intent is required: one sentence saying what this image is for'),
     source: ImageCatalogSourceSchema,
     declaredSource: ImageCatalogDeclaredSourceSchema.optional(),
+    capabilities: ImageCapabilityCacheSchema.default({}),
   })
   .strict();
 

@@ -1,4 +1,8 @@
-import type { ImageCatalogSource } from '@mediforce/platform-core';
+import {
+  unknownImageCapabilities,
+  type ImageCapabilityCache,
+  type ImageCatalogSource,
+} from '@mediforce/platform-core';
 import type { DockerImageInfo } from '../../contract/system';
 import type {
   ImageCatalogAvailability,
@@ -29,6 +33,7 @@ function matchesBuilt(image: DockerImageInfo, repo: string, dockerfile: string):
 export function resolveEntryVersions(
   source: ImageCatalogSource,
   images: readonly DockerImageInfo[],
+  capabilities: ImageCapabilityCache = {},
 ): ImageCatalogVersion[] {
   const matched =
     source.kind === 'built'
@@ -43,6 +48,7 @@ export function resolveEntryVersions(
     ...(image.buildCommit !== undefined ? { commit: image.buildCommit } : {}),
     ...(image.buildWorkflow !== undefined ? { workflow: image.buildWorkflow } : {}),
     ...(image.buildNamespace !== undefined ? { namespace: image.buildNamespace } : {}),
+    capabilities: capabilities[image.id] ?? unknownImageCapabilities(),
   }));
 }
 

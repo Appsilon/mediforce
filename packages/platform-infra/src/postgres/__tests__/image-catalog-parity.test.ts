@@ -40,6 +40,7 @@ function contract(name: string, factory: () => Promise<ImageCatalogRepository>) 
         repo: 'git@github.com:Appsilon/tealflow.git',
         dockerfile: 'container/Dockerfile',
       },
+      capabilities: {},
       ...overrides,
     });
 
@@ -63,6 +64,7 @@ function contract(name: string, factory: () => Promise<ImageCatalogRepository>) 
           commit: 'abc1234',
           dockerfile: 'packages/agent-runtime/container/Dockerfile.base',
         },
+        capabilities: {},
       };
       await repo.upsert('appsilon', referenced);
       expect(await repo.getById('appsilon', referenced.id)).toEqual(referenced);
@@ -161,6 +163,7 @@ describe.skipIf(skipPg)('PostgresImageCatalogRepository (parity)', () => {
       name: 'Trigger probe',
       intent: 'first',
       source: { kind: 'referenced', reference: 'probe' },
+      capabilities: {},
     };
     await repo.upsert('appsilon', base);
     const [before] = await testClient<{ updated_at: string }[]>`
