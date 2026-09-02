@@ -19,6 +19,13 @@ export interface DefinitionGroup {
   title?: string;
   description?: string;
   latestVersion: string;
+  /**
+   * The version a run actually starts from: the pinned default when the
+   * workflow has one, else the latest. Mirrors `useWorkflowVersions`'
+   * `effectiveVersion`, which is what `StartRunButton` starts — so a card's
+   * version label and its Start Run button can never name two definitions.
+   */
+  effectiveVersion: string;
   versions: DefinitionVersion[];
   stepCount: number;
   hasManualTrigger: boolean;
@@ -75,6 +82,7 @@ export function useProcessDefinitions(includeCompletedRuns: boolean = true) {
           title: def.title,
           description: def.description,
           latestVersion,
+          effectiveVersion: String(g.defaultVersion ?? g.latestVersion),
           versions: [
             {
               version: latestVersion,
