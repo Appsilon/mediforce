@@ -351,6 +351,13 @@
       "when": 1788864042894,
       "tag": "0049_workflow_artifacts",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1789380036000,
+      "tag": "0050_image_catalog_entries",
+      "breakpoints": true
     }
   ]
 }
