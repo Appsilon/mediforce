@@ -710,6 +710,10 @@ describe('StepEditor', () => {
           allSteps={[]}
           onChange={noop}
           dockerImages={mixedImages}
+          imageCapabilities={{
+            a1: { status: 'known', agentCapable: false, runtimes: [] },
+            g1: { status: 'known', agentCapable: true, runtimes: ['opencode', 'bash'] },
+          }}
           workflowExternalSkillsRepo={workflowExternalSkillsRepo}
         />,
       );
@@ -722,11 +726,11 @@ describe('StepEditor', () => {
       expect(select.options[0].textContent).toContain('mediforce-golden-image');
     });
 
-    it('[RENDER] marks the golden image as recommended and lists it first', () => {
+    it('[RENDER] marks the probed agent-capable image as recommended and omits known incompatible images', () => {
       const select = renderAgentStep();
       const listed = Array.from(select.options).slice(1).map((o) => o.textContent ?? '');
       expect(listed[0]).toBe('★ mediforce-golden-image:latest');
-      expect(listed).toContain('alpine:3.24');
+      expect(listed).not.toContain('alpine:3.24');
     });
 
     it('[RENDER] a build-mode step reports its build source instead of the default', () => {

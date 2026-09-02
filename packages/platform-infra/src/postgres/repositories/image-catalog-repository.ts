@@ -51,6 +51,7 @@ export class PostgresImageCatalogRepository implements ImageCatalogRepository {
       intent: parsed.intent,
       source: parsed.source,
       declaredSource: parsed.declaredSource ?? null,
+      capabilities: parsed.capabilities,
       // updated_at is set by the set_updated_at() trigger on every UPDATE;
       // for INSERTs the column default `now()` fires.
     };
@@ -64,6 +65,7 @@ export class PostgresImageCatalogRepository implements ImageCatalogRepository {
           intent: values.intent,
           source: values.source,
           declaredSource: values.declaredSource,
+          capabilities: values.capabilities,
         },
       });
     return parsed;
@@ -88,5 +90,6 @@ function toEntry(row: typeof imageCatalogEntries.$inferSelect): ImageCatalogEntr
     intent: row.intent,
     source: row.source,
     declaredSource: row.declaredSource ?? undefined,
+    capabilities: row.capabilities,
   });
 }

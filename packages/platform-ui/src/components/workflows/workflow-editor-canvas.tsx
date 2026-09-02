@@ -21,6 +21,7 @@ import {
   validateWorkflowGraphAndReferences,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
+import type { ImageCapabilities } from '@mediforce/platform-core';
 import type { NewStepPayload } from '@/lib/control-mode';
 import { BlockPicker } from './block-picker';
 import { AuthoringPathsPopover } from './authoring-paths-popover';
@@ -186,6 +187,25 @@ export function WorkflowEditorCanvas({
 
   const { toast } = useToast();
   const { images: dockerImages, isAvailable: dockerAvailable } = useDockerImages();
+  const [imageCapabilities, setImageCapabilities] = useState<Record<string, ImageCapabilities>>({});
+  useEffect(() => {
+    let cancelled = false;
+    if (!namespace) {
+      setImageCapabilities({});
+      return () => { cancelled = true; };
+    }
+    mediforce.imageCatalog.list({ namespace })
+      .then(({ entries }) => {
+        if (cancelled) return;
+        setImageCapabilities(Object.fromEntries(
+          entries.flatMap((entry) => entry.versions.map((version) => [version.imageId, version.capabilities])),
+        ));
+      })
+      .catch(() => {
+        if (!cancelled) setImageCapabilities({});
+      });
+    return () => { cancelled = true; };
+  }, [namespace]);
   const warningStepIds = useMemo(() => {
     if (!dockerAvailable) return undefined;
     const map = new Map<string, string>();
@@ -842,6 +862,7 @@ export function WorkflowEditorCanvas({
               errors={stepErrors?.[selectedStep.id]}
               imageWarning={warningStepIds?.get(selectedStep.id)}
               dockerImages={dockerImages}
+              imageCapabilities={imageCapabilities}
               workflowExternalSkillsRepo={workflowExternalSkillsRepo}
             />
           </div>
