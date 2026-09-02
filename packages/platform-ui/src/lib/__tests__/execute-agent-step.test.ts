@@ -139,7 +139,10 @@ vi.mock('@/app/actions/namespace-secrets', () => ({
   getNamespaceSecretsForRuntime: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock('@/lib/resolve-agent-defaults', () => ({
+// Only the repo-backed lookup is stubbed; `applyAgentModel` is the pure
+// precedence rule these tests are asserting, so it stays real.
+vi.mock('@/lib/resolve-agent-defaults', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/resolve-agent-defaults')>()),
   resolveAgentDefaults: vi.fn().mockResolvedValue({}),
 }));
 

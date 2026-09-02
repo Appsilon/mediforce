@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
+import { resolveDefinitionModels } from '@/lib/resolve-agent-defaults';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { checkRetiredModels } from '@mediforce/platform-api/handlers';
 import { resolveCoworkOutputSchema, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstanceRepository } from '@mediforce/platform-core';
@@ -197,8 +198,17 @@ export async function POST(
 
     // Pre-flight: validate agent step models exist in the registry and are not retired.
     {
-      const { modelRegistryRepo } = getPlatformServices();
+      const { modelRegistryRepo, agentDefinitionRepo } = getPlatformServices();
       const allModels = await modelRegistryRepo.list();
+
+      // The retired check runs against the definition as it will actually run,
+      // so a step inheriting its model from its agent cannot slip past a gate a
+      // step naming the same model is stopped by. The unknown check deliberately
+      // does NOT: "retired" is positive evidence the model must not be used,
+      // while "unknown" only means the registry does not list it — and agent
+      // foundationModels have never been registry-validated, so resolving them
+      // here would start 422-ing workflows that run fine today.
+      const runnableDefinition = await resolveDefinitionModels(workflowDefinition, agentDefinitionRepo);
 
       const knownIds = new Set(allModels.map((m) => m.id));
       const unknownModels = validateWorkflowModels(workflowDefinition, knownIds);
@@ -222,7 +232,7 @@ export async function POST(
         );
       }
 
-      const retired = checkRetiredModels(workflowDefinition, allModels);
+      const retired = checkRetiredModels(runnableDefinition, allModels);
       if (retired !== null) {
         console.log(`[auto-runner] ${retired.message}`);
         await instanceRepo.update(instanceId, {

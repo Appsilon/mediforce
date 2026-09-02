@@ -24,7 +24,7 @@ import {
 } from '@mediforce/platform-core';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
-import { resolveAgentDefaults } from './resolve-agent-defaults';
+import { applyAgentModel, resolveAgentDefaults } from './resolve-agent-defaults';
 
 export interface WorkflowAgentStepResult {
   instanceId: string;
@@ -166,17 +166,8 @@ export async function executeAgentStep(
     : {};
   const agentIdentityPrompt = agentDefaults.identityPrompt;
 
-  // The step's own model wins; the agent's foundationModel is the fallback, so
-  // picking an agent picks its model unless the step deliberately overrides it.
-  // A blank model counts as unset, matching every other model read in the
-  // codebase, and only agent steps inherit one — a script step may name an
-  // agentId for its MCP bindings without ever running a model.
-  const inheritsModel = workflowStep.executor === 'agent'
-    && agentDefaults.model !== undefined
-    && !workflowStep.agent?.model;
-  const resolvedStep: WorkflowStep = inheritsModel
-    ? { ...workflowStep, agent: { ...workflowStep.agent, model: agentDefaults.model } }
-    : workflowStep;
+  // Picking an agent picks its model unless the step deliberately overrides it.
+  const resolvedStep = applyAgentModel(workflowStep, agentDefaults.model);
 
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,
