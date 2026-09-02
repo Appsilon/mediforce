@@ -44,6 +44,13 @@ role; data access is scoped through it rather than filtered afterwards
 that queries broadly and trims the result later has already read data the caller
 was not entitled to.
 
+**A client-supplied namespace is a filter, never a grant.** Several list
+wrappers take an optional `namespace` so a page can ask for the one workspace it
+is showing. That argument arrives from the query string, so a wrapper narrows it
+through `narrowToMemberships` rather than passing it to the raw repository on its
+own — handing it straight through turns a narrowing parameter into a way to read
+any workspace's private rows.
+
 **Role checks live in the handler, never in the wrapper.** The wrapper answers
 *may you see this row*; whether you may take an action is a per-action question
 the wrapper has no way to ask. Both predicates for it are in
