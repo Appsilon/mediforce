@@ -58,6 +58,7 @@ vi.mock('@mediforce/platform-infra', () => ({
   getWorkspaceProcessRoles: async () => new Map(),
 }));
 
+import { deriveBuildTag } from '@mediforce/agent-runtime';
 import { GET } from '@/app/api/workflow-definitions/by-image/route';
 
 function makeWorkflow(
@@ -190,6 +191,62 @@ describe('GET /api/workflow-definitions/by-image', () => {
     const body = await res.json();
 
     expect(body.workflows[0].steps).toEqual(['step-0', 'step-2']);
+  });
+
+  it('matches a build-mode step that omits image, under its derived tag', async () => {
+    // The reuse-blind case: no `image` to compare against, so the row on the
+    // infrastructure page is a bare `mediforce-built:<hash>` naming nothing.
+    fake.definitions.push({
+      name: 'wf-built',
+      namespace: 'acme',
+      version: 1,
+      visibility: 'private',
+      steps: [
+        {
+          id: 'build-step',
+          name: 'Build step',
+          type: 'creation',
+          executor: 'agent',
+          agent: { repo: 'org/repo', commit: 'abc1234', dockerfile: 'container/Dockerfile' },
+        },
+      ],
+      transitions: [],
+    } as unknown as WorkflowDefinition);
+
+    const derived = deriveBuildTag('git@github.com:org/repo.git', 'abc1234', 'container/Dockerfile');
+    const res = await GET(req(derived));
+    const body = await res.json();
+
+    expect(body.workflows).toHaveLength(1);
+    expect(body.workflows[0].name).toBe('wf-built');
+    expect(body.workflows[0].steps).toEqual(['build-step']);
+  });
+
+  it('matches a step that inherits the build repo from the workflow', async () => {
+    fake.definitions.push({
+      name: 'wf-inherited',
+      namespace: 'acme',
+      version: 1,
+      visibility: 'private',
+      externalSkillsRepo: { url: 'git@github.com:org/skills.git', commit: 'def5678' },
+      steps: [
+        {
+          id: 'script-step',
+          name: 'Script step',
+          type: 'creation',
+          executor: 'script',
+          script: { command: 'run.sh', dockerfile: 'Dockerfile' },
+        },
+      ],
+      transitions: [],
+    } as unknown as WorkflowDefinition);
+
+    const derived = deriveBuildTag('git@github.com:org/skills.git', 'def5678', 'Dockerfile');
+    const res = await GET(req(derived));
+    const body = await res.json();
+
+    expect(body.workflows).toHaveLength(1);
+    expect(body.workflows[0].name).toBe('wf-inherited');
   });
 
   it('returns 401 without auth header', async () => {
