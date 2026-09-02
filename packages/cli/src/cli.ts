@@ -51,6 +51,13 @@ import {
   systemDiskCommand,
   systemRmiCommand,
 } from './commands/system-status';
+import {
+  imagesListCommand,
+  imagesShowCommand,
+  imagesCreateCommand,
+  imagesUpdateCommand,
+  imagesDeleteCommand,
+} from './commands/images';
 import { emailStatusCommand } from './commands/email-status';
 import { systemCreditsCommand } from './commands/system-credits';
 import { agentListCommand } from './commands/agent-list';
@@ -255,10 +262,20 @@ export const TREE: Record<string, BranchEntry> = {
     description: 'Docker infrastructure + OpenRouter credits',
     leaves: {
       status: { description: 'Full infrastructure status', fn: systemStatusCommand },
-      images: { description: 'List Docker images on the host', fn: systemImagesCommand },
+      images: { description: 'List raw Docker images on the host (ops view; see `mediforce images` for the catalog)', fn: systemImagesCommand },
       rmi: { description: 'Remove a Docker image by ID or name:tag', fn: systemRmiCommand },
       disk: { description: 'Docker disk usage breakdown', fn: systemDiskCommand },
       credits: { description: 'OpenRouter credit balance for a workspace', fn: systemCreditsCommand },
+    },
+  },
+  images: {
+    description: 'Image Catalog — the images a namespace offers for steps (ADR-0021)',
+    leaves: {
+      list: { description: 'List the entries a namespace offers', fn: imagesListCommand },
+      show: { description: 'Show one entry and its versions on the daemon', fn: imagesShowCommand },
+      create: { description: 'Catalogue an image (--repo or --reference, plus --intent)', fn: imagesCreateCommand },
+      update: { description: "Change an entry's name or intent", fn: imagesUpdateCommand },
+      delete: { description: 'Remove an entry', fn: imagesDeleteCommand },
     },
   },
   email: {

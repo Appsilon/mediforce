@@ -28,7 +28,7 @@ Deployment is in play.
 
 **Namespace** *(canonical domain term; Workspace is the UI/storage term per ADR-0001)*:
 An isolated scope of work inside a Deployment. Owns workflow definitions,
-workflow runs, agents, OAuth providers, secrets, tool catalog,
+workflow runs, agents, OAuth providers, secrets, tool catalog, image catalog,
 cowork sessions. Identified by a URL-safe `handle`. Two types: `personal`
 (auto-created per user, linked via `linkedUserId`) and `organization`
 (multi-member, shared — e.g. a department inside the customer tenant).
@@ -240,6 +240,31 @@ per-step via Step MCP Restriction (subtractive).
 Admin-curated stdio MCP server definition that agents reference by `catalogId`
 (prevents inline RCE). Namespace-scoped.
 
+**Image Catalog**:
+The per-namespace set of Image Catalog Entries — the curated shelf of container
+images the platform offers for Steps. Sibling of the Tool Catalog, not nested
+inside it: building an image makes it runnable, cataloguing it makes it
+selectable ([ADR-0021](docs/adr/0021-image-catalog.md)). Curating an image never
+restricts one — a Step may still name any image string.
+
+**Image Catalog Entry**:
+One image the platform offers, identified by its **source**: either `built`
+`(repo, dockerfile)` or `referenced` (an untagged image reference). Deliberately
+**not** keyed on the commit, so a rebuild is another **Version** of a row the
+author already chose rather than a new row. Every fact on it is recomputed from
+the Docker daemon; the one thing a human writes is its **Intent**. Any Workspace
+member may create, edit and delete one — an entry executes nothing.
+
+**Version** *(of an Image Catalog Entry)*:
+One built artifact of an entry's source: a commit for a `built` entry, a tag for
+a `referenced` one, carrying the image tag that names it on the daemon. Versions
+are derived on read from the daemon's build labels, never stored.
+
+**Intent** *(of an Image Catalog Entry)*:
+The single required human sentence: what the image is *for* — "R-based
+interactive exploration of ADaM datasets". Not a description of its contents;
+contents go stale on the next pin bump, intent does not.
+
 ### Identity / auth
 
 **User**:
@@ -405,7 +430,7 @@ the user-facing immutable log.
 - A **Deployment** contains many **Namespaces**.
 - A **Namespace** owns its **Workflows** (with their **Workflow Definitions**),
   **Workflow Runs**, **Agents**, **OAuth Providers**, **Secrets**,
-  **Tool Catalog**.
+  **Tool Catalog**, **Image Catalog**.
 - A **Workflow** has many versioned **Workflow Definitions**; its `visibility`
   controls cross-Namespace read access.
 - A **Workflow Run** belongs to exactly one **Workflow Definition**
