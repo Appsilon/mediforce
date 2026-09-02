@@ -874,6 +874,26 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByRole('button', { name: /^Chat$/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Voice$/i })).toBeVisible();
 
+    // Every Cowork model field uses the model registry rather than requiring
+    // authors to know provider/model IDs. The seeded registry keeps this
+    // deterministic in E2E.
+    const sidePanel = page.locator('[data-testid="step-editor"]');
+    const chatModel = sidePanel.getByRole('combobox', { name: 'Chat model' });
+    await expect(chatModel).toBeVisible();
+    await expect(chatModel.getByRole('option', { name: /GPT-4o/ })).toHaveCount(1);
+    await chatModel.selectOption('openai/gpt-4o');
+    await expect(chatModel).toHaveValue('openai/gpt-4o');
+
+    await sidePanel.getByRole('button', { name: /^Voice$/i }).click();
+    const realtimeModel = sidePanel.getByRole('combobox', { name: 'Realtime model' });
+    const synthesisModel = sidePanel.getByRole('combobox', { name: 'Synthesis model' });
+    await expect(realtimeModel).toBeVisible();
+    await expect(synthesisModel).toBeVisible();
+    await realtimeModel.selectOption('openai/gpt-4o');
+    await synthesisModel.selectOption('openai/gpt-4o');
+    await expect(realtimeModel).toHaveValue('openai/gpt-4o');
+    await expect(synthesisModel).toHaveValue('openai/gpt-4o');
+
     // System prompt textarea is visible and fillable
     const systemPromptTextarea = page.getByPlaceholder(/Instructions for the AI collaborator/i);
     await expect(systemPromptTextarea).toBeVisible();
@@ -889,6 +909,7 @@ test.describe('Workflow Editor Journey', () => {
     // Scroll the editor until the new cowork step's executor renders (CodeMirror
     // virtualizes off-screen lines).
     await expectJsonEditorContains(page, '"executor": "cowork"');
+    await expectJsonEditorContains(page, '"synthesisModel": "openai/gpt-4o"');
   });
 
   test('cowork step MCP server editor supports add, fill, transport toggle, and remove', async ({ page }) => {

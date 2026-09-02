@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
-import type { AgentDefinition, WorkflowStep } from '@mediforce/platform-core';
+import type { AgentDefinition, ModelRegistryEntry, WorkflowStep } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 
 // ---- Mocks (must be before component import) ----
@@ -18,6 +18,10 @@ const agentState = vi.hoisted(() => ({
   error: false,
 }));
 
+const modelState = vi.hoisted(() => ({
+  models: [] as ModelRegistryEntry[],
+}));
+
 vi.mock('@/hooks/use-plugins', () => ({
   usePlugins: () => ({ plugins: pluginState.plugins }),
 }));
@@ -25,7 +29,7 @@ vi.mock('@/hooks/use-plugins', () => ({
 vi.mock('@/lib/api-fetch', () => ({
   apiFetch: (input: string) => {
     if (input.startsWith('/api/model-registry')) {
-      return Promise.resolve(new Response(JSON.stringify({ models: [] }), { status: 200 }));
+      return Promise.resolve(new Response(JSON.stringify({ models: modelState.models }), { status: 200 }));
     }
     if (input.startsWith('/api/agents?namespace=test')) {
       agentState.requests.push(input);
@@ -131,6 +135,7 @@ describe('StepEditor', () => {
     agentState.response = { agents: [] };
     agentState.requests = [];
     agentState.error = false;
+    modelState.models = [];
     rolesState.workspaceRoles = {
       roles: [], workflowNames: [], heldRoles: null, loading: false, error: null,
     };
@@ -422,6 +427,71 @@ describe('StepEditor', () => {
 
     const modelSelect = screen.getByRole('combobox', { name: 'Agent Model' });
     expect(modelSelect.options[0].textContent).not.toContain('anthropic/claude-opus-4-5');
+  });
+
+  it('[DATA] Cowork model fields select from the model registry', async () => {
+    modelState.models = [
+      {
+        id: 'openai/gpt-4o',
+        canonicalSlug: 'gpt-4o',
+        name: 'GPT-4o',
+        provider: 'OpenAI',
+        contextLength: 128_000,
+        maxCompletionTokens: 16_384,
+        pricing: { input: 0.0000025, output: 0.00001 },
+        modality: 'text+image->text',
+        inputModalities: ['text', 'image'],
+        outputModalities: ['text'],
+        supportsTools: true,
+        supportsVision: true,
+        source: 'openrouter',
+        requestCount: 10,
+        lastSyncedAt: '2026-01-01T00:00:00.000Z',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        retiredAt: null,
+      },
+    ];
+    const onChange = vi.fn();
+
+    function ControlledCoworkStepEditor() {
+      const [step, setStep] = React.useState(buildStep({ executor: 'cowork', cowork: { agent: 'chat' } }));
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[]}
+          onChange={(patch) => {
+            onChange(patch);
+            setStep((current) => ({ ...current, ...patch }));
+          }}
+        />
+      );
+    }
+
+    render(<ControlledCoworkStepEditor />);
+
+    expandCard('Collaboration');
+    const chatModel = await screen.findByRole('combobox', { name: 'Chat model' });
+    expect(screen.getByRole('option', { name: /GPT-4o/ })).toBeInTheDocument();
+
+    fireEvent.change(chatModel, { target: { value: 'openai/gpt-4o' } });
+    expect(onChange).toHaveBeenCalledWith({ cowork: { agent: 'chat', chat: { model: 'openai/gpt-4o' } } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Voice' }));
+    const realtimeModel = await screen.findByRole('combobox', { name: 'Realtime model' });
+    const synthesisModel = screen.getByRole('combobox', { name: 'Synthesis model' });
+    expect(realtimeModel).toBeInTheDocument();
+    expect(synthesisModel).toBeInTheDocument();
+
+    fireEvent.change(realtimeModel, { target: { value: 'openai/gpt-4o' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      cowork: expect.objectContaining({ voiceRealtime: { model: 'openai/gpt-4o' } }),
+    }));
+
+    fireEvent.change(synthesisModel, { target: { value: 'openai/gpt-4o' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      cowork: expect.objectContaining({ voiceRealtime: { model: 'openai/gpt-4o', synthesisModel: 'openai/gpt-4o' } }),
+    }));
   });
 
   it('[REGRESSION] keeps a selected agent when it is no longer returned by the agent list', async () => {
