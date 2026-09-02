@@ -45,6 +45,92 @@ describe('fetchFromLocalDocker', () => {
     expect(result.disk.buildCache).toEqual({ size: '0B' });
   });
 
+  it('reads build provenance off the images that carry the labels', async () => {
+    const exec = async (file: string, args: readonly string[]) => {
+      if (args[0] === 'images') {
+        return {
+          stdout: [
+            JSON.stringify({ Repository: 'mediforce-built', Tag: '0a1b2c3d4e5f', ID: 'abc123def456', Size: '6GB', CreatedSince: '2 days ago' }),
+            JSON.stringify({ Repository: 'postgres', Tag: '17', ID: 'def456abc123', Size: '667MB', CreatedSince: '1 week ago' }),
+          ].join('\n'),
+          stderr: '',
+        };
+      }
+      if (args[0] === 'image') {
+        return {
+          stdout: [
+            `sha256:abc123def456000000000000000000000000000000000000000000000000\t${JSON.stringify({
+              'mediforce.build.repo': 'git@github.com:owner/repo.git',
+              'mediforce.build.commit': 'abc123',
+              'mediforce.build.dockerfile': 'container/Dockerfile',
+              'mediforce.build.workflow': 'sdtm-mapping',
+              'mediforce.build.namespace': 'acme',
+            })}`,
+            'sha256:def456abc123000000000000000000000000000000000000000000000000\tnull',
+          ].join('\n'),
+          stderr: '',
+        };
+      }
+      return {
+        stdout: [
+          JSON.stringify({ Type: 'Images', TotalCount: '2', Size: '7GB' }),
+          JSON.stringify({ Type: 'Containers', TotalCount: '0', Active: '0', Size: '0B' }),
+          JSON.stringify({ Type: 'Build Cache', TotalCount: '0', Size: '0B' }),
+        ].join('\n'),
+        stderr: '',
+      };
+    };
+
+    const result = await fetchFromLocalDocker({ exec });
+
+    expect(result.available).toBe(true);
+    if (!result.available) throw new Error('unreachable');
+    // The derived tag says nothing; the labels name the repo, commit and workflow.
+    expect(result.images[0]).toMatchObject({
+      repository: 'mediforce-built',
+      buildRepo: 'git@github.com:owner/repo.git',
+      buildCommit: 'abc123',
+      buildDockerfile: 'container/Dockerfile',
+      buildWorkflow: 'sdtm-mapping',
+      buildNamespace: 'acme',
+    });
+    // An image we did not build lists unannotated rather than dropping out.
+    expect(result.images[1]).toEqual({
+      repository: 'postgres',
+      tag: '17',
+      id: 'def456abc123',
+      size: '667MB',
+      created: '1 week ago',
+    });
+  });
+
+  it('lists images unannotated when the label inspect fails', async () => {
+    const exec = async (file: string, args: readonly string[]) => {
+      if (args[0] === 'images') {
+        return {
+          stdout: JSON.stringify({ Repository: 'alpine', Tag: 'latest', ID: 'abc123', Size: '7MB', CreatedSince: '2 days ago' }),
+          stderr: '',
+        };
+      }
+      if (args[0] === 'image') throw new Error('Error: No such image: abc123');
+      return {
+        stdout: [
+          JSON.stringify({ Type: 'Images', TotalCount: '1', Size: '7MB' }),
+          JSON.stringify({ Type: 'Containers', TotalCount: '0', Active: '0', Size: '0B' }),
+          JSON.stringify({ Type: 'Build Cache', TotalCount: '0', Size: '0B' }),
+        ].join('\n'),
+        stderr: '',
+      };
+    };
+
+    const result = await fetchFromLocalDocker({ exec });
+
+    expect(result.available).toBe(true);
+    if (!result.available) throw new Error('unreachable');
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0].buildCommit).toBeUndefined();
+  });
+
   it('returns {available: false} when image JSON does not validate', async () => {
     const exec = async (file: string, args: readonly string[]) => {
       if (args[0] === 'images') {

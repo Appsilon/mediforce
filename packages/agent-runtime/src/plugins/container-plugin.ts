@@ -111,43 +111,77 @@ export function deriveBuildTag(repoUrl: string, commit: string, dockerfile?: str
   return `mediforce-built:${hash}`;
 }
 
+/** Git inputs a build-mode container config resolves to. */
+export interface BuildSource {
+  repoUrl: string;
+  repoRef: string;
+  commit: string;
+  dockerfile?: string;
+}
+
+/**
+ * Resolve a container config's build inputs, applying the workflow-level
+ * skills-repo fallback for a step that names only a `dockerfile`.
+ *
+ * Pure and context-free so the `by-image` scan can reach the same answer from
+ * a stored WorkflowDefinition — a step that omits `image` runs under the tag
+ * `deriveBuildTag` mints from exactly these inputs, and nothing else can name it.
+ */
+export function resolveBuildSource(
+  buildConfig: ContainerConfig,
+  workflowRepo?: { url?: string; commit?: string },
+): BuildSource | undefined {
+  const { dockerfile, repo, commit } = buildConfig;
+
+  if (repo && commit) {
+    return { repoUrl: normalizeRepoUrls(repo).gitUrl, repoRef: repo, commit, dockerfile };
+  }
+
+  if (dockerfile && workflowRepo?.url && workflowRepo?.commit) {
+    const repoRef = repo ?? workflowRepo.url;
+    return {
+      repoUrl: normalizeRepoUrls(repoRef).gitUrl,
+      repoRef,
+      commit: commit ?? workflowRepo.commit,
+      dockerfile,
+    };
+  }
+
+  return undefined;
+}
+
+/**
+ * The image tag a container config runs under: its explicit `image`, or the
+ * tag derived from its build inputs when it leaves `image` unset.
+ * `undefined` when the config names neither.
+ */
+export function resolveStepImage(
+  buildConfig: ContainerConfig | undefined,
+  workflowRepo?: { url?: string; commit?: string },
+): string | undefined {
+  if (!buildConfig) return undefined;
+  if (buildConfig.image) return buildConfig.image;
+  const source = resolveBuildSource(buildConfig, workflowRepo);
+  return source ? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile) : undefined;
+}
+
 export function resolveImageBuild(
   image: string | undefined,
   buildConfig: ContainerConfig,
   context: AgentContext | WorkflowAgentContext,
   resolvedEnv?: Record<string, string>,
 ): ImageBuildMeta | undefined {
-  const { dockerfile, repo, commit } = buildConfig;
+  const workflowDefinition = isWorkflowAgentContext(context) ? context.workflowDefinition : undefined;
+  const source = resolveBuildSource(buildConfig, workflowDefinition?.externalSkillsRepo);
+  if (!source) return undefined;
 
-  if (repo && commit) {
-    const repoUrl = normalizeRepoUrls(repo).gitUrl;
-    return {
-      image: image ?? deriveBuildTag(repoUrl, commit, dockerfile),
-      repoUrl,
-      repoRef: repo,
-      commit,
-      dockerfile,
-      repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
-    };
-  }
-
-  if (dockerfile && isWorkflowAgentContext(context)) {
-    const wfRepo = context.workflowDefinition.externalSkillsRepo;
-    if (wfRepo?.url && wfRepo?.commit) {
-      const repoRef = repo ?? wfRepo.url;
-      const repoUrl = normalizeRepoUrls(repoRef).gitUrl;
-      return {
-        image: image ?? deriveBuildTag(repoUrl, commit ?? wfRepo.commit, dockerfile),
-        repoUrl,
-        repoRef,
-        commit: commit ?? wfRepo.commit,
-        dockerfile,
-        repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
-      };
-    }
-  }
-
-  return undefined;
+  return {
+    ...source,
+    image: image ?? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile),
+    repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
+    workflow: workflowDefinition?.name,
+    namespace: workflowDefinition?.namespace,
+  };
 }
 
 const SKILLS_CACHE_DIR = join(tmpdir(), 'mediforce-skills-cache');

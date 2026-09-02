@@ -23,6 +23,11 @@ export interface ImageBuildMeta {
   dockerfile?: string;
   /** Resolved token for authenticated HTTPS clones; SSH refs without a token use the deploy key. */
   repoToken?: string;
+  /** Workflow definition whose step triggered the build. Recorded as an image
+   *  label so a derived `mediforce-built:<hash>` tag can name what it is for. */
+  workflow?: string;
+  /** Namespace owning that definition. Recorded as an image label. */
+  namespace?: string;
 }
 
 export interface DockerSpawnRequest {

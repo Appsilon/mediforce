@@ -5,6 +5,12 @@ import { z } from 'zod';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
+  imageLabelsInspectArgs,
+  parseImageProvenance,
+  shortImageId,
+  type ReadImageProvenance,
+} from '@mediforce/platform-core';
+import {
   DockerDiskInfoSchema,
   DockerImageInfoSchema,
 } from '../../contract/system';
@@ -22,6 +28,25 @@ const DEFAULT_CONTAINER_WORKER_URL = 'http://container-worker:3001';
  */
 export function isLocalAgentMode(): boolean {
   return process.env.ALLOW_LOCAL_AGENTS === 'true' && !process.env.REDIS_URL;
+}
+
+/**
+ * Build provenance for each image, keyed by short id.
+ *
+ * A failure — an image removed between the two calls, an old daemon — leaves
+ * every row unannotated instead of failing the listing.
+ */
+async function fetchProvenance(
+  exec: (file: string, args: readonly string[]) => Promise<{ stdout: string; stderr: string }>,
+  imageIds: readonly string[],
+): Promise<Map<string, ReadImageProvenance>> {
+  if (imageIds.length === 0) return new Map();
+  try {
+    const { stdout } = await exec('docker', imageLabelsInspectArgs(imageIds));
+    return parseImageProvenance(stdout);
+  } catch {
+    return new Map();
+  }
 }
 
 export interface FetchFromLocalDockerOptions {
@@ -45,19 +70,22 @@ export async function fetchFromLocalDocker(
   ]);
 
   const rawImages = imagesResult.stdout.trim();
-  const rawImageList =
-    rawImages.length === 0
-      ? []
-      : rawImages.split('\n').map((line) => {
-          const parsed = JSON.parse(line);
-          return {
-            repository: parsed.Repository,
-            tag: parsed.Tag,
-            id: parsed.ID,
-            size: parsed.Size,
-            created: parsed.CreatedSince,
-          };
-        });
+  const parsedRows =
+    rawImages.length === 0 ? [] : rawImages.split('\n').map((line) => JSON.parse(line));
+
+  // One id can carry several tags — inspect each only once.
+  const provenance = await fetchProvenance(exec, [
+    ...new Set(parsedRows.map((row: { ID: string }) => row.ID)),
+  ]);
+
+  const rawImageList = parsedRows.map((parsed) => ({
+    repository: parsed.Repository,
+    tag: parsed.Tag,
+    id: parsed.ID,
+    size: parsed.Size,
+    created: parsed.CreatedSince,
+    ...provenance.get(shortImageId(parsed.ID)),
+  }));
 
   const diskRows = diskResult.stdout
     .trim()
