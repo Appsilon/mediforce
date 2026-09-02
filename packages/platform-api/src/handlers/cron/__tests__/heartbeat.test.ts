@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import {
   InMemoryAuditRepository,
   InMemoryProcessInstanceRepository,
@@ -8,6 +8,7 @@ import {
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
+import { syncRegistryIfStale } from '@mediforce/platform-infra';
 import { heartbeat, STRANDED_RUNNING_THRESHOLD_MS } from '../heartbeat';
 import { ForbiddenError } from '../../../errors';
 import {
@@ -22,8 +23,14 @@ import { noopRunKicker } from '../../../runtime/run-kicker';
  * resolved against the target workflow's default→latest version. The cron
  * trigger service is stubbed; engine mechanics are covered elsewhere. This file
  * covers the handler bridge: caller gating, resolve-and-skip, fire-cursor
- * advance, audit emission, run kick, and the paused/stranded sweeps.
+ * advance, audit emission, run kick, the paused/stranded sweeps, and the
+ * model-registry sweep (whose staleness and failure semantics belong to
+ * `syncRegistryIfStale`, mocked here).
  */
+
+vi.mock('@mediforce/platform-infra', () => ({
+  syncRegistryIfStale: vi.fn(async () => ({ ran: false })),
+}));
 
 describe('heartbeat handler', () => {
   let processRepo: InMemoryProcessRepository;
@@ -37,6 +44,10 @@ describe('heartbeat handler', () => {
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository(instanceRepo);
     triggerRepo = new InMemoryTriggerRepository();
+  });
+
+  afterEach(() => {
+    vi.mocked(syncRegistryIfStale).mockClear();
   });
 
   function seedCron(opts: {
@@ -696,5 +707,22 @@ describe('heartbeat handler', () => {
     });
     expect(fireWorkflow).not.toHaveBeenCalled();
     expect(kicker.kicks).toHaveLength(0);
+  });
+
+  it('sweeps the model registry so a long-lived deployment refreshes itself', async () => {
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
+
+    await heartbeat({}, scope);
+
+    expect(syncRegistryIfStale).toHaveBeenCalledWith(scope.models, { auditRepo });
+  });
+
+  it('completes the beat when the registry sweep fails', async () => {
+    vi.mocked(syncRegistryIfStale).mockRejectedValueOnce(new Error('OpenRouter down'));
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
+
+    await expect(heartbeat({}, scope)).resolves.toEqual({ triggered: [], skipped: [] });
   });
 });

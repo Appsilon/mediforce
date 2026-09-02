@@ -8,6 +8,7 @@ import {
   resolveStrandedBudgetMs,
   validatePayload,
 } from '@mediforce/platform-core';
+import { syncRegistryIfStale } from '@mediforce/platform-infra';
 import { validateCronSchedule, isDue } from '@mediforce/workflow-engine';
 import type {
   HeartbeatInput,
@@ -100,6 +101,7 @@ function evaluatePayload(
 // System-actor only — reads across every workspace's definitions; gating
 // is by apiKey at the call site, not per row. Skipped triggers surface in
 // the response body + console.log but are NOT audited (no state change).
+/** @public-handler  The model registry it sweeps is platform-global, and the beat itself is system-actor gated. */
 export async function heartbeat(
   _input: HeartbeatInput,
   scope: CallerScope,
@@ -301,6 +303,17 @@ export async function heartbeat(
     } catch (err) {
       console.error(`[cron-heartbeat] Failed to re-kick stranded run '${inst.id}':`, err);
     }
+  }
+
+  // Sweep: refresh the model registry once it has gone a day without a sync.
+  // The heartbeat is the only scheduler every deployment is guaranteed to run,
+  // so hanging the daily refresh here keeps model pricing and popularity
+  // rankings current on a server that has not been redeployed in weeks — no
+  // per-server cron entry, no script anyone has to remember to run.
+  try {
+    await syncRegistryIfStale(scope.models, { auditRepo: scope.system.audit });
+  } catch (err) {
+    console.error('[cron-heartbeat] Model registry sweep failed:', err);
   }
 
   return { triggered, skipped };

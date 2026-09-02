@@ -33,6 +33,9 @@ describe('mapApiToDefinitionGroups', () => {
       title: 'Test Workflow',
       description: 'A test',
       latestVersion: '2',
+      // Pinned to v1 while v2 is the newest — the card must name the version a
+      // run actually starts from, not the newest one.
+      effectiveVersion: '1',
       versions: [{
         version: '2',
         stepCount: 3,
@@ -95,6 +98,24 @@ describe('mapApiToDefinitionGroups', () => {
 
     const result = mapApiToDefinitionGroups(items);
     expect(result).toHaveLength(0);
+  });
+
+  it('falls back to the latest version when no default is pinned', () => {
+    const items: ApiDefinitionItem[] = [{
+      name: 'unpinned',
+      namespace: 'ns',
+      latestVersion: 3,
+      defaultVersion: null,
+      definition: {
+        name: 'unpinned',
+        version: 3,
+        steps: [],
+        namespace: 'ns',
+      },
+    }];
+
+    const result = mapApiToDefinitionGroups(items);
+    expect(result[0].effectiveVersion).toBe('3');
   });
 
   it('detects no manual trigger', () => {

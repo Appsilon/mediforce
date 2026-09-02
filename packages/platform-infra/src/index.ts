@@ -80,7 +80,7 @@ export { FilesystemBlobStore } from './storage/filesystem-blob-store';
 export { validateSecretsKey } from './crypto/secrets-cipher';
 export { syncFromOpenRouter, syncWithRetry } from './sync/openrouter-sync';
 export type { SyncResult } from './sync/openrouter-sync';
-export { eagerSyncIfStale } from './sync/eager-sync';
+export { syncRegistryIfStale } from './sync/sync-if-stale';
 export { isRegistryStale, MODEL_SYNC_CRON } from './sync/model-sync-scheduler';
 
 // Sync alert webhook

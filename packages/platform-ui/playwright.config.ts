@@ -111,6 +111,13 @@ const primaryWebServer = {
   // the parent process env.
   env: {
     ENABLE_PASSWORD_AUTH: 'true',
+    // No live OpenRouter data behind the fixtures. With the unattended sync on,
+    // boot (and the heartbeat's registry sweep) pulls ~400 live models plus
+    // their live popularity ranking into the same table the seed writes, and
+    // the Models page — 50 rows a page, sorted by popularity — then renders
+    // whatever OpenRouter is serving that day. That is what pushed the seeded
+    // models off page one of `model-registry.journey.ts`.
+    ENABLE_MODEL_SYNC: 'false',
     AUTH_SECRET: process.env.AUTH_SECRET ?? E2E_AUTH_SECRET,
     // Domain auto-join fixture for `auto-join-workspace.journey.ts`. The
     // domain is deliberately NOT `mediforce.dev` (every other fixture user's
@@ -148,6 +155,7 @@ const passwordOffWebServer = {
       : `pnpm start:e2e:password-off`,
   env: {
     ENABLE_PASSWORD_AUTH: 'false',
+    ENABLE_MODEL_SYNC: 'false',
     GOOGLE_CLIENT_ID: 'e2e-password-off-google-client-id',
     GOOGLE_CLIENT_SECRET: 'e2e-password-off-google-client-secret',
     ALLOWED_EMAIL_DOMAINS: 'mediforce.dev',
