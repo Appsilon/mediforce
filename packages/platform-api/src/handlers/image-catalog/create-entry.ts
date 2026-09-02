@@ -8,6 +8,7 @@ import type {
 } from '../../contract/image-catalog';
 import { actorFromCaller } from '../_helpers';
 import { canonicalizeSource, deriveImageCatalogEntryId } from './_source';
+import { refreshEntryCapabilities } from './_capabilities';
 import { toEntryViews } from './_view';
 
 export async function createImageCatalogEntry(
@@ -41,21 +42,22 @@ export async function createImageCatalogEntry(
   }
 
   const entry = await scope.imageCatalog.upsert(namespace, parsed.data);
+  const refreshedEntry = await refreshEntryCapabilities(namespace, entry, scope);
 
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,
     action: 'image_catalog_entry.created',
-    description: `Image catalog entry '${entry.id}' created in namespace '${namespace}'`,
+    description: `Image catalog entry '${refreshedEntry.id}' created in namespace '${namespace}'`,
     timestamp: new Date().toISOString(),
-    inputSnapshot: { namespace, id: entry.id, name: entry.name, source: entry.source },
-    outputSnapshot: { id: entry.id },
+    inputSnapshot: { namespace, id: refreshedEntry.id, name: refreshedEntry.name, source: refreshedEntry.source },
+    outputSnapshot: { id: refreshedEntry.id },
     basis: 'Image catalog entry created via API',
     entityType: 'imageCatalogEntry',
-    entityId: entry.id,
+    entityId: refreshedEntry.id,
     namespace,
   });
 
-  const [view] = await toEntryViews([entry], scope);
+  const [view] = await toEntryViews([refreshedEntry], scope);
   return { entry: view };
 }

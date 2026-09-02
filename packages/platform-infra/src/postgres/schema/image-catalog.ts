@@ -1,3 +1,4 @@
+import type { ImageCapabilityCache } from '@mediforce/platform-core';
 import { pgTable, text, jsonb, timestamp, primaryKey } from 'drizzle-orm/pg-core';
 import { workspaces } from './workspace';
 
@@ -33,6 +34,8 @@ export const imageCatalogEntries = pgTable(
     source: jsonb('source').notNull(),
     /** `ImageCatalogDeclaredSourceSchema`. Declared, not derived. */
     declaredSource: jsonb('declared_source'),
+    /** Derived runtime probes keyed by immutable daemon image ID. */
+    capabilities: jsonb('capabilities').$type<ImageCapabilityCache>().notNull().default({}),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

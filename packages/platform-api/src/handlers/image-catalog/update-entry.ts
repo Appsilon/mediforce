@@ -7,6 +7,7 @@ import type {
 } from '../../contract/image-catalog';
 import { actorFromCaller } from '../_helpers';
 import { toEntryViews } from './_view';
+import { refreshEntryCapabilities } from './_capabilities';
 
 export async function updateImageCatalogEntry(
   input: UpdateImageCatalogEntryInputApi,
@@ -23,6 +24,7 @@ export async function updateImageCatalogEntry(
   // `source` is not in the patch schema: it is the key the id derives from, so
   // an entry that changed it would be a different entry wearing an old id.
   const entry = await scope.imageCatalog.upsert(namespace, { ...existing, ...patch, id });
+  const refreshedEntry = await refreshEntryCapabilities(namespace, entry, scope);
 
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
@@ -31,13 +33,13 @@ export async function updateImageCatalogEntry(
     description: `Image catalog entry '${id}' updated in namespace '${namespace}'`,
     timestamp: new Date().toISOString(),
     inputSnapshot: { namespace, id, patchKeys: Object.keys(patch) },
-    outputSnapshot: { id: entry.id },
+    outputSnapshot: { id: refreshedEntry.id },
     basis: 'Image catalog entry updated via API',
     entityType: 'imageCatalogEntry',
-    entityId: entry.id,
+    entityId: refreshedEntry.id,
     namespace,
   });
 
-  const [view] = await toEntryViews([entry], scope);
+  const [view] = await toEntryViews([refreshedEntry], scope);
   return { entry: view };
 }
