@@ -344,6 +344,13 @@
       "when": 1788786295190,
       "tag": "0048_auth_users_invited_at",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1788889710066,
+      "tag": "0049_image_catalog_entries",
+      "breakpoints": true
     }
   ]
 }

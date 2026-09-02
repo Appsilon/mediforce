@@ -161,6 +161,15 @@ export {
 } from './agent-mcp-binding';
 
 export {
+  ImageCatalogSourceSchema,
+  ImageCatalogDeclaredSourceSchema,
+  ImageCatalogEntrySchema,
+  type ImageCatalogSource,
+  type ImageCatalogDeclaredSource,
+  type ImageCatalogEntry,
+} from './image-catalog-entry';
+
+export {
   ContainerSchema,
   WorkflowAgentConfigSchema,
   ScriptStepConfigSchema,

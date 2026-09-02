@@ -16,6 +16,7 @@ import {
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
   InMemoryToolCatalogRepository,
+  InMemoryImageCatalogRepository,
   InMemoryTriggerRepository,
   InMemoryAgentOAuthTokenRepository,
   InMemoryCredentialsRepository,
@@ -186,6 +187,7 @@ export interface TestScopeOverrides {
   readonly coworkSessionRepo?: InMemoryCoworkSessionRepository;
   readonly triggerRepo?: InMemoryTriggerRepository;
   readonly toolCatalogRepo?: InMemoryToolCatalogRepository;
+  readonly imageCatalogRepo?: InMemoryImageCatalogRepository;
   readonly oauthProviderRepo?: InMemoryOAuthProviderRepository;
   readonly agentOAuthTokenRepo?: InMemoryAgentOAuthTokenRepository;
   readonly pluginRegistry?: { list: () => ReadonlyArray<{ name: string; metadata?: unknown }> };
@@ -241,6 +243,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     coworkSessionRepo: overrides.coworkSessionRepo ?? new InMemoryCoworkSessionRepository(instanceRepo),
     triggerRepo: overrides.triggerRepo ?? new InMemoryTriggerRepository(),
     toolCatalogRepo: overrides.toolCatalogRepo ?? new InMemoryToolCatalogRepository(),
+    imageCatalogRepo: overrides.imageCatalogRepo ?? new InMemoryImageCatalogRepository(),
     namespaceRepo: overrides.namespaceRepo ?? stubNamespaceRepo,
     userProfileRepo: overrides.userProfileRepo ?? new InMemoryUserProfileRepository(),
     credentialsRepo: overrides.credentialsRepo ?? new InMemoryCredentialsRepository(),
