@@ -8,8 +8,10 @@ import {
   UpdateAgentDefinitionInputSchema,
 } from '@mediforce/platform-core';
 
-/** Reserved for future filters (e.g. visibility, namespace). */
-export const ListAgentsInputSchema = z.object({});
+/** Optional namespace narrows the list to agents visible for one workspace. */
+export const ListAgentsInputSchema = z.object({
+  namespace: z.string().min(1).optional(),
+});
 
 export const ListAgentsOutputSchema = z.object({
   agents: z.array(AgentDefinitionSchema),

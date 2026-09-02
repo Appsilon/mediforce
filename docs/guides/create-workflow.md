@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-08-18
+last_reviewed: 2026-09-02
 ---
 
 # How to create a workflow
@@ -101,6 +101,10 @@ one block. Which executor a block should be is decided in
 [golden rules §5](../reference/workflow-authoring-golden-rules.md#5-choose-control-mode-executor-type).
 Nothing is persisted until you **Save** (or **Save & Dry Run** / **Save & Start
 Run**).
+
+For an agent step, expand **Prompt & model** and choose a saved agent from the
+**Agent ID** dropdown. The list contains the agents visible in the current
+workspace; create or configure agents from the workspace's **Agents** page.
 
 ### By hand — the package files
 

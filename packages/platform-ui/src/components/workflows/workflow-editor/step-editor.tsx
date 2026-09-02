@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
 import { DEFAULT_AGENT_IMAGE, uniqueSlug } from '@mediforce/platform-core';
-import type { WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
+import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
@@ -128,7 +128,7 @@ const TIP = {
   autonomyLevel:           'Assist: agent runs and produces a draft; human approves. Human review: explicit human approval required. Autonomous agent: agent executes without review. L0/L1 are developer-only flags set via raw YAML.',
   plugin:                  'Agent plugin to invoke (e.g. opencode-agent, claude-code-agent). Must be registered in the platform.',
   pluginScript:            'Plugin that runs the script (usually script-container). Must be registered in the platform.',
-  agentId:                 'Slug of a saved agent definition. Loads its base model, skills, and MCP server bindings for this step.',
+  agentId:                 'Saved agent definition used by this step. Its system prompt and MCP server bindings are loaded for the run.',
   agentModel:              'LLM model for this step. Overrides the agent definition\'s default. Use provider/model format.',
   agentSkill:              'Skill file name to load at runtime. Skills provide specialised instructions and tools for a specific task.',
   agentSkillsDir:          'Repo-relative path to the directory containing skill files. Overrides the agent definition\'s setting.',
@@ -285,6 +285,37 @@ export function StepEditor({
   const isDecision = step.type === 'decision';
   const hasVerdicts = isReview || isDecision;
   const isTerminal = step.type === 'terminal';
+  const [agentDefinitions, setAgentDefinitions] = useState<AgentDefinition[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(false);
+  const [agentsError, setAgentsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isAgent) {
+      setAgentDefinitions([]);
+      setAgentsLoading(false);
+      setAgentsError(null);
+      return () => { cancelled = true; };
+    }
+
+    setAgentsLoading(true);
+    setAgentsError(null);
+    mediforce.agents.list({ namespace: handle })
+      .then(({ agents }) => {
+        if (!cancelled) setAgentDefinitions(agents);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setAgentsError(error instanceof Error ? error.message : 'Failed to load agents');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAgentsLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [handle, isAgent]);
 
   // The workspace vocabulary and roster behind the two human-step role
   // controls. `workflowName` scopes the "who can actually act here" question:
@@ -638,11 +669,25 @@ export function StepEditor({
           </FieldRow>
 
           <FieldRow label="agentId" tooltip={TIP.agentId}>
-            <input
+            <select
+              aria-label="Agent"
               value={step.agentId ?? ''}
               onChange={(e) => onChange({ agentId: e.target.value || undefined })}
-              className={riMono}
-            />
+              className={rs}
+            >
+              <option value="">{agentsLoading ? 'Loading agents…' : 'No agent selected'}</option>
+              {step.agentId && !agentDefinitions.some((agent) => agent.id === step.agentId) && (
+                <option value={step.agentId}>{step.agentId} (current)</option>
+              )}
+              {[...agentDefinitions]
+                .sort((firstAgent, secondAgent) => firstAgent.name.localeCompare(secondAgent.name))
+                .map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name} ({agent.id})
+                  </option>
+                ))}
+            </select>
+            {agentsError && <p className="text-xs text-amber-600">Agent list unavailable: {agentsError}</p>}
           </FieldRow>
 
           <FieldRow label="agent.model" tooltip={TIP.agentModel}>

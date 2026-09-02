@@ -814,6 +814,36 @@ test.describe('Workflow Editor Journey', () => {
     await expectJsonEditorContains(page, 'opencode-agent');
   });
 
+  test('agent step selects a saved agent from the agent dropdown', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+    const initialNodeCount = await page.locator('.react-flow__node').count();
+
+    await page.getByLabel('Add step here').first().click();
+    await expectPickerOpen(page);
+    await (await executorButton(page, 'agent')).click();
+    await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
+
+    await page.locator('.react-flow__node').filter({ hasText: /New Step/i }).click();
+    const stepEditor = page.locator('[data-testid="step-editor"]');
+    await expect(stepEditor).toBeVisible({ timeout: 5_000 });
+    await stepEditor.getByRole('button', { name: 'Prompt & model' }).click();
+
+    const agentSelect = stepEditor.getByRole('combobox', { name: 'Agent' });
+    await expect(agentSelect).toBeVisible({ timeout: 5_000 });
+    await expect(agentSelect.locator('option', { hasText: 'Claude Code Agent' })).toHaveCount(1, { timeout: 5_000 });
+
+    await agentSelect.selectOption({ label: 'Claude Code Agent (claude-code-agent)' });
+    await expect(agentSelect).toHaveValue('claude-code-agent');
+
+    await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    await expect(page.locator('.cm-content')).toBeVisible({ timeout: 10_000 });
+    await expectJsonEditorContains(page, '"agentId": "claude-code-agent"');
+  });
+
   // ── Cowork step ───────────────────────────────────────────────────────────
 
   test('cowork step appears in diagram and editor shows configuration', async ({ page }) => {

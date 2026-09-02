@@ -425,6 +425,19 @@ describe('Mediforce', () => {
     });
   });
 
+  describe('agents.list (namespace filter)', () => {
+    it('encodes the workspace namespace in the request', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ agents: [buildAgentDefinition({ id: 'a-1' })] }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.agents.list({ namespace: 'team alpha' });
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`${TEST_BASE_URL}/api/agents?namespace=team+alpha`);
+    });
+  });
+
   // ---- Methods with non-trivial input encoding (kept verbose) ----
 
   describe('tasks.get (path encoding)', () => {

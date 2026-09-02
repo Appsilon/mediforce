@@ -29,10 +29,12 @@ export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
       ? this.raw.getById(id)
       : this.raw.getByIdVisibleTo(id, [...this.caller.namespaces]);
 
-  list = async (): Promise<AgentDefinition[]> =>
-    this.caller.isSystemActor
+  list = async (namespace?: string): Promise<AgentDefinition[]> => {
+    if (namespace !== undefined) return this.raw.listVisibleTo([namespace]);
+    return this.caller.isSystemActor
       ? this.raw.listAll()
       : this.raw.listVisibleTo([...this.caller.namespaces]);
+  };
 
   create = async (input: CreateAgentDefinitionInput): Promise<AgentDefinition> => {
     // The namespace field is optional and only gates when supplied.
