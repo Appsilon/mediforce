@@ -1382,8 +1382,10 @@ export class Mediforce {
     };
 
     this.agents = {
-      list: async () => {
-        const res = await this.request('/api/agents');
+      list: async (input = {}) => {
+        const validated = ListAgentsInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/agents${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.agents.list');
         return ListAgentsOutputSchema.parse(body);
       },

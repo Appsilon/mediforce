@@ -222,13 +222,14 @@ A code artifact (script or git repo) consumed by an agent at spawn time
 _Avoid_: Conflating with Plugin — Plugin is the runtime; Skill is data.
 
 **Agent**:
-A reusable, mutable agent configuration: system prompt plus MCP server
-bindings. Workflow Steps reference Agents; one Agent can power many Steps and
-is not versioned today.
+A reusable, mutable agent configuration: system prompt, foundation model and
+MCP server bindings. Workflow Steps reference Agents; one Agent can power many
+Steps and is not versioned today.
 _Avoid_: Agent Definition (legacy code term; there is no versioned definition).
-_Note_: 
-Agent: only `systemPrompt` reaches the prompt (as `agentIdentityPrompt`), and
-Skills are step-level (`step.agent.skillsDir`).
+_Note_: A Step inherits two things from the Agent it names — `systemPrompt`
+reaches the prompt as `agentIdentityPrompt`, and `foundationModel` supplies the
+run's model whenever the Step leaves `step.agent.model` unset. Skills are
+step-level only (`step.agent.skillsDir`); the Agent has no `skills` field.
 
 **MCP Server**:
 External tool host (stdio or HTTP) accessible to an agent via Model Context

@@ -91,6 +91,59 @@ describe('createCallerScope', () => {
       expect(a?.id).toBe('inst-alpha');
       expect(b?.id).toBe('inst-beta');
     });
+
+    it('filters agent lists to the requested workspace', async () => {
+      const agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
+      const agentFields = {
+        kind: 'plugin' as const,
+        runtimeId: 'claude-code-agent',
+        iconName: 'Bot',
+        description: 'Test agent',
+        foundationModel: 'anthropic/claude-sonnet-4',
+        systemPrompt: '',
+        inputDescription: 'Input',
+        outputDescription: 'Output',
+        visibility: 'private' as const,
+      };
+      await agentDefinitionRepo.create({ ...agentFields, name: 'Alpha Agent', namespace: 'team-alpha' });
+      await agentDefinitionRepo.create({ ...agentFields, name: 'Beta Agent', namespace: 'team-beta' });
+
+      const scope = createTestScope({
+        agentDefinitionRepo,
+        caller: userCaller('u-1', ['team-alpha', 'team-beta']),
+      });
+
+      expect((await scope.agentDefinitions.list('team-alpha')).map((agent) => agent.name)).toEqual(['Alpha Agent']);
+    });
+
+    it('never widens a caller past its own workspaces via the namespace filter', async () => {
+      const agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
+      const agentFields = {
+        kind: 'plugin' as const,
+        runtimeId: 'claude-code-agent',
+        iconName: 'Bot',
+        description: 'Test agent',
+        foundationModel: 'anthropic/claude-sonnet-4',
+        systemPrompt: '',
+        inputDescription: 'Input',
+        outputDescription: 'Output',
+      };
+      await agentDefinitionRepo.create({
+        ...agentFields, visibility: 'private', name: 'Beta Agent', namespace: 'team-beta',
+      });
+      await agentDefinitionRepo.create({
+        ...agentFields, visibility: 'public', name: 'Platform Agent',
+      });
+
+      // `namespace` is a client-supplied filter, not a grant: a caller outside
+      // `team-beta` asking for it still only sees what it could already see.
+      const scope = createTestScope({
+        agentDefinitionRepo,
+        caller: userCaller('u-1', ['team-alpha']),
+      });
+
+      expect((await scope.agentDefinitions.list('team-beta')).map((agent) => agent.name)).toEqual(['Platform Agent']);
+    });
   });
 
   describe('parent lookup wiring (indirect-namespace entity)', () => {
