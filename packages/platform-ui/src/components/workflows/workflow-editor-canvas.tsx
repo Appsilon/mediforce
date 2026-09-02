@@ -21,7 +21,6 @@ import {
   validateWorkflowGraphAndReferences,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
-import type { ImageCapabilities } from '@mediforce/platform-core';
 import type { NewStepPayload } from '@/lib/control-mode';
 import { BlockPicker } from './block-picker';
 import { AuthoringPathsPopover } from './authoring-paths-popover';
@@ -31,6 +30,7 @@ import { selectBase } from './workflow-editor/step-editor-fields';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
 import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
+import { useImageCapabilities } from '@/hooks/use-image-catalog';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
@@ -187,25 +187,7 @@ export function WorkflowEditorCanvas({
 
   const { toast } = useToast();
   const { images: dockerImages, isAvailable: dockerAvailable } = useDockerImages();
-  const [imageCapabilities, setImageCapabilities] = useState<Record<string, ImageCapabilities>>({});
-  useEffect(() => {
-    let cancelled = false;
-    if (!namespace) {
-      setImageCapabilities({});
-      return () => { cancelled = true; };
-    }
-    mediforce.imageCatalog.list({ namespace })
-      .then(({ entries }) => {
-        if (cancelled) return;
-        setImageCapabilities(Object.fromEntries(
-          entries.flatMap((entry) => entry.versions.map((version) => [version.imageId, version.capabilities])),
-        ));
-      })
-      .catch(() => {
-        if (!cancelled) setImageCapabilities({});
-      });
-    return () => { cancelled = true; };
-  }, [namespace]);
+  const imageCapabilities = useImageCapabilities(namespace);
   const warningStepIds = useMemo(() => {
     if (!dockerAvailable) return undefined;
     const map = new Map<string, string>();

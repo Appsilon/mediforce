@@ -1,7 +1,9 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
+  imageCapabilityProbeArgs,
   imageLabelsInspectArgs,
+  IMAGE_CAPABILITY_PROBE_TIMEOUT_MS,
   parseImageCapabilities,
   unknownImageCapabilities,
   parseImageProvenance,
@@ -11,8 +13,6 @@ import {
 } from '@mediforce/platform-core';
 
 const execFileAsync = promisify(execFile);
-const IMAGE_CAPABILITY_PROBE_TIMEOUT_MS = 10_000;
-const IMAGE_CAPABILITY_PROBE_COMMAND = 'command -v claude opencode bash python3 Rscript node';
 
 /** Mirrors `DockerImageInfoSchema` in `@mediforce/platform-api`, which parses
  *  this endpoint's response. The `build*` fields come from the labels the
@@ -72,17 +72,7 @@ export async function probeImageCapabilities(image: string): Promise<ImageCapabi
   try {
     const { stdout } = await execFileAsync(
       'docker',
-      [
-        'run',
-        '--rm',
-        '--network',
-        'none',
-        '--entrypoint',
-        'sh',
-        image,
-        '-c',
-        IMAGE_CAPABILITY_PROBE_COMMAND,
-      ],
+      imageCapabilityProbeArgs(image),
       { timeout: IMAGE_CAPABILITY_PROBE_TIMEOUT_MS },
     );
     return parseImageCapabilities(stdout);

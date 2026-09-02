@@ -54,9 +54,12 @@ export const ImageCatalogDeclaredSourceSchema = z
  * One image the platform offers for steps, per namespace.
  *
  * Everything here is either the key or the single declared sentence: versions,
- * availability, capabilities and lineage are recomputed on read from the
- * daemon, never stored. That is what keeps the catalog from becoming a second
- * source of truth about what an image contains.
+ * availability and lineage are recomputed on read from the daemon, never
+ * stored. That is what keeps the catalog from becoming a second source of
+ * truth about what an image contains. Capabilities are the one derived fact
+ * that is cached rather than recomputed — reading them costs a container, so
+ * they are keyed by the immutable image ID the daemon reports and a rebuild
+ * under the same tag re-probes rather than reusing the old answer.
  */
 export const ImageCatalogEntrySchema = z
   .object({

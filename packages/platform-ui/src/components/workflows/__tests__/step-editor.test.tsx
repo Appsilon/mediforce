@@ -733,6 +733,24 @@ describe('StepEditor', () => {
       expect(listed).not.toContain('alpine:3.24');
     });
 
+    it('[RENDER] keeps the golden image starred when nothing probed it', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'agent' })}
+          allSteps={[]}
+          onChange={noop}
+          dockerImages={mixedImages}
+        />,
+      );
+      expandCard('Prompt & model');
+      const select = screen.getByLabelText('Known Docker image') as HTMLSelectElement;
+      const listed = Array.from(select.options).slice(1).map((o) => o.textContent ?? '');
+
+      expect(listed[0]).toBe('★ mediforce-golden-image:latest');
+      // Nothing ruled `alpine` out, so it stays offered — just not starred.
+      expect(listed).toContain('alpine:3.24');
+    });
+
     it('[RENDER] a build-mode step reports its build source instead of the default', () => {
       const select = renderAgentStep({
         agent: { repo: 'https://github.com/acme/wf.git', commit: 'abc1234', dockerfile: 'Dockerfile' },

@@ -5,7 +5,9 @@ import { z } from 'zod';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
+  imageCapabilityProbeArgs,
   imageLabelsInspectArgs,
+  IMAGE_CAPABILITY_PROBE_TIMEOUT_MS,
   ImageCapabilitiesSchema,
   parseImageCapabilities,
   parseImageProvenance,
@@ -23,8 +25,6 @@ import type { DockerInfoResponse } from '../../contract/system';
 const execFileAsync = promisify(execFile);
 
 const DEFAULT_CONTAINER_WORKER_URL = 'http://container-worker:3001';
-const IMAGE_CAPABILITY_PROBE_TIMEOUT_MS = 10_000;
-const IMAGE_CAPABILITY_PROBE_COMMAND = 'command -v claude opencode bash python3 Rscript node';
 
 /**
  * "Local agent" mode = developer laptop or single-binary deployment running
@@ -70,6 +70,7 @@ export interface ProbeImageCapabilitiesOptions {
   ) => Promise<{ stdout: string; stderr: string }>;
   readonly fetch?: typeof globalThis.fetch;
   readonly baseUrl?: string;
+  readonly workerSecret?: string;
 }
 
 export async function probeLocalImageCapabilities(
@@ -81,17 +82,7 @@ export async function probeLocalImageCapabilities(
   try {
     const { stdout } = await exec(
       'docker',
-      [
-        'run',
-        '--rm',
-        '--network',
-        'none',
-        '--entrypoint',
-        'sh',
-        image,
-        '-c',
-        IMAGE_CAPABILITY_PROBE_COMMAND,
-      ],
+      imageCapabilityProbeArgs(image),
       { timeout: IMAGE_CAPABILITY_PROBE_TIMEOUT_MS },
     );
     return parseImageCapabilities(stdout);
@@ -109,9 +100,17 @@ export async function probeContainerWorkerImageCapabilities(
 ): Promise<ImageCapabilities> {
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const baseUrl = options.baseUrl ?? process.env.CONTAINER_WORKER_URL ?? DEFAULT_CONTAINER_WORKER_URL;
+  // The probe starts a container on the worker host, so it carries the same
+  // secret the image-delete route does. An estate that sets none is unchanged:
+  // the worker only enforces the header once `CONTAINER_WORKER_SECRET` is set.
+  const workerSecret = options.workerSecret ?? process.env.CONTAINER_WORKER_SECRET ?? '';
+  const headers: Record<string, string> = workerSecret === ''
+    ? {}
+    : { 'X-Worker-Secret': workerSecret };
   try {
     const response = await fetchImpl(
       `${baseUrl}/images/${encodeURIComponent(image)}/capabilities`,
+      { headers },
     );
     if (!response.ok) return unknownImageCapabilities();
     const parsed = ImageCapabilitiesSchema.safeParse(await response.json());

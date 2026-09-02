@@ -61,6 +61,10 @@ export function startHttpServer(): Server {
     }
 
     if (url.pathname.startsWith('/images/') && url.pathname.endsWith('/capabilities')) {
+      // Reading this route starts a container from a caller-supplied
+      // reference, so it is gated like the destructive DELETE rather than
+      // like the read-only listings above it.
+      if (!requireSecret(req, res)) return;
       const image = decodeURIComponent(
         url.pathname.slice('/images/'.length, -'/capabilities'.length),
       );
