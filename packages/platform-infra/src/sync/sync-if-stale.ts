@@ -13,6 +13,13 @@ import { isRegistryStale } from './model-sync-scheduler';
  * If the sync fails, log the error and continue (never throw — it must not
  * block boot or sink a beat).
  *
+ * `ENABLE_MODEL_SYNC=false` turns the unattended sync off, for an estate with
+ * no outbound route to openrouter.ai and for the E2E servers, whose registry
+ * must be the seeded fixture and not a live catalogue that reorders under the
+ * assertions. The "Sync Now" button still calls `syncFromOpenRouter` directly:
+ * this gates the automatic path, not an operator who explicitly asked. On by
+ * default, so a normal deployment needs no env flip.
+ *
  * When auditRepo is provided, a failure audit entry is emitted on sync failure.
  * Audit failure is swallowed.
  */
@@ -20,6 +27,10 @@ export async function syncRegistryIfStale(
   repo: ModelRegistryRepository,
   opts?: { auditRepo?: AuditRepository },
 ): Promise<{ ran: boolean; result?: SyncResult; error?: string }> {
+  if (process.env.ENABLE_MODEL_SYNC === 'false') {
+    console.log('[model-sync] ENABLE_MODEL_SYNC=false, skipping sync.');
+    return { ran: false };
+  }
   const stale = await isRegistryStale(repo);
   if (!stale) {
     console.log('[model-sync] Registry is fresh, skipping sync.');

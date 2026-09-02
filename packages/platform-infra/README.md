@@ -57,6 +57,12 @@ has not been redeployed in weeks current — on a host whose crontab posts to
 `/api/cron/heartbeat` ([`scripts/setup-cron.py`](../../scripts/setup-cron.py)).
 `POST /api/model-registry/sync` (`pnpm exec mediforce model sync`) forces one.
 
+`ENABLE_MODEL_SYNC=false` turns the unattended path off — for an estate with no
+outbound route to openrouter.ai, and for the E2E servers, whose registry has to
+stay the seeded fixture rather than ~400 live models re-sorted by a live
+popularity ranking. The forced sync above is unaffected: the flag gates the
+automatic path, not an operator who explicitly asked.
+
 ## Testing
 
 `src/**/__tests__/` covers repository CRUD, versioning constraints, auth flows,

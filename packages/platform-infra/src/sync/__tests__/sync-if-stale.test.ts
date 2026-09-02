@@ -36,6 +36,19 @@ describe('syncRegistryIfStale', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('skips sync entirely when ENABLE_MODEL_SYNC=false', async () => {
+    vi.stubEnv('ENABLE_MODEL_SYNC', 'false');
+    const repo = new InMemoryModelRegistryRepository();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const outcome = await syncRegistryIfStale(repo);
+
+    expect(outcome.ran).toBe(false);
+    expect(outcome.result).toBeUndefined();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('skips sync when registry is fresh', async () => {
