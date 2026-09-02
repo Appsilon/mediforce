@@ -883,6 +883,60 @@ describe('ClaudeCodeAgentPlugin', () => {
       const spec = plugin.getAgentCommand('/output/prompt.txt');
       expect(spec.args).not.toContain('--mcp-config');
     });
+
+    // The model reaches the plugin as an OpenRouter slug — that is what the
+    // model registry and an agent's foundationModel both speak. The Anthropic
+    // API does not know that spelling.
+    describe('model spelling', () => {
+      function withEnv(plugin: ClaudeCodeAgentPlugin, vars: Record<string, string>): void {
+        (plugin as unknown as { resolvedEnv: { vars: Record<string, string> } }).resolvedEnv = { vars };
+      }
+
+      it('[DATA] passes the slug through when routed via the OpenRouter gateway', async () => {
+        await plugin.initialize(buildMockContext());
+        withEnv(plugin, { OPENROUTER_API_KEY: 'sk-or-x', ANTHROPIC_BASE_URL: 'https://openrouter.ai/api/v1' });
+
+        const spec = plugin.getAgentCommand('/output/prompt.txt', { model: 'anthropic/claude-sonnet-4' });
+
+        expect(spec.args[spec.args.indexOf('--model') + 1]).toBe('anthropic/claude-sonnet-4');
+      });
+
+      it('[REGRESSION] strips the provider prefix when talking to the Anthropic API directly', async () => {
+        await plugin.initialize(buildMockContext());
+        withEnv(plugin, { ANTHROPIC_API_KEY: 'sk-ant-x' });
+
+        const spec = plugin.getAgentCommand('/output/prompt.txt', { model: 'anthropic/claude-sonnet-4' });
+
+        expect(spec.args[spec.args.indexOf('--model') + 1]).toBe('claude-sonnet-4');
+      });
+
+      it('[DATA] leaves an already-bare Anthropic id or CLI alias alone', async () => {
+        await plugin.initialize(buildMockContext());
+        withEnv(plugin, { ANTHROPIC_API_KEY: 'sk-ant-x' });
+
+        for (const model of ['claude-sonnet-4-6', 'sonnet', 'haiku']) {
+          const spec = plugin.getAgentCommand('/output/prompt.txt', { model });
+          expect(spec.args[spec.args.indexOf('--model') + 1]).toBe(model);
+        }
+      });
+
+      it('[REGRESSION] refuses a non-Anthropic model rather than silently running a different one', async () => {
+        await plugin.initialize(buildMockContext());
+        withEnv(plugin, { ANTHROPIC_API_KEY: 'sk-ant-x' });
+
+        expect(() => plugin.getAgentCommand('/output/prompt.txt', { model: 'openai/gpt-4o' }))
+          .toThrow(/openai\/gpt-4o/);
+      });
+
+      it('[DATA] emits no --model flag when no model is set', async () => {
+        await plugin.initialize(buildMockContext());
+        withEnv(plugin, { ANTHROPIC_API_KEY: 'sk-ant-x' });
+
+        const spec = plugin.getAgentCommand('/output/prompt.txt');
+
+        expect(spec.args).not.toContain('--model');
+      });
+    });
   });
 
   // Issue #868: resolveStepTimeoutMinutes must be the single source feeding both
