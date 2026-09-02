@@ -135,11 +135,26 @@ async function collectPages(): Promise<Page[]> {
     if (url === null) throw new Error(`${relative}: no <link rel="canonical">`);
 
     const slug = slugFor(url);
-    const expected = `${CARD_BASE}/${slug}.png`;
-    const declared = extract(html, /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i);
-    if (declared === null) throw new Error(`${relative}: no <meta property="og:image">`);
-    if (declared !== expected) {
-      throw new Error(`${relative}: og:image is ${declared}, this run writes ${expected}`);
+
+    // The card is generated and the tags that describe it are hand-written, so
+    // the run holds them to each other. Without this, editing a `<title>` and
+    // forgetting its `og:title` ships a share preview that contradicts the page.
+    const mustMatch: [string, string | null, string][] = [
+      ['og:image', extract(html, /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i), `${CARD_BASE}/${slug}.png`],
+      ['og:url', extract(html, /<meta[^>]+property="og:url"[^>]+content="([^"]+)"/i), url],
+      ['og:title', extract(html, /<meta[^>]+property="og:title"[^>]+content="([^"]*)"/i), title],
+      ['twitter:title', extract(html, /<meta[^>]+name="twitter:title"[^>]+content="([^"]*)"/i), title],
+    ];
+    if (description !== null) {
+      mustMatch.push([
+        'og:description',
+        extract(html, /<meta[^>]+property="og:description"[^>]+content="([^"]*)"/i),
+        description,
+      ]);
+    }
+    for (const [tag, found, want] of mustMatch) {
+      if (found === null) throw new Error(`${relative}: no ${tag}`);
+      if (found !== want) throw new Error(`${relative}: ${tag} is "${found}", page says "${want}"`);
     }
 
     pages.push({
