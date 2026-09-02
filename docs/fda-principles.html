@@ -4,18 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FDA/EMA AI Principles - Mediforce</title>
+  <meta name="description" content="The 10 FDA and EMA guiding principles for good AI practice in drug development, and how Mediforce addresses each one." />
   <link rel="canonical" href="https://mediforce.ai/fda-principles.html" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Mediforce" />
   <meta property="og:locale" content="en_US" />
   <meta property="og:url" content="https://mediforce.ai/fda-principles.html" />
   <meta property="og:title" content="FDA/EMA AI Principles - Mediforce" />
+  <meta property="og:description" content="The 10 FDA and EMA guiding principles for good AI practice in drug development, and how Mediforce addresses each one." />
   <meta property="og:image" content="https://mediforce.ai/images/og/fda-principles.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="FDA/EMA AI Principles — Mediforce social card" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="FDA/EMA AI Principles - Mediforce" />
+  <meta name="twitter:description" content="The 10 FDA and EMA guiding principles for good AI practice in drug development, and how Mediforce addresses each one." />
   <meta name="twitter:image" content="https://mediforce.ai/images/og/fda-principles.png" />
   <meta name="twitter:image:alt" content="FDA/EMA AI Principles — Mediforce social card" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -93,6 +96,11 @@
 
     .principle-left {}
 
+    .principles-heading {
+      margin: 0 0 20px;
+      font-size: 22px; font-weight: 700;
+      color: var(--text);
+    }
     .principle-header {
       display: flex; align-items: baseline; gap: 12px;
       margin-bottom: 8px;
@@ -105,6 +113,7 @@
       min-width: 38px;
     }
     .principle-title {
+      margin: 0;
       font-size: 16px; font-weight: 700;
       color: var(--text);
       line-height: 1.3;
@@ -260,6 +269,7 @@
 </section>
 
 <div class="w">
+  <h2 class="principles-heading">How Mediforce addresses each principle</h2>
   <div class="status-legend">
     <div class="status-legend-item"><span class="fi-icon fi-icon--live"></span> Live</div>
     <div class="status-legend-item"><span class="fi-icon fi-icon--building"></span> In progress</div>
@@ -273,7 +283,7 @@
       <div class="principle-left">
         <div class="principle-header">
         <span class="principle-num">01</span>
-        <span class="principle-title">Human-centric by design</span>
+        <h3 class="principle-title">Human-centric by design</h3>
       </div>
         <div class="principle-desc">The development and use of AI technologies <b>align with ethical and human-centric values</b>.</div>
       </div>
@@ -289,7 +299,7 @@
       <div class="principle-left">
         <div class="principle-header">
         <span class="principle-num">02</span>
-        <span class="principle-title">Risk-based approach</span>
+        <h3 class="principle-title">Risk-based approach</h3>
       </div>
         <div class="principle-desc">The development and use of AI technologies follow a risk-based approach with <b>proportionate validation, risk mitigation, and oversight</b> based on the context of use and determined model risk.</div>
       </div>
@@ -305,7 +315,7 @@
       <div class="principle-left">
         <div class="principle-header">
         <span class="principle-num">03</span>
-        <span class="principle-title">Adherence to standards</span>
+        <h3 class="principle-title">Adherence to standards</h3>
       </div>
         <div class="principle-desc">AI technologies adhere to relevant legal, ethical, technical, scientific, <b>cybersecurity, and regulatory standards</b>, including Good Practices (GxP).</div>
       </div>
@@ -321,7 +331,7 @@
       <div class="principle-left">
         <div class="principle-header">
         <span class="principle-num">04</span>
-        <span class="principle-title">Clear context of use</span>
+        <h3 class="principle-title">Clear context of use</h3>
       </div>
         <div class="principle-desc">AI technologies have a <b>well-defined context of use</b> (role and scope for why it is being used).</div>
       </div>
@@ -336,7 +346,7 @@
       <div class="principle-left">
         <div class="principle-header">
         <span class="principle-num">05</span>
-        <span class="principle-title">Multidisciplinary expertise</span>
+        <h3 class="principle-title">Multidisciplinary expertise</h3>
       </div>
         <div class="principle-desc"><b>Multidisciplinary expertise</b> covering both the AI technology and its context of use are integrated throughout the technology's life cycle.</div>
       </div>
@@ -352,7 +362,7 @@
       <div class="principle-left">
         <div class="principle-header">
         <span class="principle-num">06</span>
-        <span class="principle-title">Data governance &amp; documentation</span>
+        <h3 class="principle-title">Data governance &amp; documentation</h3>
       </div>
         <div class="principle-desc">Data source provenance, processing steps, and analytical decisions are <b>documented in a detailed, traceable, and verifiable manner</b>, in line with GxP requirements.</div>
       </div>
@@ -368,7 +378,7 @@
       <div class="principle-left">
         <div class="principle-header">
         <span class="principle-num">07</span>
-        <span class="principle-title">Model design &amp; development</span>
+        <h3 class="principle-title">Model design &amp; development</h3>
       </div>
         <div class="principle-desc">The development of AI technologies follows best practices in model and system design, considering <b>interpretability, explainability</b>, and predictive performance. Good development promotes <b>transparency, reliability</b>, and robustness.</div>
       </div>
@@ -384,7 +394,7 @@
       <div class="principle-left">
         <div class="principle-header">
         <span class="principle-num">08</span>
-        <span class="principle-title">Risk-based performance assessment</span>
+        <h3 class="principle-title">Risk-based performance assessment</h3>
       </div>
         <div class="principle-desc">Risk-based performance assessments <b>evaluate the complete system including human-AI interactions</b>, using fit-for-use data and metrics appropriate for the intended context of use.</div>
       </div>
@@ -400,7 +410,7 @@
       <div class="principle-left">
         <div class="principle-header">
         <span class="principle-num">09</span>
-        <span class="principle-title">Life cycle management</span>
+        <h3 class="principle-title">Life cycle management</h3>
       </div>
         <div class="principle-desc">Risk-based quality management systems are implemented throughout the AI technologies' life cycles. The AI technologies undergo <b>scheduled monitoring and periodic re-evaluation</b> to ensure adequate performance (e.g., to address data drift).</div>
       </div>
@@ -416,7 +426,7 @@
       <div class="principle-left">
         <div class="principle-header">
         <span class="principle-num">10</span>
-        <span class="principle-title">Clear, essential information</span>
+        <h3 class="principle-title">Clear, essential information</h3>
       </div>
         <div class="principle-desc">Plain language is used to present <b>clear, accessible, and contextually relevant information</b> regarding the AI technology's context of use, performance, limitations, and interpretability.</div>
       </div>
