@@ -149,6 +149,8 @@ export {
   ImageCapabilityCacheSchema,
   parseImageCapabilities,
   unknownImageCapabilities,
+  imageCapabilityProbeArgs,
+  IMAGE_CAPABILITY_PROBE_TIMEOUT_MS,
   buildTaskVerdicts,
   defaultVerdictIntent,
   defaultVerdictLabel,

@@ -137,6 +137,11 @@ services:
       # NEXT_PUBLIC_APP_URL if unset; falls back to request URL only as
       # a last resort, which is wrong behind Docker/reverse proxies.
       - APP_BASE_URL=${APP_BASE_URL:-${NEXT_PUBLIC_APP_URL:-}}
+      # Shared secret for the container-worker's HTTP routes that act on the
+      # host daemon (image delete, image capability probe). Both sides read the
+      # same var; unset on both means the worker enforces no header, which is
+      # every estate that has not opted in.
+      - CONTAINER_WORKER_SECRET=${CONTAINER_WORKER_SECRET:-}
       - MEDIFORCE_ROOT=/repo
       # Per-run worktrees + bare repos live here. Path must be identical
       # in-container and on the host so `docker run -v <wt>:/workspace` from
@@ -193,6 +198,9 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - WORKER_HTTP_PORT=3001
+      # Set it and the worker requires `X-Worker-Secret` on the routes that
+      # touch the host daemon; the platform reads the same var to send it.
+      - CONTAINER_WORKER_SECRET=${CONTAINER_WORKER_SECRET:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp

@@ -168,6 +168,8 @@ export {
   ImageCapabilityCacheSchema,
   parseImageCapabilities,
   unknownImageCapabilities,
+  imageCapabilityProbeArgs,
+  IMAGE_CAPABILITY_PROBE_TIMEOUT_MS,
   type ImageRuntime,
   type ImageCapabilities,
   type ImageCapabilityCache,

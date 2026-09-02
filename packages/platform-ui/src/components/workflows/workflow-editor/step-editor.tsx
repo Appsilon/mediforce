@@ -80,6 +80,14 @@ function pickerImageValue(image: string): string {
   return image === `${DEFAULT_AGENT_IMAGE}:latest` ? DEFAULT_AGENT_IMAGE : image;
 }
 
+/**
+ * Agent images with the ones a probe found agent-capable first. An image the
+ * probe answered for is judged by that answer — a bare `alpine` or a language
+ * runtime carries no agent CLI and fails at container start, so it is dropped
+ * rather than offered. An image with no answer (uncatalogued, or a daemon that
+ * could not be reached) stays offered, and the golden image keeps the star it
+ * has always carried: it is the one image the platform ships an agent CLI in.
+ */
 function agentImageOptions(
   images: DockerImageInfo[],
   capabilitiesByImageId: Record<string, ImageCapabilities>,
@@ -91,7 +99,9 @@ function agentImageOptions(
     })
     .map((img) => {
       const capabilities = capabilitiesByImageId[img.id];
-      const recommended = capabilities?.status === 'known' && capabilities.agentCapable;
+      const recommended = capabilities?.status === 'known'
+        ? capabilities.agentCapable
+        : pickerImageValue(imageRef(img)) === DEFAULT_AGENT_IMAGE;
       return { img, recommended, label: recommended ? `★ ${imageRef(img)}` : imageRef(img) };
     })
     .sort((a, b) => Number(b.recommended) - Number(a.recommended));

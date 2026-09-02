@@ -33,6 +33,12 @@ cleanup, daemon probing, workspace file transfer, and a health endpoint.
 effects and then re-ran produces duplicate work, and for a workflow step that
 means a duplicated audit trail.
 
+**Host-daemon HTTP routes carry the shared secret.** The info server's reads
+(`/health`, `/images`, `/disk`) are open, but anything that acts on the daemon —
+`DELETE /images/:id`, `GET /images/:image/capabilities`, which starts a probe
+container — requires `X-Worker-Secret` once `CONTAINER_WORKER_SECRET` is set,
+and the platform sends the same value.
+
 **Payload schemas are a cross-process contract.** The enqueuing platform and the
 worker are deployed separately and can briefly run different versions. Change
 `src/schemas.ts` additively.
