@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { InMemoryModelRegistryRepository } from '@mediforce/platform-core/testing';
-import { eagerSyncIfStale } from '../eager-sync';
+import { syncRegistryIfStale } from '../sync-if-stale';
 
 const OPENROUTER_MODELS = [
   {
@@ -19,17 +19,17 @@ const OPENROUTER_MODELS = [
 ];
 
 function mockFetchSuccess() {
-  vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
-    ok: true,
-    json: async () => ({ data: OPENROUTER_MODELS }),
-  } as Response);
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    const data = String(input).includes('/rankings/') ? [] : OPENROUTER_MODELS;
+    return { ok: true, json: async () => ({ data }) } as Response;
+  });
 }
 
 function mockFetchFailure() {
-  vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'));
+  vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Network error'));
 }
 
-describe('eagerSyncIfStale', () => {
+describe('syncRegistryIfStale', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -61,7 +61,7 @@ describe('eagerSyncIfStale', () => {
     });
 
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const outcome = await eagerSyncIfStale(repo);
+    const outcome = await syncRegistryIfStale(repo);
 
     expect(outcome.ran).toBe(false);
     expect(outcome.result).toBeUndefined();
@@ -72,7 +72,7 @@ describe('eagerSyncIfStale', () => {
     const repo = new InMemoryModelRegistryRepository();
     mockFetchSuccess();
 
-    const outcome = await eagerSyncIfStale(repo);
+    const outcome = await syncRegistryIfStale(repo);
 
     expect(outcome.ran).toBe(true);
     expect(outcome.result).toBeDefined();
@@ -103,7 +103,7 @@ describe('eagerSyncIfStale', () => {
     });
     mockFetchSuccess();
 
-    const outcome = await eagerSyncIfStale(repo);
+    const outcome = await syncRegistryIfStale(repo);
 
     expect(outcome.ran).toBe(true);
     expect(outcome.result).toBeDefined();
@@ -114,7 +114,7 @@ describe('eagerSyncIfStale', () => {
     const repo = new InMemoryModelRegistryRepository();
     mockFetchFailure();
 
-    const outcome = await eagerSyncIfStale(repo);
+    const outcome = await syncRegistryIfStale(repo);
 
     expect(outcome.ran).toBe(true);
     expect(outcome.error).toBe('Network error');

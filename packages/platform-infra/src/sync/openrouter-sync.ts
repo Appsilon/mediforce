@@ -1,6 +1,9 @@
 import type { ModelRegistryRepository, CreateModelRegistryEntryInput } from '@mediforce/platform-core';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
+// The public model catalogue carries no usage numbers, so popularity ranking
+// comes from the feed OpenRouter's own /rankings page reads.
+const OPENROUTER_RANKINGS_URL = 'https://openrouter.ai/api/frontend/v1/rankings/performance';
 
 interface OpenRouterModel {
   id: string;
@@ -22,7 +25,11 @@ interface OpenRouterModel {
     max_completion_tokens: number | null;
   };
   supported_parameters: string[];
-  requests?: number;
+}
+
+interface ModelRanking {
+  id: string;
+  requestCount: number;
 }
 
 export interface SyncResult {
@@ -69,6 +76,26 @@ function transformModel(model: OpenRouterModel): CreateModelRegistryEntryInput {
   };
 }
 
+async function fetchRankings(): Promise<ModelRanking[]> {
+  const response = await fetch(OPENROUTER_RANKINGS_URL, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) {
+    throw new Error(`OpenRouter rankings returned ${response.status}: ${response.statusText}`);
+  }
+  const json: unknown = await response.json();
+  const rows = (json as { data?: unknown }).data;
+  if (!Array.isArray(rows)) {
+    throw new Error('Unexpected OpenRouter rankings response shape: expected array under `data`');
+  }
+  return rows.flatMap((row: unknown) => {
+    const { id, request_count: requestCount } = row as { id?: unknown; request_count?: unknown };
+    if (typeof id !== 'string' || typeof requestCount !== 'number') return [];
+    return [{ id, requestCount }];
+  });
+}
+
 export async function syncFromOpenRouter(
   repo: ModelRegistryRepository,
 ): Promise<SyncResult> {
@@ -91,11 +118,16 @@ export async function syncFromOpenRouter(
   const syncedIds = entries.map((e) => e.id);
   const { retired, reinstated } = await repo.retireAbsentModels(syncedIds);
 
-  // Update rankings from request counts in the OpenRouter response
-  const rankings = models
-    .filter((m) => typeof m.requests === 'number' && m.requests > 0)
-    .map((m) => ({ id: m.id, requestCount: m.requests as number }));
-  const rankingsUpdated = rankings.length > 0 ? await repo.updateRankings(rankings) : 0;
+  // Rankings ride a second, unversioned feed, so a failure there must not sink
+  // an otherwise good catalogue sync — it degrades to "rankings left as they were".
+  let rankingsUpdated = 0;
+  try {
+    const rankings = await fetchRankings();
+    if (rankings.length > 0) rankingsUpdated = await repo.updateRankings(rankings);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[model-sync] Rankings refresh failed, models synced without it: ${message}`);
+  }
 
   const lastSyncedAt = new Date().toISOString();
   return { synced, total: models.length, retired, reinstated, rankingsUpdated, lastSyncedAt };

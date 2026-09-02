@@ -41,6 +41,22 @@ and nothing else internal — not `workflow-engine`, not `agent-runtime`. Busine
 logic that needs a repository belongs in a `platform-api` handler; putting it
 here inverts the layering and makes it unreachable from the CLI.
 
+## Model registry sync
+
+`syncFromOpenRouter` reads two OpenRouter feeds: the public model catalogue
+(`/api/v1/models`) for pricing and capabilities, and the rankings feed
+(`/api/frontend/v1/rankings/performance`) for the request counts the catalogue
+does not carry. A rankings failure is logged and skipped — the catalogue sync
+still lands.
+
+Nobody triggers it by hand. `syncRegistryIfStale` runs it whenever the registry
+has gone 24h without a sync, from two places: `getPlatformServices()` once per
+app process (so every deploy), and the cron heartbeat's registry sweep
+(`platform-api`'s `heartbeat` handler), which is what keeps a deployment that
+has not been redeployed in weeks current — on a host whose crontab posts to
+`/api/cron/heartbeat` ([`scripts/setup-cron.py`](../../scripts/setup-cron.py)).
+`POST /api/model-registry/sync` (`pnpm exec mediforce model sync`) forces one.
+
 ## Testing
 
 `src/**/__tests__/` covers repository CRUD, versioning constraints, auth flows,

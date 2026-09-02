@@ -9,7 +9,7 @@ function parseContext(label: string): number {
 }
 
 // The registry holds more than the seeded models: the boot-time OpenRouter sync
-// (`eagerSyncIfStale`) writes the live catalogue into the same database. Every
+// (`syncRegistryIfStale`) writes the live catalogue into the same database. Every
 // assertion therefore targets an exact seeded cell, and none of them depend on
 // the registry's size or on which other models happen to be present.
 test.describe('Model Registry Journey', () => {
