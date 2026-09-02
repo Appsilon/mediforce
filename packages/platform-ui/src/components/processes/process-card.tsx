@@ -149,7 +149,14 @@ export function ProcessCard({
                 </p>
               )}
               <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
-                <VersionLabel version={definition.latestVersion} title={definition.title} variant="inline" />
+                {/* `title` belongs to the latest version — the only definition this
+                    list read returns — so a card pinned to an older default shows
+                    its version alone rather than pairing it with another's title. */}
+                <VersionLabel
+                  version={definition.effectiveVersion}
+                  title={definition.effectiveVersion === definition.latestVersion ? definition.title : undefined}
+                  variant="inline"
+                />
                 <span className="text-border">·</span>
                 <span className="flex items-center gap-1">
                   <Layers className="h-3 w-3" />
@@ -189,12 +196,12 @@ export function ProcessCard({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <InstantTooltip label={`Current version — open v${definition.latestVersion} of this workflow`}>
+            <InstantTooltip label={`Start Run uses v${definition.effectiveVersion} — open this version's definition`}>
               <Link
-                href={routes.workflowDefinition(handle, definition.name, definition.latestVersion)}
+                href={routes.workflowDefinition(handle, definition.name, definition.effectiveVersion)}
                 className="inline-flex items-center rounded-md border px-2.5 py-1.5 text-sm font-medium hover:bg-muted transition-colors whitespace-nowrap"
               >
-                <VersionLabel version={definition.latestVersion} variant="inline" className="text-sm" />
+                <VersionLabel version={definition.effectiveVersion} variant="inline" className="text-sm" />
               </Link>
             </InstantTooltip>
             <StartRunButton

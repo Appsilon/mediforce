@@ -8,7 +8,8 @@ export interface ApiDefinitionItem {
   namespace: string;
   name: string;
   latestVersion: number;
-  defaultVersion: number;
+  /** `null` when the workflow is not pinned — the handler returns it nullable. */
+  defaultVersion: number | null;
   manualStartEnabled?: boolean;
   callerMayRun?: boolean;
   definition: {
@@ -37,6 +38,7 @@ export function mapApiToDefinitionGroups(
         title: def.title,
         description: def.description,
         latestVersion: String(def.version),
+        effectiveVersion: String(item.defaultVersion ?? def.version),
         versions: [{
           version: String(def.version),
           stepCount: def.steps.length,
