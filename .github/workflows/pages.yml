@@ -25,6 +25,10 @@ on:
       # no page still changes the build, and this is the only job that runs it.
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
+      # The card generator and the faces it draws with: a change to either
+      # changes every card, and nothing else would rebuild the site.
+      - 'scripts/generate-og-cards.ts'
+      - 'scripts/assets/**'
       - '.github/workflows/pages.yml'
   pull_request:
     paths:
@@ -33,6 +37,10 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
+      # The card generator and the faces it draws with: a change to either
+      # changes every card, and nothing else would rebuild the site.
+      - 'scripts/generate-og-cards.ts'
+      - 'scripts/assets/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
