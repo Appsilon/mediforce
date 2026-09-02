@@ -150,6 +150,11 @@ services:
       # default, and a larger value is clamped back down to it. Without this
       # line the knob is settable in `.env` and never reaches the process.
       - MEDIFORCE_ATTACHMENT_MAX_BYTES=${MEDIFORCE_ATTACHMENT_MAX_BYTES:-}
+      # Unattended OpenRouter model-registry refresh (boot + the cron
+      # heartbeat's daily sweep). On unless set to `false`, for an estate with
+      # no outbound route to openrouter.ai; the Models page's "Sync Now" button
+      # is unaffected either way.
+      - ENABLE_MODEL_SYNC=${ENABLE_MODEL_SYNC:-}
       # Boot refuses to start without an email provider unless this is true.
       - MEDIFORCE_DISABLE_EMAIL=${MEDIFORCE_DISABLE_EMAIL:-}
       - EMAIL_PROVIDER=${EMAIL_PROVIDER:-}
