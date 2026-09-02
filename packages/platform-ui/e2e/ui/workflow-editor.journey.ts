@@ -831,7 +831,7 @@ test.describe('Workflow Editor Journey', () => {
     await expect(stepEditor).toBeVisible({ timeout: 5_000 });
     await stepEditor.getByRole('button', { name: 'Prompt & model' }).click();
 
-    const agentSelect = stepEditor.getByRole('combobox', { name: 'Agent' });
+    const agentSelect = stepEditor.getByRole('combobox', { name: 'Agent', exact: true });
     await expect(agentSelect).toBeVisible({ timeout: 5_000 });
     await expect(agentSelect.locator('option', { hasText: 'Claude Code Agent' })).toHaveCount(1, { timeout: 5_000 });
 
