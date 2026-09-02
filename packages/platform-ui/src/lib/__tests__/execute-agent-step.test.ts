@@ -388,6 +388,37 @@ describe('executeAgentStep', () => {
       });
     });
 
+    it('[DATA] treats a blank step model as unset and inherits the agent model', async () => {
+      vi.mocked(resolveAgentDefaults).mockResolvedValueOnce({ model: 'anthropic/claude-opus-4' });
+      const stepBlankModel: WorkflowStep = { ...agentStep, agent: { model: '' } };
+
+      await executeAgentStep('inst-wf-001', 'gather-data', stepBlankModel, {}, 'user-1');
+
+      const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+      expect(contextArg.step.agent.model).toBe('anthropic/claude-opus-4');
+    });
+
+    it('[DATA] does not give a script step an agent model it never had', async () => {
+      vi.mocked(resolveAgentDefaults).mockResolvedValueOnce({ model: 'anthropic/claude-opus-4' });
+      const scriptStep: WorkflowStep = {
+        id: 'gather-data',
+        name: 'Gather Data',
+        type: 'creation',
+        executor: 'script',
+        agentId: 'cdisc-author',
+        script: { inlineScript: 'print(1)', runtime: 'python' },
+      };
+
+      const executeSpy = vi.spyOn(scriptStepExecutor, 'execute');
+      try {
+        await executeAgentStep('inst-wf-001', 'gather-data', scriptStep, {}, 'user-1');
+        const contextArg = executeSpy.mock.calls[0][1];
+        expect(contextArg.step.agent).toBeUndefined();
+      } finally {
+        executeSpy.mockRestore();
+      }
+    });
+
     it('[DATA] does not consult the agent definition when the step has no agentId', async () => {
       const stepNoAgentId: WorkflowStep = { ...agentStep, agentId: undefined };
 

@@ -99,8 +99,8 @@ export default function NewAgentPage() {
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl">
       <ConceptIntro>
         <p>
-          <strong>An agent is a reusable configuration workflow steps call by id</strong> — its system prompt and its
-          MCP server bindings are the parts a run consumes. Name, description and input/output text are how people
+          <strong>An agent is a reusable configuration workflow steps call by id</strong> — its system prompt, its
+          foundation model and its MCP server bindings are the parts a run consumes. Name, description and input/output text are how people
           recognise it when wiring a step.
         </p>
         <p>
