@@ -106,6 +106,11 @@ For an agent step, expand **Prompt & model** and choose a saved agent from the
 **Agent ID** dropdown. The list contains the agents visible in the current
 workspace; create or configure agents from the workspace's **Agents** page.
 
+The step then runs on that agent's foundation model. Set **agent.model** only
+to override it for this one step — leaving it blank keeps the step on whatever
+model the agent is configured with, so changing the agent changes every step
+that inherits from it.
+
 ### By hand — the package files
 
 Write the `.wd.json` and its package yourself only when building a reusable

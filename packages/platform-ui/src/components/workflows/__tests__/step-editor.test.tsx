@@ -386,6 +386,44 @@ describe('StepEditor', () => {
     expect(onChange).toHaveBeenCalledWith({ agentId: 'clinical-reviewer' });
   });
 
+  it('[DATA] the model picker offers the selected agent model as the blank default', async () => {
+    agentState.response = {
+      agents: [
+        { ...buildAgentDefinition('clinical-reviewer', 'Clinical Reviewer'), foundationModel: 'anthropic/claude-opus-4-5' },
+      ],
+    };
+
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', agentId: 'clinical-reviewer' })}
+        allSteps={[]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expandCard('Prompt & model');
+    await screen.findByRole('combobox', { name: 'Agent' });
+
+    const modelSelect = screen.getByRole('combobox', { name: 'Agent Model' });
+    expect(modelSelect.options[0].textContent).toContain('anthropic/claude-opus-4-5');
+  });
+
+  it('[DATA] the model picker falls back to the plugin default when no agent is selected', async () => {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent' })}
+        allSteps={[]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expandCard('Prompt & model');
+    await screen.findByRole('combobox', { name: 'Agent' });
+
+    const modelSelect = screen.getByRole('combobox', { name: 'Agent Model' });
+    expect(modelSelect.options[0].textContent).not.toContain('anthropic/claude-opus-4-5');
+  });
+
   it('[REGRESSION] keeps a selected agent when it is no longer returned by the agent list', async () => {
     const onChange = vi.fn();
 

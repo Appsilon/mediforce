@@ -317,6 +317,13 @@ export function StepEditor({
     return () => { cancelled = true; };
   }, [handle, isAgent]);
 
+  // What a blank `agent.model` actually resolves to at run time: the named
+  // agent's foundationModel, or the plugin's own default when the step names
+  // no agent. Mirrors the fallback in `execute-agent-step`.
+  const selectedAgentDefaultModel =
+    agentDefinitions.find((agent) => agent.id === step.agentId)?.foundationModel
+    ?? selectedPluginDefaultModel;
+
   // The workspace vocabulary and roster behind the two human-step role
   // controls. `workflowName` scopes the "who can actually act here" question:
   // a grant narrowed to another workflow does not let its holder claim this
@@ -694,7 +701,8 @@ export function StepEditor({
             <ModelPicker
               value={step.agent?.model}
               onChange={(model) => updateAgent({ model })}
-              defaultModel={selectedPluginDefaultModel}
+              defaultModel={selectedAgentDefaultModel}
+              ariaLabel="Agent Model"
               className={rs}
             />
           </FieldRow>
