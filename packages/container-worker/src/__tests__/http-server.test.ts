@@ -30,6 +30,8 @@ afterEach(() => {
     server.close();
     server = null;
   }
+  delete process.env.CONTAINER_WORKER_SECRET;
+  vi.clearAllMocks();
   vi.resetModules();
 });
 
@@ -78,6 +80,22 @@ describe('HTTP info server', () => {
     expect(await res.json()).toEqual({
       status: 'known', agentCapable: true, runtimes: ['claude', 'bash'],
     });
+  });
+
+  it('GET /images/:image/capabilities needs the worker secret once one is set', async () => {
+    process.env.CONTAINER_WORKER_SECRET = 'worker-secret';
+    mockProbeImageCapabilities.mockResolvedValue({ status: 'unknown' });
+
+    const { port } = await getServer();
+    const url = `http://localhost:${port}/images/alpine%3A3.24/capabilities`;
+
+    const unauthorized = await fetch(url);
+    expect(unauthorized.status).toBe(401);
+    expect(mockProbeImageCapabilities).not.toHaveBeenCalled();
+
+    const authorized = await fetch(url, { headers: { 'X-Worker-Secret': 'worker-secret' } });
+    expect(authorized.status).toBe(200);
+    expect(mockProbeImageCapabilities).toHaveBeenCalledWith('alpine:3.24');
   });
 
   it('returns 404 for unknown routes', async () => {
