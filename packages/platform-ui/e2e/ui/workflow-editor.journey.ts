@@ -814,6 +814,36 @@ test.describe('Workflow Editor Journey', () => {
     await expectJsonEditorContains(page, 'opencode-agent');
   });
 
+  test('agent step selects a saved agent from the agent dropdown', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+    const initialNodeCount = await page.locator('.react-flow__node').count();
+
+    await page.getByLabel('Add step here').first().click();
+    await expectPickerOpen(page);
+    await (await executorButton(page, 'agent')).click();
+    await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
+
+    await page.locator('.react-flow__node').filter({ hasText: /New Step/i }).click();
+    const stepEditor = page.locator('[data-testid="step-editor"]');
+    await expect(stepEditor).toBeVisible({ timeout: 5_000 });
+    await stepEditor.getByRole('button', { name: 'Prompt & model' }).click();
+
+    const agentSelect = stepEditor.getByRole('combobox', { name: 'Agent', exact: true });
+    await expect(agentSelect).toBeVisible({ timeout: 5_000 });
+    await expect(agentSelect.locator('option', { hasText: 'Claude Code Agent' })).toHaveCount(1, { timeout: 5_000 });
+
+    await agentSelect.selectOption({ label: 'Claude Code Agent (claude-code-agent)' });
+    await expect(agentSelect).toHaveValue('claude-code-agent');
+
+    await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    await expect(page.locator('.cm-content')).toBeVisible({ timeout: 10_000 });
+    await expectJsonEditorContains(page, '"agentId": "claude-code-agent"');
+  });
+
   // ── Cowork step ───────────────────────────────────────────────────────────
 
   test('cowork step appears in diagram and editor shows configuration', async ({ page }) => {
@@ -844,6 +874,26 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByRole('button', { name: /^Chat$/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Voice$/i })).toBeVisible();
 
+    // Every Cowork model field uses the model registry rather than requiring
+    // authors to know provider/model IDs. The seeded registry keeps this
+    // deterministic in E2E.
+    const sidePanel = page.locator('[data-testid="step-editor"]');
+    const chatModel = sidePanel.getByRole('combobox', { name: 'Chat model' });
+    await expect(chatModel).toBeVisible();
+    await expect(chatModel.getByRole('option', { name: /GPT-4o/ })).toHaveCount(1);
+    await chatModel.selectOption('openai/gpt-4o');
+    await expect(chatModel).toHaveValue('openai/gpt-4o');
+
+    await sidePanel.getByRole('button', { name: /^Voice$/i }).click();
+    const realtimeModel = sidePanel.getByRole('combobox', { name: 'Realtime model' });
+    const synthesisModel = sidePanel.getByRole('combobox', { name: 'Synthesis model' });
+    await expect(realtimeModel).toBeVisible();
+    await expect(synthesisModel).toBeVisible();
+    await realtimeModel.selectOption('openai/gpt-4o');
+    await synthesisModel.selectOption('openai/gpt-4o');
+    await expect(realtimeModel).toHaveValue('openai/gpt-4o');
+    await expect(synthesisModel).toHaveValue('openai/gpt-4o');
+
     // System prompt textarea is visible and fillable
     const systemPromptTextarea = page.getByPlaceholder(/Instructions for the AI collaborator/i);
     await expect(systemPromptTextarea).toBeVisible();
@@ -859,6 +909,7 @@ test.describe('Workflow Editor Journey', () => {
     // Scroll the editor until the new cowork step's executor renders (CodeMirror
     // virtualizes off-screen lines).
     await expectJsonEditorContains(page, '"executor": "cowork"');
+    await expectJsonEditorContains(page, '"synthesisModel": "openai/gpt-4o"');
   });
 
   test('cowork step MCP server editor supports add, fill, transport toggle, and remove', async ({ page }) => {

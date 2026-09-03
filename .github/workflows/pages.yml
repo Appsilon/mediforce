@@ -25,6 +25,10 @@ on:
       # no page still changes the build, and this is the only job that runs it.
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
+      # The card generator and the faces it draws with: a change to either
+      # changes every card, and nothing else would rebuild the site.
+      - 'scripts/generate-og-cards.ts'
+      - 'scripts/assets/**'
       - '.github/workflows/pages.yml'
   pull_request:
     paths:
@@ -33,6 +37,10 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
+      # The card generator and the faces it draws with: a change to either
+      # changes every card, and nothing else would rebuild the site.
+      - 'scripts/generate-og-cards.ts'
+      - 'scripts/assets/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -54,6 +62,20 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Writes into `docs/images/og/`, which is gitignored, so this has to run
+      # before Jekyll copies the folder. It also fails the build when a page's
+      # `og:image` names a card this run does not write — a renamed page would
+      # otherwise ship a tag pointing at a 404.
+      - name: Generate the Open Graph cards
+        run: pnpm gen:og-cards
+
       # Reproduces what the legacy builder does today. Every `.md` under
       # `docs/` is rendered to HTML and is already live — `docs/README.md`
       # serves as mediforce.ai/README — so publishing `docs/` as plain static
@@ -68,13 +90,6 @@ jobs:
       # and the later copy would be denied.
       - name: Take ownership of the Jekyll output
         run: sudo chown -R "$(id -u):$(id -g)" _site
-
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
 
       # `docusaurus build` transpiles without type-checking, and the root
       # `tsc -b` has no `website` reference, so this is the only thing in CI
@@ -103,6 +118,7 @@ jobs:
       - name: Check both sites reached the artifact
         run: |
           for page in index.html README.html security.html CNAME \
+                      robots.txt sitemap.xml llms.txt images/og/index.png \
                       docs/index.html docs/install/index.html; do
             test -f "_site/$page" || {
               echo "::error::_site/$page missing — composed site incomplete"

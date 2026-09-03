@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
-import type { WorkflowStep } from '@mediforce/platform-core';
+import type { AgentDefinition, ModelRegistryEntry, WorkflowStep } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 
 // ---- Mocks (must be before component import) ----
@@ -12,8 +12,37 @@ const pluginState = vi.hoisted(() => ({
   plugins: [] as { name: string; metadata?: Record<string, unknown> }[],
 }));
 
+const agentState = vi.hoisted(() => ({
+  response: { agents: [] as AgentDefinition[] },
+  requests: [] as string[],
+  error: false,
+}));
+
+const modelState = vi.hoisted(() => ({
+  models: [] as ModelRegistryEntry[],
+}));
+
 vi.mock('@/hooks/use-plugins', () => ({
   usePlugins: () => ({ plugins: pluginState.plugins }),
+}));
+
+vi.mock('@/lib/api-fetch', () => ({
+  apiFetch: (input: string) => {
+    if (input.startsWith('/api/model-registry')) {
+      return Promise.resolve(new Response(JSON.stringify({ models: modelState.models }), { status: 200 }));
+    }
+    if (input.startsWith('/api/agents?namespace=test')) {
+      agentState.requests.push(input);
+      return Promise.resolve(new Response(
+        JSON.stringify(agentState.error ? { error: 'agent list failed' } : agentState.response),
+        { status: agentState.error ? 500 : 200 },
+      ));
+    }
+    if (input.includes('/mcp-servers')) {
+      return Promise.resolve(new Response(JSON.stringify({ mcpServers: {} }), { status: 200 }));
+    }
+    throw new Error(`Unexpected API request: ${input}`);
+  },
 }));
 
 vi.mock('@/contexts/auth-context', () => ({
@@ -65,6 +94,24 @@ function buildStep(overrides: Partial<WorkflowStep> = {}): WorkflowStep {
   };
 }
 
+function buildAgentDefinition(id: string, name: string, runtimeId?: string): AgentDefinition {
+  return {
+    id,
+    kind: 'plugin',
+    runtimeId,
+    name,
+    iconName: 'Bot',
+    description: `${name} description`,
+    foundationModel: 'anthropic/claude-sonnet-4',
+    systemPrompt: '',
+    inputDescription: 'Input',
+    outputDescription: 'Output',
+    visibility: 'private',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
 const noop = () => {};
 
 // The step editor is a single-open accordion with only "Basics" open by default;
@@ -85,6 +132,10 @@ const dockerImages: DockerImageInfo[] = [
 describe('StepEditor', () => {
   beforeEach(() => {
     pluginState.plugins = [];
+    agentState.response = { agents: [] };
+    agentState.requests = [];
+    agentState.error = false;
+    modelState.models = [];
     rolesState.workspaceRoles = {
       roles: [], workflowNames: [], heldRoles: null, loading: false, error: null,
     };
@@ -307,6 +358,174 @@ describe('StepEditor', () => {
     expect(screen.getByText('Agent ID')).toBeInTheDocument();
     expect(screen.getByText('Agent Model')).toBeInTheDocument();
     expect(screen.getByText('Agent Prompt')).toBeInTheDocument();
+  });
+
+  it('[DATA] agent ID selects a saved agent definition', async () => {
+    agentState.response = {
+      agents: [
+        buildAgentDefinition('clinical-reviewer', 'Clinical Reviewer', 'claude-code-agent'),
+        buildAgentDefinition('safety-reviewer', 'Safety Reviewer'),
+      ],
+    };
+    const onChange = vi.fn();
+
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent' })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+
+    expandCard('Prompt & model');
+    const agentSelect = await screen.findByRole('combobox', { name: 'Agent' });
+
+    expect(agentSelect).toHaveValue('');
+    expect(agentState.requests).toContain('/api/agents?namespace=test');
+    const optionLabels = Array.from(agentSelect.querySelectorAll('option')).map((option) => option.textContent);
+    expect(optionLabels).toContain('Clinical Reviewer (clinical-reviewer)');
+    expect(optionLabels).toContain('Safety Reviewer (safety-reviewer)');
+
+    fireEvent.change(agentSelect, { target: { value: 'clinical-reviewer' } });
+
+    expect(onChange).toHaveBeenCalledWith({ agentId: 'clinical-reviewer' });
+  });
+
+  it('[DATA] the model picker offers the selected agent model as the blank default', async () => {
+    agentState.response = {
+      agents: [
+        { ...buildAgentDefinition('clinical-reviewer', 'Clinical Reviewer'), foundationModel: 'anthropic/claude-opus-4-5' },
+      ],
+    };
+
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', agentId: 'clinical-reviewer' })}
+        allSteps={[]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expandCard('Prompt & model');
+    await screen.findByRole('combobox', { name: 'Agent' });
+
+    const modelSelect = screen.getByRole('combobox', { name: 'Agent Model' });
+    expect(modelSelect.options[0].textContent).toContain('anthropic/claude-opus-4-5');
+  });
+
+  it('[DATA] the model picker falls back to the plugin default when no agent is selected', async () => {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent' })}
+        allSteps={[]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expandCard('Prompt & model');
+    await screen.findByRole('combobox', { name: 'Agent' });
+
+    const modelSelect = screen.getByRole('combobox', { name: 'Agent Model' });
+    expect(modelSelect.options[0].textContent).not.toContain('anthropic/claude-opus-4-5');
+  });
+
+  it('[DATA] Cowork model fields select from the model registry', async () => {
+    modelState.models = [
+      {
+        id: 'openai/gpt-4o',
+        canonicalSlug: 'gpt-4o',
+        name: 'GPT-4o',
+        provider: 'OpenAI',
+        contextLength: 128_000,
+        maxCompletionTokens: 16_384,
+        pricing: { input: 0.0000025, output: 0.00001 },
+        modality: 'text+image->text',
+        inputModalities: ['text', 'image'],
+        outputModalities: ['text'],
+        supportsTools: true,
+        supportsVision: true,
+        source: 'openrouter',
+        requestCount: 10,
+        lastSyncedAt: '2026-01-01T00:00:00.000Z',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        retiredAt: null,
+      },
+    ];
+    const onChange = vi.fn();
+
+    function ControlledCoworkStepEditor() {
+      const [step, setStep] = React.useState(buildStep({ executor: 'cowork', cowork: { agent: 'chat' } }));
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[]}
+          onChange={(patch) => {
+            onChange(patch);
+            setStep((current) => ({ ...current, ...patch }));
+          }}
+        />
+      );
+    }
+
+    render(<ControlledCoworkStepEditor />);
+
+    expandCard('Collaboration');
+    const chatModel = await screen.findByRole('combobox', { name: 'Chat model' });
+    expect(screen.getByRole('option', { name: /GPT-4o/ })).toBeInTheDocument();
+
+    fireEvent.change(chatModel, { target: { value: 'openai/gpt-4o' } });
+    expect(onChange).toHaveBeenCalledWith({ cowork: { agent: 'chat', chat: { model: 'openai/gpt-4o' } } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Voice' }));
+    const realtimeModel = await screen.findByRole('combobox', { name: 'Realtime model' });
+    const synthesisModel = screen.getByRole('combobox', { name: 'Synthesis model' });
+    expect(realtimeModel).toBeInTheDocument();
+    expect(synthesisModel).toBeInTheDocument();
+
+    fireEvent.change(realtimeModel, { target: { value: 'openai/gpt-4o' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      cowork: expect.objectContaining({ voiceRealtime: { model: 'openai/gpt-4o' } }),
+    }));
+
+    fireEvent.change(synthesisModel, { target: { value: 'openai/gpt-4o' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      cowork: expect.objectContaining({ voiceRealtime: { model: 'openai/gpt-4o', synthesisModel: 'openai/gpt-4o' } }),
+    }));
+  });
+
+  it('[REGRESSION] keeps a selected agent when it is no longer returned by the agent list', async () => {
+    const onChange = vi.fn();
+
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', agentId: 'retired-agent' })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+
+    expandCard('Prompt & model');
+    const agentSelect = await screen.findByRole('combobox', { name: 'Agent' });
+
+    expect(agentSelect).toHaveValue('retired-agent');
+    expect(screen.getByRole('option', { name: 'retired-agent (current)' })).toBeInTheDocument();
+  });
+
+  it('[ERROR] reports when the workspace agent list cannot be loaded', async () => {
+    agentState.error = true;
+
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent' })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+
+    expandCard('Prompt & model');
+
+    expect(await screen.findByText(/Agent list unavailable/)).toBeInTheDocument();
   });
 
   it('[RENDER] script config fields are shown for script executor', () => {

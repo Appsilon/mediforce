@@ -1,0 +1,44 @@
+# Mediforce
+
+> Open-source platform for orchestrating AI agents with built-in validation, traceability and human oversight in regulated clinical processes. Built by Appsilon. Every step of a workflow is assigned a Control Mode (CM0-CM4) that fixes how much the agent may do alone and where a human must sign off.
+
+Mediforce is infrastructure, not a compliance product. It provides the audit trail, per-step role gating, versioning and human-approval mechanics that GxP work requires; the regulatory judgement stays with the organisation running it. The FDA principles page states where each capability actually stands today rather than claiming coverage.
+
+## Disambiguation
+
+"Mediforce" is a heavily reused name. This project is **Appsilon's open-source pharma workflow platform at mediforce.ai**, and is not affiliated with any of:
+
+- Mediforce HME / Mediforce TX (US home medical equipment)
+- Mediforce Healthcare (India, pharmaceutical manufacturing)
+- MediForce Solutions (US medical billing)
+- MedForce, an IQVIA product
+- CMV Médiforce (France, healthcare financing)
+- medi-force.net
+- MediForce Staffing (healthcare staffing)
+
+The project's canonical identifiers are the domain mediforce.ai, the repository github.com/Appsilon/mediforce, and the parent organisation Appsilon (appsilon.com).
+
+## Pages
+
+- [Mediforce](https://mediforce.ai/): what the platform is, the Control Mode table (CM0-CM4), and how a workflow is assembled from human, script and agent steps.
+- [Validated AI for Regulated Pharma](https://mediforce.ai/validated-ai.html): the concrete mechanisms behind validation — CDISC CORE checks, IQ/OQ/PQ documentation, versioning locked on activation, 21 CFR Part 11-aligned audit trails. Carries a Live / In progress / Planned maturity ledger.
+- [Security for Clinical Data](https://mediforce.ai/security.html): sandboxed agent execution, per-step data scoping, AES-256-GCM at rest, per-step RBAC. Also carries a maturity ledger.
+- [FDA/EMA AI Principles](https://mediforce.ai/fda-principles.html): the 10 guiding principles from the January 2026 FDA-hosted document, each mapped to Mediforce's current status. Explicitly a request for comment, not a finished compliance claim.
+- [Workflow Examples](https://mediforce.ai/examples.html): CI-tested workflow patterns to combine and adapt.
+- [Server Setup](https://mediforce.ai/setup/): browser-based wizard for standing up a self-hosted instance.
+
+## Case studies
+
+- [Case Studies](https://mediforce.ai/case-studies/): both workflows side by side, with what each one automates and where a human still decides.
+- [Automated Clinical Data Delivery](https://mediforce.ai/case-studies/data-delivery/): an agent watches a CRO SFTP endpoint, validates each delivery against CDISC standards, and escalates to a human only when judgement is required.
+- [Automated Submission Document Collection](https://mediforce.ai/case-studies/collecting-documents/): an agent requests submission documents from stakeholder teams, tracks deliveries, reviews content and drafts every reminder.
+
+## Documentation
+
+- [Product documentation](https://mediforce.ai/docs/): installation, first run, workflow authoring, CLI reference, triggers and verification.
+- [Repository](https://github.com/Appsilon/mediforce): Apache-2.0. Every capability described on the site is inspectable here.
+
+## Optional
+
+- [Appsilon](https://appsilon.com): the company behind Mediforce, building open-source tooling for life sciences since 2013.
+- [Discord](https://discord.gg/TVx4VkG3C2): where the team answers questions about the project.

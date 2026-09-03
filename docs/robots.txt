@@ -1,0 +1,32 @@
+Sitemap: https://mediforce.ai/sitemap.xml
+Sitemap: https://mediforce.ai/docs/sitemap.xml
+
+User-agent: *
+Content-Signal: search=yes, ai-train=no, use=reference
+Allow: /
+
+# Live AI citation / retrieval bots — allow explicitly
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: Claude-User
+Allow: /
+User-agent: Claude-SearchBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+
+# Training crawlers — allow the fetch so the no-train signal is actually seen
+User-agent: GPTBot
+Content-Signal: ai-train=no, use=reference
+Allow: /
+User-agent: ClaudeBot
+Content-Signal: ai-train=no, use=reference
+Allow: /
+
+# Keep blocked if strict training control is desired
+User-agent: CCBot
+Disallow: /
+User-agent: Bytespider
+Disallow: /

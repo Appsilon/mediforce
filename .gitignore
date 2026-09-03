@@ -64,3 +64,6 @@ __pycache__/
 
 # rendered research docs — regenerate locally if needed
 docs/research/rendered-pdfs/
+
+# Open Graph cards — generated from each page's own head by `pnpm gen:og-cards`
+docs/images/og/

@@ -10,6 +10,7 @@ interface ModelPickerProps {
   value: string | undefined;
   onChange: (model: string | undefined) => void;
   defaultModel?: string;
+  ariaLabel?: string;
   className?: string;
   requireToolSupport?: boolean;
   /**
@@ -35,7 +36,7 @@ function formatPrice(perToken: number): string {
 
 const TOP_PICKS_COUNT = 20;
 
-export function ModelPicker({ value, onChange, defaultModel, className, requireToolSupport, minContextTokens }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, defaultModel, ariaLabel, className, requireToolSupport, minContextTokens }: ModelPickerProps) {
   const [allModels, setModels] = useState<ModelRegistryEntry[]>([]);
   const models = useMemo(
     () => allModels
@@ -127,6 +128,7 @@ export function ModelPicker({ value, onChange, defaultModel, className, requireT
     <div className="space-y-2">
       <div className="flex gap-2">
         <select
+          aria-label={ariaLabel}
           value={value ?? ''}
           disabled={loading}
           onChange={(e) => {

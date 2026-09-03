@@ -55,6 +55,21 @@ test.describe('GET /api/agents — API E2E', () => {
     expect(body.agents.every((agent) => agent.visibility === 'public')).toBe(true);
   });
 
+  test('list: `?namespace=` filters, it does not grant — outsider still sees no `test` agents', async ({ request }) => {
+    // The step editor's agent dropdown passes the workspace it is editing in.
+    // That parameter must never widen a caller past its own memberships: an
+    // outsider naming `test` gets the same public-only list as with no filter.
+    const res = await request.get('/api/agents?namespace=test', {
+      headers: sessionCookieHeaders(callers.outsider),
+    });
+    expect(res.status(), await res.text()).toBe(200);
+    const body = await res.json() as { agents: Array<{ id: string; visibility?: string }> };
+    const ids = body.agents.map((agent) => agent.id);
+    expect(ids).not.toContain('mcp-test-agent');
+    expect(ids).not.toContain('oauth-test-agent');
+    expect(body.agents.every((agent) => agent.visibility === 'public')).toBe(true);
+  });
+
   test('single: outsider user → 404 on a private agent (anti-enum)', async ({ request }) => {
     const res = await request.get('/api/agents/mcp-test-agent', {
       headers: sessionCookieHeaders(callers.outsider),
