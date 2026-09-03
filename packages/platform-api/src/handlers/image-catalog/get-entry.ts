@@ -5,7 +5,8 @@ import type {
   GetImageCatalogEntryInput,
   GetImageCatalogEntryOutput,
 } from '../../contract/image-catalog';
-import { toEntryViews } from './_view';
+import { toEntryView } from './_view';
+import { withBuildSteps } from './_lineage';
 
 export async function getImageCatalogEntry(
   input: GetImageCatalogEntryInput,
@@ -18,6 +19,8 @@ export async function getImageCatalogEntry(
   }
   // An entry whose image is gone from the daemon is not a 404: the sentence
   // someone wrote about it is still the answer to "what was this for?".
-  const [view] = await toEntryViews([entry], scope);
-  return { entry: view };
+  const view = await toEntryView(input.namespace, entry, scope);
+  // The layer delta costs a `docker history` per version, so it is attached
+  // here and not on the listing — one entry at a time is what it is for.
+  return { entry: await withBuildSteps(view) };
 }

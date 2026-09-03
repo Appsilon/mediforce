@@ -8,6 +8,7 @@
  * shared so both builders emit the same keys the listing looks for.
  */
 
+import { z } from 'zod';
 import { normalizeRepoUrls, redactRepoCredentials } from './repo-url';
 
 /** Label keys the platform writes on every image it builds. */
@@ -75,19 +76,22 @@ export function buildProvenanceLabelArgs(provenance: ImageProvenance): string[] 
 }
 
 /**
- * `docker image inspect --format` template pairing an image id with its labels.
+ * `docker image inspect --format` template pairing an image id with its labels
+ * and its layers.
  *
  * `index` rather than `.Config.Labels`: an image with no labels has no such key
  * at all, and the dotted form fails the whole invocation — one unlabelled
  * `postgres` would strip the provenance off every other row in the batch.
- * `docker images` cannot answer this itself; its template context has no
- * `.Labels` field, which is why reading provenance costs a second call.
+ * `docker images` cannot answer this itself; its template context has neither
+ * a `.Labels` nor a `.RootFS` field, which is why reading either costs a second
+ * call — and why they travel in one call rather than two.
  */
-export const IMAGE_LABELS_FORMAT = '{{.Id}}\t{{json (index .Config "Labels")}}';
+export const IMAGE_INSPECT_FORMAT =
+  '{{.Id}}\t{{json (index .Config "Labels")}}\t{{json .RootFS.Layers}}';
 
-/** `docker` arguments that emit one `IMAGE_LABELS_FORMAT` line per image. */
-export function imageLabelsInspectArgs(imageIds: readonly string[]): string[] {
-  return ['image', 'inspect', '--format', IMAGE_LABELS_FORMAT, ...imageIds];
+/** `docker` arguments that emit one `IMAGE_INSPECT_FORMAT` line per image. */
+export function imageInspectArgs(imageIds: readonly string[]): string[] {
+  return ['image', 'inspect', '--format', IMAGE_INSPECT_FORMAT, ...imageIds];
 }
 
 /** `docker images` truncates ids; `docker image inspect` does not. */
@@ -127,20 +131,38 @@ export function readProvenanceLabels(
   };
 }
 
+/** What `IMAGE_INSPECT_FORMAT` reads back off one image. */
+export interface InspectedImage {
+  /** Every label the image carries — the ones inherited from its base
+   *  included, indistinguishably. Splitting them is lineage's job. */
+  labels: Record<string, string>;
+  /** `RootFS.Layers`: ordered, content-addressed diff ids. */
+  layers: string[];
+}
+
+const LabelMapSchema = z.record(z.string(), z.string()).catch({});
+const LayerListSchema = z.array(z.string()).catch([]);
+
 /**
- * Provenance for each inspected image, keyed by short id.
+ * Labels and layers for each inspected image, keyed by short id.
  *
  * A line that will not parse annotates nothing and the rest of the batch still
  * stands — a listing degrades to unannotated rows, never to an error.
  */
-export function parseImageProvenance(stdout: string): Map<string, ReadImageProvenance> {
-  const byId = new Map<string, ReadImageProvenance>();
+export function parseImageInspect(stdout: string): Map<string, InspectedImage> {
+  const byId = new Map<string, InspectedImage>();
 
   for (const line of stdout.trim().split('\n')) {
-    const [id, rawLabels] = line.split('\t');
+    const [id, rawLabels, rawLayers] = line.split('\t');
     if (!id || !rawLabels) continue;
     try {
-      byId.set(shortImageId(id), readProvenanceLabels(JSON.parse(rawLabels)));
+      byId.set(shortImageId(id), {
+        // `null` for an unlabelled image, and a label map can hold a non-string
+        // value; `catch` turns either into the empty answer rather than an
+        // exception that would drop the row.
+        labels: LabelMapSchema.parse(JSON.parse(rawLabels)),
+        layers: LayerListSchema.parse(rawLayers === undefined ? [] : JSON.parse(rawLayers)),
+      });
     } catch {
       continue;
     }

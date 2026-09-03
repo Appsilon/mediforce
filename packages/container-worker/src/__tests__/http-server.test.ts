@@ -4,12 +4,14 @@ import type { Server } from 'node:http';
 vi.mock('../docker-info', () => ({
   listImages: vi.fn(),
   getDiskUsage: vi.fn(),
+  getImageHistory: vi.fn(),
   probeImageCapabilities: vi.fn(),
 }));
 
-import { listImages, getDiskUsage, probeImageCapabilities } from '../docker-info';
+import { listImages, getDiskUsage, getImageHistory, probeImageCapabilities } from '../docker-info';
 const mockListImages = vi.mocked(listImages);
 const mockGetDiskUsage = vi.mocked(getDiskUsage);
+const mockGetImageHistory = vi.mocked(getImageHistory);
 const mockProbeImageCapabilities = vi.mocked(probeImageCapabilities);
 
 let server: Server | null = null;
@@ -96,6 +98,30 @@ describe('HTTP info server', () => {
     const authorized = await fetch(url, { headers: { 'X-Worker-Secret': 'worker-secret' } });
     expect(authorized.status).toBe(200);
     expect(mockProbeImageCapabilities).toHaveBeenCalledWith('alpine:3.24');
+  });
+
+  it('GET /images/:image/history returns the layer summary, ungated', async () => {
+    // No secret header, and one is set: reading history starts no container,
+    // so it is gated like `/images`, not like the capability probe.
+    process.env.CONTAINER_WORKER_SECRET = 'worker-secret';
+    const steps = [{ command: 'RUN apt-get update', size: '87MB' }];
+    mockGetImageHistory.mockResolvedValue(steps);
+
+    const { port } = await getServer();
+    const res = await fetch(`http://localhost:${port}/images/mediforce-golden-image%3Alatest/history`);
+
+    expect(res.status).toBe(200);
+    expect(mockGetImageHistory).toHaveBeenCalledWith('mediforce-golden-image:latest');
+    expect(await res.json()).toEqual(steps);
+  });
+
+  it('GET /images/:image/history answers 500 when the daemon refuses', async () => {
+    mockGetImageHistory.mockRejectedValue(new Error('No such image'));
+
+    const { port } = await getServer();
+    const res = await fetch(`http://localhost:${port}/images/gone%3Alatest/history`);
+
+    expect(res.status).toBe(500);
   });
 
   it('returns 404 for unknown routes', async () => {
