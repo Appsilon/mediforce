@@ -139,6 +139,20 @@ describe('readableBuildStepCommand', () => {
     ).toContain('API_KEY=***');
   });
 
+  it('redacts a quoted secret whole, not up to its first space', () => {
+    expect(readableBuildStepCommand('ENV API_KEY="top secret value"')).toBe('ENV API_KEY=***');
+    expect(readableBuildStepCommand("ENV API_KEY='top secret value'")).toBe('ENV API_KEY=***');
+    // An unterminated quote takes the rest of the command with it: the value
+    // has no end to find, and the alternative is publishing most of it.
+    expect(readableBuildStepCommand('ENV API_KEY="top secret value')).toBe('ENV API_KEY=***');
+  });
+
+  it('redacts a build-arg value that carries spaces, and keeps the command after it', () => {
+    expect(
+      readableBuildStepCommand('RUN |1 GITHUB_TOKEN="ghp real secret" /bin/sh -c git clone x # buildkit'),
+    ).toBe('RUN GITHUB_TOKEN=*** git clone x');
+  });
+
   it('redacts credentials embedded in a clone URL', () => {
     expect(
       readableBuildStepCommand(

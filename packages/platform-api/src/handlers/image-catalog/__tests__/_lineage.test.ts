@@ -5,14 +5,19 @@ import type { ImageCatalogEntryView } from '../../../contract/image-catalog';
 import type { EntryViewWithoutLineage } from '../_lineage';
 import type { ResolvedVersion } from '../_versions';
 
+/** `history` holds what the daemon can answer for an image id; an id absent
+ *  from it is one the daemon could not answer for — `null`, not empty.
+ *  `costMs` is how long each read takes, for the budget case. */
 const daemon = vi.hoisted(() => ({
   history: new Map<string, ImageBuildStep[]>(),
   calls: [] as string[],
+  costMs: 0,
 }));
 vi.mock('../../system/_docker', () => ({
-  fetchImageHistory: async (imageTag: string) => {
-    daemon.calls.push(imageTag);
-    return daemon.history.get(imageTag) ?? [];
+  fetchImageHistory: async (image: string) => {
+    daemon.calls.push(image);
+    if (daemon.costMs > 0) vi.setSystemTime(Date.now() + daemon.costMs);
+    return daemon.history.get(image) ?? null;
   },
 }));
 
@@ -152,6 +157,27 @@ describe('resolveCatalogLineage', () => {
     expect(teal.versions[0].lineage.ownLabels).toEqual({ 'mediforce.build.commit': 'abc123' });
   });
 
+  it('names the base the way the catalog names it, not by whichever tag the daemon listed last', () => {
+    // One id, two rows: `base:v1` is what somebody catalogued, `alias:latest`
+    // is another tag on the same image and is listed after it.
+    const images = [
+      image({ id: 'base', repository: 'base', tag: 'v1' }),
+      image({ id: 'base', repository: 'alias', tag: 'latest' }),
+      image({ id: 'derived', baseImageId: 'base' }),
+    ];
+    const baseEntry: EntryViewWithoutLineage = {
+      ...entry('base-entry', []),
+      versions: [version({ imageId: 'base', imageTag: 'base:v1' })],
+    };
+
+    const [, derived] = resolveCatalogLineage(
+      [baseEntry, entry('derived-entry', ['derived'])],
+      images,
+    );
+
+    expect(derived.versions[0].lineage.base?.imageTag).toBe('base:v1');
+  });
+
   it('leaves every entry a root when the daemon held nothing', () => {
     const views = resolveCatalogLineage(
       [
@@ -213,6 +239,7 @@ describe('withBuildSteps', () => {
   beforeEach(() => {
     daemon.history.clear();
     daemon.calls.length = 0;
+    daemon.costMs = 0;
   });
 
   function tealView(): ImageCatalogEntryView {
@@ -228,8 +255,8 @@ describe('withBuildSteps', () => {
   }
 
   it('reports only the steps added past the base boundary', async () => {
-    daemon.history.set('mediforce-agent:golden', BASE_SUMMARY);
-    daemon.history.set('mediforce-agent:teal', [
+    daemon.history.set('golden', BASE_SUMMARY);
+    daemon.history.set('teal', [
       ...BASE_SUMMARY,
       step('RUN install teal'),
       step('COPY mcp /app/mcp'),
@@ -244,7 +271,7 @@ describe('withBuildSteps', () => {
   });
 
   it('gives a root its whole summary — there is no base to cut at', async () => {
-    daemon.history.set('mediforce-agent:golden', BASE_SUMMARY);
+    daemon.history.set('golden', BASE_SUMMARY);
     const [golden] = resolveCatalogLineage(
       [entry('golden-entry', ['golden'])],
       [image({ id: 'golden' })],
@@ -268,16 +295,51 @@ describe('withBuildSteps', () => {
 
     await withBuildSteps(teal);
 
-    expect(daemon.calls).toEqual([
-      'mediforce-agent:teal-new',
-      'mediforce-agent:golden',
-      'mediforce-agent:teal-old',
-    ]);
+    // By id, not by tag: a tag can be moved between the listing and the read.
+    expect(daemon.calls).toEqual(['teal-new', 'golden', 'teal-old']);
   });
 
-  it('leaves the steps empty when the daemon cannot answer', async () => {
+  it('omits the summary when the daemon cannot answer for the image', async () => {
     const withSteps = await withBuildSteps(tealView());
 
-    expect(withSteps.versions[0].lineage.addedSteps).toEqual([]);
+    expect(withSteps.versions[0].lineage.addedSteps).toBeUndefined();
+  });
+
+  it('omits the summary when the base history is the one that failed', async () => {
+    // Without this the child's whole inherited history — the base's steps and
+    // everything under them — would be published as steps the child added.
+    daemon.history.set('teal', [...BASE_SUMMARY, step('RUN install teal')]);
+
+    const withSteps = await withBuildSteps(tealView());
+
+    expect(withSteps.versions[0].lineage.addedSteps).toBeUndefined();
+  });
+
+  it('stops reading once the entry budget is spent instead of paying a timeout per version', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const images = [
+        image({ id: 'golden' }),
+        ...Array.from({ length: 6 }, (_, index) =>
+          image({ id: `teal-${String(index)}`, baseImageId: 'golden' }),
+        ),
+      ];
+      const [, teal] = resolveCatalogLineage(
+        [
+          entry('golden-entry', ['golden']),
+          entry('teal-entry', images.slice(1).map((each) => each.id)),
+        ],
+        images,
+      );
+      // A daemon answering just under its own per-call ceiling.
+      daemon.costMs = 9_000;
+
+      const withSteps = await withBuildSteps(teal);
+
+      expect(daemon.calls.length).toBeLessThan(images.length);
+      expect(withSteps.versions).toHaveLength(6);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
