@@ -1,3 +1,6 @@
+Sitemap: https://mediforce.ai/sitemap.xml
+Sitemap: https://mediforce.ai/docs/sitemap.xml
+
 User-agent: *
 Content-Signal: search=yes, ai-train=no, use=reference
 Allow: /
@@ -8,6 +11,8 @@ Allow: /
 User-agent: ChatGPT-User
 Allow: /
 User-agent: Claude-User
+Allow: /
+User-agent: Claude-SearchBot
 Allow: /
 User-agent: PerplexityBot
 Allow: /

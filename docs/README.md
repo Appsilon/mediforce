@@ -14,7 +14,7 @@ New here: [`../GETTING-STARTED.md`](../GETTING-STARTED.md), then
 [`start/dev-quickref.md`](start/dev-quickref.md).
 
 > This folder also serves the public website at **mediforce.ai**: the `.html`
-> files, `nav.js` and `theme.css` at this level, plus `CNAME`, `robots.txt`, `sitemap.xml`, `setup/`,
+> files, `nav.js` and `theme.css` at this level, plus `CNAME`, `robots.txt`, `sitemap.xml`, `llms.txt`, `setup/`,
 > `case-studies/`, `images/`, `features/` and the loose images. Those
 > back live URLs and never move. GitHub Pages serves `index.html`; GitHub renders
 > this README when you browse the folder. Everything below is engineering

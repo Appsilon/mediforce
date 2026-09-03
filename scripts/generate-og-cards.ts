@@ -26,6 +26,7 @@ const WIDTH = 1200;
 const HEIGHT = 630;
 const CARD_BASE = 'https://mediforce.ai/images/og';
 const LLMS = 'llms.txt';
+const ROBOTS = 'robots.txt';
 
 /** Written as in `docs/theme.css`, converted here so the two cannot drift. */
 const TOKENS = {
@@ -302,6 +303,15 @@ async function main() {
   // llms.txt is written by hand on purpose - it is a curated guide, not a dump
   // of titles - but a page missing from it is invisible to the assistants it
   // exists for, and nothing else would notice.
+  // A Sitemap: line was silently dropped from robots.txt once already, and with
+  // Cloudflare's managed file disabled this is the only thing serving the path.
+  const robots = await readFile(path.join(DOCS, ROBOTS), 'utf-8');
+  for (const sitemap of ['/sitemap.xml', '/docs/sitemap.xml']) {
+    if (robots.includes(`Sitemap: https://mediforce.ai${sitemap}`) === false) {
+      throw new Error(`${ROBOTS} does not point at ${sitemap}`);
+    }
+  }
+
   const llms = await readFile(path.join(DOCS, LLMS), 'utf-8');
   const absent = pages.filter((page) => llms.includes(page.url) === false);
   if (absent.length > 0) {
