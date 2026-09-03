@@ -8,14 +8,20 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
-import type { DockerInfoResponse } from '../../../contract/system';
-import { TEALFLOW, TEALFLOW_REPO_URL } from './fixtures';
+import type { DaemonImageListing } from '../../system/_docker';
+import { TEALFLOW, TEALFLOW_REPO_URL, UNREACHABLE_DAEMON } from './fixtures';
 
 // The handlers reconcile against the daemon on every read; stubbing that one
 // read keeps these tests hermetic. Reconciliation itself is covered by
 // `_versions.test.ts`, at the level where it is a pure function.
-const daemon = vi.hoisted(() => ({ value: { available: false } as DockerInfoResponse }));
-vi.mock('../../system/get-docker-info', () => ({ getDockerInfo: async () => daemon.value }));
+const daemon = vi.hoisted(() => ({
+  value: { available: false, images: [] } as DaemonImageListing,
+}));
+vi.mock('../../system/_docker', () => ({
+  fetchDaemonImages: async () => daemon.value,
+  probeImageCapabilities: async () => ({ status: 'unknown' }),
+  fetchImageHistory: async () => null,
+}));
 
 const { createImageCatalogEntry } = await import('../create-entry');
 
@@ -26,7 +32,7 @@ describe('createImageCatalogEntry handler', () => {
   beforeEach(() => {
     repo = new InMemoryImageCatalogRepository();
     auditRepo = new InMemoryAuditRepository();
-    daemon.value = { available: false };
+    daemon.value = UNREACHABLE_DAEMON;
   });
 
   const scopeFor = (uid: string, namespaces: string[]) =>

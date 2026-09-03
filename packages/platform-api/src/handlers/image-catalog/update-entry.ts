@@ -6,7 +6,7 @@ import type {
   UpdateImageCatalogEntryOutput,
 } from '../../contract/image-catalog';
 import { actorFromCaller } from '../_helpers';
-import { getDockerInfo } from '../system/get-docker-info';
+import { fetchDaemonImages } from '../system/_docker';
 import { toEntryView } from './_view';
 import { refreshEntryCapabilities } from './_capabilities';
 
@@ -24,7 +24,7 @@ export async function updateImageCatalogEntry(
 
   // One daemon read for the whole write: the probe and the response view ask
   // the same questions of it.
-  const daemon = await getDockerInfo({}, scope);
+  const daemon = await fetchDaemonImages();
   // `source` is not in the patch schema: it is the key the id derives from, so
   // an entry that changed it would be a different entry wearing an old id.
   const entry = await scope.imageCatalog.upsert(namespace, { ...existing, ...patch, id });
