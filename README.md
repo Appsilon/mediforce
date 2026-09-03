@@ -6,7 +6,7 @@
 
 Define processes. Assign humans and AI agents to each step. Ship compliant workflows — fast.
 
-[Why Mediforce](#why-mediforce) | [How It Works](#how-it-works) | [See It in Action](#see-it-in-action) | [Quick Start](#quick-start) | [Docs](#documentation)
+[mediforce.ai](https://mediforce.ai) | [Why Mediforce](#why-mediforce) | [How It Works](#how-it-works) | [See It in Action](#see-it-in-action) | [Quick Start](#quick-start) | [Docs](https://mediforce.ai/docs/)
 
 </div>
 

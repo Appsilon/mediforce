@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Case Studies | Mediforce</title>
+  <meta name="description" content="Two clinical workflows running on Mediforce end to end: an autonomous CRO data ingest, and submission document collection across stakeholder teams." />
+  <link rel="canonical" href="https://mediforce.ai/case-studies/" />
+  <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Mediforce" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:url" content="https://mediforce.ai/case-studies/" />
+  <meta property="og:title" content="Case Studies | Mediforce" />
+  <meta property="og:description" content="Two clinical workflows running on Mediforce end to end: an autonomous CRO data ingest, and submission document collection across stakeholder teams." />
+  <meta property="og:image" content="https://mediforce.ai/images/og/case-studies.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Case Studies — Mediforce social card" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Case Studies | Mediforce" />
+  <meta name="twitter:description" content="Two clinical workflows running on Mediforce end to end: an autonomous CRO data ingest, and submission document collection across stakeholder teams." />
+  <meta name="twitter:image" content="https://mediforce.ai/images/og/case-studies.png" />
+  <meta name="twitter:image:alt" content="Case Studies — Mediforce social card" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Mediforce", "item": "https://mediforce.ai/" },
+      { "@type": "ListItem", "position": 2, "name": "Case Studies", "item": "https://mediforce.ai/case-studies/" }
+    ]
+  }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1, h2, h3 {
+      font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+      letter-spacing: -0.01em;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .container { max-width: 68rem; margin: 0 auto; padding: 0 1.5rem; }
+
+    .cs-hero { padding: 5rem 0 2.5rem; }
+
+    .cs-label {
+      font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    .cs-hero h1 {
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      font-weight: 800;
+      letter-spacing: -0.035em;
+      line-height: 1.15;
+      max-width: 40rem;
+    }
+
+    .cs-hero p {
+      max-width: 42rem;
+      margin-top: 1.25rem;
+      font-size: 1.0625rem;
+      color: var(--text-60);
+    }
+
+    .cs-grid {
+      display: grid;
+      gap: 1.5rem;
+      padding-bottom: 6rem;
+    }
+
+    @media (min-width: 860px) {
+      .cs-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    .cs-card {
+      display: flex;
+      flex-direction: column;
+      border: 1.5px solid var(--border);
+      border-radius: 0.75rem;
+      background: var(--bg-card);
+      overflow: hidden;
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .cs-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 4px 6px -1px hsl(222 47% 11% / 0.1), 0 2px 4px -2px hsl(222 47% 11% / 0.1);
+    }
+
+    .cs-card img { display: block; width: 100%; height: auto; border-bottom: 1px solid var(--border); }
+
+    .cs-card-body { padding: 1.5rem; display: flex; flex-direction: column; flex: 1; }
+
+    .cs-card h2 { font-size: 1.375rem; font-weight: 700; line-height: 1.25; }
+
+    .cs-card p { margin-top: 0.75rem; color: var(--text-60); font-size: 0.9375rem; }
+
+    .cs-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.375rem;
+      margin-top: 1.25rem;
+    }
+
+    .cs-tag {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-70);
+      border: 1px solid var(--border);
+      border-radius: 0.375rem;
+      padding: 0.125rem 0.5rem;
+    }
+
+    .cs-more {
+      margin-top: 1.5rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+  </style>
+  <link rel="stylesheet" href="../theme.css?v=c85f62e4" />
+</head>
+<body>
+  <header class="site-header" id="site-header">
+    <div class="header-inner">
+      <a href="../index.html" class="logo-group">
+        <div class="logo-mark"><img src="../logo.png" alt="Mediforce logo" width="32" height="32" /></div>
+        <span class="logo-text">Mediforce</span>
+      </a>
+      <div class="header-links">
+        <a href="../case-studies/" class="header-link">Case Studies</a>
+        <a href="../validated-ai.html" class="header-link">Validation</a>
+        <a href="../security.html" class="header-link">Security</a>
+        <a href="../fda-principles.html" class="header-link">FDA Alignment</a>
+        <a href="../setup/" class="header-link">Self-host</a>
+        <a href="https://mediforce.ai/docs/" class="header-link" target="_blank" rel="noopener noreferrer">Docs</a>
+        <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer" class="header-link">GitHub</a>
+        <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="header-link">Join Discord</a>
+      </div>
+    </div>
+  </header>
+  <script src="../nav.js?v=a64ae0f4" defer></script>
+
+  <main>
+    <section class="cs-hero">
+      <div class="container">
+        <div class="cs-label">Case Studies</div>
+        <h1>Two clinical workflows, running end to end.</h1>
+        <p>
+          Each one is a real process with a Control Mode on every step, so you can see exactly
+          where an agent acts alone, where it drafts for review, and where a human has to decide.
+        </p>
+      </div>
+    </section>
+
+    <div class="container">
+      <div class="cs-grid">
+
+        <a class="cs-card" href="data-delivery/">
+          <img src="../images/mediforce-lz-validation-report.webp"
+               alt="Validation report in Mediforce with the Accept or Reject decision"
+               loading="lazy" decoding="async" width="1400" height="698" />
+          <div class="cs-card-body">
+            <h2>Automated Clinical Data Delivery</h2>
+            <p>
+              A CRO drops files on an SFTP endpoint on no fixed schedule. The workflow notices,
+              validates against CDISC standards, and produces a report a data manager either
+              accepts or rejects. On a clean delivery the human sees one screen; on a bad one an
+              agent drafts the note back to the CRO.
+            </p>
+            <div class="cs-meta">
+              <span class="cs-tag">CDISC CORE</span>
+              <span class="cs-tag">SFTP polling</span>
+              <span class="cs-tag">Human decision gate</span>
+            </div>
+            <div class="cs-more">Read the walkthrough &rarr;</div>
+          </div>
+        </a>
+
+        <a class="cs-card" href="collecting-documents/">
+          <img src="collecting-documents/submission-docs-workflow.webp"
+               alt="Submission document collection workflow in the Mediforce designer"
+               loading="lazy" decoding="async" width="1800" height="905" />
+          <div class="cs-card-body">
+            <h2>Automated Submission Document Collection</h2>
+            <p>
+              A submission needs documents from a dozen teams who all have other priorities.
+              The workflow asks, tracks what has arrived, reviews what it gets, and writes every
+              chase-up itself &mdash; leaving the deadline as the only thing a human has to care about.
+            </p>
+            <div class="cs-meta">
+              <span class="cs-tag">Stakeholder chasing</span>
+              <span class="cs-tag">Content review</span>
+              <span class="cs-tag">Agent-drafted email</span>
+            </div>
+            <div class="cs-more">Read the walkthrough &rarr;</div>
+          </div>
+        </a>
+
+      </div>
+    </div>
+  </main>
+</body>
+</html>

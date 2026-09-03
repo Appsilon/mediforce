@@ -3,11 +3,12 @@
 (function () {
   const scriptEl = document.currentScript;
   const src = scriptEl?.getAttribute('src') || '';
-  const p = src.replace(/nav\.js$/, '');
+  const p = src.replace(/nav\.js(\?.*)?$/, '');
 
   const LINKS = [
     {
       label: 'Case Studies',
+      href: 'case-studies/',
       children: [
         { href: 'case-studies/data-delivery/', label: 'Data Delivery' },
         { href: 'case-studies/collecting-documents/', label: 'Collecting Documents' },
@@ -33,7 +34,7 @@
     return path.endsWith(href) || path.endsWith(href.replace('.html', ''));
   }
   function groupActive(l) {
-    return l.children.some(c => isActive(c.href));
+    return (l.href !== undefined && isActive(l.href)) || l.children.some(c => isActive(c.href));
   }
 
   const chevronIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="header-dropdown-chevron"><polyline points="6 9 12 15 18 9"/></svg>';
@@ -45,7 +46,7 @@
         `<a href="${p}${c.href}" class="header-dropdown-item${isActive(c.href) ? ' header-dropdown-item--active' : ''}">${c.label}</a>`
       ).join('');
       return `<div class="header-dropdown">
-        <button type="button" class="header-link header-dropdown-trigger${active ? ' header-link--active' : ''}" aria-haspopup="true" aria-expanded="false">${l.label}${chevronIcon}</button>
+        <a href="${p}${l.href}" class="header-link header-dropdown-trigger${active ? ' header-link--active' : ''}" aria-haspopup="true" aria-expanded="false">${l.label}${chevronIcon}</a>
         <div class="header-dropdown-menu">${items}</div>
       </div>`;
     }
@@ -58,7 +59,10 @@
       const items = l.children.map(c =>
         `<a href="${p}${c.href}" class="mobile-nav-sublink"${isActive(c.href) ? ' style="color:var(--accent,hsl(161 94% 30%));font-weight:600"' : ''}>${c.label}</a>`
       ).join('');
-      return `<div class="mobile-nav-group-label">${l.label}</div>${items}`;
+      const label = l.href === undefined
+        ? `<div class="mobile-nav-group-label">${l.label}</div>`
+        : `<a href="${p}${l.href}"${isActive(l.href) ? ' style="color:var(--accent,hsl(161 94% 30%));font-weight:600"' : ''}>${l.label}</a>`;
+      return `${label}${items}`;
     }
     if (l.external === true) return `<a href="${l.href}" target="_blank" rel="noopener noreferrer">${l.label}</a>`;
     return `<a href="${p}${l.href}"${isActive(l.href) ? ' style="color:var(--accent,hsl(161 94% 30%));font-weight:600"' : ''}>${l.label}</a>`;
@@ -88,60 +92,15 @@
   </nav>
 </header>`;
 
-  const css = `
-.site-header{position:sticky;top:0;z-index:1000;border-bottom:1px solid hsl(214.3 31.8% 91.4%);background:rgba(255,255,255,0.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif}
-.site-header .header-inner{max-width:68rem;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:0.875rem 1.5rem}
-.site-header .logo-group{display:flex;align-items:center;gap:0.625rem;text-decoration:none}
-.site-header .logo-mark{width:1.75rem;height:1.75rem;display:flex;align-items:center;justify-content:center}
-.site-header .logo-mark img{width:100%;height:100%;object-fit:contain}
-.site-header .logo-text{font-family:'Space Grotesk',sans-serif;font-size:1.125rem;font-weight:700;letter-spacing:-0.025em;color:hsl(161 94% 30%)}
-.site-header .header-links{display:flex;align-items:center;gap:0.25rem}
-.site-header .header-link{display:inline-flex;align-items:center;gap:0.375rem;font-size:0.8125rem;font-weight:500;color:#6B7280;padding:0.375rem 0.75rem;border-radius:0.375rem;text-decoration:none;transition:color 0.15s}
-.site-header .header-link:hover{color:#111827;background:rgba(0,0,0,0.04)}
-.site-header .header-link--active{color:hsl(161 94% 30%);font-weight:600;background:hsl(152 81% 96%)}
-.site-header .header-link--icon{display:flex;align-items:center;padding:0.375rem 0.5rem;color:#9CA3AF}
-.site-header .header-link--icon:hover{color:#111827;background:rgba(0,0,0,0.04)}
-.site-header .header-link--icon svg{width:1.125rem;height:1.125rem}
-.site-header .header-dropdown{position:relative}
-.site-header .header-dropdown-trigger{display:inline-flex;align-items:center;gap:0.25rem;font-family:inherit;background:none;border:none;cursor:pointer}
-.site-header .header-dropdown-chevron{width:0.75rem;height:0.75rem;transition:transform 0.15s}
-.site-header .header-dropdown.is-open .header-dropdown-chevron,.site-header .header-dropdown:focus-within .header-dropdown-chevron{transform:rotate(180deg)}
-.site-header .header-dropdown-menu{display:none;position:absolute;top:calc(100% + 0.375rem);left:0;min-width:12rem;padding:0.375rem;border-radius:0.625rem;border:1px solid hsl(214.3 31.8% 91.4%);background:#fff;box-shadow:0 12px 32px rgba(0,0,0,0.1);z-index:1001}
-.site-header .header-dropdown.is-open .header-dropdown-menu,.site-header .header-dropdown:focus-within .header-dropdown-menu{display:block}
-.site-header .header-dropdown-item{display:block;font-size:0.8125rem;font-weight:500;color:#4B5563;padding:0.5rem 0.625rem;border-radius:0.375rem;text-decoration:none;white-space:nowrap}
-.site-header .header-dropdown-item:hover{background:rgba(0,0,0,0.04);color:#111827}
-.site-header .header-dropdown-item--active{color:hsl(161 94% 30%);font-weight:600;background:hsl(152 81% 96%)}
-.site-header .mobile-nav-group-label{font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;padding:0.625rem 0.75rem 0.25rem}
-.site-header .mobile-nav-sublink{padding-left:1.5rem!important}
-.site-header .header-link--discord{background:hsl(161 94% 26%);color:#fff;display:inline-flex;align-items:center;gap:0.375rem;margin-left:0.25rem}
-.site-header .header-link--discord:hover{background:hsl(161 94% 20%);color:#fff}
-.site-header .header-link--discord svg{width:1rem;height:1rem}
-.site-header .nav-toggle{display:none;align-items:center;justify-content:center;width:2.25rem;height:2.25rem;padding:0;background:none;border:none;cursor:pointer;color:#6B7280;border-radius:0.375rem;flex-shrink:0}
-.site-header .nav-toggle:hover{background:rgba(0,0,0,0.04);color:#111827}
-.site-header .nav-toggle svg{display:block}
-.site-header .mobile-nav{display:none;flex-direction:column;padding:0.75rem 1.5rem 1.25rem;border-top:1px solid hsl(214.3 31.8% 91.4%);background:rgba(255,255,255,0.98);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
-.site-header .mobile-nav.is-open{display:flex}
-.site-header .mobile-nav a{display:block;font-size:0.9375rem;font-weight:500;color:#4B5563;padding:0.625rem 0.75rem;border-radius:0.375rem;text-decoration:none}
-.site-header .mobile-nav a:hover{background:rgba(0,0,0,0.04);color:#111827}
-.site-header .mobile-nav-discord{background:hsl(161 94% 26%)!important;color:#fff!important;display:flex!important;align-items:center!important;gap:0.5rem;justify-content:center;margin-top:0.5rem}
-.site-header .mobile-nav-discord:hover{background:hsl(161 94% 20%)!important}
-@media(max-width:767px){.site-header .nav-toggle{display:flex}.site-header .header-links{display:none!important}}`;
 
-  const style = document.createElement('style');
-  style.textContent = css;
-  document.head.appendChild(style);
-
-  // Declared here rather than in each page's head so nested pages get the same
-  // path prefix the header links already use. A page that declares its own icon
-  // is updated in place — appending a second link leaves two competing favicons
-  // and the browser may keep the first.
-  const favicon = document.querySelector('link[rel="icon"]') ?? document.createElement('link');
-  favicon.rel = 'icon';
-  favicon.type = 'image/x-icon';
-  favicon.href = `${p}favicon.ico`;
-  if (favicon.parentNode === null) document.head.appendChild(favicon);
-
-  document.body.insertAdjacentHTML('afterbegin', html);
+  // Every page ships a static header so the link graph survives without JS.
+  // Replacing it keeps one header; prepending would leave two.
+  const served = document.getElementById('site-header');
+  if (served === null) {
+    document.body.insertAdjacentHTML('afterbegin', html);
+  } else {
+    served.outerHTML = html;
+  }
 
   const toggle = document.getElementById('site-nav-toggle');
   const mobileNav = document.getElementById('site-mobile-nav');
@@ -167,6 +126,9 @@
     dropdown.addEventListener('mouseenter', function () {
       openDropdown(dropdown);
     });
+    if (trigger.tagName === 'A') {
+      return;
+    }
     trigger.addEventListener('click', function (e) {
       e.stopPropagation();
       if (dropdown.classList.contains('is-open')) {
