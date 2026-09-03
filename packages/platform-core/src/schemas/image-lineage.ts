@@ -168,10 +168,24 @@ export function imageHistoryArgs(image: string): string[] {
 const SENSITIVE_KEY =
   /(?:TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIALS?|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|AUTH)/i;
 
-const ASSIGNMENT = /\b([A-Za-z_][A-Za-z0-9_]*)=(\S+)/g;
+/**
+ * The value half of an assignment: a quoted string runs to its closing quote,
+ * anything else to the first space.
+ *
+ * Stopping at the space unconditionally would redact `API_KEY="top` and hand
+ * the rest of the credential to the reader. An unterminated quote takes the
+ * remainder of the command with it — over-redaction, which is the direction
+ * this file errs in on purpose. Shared by both places that redact a value, so
+ * neither can learn what a value is without the other.
+ */
+const VALUE = String.raw`("[^"]*"?|'[^']*'?|\S*)`;
+
+const ASSIGNMENT = new RegExp(String.raw`\b([A-Za-z_][A-Za-z0-9_]*)=${VALUE}`, 'g');
 
 /** `RUN |2 A=x B=y /bin/sh -c …` — the build args docker inlines verbatim. */
 const BUILD_ARG_PREFIX = /^RUN\s+\|(\d+)\s+/;
+/** One of those inlined args, leading the rest of the command. */
+const BUILD_ARG = new RegExp(String.raw`^(\S+?)=${VALUE}\s*`);
 const SHELL_PREFIX = /^\/bin\/sh -c\s+/;
 const NOP_PREFIX = /^\/bin\/sh -c\s+#\(nop\)\s+/;
 const BUILDKIT_MARKER = /\s*#\s*buildkit\s*$/;
@@ -195,7 +209,7 @@ function redactBuildArgs(rest: string, count: number): { args: string[]; command
   const args: string[] = [];
 
   for (let index = 0; index < count; index += 1) {
-    const argument = remaining.match(/^(\S+?)=(\S*)\s*/);
+    const argument = remaining.match(BUILD_ARG);
     if (argument === null) break;
     args.push(`${argument[1]}=***`);
     remaining = remaining.slice(argument[0].length);

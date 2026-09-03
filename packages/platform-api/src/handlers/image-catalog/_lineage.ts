@@ -3,6 +3,7 @@ import type { DockerImageInfo } from '../../contract/system';
 import type {
   ImageCatalogEntryView,
   ImageCatalogVersion,
+  ImageCatalogVersionBase,
   ImageVersionLineage,
 } from '../../contract/image-catalog';
 import { fetchImageHistory } from '../system/_docker';
@@ -29,16 +30,28 @@ export type EntryViewWithoutLineage = Omit<ImageCatalogEntryView, 'versions' | '
  *  resolved against. */
 export interface CataloguedImages {
   id: string;
-  versions: readonly { imageId: string }[];
+  versions: readonly { imageId: string; imageTag: string }[];
 }
 
-/** Entry id owning each catalogued image, by image id. Two entries *can* name
- *  one daemon image — two references to the same pushed image — and the later
- *  one in the catalog wins; the listing's order is stable, so the grouping is
- *  too, and naming both would leave nothing to group under. */
-function entryIdByImageId(catalog: readonly CataloguedImages[]): Map<string, string> {
+/** The catalogued version each image id belongs to. The tag comes from that
+ *  version and not from the daemon listing, where one id collapses every tag it
+ *  carries: a base catalogued as `base:v1` and also tagged `alias:latest` must
+ *  be named the way the catalog names it.
+ *
+ *  Two entries *can* name one daemon image — two references to the same pushed
+ *  image — and the later one in the catalog wins; the listing's order is
+ *  stable, so the grouping is too, and naming both would leave nothing to group
+ *  under. */
+function catalogVersionByImageId(
+  catalog: readonly CataloguedImages[],
+): Map<string, ImageCatalogVersionBase> {
   return new Map(
-    catalog.flatMap((entry) => entry.versions.map((version) => [version.imageId, entry.id])),
+    catalog.flatMap((entry) =>
+      entry.versions.map((version): [string, ImageCatalogVersionBase] => [
+        version.imageId,
+        { entryId: entry.id, imageId: version.imageId, imageTag: version.imageTag },
+      ]),
+    ),
   );
 }
 
@@ -54,22 +67,19 @@ function entryIdByImageId(catalog: readonly CataloguedImages[]): Map<string, str
 function nearestCatalogAncestor(
   imageId: string,
   imagesById: ReadonlyMap<string, DockerImageInfo>,
-  catalogued: ReadonlyMap<string, string>,
+  catalogued: ReadonlyMap<string, ImageCatalogVersionBase>,
   selfEntryId: string,
-): { entryId: string; image: DockerImageInfo } | null {
+): ImageCatalogVersionBase | null {
   const seen = new Set<string>([imageId]);
   let current = imagesById.get(imageId)?.baseImageId;
 
   while (current !== undefined && !seen.has(current)) {
     seen.add(current);
-    const entryId = catalogued.get(current);
-    const image = imagesById.get(current);
+    const base = catalogued.get(current);
     // An entry is not its own base: two versions of one entry are two builds
     // of one source, and grouping an entry under itself would say nothing.
-    if (entryId !== undefined && entryId !== selfEntryId && image !== undefined) {
-      return { entryId, image };
-    }
-    current = image?.baseImageId;
+    if (base !== undefined && base.entryId !== selfEntryId) return base;
+    current = imagesById.get(current)?.baseImageId;
   }
 
   return null;
@@ -79,18 +89,10 @@ function versionLineage(
   version: ResolvedVersion,
   entryId: string,
   imagesById: ReadonlyMap<string, DockerImageInfo>,
-  catalogued: ReadonlyMap<string, string>,
+  catalogued: ReadonlyMap<string, ImageCatalogVersionBase>,
 ): ImageVersionLineage {
-  const ancestor = nearestCatalogAncestor(version.imageId, imagesById, catalogued, entryId);
   return {
-    base:
-      ancestor === null
-        ? null
-        : {
-            entryId: ancestor.entryId,
-            imageId: ancestor.image.id,
-            imageTag: `${ancestor.image.repository}:${ancestor.image.tag}`,
-          },
+    base: nearestCatalogAncestor(version.imageId, imagesById, catalogued, entryId),
     ownLabels: imagesById.get(version.imageId)?.ownLabels ?? {},
   };
 }
@@ -112,7 +114,7 @@ export function resolveCatalogLineage(
   catalog: readonly CataloguedImages[] = entries,
 ): ImageCatalogEntryView[] {
   const imagesById = new Map(images.map((image) => [image.id, image]));
-  const catalogued = entryIdByImageId(catalog);
+  const catalogued = catalogVersionByImageId(catalog);
 
   return entries.map((entry) => {
     const versions: ImageCatalogVersion[] = entry.versions.map((version) => ({
@@ -165,6 +167,16 @@ export function orderByLineage(entries: readonly ImageCatalogEntryView[]): Image
 }
 
 /**
+ * Wall-clock budget for one entry's whole summary. Each `docker history` is
+ * bounded on its own, but an entry accumulates a version per build: on a slow
+ * daemon a ten-version entry would otherwise pay ten timeouts in a row and hold
+ * the read open for minutes. Past the budget the remaining versions report the
+ * summary as unavailable — exactly what an unreachable daemon reports — and the
+ * next read, against a daemon that has recovered, computes them.
+ */
+const BUILD_STEPS_BUDGET_MS = 20_000;
+
+/**
  * Attach each version's layer delta — the steps it adds over its base.
  *
  * One `docker history` call per distinct image, which is why this runs on a
@@ -176,23 +188,33 @@ export function orderByLineage(entries: readonly ImageCatalogEntryView[]): Image
 export async function withBuildSteps(
   entry: ImageCatalogEntryView,
 ): Promise<ImageCatalogEntryView> {
-  const history = new Map<string, ImageBuildStep[]>();
-  const stepsFor = async (imageTag: string): Promise<ImageBuildStep[]> => {
-    const cached = history.get(imageTag);
+  const history = new Map<string, ImageBuildStep[] | null>();
+  const deadline = Date.now() + BUILD_STEPS_BUDGET_MS;
+  // Read by immutable id, never by tag: a tag like `latest` can be moved
+  // between the listing that resolved this version and this call, and the delta
+  // would then summarise a different artifact.
+  const stepsFor = async (imageId: string): Promise<ImageBuildStep[] | null> => {
+    const cached = history.get(imageId);
     if (cached !== undefined) return cached;
-    const steps = await fetchImageHistory(imageTag);
-    history.set(imageTag, steps);
+    const steps = Date.now() >= deadline ? null : await fetchImageHistory(imageId);
+    history.set(imageId, steps);
     return steps;
   };
 
   const versions: ImageCatalogVersion[] = [];
   for (const version of entry.versions) {
-    const steps = await stepsFor(version.imageTag);
+    const steps = await stepsFor(version.imageId);
     const baseSteps =
-      version.lineage.base === null ? [] : await stepsFor(version.lineage.base.imageTag);
+      version.lineage.base === null ? [] : await stepsFor(version.lineage.base.imageId);
     versions.push({
       ...version,
-      lineage: { ...version.lineage, addedSteps: imageStepDelta(steps, baseSteps) },
+      // Absent, not empty, unless both reads answered: a base whose history the
+      // daemon could not produce reads as contributing nothing, which would
+      // publish every step the image inherited as one it added.
+      lineage:
+        steps === null || baseSteps === null
+          ? version.lineage
+          : { ...version.lineage, addedSteps: imageStepDelta(steps, baseSteps) },
     });
   }
 
