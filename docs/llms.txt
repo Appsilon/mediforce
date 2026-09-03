@@ -29,6 +29,7 @@ The project's canonical identifiers are the domain mediforce.ai, the repository 
 
 ## Case studies
 
+- [Case Studies](https://mediforce.ai/case-studies/): both workflows side by side, with what each one automates and where a human still decides.
 - [Automated Clinical Data Delivery](https://mediforce.ai/case-studies/data-delivery/): an agent watches a CRO SFTP endpoint, validates each delivery against CDISC standards, and escalates to a human only when judgement is required.
 - [Automated Submission Document Collection](https://mediforce.ai/case-studies/collecting-documents/): an agent requests submission documents from stakeholder teams, tracks deliveries, reviews content and drafts every reminder.
 

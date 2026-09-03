@@ -9,6 +9,7 @@
     {
       label: 'Case Studies',
       children: [
+        { href: 'case-studies/', label: 'All case studies' },
         { href: 'case-studies/data-delivery/', label: 'Data Delivery' },
         { href: 'case-studies/collecting-documents/', label: 'Collecting Documents' },
       ],
