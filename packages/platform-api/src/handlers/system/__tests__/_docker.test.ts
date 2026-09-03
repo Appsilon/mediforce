@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  fetchContainerWorkerImageHistory,
   fetchFromContainerWorker,
   fetchFromLocalDocker,
+  fetchLocalImageHistory,
   probeContainerWorkerImageCapabilities,
   probeLocalImageCapabilities,
 } from '../_docker';
@@ -300,5 +302,53 @@ describe('image capability probes', () => {
 
     expect(local).toEqual({ status: 'unknown' });
     expect(worker).toEqual({ status: 'unknown' });
+  });
+});
+
+describe('image history reads', () => {
+  const row = JSON.stringify({ CreatedBy: 'COPY mcp /app/mcp # buildkit', Size: '430kB' });
+
+  it('normalises the same history from local Docker and the worker', async () => {
+    const local = await fetchLocalImageHistory('sha-1', {
+      exec: async () => ({ stdout: row, stderr: '' }),
+    });
+    const worker = await fetchContainerWorkerImageHistory('sha-1', {
+      baseUrl: 'http://worker.test',
+      fetch: async () => new Response(
+        JSON.stringify([{ command: 'COPY mcp /app/mcp', size: '430kB' }]),
+      ),
+    });
+
+    expect(local).toEqual([{ command: 'COPY mcp /app/mcp', size: '430kB' }]);
+    expect(worker).toEqual(local);
+  });
+
+  it('reports a daemon that could not answer as null, never as an image with no steps', async () => {
+    const local = await fetchLocalImageHistory('missing', {
+      exec: async () => { throw new Error('timed out'); },
+    });
+    const refused = await fetchContainerWorkerImageHistory('missing', {
+      fetch: async () => { throw new Error('connection refused'); },
+    });
+    const notFound = await fetchContainerWorkerImageHistory('missing', {
+      fetch: async () => new Response('nope', { status: 404 }),
+    });
+
+    expect(local).toBeNull();
+    expect(refused).toBeNull();
+    expect(notFound).toBeNull();
+  });
+
+  it('bounds the worker request, so a stalled worker degrades instead of hanging the read', async () => {
+    let signal: AbortSignal | undefined;
+    await fetchContainerWorkerImageHistory('sha-1', {
+      baseUrl: 'http://worker.test',
+      fetch: async (_input, init) => {
+        signal = init?.signal ?? undefined;
+        return new Response('[]');
+      },
+    });
+
+    expect(signal).toBeInstanceOf(AbortSignal);
   });
 });
