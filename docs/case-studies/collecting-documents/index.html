@@ -73,7 +73,7 @@
       padding: 0 1.5rem;
     }
 
-    /* Header injected by nav.js */
+    /* Header styles live in theme.css, shared with every page */
 
     /* ── Hero ── */
     .hero {
@@ -732,7 +732,26 @@
   <link rel="stylesheet" href="../../theme.css" />
 </head>
 <body>
-  <script src="../../nav.js"></script>
+  <header class="site-header" id="site-header">
+    <div class="header-inner">
+      <a href="../../index.html" class="logo-group">
+        <div class="logo-mark"><img src="../../logo.png" alt="Mediforce logo" width="32" height="32" /></div>
+        <span class="logo-text">Mediforce</span>
+      </a>
+      <div class="header-links">
+        <a href="../../case-studies/data-delivery/" class="header-link">Data Delivery</a>
+        <a href="../../case-studies/collecting-documents/" class="header-link">Collecting Documents</a>
+        <a href="../../validated-ai.html" class="header-link">Validation</a>
+        <a href="../../security.html" class="header-link">Security</a>
+        <a href="../../fda-principles.html" class="header-link">FDA Alignment</a>
+        <a href="../../setup/" class="header-link">Self-host</a>
+        <a href="https://mediforce.ai/docs/" class="header-link" target="_blank" rel="noopener noreferrer">Docs</a>
+        <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer" class="header-link">GitHub</a>
+        <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="header-link">Join Discord</a>
+      </div>
+    </div>
+  </header>
+  <script src="../../nav.js" defer></script>
 
   <!-- Hero -->
   <section class="hero">
