@@ -1,8 +1,10 @@
 import type { ImageCapabilityCache, ImageCatalogEntry } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
-import type { DockerInfoResponse } from '../../contract/system';
-import { getDockerInfo } from '../system/get-docker-info';
-import { probeImageCapabilities } from '../system/_docker';
+import {
+  fetchDaemonImages,
+  probeImageCapabilities,
+  type DaemonImageListing,
+} from '../system/_docker';
 import { resolveEntryVersions } from './_versions';
 
 /**
@@ -19,12 +21,11 @@ export async function refreshEntryCapabilities(
   namespace: string,
   entry: ImageCatalogEntry,
   scope: CallerScope,
-  daemon?: DockerInfoResponse,
+  daemon?: DaemonImageListing,
 ): Promise<ImageCatalogEntry> {
-  // A caller that has already read the daemon passes it in: reading it costs
-  // three `docker` invocations — `docker system df` alone is seconds — and a
-  // create or update would otherwise pay for two reads of the same listing.
-  const docker = daemon ?? (await getDockerInfo({}, scope));
+  // A caller that has already read the daemon passes it in: a create or update
+  // would otherwise pay for two reads of the same listing.
+  const docker = daemon ?? (await fetchDaemonImages());
   if (!docker.available) return entry;
 
   const versions = resolveEntryVersions(entry.source, docker.images);

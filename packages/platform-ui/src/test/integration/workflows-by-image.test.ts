@@ -79,9 +79,10 @@ function makeWorkflow(
   } as WorkflowDefinition;
 }
 
-function req(image: string): NextRequest {
+function req(...images: string[]): NextRequest {
+  const query = images.map((image) => `image=${encodeURIComponent(image)}`).join('&');
   return new NextRequest(
-    `http://localhost/api/workflow-definitions/by-image?image=${encodeURIComponent(image)}`,
+    `http://localhost/api/workflow-definitions/by-image?${query}`,
     { headers: { cookie: 'authjs.session-token=tok-123' } },
   );
 }
@@ -191,6 +192,40 @@ describe('GET /api/workflow-definitions/by-image', () => {
     const body = await res.json();
 
     expect(body.workflows[0].steps).toEqual(['step-0', 'step-2']);
+  });
+
+  it('answers for several images at once, naming which ones each workflow uses', async () => {
+    // One catalog entry accumulates a version per build, and the Images view
+    // asks about all of them together: a call per version would be a full scan
+    // of every workflow definition per version.
+    fake.definitions.push(
+      makeWorkflow({ name: 'wf-old', namespace: 'acme', version: 1 }, ['img:v1']),
+      makeWorkflow({ name: 'wf-new', namespace: 'acme', version: 1 }, ['img:v2']),
+      makeWorkflow({ name: 'wf-elsewhere', namespace: 'acme', version: 1 }, ['other:v9']),
+    );
+
+    const res = await GET(req('img:v1', 'img:v2'));
+    const body = await res.json();
+
+    expect(body.workflows.map((w: { name: string }) => w.name).sort()).toEqual([
+      'wf-new',
+      'wf-old',
+    ]);
+    expect(body.workflows.find((w: { name: string }) => w.name === 'wf-old').images).toEqual([
+      'img:v1',
+    ]);
+  });
+
+  it('reports every requested image a single workflow uses, so an unused version is visible', async () => {
+    fake.definitions.push(
+      makeWorkflow({ name: 'wf-both', namespace: 'acme', version: 1 }, ['img:v1', 'img:v2']),
+    );
+
+    const res = await GET(req('img:v1', 'img:v2', 'img:v3'));
+    const body = await res.json();
+
+    expect(body.workflows).toHaveLength(1);
+    expect(body.workflows[0].images).toEqual(['img:v1', 'img:v2']);
   });
 
   it('matches a build-mode step that omits image, under its derived tag', async () => {

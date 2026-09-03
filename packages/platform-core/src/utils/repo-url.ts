@@ -35,6 +35,28 @@ export function normalizeRepoUrls(repo: string): { gitUrl: string; httpsUrl: str
   };
 }
 
+/**
+ * A permalink to a repo at a pinned commit — the file at `path`, or the tree
+ * when no path is pinned. `null` when no honest link can be built.
+ *
+ * Two refusals, both deliberate (AGENTS.md §13). `normalizeRepoUrls` returns an
+ * empty `httpsUrl` for a local-path ref (`/…`, `./…`), which nothing can
+ * browse; and `/blob/<commit>/<path>` is **GitHub's** URL shape, so a GitLab or
+ * self-hosted ref keeps its `httpsUrl` but gets no deep link here — rendering
+ * nothing beats guessing a shape another host does not serve. An unpinned
+ * commit is refused for the same reason: a link to a moving ref is not a
+ * permalink, and the whole point is that the reader sees the bytes this image
+ * was built from.
+ */
+export function githubPermalink(repo: string, commit: string, path?: string): string | null {
+  if (commit.length === 0) return null;
+  const { httpsUrl } = normalizeRepoUrls(repo);
+  if (!httpsUrl.startsWith('https://github.com/')) return null;
+  if (path === undefined || path.length === 0) return `${httpsUrl}/tree/${commit}`;
+  const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+  return `${httpsUrl}/blob/${commit}/${encodedPath}`;
+}
+
 /** Convert SSH git URL to HTTPS with token for authenticated clone. */
 export function toHttpsWithToken(sshUrl: string, token: string): string {
   const match = sshUrl.match(/git@github\.com:(.+?)(?:\.git)?$/);
