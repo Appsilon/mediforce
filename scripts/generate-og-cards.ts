@@ -25,6 +25,7 @@ const FONTS = path.join(ROOT, 'scripts', 'assets', 'fonts');
 const WIDTH = 1200;
 const HEIGHT = 630;
 const CARD_BASE = 'https://mediforce.ai/images/og';
+const LLMS = 'llms.txt';
 
 /** Written as in `docs/theme.css`, converted here so the two cannot drift. */
 const TOKENS = {
@@ -297,6 +298,15 @@ async function main() {
   const dots = `data:image/svg+xml;base64,${Buffer.from(dotTile).toString('base64')}`;
 
   const pages = await collectPages();
+
+  // llms.txt is written by hand on purpose - it is a curated guide, not a dump
+  // of titles - but a page missing from it is invisible to the assistants it
+  // exists for, and nothing else would notice.
+  const llms = await readFile(path.join(DOCS, LLMS), 'utf-8');
+  const absent = pages.filter((page) => llms.includes(page.url) === false);
+  if (absent.length > 0) {
+    throw new Error(`${LLMS} does not list: ${absent.map((p) => p.url).join(', ')}`);
+  }
   await mkdir(OUT, { recursive: true });
 
   for (const page of pages) {

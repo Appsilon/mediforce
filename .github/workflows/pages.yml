@@ -118,7 +118,7 @@ jobs:
       - name: Check both sites reached the artifact
         run: |
           for page in index.html README.html security.html CNAME \
-                      robots.txt sitemap.xml images/og/index.png \
+                      robots.txt sitemap.xml llms.txt images/og/index.png \
                       docs/index.html docs/install/index.html; do
             test -f "_site/$page" || {
               echo "::error::_site/$page missing — composed site incomplete"
