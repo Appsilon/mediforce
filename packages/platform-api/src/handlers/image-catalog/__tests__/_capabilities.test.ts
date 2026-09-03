@@ -1,14 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InMemoryImageCatalogRepository } from '@mediforce/platform-core/testing';
 import type { ImageCatalogEntry } from '@mediforce/platform-core';
-import type { DockerInfoResponse } from '../../../contract/system';
 import { createTestScope } from '../../../repositories/__tests__/create-test-scope';
-import { builtImage, daemonWith, TEALFLOW_REPO_URL } from './fixtures';
+import type { DaemonImageListing } from '../../system/_docker';
+import { builtImage, daemonWith, TEALFLOW_REPO_URL, UNREACHABLE_DAEMON } from './fixtures';
 
-const daemon = vi.hoisted(() => ({ value: { available: false } as DockerInfoResponse }));
+const daemon = vi.hoisted(() => ({
+  value: { available: false, images: [] } as DaemonImageListing,
+}));
 const probe = vi.hoisted(() => vi.fn());
-vi.mock('../../system/get-docker-info', () => ({ getDockerInfo: async () => daemon.value }));
-vi.mock('../../system/_docker', () => ({ probeImageCapabilities: probe }));
+vi.mock('../../system/_docker', () => ({
+  fetchDaemonImages: async () => daemon.value,
+  probeImageCapabilities: probe,
+}));
 
 const { refreshEntryCapabilities } = await import('../_capabilities');
 
@@ -82,7 +86,7 @@ describe('refreshEntryCapabilities', () => {
 
   it('does not start a probe when the daemon is unavailable', async () => {
     const scope = createTestScope({ imageCatalogRepo: new InMemoryImageCatalogRepository() });
-    daemon.value = { available: false };
+    daemon.value = UNREACHABLE_DAEMON;
 
     expect(await refreshEntryCapabilities('alpha', entry, scope)).toEqual(entry);
     expect(probe).not.toHaveBeenCalled();

@@ -1,26 +1,27 @@
 import type { ImageCatalogEntry } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
 import type { ImageCatalogEntryView } from '../../contract/image-catalog';
-import type { DockerInfoResponse } from '../../contract/system';
-import { getDockerInfo } from '../system/get-docker-info';
+import { fetchDaemonImages, type DaemonImageListing } from '../system/_docker';
 import { entryAvailability, resolveEntryVersions } from './_versions';
 import { resolveCatalogLineage } from './_lineage';
 
 /**
  * Annotate stored entries with the facts recomputed for this read.
  *
- * The daemon is asked once for the whole batch, and an unreachable one leaves
- * every entry at `availability: 'unknown'` with no versions rather than
- * failing the request — a catalog whose facts cannot be computed today still
- * renders (AGENTS.md §13, ADR-0021 decision 2).
+ * The daemon is asked once for the whole batch — for its image listing only,
+ * never the disk statistics `getDockerInfo` also gathers, which nothing here
+ * reads and which cost seconds. An unreachable daemon leaves every entry at
+ * `availability: 'unknown'` with no versions rather than failing the request —
+ * a catalog whose facts cannot be computed today still renders (AGENTS.md §13,
+ * ADR-0021 decision 2).
  */
 export async function toEntryViews(
   entries: readonly ImageCatalogEntry[],
   scope: CallerScope,
   catalog: readonly ImageCatalogEntry[] = entries,
-  daemon?: DockerInfoResponse,
+  daemon?: DaemonImageListing,
 ): Promise<ImageCatalogEntryView[]> {
-  const docker = daemon ?? (await getDockerInfo({}, scope));
+  const docker = daemon ?? (await fetchDaemonImages());
   const images = docker.available ? docker.images : [];
 
   // Lineage last: an entry's base is another entry, so it is resolved against
@@ -53,7 +54,7 @@ export async function toEntryView(
   namespace: string,
   entry: ImageCatalogEntry,
   scope: CallerScope,
-  daemon?: DockerInfoResponse,
+  daemon?: DaemonImageListing,
 ): Promise<ImageCatalogEntryView> {
   const catalog = await scope.imageCatalog.list(namespace);
   const [view] = await toEntryViews([entry], scope, catalog, daemon);

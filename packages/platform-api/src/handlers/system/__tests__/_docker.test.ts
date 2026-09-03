@@ -3,6 +3,8 @@ import {
   fetchContainerWorkerImageHistory,
   fetchFromContainerWorker,
   fetchFromLocalDocker,
+  fetchImagesFromContainerWorker,
+  fetchImagesFromLocalDocker,
   fetchLocalImageHistory,
   probeContainerWorkerImageCapabilities,
   probeLocalImageCapabilities,
@@ -215,6 +217,58 @@ describe('fetchFromLocalDocker', () => {
     expect(result.available).toBe(true);
     if (!result.available) throw new Error('unreachable');
     expect(result.images).toEqual([]);
+  });
+});
+
+describe('the listing without the disk statistics', () => {
+  it('never runs `docker system df` — the catalog reads the listing only', async () => {
+    const invoked: string[] = [];
+    const exec = async (_file: string, args: readonly string[]) => {
+      invoked.push(args.join(' '));
+      return args[0] === 'images'
+        ? {
+            stdout: JSON.stringify({
+              Repository: 'alpine',
+              Tag: 'latest',
+              ID: 'abc123',
+              Size: '7MB',
+              CreatedSince: '2 days ago',
+            }),
+            stderr: '',
+          }
+        : { stdout: '', stderr: '' };
+    };
+
+    const result = await fetchImagesFromLocalDocker({ exec });
+
+    expect(result.available).toBe(true);
+    expect(result.images.map((image) => image.repository)).toEqual(['alpine']);
+    expect(invoked.some((call) => call.startsWith('system df'))).toBe(false);
+  });
+
+  it('never asks the container worker for /disk', async () => {
+    const requested: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      requested.push(url);
+      return { ok: true, json: async () => [] };
+    }) as unknown as typeof globalThis.fetch;
+
+    const result = await fetchImagesFromContainerWorker({
+      fetch: fetchImpl,
+      baseUrl: 'http://worker:3001',
+    });
+
+    expect(result).toEqual({ available: true, images: [] });
+    expect(requested).toEqual(['http://worker:3001/images']);
+  });
+
+  it('reports an unreachable worker as unavailable with no images, never an error', async () => {
+    const fetchImpl = (async () => ({ ok: false, json: async () => ({}) })) as unknown as
+      typeof globalThis.fetch;
+
+    expect(
+      await fetchImagesFromContainerWorker({ fetch: fetchImpl, baseUrl: 'http://worker:3001' }),
+    ).toEqual({ available: false, images: [] });
   });
 });
 
