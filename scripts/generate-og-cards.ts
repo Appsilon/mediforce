@@ -129,6 +129,13 @@ async function collectPages(): Promise<Page[]> {
     const relative = path.relative(ROOT, file);
     const html = await readFile(file, 'utf-8');
 
+    // A noindex page is not part of the site's surface: it needs no canonical,
+    // no card, no sitemap entry and no line in llms.txt.
+    if (/<meta[^>]+name="robots"[^>]+content="[^"]*noindex/i.test(html)) {
+      console.log(`[og] skip ${relative} (noindex)`);
+      continue;
+    }
+
     const title = extract(html, /<title>([\s\S]*?)<\/title>/i);
     const url = extract(html, /<link[^>]+rel="canonical"[^>]+href="([^"]+)"/i);
     const description = extract(html, /<meta[^>]+name="description"[^>]+content="([^"]*)"/i);
