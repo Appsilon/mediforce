@@ -1,3 +1,36 @@
+/* Self-hosted so a page render needs no third-party request. Each family is
+   one variable file: the per-weight URLs Google serves are identical bytes,
+   so a weight range replaces five copies. Declared for the whole site
+   because @font-face only fetches what a page actually renders. */
+@font-face {
+  font-family: 'Inter';
+  src: url('fonts/Inter.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('fonts/SpaceGrotesk.woff2') format('woff2-variations');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Manrope';
+  src: url('fonts/Manrope.woff2') format('woff2-variations');
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('fonts/JetBrainsMono.woff2') format('woff2-variations');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 /*
  * mediforce.ai shared theme.
  *
