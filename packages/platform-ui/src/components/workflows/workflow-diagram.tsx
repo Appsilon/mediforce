@@ -31,7 +31,7 @@ import {
   type ControlMode,
   type NewStepPayload,
 } from '@/lib/control-mode';
-import { computeGraphLayout, NODE_WIDTH, COLUMN_GAP, ROW_GAP, type GraphEdge } from './workflow-graph-layout';
+import { computeGraphLayout, placeNewNodes, NODE_WIDTH, type GraphEdge } from './workflow-graph-layout';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -392,7 +392,7 @@ function shortenCondition(raw: string | undefined): string | undefined {
 /** Every path a step can take, in the order the definition declares them.
  *  Verdicts win over a plain transition to the same target, because the verdict
  *  carries the label a reader recognises. */
-function graphEdgesOf(definition: WorkflowDefinition): GraphEdge[] {
+export function graphEdgesOf(definition: WorkflowDefinition): GraphEdge[] {
   // A step whose branching is defined by verdicts also carries plain transitions
   // to the same targets — routing detail that would duplicate the verdict edges.
   const verdictSteps = new Set(
@@ -401,17 +401,24 @@ function graphEdgesOf(definition: WorkflowDefinition): GraphEdge[] {
 
   const edges: GraphEdge[] = [];
   const byKey = new Map<string, GraphEdge>();
+  // Labels per arrow are kept as whole names, never matched as substrings — with
+  // `approve_only` and `approve` on the same target, a substring test would drop
+  // one of the two paths the shared arrow is supposed to name.
+  const labelsByKey = new Map<string, string[]>();
   function add(from: string, to: string, label?: string) {
     const key = `${from}->${to}`;
+    const labels = labelsByKey.get(key) ?? [];
+    if (label !== undefined && labels.includes(label) === false) labels.push(label);
+    labelsByKey.set(key, labels);
+
+    // Two verdicts landing on the same step share one arrow — name both on it.
+    const joined = labels.length > 0 ? labels.join(' / ') : undefined;
     const existing = byKey.get(key);
     if (existing) {
-      // Two verdicts landing on the same step share one arrow — name both on it.
-      if (label && existing.label && existing.label.includes(label) === false) {
-        existing.label = `${existing.label} / ${label}`;
-      }
+      existing.label = joined;
       return;
     }
-    const edge = { from, to, label };
+    const edge = { from, to, label: joined };
     byKey.set(key, edge);
     edges.push(edge);
   }
@@ -677,65 +684,17 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
   // new node would otherwise land on top of it.
   useEffect(() => {
     setLocalNodes((prev) => {
-      const prevById = new Map(prev.map((n) => [n.id, n]));
-
-      const forwardEdges = layoutEdges.filter((e) => e.sourceHandle !== 'right-out');
-      const parentOf = new Map<string, string[]>();
-      const childOf = new Map<string, string[]>();
-      for (const e of forwardEdges) {
-        parentOf.set(e.target, [...(parentOf.get(e.target) ?? []), e.source]);
-        childOf.set(e.source, [...(childOf.get(e.source) ?? []), e.target]);
-      }
-
-      const heightById = new Map(computedNodes.map((n) => [n.id, nodeHeight(n)]));
-
-      const positioned = new Map<string, { x: number; y: number }>();
-      for (const n of prev) positioned.set(n.id, n.position);
-
-      const newIds = computedNodes.filter((n) => !prevById.has(n.id)).map((n) => n.id);
-      // Stagger new nodes that would otherwise land on the same anchor (multiple
-      // blocks added below one parent, or unconnected blocks that all default to
-      // buildLayout's origin) so each lands beside the previous instead of on top.
-      const NODE_STAGGER_X = NODE_WIDTH + COLUMN_GAP;
-      const placedForAnchor = new Map<string, number>();
-      for (const id of newIds) {
-        const parents = parentOf.get(id) ?? [];
-        const parentPos = parents.length === 1 ? positioned.get(parents[0]) : undefined;
-        const anchorKey = parents.length === 1 ? parents[0] : '__no-parent__';
-        const siblingIdx = placedForAnchor.get(anchorKey) ?? 0;
-        placedForAnchor.set(anchorKey, siblingIdx + 1);
-        if (parentPos) {
-          const parentHeight = heightById.get(parents[0]) ?? NODE_INNER_HEIGHT;
-          positioned.set(id, {
-            x: parentPos.x + siblingIdx * NODE_STAGGER_X,
-            y: parentPos.y + parentHeight + ROW_GAP,
-          });
-        } else {
-          const fresh = computedNodes.find((n) => n.id === id);
-          if (fresh) positioned.set(id, { x: fresh.position.x + siblingIdx * NODE_STAGGER_X, y: fresh.position.y });
-        }
-      }
-
-      // Push existing downstream nodes (e.g. the terminal step) out of the way
-      // if a newly-placed node now overlaps them.
-      for (const id of newIds) {
-        const newPos = positioned.get(id);
-        if (!newPos) continue;
-        const newBottom = newPos.y + (heightById.get(id) ?? NODE_INNER_HEIGHT);
-        for (const childId of childOf.get(id) ?? []) {
-          if (!prevById.has(childId)) continue;
-          const childPos = positioned.get(childId);
-          if (!childPos) continue;
-          const requiredY = newBottom + ROW_GAP;
-          if (childPos.y < requiredY) {
-            positioned.set(childId, { ...childPos, y: requiredY });
-          }
-        }
-      }
-
+      const anchored = (nodes: Node[]) => nodes.map((n) => ({ id: n.id, position: n.position, height: nodeHeight(n) }));
+      const positioned = placeNewNodes(
+        anchored(prev),
+        anchored(computedNodes),
+        layoutEdges
+          .filter((e) => e.sourceHandle !== 'right-out')
+          .map((e) => ({ from: e.source, to: e.target })),
+      );
       return computedNodes.map((n) => {
-        const pos = positioned.get(n.id);
-        return pos ? { ...n, position: pos } : n;
+        const position = positioned.get(n.id);
+        return position ? { ...n, position } : n;
       });
     });
   }, [computedNodes, layoutEdges]);

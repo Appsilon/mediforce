@@ -32,7 +32,7 @@ vi.mock('@xyflow/react', () => {
   };
 });
 
-import { WorkflowDiagram } from '../workflow-diagram';
+import { WorkflowDiagram, graphEdgesOf } from '../workflow-diagram';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 
 describe('StepNode (via WorkflowDiagram)', () => {
@@ -93,5 +93,30 @@ describe('StepNode (via WorkflowDiagram)', () => {
     render(<WorkflowDiagram definition={definition} />);
 
     expect(screen.getAllByText('Script').length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('graphEdgesOf', () => {
+  it('[UNIT] names both verdicts on the arrow they share, even when one name contains the other', () => {
+    const definition = buildWorkflowDefinition({
+      steps: [
+        {
+          id: 'review',
+          name: 'Review',
+          type: 'review',
+          executor: 'human',
+          verdicts: {
+            approve_only: { target: 'done' },
+            approve: { target: 'done' },
+          },
+        },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'review', to: 'done' }],
+    });
+
+    const shared = graphEdgesOf(definition).find((e) => e.from === 'review' && e.to === 'done');
+
+    expect(shared?.label).toBe('approve_only / approve');
   });
 });

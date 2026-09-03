@@ -87,6 +87,37 @@ export function retargetVerdictTargets(
 }
 
 /**
+ * Transitions after splicing `newId` in below `afterId`.
+ *
+ * `beforeId` names the single outgoing branch to split; that branch's `when`
+ * moves onto the edge into the new step, so a conditional path stays
+ * conditional and a multi-branch step keeps a condition on every outgoing edge.
+ * Without `beforeId` the new step takes over the whole outgoing fan, and each
+ * rewired edge carries its own condition with it.
+ */
+export function spliceStepIntoTransitions(
+  transitions: Transitions,
+  afterId: string,
+  beforeId: string | null,
+  newId: string,
+): Transitions {
+  if (beforeId !== null) {
+    const isSplit = (t: Transitions[number]) => t.from === afterId && t.to === beforeId;
+    const split = transitions.filter(isSplit);
+    const intoNew = split.length > 0
+      ? split.map((t) => ({ from: afterId, to: newId, ...(t.when !== undefined ? { when: t.when } : {}) }))
+      : [{ from: afterId, to: newId }];
+    return [...transitions.filter((t) => isSplit(t) === false), ...intoNew, { from: newId, to: beforeId }];
+  }
+  const outgoing = transitions.filter((t) => t.from === afterId);
+  return [
+    ...transitions.filter((t) => t.from !== afterId),
+    { from: afterId, to: newId },
+    ...outgoing.map((t) => ({ from: newId, to: t.to, ...(t.when !== undefined ? { when: t.when } : {}) })),
+  ];
+}
+
+/**
  * The step a deleted node's dangling verdicts should bridge to: the node's first
  * outgoing transition target, falling back to the terminal step. `undefined`
  * only when neither exists (nothing sensible to bridge to).

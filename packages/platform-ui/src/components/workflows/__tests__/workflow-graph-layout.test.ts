@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeGraphLayout, NODE_WIDTH, COLUMN_GAP } from '../workflow-graph-layout';
+import { computeGraphLayout, placeNewNodes, NODE_WIDTH, COLUMN_GAP } from '../workflow-graph-layout';
 
 const COLUMN_PITCH = NODE_WIDTH + COLUMN_GAP;
 const columnOf = (x: number) => Math.round(x / COLUMN_PITCH);
@@ -97,5 +97,55 @@ describe('computeGraphLayout', () => {
 
     expect(positions.size).toBe(2);
     expect(edges.filter((e) => e.isBack)).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// placeNewNodes
+// ---------------------------------------------------------------------------
+
+describe('placeNewNodes', () => {
+  const node = (id: string, x: number, y: number, height = 100) => ({ id, position: { x, y }, height });
+
+  it('[UNIT] anchors a new branch node clear of the sibling already in that column', () => {
+    // root -> A already on canvas; a block added on root -> B introduces B below root.
+    const previous = [node('root', 0, 0), node('a', 0, 158)];
+    const current = [...previous, node('b', 0, 0)];
+    const edges = [{ from: 'root', to: 'a' }, { from: 'root', to: 'b' }];
+
+    const positions = placeNewNodes(previous, current, edges);
+
+    expect(positions.get('b')?.y).toBe(158);
+    expect(columnOf(positions.get('b')?.x ?? 0)).toBe(1);
+    expect(positions.get('a')).toEqual({ x: 0, y: 158 });
+  });
+
+  it('[UNIT] keeps a step inserted into a path in line and pushes its successor down', () => {
+    const previous = [node('a', 0, 0), node('done', 0, 158)];
+    const current = [...previous, node('mid', 0, 0)];
+    const edges = [{ from: 'a', to: 'mid' }, { from: 'mid', to: 'done' }];
+
+    const positions = placeNewNodes(previous, current, edges);
+
+    expect(positions.get('mid')).toEqual({ x: 0, y: 158 });
+    expect(positions.get('done')).toEqual({ x: 0, y: 316 });
+  });
+
+  it('[UNIT] staggers several new nodes sharing one parent instead of stacking them', () => {
+    const previous = [node('root', 0, 0)];
+    const current = [...previous, node('x', 0, 0), node('y', 0, 0)];
+    const edges = [{ from: 'root', to: 'x' }, { from: 'root', to: 'y' }];
+
+    const positions = placeNewNodes(previous, current, edges);
+
+    expect(columnOf(positions.get('x')?.x ?? 0)).toBe(0);
+    expect(columnOf(positions.get('y')?.x ?? 0)).toBe(1);
+  });
+
+  it('[UNIT] leaves a dragged position alone', () => {
+    const previous = [node('root', 999, 42)];
+    const current = [node('root', 0, 0)];
+
+    expect(placeNewNodes(previous, current, []).get('root')).toEqual({ x: 999, y: 42 });
   });
 });

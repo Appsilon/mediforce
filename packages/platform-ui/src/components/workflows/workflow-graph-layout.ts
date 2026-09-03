@@ -210,3 +210,77 @@ export function computeGraphLayout(
 
   return { order, edges: placedEdges, positions, height: cursorY + CANVAS_PADDING };
 }
+
+/** A node as the canvas currently holds it: where it sits and how tall it is. */
+export type AnchoredNode = { id: string; position: { x: number; y: number }; height: number };
+
+function overlapsSomething(
+  x: number,
+  y: number,
+  height: number,
+  positioned: Map<string, { x: number; y: number }>,
+  heightById: Map<string, number>,
+  ignore: Set<string>,
+): boolean {
+  return [...positioned].some(([id, position]) => {
+    const otherHeight = heightById.get(id);
+    if (otherHeight === undefined || ignore.has(id) === true) return false;
+    return Math.abs(position.x - x) < NODE_WIDTH && position.y < y + height && y < position.y + otherHeight;
+  });
+}
+
+/**
+ * Positions for a re-rendered canvas. Nodes already on it keep whatever position
+ * the user dragged them to; each brand-new node is anchored below its parent and
+ * slides right until it finds a column nothing else occupies at that height — so
+ * a block added on one branch never lands on top of the branch beside it.
+ *
+ * The nodes the new one now feeds are exempt from that search and are pushed
+ * down instead, which keeps a step inserted mid-path in line with that path.
+ */
+export function placeNewNodes(
+  previous: AnchoredNode[],
+  current: AnchoredNode[],
+  forwardEdges: GraphEdge[],
+): Map<string, { x: number; y: number }> {
+  const previousIds = new Set(previous.map((node) => node.id));
+  const heightById = new Map(current.map((node) => [node.id, node.height]));
+  const parentsOf = new Map<string, string[]>();
+  const childrenOf = new Map<string, string[]>();
+  for (const edge of forwardEdges) {
+    parentsOf.set(edge.to, [...(parentsOf.get(edge.to) ?? []), edge.from]);
+    childrenOf.set(edge.from, [...(childrenOf.get(edge.from) ?? []), edge.to]);
+  }
+
+  const positioned = new Map(previous.map((node) => [node.id, node.position]));
+  const newNodes = current.filter((node) => previousIds.has(node.id) === false);
+
+  for (const node of newNodes) {
+    const parents = parentsOf.get(node.id) ?? [];
+    const parentPosition = parents.length === 1 ? positioned.get(parents[0]) : undefined;
+    const anchor = parentPosition
+      ? { x: parentPosition.x, y: parentPosition.y + (heightById.get(parents[0]) ?? node.height) + ROW_GAP }
+      : node.position;
+    const ignore = new Set(childrenOf.get(node.id) ?? []);
+    let x = anchor.x;
+    while (overlapsSomething(x, anchor.y, node.height, positioned, heightById, ignore) === true) {
+      x += NODE_WIDTH + COLUMN_GAP;
+    }
+    positioned.set(node.id, { x, y: anchor.y });
+  }
+
+  for (const node of newNodes) {
+    const placed = positioned.get(node.id);
+    if (placed === undefined) continue;
+    const requiredY = placed.y + node.height + ROW_GAP;
+    for (const childId of childrenOf.get(node.id) ?? []) {
+      if (previousIds.has(childId) === false) continue;
+      const childPosition = positioned.get(childId);
+      if (childPosition !== undefined && childPosition.y < requiredY) {
+        positioned.set(childId, { ...childPosition, y: requiredY });
+      }
+    }
+  }
+
+  return positioned;
+}

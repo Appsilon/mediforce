@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, nonGraphFieldsDiffer } from '../workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, nonGraphFieldsDiffer, spliceStepIntoTransitions } from '../workflow-editor-utils';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -260,5 +260,41 @@ describe('ensureTerminalConnected', () => {
     const result = ensureTerminalConnected(steps, transitions);
     // review step should NOT get a phantom transition to done
     expect(result.transitions.some((t) => t.from === 'review' && t.to === 'done')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spliceStepIntoTransitions
+// ---------------------------------------------------------------------------
+
+describe('spliceStepIntoTransitions', () => {
+  const branching = [
+    { from: 'pick', to: 'upload', when: 'output.choice == "upload"' },
+    { from: 'pick', to: 'build', when: 'output.choice == "demo"' },
+  ];
+
+  it('[UNIT] keeps the split branch condition on the edge into the new step', () => {
+    const result = spliceStepIntoTransitions(branching, 'pick', 'upload', 'confirm');
+
+    expect(result).toContainEqual({ from: 'pick', to: 'confirm', when: 'output.choice == "upload"' });
+    expect(result).toContainEqual({ from: 'confirm', to: 'upload' });
+    // The branch that was not split is untouched, so every path out of `pick`
+    // still carries a condition.
+    expect(result).toContainEqual(branching[1]);
+    expect(result.filter((t) => t.from === 'pick').every((t) => t.when !== undefined)).toBe(true);
+  });
+
+  it('[UNIT] carries every condition over when the new step takes the whole outgoing', () => {
+    const result = spliceStepIntoTransitions(branching, 'pick', null, 'confirm');
+
+    expect(result).toContainEqual({ from: 'pick', to: 'confirm' });
+    expect(result).toContainEqual({ from: 'confirm', to: 'upload', when: 'output.choice == "upload"' });
+    expect(result).toContainEqual({ from: 'confirm', to: 'build', when: 'output.choice == "demo"' });
+  });
+
+  it('[UNIT] leaves an unconditional split unconditional', () => {
+    const result = spliceStepIntoTransitions([tr('a', 'b')], 'a', 'b', 'mid');
+
+    expect(result).toEqual([{ from: 'a', to: 'mid' }, { from: 'mid', to: 'b' }]);
   });
 });
