@@ -268,6 +268,24 @@ never starts a container. A Version is **agent-capable** only when it has
 `bash` and either agent CLI; an unavailable daemon or timed-out probe is
 explicitly `unknown`, which remains selectable without a suitability claim.
 
+**Lineage** *(of an Image Catalog Version)*:
+The ancestry relation between images, computed from `RootFS.Layers` prefix
+containment — image X descends from image P exactly when X's layer array starts
+with the whole of P's — never parsed from a `FROM` string, so it holds for
+images the platform did not build. Recomputed on every read; nothing about it
+is stored.
+
+**Base** *(of an Image Catalog Entry or Version)*:
+The nearest ancestor **in the same namespace's catalog**, or `none` for a root.
+Nearest, not the root of the tree: an image built on one that is itself
+catalogued names the closer of the two, and the catalog view groups entries
+under it, roots first. Nothing is special-cased — an entry for `python3.12-slim`
+collects everything built on it exactly as the golden image collects the
+workflow images. A **layer summary** is the steps a Version adds over its base,
+cut at that boundary and read off `docker history` with build-arg values
+redacted; it is never "the Dockerfile" — no file contents, no comments, no
+multi-stage.
+
 **Intent** *(of an Image Catalog Entry)*:
 The single required human sentence: what the image is *for* — "R-based
 interactive exploration of ADaM datasets". Not a description of its contents;

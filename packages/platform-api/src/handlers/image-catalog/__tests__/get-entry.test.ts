@@ -57,6 +57,34 @@ describe('getImageCatalogEntry handler', () => {
     ]);
   });
 
+  it('names a base that is another entry — resolved against the whole catalog, not this row', async () => {
+    const { scope, id } = await seedEntry();
+    const { entry: golden } = await createImageCatalogEntry(
+      {
+        namespace: 'alpha',
+        name: 'Golden image',
+        intent: 'The deployment agent-capable base image',
+        source: { kind: 'referenced', reference: 'mediforce-golden-image' },
+      },
+      scope,
+    );
+    daemon.value = daemonWith([
+      builtImage({ baseImageId: 'sha-g' }),
+      builtImage({
+        repository: 'mediforce-golden-image',
+        tag: 'latest',
+        id: 'sha-g',
+        buildRepo: undefined,
+        buildDockerfile: undefined,
+      }),
+    ]);
+
+    const { entry } = await getImageCatalogEntry({ namespace: 'alpha', id }, scope);
+
+    expect(entry.baseEntryId).toBe(golden.id);
+    expect(entry.versions[0].lineage.base?.imageTag).toBe('mediforce-golden-image:latest');
+  });
+
   it('still returns an entry whose image is gone from the daemon, marked absent', async () => {
     const { scope, id } = await seedEntry();
     daemon.value = EMPTY_DAEMON;

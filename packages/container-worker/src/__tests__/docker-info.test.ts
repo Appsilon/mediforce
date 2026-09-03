@@ -39,10 +39,12 @@ describe('listImages', () => {
 
     const result = await listImages();
 
-    expect(result).toEqual([
+    expect(result).toMatchObject([
       { repository: 'mediforce/agent', tag: 'latest', id: 'abc123', size: '1.2GB', created: '2 days ago' },
       { repository: 'node', tag: '20-slim', id: 'def456', size: '200MB', created: '3 weeks ago' },
     ]);
+    // Neither is descended from the other, so neither names a base.
+    expect(result.map((image) => image.baseImageId)).toEqual([undefined, undefined]);
     expect(mockExecFile).toHaveBeenCalledWith('docker', ['images', '--format', '{{json .}}']);
   });
 
@@ -56,7 +58,7 @@ describe('listImages', () => {
       })}`,
     );
 
-    expect(await listImages()).toEqual([
+    expect(await listImages()).toMatchObject([
       {
         repository: 'mediforce-built',
         tag: '0a1b2c3d4e5f',
@@ -70,6 +72,26 @@ describe('listImages', () => {
         buildNamespace: undefined,
       },
     ]);
+  });
+
+  it('names the base each image descends from, by layer prefix', async () => {
+    const layer = (name: string) => `sha256:${name}`;
+    mockDocker(
+      [
+        JSON.stringify({ Repository: 'mediforce-agent', Tag: 'tealflow', ID: 'bbb000000000', Size: '7GB', CreatedSince: '1 day ago' }),
+        JSON.stringify({ Repository: 'mediforce-golden-image', Tag: 'latest', ID: 'aaa000000000', Size: '6GB', CreatedSince: '2 days ago' }),
+      ].join('\n'),
+      [
+        `bbb000000000\t${JSON.stringify({ 'mediforce.build.commit': 'abc123' })}\t${JSON.stringify([layer('a'), layer('b')])}`,
+        `aaa000000000\t${JSON.stringify(null)}\t${JSON.stringify([layer('a')])}`,
+      ].join('\n'),
+    );
+
+    const [derived, golden] = await listImages();
+
+    expect(derived.baseImageId).toBe('aaa000000000');
+    expect(derived.ownLabels).toEqual({ 'mediforce.build.commit': 'abc123' });
+    expect(golden.baseImageId).toBeUndefined();
   });
 
   it('lists images unannotated when the label inspect fails', async () => {

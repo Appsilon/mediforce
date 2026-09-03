@@ -10,13 +10,16 @@ last_reviewed: 2026-09-02
 **Deciders:** Krystian Zieliński
 **Epic:** [#1292](https://github.com/Appsilon/mediforce/issues/1292) — Step Image Catalog
 
-**Built so far: decision 1 and the parts of decisions 2 and 3 that the entry
-model carries.** #1294 landed `image_catalog_entries`, the source-derived key,
-the required `intent`, `unknown` as a state, the workspace-member write gate,
-the handlers, the contract, the route adapters and `mediforce images`. Still
-paper: capabilities (#1295), lineage (#1296), the catalog view (#1297), and the
-step-editor picker (#1298) — which still reads the Docker daemon exactly as it
-does today. Read the decisions below as the six those PRs may not relitigate.
+**Built so far: decision 1, and decision 2 apart from the Dockerfile-from-git
+preference.** #1294 landed `image_catalog_entries`, the source-derived key, the
+required `intent`, `unknown` as a state, the workspace-member write gate, the
+handlers, the contract, the route adapters and `mediforce images`; #1295 landed
+probed capabilities; #1296 landed lineage — the base computed from
+`RootFS.Layers` prefix containment, the layer delta cut at that boundary, the
+label delta, and the catalog view grouped by base. Still paper: the catalog view
+(#1297) and the step-editor picker (#1298) — which still reads the Docker daemon
+exactly as it does today. Read the decisions below as the six those PRs may not
+relitigate.
 This ADR becomes `finalized` in the PR closing the last issue of the epic.
 
 ## Context

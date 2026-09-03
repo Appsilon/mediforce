@@ -6,7 +6,8 @@ import type {
   UpdateImageCatalogEntryOutput,
 } from '../../contract/image-catalog';
 import { actorFromCaller } from '../_helpers';
-import { toEntryViews } from './_view';
+import { getDockerInfo } from '../system/get-docker-info';
+import { toEntryView } from './_view';
 import { refreshEntryCapabilities } from './_capabilities';
 
 export async function updateImageCatalogEntry(
@@ -21,10 +22,13 @@ export async function updateImageCatalogEntry(
     throw new NotFoundError(`Image catalog entry '${id}' not found`);
   }
 
+  // One daemon read for the whole write: the probe and the response view ask
+  // the same questions of it.
+  const daemon = await getDockerInfo({}, scope);
   // `source` is not in the patch schema: it is the key the id derives from, so
   // an entry that changed it would be a different entry wearing an old id.
   const entry = await scope.imageCatalog.upsert(namespace, { ...existing, ...patch, id });
-  const refreshedEntry = await refreshEntryCapabilities(namespace, entry, scope);
+  const refreshedEntry = await refreshEntryCapabilities(namespace, entry, scope, daemon);
 
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
@@ -40,6 +44,5 @@ export async function updateImageCatalogEntry(
     namespace,
   });
 
-  const [view] = await toEntryViews([refreshedEntry], scope);
-  return { entry: view };
+  return { entry: await toEntryView(namespace, refreshedEntry, scope, daemon) };
 }

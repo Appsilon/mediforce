@@ -24,6 +24,11 @@ interface VersionView {
   capabilities:
     | { status: 'unknown' }
     | { status: 'known'; agentCapable: boolean; runtimes: string[] };
+  lineage: {
+    base: { entryId: string; imageId: string; imageTag: string } | null;
+    ownLabels: Record<string, string>;
+    addedSteps?: { command: string; size: string }[];
+  };
 }
 
 interface EntryView {
@@ -33,6 +38,7 @@ interface EntryView {
   source: { kind: string; repo?: string; dockerfile?: string; reference?: string };
   versions: VersionView[];
   availability: 'present' | 'absent' | 'unknown';
+  baseEntryId: string | null;
 }
 
 /** The image the capability probe runs against: `alpine` has a shell and none
@@ -42,6 +48,24 @@ const PROBE_BASE_IMAGE = 'alpine:3.22';
 
 function docker(...args: string[]): void {
   execFileSync('docker', args, { stdio: 'pipe' });
+}
+
+/**
+ * Derive `tag` from `from` by running one command and committing the result.
+ *
+ * `docker commit` rather than `docker build`: it adds exactly one real
+ * filesystem layer — which is what lineage matches on — in about a second and
+ * without occupying BuildKit. Every test in this suite reads the same daemon
+ * on every request, so a journey that keeps it busy times its neighbours out.
+ */
+function deriveImage(tag: string, from: string, command: string): void {
+  const container = `mediforce-e2e-lineage-${tag.replace(/[^a-z0-9]/gi, '-')}`;
+  docker('run', '--name', container, from, ...command.split(' '));
+  try {
+    docker('commit', container, tag);
+  } finally {
+    docker('rm', '-f', container);
+  }
 }
 
 function dockerAvailable(): boolean {
@@ -69,11 +93,26 @@ function entryPayload(suffix: string) {
   };
 }
 
+// One worker, in order: every test here reads the same Docker daemon through
+// `docker images` / `system df` / `image inspect`, and this one also commits
+// two images. Run concurrently they starve each other, and the failure lands on
+// whichever neighbour was mid-request. Not `serial` — a failure must not skip
+// the rest of the file.
+test.describe.configure({ mode: 'default' });
+
 test.describe('image catalog API journey', () => {
   let callers: MultiNamespaceFixture;
 
   test.beforeAll(async () => {
     callers = await setupMultiNamespaceCallers();
+  });
+
+  test.beforeEach(() => {
+    // Every request here reads the Docker daemon server-side — `docker images`,
+    // `docker system df` and `docker image inspect`, seconds of shelling out
+    // per call — and the CRUD journey below makes six of them in a row. The
+    // default 30s is a timing assertion nobody meant to write.
+    test.setTimeout(90_000);
   });
 
   test('CRUD round-trip: create, list scoped, read, update, delete', async ({ request }) => {
@@ -192,6 +231,73 @@ test.describe('image catalog API journey', () => {
       headers: apiKeyHeaders(),
     });
     docker('rmi', `${reference}:v1`);
+  });
+
+  test('a derived image is grouped under the entry it was built on', async ({ request }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    const stamp = Date.now();
+    const baseReference = `mediforce-e2e-base-${stamp}`;
+    const derivedReference = `mediforce-e2e-derived-${stamp}`;
+    try {
+      docker('image', 'inspect', PROBE_BASE_IMAGE);
+    } catch {
+      docker('pull', PROBE_BASE_IMAGE);
+    }
+    // Both images are this test's own: a tag would share `alpine`'s image id
+    // with the probe journey's image, and one id cannot belong to two entries.
+    deriveImage(`${baseReference}:v1`, PROBE_BASE_IMAGE, 'mkdir /base-marker');
+    deriveImage(`${derivedReference}:v1`, `${baseReference}:v1`, 'mkdir /derived-marker');
+
+    // Catalogued derivative-first, so an order that comes out right cannot be
+    // insertion order.
+    const created: string[] = [];
+    for (const [name, reference] of [
+      ['E2E derived image', derivedReference],
+      ['E2E base image', baseReference],
+    ]) {
+      const res = await request.post(catalogUrl(), {
+        headers: apiKeyHeaders(),
+        data: {
+          name,
+          intent: 'Proves lineage is computed from layers, not from a FROM string',
+          source: { kind: 'referenced', reference },
+        },
+      });
+      expect(res.status(), await res.text()).toBe(201);
+      created.push(((await res.json()) as { entry: EntryView }).entry.id);
+    }
+    const [derivedId, baseId] = created;
+
+    const listRes = await request.get(catalogUrl(), { headers: apiKeyHeaders() });
+    const { entries } = (await listRes.json()) as { entries: EntryView[] };
+    const derived = entries.find((entry) => entry.id === derivedId);
+    const base = entries.find((entry) => entry.id === baseId);
+    expect(derived?.baseEntryId).toBe(baseId);
+    // Not asserted a root: `alpine` beneath it may be catalogued by a sibling
+    // journey, and resolving to that would be the *nearest* base rule working.
+    expect(base?.baseEntryId).not.toBe(derivedId);
+    // Grouped: the base is listed before what was built on it.
+    expect(entries.findIndex((entry) => entry.id === baseId)).toBeLessThan(
+      entries.findIndex((entry) => entry.id === derivedId),
+    );
+
+    const getRes = await request.get(`/api/image-catalog/${derivedId}?namespace=${TEST_ORG_HANDLE}`, {
+      headers: apiKeyHeaders(),
+    });
+    expect(getRes.ok(), await getRes.text()).toBe(true);
+    const [version] = ((await getRes.json()) as { entry: EntryView }).entry.versions;
+    expect(version.lineage.base?.imageTag).toBe(`${baseReference}:v1`);
+    // The delta is cut at the base boundary: what this image adds, and only
+    // that — the base's own step, and alpine's below it, stay out.
+    const commands = (version.lineage.addedSteps ?? []).map((step) => step.command);
+    expect(commands).toEqual(['mkdir /derived-marker']);
+
+    for (const id of created) {
+      await request.delete(`/api/image-catalog/${id}?namespace=${TEST_ORG_HANDLE}`, {
+        headers: apiKeyHeaders(),
+      });
+    }
+    docker('rmi', `${derivedReference}:v1`, `${baseReference}:v1`);
   });
 
   test('intent is rejected when empty, by the contract', async ({ request }) => {
