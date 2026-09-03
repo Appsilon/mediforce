@@ -1,0 +1,200 @@
+import { imageStepDelta, type ImageBuildStep } from '@mediforce/platform-core';
+import type { DockerImageInfo } from '../../contract/system';
+import type {
+  ImageCatalogEntryView,
+  ImageCatalogVersion,
+  ImageVersionLineage,
+} from '../../contract/image-catalog';
+import { fetchImageHistory } from '../system/_docker';
+import type { ResolvedVersion } from './_versions';
+
+/**
+ * Lineage, at the level the catalog reads it.
+ *
+ * The daemon listing has already done the exact part — every image row carries
+ * `baseImageId`, its nearest ancestor by `RootFS.Layers` prefix containment.
+ * What is left here is the catalog's question: which *entry* is the nearest
+ * ancestor, which is a walk up that chain until an image someone catalogued
+ * turns up. Nothing in here knows the golden image by name; an entry for
+ * `python3.12-slim` collects its derivatives exactly the same way.
+ */
+
+/** An entry view before lineage — what `_view.ts` can build without knowing
+ *  about the other entries. */
+export type EntryViewWithoutLineage = Omit<ImageCatalogEntryView, 'versions' | 'baseEntryId'> & {
+  versions: readonly ResolvedVersion[];
+};
+
+/** The images a namespace has catalogued, entry by entry — what a base is
+ *  resolved against. */
+export interface CataloguedImages {
+  id: string;
+  versions: readonly { imageId: string }[];
+}
+
+/** Entry id owning each catalogued image, by image id. Two entries *can* name
+ *  one daemon image — two references to the same pushed image — and the later
+ *  one in the catalog wins; the listing's order is stable, so the grouping is
+ *  too, and naming both would leave nothing to group under. */
+function entryIdByImageId(catalog: readonly CataloguedImages[]): Map<string, string> {
+  return new Map(
+    catalog.flatMap((entry) => entry.versions.map((version) => [version.imageId, entry.id])),
+  );
+}
+
+/**
+ * The nearest catalogued ancestor of an image, walking the daemon's chain.
+ *
+ * Each link is one image's immediate parent, so following them enumerates
+ * every ancestor on the daemon nearest-first; the first one somebody
+ * catalogued is the base. Walking rather than matching against the catalog
+ * directly is what makes an uncatalogued image in the middle — a rebuilt
+ * intermediate, a dangling layer — a hop instead of a wall.
+ */
+function nearestCatalogAncestor(
+  imageId: string,
+  imagesById: ReadonlyMap<string, DockerImageInfo>,
+  catalogued: ReadonlyMap<string, string>,
+  selfEntryId: string,
+): { entryId: string; image: DockerImageInfo } | null {
+  const seen = new Set<string>([imageId]);
+  let current = imagesById.get(imageId)?.baseImageId;
+
+  while (current !== undefined && !seen.has(current)) {
+    seen.add(current);
+    const entryId = catalogued.get(current);
+    const image = imagesById.get(current);
+    // An entry is not its own base: two versions of one entry are two builds
+    // of one source, and grouping an entry under itself would say nothing.
+    if (entryId !== undefined && entryId !== selfEntryId && image !== undefined) {
+      return { entryId, image };
+    }
+    current = image?.baseImageId;
+  }
+
+  return null;
+}
+
+function versionLineage(
+  version: ResolvedVersion,
+  entryId: string,
+  imagesById: ReadonlyMap<string, DockerImageInfo>,
+  catalogued: ReadonlyMap<string, string>,
+): ImageVersionLineage {
+  const ancestor = nearestCatalogAncestor(version.imageId, imagesById, catalogued, entryId);
+  return {
+    base:
+      ancestor === null
+        ? null
+        : {
+            entryId: ancestor.entryId,
+            imageId: ancestor.image.id,
+            imageTag: `${ancestor.image.repository}:${ancestor.image.tag}`,
+          },
+    ownLabels: imagesById.get(version.imageId)?.ownLabels ?? {},
+  };
+}
+
+/**
+ * Resolve every entry's base, and every version's, from the daemon listing.
+ *
+ * `catalog` is the whole namespace's catalog, which is not always the entries
+ * being annotated: a base is *another entry*, so a single-entry read that only
+ * knew about itself would report every entry a root.
+ *
+ * Free of daemon calls: the layers were read once for the listing and the rest
+ * is arithmetic, which is why lineage runs on every read rather than being
+ * cached the way capabilities are (ADR-0021 decision 2).
+ */
+export function resolveCatalogLineage(
+  entries: readonly EntryViewWithoutLineage[],
+  images: readonly DockerImageInfo[],
+  catalog: readonly CataloguedImages[] = entries,
+): ImageCatalogEntryView[] {
+  const imagesById = new Map(images.map((image) => [image.id, image]));
+  const catalogued = entryIdByImageId(catalog);
+
+  return entries.map((entry) => {
+    const versions: ImageCatalogVersion[] = entry.versions.map((version) => ({
+      ...version,
+      lineage: versionLineage(version, entry.id, imagesById, catalogued),
+    }));
+    return {
+      ...entry,
+      versions,
+      // The newest version speaks for the entry: it is the build an author is
+      // about to pick, and the daemon lists newest first.
+      baseEntryId: versions[0]?.lineage.base?.entryId ?? null,
+    };
+  });
+}
+
+/**
+ * Order entries so each one follows the entry it was built on, roots first.
+ *
+ * Depth-first from every root, preserving the incoming order within a group,
+ * so the catalog reads as the tree it is — "the golden image, then everything
+ * built on it" — instead of as unrelated rows. An entry whose base is missing
+ * from this listing is a root here; a cycle, which layer containment makes
+ * impossible, would leave its members at the end rather than dropping them.
+ */
+export function orderByLineage(entries: readonly ImageCatalogEntryView[]): ImageCatalogEntryView[] {
+  const byId = new Map(entries.map((entry) => [entry.id, entry]));
+  const children = new Map<string, ImageCatalogEntryView[]>();
+  for (const entry of entries) {
+    if (entry.baseEntryId === null || !byId.has(entry.baseEntryId)) continue;
+    children.set(entry.baseEntryId, [...(children.get(entry.baseEntryId) ?? []), entry]);
+  }
+
+  const ordered: ImageCatalogEntryView[] = [];
+  const emitted = new Set<string>();
+
+  const emit = (entry: ImageCatalogEntryView): void => {
+    if (emitted.has(entry.id)) return;
+    emitted.add(entry.id);
+    ordered.push(entry);
+    for (const child of children.get(entry.id) ?? []) emit(child);
+  };
+
+  for (const entry of entries) {
+    if (entry.baseEntryId === null || !byId.has(entry.baseEntryId)) emit(entry);
+  }
+  for (const entry of entries) emit(entry);
+
+  return ordered;
+}
+
+/**
+ * Attach each version's layer delta — the steps it adds over its base.
+ *
+ * One `docker history` call per distinct image, which is why this runs on a
+ * single-entry read and not on the listing: an entry accumulates a version per
+ * build, and a workspace's whole catalog would be a call per version on every
+ * page load. A daemon that cannot answer leaves the steps absent, never an
+ * error (ADR-0021 decision 2).
+ */
+export async function withBuildSteps(
+  entry: ImageCatalogEntryView,
+): Promise<ImageCatalogEntryView> {
+  const history = new Map<string, ImageBuildStep[]>();
+  const stepsFor = async (imageTag: string): Promise<ImageBuildStep[]> => {
+    const cached = history.get(imageTag);
+    if (cached !== undefined) return cached;
+    const steps = await fetchImageHistory(imageTag);
+    history.set(imageTag, steps);
+    return steps;
+  };
+
+  const versions: ImageCatalogVersion[] = [];
+  for (const version of entry.versions) {
+    const steps = await stepsFor(version.imageTag);
+    const baseSteps =
+      version.lineage.base === null ? [] : await stepsFor(version.lineage.base.imageTag);
+    versions.push({
+      ...version,
+      lineage: { ...version.lineage, addedSteps: imageStepDelta(steps, baseSteps) },
+    });
+  }
+
+  return { ...entry, versions };
+}

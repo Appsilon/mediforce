@@ -7,9 +7,10 @@ import type {
   CreateImageCatalogEntryOutput,
 } from '../../contract/image-catalog';
 import { actorFromCaller } from '../_helpers';
+import { getDockerInfo } from '../system/get-docker-info';
 import { canonicalizeSource, deriveImageCatalogEntryId } from './_source';
 import { refreshEntryCapabilities } from './_capabilities';
-import { toEntryViews } from './_view';
+import { toEntryView } from './_view';
 
 export async function createImageCatalogEntry(
   input: CreateImageCatalogEntryInputApi,
@@ -41,8 +42,11 @@ export async function createImageCatalogEntry(
     );
   }
 
+  // One daemon read for the whole write: the probe and the response view
+  // ask the same questions of it.
+  const daemon = await getDockerInfo({}, scope);
   const entry = await scope.imageCatalog.upsert(namespace, parsed.data);
-  const refreshedEntry = await refreshEntryCapabilities(namespace, entry, scope);
+  const refreshedEntry = await refreshEntryCapabilities(namespace, entry, scope, daemon);
 
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
@@ -58,6 +62,5 @@ export async function createImageCatalogEntry(
     namespace,
   });
 
-  const [view] = await toEntryViews([refreshedEntry], scope);
-  return { entry: view };
+  return { entry: await toEntryView(namespace, refreshedEntry, scope, daemon) };
 }

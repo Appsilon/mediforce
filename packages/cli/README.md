@@ -40,7 +40,10 @@ names are close enough to be worth stating: `images` is the per-namespace
 **Image Catalog** — the images a workspace offers for steps, one row per source
 with a sentence saying what each is for ([ADR-0021](../../docs/adr/0021-image-catalog.md)).
 `system images` is the raw, deployment-wide Docker daemon listing an admin uses
-to hunt disk, `postgres` and dangling layers included.
+to hunt disk, `postgres` and dangling layers included. `images list` indents each
+entry under the one its images were built on — computed from image layers, not
+from a `FROM` string — and `images show` prints, per version, that base and the
+layer summary the version adds over it.
 
 ## Rules
 

@@ -6,15 +6,22 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
   imageCapabilityProbeArgs,
-  imageLabelsInspectArgs,
+  imageHistoryArgs,
+  imageInspectArgs,
   IMAGE_CAPABILITY_PROBE_TIMEOUT_MS,
+  IMAGE_HISTORY_TIMEOUT_MS,
+  ImageBuildStepSchema,
   ImageCapabilitiesSchema,
   parseImageCapabilities,
-  parseImageProvenance,
+  parseImageHistory,
+  parseImageInspect,
+  readProvenanceLabels,
+  resolveImageLineage,
   shortImageId,
   unknownImageCapabilities,
+  type ImageBuildStep,
   type ImageCapabilities,
-  type ReadImageProvenance,
+  type InspectedImage,
 } from '@mediforce/platform-core';
 import {
   DockerDiskInfoSchema,
@@ -37,19 +44,19 @@ export function isLocalAgentMode(): boolean {
 }
 
 /**
- * Build provenance for each image, keyed by short id.
+ * Labels and layers for each image, keyed by short id.
  *
  * A failure — an image removed between the two calls, an old daemon — leaves
  * every row unannotated instead of failing the listing.
  */
-async function fetchProvenance(
+async function fetchInspected(
   exec: (file: string, args: readonly string[]) => Promise<{ stdout: string; stderr: string }>,
   imageIds: readonly string[],
-): Promise<Map<string, ReadImageProvenance>> {
+): Promise<Map<string, InspectedImage>> {
   if (imageIds.length === 0) return new Map();
   try {
-    const { stdout } = await exec('docker', imageLabelsInspectArgs(imageIds));
-    return parseImageProvenance(stdout);
+    const { stdout } = await exec('docker', imageInspectArgs(imageIds));
+    return parseImageInspect(stdout);
   } catch {
     return new Map();
   }
@@ -126,6 +133,64 @@ export async function probeImageCapabilities(image: string): Promise<ImageCapabi
     : probeContainerWorkerImageCapabilities(image);
 }
 
+export interface FetchImageHistoryOptions {
+  readonly exec?: (
+    file: string,
+    args: readonly string[],
+    options?: { timeout: number },
+  ) => Promise<{ stdout: string; stderr: string }>;
+  readonly fetch?: typeof globalThis.fetch;
+  readonly baseUrl?: string;
+}
+
+export async function fetchLocalImageHistory(
+  image: string,
+  options: FetchImageHistoryOptions = {},
+): Promise<ImageBuildStep[]> {
+  const exec = options.exec ?? ((file, args, execOptions) =>
+    execFileAsync(file, [...args], execOptions) as Promise<{ stdout: string; stderr: string }>);
+  try {
+    const { stdout } = await exec('docker', imageHistoryArgs(image), {
+      timeout: IMAGE_HISTORY_TIMEOUT_MS,
+    });
+    return parseImageHistory(stdout);
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchContainerWorkerImageHistory(
+  image: string,
+  options: FetchImageHistoryOptions = {},
+): Promise<ImageBuildStep[]> {
+  const fetchImpl = options.fetch ?? globalThis.fetch;
+  const baseUrl =
+    options.baseUrl ?? process.env.CONTAINER_WORKER_URL ?? DEFAULT_CONTAINER_WORKER_URL;
+  try {
+    const response = await fetchImpl(`${baseUrl}/images/${encodeURIComponent(image)}/history`);
+    if (!response.ok) return [];
+    const parsed = z.array(ImageBuildStepSchema).safeParse(await response.json());
+    return parsed.success ? parsed.data : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * An image's layer summary, or nothing at all.
+ *
+ * Unlike the capability probe this starts no container — it reads metadata the
+ * daemon already holds — which is why the worker leaves it ungated alongside
+ * the other listings and why it can run on an ordinary read. A daemon that
+ * cannot answer yields no steps rather than an error: an entry whose summary
+ * is unavailable still renders (ADR-0021 decision 2).
+ */
+export async function fetchImageHistory(image: string): Promise<ImageBuildStep[]> {
+  return isLocalAgentMode()
+    ? fetchLocalImageHistory(image)
+    : fetchContainerWorkerImageHistory(image);
+}
+
 /** Shell out to `docker images` + `docker system df` and normalise the output. */
 export async function fetchFromLocalDocker(
   options: FetchFromLocalDockerOptions = {},
@@ -144,18 +209,23 @@ export async function fetchFromLocalDocker(
     rawImages.length === 0 ? [] : rawImages.split('\n').map((line) => JSON.parse(line));
 
   // One id can carry several tags — inspect each only once.
-  const provenance = await fetchProvenance(exec, [
+  const inspected = await fetchInspected(exec, [
     ...new Set(parsedRows.map((row: { ID: string }) => row.ID)),
   ]);
+  const lineage = resolveImageLineage(inspected);
 
-  const rawImageList = parsedRows.map((parsed) => ({
-    repository: parsed.Repository,
-    tag: parsed.Tag,
-    id: parsed.ID,
-    size: parsed.Size,
-    created: parsed.CreatedSince,
-    ...provenance.get(shortImageId(parsed.ID)),
-  }));
+  const rawImageList = parsedRows.map((parsed) => {
+    const id = shortImageId(parsed.ID);
+    return {
+      repository: parsed.Repository,
+      tag: parsed.Tag,
+      id: parsed.ID,
+      size: parsed.Size,
+      created: parsed.CreatedSince,
+      ...readProvenanceLabels(inspected.get(id)?.labels),
+      ...lineage.get(id),
+    };
+  });
 
   const diskRows = diskResult.stdout
     .trim()

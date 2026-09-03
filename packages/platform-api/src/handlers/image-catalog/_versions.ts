@@ -9,6 +9,11 @@ import type {
   ImageCatalogVersion,
 } from '../../contract/image-catalog';
 
+/** A version before lineage: everything one image row says about itself.
+ *  Lineage is the one fact that needs the *other* entries, so it is attached
+ *  in `_lineage.ts` once they are all resolved. */
+export type ResolvedVersion = Omit<ImageCatalogVersion, 'lineage'>;
+
 /** A daemon row belongs to a built entry when its build labels name the same
  *  source. A step that named no Dockerfile carries no `mediforce.build.dockerfile`
  *  label at all — the builders label the value `deriveBuildTag` hashed, which is
@@ -34,7 +39,7 @@ export function resolveEntryVersions(
   source: ImageCatalogSource,
   images: readonly DockerImageInfo[],
   capabilities: ImageCapabilityCache = {},
-): ImageCatalogVersion[] {
+): ResolvedVersion[] {
   const matched =
     source.kind === 'built'
       ? images.filter((image) => matchesBuilt(image, source.repo, source.dockerfile))

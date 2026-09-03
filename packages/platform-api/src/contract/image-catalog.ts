@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  ImageBuildStepSchema,
   ImageCatalogDeclaredSourceSchema,
   ImageCatalogEntrySchema,
   ImageCatalogSourceSchema,
@@ -7,6 +8,39 @@ import {
 } from '@mediforce/platform-core';
 
 const NamespaceQuery = z.object({ namespace: z.string().min(1) });
+
+/** The catalog entry a version was built on, resolved by layer containment. */
+export const ImageCatalogVersionBaseSchema = z.object({
+  /** Entry owning the base image — what the catalog view groups under. */
+  entryId: z.string(),
+  imageId: z.string(),
+  imageTag: z.string(),
+});
+
+/** What one version was built on and what it adds, computed from layers. */
+export const ImageVersionLineageSchema = z.object({
+  /**
+   * The version's nearest ancestor **in this namespace's catalog**, or `null`
+   * for a root. Nearest, not the root of the tree: an image built on one that
+   * is itself catalogued names the closer of the two.
+   */
+  base: ImageCatalogVersionBaseSchema.nullable(),
+  /**
+   * The labels this image sets itself, its immediate ancestor's stripped out —
+   * the only form in which `org.opencontainers.image.source` can be trusted,
+   * since Docker inherits labels indistinguishably.
+   */
+  ownLabels: z.record(z.string(), z.string()),
+  /**
+   * The build steps this image adds over its base, oldest first.
+   *
+   * **A layer summary, never "the Dockerfile"**: no file contents, no
+   * comments, no formatting, no multi-stage, and `<missing>` for every
+   * intermediate id. Absent — not empty — on list reads, where computing it
+   * would cost a `docker history` call per version; `GET` one entry to get it.
+   */
+  addedSteps: z.array(ImageBuildStepSchema).optional(),
+});
 
 /** One built artifact of an entry's source, as the daemon currently holds it.
  *  Recomputed on every read — see `handlers/image-catalog/_versions.ts`. */
@@ -27,6 +61,7 @@ export const ImageCatalogVersionSchema = z.object({
   /** Cached probe result. Unknown means the image was not probed or the
    * daemon could not complete the bounded probe; it is never a render error. */
   capabilities: ImageCapabilitiesSchema,
+  lineage: ImageVersionLineageSchema,
 });
 
 /** Present, absent, or unknown. Unknown means the daemon could not be reached,
@@ -37,6 +72,13 @@ export const ImageCatalogAvailabilitySchema = z.enum(['present', 'absent', 'unkn
 export const ImageCatalogEntryViewSchema = ImageCatalogEntrySchema.extend({
   versions: z.array(ImageCatalogVersionSchema),
   availability: ImageCatalogAvailabilitySchema,
+  /**
+   * The entry this one's images are built on, or `null` for a root — the
+   * grouping key of the catalog view. Taken from the entry's newest version,
+   * since that is the one an author is about to pick; an older version built
+   * on something else keeps its own `lineage.base`.
+   */
+  baseEntryId: z.string().nullable(),
 });
 
 export const ListImageCatalogEntriesInputSchema = NamespaceQuery;
@@ -91,6 +133,8 @@ export const DeleteImageCatalogEntryOutputSchema = z.object({
   success: z.literal(true),
 });
 
+export type ImageCatalogVersionBase = z.infer<typeof ImageCatalogVersionBaseSchema>;
+export type ImageVersionLineage = z.infer<typeof ImageVersionLineageSchema>;
 export type ImageCatalogVersion = z.infer<typeof ImageCatalogVersionSchema>;
 export type ImageCatalogAvailability = z.infer<typeof ImageCatalogAvailabilitySchema>;
 export type ImageCatalogEntryView = z.infer<typeof ImageCatalogEntryViewSchema>;
