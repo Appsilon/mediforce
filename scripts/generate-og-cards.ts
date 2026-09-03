@@ -11,6 +11,7 @@
  * `scripts/assets/fonts/` for the same reason: no network in the build.
  */
 
+import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -312,6 +313,22 @@ async function main() {
   // exists for, and nothing else would notice.
   // A Sitemap: line was silently dropped from robots.txt once already, and with
   // Cloudflare's managed file disabled this is the only thing serving the path.
+  // nav.js and theme.css are cached for four hours at the edge, and the pages
+  // that depend on them are not. A stale nav.js paired with fresh HTML prepends
+  // a second header to every page, which is what shipping without this did.
+  for (const asset of ['nav.js', 'theme.css']) {
+    const bytes = await readFile(path.join(DOCS, asset));
+    const want = createHash('sha256').update(bytes).digest('hex').slice(0, 8);
+    for (const page of pages) {
+      const html = await readFile(path.join(ROOT, page.file), 'utf-8');
+      const found = html.match(new RegExp(`${asset.replace('.', '\\.')}\\?v=([0-9a-f]{8})`));
+      if (found === null) throw new Error(`${page.file}: ${asset} has no ?v= cache key`);
+      if (found[1] !== want) {
+        throw new Error(`${page.file}: ${asset}?v=${found[1]} but the file hashes to ${want}`);
+      }
+    }
+  }
+
   const robots = await readFile(path.join(DOCS, ROBOTS), 'utf-8');
   for (const sitemap of ['/sitemap.xml', '/docs/sitemap.xml']) {
     if (robots.includes(`Sitemap: https://mediforce.ai${sitemap}`) === false) {
