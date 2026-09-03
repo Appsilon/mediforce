@@ -50,6 +50,37 @@ describe('StepNode (via WorkflowDiagram)', () => {
     expect(screen.getByText('Assist')).toBeInTheDocument();
   });
 
+  it('[RENDER] both sides of a decision are on the canvas at once', () => {
+    const definition = buildWorkflowDefinition({
+      steps: [
+        {
+          id: 'pick-data',
+          name: 'Pick Data',
+          type: 'decision',
+          executor: 'human',
+          verdicts: {
+            use_demo: { target: 'build', label: 'Use Demo Data' },
+            upload_data: { target: 'upload', label: 'Upload My Own Data' },
+          },
+        },
+        { id: 'upload', name: 'Upload Data', type: 'creation', executor: 'human' },
+        { id: 'build', name: 'Build App', type: 'creation', executor: 'agent', autonomyLevel: 'L4' },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [
+        { from: 'pick-data', to: 'upload' },
+        { from: 'pick-data', to: 'build' },
+        { from: 'upload', to: 'build' },
+        { from: 'build', to: 'done' },
+      ],
+    });
+
+    render(<WorkflowDiagram definition={definition} />);
+
+    expect(screen.getByText('Upload Data')).toBeInTheDocument();
+    expect(screen.getByText('Build App')).toBeInTheDocument();
+  });
+
   it('[RENDER] script step nodes show Script executor label', () => {
     const definition = buildWorkflowDefinition({
       steps: [
