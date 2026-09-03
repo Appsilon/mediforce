@@ -6,7 +6,7 @@ import { routes } from '@/lib/routes';
 export function WorkspaceAdministrationSection({ handle }: { handle: string }) {
   const entries = [
     {
-      href: `/${handle}/admin/infrastructure`,
+      href: routes.adminInfrastructure(handle),
       title: 'Infrastructure',
       description: 'Docker images and disk usage',
     },
