@@ -18,6 +18,19 @@ const AVAILABILITY_NOTE: Record<ImageCatalogEntryView['availability'], string> =
   unknown: '  (daemon unreachable)',
 };
 
+/** Two spaces per level of lineage, so the shelf reads as the tree it is. */
+function indentFor(entry: ImageCatalogEntryView, byId: Map<string, ImageCatalogEntryView>): string {
+  let depth = 0;
+  let current = entry.baseEntryId;
+  const seen = new Set<string>([entry.id]);
+  while (current !== null && !seen.has(current)) {
+    seen.add(current);
+    depth += 1;
+    current = byId.get(current)?.baseEntryId ?? null;
+  }
+  return '  '.repeat(depth);
+}
+
 function describeSource(entry: ImageCatalogEntryView): string {
   return entry.source.kind === 'built'
     ? `${entry.source.repo}${entry.source.dockerfile === '' ? '' : ` · ${entry.source.dockerfile}`}`
@@ -41,11 +54,15 @@ export const imagesListCommand = defineCommand({
       return 0;
     }
     output.stdout(`Image catalog for "${args.namespace}" (${String(result.entries.length)}):\n`);
+    // The handler returns roots first with each derivative behind its base;
+    // indenting is all that is left to make the grouping visible (#1296).
+    const byId = new Map(result.entries.map((entry) => [entry.id, entry]));
     for (const entry of result.entries) {
-      output.stdout(`  ${entry.id}  ${entry.name}`);
-      output.stdout(`    ${entry.intent}`);
+      const indent = indentFor(entry, byId);
+      output.stdout(`${indent}  ${entry.id}  ${entry.name}`);
+      output.stdout(`${indent}    ${entry.intent}`);
       output.stdout(
-        `    ${describeSource(entry)}  ·  ${String(entry.versions.length)} version(s)${AVAILABILITY_NOTE[entry.availability]}`,
+        `${indent}    ${describeSource(entry)}  ·  ${String(entry.versions.length)} version(s)${AVAILABILITY_NOTE[entry.availability]}`,
       );
     }
     return 0;
@@ -99,6 +116,19 @@ export const imagesShowCommand = defineCommand({
       output.stdout(
         `    ${version.imageTag}  ${version.commit ?? '—'}  ${version.size}  ${version.created}`,
       );
+      const { base, addedSteps } = version.lineage;
+      output.stdout(`      Base:  ${base === null ? 'none (root)' : base.imageTag}`);
+      if (addedSteps !== undefined && addedSteps.length > 0) {
+        // Never "the Dockerfile": no file contents, no comments, no
+        // multi-stage — the layers this image adds over its base, and nothing
+        // more (#1296).
+        output.stdout(
+          `      Layer summary${base === null ? '' : ' over the base'} (${String(addedSteps.length)} steps):`,
+        );
+        for (const step of addedSteps) {
+          output.stdout(`        ${step.size.padStart(8)}  ${step.command}`);
+        }
+      }
     }
     return 0;
   },

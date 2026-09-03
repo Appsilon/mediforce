@@ -23,6 +23,24 @@ export const DockerImageInfoSchema = z.object({
   buildWorkflow: z.string().optional(),
   /** Namespace owning that definition (`mediforce.build.namespace`). */
   buildNamespace: z.string().optional(),
+  /**
+   * The image's nearest ancestor on this daemon, by `RootFS.Layers` prefix
+   * containment — exact, and computed rather than parsed out of a `FROM`
+   * string. Absent for a root: an image whose base is not on this daemon looks
+   * the same as one built from scratch, and the listing does not pretend to
+   * tell them apart.
+   */
+  baseImageId: z.string().optional(),
+  /**
+   * The labels this image sets itself, its base's stripped out. Docker copies
+   * a base's labels onto every child, so the raw set cannot be read as
+   * provenance — a local image of ours carries rocker's
+   * `org.opencontainers.image.source` until we override it.
+   *
+   * Absent, like the fields above it, when the listing could not inspect the
+   * image — an image removed between the two calls, an old daemon.
+   */
+  ownLabels: z.record(z.string(), z.string()).optional(),
 });
 
 export const DockerDiskInfoSchema = z.object({

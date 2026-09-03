@@ -97,13 +97,63 @@ describe('fetchFromLocalDocker', () => {
       buildNamespace: 'acme',
     });
     // An image we did not build lists unannotated rather than dropping out.
-    expect(result.images[1]).toEqual({
+    expect(result.images[1]).toMatchObject({
       repository: 'postgres',
       tag: '17',
       id: 'def456abc123',
       size: '667MB',
       created: '1 week ago',
     });
+    expect(result.images[1].buildRepo).toBeUndefined();
+    expect(result.images[1].ownLabels).toEqual({});
+  });
+
+  it('annotates each row with the base it descends from and the labels it owns', async () => {
+    const base = 'sha256:aaa000000000000000000000000000000000000000000000000000000000';
+    const child = 'sha256:bbb000000000000000000000000000000000000000000000000000000000';
+    const layer = (name: string) => `sha256:${name}`;
+    const exec = async (file: string, args: readonly string[]) => {
+      if (args[0] === 'images') {
+        return {
+          stdout: [
+            JSON.stringify({ Repository: 'mediforce-agent', Tag: 'tealflow', ID: 'bbb000000000', Size: '7GB', CreatedSince: '1 day ago' }),
+            JSON.stringify({ Repository: 'mediforce-golden-image', Tag: 'latest', ID: 'aaa000000000', Size: '6GB', CreatedSince: '2 days ago' }),
+          ].join('\n'),
+          stderr: '',
+        };
+      }
+      if (args[0] === 'image') {
+        return {
+          stdout: [
+            `${base}\t${JSON.stringify({ 'org.opencontainers.image.source': 'https://github.com/rocker-org/rocker-versioned2' })}\t${JSON.stringify([layer('a'), layer('b')])}`,
+            `${child}\t${JSON.stringify({
+              'org.opencontainers.image.source': 'https://github.com/rocker-org/rocker-versioned2',
+              'mediforce.build.commit': 'abc123',
+            })}\t${JSON.stringify([layer('a'), layer('b'), layer('c')])}`,
+          ].join('\n'),
+          stderr: '',
+        };
+      }
+      return {
+        stdout: [
+          JSON.stringify({ Type: 'Images', TotalCount: '2', Size: '13GB' }),
+          JSON.stringify({ Type: 'Containers', TotalCount: '0', Active: '0', Size: '0B' }),
+          JSON.stringify({ Type: 'Build Cache', TotalCount: '0', Size: '0B' }),
+        ].join('\n'),
+        stderr: '',
+      };
+    };
+
+    const result = await fetchFromLocalDocker({ exec });
+    expect(result.available).toBe(true);
+    if (!result.available) throw new Error('unreachable');
+
+    const [derived, golden] = result.images;
+    expect(derived.baseImageId).toBe('aaa000000000');
+    expect(golden.baseImageId).toBeUndefined();
+    // The rocker label is the base's claim, inherited verbatim; only the commit
+    // is this image's own, which is what makes `.source` safe to read (#1296).
+    expect(derived.ownLabels).toEqual({ 'mediforce.build.commit': 'abc123' });
   });
 
   it('lists images unannotated when the label inspect fails', async () => {
