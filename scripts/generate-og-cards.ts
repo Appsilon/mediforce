@@ -145,6 +145,15 @@ async function collectPages(): Promise<Page[]> {
       ['og:title', extract(html, /<meta[^>]+property="og:title"[^>]+content="([^"]*)"/i), title],
       ['twitter:title', extract(html, /<meta[^>]+name="twitter:title"[^>]+content="([^"]*)"/i), title],
     ];
+    const topic = title.replace(/\s*\|\s*Mediforce\s*$/, '').trim();
+    for (const tag of ['og:image:alt', 'twitter:image:alt'] as const) {
+      const attr = tag.startsWith('og:') ? 'property' : 'name';
+      mustMatch.push([
+        tag,
+        extract(html, new RegExp(`<meta[^>]+${attr}="${tag}"[^>]+content="([^"]*)"`, 'i')),
+        `${topic} — Mediforce social card`,
+      ]);
+    }
     if (description !== null) {
       mustMatch.push([
         'og:description',
