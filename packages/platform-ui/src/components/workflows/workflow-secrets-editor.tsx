@@ -46,6 +46,7 @@ export function WorkflowSecretsEditor({ namespace, workflowName, requiredKeys }:
   const [secrets, setSecrets] = React.useState<SecretRow[]>([]);
   const [workspaceKeys, setWorkspaceKeys] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [dirty, setDirty] = React.useState(false);
   const [revealedIndices, setRevealedIndices] = React.useState<Set<number>>(new Set());
@@ -57,6 +58,7 @@ export function WorkflowSecretsEditor({ namespace, workflowName, requiredKeys }:
   React.useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError(null);
     // Workspace secrets satisfy a `{{KEY}}` reference too, so a key already set
     // there must not come back as a "needed" row here. Best-effort: the tab's
     // own secrets must still render when that second read fails.
@@ -75,7 +77,11 @@ export function WorkflowSecretsEditor({ namespace, workflowName, requiredKeys }:
       })
       .catch((error) => {
         if (cancelled) return;
+        // Save is an atomic replace of the whole set. Editing against a set we
+        // failed to read would delete every secret this read never loaded, so
+        // the editor refuses to render until the authoritative read succeeds.
         console.error('Failed to load workflow secrets:', error);
+        setLoadError(error instanceof Error ? error.message : 'Unknown error');
         setLoading(false);
       });
     return () => { cancelled = true; };
@@ -84,25 +90,37 @@ export function WorkflowSecretsEditor({ namespace, workflowName, requiredKeys }:
   // Prepopulating leaves the form clean: an untouched needed row is a prompt,
   // not an edit, so Save stays hidden until the user types a value.
   React.useEffect(() => {
-    if (loading || !requiredKeys || requiredKeys.length === 0) return;
+    if (loading || loadError !== null || !requiredKeys || requiredKeys.length === 0) return;
+    const required = new Set(requiredKeys);
+    const satisfiedElsewhere = new Set(workspaceKeys);
+    // A stored key whose value is empty is not configured — the runtime rejects
+    // `''` — so it is a prompt like any prepopulated row, not a satisfied one.
+    const isPrompt = (row: SecretRow) =>
+      required.has(row.key) && row.value === '' && !satisfiedElsewhere.has(row.key);
     setSecrets((prev) => {
-      const covered = new Set([...prev.map((row) => row.key), ...workspaceKeys]);
-      const toAdd = requiredKeys.filter((key) => !covered.has(key));
-      if (toAdd.length === 0) return prev;
-      return [...prev, ...toAdd.map((key) => ({ key, value: '', needed: true }))];
+      const present = new Set(prev.map((row) => row.key));
+      const toAdd = requiredKeys.filter((key) => !present.has(key) && !satisfiedElsewhere.has(key));
+      const toMark = prev.some((row) => isPrompt(row) && row.needed !== true);
+      if (toAdd.length === 0 && toMark === false) return prev;
+      return [
+        ...prev.map((row) => (isPrompt(row) ? { ...row, needed: true } : row)),
+        ...toAdd.map((key) => ({ key, value: '', needed: true })),
+      ];
     });
-  }, [loading, requiredKeys, workspaceKeys]);
+  }, [loading, loadError, requiredKeys, workspaceKeys]);
 
   const handleSave = async () => {
     setSaving(true);
     setSaveMessage(null);
     try {
       const record: Record<string, string> = {};
-      for (const { key, value, needed } of secrets) {
+      for (const { key, value } of secrets) {
         const trimmedKey = key.trim();
-        // An untouched prepopulated row is a prompt, not a secret — storing it
-        // empty would silence the very warning that put it there.
-        if (trimmedKey === '' || (needed === true && value === '')) continue;
+        // A key with no value is not a secret — the runtime rejects `''` — but
+        // storing it would still satisfy the "is this key configured" check and
+        // silence the very warning that put the row there. Drop it whatever the
+        // row's provenance: prepopulated, hand-typed, or pasted as `KEY=`.
+        if (trimmedKey === '' || value === '') continue;
         record[trimmedKey] = value;
       }
       await mediforce.workflowSecrets.save({ namespace, workflow: workflowName, secrets: record });
@@ -150,6 +168,18 @@ export function WorkflowSecretsEditor({ namespace, workflowName, requiredKeys }:
         <div className="h-4 w-32 rounded bg-muted" />
         <div className="h-10 rounded bg-muted" />
         <div className="h-10 rounded bg-muted" />
+      </div>
+    );
+  }
+
+  if (loadError !== null) {
+    return (
+      <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+        <Info className="h-4 w-4 mt-0.5 shrink-0" />
+        <span>
+          Could not load this workflow&apos;s secrets ({loadError}). Editing is disabled — saving now would
+          replace every configured secret with the ones this page failed to read. Reload to try again.
+        </span>
       </div>
     );
   }
@@ -275,7 +305,9 @@ export function WorkflowSecretsEditor({ namespace, workflowName, requiredKeys }:
                 for (const entry of bulkPreview) {
                   const idx = merged.findIndex((s) => s.key === entry.key);
                   if (idx >= 0) {
-                    merged[idx] = entry; // overwrite existing
+                    // Spread over the row so an import of `KEY=` keeps the
+                    // `needed` marker and stays flagged as unfilled.
+                    merged[idx] = { ...merged[idx], ...entry };
                   } else {
                     merged.push(entry);
                   }

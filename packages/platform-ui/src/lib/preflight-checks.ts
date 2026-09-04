@@ -14,7 +14,7 @@ export interface PreflightWarning {
   actions: PreflightAction[];
 }
 
-const TEMPLATE_RE = /^\{\{(?:[A-Z]+:)?([A-Za-z0-9_-]+)\}\}$/;
+const TEMPLATE_RE = /^\{\{(?:([A-Z]+):)?([A-Za-z0-9_-]+)\}\}$/;
 
 export interface SecretReference {
   key: string;
@@ -43,7 +43,12 @@ export function collectSecretReferences(definition: WorkflowDefinition): SecretR
     for (const [varName, value] of Object.entries(env)) {
       const match = TEMPLATE_RE.exec(value);
       if (match === null) continue;
-      const key = match[1];
+      const [, namespace, key] = match;
+      // `{{OAUTH:provider}}` names an OAuth binding, not a secret: the runtime
+      // injects that token through the MCP auth config and `resolveValue`
+      // throws on the namespace, so a secret row called `provider` could never
+      // satisfy the reference.
+      if (namespace === 'OAUTH') continue;
       const existing = references.get(key);
       if (existing) { existing.stepNames.push(step.name); }
       else { references.set(key, { key, envVar: varName, stepNames: [step.name] }); }

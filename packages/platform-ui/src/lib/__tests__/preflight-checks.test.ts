@@ -303,6 +303,11 @@ describe('collectSecretReferences', () => {
     expect(collectSecretReferences(wd)).toEqual([]);
   });
 
+  it('ignores OAUTH templates, which no secret row can satisfy', () => {
+    const wd = makeDefinition({ env: { GITHUB_TOKEN: '{{OAUTH:github}}', API_KEY: '{{SECRET:my_key}}' } });
+    expect(collectSecretReferences(wd).map((r) => r.key)).toEqual(['my_key']);
+  });
+
   it('returns nothing for a definition without steps', () => {
     const wd = buildWorkflowDefinition({ name: 'test-wf' });
     // @ts-expect-error — a stale bundle can deliver a definition without steps
