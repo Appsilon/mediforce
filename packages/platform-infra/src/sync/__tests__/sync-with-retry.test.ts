@@ -35,23 +35,31 @@ function makeFakeModel(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** Stubs both OpenRouter feeds; the first `modelsFailures` catalogue calls throw. */
+function stubOpenRouter(modelsFailures = 0) {
+  let remaining = modelsFailures;
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    if (String(input).includes('/rankings/')) {
+      return new Response(JSON.stringify({ data: [] }), { status: 200 });
+    }
+    if (remaining > 0) {
+      remaining -= 1;
+      throw new Error(`network error ${String(modelsFailures - remaining)}`);
+    }
+    return new Response(JSON.stringify({ data: [makeFakeModel()] }), { status: 200 });
+  });
+}
+
 describe('syncWithRetry', () => {
   it('succeeds on first attempt', async () => {
-    const fakeResponse = { data: [makeFakeModel()] };
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify(fakeResponse), { status: 200 }),
-    );
+    stubOpenRouter();
     const result = await syncWithRetry(makeRepo(), { maxRetries: 3, intervalMs: 10 });
     expect(result.synced).toBe(1);
     vi.restoreAllMocks();
   });
 
   it('retries after failure and succeeds on third attempt', async () => {
-    const fakeResponse = { data: [makeFakeModel()] };
-    vi.spyOn(globalThis, 'fetch')
-      .mockRejectedValueOnce(new Error('network error 1'))
-      .mockRejectedValueOnce(new Error('network error 2'))
-      .mockResolvedValueOnce(new Response(JSON.stringify(fakeResponse), { status: 200 }));
+    stubOpenRouter(2);
 
     const result = await syncWithRetry(makeRepo(), { maxRetries: 3, intervalMs: 10 });
     expect(result.synced).toBe(1);

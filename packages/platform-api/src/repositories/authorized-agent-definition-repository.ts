@@ -29,10 +29,18 @@ export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
       ? this.raw.getById(id)
       : this.raw.getByIdVisibleTo(id, [...this.caller.namespaces]);
 
-  list = async (): Promise<AgentDefinition[]> =>
-    this.caller.isSystemActor
+  /**
+   * `namespace` is a client-supplied *filter*, never a grant: `narrowToMemberships`
+   * intersects it with what the caller may read, so a non-member asking for
+   * someone else's workspace is left with the public agents alone rather than
+   * that workspace's private roster.
+   */
+  list = async (namespace?: string): Promise<AgentDefinition[]> => {
+    if (namespace !== undefined) return this.raw.listVisibleTo(this.narrowToMemberships([namespace]));
+    return this.caller.isSystemActor
       ? this.raw.listAll()
       : this.raw.listVisibleTo([...this.caller.namespaces]);
+  };
 
   create = async (input: CreateAgentDefinitionInput): Promise<AgentDefinition> => {
     // The namespace field is optional and only gates when supplied.

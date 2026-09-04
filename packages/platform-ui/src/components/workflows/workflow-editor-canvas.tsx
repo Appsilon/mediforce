@@ -27,7 +27,7 @@ import { StepEditor } from './workflow-editor/step-editor';
 import { ModelPicker } from './workflow-editor/model-picker';
 import { selectBase } from './workflow-editor/step-editor-fields';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
-import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, nonGraphFieldsDiffer } from './workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, nonGraphFieldsDiffer, spliceStepIntoTransitions } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
@@ -366,16 +366,9 @@ export function WorkflowEditorCanvas({
         next.splice(insertIdx + 1, 0, newStep);
         return next;
       });
-      setEditedTransitions((prev) => {
-        if (insertBeforeId) {
-          const others = prev.filter((t) => !(t.from === resolvedInsertAfterId && t.to === insertBeforeId));
-          return [...others, { from: resolvedInsertAfterId, to: newId }, { from: newId, to: insertBeforeId }];
-        }
-        const outgoing = prev.filter((t) => t.from === resolvedInsertAfterId);
-        const others = prev.filter((t) => t.from !== resolvedInsertAfterId);
-        const rewired = outgoing.map((t) => ({ from: newId, to: t.to }));
-        return [...others, { from: resolvedInsertAfterId, to: newId }, ...rewired];
-      });
+      setEditedTransitions((prev) =>
+        spliceStepIntoTransitions(prev, resolvedInsertAfterId, insertBeforeId ?? null, newId),
+      );
     } else {
       const terminalIdx = editedSteps.findIndex((s) => s.id === terminalStep.id);
       setEditedSteps((prev) => {

@@ -8,10 +8,12 @@ function parseContext(label: string): number {
   return label.endsWith('M') ? amount * 1_000_000 : amount * 1000;
 }
 
-// The registry holds more than the seeded models: the boot-time OpenRouter sync
-// (`eagerSyncIfStale`) writes the live catalogue into the same database. Every
-// assertion therefore targets an exact seeded cell, and none of them depend on
-// the registry's size or on which other models happen to be present.
+// The E2E servers run with `ENABLE_MODEL_SYNC=false` (see playwright.config.ts),
+// so nothing writes a live OpenRouter catalogue into this database behind the
+// test. The seeded models are then the only ranked ones, which is what keeps
+// them on page one of a table that pages at 50 rows sorted by popularity — a
+// live ranking put ~400 models above them. Assertions still target exact
+// seeded cells, so a catalogue left over from a dev run changes nothing.
 test.describe('Model Registry Journey', () => {
   test('user browses model registry, filters by provider and capabilities', async ({ page }) => {
     trackPageErrors(page);

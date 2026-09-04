@@ -19,7 +19,7 @@ import type {
   ProcessNotificationConfig,
 } from '@mediforce/platform-core';
 import type { Selection, TaskVerdict } from '@mediforce/platform-core';
-import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts, interpolate, toProcessDefinition } from '@mediforce/platform-core';
+import { normalizeSelection, buildTaskVerdicts, interpolate, toProcessDefinition } from '@mediforce/platform-core';
 import { validateStepGraph } from '@mediforce/platform-core';
 import { StepExecutor, type StepActor } from './step-executor';
 import { RoutingError, InvalidTransitionError, ParentInstanceNotFoundError } from './errors';
@@ -59,7 +59,6 @@ export class WorkflowEngine {
     private readonly processRepository: ProcessRepository,
     private readonly instanceRepository: ProcessInstanceRepository,
     private readonly auditRepository: AuditRepository,
-    private readonly rbacService?: RbacService,          // optional: Phase 4 RBAC enforcement
     private readonly handoffRepository?: HandoffRepository, // optional: Phase 4 handoff creation on escalation
     private readonly notificationService?: NotificationService, // optional: escalation notifications
     private readonly humanTaskRepository?: HumanTaskRepository, // optional: Phase 4.1 HumanTask creation on human step advance
@@ -171,36 +170,6 @@ export class WorkflowEngine {
 
     const definition = await this.loadDefinitionUnified(instance);
     const workflowStep = definition.steps.find((s) => s.id === instance.currentStepId);
-
-    // RBAC enforcement: check step access before executing
-    if (this.rbacService && workflowStep?.allowedRoles) {
-      try {
-        await this.rbacService.requireStepAccess(
-          workflowStep.allowedRoles,
-          instance.currentStepId!,
-        );
-      } catch (err) {
-        if (err instanceof RbacError) {
-          await this.auditRepository.append({
-            actorId: err.userId,
-            actorType: 'user',
-            actorRole: 'unknown',
-            action: 'rbac.access_denied',
-            description: `Unauthorized access attempt on step '${err.stepId}'`,
-            timestamp: new Date().toISOString(),
-            inputSnapshot: { stepId: err.stepId, requiredRoles: err.requiredRoles },
-            outputSnapshot: { userRoles: err.userRoles },
-            basis: 'RBAC enforcement: user lacks required role',
-            entityType: 'processInstance',
-            entityId: instanceId,
-            processInstanceId: instanceId,
-            stepId: err.stepId,
-          });
-          throw err;
-        }
-        throw err;
-      }
-    }
 
     // Handoff creation: when agent escalates, create HandoffEntity before pausing
     if (agentRunResult?.status === 'escalated' && this.handoffRepository) {

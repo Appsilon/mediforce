@@ -4,10 +4,19 @@ import { NextRequest } from 'next/server';
 const mockTransferNamespace = vi.fn();
 const mockTriggerTransfer = vi.fn();
 const mockAuditAppend = vi.fn();
+const mockSetWorkflowAccess = vi.fn();
+/** No gate configured — the state every workflow is in until an admin sets one. */
+const mockGetWorkflowAccess = vi.fn().mockResolvedValue({ run: [], edit: [] });
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
-    processRepo: { transferWorkflowNamespace: mockTransferNamespace },
+    processRepo: {
+      transferWorkflowNamespace: mockTransferNamespace,
+      // ADR-0019 cascade: the gates stay in the source workspace, where the
+      // role names mean the people they were granted to.
+      setWorkflowAccess: mockSetWorkflowAccess,
+      getWorkflowAccess: mockGetWorkflowAccess,
+    },
     triggerRepo: { transferWorkflowNamespace: mockTriggerTransfer },
     auditRepo: { append: mockAuditAppend },
     namespaceRepo: {},

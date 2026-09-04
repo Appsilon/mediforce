@@ -131,7 +131,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      undefined, // no rbacService
       handoffRepo,
       notificationService,
     );
@@ -177,7 +176,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      undefined,
       handoffRepo,
       notificationService,
     );
@@ -209,7 +207,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      undefined, // no rbacService
       undefined, // no handoffRepository
       undefined, // no notificationService
     );
@@ -241,7 +238,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      undefined,
       handoffRepo,
       notificationService,
       undefined, // humanTaskRepository
@@ -277,7 +273,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      undefined,
       handoffRepo,
       notificationService,
     );
@@ -305,7 +300,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      undefined,
       handoffRepo,
       notificationService,
     );
@@ -342,7 +336,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      undefined,
       handoffRepo,
       notificationService,
       undefined,
@@ -370,7 +363,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      undefined,
       handoffRepo,
       notificationService,
       undefined, // humanTaskRepository
@@ -408,7 +400,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      undefined,
       handoffRepo,
       failingNotificationService,
       undefined,
@@ -441,7 +432,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      undefined,
       handoffRepo,
       notificationService,
       undefined,

@@ -5,7 +5,11 @@ import {
   WorkflowSourceSchema,
   WorkflowDefinitionVersionAlreadyExistsError,
   WorkflowDefinitionVersionNotFoundError,
+  WorkflowAccessSchema,
+  OPEN_WORKFLOW_ACCESS,
+  isOpenWorkflowAccess,
   type ProcessRepository,
+  type WorkflowAccess,
   type WorkflowDefinition,
   type WorkflowDefinitionGroup,
   type WorkflowDefinitionListResult,
@@ -16,6 +20,7 @@ import {
   workflowDefinitions,
   workflowMeta,
 } from '../schema/workflow-definition';
+import { workflowAccess } from '../schema/workflow-access';
 import { processInstances } from '../schema/process-instance';
 
 /**
@@ -319,6 +324,74 @@ export class PostgresProcessRepository implements ProcessRepository {
           rows.map((r) => r.id),
         ),
       );
+  }
+
+  async getWorkflowAccess(namespace: string, name: string): Promise<WorkflowAccess> {
+    const rows = await this.db
+      .select({ runRoles: workflowAccess.runRoles, editRoles: workflowAccess.editRoles })
+      .from(workflowAccess)
+      .where(and(eq(workflowAccess.workspace, namespace), eq(workflowAccess.name, name)))
+      .limit(1);
+    const row = rows[0];
+    if (row === undefined) return OPEN_WORKFLOW_ACCESS;
+    // Parse on read like every other repository here (ADR-0001 pattern 2): the
+    // columns are jsonb, so a hand-edited row must not reach the gate as
+    // something other than two arrays of strings. An unparseable row is an
+    // absent one — a broken gate must not lock a workspace out of its own
+    // workflow.
+    const parsed = WorkflowAccessSchema.safeParse({ run: row.runRoles, edit: row.editRoles });
+    return parsed.success ? parsed.data : OPEN_WORKFLOW_ACCESS;
+  }
+
+  async listWorkflowAccess(
+    namespaces: readonly string[],
+  ): Promise<Map<string, WorkflowAccess>> {
+    if (namespaces.length === 0) return new Map();
+    const rows = await this.db
+      .select({
+        workspace: workflowAccess.workspace,
+        name: workflowAccess.name,
+        runRoles: workflowAccess.runRoles,
+        editRoles: workflowAccess.editRoles,
+      })
+      .from(workflowAccess)
+      .where(inArray(workflowAccess.workspace, [...namespaces]));
+
+    const found = new Map<string, WorkflowAccess>();
+    for (const row of rows) {
+      const parsed = WorkflowAccessSchema.safeParse({ run: row.runRoles, edit: row.editRoles });
+      if (parsed.success) found.set(`${row.workspace}:${row.name}`, parsed.data);
+    }
+    return found;
+  }
+
+  async setWorkflowAccess(
+    namespace: string,
+    name: string,
+    access: WorkflowAccess,
+  ): Promise<void> {
+    // Access granting nothing is stored as no row, so "any workspace member"
+    // has one representation whether it was never set or just cleared. This is
+    // also the delete / transfer cascade's only call.
+    if (isOpenWorkflowAccess(access)) {
+      await this.db
+        .delete(workflowAccess)
+        .where(and(eq(workflowAccess.workspace, namespace), eq(workflowAccess.name, name)));
+      return;
+    }
+
+    await this.db
+      .insert(workflowAccess)
+      .values({
+        workspace: namespace,
+        name,
+        runRoles: access.run,
+        editRoles: access.edit,
+      })
+      .onConflictDoUpdate({
+        target: [workflowAccess.workspace, workflowAccess.name],
+        set: { runRoles: access.run, editRoles: access.edit, updatedAt: new Date() },
+      });
   }
 
   async setWorkflowDeleted(

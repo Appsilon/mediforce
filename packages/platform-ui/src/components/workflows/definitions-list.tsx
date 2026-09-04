@@ -8,6 +8,8 @@ import { VersionLabel } from '@/components/ui/version-label';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
 
 interface DefinitionsListProps {
   workflowName: string;
@@ -17,6 +19,10 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
   const handle = useHandleFromPath();
   const { versions: definitions, latestVersion, defaultVersion, loading, refreshDefault } = useWorkflowVersions(workflowName, handle);
   const [showArchived, setShowArchived] = React.useState(false);
+  // ADR-0019 `edit`: editing a version, making one the default and archiving
+  // one are all the same verb as deleting the workflow. Greyed out with the
+  // reason rather than hidden, so a member knows there is a role to ask for.
+  const { mayEdit, reason: editReason } = useWorkflowEditGate(handle, workflowName);
   const [archivingVersion, setArchivingVersion] = React.useState<number | null>(null);
 
   const archivedCount = definitions.filter((d) => d.archived === true).length;
@@ -39,13 +45,19 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
         <p className="text-sm text-muted-foreground">
           No definitions found.
         </p>
-        <Link
-          href={`/${handle}/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-          Create first definition
-        </Link>
+        <InstantTooltip label={editReason}>
+          <Link
+            href={`/${handle}/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
+            aria-disabled={!mayEdit}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors',
+              !mayEdit && 'opacity-50 pointer-events-none',
+            )}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Create first definition
+          </Link>
+        </InstantTooltip>
       </div>
     );
   }
@@ -73,13 +85,19 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
             </button>
           )}
         </div>
-        <Link
-          href={`/${handle}/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-          Edit
-        </Link>
+        <InstantTooltip label={editReason}>
+          <Link
+            href={`/${handle}/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
+            aria-disabled={!mayEdit}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors',
+              !mayEdit && 'opacity-50 pointer-events-none',
+            )}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </Link>
+        </InstantTooltip>
       </div>
 
       <div className="rounded-lg border divide-y">
@@ -140,12 +158,14 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                         refreshDefault();
                       }
                     }}
-                    disabled={!canSetDefault}
+                    disabled={!canSetDefault || !mayEdit}
                     className={cn(
                       'text-[11px] whitespace-nowrap transition-colors',
-                      canSetDefault
-                        ? 'text-muted-foreground/60 hover:text-foreground md:opacity-0 md:group-hover:opacity-100'
-                        : 'invisible',
+                      !canSetDefault
+                        ? 'invisible'
+                        : mayEdit
+                          ? 'text-muted-foreground/60 hover:text-foreground md:opacity-0 md:group-hover:opacity-100'
+                          : 'text-muted-foreground/40 cursor-not-allowed md:opacity-0 md:group-hover:opacity-100',
                     )}
                   >
                     Make default
@@ -169,14 +189,20 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                       setArchivingVersion(null);
                     }
                   }}
-                  disabled={isArchiving || isDefault}
-                  title={isDefault ? 'Cannot archive the default version' : isArchived ? 'Unarchive this version' : 'Archive this version'}
+                  disabled={isArchiving || isDefault || !mayEdit}
+                  title={
+                    isDefault
+                      ? 'Cannot archive the default version'
+                      : !mayEdit
+                        ? editReason
+                        : isArchived ? 'Unarchive this version' : 'Archive this version'
+                  }
                   className={cn(
                     'rounded-md p-1 transition-colors',
                     isDefault
                       ? 'invisible'
-                      : isArchiving
-                        ? 'opacity-50 pointer-events-none'
+                      : isArchiving || !mayEdit
+                        ? 'opacity-50 pointer-events-none md:group-hover:opacity-50'
                         : 'text-muted-foreground/60 hover:text-foreground md:opacity-0 md:group-hover:opacity-100',
                   )}
                 >

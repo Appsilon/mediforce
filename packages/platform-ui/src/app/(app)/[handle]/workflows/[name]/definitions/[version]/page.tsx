@@ -10,6 +10,8 @@ import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-can
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { StartRunButton } from '@/components/processes/start-run-button';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
 import { mediforceSilent } from '@/lib/mediforce';
 import { validateSteps, toastRegistrationWarnings, handleSaveFailure, workflowDisplayName } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
@@ -41,6 +43,11 @@ export default function WorkflowDefinitionVersionPage() {
 
   const [editedDescription, setEditedDescription] = useState('');
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
+  // ADR-0019 `edit`: saving is registering a version. Refused at the server
+  // either way, but a 403 arrives here as a raw error beside whatever the
+  // step validator was already complaining about — which reads as a broken
+  // Save, not as a permission you can go and ask for.
+  const { mayEdit, reason: editReason } = useWorkflowEditGate(handle, decodedName);
   const [stepErrors, setStepErrors] = useState<Record<string, Record<string, string>>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [canvasDirty, setCanvasDirty] = useState(false);
@@ -223,17 +230,19 @@ export default function WorkflowDefinitionVersionPage() {
                 {saveState.message}
               </span>
             )}
-            <button
-              onClick={() => setDialogOpen(true)}
-              disabled={saveState.status === 'saving'}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors whitespace-nowrap',
-                saveState.status === 'saving' && 'opacity-50 cursor-not-allowed',
-              )}
-            >
-              <Save className="h-3.5 w-3.5" />
-              {saveState.status === 'saving' ? 'Saving…' : 'Save'}
-            </button>
+            <InstantTooltip label={editReason}>
+              <button
+                onClick={() => setDialogOpen(true)}
+                disabled={saveState.status === 'saving' || !mayEdit}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors whitespace-nowrap',
+                  (saveState.status === 'saving' || !mayEdit) && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                <Save className="h-3.5 w-3.5" />
+                {saveState.status === 'saving' ? 'Saving…' : 'Save'}
+              </button>
+            </InstantTooltip>
             <StartRunButton
               workflowName={decodedName}
               version={definition.version}
@@ -241,6 +250,8 @@ export default function WorkflowDefinitionVersionPage() {
               archived={definition.archived === true}
               label="Save & Dry Run"
               mode="dry-run"
+              disabled={!mayEdit}
+              disabledTooltip={editReason}
               onBeforeStart={() => new Promise<{ version: number; namespace: string } | undefined>((resolve) => {
                 startAfterSaveResolverRef.current = resolve;
                 setDialogOpen(true);
@@ -253,6 +264,8 @@ export default function WorkflowDefinitionVersionPage() {
               archived={definition.archived === true}
               label="Save & Start Run"
               mode="production"
+              disabled={!mayEdit}
+              disabledTooltip={editReason}
               onBeforeStart={() => new Promise<{ version: number; namespace: string } | undefined>((resolve) => {
                 startAfterSaveResolverRef.current = resolve;
                 setDialogOpen(true);

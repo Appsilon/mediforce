@@ -25,10 +25,11 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
       ? this.raw.getById(taskId)
       : this.raw.getByIdInNamespaces(taskId, [...this.caller.namespaces]);
 
-  getByRole = async (role: string, namespace?: string): Promise<HumanTask[]> => {
-    if (namespace !== undefined) {
-      if (!this.caller.isSystemActor && !this.caller.namespaces.has(namespace)) return [];
-      return this.raw.getByRoleInNamespaces(role, [namespace]);
+  getByRole = async (role: string, namespaces?: readonly string[]): Promise<HumanTask[]> => {
+    if (namespaces !== undefined) {
+      const allowed = this.narrowToMemberships(namespaces);
+      if (allowed.length === 0) return [];
+      return this.raw.getByRoleInNamespaces(role, allowed);
     }
     return this.caller.isSystemActor
       ? this.raw.getByRoleAll(role)
@@ -49,11 +50,14 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
    * Caller-scope read: every task the caller is allowed to see across all
    * roles + instances. System actors see the whole store; user callers see
    * tasks whose parent run belongs to one of their namespaces.
+   *
+   * `namespaces` narrows to a chosen subset — the inbox's workspace filter.
    */
-  listForCaller = async (namespace?: string): Promise<HumanTask[]> => {
-    if (namespace !== undefined) {
-      if (!this.caller.isSystemActor && !this.caller.namespaces.has(namespace)) return [];
-      return this.raw.listInNamespaces([namespace]);
+  listForCaller = async (namespaces?: readonly string[]): Promise<HumanTask[]> => {
+    if (namespaces !== undefined) {
+      const allowed = this.narrowToMemberships(namespaces);
+      if (allowed.length === 0) return [];
+      return this.raw.listInNamespaces(allowed);
     }
     return this.caller.isSystemActor
       ? this.raw.listAll()

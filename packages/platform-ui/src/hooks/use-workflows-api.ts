@@ -8,8 +8,10 @@ export interface ApiDefinitionItem {
   namespace: string;
   name: string;
   latestVersion: number;
-  defaultVersion: number;
+  /** `null` when the workflow is not pinned — the handler returns it nullable. */
+  defaultVersion: number | null;
   manualStartEnabled?: boolean;
+  callerMayRun?: boolean;
   definition: {
     name: string;
     version: number;
@@ -36,6 +38,7 @@ export function mapApiToDefinitionGroups(
         title: def.title,
         description: def.description,
         latestVersion: String(def.version),
+        effectiveVersion: String(item.defaultVersion ?? def.version),
         versions: [{
           version: String(def.version),
           stepCount: def.steps.length,
@@ -45,6 +48,8 @@ export function mapApiToDefinitionGroups(
         stepCount: def.steps.length,
         // Hand-start gate reads the triggers table (Issue #930).
         hasManualTrigger: item.manualStartEnabled ?? false,
+        // Absent means "no gate", which is what an ungated workflow answers.
+        callerMayRun: item.callerMayRun ?? true,
         externalSkillsRepo: def.externalSkillsRepo,
         url: def.url,
         archived: def.archived,

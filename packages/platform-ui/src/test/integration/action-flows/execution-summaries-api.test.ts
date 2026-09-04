@@ -88,7 +88,6 @@ const services = (() => {
     auditRepo,
     undefined,
     undefined,
-    undefined,
     humanTaskRepo,
     coworkSessionRepo,
   );

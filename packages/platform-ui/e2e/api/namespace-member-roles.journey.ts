@@ -1,4 +1,5 @@
 import type { APIRequestContext } from '@playwright/test';
+import { formatRoleGrant } from '@mediforce/platform-core';
 import { test, expect } from '../helpers/test-fixtures';
 import { createTestUser, signInAndGetSessionCookie } from '../helpers/emulator';
 import { seedPostgresOrganizationNamespace } from '../helpers/postgres-seed';
@@ -62,15 +63,18 @@ async function freshTarget(request: APIRequestContext, email: string): Promise<s
   return uid;
 }
 
+/** The roster's view of a member's grants, as `role` / `role@workflow`, sorted. */
 async function rolesOf(request: APIRequestContext, uid: string): Promise<string[]> {
   const res = await request.get(`/api/users/members?namespace=${ORG_HANDLE}`, {
     headers: apiKeyHeaders(),
   });
   expect(res.status(), await res.text()).toBe(200);
-  const body = (await res.json()) as { members: Array<{ uid: string; roles: string[] }> };
+  const body = (await res.json()) as {
+    members: Array<{ uid: string; grants: Array<{ role: string; workflowName: string | null }> }>;
+  };
   const member = body.members.find((row) => row.uid === uid);
   expect(member, `member ${uid} missing from the ${ORG_HANDLE} roster`).toBeDefined();
-  return [...(member?.roles ?? [])].sort();
+  return (member?.grants ?? []).map(formatRoleGrant).sort();
 }
 
 test.describe('Workspace process roles — API E2E', () => {
@@ -107,10 +111,11 @@ test.describe('Workspace process roles — API E2E', () => {
     );
     expect(res.status(), await res.text()).toBe(200);
 
-    // The roster reports both, de-duplicated and without the narrowing — a
-    // plain member reads this list too, so it is the one place a colleague can
-    // find out who the reviewer is.
-    expect(await rolesOf(request, target)).toEqual(['approver', 'reviewer']);
+    // The roster reports both, each keeping the workflow it was narrowed to —
+    // a plain member reads this list too, so it is the one place a colleague
+    // can find out who the reviewer is, and the settings editor writes back a
+    // full replace off exactly this read.
+    expect(await rolesOf(request, target)).toEqual([`approver@${TEALFLOW}`, 'reviewer']);
   });
 
   test('a plain member cannot set anyone’s roles', async ({ request }) => {

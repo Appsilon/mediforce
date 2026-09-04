@@ -1,6 +1,5 @@
 export type { AgentEventRepository } from './agent-event-repository';
 export type { AuditRepository, GetByNamespaceOptions, GetByNamespacePage } from './audit-repository';
-export type { AuthService, AuthUser } from './auth-service';
 export type { ProcessRepository, WorkflowDefinitionListResult, WorkflowDefinitionGroup } from './process-repository';
 export type {
   ProcessInstanceRepository,
@@ -17,6 +16,7 @@ export type { HandoffRepository } from './handoff-repository';
 export type { NotificationService, NotificationEvent, NotificationTarget } from './notification-service';
 export type { SendEmailParams, SendEmailResult, SendEmailFn, EmailProviderInfo } from './email-service';
 export type { UserDirectoryService, DirectoryUser, UserAuthMetadata, RoleGrant } from './user-directory-service';
+export { formatRoleGrant } from './user-directory-service';
 export type {
   AgentRunRepository,
   ListAgentRunsOptions,

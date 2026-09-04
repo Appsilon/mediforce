@@ -11,8 +11,6 @@ import { WorkspaceAvatar } from './workspace-avatar';
 import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
-import { useNamespaceRole } from '@/hooks/use-namespace-role';
-import { useRankingsAge } from '@/hooks/use-rankings-age';
 import { ThemeToggle } from './theme-toggle';
 import { CommandPaletteTrigger } from './command-palette';
 import { cn } from '@/lib/utils';
@@ -163,12 +161,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const handlePrefix = handleFromPath !== '' ? `/${handleFromPath}` : '';
 
   const breadcrumbs = buildBreadcrumbs(pathname, handleFromPath, handlePrefix);
-  const { canAdmin } = useNamespaceRole(handleFromPath);
-  const { daysSinceUpdate, loading: rankingsLoading } = useRankingsAge();
-  const [rankingsBannerDismissed, setRankingsBannerDismissed] = React.useState(false);
-  const showRankingsBanner = canAdmin && !rankingsLoading && !rankingsBannerDismissed
-    && process.env.NEXT_PUBLIC_USE_EMULATORS !== 'true'
-    && (daysSinceUpdate === null || daysSinceUpdate > 21);
 
   if (isWorkspaceRoute && routeNamespaceAccessDenied) {
     return <WorkspaceAccessError handle={handleFromPath} />;
@@ -387,15 +379,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         primaryColor={activeNamespace?.brandPrimaryColor}
         accentColor={activeNamespace?.brandAccentColor}
       />
-      {showRankingsBanner && (
-        <div className="flex items-center justify-between bg-amber-100 dark:bg-amber-950/50 px-4 py-1.5 text-xs text-amber-800 dark:text-amber-300 border-b border-amber-200 dark:border-amber-900/50">
-          <span>
-            Model rankings {daysSinceUpdate === null ? 'never synced' : `outdated (${daysSinceUpdate}d ago)`}.
-            Run <code className="mx-1 rounded bg-amber-200/60 dark:bg-amber-900/40 px-1 py-0.5 font-mono">python3 scripts/sync-model-rankings.py</code> to update.
-          </span>
-          <button onClick={() => setRankingsBannerDismissed(true)} className="ml-4 hover:text-amber-900 dark:hover:text-amber-100" aria-label="Dismiss">✕</button>
-        </div>
-      )}
       <div className="flex flex-1 overflow-hidden">
       {/* Sidebar — desktop */}
       <aside className="hidden w-[224px] shrink-0 border-r bg-background md:flex md:flex-col">

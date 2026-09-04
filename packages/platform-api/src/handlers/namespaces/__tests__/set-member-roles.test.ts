@@ -39,6 +39,8 @@ describe('setNamespaceMemberRoles handler', () => {
     auditRepo = new InMemoryAuditRepository();
     directory = new InMemoryUserDirectoryService();
     directory.addUser({ uid: 'uid-member', email: 'member@acme.test' });
+    directory.addUser({ uid: 'uid-owner', email: 'owner@acme.test' });
+    directory.addUser({ uid: 'uid-admin', email: 'admin@acme.test' });
     // Membership is what `setRolesForUser` checks under its own lock, so the
     // directory double carries the same roster the repo was seeded with.
     for (const uid of ['uid-owner', 'uid-admin', 'uid-member']) {
@@ -50,6 +52,58 @@ describe('setNamespaceMemberRoles handler', () => {
   function scopeFor(caller = ownerCaller) {
     return createTestScope({ namespaceRepo, auditRepo, userDirectory: directory, caller });
   }
+
+  it('keeps the owner’s workflow-manager through a replace that drops it', async () => {
+    await setNamespaceMemberRoles(
+      { handle: HANDLE, uid: 'uid-owner', grants: [{ role: 'reviewer', workflowName: null }] },
+      scopeFor(),
+    );
+
+    // The roles-demo failure: clearing the owner's roles from this table left a
+    // workspace whose every new workflow is gated on a role nobody held, and
+    // nobody able to grant it back — the owner cannot be removed or demoted,
+    // so their grant is the invariant (ADR-0020).
+    expect(await directory.getGrantsForUser('uid-owner', HANDLE)).toEqual([
+      { role: 'reviewer', workflowName: null },
+      { role: 'workflow-manager', workflowName: null },
+    ]);
+  });
+
+  it('re-establishes it even when the replace is empty', async () => {
+    await setNamespaceMemberRoles(
+      { handle: HANDLE, uid: 'uid-owner', grants: [] },
+      scopeFor(),
+    );
+
+    expect(await directory.getGrantsForUser('uid-owner', HANDLE)).toEqual([
+      { role: 'workflow-manager', workflowName: null },
+    ]);
+  });
+
+  it('does not add it twice when the owner already holds it', async () => {
+    const grants = [{ role: 'workflow-manager', workflowName: null }];
+
+    const result = await setNamespaceMemberRoles(
+      { handle: HANDLE, uid: 'uid-owner', grants },
+      scopeFor(),
+    );
+
+    expect(result.grants).toEqual(grants);
+    expect(await directory.getGrantsForUser('uid-owner', HANDLE)).toEqual(grants);
+  });
+
+  it('replaces an admin’s roles exactly as asked — the invariant is the owner’s alone', async () => {
+    await setNamespaceMemberRoles(
+      { handle: HANDLE, uid: 'uid-admin', grants: [{ role: 'reviewer', workflowName: null }] },
+      scopeFor(),
+    );
+
+    // Migration 0045 seeds admins as a convenience; revoking that is an
+    // ordinary decision this must not undo.
+    expect(await directory.getGrantsForUser('uid-admin', HANDLE)).toEqual([
+      { role: 'reviewer', workflowName: null },
+    ]);
+  });
 
   it('grants workspace-wide and workflow-narrowed roles in one call', async () => {
     const result = await setNamespaceMemberRoles(

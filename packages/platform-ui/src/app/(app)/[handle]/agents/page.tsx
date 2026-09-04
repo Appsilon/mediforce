@@ -295,7 +295,7 @@ export default function AgentsPage() {
                 not versioned, so editing one changes every step that already references it.
               </p>
               <p>
-                The model a run uses is chosen per step in the workflow definition, not on the agent.
+                A run uses the agent&apos;s foundation model unless the workflow step that calls it names its own.
               </p>
             </ConceptPopover>
           </div>

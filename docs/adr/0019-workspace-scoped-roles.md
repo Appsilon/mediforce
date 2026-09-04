@@ -1,30 +1,41 @@
 ---
-status: proposed
+status: finalized
 audience: engineers
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-28
 ---
 
 # ADR-0019: Process roles are workspace-scoped
 
-> **Partly built.** The storage model below ships as of
-> [#1248](https://github.com/Appsilon/mediforce/issues/1248): `user_roles` is
-> workspace-scoped with an optional `workflow_name`, owner/admin can grant
-> roles via CLI and API, notification targeting is namespace- and
-> workflow-scoped, and all three cascades (membership removal, workflow
-> deletion, workflow transfer) are in place — membership is checked by the
-> write itself, under the lock that also serializes concurrent replaces. **Enforcement is not.** `step.allowedRoles` is still
-> declarative — any workspace member can claim and complete any human task —
-> and no workflow mutation is gated
-> ([#1249](https://github.com/Appsilon/mediforce/issues/1249)). The rest of the
-> epic is [#1246](https://github.com/Appsilon/mediforce/issues/1246); this line
-> changes to "Implemented" when the ADR is promoted to `finalized`.
+> **Implemented.** Every decision below ships as of the
+> [#1246](https://github.com/Appsilon/mediforce/issues/1246) epic, and this ADR
+> is `finalized` — changes by supersession only.
+>
+> `user_roles` is workspace-scoped with an optional `workflow_name`
+> ([#1248](https://github.com/Appsilon/mediforce/issues/1248)); owner/admin
+> grant roles from the **Roles** table in workspace settings, the CLI and the
+> API ([#1250](https://github.com/Appsilon/mediforce/issues/1250)); all three
+> cascades (membership removal, workflow deletion, workflow transfer) are in
+> place. `assertCallerHoldsRole` in `packages/platform-api/src/auth.ts` is the
+> one predicate behind all three verbs: **`act`** gates task claim and complete
+> ([#1249](https://github.com/Appsilon/mediforce/issues/1249)) and answers the
+> Human actions inbox
+> ([#1251](https://github.com/Appsilon/mediforce/issues/1251)), and **`run`**
+> and **`edit`** gate the workflow through its **Access** tab
+> ([#1253](https://github.com/Appsilon/mediforce/issues/1253)) — closing fact 3
+> below, the hole where any member of a workspace could delete or re-register
+> any workflow in it. `allowedRoles` is picked from a list rather than typed
+> ([#1252](https://github.com/Appsilon/mediforce/issues/1252)). `RbacService` is
+> deleted rather than switched on.
+>
+> Absent or empty role lists still mean "any workspace member" at every level,
+> so a deployment that grants nothing behaves exactly as it did before the epic.
 
 **Date:** 2026-08-21
 **Deciders:** Krystian Zieliński
 **Issue:** [#1247](https://github.com/Appsilon/mediforce/issues/1247) (epic: [#1246](https://github.com/Appsilon/mediforce/issues/1246))
-**On acceptance, partially supersedes:** [ADR-0002](./0002-firebase-auth-to-nextauth.md)
-§5, second bullet (the global `user_roles` table). The rest of ADR-0002 stands,
-and stays fully binding until this ADR is accepted.
+**Partially supersedes:** [ADR-0002](./0002-firebase-auth-to-nextauth.md)
+§5, second bullet (the global `user_roles` table). The rest of ADR-0002 stands
+and remains fully binding.
 **Answers:** [ADR-0004](./0004-scoped-data-access-authorization.md) §4 and its
 "Out of scope — role enforcement at the HTTP API layer", which deferred this to
 "a later ADR that lands alongside or after ADR-0002".
@@ -50,16 +61,31 @@ against source:
 2. **`step.allowedRoles` is not enforced.** `RbacService` implements the check
    and `WorkflowEngine.advanceStep` calls it, but `rbacService` is the engine's
    optional 4th constructor argument and production passes `undefined`. Any
-   member of a workspace can claim and complete any human task.
+   member of a workspace can claim and complete any human task. *(Resolved by
+   [#1249](https://github.com/Appsilon/mediforce/issues/1249): the gate is
+   `assertCallerHoldsRole`, and `RbacService` and its constructor slot are
+   gone.)*
 3. **No workflow mutation is gated.** `register-workflow`, `delete-workflow`,
    `archive-workflow`, `transfer-workflow`, `set-visibility` and `copy-workflow`
    check workspace membership and nothing else — not even owner/admin. Any
-   member can delete or re-register any workflow in the workspace.
+   member can delete or re-register any workflow in the workspace. *(Resolved by
+   [#1253](https://github.com/Appsilon/mediforce/issues/1253): the workflow's
+   **Access** tab, whose `edit` list gates register, archive, delete, transfer,
+   set-visibility and set-default-version. `copy-workflow` stays ungated on
+   purpose — refusing it would remove a capability `visibility: public` exists
+   to grant — but a copy that stays inside the workspace inherits the source's
+   access, or copying would launder the gate: a member refused `run` on
+   `payments` could copy it to `payments-2` and start that instead.)*
 4. **Role-based inbox filtering already ships, by accident.** The NextAuth
    `session` callback puts the flat global list on `session.user.roles`,
    `useViewerIdentity` returns **`roles[0]`**, and the Human actions page pivots
    its whole inbox on that one string — so a user holding two roles sees only
    the first one's queue, off a value with no workspace context at all.
+   *(Resolved by [#1251](https://github.com/Appsilon/mediforce/issues/1251):
+   the pivot is gone. The inbox asks the server —
+   `GET /api/tasks?actionable=true` — which answers with the same
+   `resolveStepGate` + `callerHoldsRole` predicate the claim is gated on, and
+   the page keeps an **All in workspace** toggle for the unfiltered view.)*
 
 Fact 4 is the one ADR-0002 did not weigh, and it is why the scoping question
 cannot be deferred any further: the moment roles carry authority, a
@@ -144,8 +170,8 @@ The same role predicate gates three actions, at two levels:
 
 | Verb | Level | Gate |
 |---|---|---|
-| `run` — start a run | workflow | workflow `allowedRoles` |
-| `edit` — register a version, archive, delete, transfer, set visibility | workflow | workflow `allowedRoles` |
+| `run` — start a run | workflow | `workflow_access.run_roles` |
+| `edit` — register a version, archive, delete, transfer, set visibility, set the default version | workflow | `workflow_access.edit_roles` |
 | `act` — claim and complete a human task | step | `step.allowedRoles` |
 
 **`read` is deliberately not gated.** Every member of a workspace sees every
@@ -165,11 +191,27 @@ workspace separately binds `reviewer` to people. An operational override that
 contradicted the definition would give the same step two answers and make the WD
 stop describing the process it runs — unacceptable in a regulated audit trail.
 
-Workflow-level `run`/`edit` access is **not** on the definition. Like
-`visibility` it is mutable and operational, so it lives in a side table keyed by
-`(namespace, workflow)`. Putting it in the versioned document would mean
+Workflow-level `run`/`edit` access is **not** on the definition. It is mutable
+and operational rather than authored, so it lives in a side table keyed by
+`(namespace, workflow)` — `workflow_access`, whose row exists only while it
+grants something, so "open to every workspace member" has one representation
+however it got there. Putting it in the versioned document would mean
 registering v8 silently rewrites permissions, and would hand the design LLM a
-field that grants authority.
+field that grants authority: `WorkflowAuthorableSchema` is exactly what the
+assistant may emit. `visibility` is the cautionary case rather than the
+precedent — it *is* on the definition and *is* authorable, which is why
+registering a version can silently reshare a workflow. Folding it into this
+table is the obvious follow-up and is deliberately not done here: it is a
+schema change to a field 23 definitions and the whole public-profile surface
+already read.
+
+The two lists are one verb each rather than one switch per operation, because
+delete is strictly more dangerous than edit: a workflow where somebody may edit
+but may not archive is a distinction nobody wants to administer. The gates leave
+the workspace with the workflow's name — deleting or transferring a workflow
+clears them, exactly as it clears the role grants narrowed to it — because role
+names mean different people in a different workspace, and a name back in
+circulation must not carry a restriction its next registrant never configured.
 
 Both levels grant through **roles, never by naming a user** — a role with one
 member expresses "only Krystian may edit this" without a second mechanism.
@@ -238,10 +280,16 @@ Implications the implementation issues must resolve, not decided here:
 - **`session.user.roles` cannot stay a flat array** (fact 4). The `session`
   callback runs on every session read with no route params, so it has nothing to
   scope to. Either it carries a `handle → roles` map, or the browser reads roles
-  per workspace instead. Whichever wins, the current `roles[0]` inbox pivot
-  changes behaviour, making it user-visible (AGENTS.md §12) rather than a
-  refactor. → [#1248](https://github.com/Appsilon/mediforce/issues/1248) /
-  [#1251](https://github.com/Appsilon/mediforce/issues/1251)
+  per workspace instead. **Settled by
+  [#1251](https://github.com/Appsilon/mediforce/issues/1251): neither.** The
+  browser stopped needing the answer — the inbox question is decided server-side,
+  where the run's pinned definition and the caller's scoped grants both are, so
+  the flat array carries no authority and the shape never had to change.
+  `session.user.roles` remains what
+  [#1248](https://github.com/Appsilon/mediforce/issues/1248) left it as: a
+  cross-workspace union, read by nothing that gates. The behaviour change it
+  predicted is real and is user-visible (AGENTS.md §12), which is what the
+  toggle covers.
 - **Where enforcement reads `allowedRoles` from.** `HumanTask.assignedRole` holds
   only `allowedRoles[0]`, so gating on it would enforce a rule the author did not
   write; the run's pinned Workflow Definition carries the full array and needs no
@@ -251,7 +299,8 @@ Implications the implementation issues must resolve, not decided here:
   through the client-side `AuthService` (wrong side of the ADR-0005 boundary for
   a server authorization decision) and gates `advanceStep` — engine machinery
   running as the system actor — rather than the human action. →
-  [#1249](https://github.com/Appsilon/mediforce/issues/1249)
+  [#1249](https://github.com/Appsilon/mediforce/issues/1249) *(deleted, along
+  with the `AuthService` port it was the only consumer of)*
 - **A typo in `allowedRoles` produces a run nobody can advance** once the gate is
   live. The editor's role pick-list is not polish; it is what keeps the gate from
   becoming a footgun. →
@@ -299,6 +348,15 @@ Implications the implementation issues must resolve, not decided here:
   administered by workspace owner/admin. Revisit only if per-creator control is
   actually asked for.
 - **Renaming `workspace_members.role` to `membership`** — still deferred.
-- **The `roles` field on the Workflow Definition envelope**, which declares a
-  vocabulary rather than granting anything. Whether it survives now that role
-  assignment is real is a question for the implementation issues.
+- **Removing the `roles` field from the Workflow Definition envelope.** It
+  declares a vocabulary rather than granting anything, and now that role
+  assignment is real the two names on one object are a genuine confusion risk.
+  It earns its keep for now, in the one job left to it: the workspace
+  pick-list is the union of roles already granted with the `roles` an imported
+  workflow package declares, which is how a package that travels
+  ([ADR-0013](./0013-workflow-packages-outside-platform-repo.md)) tells its new
+  deployment what roles it expects before anyone has been granted one.
+  Disambiguated in
+  [`docs/reference/workflow-capabilities.md`](../reference/workflow-capabilities.md)
+  rather than removed — the removal would take a schema migration across 23
+  definitions and buy a name.

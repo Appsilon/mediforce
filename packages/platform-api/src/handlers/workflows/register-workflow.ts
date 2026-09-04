@@ -13,7 +13,9 @@ import {
   ValidationError,
 } from '../../errors';
 import { actorFromCaller } from '../_helpers';
+import { assertCallerMayEditWorkflow } from './_access-gate';
 import { checkRetiredModels } from './retired-model-check';
+import { seedDefaultWorkflowAccess } from './_seed-access';
 import { seedManualTrigger } from './_seed-triggers';
 import { isLocalAgentMode, fetchFromContainerWorker, fetchFromLocalDocker } from '../system/_docker';
 
@@ -28,6 +30,12 @@ export async function registerWorkflow(
   if (typeof input.namespace !== 'string' || input.namespace.length === 0) {
     throw new ForbiddenError('Missing required query parameter: namespace');
   }
+
+  // ADR-0019 `edit`: registering a version of an existing workflow changes what
+  // that workflow does, so it answers to the same list as archive and delete.
+  // A name nobody has registered yet has no access rows and is therefore open,
+  // which is what keeps creating a workflow a plain member's act.
+  await assertCallerMayEditWorkflow(scope, input.namespace, input.name);
 
   const isDeleted = await scope.workflowDefinitions.isNameDeleted(input.namespace, input.name);
   if (isDeleted) {
@@ -111,6 +119,14 @@ export async function registerWorkflow(
   // hand-startable by default (Issue #930). Cron/webhook triggers are created
   // separately via the triggers table — definitions are trigger-free (Issue #932).
   await seedManualTrigger(scope, input.namespace, definition.name);
+
+  // ADR-0020: v1 of a workflow a person created starts out gated by the
+  // built-in roles, with its creator granted `workflow-manager` on it. Later
+  // versions leave the lists alone — they belong to the workspace's admins by
+  // then, and an empty pair is a deliberate "open to every member".
+  if (nextVersion === 1) {
+    await seedDefaultWorkflowAccess(scope, input.namespace, definition.name);
+  }
 
   const warnings: RegistrationWarning[] = [];
 

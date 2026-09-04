@@ -1,9 +1,11 @@
+import { OPEN_WORKFLOW_ACCESS } from '@mediforce/platform-core';
 import type {
   TransferWorkflowInput,
   TransferWorkflowOutput,
 } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller } from '../_helpers';
+import { assertCallerMayEditWorkflow } from './_access-gate';
 
 /**
  * Move all versions of a workflow definition between workspaces. Transfer
@@ -11,13 +13,16 @@ import { actorFromCaller } from '../_helpers';
  * writes through the repository (not raw Firestore) so namespace scoping is
  * enforced, and emits a `workflow.transferred` audit event.
  *
- * The gate is membership-only on both namespaces; adding a role gate is a
- * separate decision.
+ * Membership on both namespaces is necessary but no longer sufficient: moving
+ * a workflow out of a workspace is an `edit` (ADR-0019), gated on the source's
+ * role list. The destination has none for a name it has never seen.
  */
 export async function transferWorkflowNamespace(
   input: TransferWorkflowInput,
   scope: CallerScope,
 ): Promise<TransferWorkflowOutput> {
+  await assertCallerMayEditWorkflow(scope, input.sourceNamespace, input.name);
+
   await scope.workflowDefinitions.transferNamespace(
     input.name,
     input.sourceNamespace,
@@ -43,6 +48,18 @@ export async function transferWorkflowNamespace(
   // grants in the source (`workflowName: null`) are untouched — they were
   // never about this workflow.
   await scope.system.userDirectory?.clearRolesForWorkflow(input.sourceNamespace, input.name);
+
+  // The `run` / `edit` lists stay behind too. They name roles, and a role name
+  // means different people in the destination workspace — carrying `edit:
+  // ['reviewer']` across would hand the workflow to whoever happens to hold
+  // that name there. The destination's owner/admin configures it afresh, and
+  // until they do the workflow is open to their members, as a newly
+  // registered one would be.
+  await scope.workflowDefinitions.setAccess(
+    input.sourceNamespace,
+    input.name,
+    OPEN_WORKFLOW_ACCESS,
+  );
 
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({

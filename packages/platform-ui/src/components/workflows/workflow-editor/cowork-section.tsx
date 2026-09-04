@@ -5,6 +5,7 @@ import { Trash2 } from 'lucide-react';
 import type { WorkflowStep, McpServerConfig } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { FieldRow, FieldGroup, Section, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
+import { ModelPicker } from './model-picker';
 
 const VOICE_OPTIONS = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const;
 
@@ -84,13 +85,14 @@ export function CoworkSection({
       {/* Fields */}
       <FieldGroup>
         <FieldRow label={isVoice ? 'voiceRealtime.model' : 'chat.model'} tooltip={TIP.model}>
-          <input
+          <ModelPicker
             value={isVoice ? (cowork.voiceRealtime?.model ?? '') : (cowork.chat?.model ?? '')}
-            onChange={(e) => isVoice
-              ? patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, model: e.target.value || undefined } })
-              : patchCowork({ chat: { ...cowork.chat, model: e.target.value || undefined } })
+            onChange={(model) => isVoice
+              ? patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, model } })
+              : patchCowork({ chat: { ...cowork.chat, model } })
             }
-            className={ri}
+            ariaLabel={isVoice ? 'Realtime model' : 'Chat model'}
+            className={rs}
           />
         </FieldRow>
 
@@ -108,10 +110,11 @@ export function CoworkSection({
             </FieldRow>
 
             <FieldRow label="voiceRealtime.synthesisModel" tooltip={TIP.synthesisModel}>
-              <input
+              <ModelPicker
                 value={cowork.voiceRealtime?.synthesisModel ?? ''}
-                onChange={(e) => patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, synthesisModel: e.target.value || undefined } })}
-                className={ri}
+                onChange={(synthesisModel) => patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, synthesisModel } })}
+                ariaLabel="Synthesis model"
+                className={rs}
               />
             </FieldRow>
 

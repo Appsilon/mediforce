@@ -220,13 +220,13 @@ describe('listTasks handler', () => {
 
     it('narrows the role axis to one workspace for api-key callers', async () => {
       const scope = createTestScope({ humanTaskRepo, instanceRepo });
-      const result = await listTasks({ role: 'reviewer', namespace: 'team-alpha' }, scope);
+      const result = await listTasks({ role: 'reviewer', namespace: ['team-alpha'] }, scope);
       expect(result.tasks.map((t) => t.id)).toEqual(['t-alpha']);
     });
 
     it('narrows the caller-scope axis to one workspace for api-key callers', async () => {
       const scope = createTestScope({ humanTaskRepo, instanceRepo });
-      const result = await listTasks({ namespace: 'team-beta' }, scope);
+      const result = await listTasks({ namespace: ['team-beta'] }, scope);
       expect(result.tasks.map((t) => t.id)).toEqual(['t-beta']);
     });
 
@@ -236,7 +236,7 @@ describe('listTasks handler', () => {
         instanceRepo,
         caller: userCaller('u-1', ['team-alpha', 'team-beta']),
       });
-      const result = await listTasks({ namespace: 'team-alpha' }, scope);
+      const result = await listTasks({ namespace: ['team-alpha'] }, scope);
       expect(result.tasks.map((t) => t.id)).toEqual(['t-alpha']);
     });
 
@@ -246,7 +246,7 @@ describe('listTasks handler', () => {
         instanceRepo,
         caller: userCaller('u-2', ['team-beta']),
       });
-      const result = await listTasks({ namespace: 'team-alpha' }, scope);
+      const result = await listTasks({ namespace: ['team-alpha'] }, scope);
       expect(result.tasks).toEqual([]);
     });
   });
@@ -330,5 +330,73 @@ describe('listTasks handler', () => {
       const result = await listTasks({}, scope);
       expect(result.tasks).toEqual([]);
     });
+  });
+});
+
+/**
+ * The inbox's workspace filter is a multi-select, so the axis has to answer
+ * for a set. Intersection with the caller's memberships, not refusal: a
+ * selection naming a workspace they have since left still answers for the
+ * rest, which is the difference between a filter that degrades and one that
+ * empties.
+ */
+describe('listTasks — several workspaces at once', () => {
+  let humanTaskRepo: InMemoryHumanTaskRepository;
+  let instanceRepo: InMemoryProcessInstanceRepository;
+
+  beforeEach(async () => {
+    resetFactorySequence();
+    instanceRepo = new InMemoryProcessInstanceRepository();
+    humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-b', namespace: 'team-beta' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-c', namespace: 'team-gamma' }));
+    await humanTaskRepo.create(buildHumanTask({ id: 't-a', processInstanceId: 'inst-a' }));
+    await humanTaskRepo.create(buildHumanTask({ id: 't-b', processInstanceId: 'inst-b' }));
+    await humanTaskRepo.create(buildHumanTask({ id: 't-c', processInstanceId: 'inst-c' }));
+  });
+
+  it('unions the workspaces named', async () => {
+    const scope = createTestScope({
+      humanTaskRepo,
+      instanceRepo,
+      caller: userCaller('u-1', ['team-alpha', 'team-beta', 'team-gamma']),
+    });
+
+    const result = await listTasks({ namespace: ['team-alpha', 'team-gamma'] }, scope);
+    expect(result.tasks.map((t) => t.id).sort()).toEqual(['t-a', 't-c']);
+  });
+
+  it('drops the workspaces the caller cannot read and answers for the rest', async () => {
+    const scope = createTestScope({
+      humanTaskRepo,
+      instanceRepo,
+      caller: userCaller('u-2', ['team-alpha']),
+    });
+
+    const result = await listTasks({ namespace: ['team-alpha', 'team-beta'] }, scope);
+    expect(result.tasks.map((t) => t.id)).toEqual(['t-a']);
+  });
+
+  it('reads a selection of only unreadable workspaces as empty, not a refusal', async () => {
+    const scope = createTestScope({
+      humanTaskRepo,
+      instanceRepo,
+      caller: userCaller('u-3', ['team-alpha']),
+    });
+
+    const result = await listTasks({ namespace: ['team-beta', 'team-gamma'] }, scope);
+    expect(result.tasks).toEqual([]);
+  });
+
+  it('de-duplicates a repeated workspace instead of doubling its tasks', async () => {
+    const scope = createTestScope({
+      humanTaskRepo,
+      instanceRepo,
+      caller: userCaller('u-4', ['team-alpha']),
+    });
+
+    const result = await listTasks({ namespace: ['team-alpha', 'team-alpha'] }, scope);
+    expect(result.tasks.map((t) => t.id)).toEqual(['t-a']);
   });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
-import type { WorkflowStep } from '@mediforce/platform-core';
+import type { AgentDefinition, ModelRegistryEntry, WorkflowStep } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 
 // ---- Mocks (must be before component import) ----
@@ -12,8 +12,37 @@ const pluginState = vi.hoisted(() => ({
   plugins: [] as { name: string; metadata?: Record<string, unknown> }[],
 }));
 
+const agentState = vi.hoisted(() => ({
+  response: { agents: [] as AgentDefinition[] },
+  requests: [] as string[],
+  error: false,
+}));
+
+const modelState = vi.hoisted(() => ({
+  models: [] as ModelRegistryEntry[],
+}));
+
 vi.mock('@/hooks/use-plugins', () => ({
   usePlugins: () => ({ plugins: pluginState.plugins }),
+}));
+
+vi.mock('@/lib/api-fetch', () => ({
+  apiFetch: (input: string) => {
+    if (input.startsWith('/api/model-registry')) {
+      return Promise.resolve(new Response(JSON.stringify({ models: modelState.models }), { status: 200 }));
+    }
+    if (input.startsWith('/api/agents?namespace=test')) {
+      agentState.requests.push(input);
+      return Promise.resolve(new Response(
+        JSON.stringify(agentState.error ? { error: 'agent list failed' } : agentState.response),
+        { status: agentState.error ? 500 : 200 },
+      ));
+    }
+    if (input.includes('/mcp-servers')) {
+      return Promise.resolve(new Response(JSON.stringify({ mcpServers: {} }), { status: 200 }));
+    }
+    throw new Error(`Unexpected API request: ${input}`);
+  },
 }));
 
 vi.mock('@/contexts/auth-context', () => ({
@@ -26,6 +55,27 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/app/actions/workflow-secrets', () => ({
   getWorkflowSecretKeys: () => Promise.resolve([]),
+}));
+
+// The role controls read the workspace vocabulary and roster. Mutable so a test
+// can hand the editor a specific set of grants; reset in beforeEach.
+const rolesState = vi.hoisted(() => ({
+  workspaceRoles: { roles: [], workflowNames: [], heldRoles: null, loading: false, error: null } as {
+    roles: string[];
+    workflowNames: string[];
+    heldRoles: string[] | null;
+    loading: boolean;
+    error: Error | null;
+  },
+  members: [] as { uid: string; displayName: string | null }[],
+}));
+
+vi.mock('@/hooks/use-workspace-roles', () => ({
+  useWorkspaceRoles: () => rolesState.workspaceRoles,
+}));
+
+vi.mock('@/hooks/use-namespace-members', () => ({
+  useNamespaceMembers: () => ({ members: rolesState.members, loading: false, resolved: true }),
 }));
 
 import { StepEditor } from '../workflow-editor/step-editor';
@@ -41,6 +91,24 @@ function buildStep(overrides: Partial<WorkflowStep> = {}): WorkflowStep {
     type: 'creation',
     executor: 'human',
     ...overrides,
+  };
+}
+
+function buildAgentDefinition(id: string, name: string, runtimeId?: string): AgentDefinition {
+  return {
+    id,
+    kind: 'plugin',
+    runtimeId,
+    name,
+    iconName: 'Bot',
+    description: `${name} description`,
+    foundationModel: 'anthropic/claude-sonnet-4',
+    systemPrompt: '',
+    inputDescription: 'Input',
+    outputDescription: 'Output',
+    visibility: 'private',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
   };
 }
 
@@ -64,6 +132,14 @@ const dockerImages: DockerImageInfo[] = [
 describe('StepEditor', () => {
   beforeEach(() => {
     pluginState.plugins = [];
+    agentState.response = { agents: [] };
+    agentState.requests = [];
+    agentState.error = false;
+    modelState.models = [];
+    rolesState.workspaceRoles = {
+      roles: [], workflowNames: [], heldRoles: null, loading: false, error: null,
+    };
+    rolesState.members = [];
   });
 
   it('[REGRESSION #1025] does not change a new step id while its name is being typed', () => {
@@ -110,6 +186,105 @@ describe('StepEditor', () => {
     fireEvent.blur(nameInput);
 
     expect(onChange).toHaveBeenLastCalledWith({ id: 'input-text-2' });
+  });
+
+  it('[REGRESSION] keeps the verdict row label steady while the verdict name is edited', () => {
+    function ControlledStepEditor() {
+      const [step, setStep] = React.useState(
+        buildStep({ type: 'decision', executor: 'human', verdicts: { approve: { target: 'done' } } }),
+      );
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step]}
+          onChange={(patch) => setStep((current) => ({ ...current, ...patch }))}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Routing');
+
+    const verdictInput = screen.getByDisplayValue('approve') as HTMLInputElement;
+    fireEvent.change(verdictInput, { target: { value: 'approved' } });
+
+    // The row label names the field, not the value being typed...
+    expect(screen.getAllByText('Verdict').length).toBe(1);
+    expect(screen.queryByText('Approve')).toBeNull();
+    // ...and the input is the same element, so typing never steals its own focus.
+    expect(screen.getByDisplayValue('approved')).toBe(verdictInput);
+  });
+
+  it('[REGRESSION] adds a second verdict without renaming the first', () => {
+    function ControlledStepEditor() {
+      const [step, setStep] = React.useState(buildStep({ type: 'decision', executor: 'human' }));
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step]}
+          onChange={(patch) => setStep((current) => ({ ...current, ...patch }))}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Routing');
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add verdict' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ Add verdict' }));
+
+    expect(screen.getAllByText('Verdict').length).toBe(2);
+    expect(screen.getByDisplayValue('new-verdict')).toBeTruthy();
+    expect(screen.getByDisplayValue('new-verdict-2')).toBeTruthy();
+  });
+
+  it('[REGRESSION] adds a second environment variable without renaming the first', () => {
+    function ControlledStepEditor() {
+      const [step, setStep] = React.useState(buildStep({ executor: 'agent' }));
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step]}
+          onChange={(patch) => setStep((current) => ({ ...current, ...patch }))}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Advanced');
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add variable' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ Add variable' }));
+
+    // Suffixed the way an env var is named, not slugified into `new-var`.
+    expect(screen.getByDisplayValue('NEW_VAR')).toBeTruthy();
+    expect(screen.getByDisplayValue('NEW_VAR_2')).toBeTruthy();
+  });
+
+  it('[REGRESSION] adds a second http header without renaming the first', () => {
+    function ControlledStepEditor() {
+      const [step, setStep] = React.useState(buildStep({
+        executor: 'action',
+        action: { kind: 'http', config: { method: 'GET', url: 'https://example.com' } },
+      }));
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step]}
+          onChange={(patch) => setStep((current) => ({ ...current, ...patch }))}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Action');
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add header' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ Add header' }));
+
+    // Header names keep their casing; `x-header` would not match the convention.
+    expect(screen.getByDisplayValue('X-Header')).toBeTruthy();
+    expect(screen.getByDisplayValue('X-Header-2')).toBeTruthy();
   });
 
   it('[RENDER] step type badge visible without expanding details', () => {
@@ -282,6 +457,174 @@ describe('StepEditor', () => {
     expect(screen.getByText('Agent ID')).toBeInTheDocument();
     expect(screen.getByText('Agent Model')).toBeInTheDocument();
     expect(screen.getByText('Agent Prompt')).toBeInTheDocument();
+  });
+
+  it('[DATA] agent ID selects a saved agent definition', async () => {
+    agentState.response = {
+      agents: [
+        buildAgentDefinition('clinical-reviewer', 'Clinical Reviewer', 'claude-code-agent'),
+        buildAgentDefinition('safety-reviewer', 'Safety Reviewer'),
+      ],
+    };
+    const onChange = vi.fn();
+
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent' })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+
+    expandCard('Prompt & model');
+    const agentSelect = await screen.findByRole('combobox', { name: 'Agent' });
+
+    expect(agentSelect).toHaveValue('');
+    expect(agentState.requests).toContain('/api/agents?namespace=test');
+    const optionLabels = Array.from(agentSelect.querySelectorAll('option')).map((option) => option.textContent);
+    expect(optionLabels).toContain('Clinical Reviewer (clinical-reviewer)');
+    expect(optionLabels).toContain('Safety Reviewer (safety-reviewer)');
+
+    fireEvent.change(agentSelect, { target: { value: 'clinical-reviewer' } });
+
+    expect(onChange).toHaveBeenCalledWith({ agentId: 'clinical-reviewer' });
+  });
+
+  it('[DATA] the model picker offers the selected agent model as the blank default', async () => {
+    agentState.response = {
+      agents: [
+        { ...buildAgentDefinition('clinical-reviewer', 'Clinical Reviewer'), foundationModel: 'anthropic/claude-opus-4-5' },
+      ],
+    };
+
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', agentId: 'clinical-reviewer' })}
+        allSteps={[]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expandCard('Prompt & model');
+    await screen.findByRole('combobox', { name: 'Agent' });
+
+    const modelSelect = screen.getByRole('combobox', { name: 'Agent Model' });
+    expect(modelSelect.options[0].textContent).toContain('anthropic/claude-opus-4-5');
+  });
+
+  it('[DATA] the model picker falls back to the plugin default when no agent is selected', async () => {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent' })}
+        allSteps={[]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expandCard('Prompt & model');
+    await screen.findByRole('combobox', { name: 'Agent' });
+
+    const modelSelect = screen.getByRole('combobox', { name: 'Agent Model' });
+    expect(modelSelect.options[0].textContent).not.toContain('anthropic/claude-opus-4-5');
+  });
+
+  it('[DATA] Cowork model fields select from the model registry', async () => {
+    modelState.models = [
+      {
+        id: 'openai/gpt-4o',
+        canonicalSlug: 'gpt-4o',
+        name: 'GPT-4o',
+        provider: 'OpenAI',
+        contextLength: 128_000,
+        maxCompletionTokens: 16_384,
+        pricing: { input: 0.0000025, output: 0.00001 },
+        modality: 'text+image->text',
+        inputModalities: ['text', 'image'],
+        outputModalities: ['text'],
+        supportsTools: true,
+        supportsVision: true,
+        source: 'openrouter',
+        requestCount: 10,
+        lastSyncedAt: '2026-01-01T00:00:00.000Z',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        retiredAt: null,
+      },
+    ];
+    const onChange = vi.fn();
+
+    function ControlledCoworkStepEditor() {
+      const [step, setStep] = React.useState(buildStep({ executor: 'cowork', cowork: { agent: 'chat' } }));
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[]}
+          onChange={(patch) => {
+            onChange(patch);
+            setStep((current) => ({ ...current, ...patch }));
+          }}
+        />
+      );
+    }
+
+    render(<ControlledCoworkStepEditor />);
+
+    expandCard('Collaboration');
+    const chatModel = await screen.findByRole('combobox', { name: 'Chat model' });
+    expect(screen.getByRole('option', { name: /GPT-4o/ })).toBeInTheDocument();
+
+    fireEvent.change(chatModel, { target: { value: 'openai/gpt-4o' } });
+    expect(onChange).toHaveBeenCalledWith({ cowork: { agent: 'chat', chat: { model: 'openai/gpt-4o' } } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Voice' }));
+    const realtimeModel = await screen.findByRole('combobox', { name: 'Realtime model' });
+    const synthesisModel = screen.getByRole('combobox', { name: 'Synthesis model' });
+    expect(realtimeModel).toBeInTheDocument();
+    expect(synthesisModel).toBeInTheDocument();
+
+    fireEvent.change(realtimeModel, { target: { value: 'openai/gpt-4o' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      cowork: expect.objectContaining({ voiceRealtime: { model: 'openai/gpt-4o' } }),
+    }));
+
+    fireEvent.change(synthesisModel, { target: { value: 'openai/gpt-4o' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      cowork: expect.objectContaining({ voiceRealtime: { model: 'openai/gpt-4o', synthesisModel: 'openai/gpt-4o' } }),
+    }));
+  });
+
+  it('[REGRESSION] keeps a selected agent when it is no longer returned by the agent list', async () => {
+    const onChange = vi.fn();
+
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', agentId: 'retired-agent' })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+
+    expandCard('Prompt & model');
+    const agentSelect = await screen.findByRole('combobox', { name: 'Agent' });
+
+    expect(agentSelect).toHaveValue('retired-agent');
+    expect(screen.getByRole('option', { name: 'retired-agent (current)' })).toBeInTheDocument();
+  });
+
+  it('[ERROR] reports when the workspace agent list cannot be loaded', async () => {
+    agentState.error = true;
+
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent' })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+
+    expandCard('Prompt & model');
+
+    expect(await screen.findByText(/Agent list unavailable/)).toBeInTheDocument();
   });
 
   it('[RENDER] script config fields are shown for script executor', () => {
@@ -673,6 +1016,191 @@ describe('StepEditor', () => {
       );
 
       expect(screen.queryByTestId('step-data-flow')).not.toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Human step: allowedRoles picker and assignedTo combobox (#1252)
+  // -------------------------------------------------------------------------
+
+  describe('human step roles', () => {
+    /** Renders a human step's Advanced card, where both role controls live. */
+    function renderRoles(step: Partial<WorkflowStep> = {}, workflowName = 'tealflow') {
+      const onChange = vi.fn();
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'human', ...step })}
+          allSteps={[]}
+          workflowName={workflowName}
+          onChange={onChange}
+        />,
+      );
+      expandCard('Advanced');
+      return { onChange };
+    }
+
+    function addRole(text: string) {
+      const input = screen.getByLabelText('Add an allowed role');
+      fireEvent.change(input, { target: { value: text } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+    }
+
+    it('renders each authored role as its own chip rather than a comma-joined string', () => {
+      renderRoles({ allowedRoles: ['reviewer', 'approver'] });
+
+      expect(screen.getByText('reviewer')).toBeInTheDocument();
+      expect(screen.getByText('approver')).toBeInTheDocument();
+    });
+
+    it('round-trips a picked role into allowedRoles', () => {
+      rolesState.workspaceRoles = {
+        roles: ['approver', 'reviewer'], workflowNames: ['tealflow'],
+        heldRoles: ['approver', 'reviewer'], loading: false, error: null,
+      };
+      const { onChange } = renderRoles({ allowedRoles: ['reviewer'] });
+
+      addRole('approver');
+
+      expect(onChange).toHaveBeenCalledWith({ allowedRoles: ['reviewer', 'approver'] });
+    });
+
+    it('accepts a role nobody holds yet — the vocabulary is a pick-list, not a validator', () => {
+      rolesState.workspaceRoles = {
+        roles: ['reviewer'], workflowNames: ['tealflow'], heldRoles: ['reviewer'],
+        loading: false, error: null,
+      };
+      const { onChange } = renderRoles();
+
+      addRole('principal-investigator');
+
+      expect(onChange).toHaveBeenCalledWith({ allowedRoles: ['principal-investigator'] });
+    });
+
+    it('offers the workspace vocabulary as suggestions', () => {
+      rolesState.workspaceRoles = {
+        roles: ['approver', 'reviewer'], workflowNames: ['tealflow'],
+        heldRoles: ['approver'], loading: false, error: null,
+      };
+      renderRoles();
+
+      const listId = screen.getByLabelText('Add an allowed role').getAttribute('list');
+      const options = document.querySelectorAll(`#${listId} option`);
+      expect([...options].map((option) => option.getAttribute('value'))).toEqual(['approver', 'reviewer']);
+    });
+
+    it('drops allowedRoles entirely when the last chip is removed', () => {
+      const { onChange } = renderRoles({ allowedRoles: ['reviewer'] });
+
+      fireEvent.click(screen.getByLabelText('Remove role reviewer'));
+
+      expect(onChange).toHaveBeenCalledWith({ allowedRoles: undefined });
+    });
+
+    it('warns about a role nobody holds, without blocking the edit', () => {
+      rolesState.workspaceRoles = {
+        roles: ['reviewer'], workflowNames: ['tealflow'], heldRoles: [],
+        loading: false, error: null,
+      };
+      const { onChange } = renderRoles({ allowedRoles: ['reviewer'] });
+
+      expect(screen.getByText(/no one holds/i)).toHaveTextContent('reviewer');
+
+      // Authoring a role before granting it is legitimate, so the warning has
+      // to leave the field writable — including for a second unheld role.
+      addRole('approver');
+      expect(onChange).toHaveBeenCalledWith({ allowedRoles: ['reviewer', 'approver'] });
+    });
+
+    it('says the step is blocked only when no listed role is held', () => {
+      // ADR-0020 seeds every new human step with `reviewer, workflow-manager`,
+      // and most workspaces have no reviewer — so on the common step the
+      // warning has to name what is missing without claiming a stall that the
+      // held role prevents.
+      rolesState.workspaceRoles = {
+        roles: ['reviewer', 'workflow-manager'],
+        workflowNames: ['tealflow'],
+        heldRoles: ['workflow-manager'],
+        loading: false,
+        error: null,
+      };
+      renderRoles({ allowedRoles: ['reviewer', 'workflow-manager'] });
+
+      const warning = screen.getByText(/no one holds/i);
+      expect(warning).toHaveTextContent('reviewer');
+      expect(warning).toHaveTextContent('only "workflow-manager" can act on this step');
+      expect(warning).not.toHaveTextContent('will block');
+    });
+
+    it('does not call a step blocked when a workflow-manager can reach it', () => {
+      // ADR-0020: a restricted step admits `workflow-manager` whether or not
+      // the author wrote it, so an imported step naming only `engineer` is
+      // reachable in a workspace that has one.
+      rolesState.workspaceRoles = {
+        roles: ['engineer', 'workflow-manager'],
+        workflowNames: ['tealflow'],
+        heldRoles: ['workflow-manager'],
+        loading: false,
+        error: null,
+      };
+      renderRoles({ allowedRoles: ['engineer'] });
+
+      const warning = screen.getByText(/no one holds/i);
+      expect(warning).toHaveTextContent('engineer');
+      expect(warning).not.toHaveTextContent('will block');
+    });
+
+    it('[REGRESSION #1252] a holder scoped to another workflow does not silence the warning', () => {
+      // `heldRoles` is already scoped to this workflow by the hook, so a grant
+      // narrowed to `otherflow` never reaches it.
+      rolesState.workspaceRoles = {
+        roles: ['reviewer'], workflowNames: ['otherflow', 'tealflow'], heldRoles: [],
+        loading: false, error: null,
+      };
+      renderRoles({ allowedRoles: ['reviewer'] });
+
+      expect(screen.getByText(/no one holds/i)).toBeInTheDocument();
+    });
+
+    it('stays quiet when somebody does hold the role here', () => {
+      rolesState.workspaceRoles = {
+        roles: ['reviewer'], workflowNames: ['tealflow'], heldRoles: ['reviewer'],
+        loading: false, error: null,
+      };
+      renderRoles({ allowedRoles: ['reviewer'] });
+
+      expect(screen.queryByText(/no one holds/i)).not.toBeInTheDocument();
+    });
+
+    it('stays quiet while the roster is still unknown — absence of an answer is not a "no"', () => {
+      rolesState.workspaceRoles = {
+        roles: [], workflowNames: [], heldRoles: null, loading: true, error: null,
+      };
+      renderRoles({ allowedRoles: ['reviewer'] });
+
+      expect(screen.queryByText(/no one holds/i)).not.toBeInTheDocument();
+    });
+
+    it('keeps an interpolation template in assignedTo through an edit', () => {
+      rolesState.members = [{ uid: 'uid-alice', displayName: 'Alice' }];
+      const { onChange } = renderRoles({ assignedTo: '${triggerPayload.userId}' });
+
+      const input = screen.getByLabelText('Assign this task to') as HTMLInputElement;
+      expect(input.value).toBe('${triggerPayload.userId}');
+
+      fireEvent.change(input, { target: { value: '${triggerPayload.reviewerId}' } });
+      expect(onChange).toHaveBeenCalledWith({ assignedTo: '${triggerPayload.reviewerId}' });
+    });
+
+    it('offers workspace members as assignee suggestions', () => {
+      rolesState.members = [
+        { uid: 'uid-alice', displayName: 'Alice' },
+        { uid: 'uid-bob', displayName: null },
+      ];
+      renderRoles();
+
+      const listId = screen.getByLabelText('Assign this task to').getAttribute('list');
+      const options = document.querySelectorAll(`#${listId} option`);
+      expect([...options].map((option) => option.getAttribute('value'))).toEqual(['uid-alice', 'uid-bob']);
     });
   });
 });

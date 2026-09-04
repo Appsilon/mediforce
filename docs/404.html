@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page not found | Mediforce</title>
+  <meta name="robots" content="noindex, follow" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .nf {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 7rem 1.5rem 8rem;
+      min-height: 68vh;
+    }
+
+    .nf-code {
+      font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1.25rem;
+    }
+
+    .nf h1 {
+      font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+      font-size: clamp(2rem, 6vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -0.035em;
+      line-height: 1.15;
+      max-width: 34rem;
+    }
+
+    .nf p {
+      max-width: 34rem;
+      margin-top: 1.25rem;
+      font-size: 1.0625rem;
+      color: var(--text-60);
+    }
+
+    .nf-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.625rem;
+      margin-top: 2.5rem;
+    }
+
+    .nf-link {
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      background: var(--bg-card);
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: border-color 150ms ease, color 150ms ease;
+    }
+
+    .nf-link:hover { border-color: var(--accent); color: var(--accent); }
+
+    .nf-link--primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .nf-link--primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
+  </style>
+  <link rel="stylesheet" href="theme.css?v=c85f62e4" />
+</head>
+<body>
+  <header class="site-header" id="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="logo-group">
+        <div class="logo-mark"><img src="logo.png" alt="Mediforce logo" width="32" height="32" /></div>
+        <span class="logo-text">Mediforce</span>
+      </a>
+      <div class="header-links">
+        <a href="case-studies/" class="header-link">Case Studies</a>
+        <a href="validated-ai.html" class="header-link">Validation</a>
+        <a href="security.html" class="header-link">Security</a>
+        <a href="fda-principles.html" class="header-link">FDA Alignment</a>
+        <a href="setup/" class="header-link">Self-host</a>
+        <a href="https://mediforce.ai/docs/" class="header-link" target="_blank" rel="noopener noreferrer">Docs</a>
+        <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer" class="header-link">GitHub</a>
+        <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="header-link">Join Discord</a>
+      </div>
+    </div>
+  </header>
+  <script src="nav.js?v=a64ae0f4" defer></script>
+
+  <main class="nf">
+    <div class="nf-code">Error 404</div>
+    <h1>This page isn't here.</h1>
+    <p>
+      It may have moved, or the link may be wrong. The navigation above still works,
+      and everything below is a good place to pick up.
+    </p>
+    <div class="nf-links">
+      <a class="nf-link nf-link--primary" href="index.html">Back to the homepage</a>
+      <a class="nf-link" href="case-studies/">Case studies</a>
+      <a class="nf-link" href="https://mediforce.ai/docs/">Documentation</a>
+      <a class="nf-link" href="https://github.com/Appsilon/mediforce">GitHub</a>
+    </div>
+  </main>
+</body>
+</html>

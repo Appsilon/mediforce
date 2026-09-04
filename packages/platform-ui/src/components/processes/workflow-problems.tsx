@@ -17,6 +17,11 @@ interface WorkflowWarning extends PreflightWarning {
   workflowTitle?: string;
 }
 
+/** The warning's own Secrets-panel deep link, so the row is one click from a fix. */
+function secretsHref(warning: WorkflowWarning): string | null {
+  return warning.actions.find((action) => action.label === 'Configure in Secrets panel')?.href ?? null;
+}
+
 interface WorkflowProblemsProps {
   handle: string;
   latestDocs: Map<string, WorkflowDefinition>;
@@ -118,6 +123,7 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
       <ul className="space-y-1.5">
         {visible.map((warning) => {
           const showName = warning.workflowTitle && warning.workflowTitle !== warning.workflowName;
+          const secretHref = warning.category === 'missing-secret' ? secretsHref(warning) : null;
           return (
             <li key={`${warning.workflowName}-${warning.category}-${warning.resource}`} className="text-sm">
               <span className="font-medium text-foreground">
@@ -137,6 +143,14 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
                   className="ml-1.5 text-xs text-amber-700 underline hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200"
                 >
                   View images
+                </Link>
+              )}
+              {secretHref !== null && (
+                <Link
+                  href={secretHref}
+                  className="ml-1.5 text-xs text-amber-700 underline hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200"
+                >
+                  Set it
                 </Link>
               )}
             </li>

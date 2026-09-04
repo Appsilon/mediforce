@@ -107,6 +107,12 @@ visible to handlers.
    today, in one place. Adding role enforcement is a separate change
    (likely with [ADR-0002](./0002-firebase-auth-to-nextauth.md), when
    `CallerIdentity` gains per-workspace roles, or as the Phase 4 ADR).
+
+   > **Answered by [ADR-0019](./0019-workspace-scoped-roles.md).** The
+   > division of labour above stands — the wrapper still consults no roles.
+   > What changed is the other half: `assertCallerHoldsRole` in
+   > `packages/platform-api/src/auth.ts` now gates task claim and complete,
+   > and `RbacService` has been deleted rather than wired up.
 5. **Cross-entity logic stays in the handler.** When a mutation needs to
    read a second entity (e.g. `complete(taskId, data)` validates `data`
    against the parent run's step gate config), the handler does the second
@@ -282,7 +288,9 @@ visible to handlers.
   enforcement lives in Firestore security rules and an unwired
   `RbacService`. Adding handler-level role checks is deferred to a later
   ADR that lands alongside or after ADR-0002 (so `CallerIdentity` carries
-  roles per workspace).
+  roles per workspace). *That ADR is
+  [ADR-0019](./0019-workspace-scoped-roles.md); the checks are handler-resident
+  and `RbacService` is gone.*
 - **`ProcessInstance` → `WorkflowRun` rename and friends.** Per ADR-0001,
   these are follow-up PRs. New wrapper types use canonical names from
   day one (`AuthorizedWorkflowRunRepository`), so we do not propagate

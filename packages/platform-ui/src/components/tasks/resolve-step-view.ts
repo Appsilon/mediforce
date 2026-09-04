@@ -2,21 +2,24 @@ import type { HumanTask, StepExecution } from '@mediforce/platform-core';
 
 export interface ViewerIdentity {
   uid: string | null;
-  role: string | null;
 }
 
 /**
  * How the current viewer may interact with the step's human task.
  *
- * `claimed-by-other` / `role-mismatch` render the task read-only with a
- * banner — the server enforces the claimant on complete, this is the UI
- * mirror of that rule. A viewer without a role claim (workspace admins
- * browsing) is treated as allowed; the engine auto-claims on completion.
+ * `claimed-by-other` renders the task read-only with a banner — the server
+ * enforces the claimant on complete, and this is the UI mirror of that rule.
+ *
+ * Role gating is deliberately NOT mirrored here. `step.allowedRoles` is
+ * enforced server-side against the run's pinned definition (ADR-0019), and the
+ * only role data this component can see is `HumanTask.assignedRole` — which
+ * holds `allowedRoles[0]` alone. A mirror built on it refuses a legitimate
+ * holder of the step's second role, so the server's refusal, which names the
+ * roles required and the roles held, is the one answer.
  */
 export type HumanStepAccess =
   | { kind: 'actionable' }
   | { kind: 'claimed-by-other'; claimedBy: string }
-  | { kind: 'role-mismatch'; requiredRole: string }
   | { kind: 'completed' };
 
 export type StepView =
@@ -70,9 +73,6 @@ export function resolveStepView(args: {
 function accessFor(task: HumanTask, viewer: ViewerIdentity): HumanStepAccess {
   if (task.assignedUserId !== null && task.assignedUserId !== viewer.uid) {
     return { kind: 'claimed-by-other', claimedBy: task.assignedUserId };
-  }
-  if (viewer.role !== null && task.assignedRole !== viewer.role) {
-    return { kind: 'role-mismatch', requiredRole: task.assignedRole };
   }
   return { kind: 'actionable' };
 }

@@ -6,6 +6,31 @@ import {
 } from './base-container-agent-plugin';
 import { isWorkflowAgentContext } from './container-plugin';
 
+/**
+ * Spell a model the way the endpoint the CLI is pointed at expects.
+ *
+ * Models reach this plugin as OpenRouter slugs (`anthropic/claude-sonnet-4`) —
+ * that is what the model registry and an agent's `foundationModel` both speak.
+ * Through the OpenRouter gateway that spelling is correct. Against the Anthropic
+ * API directly it is not: there a model is a bare id (`claude-sonnet-4`), so the
+ * provider prefix has to come off, and a non-Anthropic model cannot be served at
+ * all — better to say so than to quietly run a different model than the one the
+ * step and the audit trail name.
+ */
+export function resolveClaudeModel(model: string, viaGateway: boolean): string {
+  const separator = model.indexOf('/');
+  if (viaGateway || separator < 0) return model;
+
+  const provider = model.slice(0, separator);
+  if (provider !== 'anthropic') {
+    throw new Error(
+      `Model '${model}' cannot run on the claude-code-agent plugin against the Anthropic API directly. ` +
+      'Set OPENROUTER_API_KEY + ANTHROPIC_BASE_URL to route through OpenRouter, or choose an Anthropic model.',
+    );
+  }
+  return model.slice(separator + 1);
+}
+
 interface StreamEvent {
   type: string;
   subtype?: string;
@@ -176,7 +201,10 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
     ];
 
     if (options?.model) {
-      args.push('--model', options.model);
+      // ANTHROPIC_BASE_URL set means the CLI is pointed at a gateway (OpenRouter)
+      // rather than at the Anthropic API, which is what decides the spelling.
+      const viaGateway = this.resolvedEnv.vars.ANTHROPIC_BASE_URL !== undefined;
+      args.push('--model', resolveClaudeModel(options.model, viaGateway));
     }
     if (options?.addDirs) {
       // In Docker mode, files are mounted at /data; in local mode, use the real host path

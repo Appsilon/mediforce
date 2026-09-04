@@ -37,7 +37,7 @@ describe('AgentsPage', () => {
       await screen.findByText(/An agent is a reusable configuration a workflow step calls by id/),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/model a run uses is chosen per step in the workflow definition/),
+      screen.getByText(/run uses the agent's foundation model unless the workflow step/),
     ).toBeInTheDocument();
   });
 });

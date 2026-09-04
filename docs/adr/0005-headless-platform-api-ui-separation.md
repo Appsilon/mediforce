@@ -345,7 +345,9 @@ layer has different tradeoffs that need their own grilling:
   level). Needs caller to push intent down as context.
 - **Engine-resident emit.** `WorkflowEngine` already emits 7 internal
   lifecycle events today (`instance.created/started/paused/resumed`,
-  `step.retried`, `task.created`, `rbac.access_denied`); engine is the
+  `step.retried`, `task.created`, `rbac.access_denied` — the last of these
+  emitted by the `RbacService` branch [ADR-0019](./0019-workspace-scoped-roles.md)
+  has since deleted); engine is the
   state-machine source of truth. Pro: natural fit for state-transition
   audit; HTTP handler / CLI / future MCP / agent-runner all get audit
   for free. Con: engine needs caller actor + intent passed through

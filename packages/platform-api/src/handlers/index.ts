@@ -49,6 +49,7 @@ export { askWorkflowAssistant } from './workflow-assistant/ask-workflow-assistan
 export { validateWorkflow } from './workflows/validate-workflow';
 export { getWorkflowSchema } from './workflows/get-workflow-schema';
 export { setWorkflowVisibility } from './workflows/set-visibility';
+export { getWorkflowAccess, setWorkflowAccess } from './workflows/workflow-access';
 export {
   archiveWorkflow,
   archiveWorkflowVersion,

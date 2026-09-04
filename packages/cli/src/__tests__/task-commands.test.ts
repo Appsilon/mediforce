@@ -73,6 +73,30 @@ describe('task list command', () => {
     expect(url).not.toMatch(/instanceId=/);
   });
 
+  it('passes --actionable through as a query param', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ tasks: [] }),
+    );
+    await taskListCommand({
+      argv: ['--actionable'],
+      env: { MEDIFORCE_API_KEY: 'k' },
+      output: captureOutput(),
+    });
+    expect(fetchSpy.mock.calls[0]?.[0] as string).toMatch(/actionable=true/);
+  });
+
+  it('omits actionable entirely without the flag — the unfiltered default', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ tasks: [] }),
+    );
+    await taskListCommand({
+      argv: [],
+      env: { MEDIFORCE_API_KEY: 'k' },
+      output: captureOutput(),
+    });
+    expect(fetchSpy.mock.calls[0]?.[0] as string).not.toMatch(/actionable/);
+  });
+
   it('exits 2 when both --role and --instance-id are given', async () => {
     const output = captureOutput();
     const code = await taskListCommand({

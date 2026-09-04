@@ -3,7 +3,7 @@ import type { UserDirectoryService } from '@mediforce/platform-core';
 /**
  * A `UserDirectoryService` that answers nothing, with the parts a test cares
  * about overridden. Most handler tests need exactly one method — usually
- * `getUserMetadata` — and would otherwise re-declare the other five as
+ * `getUserMetadata` — and would otherwise re-declare the other six as
  * `async () => []` in every file, which then all have to be edited whenever
  * the port grows (as ADR-0019 just made it).
  *
@@ -21,7 +21,13 @@ export function stubUserDirectory(
     async getRolesForUser() {
       return [];
     },
+    async getGrantsForUser() {
+      return [];
+    },
     async setRolesForUser() {
+      // no-op
+    },
+    async grantRole() {
       // no-op
     },
     async clearRolesForWorkflow() {

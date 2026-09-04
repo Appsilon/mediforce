@@ -3,6 +3,7 @@ import { createAgent, listAdapter } from '@mediforce/platform-api/handlers';
 import {
   ListAgentsInputSchema,
   CreateAgentInputSchema,
+  type ListAgentsInput,
   type CreateAgentInput,
 } from '@mediforce/platform-api/contract';
 
@@ -11,8 +12,8 @@ import {
  */
 export const GET = createRouteAdapter(
   ListAgentsInputSchema,
-  () => ({}),
-  listAdapter('agents', (_input, scope) => scope.agentDefinitions.list()),
+  (req) => ({ namespace: req.nextUrl.searchParams.get('namespace') ?? undefined }),
+  listAdapter('agents', (input: ListAgentsInput, scope) => scope.agentDefinitions.list(input.namespace)),
 );
 
 /**

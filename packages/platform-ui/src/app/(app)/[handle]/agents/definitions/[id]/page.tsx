@@ -139,8 +139,8 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl">
       <ConceptIntro>
         <p>
-          <strong>An agent is a reusable configuration workflow steps call by id</strong> — its system prompt and its
-          MCP server bindings are the parts a run consumes. Agents are not versioned, so a change here applies to
+          <strong>An agent is a reusable configuration workflow steps call by id</strong> — its system prompt, its
+          foundation model and its MCP server bindings are the parts a run consumes. Agents are not versioned, so a change here applies to
           every step that already references this one.
         </p>
       </ConceptIntro>
@@ -302,7 +302,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              Recorded on the agent for reference. A run takes its model from the workflow step that calls the agent.
+              Used by every workflow step that calls this agent, unless the step sets its own model.
             </p>
           </div>
 

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   ProcessInstanceSchema,
+  WorkflowAccessSchema,
   WorkflowDefinitionBaseSchema,
   WorkflowDefinitionSchema,
   WorkflowVisibilitySchema,
@@ -114,6 +115,18 @@ export const WorkflowDefinitionGroupSchema = z.object({
    * guard. Defaults to `false` for older clients.
    */
   manualStartEnabled: z.boolean().default(false),
+  /**
+   * Whether *this caller* may start a run of this workflow — the workflow's
+   * `run` role gate (ADR-0019), answered server-side by the same predicate
+   * that enforces it.
+   *
+   * It rides on the card for the reason `manualStartEnabled` does: the catalog
+   * renders a Start button per workflow, and a per-card round trip to ask
+   * would be one HTTP request per card on the busiest page in the app. Defaults
+   * to `true` for older clients — an ungated workflow is what almost every card
+   * is, and greying out a button on a stale client would be the worse default.
+   */
+  callerMayRun: z.boolean().default(true),
 });
 
 export const ListWorkflowsInputSchema = z.object({
@@ -258,6 +271,62 @@ export const SetVisibilityOutputSchema = z.object({
 
 export type SetVisibilityInput = z.infer<typeof SetVisibilityInputSchema>;
 export type SetVisibilityOutput = z.infer<typeof SetVisibilityOutputSchema>;
+
+/**
+ * Contract for `GET|PUT /api/workflow-definitions/:name/access?namespace=<ns>`
+ * — who may run and who may edit this workflow (ADR-0019, issue #1253).
+ *
+ * `visibility` above is the *cross-workspace* shelf and is unrelated: every
+ * member of the owning workspace can still see every workflow in it. This
+ * decides who may start it and who may change it.
+ *
+ * The response carries `caller`, the same two questions answered for the
+ * caller by the predicate the gates enforce. It exists so the browser never
+ * has to re-derive the rule: a Start button that decided on its own whether it
+ * is enabled would drift from the 403 the server actually returns, which is
+ * the bug #1249 deleted from the run step page and #1251 from the inbox.
+ */
+export const GetWorkflowAccessInputSchema = z.object({
+  name: z.string().min(1),
+  namespace: z.string().min(1),
+});
+
+export const WorkflowAccessCallerSchema = z.object({
+  /** Whether this caller may start a run of the workflow right now. */
+  mayRun: z.boolean(),
+  /** Whether this caller may register, archive, delete, transfer or re-point it. */
+  mayEdit: z.boolean(),
+});
+
+export const GetWorkflowAccessOutputSchema = z.object({
+  namespace: z.string().min(1),
+  name: z.string().min(1),
+  access: WorkflowAccessSchema,
+  caller: WorkflowAccessCallerSchema,
+});
+
+/**
+ * Full replace, like every other role write in the epic (`setRolesForUser`,
+ * `step.allowedRoles`): the caller states the end state, and empty lists mean
+ * "any workspace member" rather than "leave it alone". Administered by
+ * workspace owner/admin — access to a workflow is a Membership privilege, not
+ * a workflow-ownership one (ADR-0019 introduces no `createdBy`).
+ */
+export const SetWorkflowAccessBodySchema = z.object({
+  access: WorkflowAccessSchema,
+});
+
+export const SetWorkflowAccessInputSchema = SetWorkflowAccessBodySchema.extend({
+  name: z.string().min(1),
+  namespace: z.string().min(1),
+});
+
+export const SetWorkflowAccessOutputSchema = GetWorkflowAccessOutputSchema;
+
+export type GetWorkflowAccessInput = z.infer<typeof GetWorkflowAccessInputSchema>;
+export type GetWorkflowAccessOutput = z.infer<typeof GetWorkflowAccessOutputSchema>;
+export type SetWorkflowAccessInput = z.infer<typeof SetWorkflowAccessInputSchema>;
+export type SetWorkflowAccessOutput = z.infer<typeof SetWorkflowAccessOutputSchema>;
 
 export const CopyWorkflowInputSchema = z.object({
   name: z.string().min(1),

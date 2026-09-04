@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-08-19
+last_reviewed: 2026-08-28
 ---
 
 # Workflow capabilities
@@ -122,7 +122,7 @@ shared sub-schemas (`StepUiSchema`, `StepParamSchema`, `VerdictSchema`,
 | Business verdicts | `verdicts` | `VerdictSchema`: `target` + `label`, `intent` (`success`/`danger`/`warning`/`neutral`), `requiresComment`. Defaults filled by [`verdicts.ts`](../../packages/platform-core/src/schemas/verdicts.ts). Routed by transition `when: verdict == "..."` |
 | Pick from a list | `selection` | `SelectionSchema`: a number (exact count) or `{ min, max }` range |
 | **Dynamic assignee** | `assignedTo` | `${...}`-interpolated user id; only valid on `executor: human`; the engine resolves it and marks the task `claimed` — [`workflow-engine.ts`](../../packages/workflow-engine/src/engine/workflow-engine.ts) |
-| Role gating | `allowedRoles` | **Declarative only today — nothing enforces it.** Any workspace member can claim and complete the task. Enforcement is proposed in [ADR-0019](../adr/0019-workspace-scoped-roles.md) and tracked by [#1249](https://github.com/Appsilon/mediforce/issues/1249). Note the engine copies only `allowedRoles[0]` into `HumanTask.assignedRole` |
+| Role gating | `allowedRoles` | **Enforced on claim and complete** ([ADR-0019](../adr/0019-workspace-scoped-roles.md)): the caller must hold one of the listed Roles in the run's workspace. Absent or empty means any workspace member, as before. Roles are granted per workspace (`mediforce namespace set-member-roles`), and a role nobody holds makes the step unclaimable by design — the 403 names the role and the fix. The gate reads the array off the run's pinned definition, not `HumanTask.assignedRole`, which only ever holds `allowedRoles[0]`. This is the *step* gate; who may start or change the workflow at all is the Access tab — see "Three things called roles" |
 
 What a human task can *submit back* is a discriminated union in
 [`task-completion.ts`](../../packages/platform-core/src/schemas/task-completion.ts):
@@ -295,7 +295,7 @@ Beyond `steps` / `transitions`, on `WorkflowDefinitionBaseSchema` in
 | Capability | Field | Notes |
 |-----------|-------|-------|
 | Listing visibility | `visibility` = `public` \| `private` (default `private`) | `WorkflowVisibilitySchema` |
-| Declared roles | `roles` | role names used by `allowedRoles` / `assignedTo` / notifications |
+| Declared roles | `roles` | **Declares a vocabulary; grants nothing.** See "Three things called roles" below |
 | Run-wide / per-step config | `env` (workflow + step level) | non-secret config; values may reference `{{SECRET_NAME}}` |
 | Agent context preamble | `preamble` | prepended context for agent steps |
 | Git-import provenance (no runtime effect) | `source` (`WorkflowSourceSchema`, `{url, path, commit}`) | informational only — see [ADR-0009](../adr/0009-workflow-import-scope-boundary.md) |
@@ -305,3 +305,71 @@ Beyond `steps` / `transitions`, on `WorkflowDefinitionBaseSchema` in
 
 The authorable surface (what the design LLM may emit) is `WorkflowAuthorableSchema`
 in the same file — server-managed and lifecycle fields are excluded by construction.
+
+### Three things called roles — and only two of them grant anything
+
+The word appears three times around a workflow, and they are not the same thing
+([ADR-0019](../adr/0019-workspace-scoped-roles.md)):
+
+| | Where it lives | What it does |
+|---|---|---|
+| `roles` | the WD envelope, **authored** | *Declares* the role names this workflow expects — `["reviewer", "biostatistician"]`. Grants nobody anything, gates nothing, and is checked by no code path. Its one job is telling a deployment that imports this package what to grant, which is why it survives: the role pick-list in the editor is the union of roles already granted in the workspace with the ones definitions declare |
+| `step.allowedRoles` | each human step, **authored** | Who may claim and complete *that step*. **Enforced** on claim and complete. Travels with the package, because "a reviewer does this step" is a property of the process |
+| Access tab (`run` / `edit`) | the workflow's **Access** tab, operational | Who may start a run of this workflow, and who may change it (register a version, archive, delete, transfer, set visibility, move the default version). **Enforced.** Deliberately *not* in the WD: it is mutable and local, and registering v8 must not silently rewrite permissions |
+
+Who actually *holds* a role is none of the three: roles are granted per member,
+per workspace (optionally narrowed to one workflow), from workspace **Settings →
+Members**, `mediforce namespace set-member-roles`, or
+`PUT /api/namespaces/:handle/members/:uid/roles`.
+
+Empty or absent means "any workspace member" at every level, so a workflow that
+sets none of this behaves exactly as it did before roles were enforced. A role
+nobody holds is the opposite: the gate naming it is closed to everyone, which is
+correct (an approval control that opens when unconfigured is the worse failure)
+and is why both the step editor and the Access tab warn about it.
+
+**Nothing starts empty any more, for a workflow a person creates.**
+[ADR-0020](../adr/0020-built-in-roles-and-default-workflow-access.md) ships four
+built-in roles and writes them into the two enforced places as defaults:
+
+| Role | May |
+|---|---|
+| `executor` | start runs |
+| `editor` | change the workflow |
+| `reviewer` | act on its human steps |
+| `workflow-manager` | all three |
+
+Registering a workflow's **first version** seeds its Access tab with
+`run: [executor, workflow-manager]` and `edit: [editor, workflow-manager]`, and
+adding a human block in the editor starts its `allowedRoles` at
+`[reviewer, workflow-manager]`. Both are ordinary values on the two lists above,
+and nothing recognises these names in the gate itself — a role holds a privilege
+only where a list names it.
+
+On the Access tab the built-ins are a **floor**, not just a starting point: a
+verb you restrict always keeps the built-in roles that carry it, so restricting
+`run` to `qa-lead` stores `[executor, workflow-manager, qa-lead]` and the tab
+shows those two as locked chips. The way back to "any member" is the verb's
+**restrict** toggle, not removing chips.
+
+A restricted **step** has a floor too, and it is exactly one role:
+`workflow-manager` can act on any human step, whatever its `allowedRoles` say.
+An imported package whose step allows `engineer` is still actionable by a
+workflow manager. The floor is applied where the gate reads rather than written
+into the list, because `allowedRoles` travels with the package and rewriting it
+would put this deployment's vocabulary into someone else's workflow — the chips
+in the step editor stay exactly what the author wrote. `reviewer` gets no such
+standing despite carrying `act`: it is an ordinary process role that authored
+definitions already name, and widening it would let a grant made for one step
+claim every other one. Its `act` verb shows up where it is honest — as the role
+a new human step is seeded to allow.
+
+An empty `allowedRoles` is untouched in both cases: no restriction means any
+workspace member, and a floor there would gate a step that is open today.
+
+Two exceptions keep this deployable: a workflow **registered by automation**
+(the CLI, an import, the seeded builtins) stays open, because a system actor
+has no uid to grant the matching role to, and **workflows that predate
+ADR-0020** are untouched. The person who registers a workflow is granted
+`workflow-manager` narrowed to it, which is what stops the seeded `edit` list
+from refusing them their own second Save.

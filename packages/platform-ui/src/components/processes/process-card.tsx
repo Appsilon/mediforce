@@ -8,6 +8,8 @@ import { ProcessInstanceRow } from '@/components/processes/process-run-section';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { workflowDisplayName } from '@/lib/workflow-save-utils';
 import { VersionLabel } from '@/components/ui/version-label';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import type { WorkflowRunSummary } from '@mediforce/platform-api/contract';
 import type { DefinitionGroup } from '@/hooks/use-process-definitions';
@@ -113,7 +115,7 @@ export function ProcessCard({
       >
         {/* Definition header — primary content */}
         <Link
-          href={`/${handle}/workflows/${encodeURIComponent(definition.name)}`}
+          href={routes.workflow(handle, definition.name)}
           className="group flex items-start justify-between gap-2 px-4 py-4 hover:bg-muted/20 transition-colors"
         >
           <div className="flex items-start gap-3 min-w-0">
@@ -147,7 +149,14 @@ export function ProcessCard({
                 </p>
               )}
               <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
-                <VersionLabel version={definition.latestVersion} title={definition.title} variant="inline" />
+                {/* `title` belongs to the latest version — the only definition this
+                    list read returns — so a card pinned to an older default shows
+                    its version alone rather than pairing it with another's title. */}
+                <VersionLabel
+                  version={definition.effectiveVersion}
+                  title={definition.effectiveVersion === definition.latestVersion ? definition.title : undefined}
+                  variant="inline"
+                />
                 <span className="text-border">·</span>
                 <span className="flex items-center gap-1">
                   <Layers className="h-3 w-3" />
@@ -186,14 +195,23 @@ export function ProcessCard({
               <span>No runs</span>
             )}
           </div>
-          {isMember && (
+          <div className="flex items-center gap-2">
+            <InstantTooltip label={`Start Run uses v${definition.effectiveVersion} — open this version's definition`}>
+              <Link
+                href={routes.workflowDefinition(handle, definition.name, definition.effectiveVersion)}
+                className="inline-flex items-center rounded-md border px-2.5 py-1.5 text-sm font-medium hover:bg-muted transition-colors whitespace-nowrap"
+              >
+                <VersionLabel version={definition.effectiveVersion} variant="inline" className="text-sm" />
+              </Link>
+            </InstantTooltip>
             <StartRunButton
               workflowName={definition.name}
               showVersionPicker
               hasManualTrigger={definition.hasManualTrigger}
+              mayRun={definition.callerMayRun}
               archived={definition.archived === true}
             />
-          )}
+          </div>
         </div>
         )}
 
@@ -214,7 +232,7 @@ export function ProcessCard({
 
           {hasMore && (
             <Link
-              href={`/${handle}/runs?workflow=${encodeURIComponent(definition.name)}`}
+              href={routes.runs(handle, { workflow: definition.name })}
               className="block w-full px-4 py-2 text-xs font-medium text-primary hover:bg-muted/30 transition-colors border-t border-border/30 text-center"
             >
               Show all {totalCount} runs

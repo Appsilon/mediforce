@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import type { AgentRun, AgentRunStatus } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
@@ -86,38 +86,78 @@ export function useAgentRun(runId: string | null): {
   };
 }
 
+/** Where a run lives and what it is called — everything a row needs to link. */
+export interface RunLocation {
+  readonly definitionName: string;
+  readonly namespace: string;
+}
+
 /**
- * Definition-name lookup map indexed by process-instance id, scoped to the
- * active workspace `handle`. Uses the projected `mediforce.runs.listNames`
- * endpoint (issue #588): only `{ id, definitionName }` per run, not the full
+ * Run lookup indexed by process-instance id, covering every workspace in
+ * `handles`. Uses the projected `mediforce.runs.listNames` endpoint (issue
+ * #588): only `{ id, definitionName }` per run, not the full
  * `ProcessInstance` — the full-document `runs.list` path was ~24 s/request in
  * dev for a 10k-run workspace.
+ *
+ * One query per workspace rather than one widened endpoint: the entries are
+ * already keyed and cached per workspace, so a selection that adds a workspace
+ * re-uses every map it already had and fetches only the new one. The endpoint
+ * answers per workspace, which is also how `namespace` re-enters the result —
+ * `RunNameEntry` itself does not carry one, and a row rendered under a
+ * multi-workspace selection needs it to build a link that resolves.
  *
  * NICE LIVE (30 s): the map only changes when a new run lands, so a slower
  * cadence plus `staleTime` cuts read volume on this loop without staleness the
  * operator would notice.
  */
-export function useProcessNameMap(handle: string): Map<string, string> {
-  const query = useQuery({
-    queryKey: queryKeys.runs.nameMap(handle),
-    enabled: handle.length > 0,
-    staleTime: NICE_LIVE_INTERVAL_MS,
-    queryFn: async () => {
-      const result = await mediforce.runs.listNames({ namespace: handle });
-      return result.runs;
-    },
-    refetchInterval: (q) => {
-      // PRD §9 rule 4: terminate on 4xx so a session whose membership flipped
-      // stops polling this slice.
-      if (q.state.error !== null) return false;
-      return NICE_LIVE_INTERVAL_MS;
-    },
-    retry: stopRetryOn4xx,
+export function useProcessRunMap(handles: readonly string[]): Map<string, RunLocation> {
+  const namespaces = useMemo(
+    () => [...new Set(handles.filter((handle) => handle.length > 0))].sort(),
+    [handles],
+  );
+
+  const results = useQueries({
+    queries: namespaces.map((namespace) => ({
+      queryKey: queryKeys.runs.nameMap(namespace),
+      staleTime: NICE_LIVE_INTERVAL_MS,
+      queryFn: async () => {
+        const result = await mediforce.runs.listNames({ namespace });
+        return result.runs.map((run) => ({ ...run, namespace }));
+      },
+      refetchInterval: (q: { state: { error: unknown } }) => {
+        // PRD §9 rule 4: terminate on 4xx so a session whose membership
+        // flipped stops polling this slice.
+        if (q.state.error !== null) return false as const;
+        return NICE_LIVE_INTERVAL_MS;
+      },
+      retry: stopRetryOn4xx,
+    })),
   });
-  const entries = query.data ?? [];
+
+  // `useQueries` returns a fresh array every render, so the map is memoised on
+  // the entry payloads rather than on `results` itself.
+  const entries = results.flatMap((result) => result.data ?? []);
+  const fingerprint = entries.map((entry) => `${entry.namespace}/${entry.id}`).join(',');
+
   return useMemo(() => {
-    const map = new Map<string, string>();
-    for (const entry of entries) map.set(entry.id, entry.definitionName);
+    const map = new Map<string, RunLocation>();
+    for (const entry of entries) {
+      map.set(entry.id, { definitionName: entry.definitionName, namespace: entry.namespace });
+    }
     return map;
-  }, [entries]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fingerprint]);
+}
+
+/**
+ * Single-workspace definition-name map — the shape the monitoring tabs read.
+ * A projection of `useProcessRunMap`, so both share one cache entry per
+ * workspace.
+ */
+export function useProcessNameMap(handle: string): Map<string, string> {
+  const runs = useProcessRunMap(useMemo(() => [handle], [handle]));
+  return useMemo(
+    () => new Map([...runs].map(([id, run]) => [id, run.definitionName])),
+    [runs],
+  );
 }

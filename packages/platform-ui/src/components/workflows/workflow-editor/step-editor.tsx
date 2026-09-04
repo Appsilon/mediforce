@@ -4,13 +4,15 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
+import { useNamespaceMembers } from '@/hooks/use-namespace-members';
+import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
-import { DEFAULT_AGENT_IMAGE, uniqueSlug } from '@mediforce/platform-core';
-import type { WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
+import { DEFAULT_AGENT_IMAGE, uniqueName, uniqueSlug } from '@mediforce/platform-core';
+import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
@@ -22,6 +24,7 @@ import { CoworkSection } from './cowork-section';
 import { StepDataFlow } from './step-data-flow';
 import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
+import { AllowedRolesField, AssignedToField } from './step-editor-roles';
 import { CollapsibleCard } from './collapsible-card';
 
 function friendlyFieldError(message: string): string {
@@ -125,8 +128,8 @@ const TIP = {
   autonomyLevel:           'Assist: agent runs and produces a draft; human approves. Human review: explicit human approval required. Autonomous agent: agent executes without review. L0/L1 are developer-only flags set via raw YAML.',
   plugin:                  'Agent plugin to invoke (e.g. opencode-agent, claude-code-agent). Must be registered in the platform.',
   pluginScript:            'Plugin that runs the script (usually script-container). Must be registered in the platform.',
-  agentId:                 'Slug of a saved agent definition. Loads its base model, skills, and MCP server bindings for this step.',
-  agentModel:              'LLM model for this step. Overrides the agent definition\'s default. Use provider/model format.',
+  agentId:                 'Saved agent definition used by this step. Its system prompt, model and MCP server bindings are loaded for the run.',
+  agentModel:              'LLM model for this step. Leave blank to use the agent definition\'s model. Use provider/model format.',
   agentSkill:              'Skill file name to load at runtime. Skills provide specialised instructions and tools for a specific task.',
   agentSkillsDir:          'Repo-relative path to the directory containing skill files. Overrides the agent definition\'s setting.',
   agentTimeoutMinutes:     'Maximum minutes the agent may run before the step is escalated.',
@@ -156,8 +159,8 @@ const TIP = {
   databricksPollIntervalMs:'How often to poll the run state, in milliseconds. Default 10000.',
   databricksTimeoutMinutes:'Step timeout in minutes — the run is cancelled when exceeded. Default 30.',
 
-  allowedRoles:            'Roles that can claim this task, comma-separated. Leave empty to allow any signed-in user.',
-  assignedTo:              'Pre-assign this human task to a specific user. Accepts a user id or an interpolated value like ${triggerPayload.userId}. Human steps only.',
+  allowedRoles:            'Roles that can claim and complete this task. Enforced: a member holding none of them is refused, and a role nobody holds on this workflow makes the step unclaimable. Pick from the roles this workspace already knows, or type a new one. Leave empty to allow any workspace member.',
+  assignedTo:              'Pre-assign this human task to a specific user. Pick a workspace member, or type an interpolated value like ${triggerPayload.userId} to assign per run. Human steps only.',
   continueOnError:         'When on, a failure of this step is logged as a warning and the workflow advances anyway instead of failing the whole run. Use for non-critical side-effects (e.g. a notification), never for a step later steps depend on.',
   uiComponent:             'Custom task body. "File upload" collects files; "Assignment table" and "Table editor" render their own views (configure their columns in the source editor). Default is the params form.',
   uiAcceptedTypes:         'Accepted file types, comma-separated — MIME types and/or extensions (e.g. text/csv, .csv, application/pdf). If empty, only PDFs are accepted.',
@@ -282,6 +285,54 @@ export function StepEditor({
   const isDecision = step.type === 'decision';
   const hasVerdicts = isReview || isDecision;
   const isTerminal = step.type === 'terminal';
+  const [agentDefinitions, setAgentDefinitions] = useState<AgentDefinition[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(false);
+  const [agentsError, setAgentsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isAgent) {
+      setAgentDefinitions([]);
+      setAgentsLoading(false);
+      setAgentsError(null);
+      return () => { cancelled = true; };
+    }
+
+    setAgentsLoading(true);
+    setAgentsError(null);
+    mediforce.agents.list({ namespace: handle })
+      .then(({ agents }) => {
+        if (!cancelled) setAgentDefinitions(agents);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setAgentsError(error instanceof Error ? error.message : 'Failed to load agents');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAgentsLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [handle, isAgent]);
+
+  // What a blank `agent.model` actually resolves to at run time: the named
+  // agent's foundationModel, or the plugin's own default when the step names
+  // no agent. Mirrors the fallback in `execute-agent-step`.
+  const selectedAgentDefaultModel =
+    agentDefinitions.find((agent) => agent.id === step.agentId)?.foundationModel
+    ?? selectedPluginDefaultModel;
+
+  // The workspace vocabulary and roster behind the two human-step role
+  // controls. `workflowName` scopes the "who can actually act here" question:
+  // a grant narrowed to another workflow does not let its holder claim this
+  // task, so it must not silence the unheld-role warning (#1252).
+  const { roles: workspaceRoles, heldRoles } = useWorkspaceRoles(handle, {
+    enabled: isHuman,
+    workflowName,
+  });
+  const { members } = useNamespaceMembers(handle);
 
   const httpAction    = step.action?.kind === 'http'    ? step.action : undefined;
   const reshapeAction = step.action?.kind === 'reshape' ? step.action : undefined;
@@ -625,18 +676,33 @@ export function StepEditor({
           </FieldRow>
 
           <FieldRow label="agentId" tooltip={TIP.agentId}>
-            <input
+            <select
+              aria-label="Agent"
               value={step.agentId ?? ''}
               onChange={(e) => onChange({ agentId: e.target.value || undefined })}
-              className={riMono}
-            />
+              className={rs}
+            >
+              <option value="">{agentsLoading ? 'Loading agents…' : 'No agent selected'}</option>
+              {step.agentId && !agentDefinitions.some((agent) => agent.id === step.agentId) && (
+                <option value={step.agentId}>{step.agentId} (current)</option>
+              )}
+              {[...agentDefinitions]
+                .sort((firstAgent, secondAgent) => firstAgent.name.localeCompare(secondAgent.name))
+                .map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name} ({agent.id})
+                  </option>
+                ))}
+            </select>
+            {agentsError && <p className="text-xs text-amber-600">Agent list unavailable: {agentsError}</p>}
           </FieldRow>
 
           <FieldRow label="agent.model" tooltip={TIP.agentModel}>
             <ModelPicker
               value={step.agent?.model}
               onChange={(model) => updateAgent({ model })}
-              defaultModel={selectedPluginDefaultModel}
+              defaultModel={selectedAgentDefaultModel}
+              ariaLabel="Agent Model"
               className={rs}
             />
           </FieldRow>
@@ -1178,7 +1244,10 @@ export function StepEditor({
                 ))}
                 <div className="px-3 py-1.5">
                   <button
-                    onClick={() => onChange({ action: { ...httpAction, config: { ...httpAction.config, headers: { ...httpAction.config.headers, 'X-Header': '' } } } })}
+                    onClick={() => {
+                      const header = uniqueName('X-Header', Object.keys(httpAction.config.headers ?? {}));
+                      onChange({ action: { ...httpAction, config: { ...httpAction.config, headers: { ...httpAction.config.headers, [header]: '' } } } });
+                    }}
                     className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                   >+ Add header</button>
                 </div>
@@ -1301,13 +1370,15 @@ export function StepEditor({
       {/* ── Verdicts ─────────────────────────────────────────────── */}
         <Section title="Verdicts">
           <FieldGroup>
-            {Object.entries(step.verdicts ?? {}).map(([verdictName, verdict]) => (
-              <FieldRow key={verdictName} label={verdictName} tooltip={TIP.verdictName}>
+            {Object.entries(step.verdicts ?? {}).map(([verdictName, verdict], index) => (
+              // Keyed by position, not name: a name-keyed row remounts on every
+              // keystroke and the input loses focus mid-rename.
+              <FieldRow key={index} label="Verdict" tooltip={TIP.verdictName}>
                 <div className="flex items-center gap-1.5">
                   <input
                     value={verdictName}
                     onChange={(e) => {
-                      const next: Record<string, { target: string }> = {};
+                      const next: NonNullable<WorkflowStep['verdicts']> = {};
                       for (const [k, v] of Object.entries(step.verdicts ?? {})) {
                         next[k === verdictName ? e.target.value : k] = v;
                       }
@@ -1341,7 +1412,10 @@ export function StepEditor({
             )}
           </FieldGroup>
           <button
-            onClick={() => onChange({ verdicts: { ...step.verdicts, 'new-verdict': { target: '' } } })}
+            onClick={() => {
+              const name = uniqueSlug('new-verdict', Object.keys(step.verdicts ?? {}));
+              onChange({ verdicts: { ...step.verdicts, [name]: { target: '' } } });
+            }}
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >+ Add verdict</button>
         </Section>
@@ -1374,20 +1448,18 @@ export function StepEditor({
       {isHuman && (
         <FieldGroup>
           <FieldRow label="allowedRoles" tooltip={TIP.allowedRoles}>
-            <input
-              value={step.allowedRoles?.join(', ') ?? ''}
-              onChange={(e) => onChange({
-                allowedRoles: e.target.value ? e.target.value.split(',').map((r) => r.trim()).filter(Boolean) : undefined,
-              })}
-              className={ri}
+            <AllowedRolesField
+              value={step.allowedRoles ?? []}
+              vocabulary={workspaceRoles}
+              heldRoles={heldRoles}
+              onChange={(roles) => onChange({ allowedRoles: roles.length > 0 ? roles : undefined })}
             />
           </FieldRow>
           <FieldRow label="assignedTo" tooltip={TIP.assignedTo}>
-            <input
+            <AssignedToField
               value={step.assignedTo ?? ''}
-              onChange={(e) => onChange({ assignedTo: e.target.value || undefined })}
-              placeholder="user id or ${triggerPayload.userId}"
-              className={riMono}
+              members={members}
+              onChange={(assignedTo) => onChange({ assignedTo: assignedTo || undefined })}
             />
           </FieldRow>
         </FieldGroup>
@@ -1459,7 +1531,10 @@ export function StepEditor({
             )}
           </FieldGroup>
           <button
-            onClick={() => onChange({ env: { ...step.env, NEW_VAR: '' } })}
+            onClick={() => {
+              const variable = uniqueName('NEW_VAR', Object.keys(step.env ?? {}), '_');
+              onChange({ env: { ...step.env, [variable]: '' } });
+            }}
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >+ Add variable</button>
         </Section>

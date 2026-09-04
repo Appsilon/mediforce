@@ -35,15 +35,17 @@ function makeFakeModel(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** Stubs both OpenRouter feeds: the model catalogue and the rankings feed. */
+function stubOpenRouter(rankings: unknown[] = []) {
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    const data = String(input).includes('/rankings/') ? rankings : [makeFakeModel()];
+    return new Response(JSON.stringify({ data }), { status: 200 });
+  });
+}
+
 describe('syncModels handler', () => {
   it('returns synced count and lastSyncedAt from OpenRouter response', async () => {
-    const fakeResponse = {
-      data: [makeFakeModel()],
-    };
-
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify(fakeResponse), { status: 200 }),
-    );
+    stubOpenRouter();
 
     const result = await syncModels({ modelRegistryRepo: makeRepo() });
     expect(result.synced).toBe(1);
@@ -54,13 +56,7 @@ describe('syncModels handler', () => {
   });
 
   it('returns retired, reinstated, and rankingsUpdated counts', async () => {
-    const fakeResponse = {
-      data: [makeFakeModel({ requests: 500 })],
-    };
-
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify(fakeResponse), { status: 200 }),
-    );
+    stubOpenRouter([{ id: 'test/model-1', request_count: 500 }]);
 
     const result = await syncModels({
       modelRegistryRepo: makeRepo({

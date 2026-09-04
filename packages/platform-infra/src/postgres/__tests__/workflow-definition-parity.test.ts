@@ -313,6 +313,100 @@ function contract(
       ).toBeUndefined();
     });
 
+    /**
+     * Workflow access (ADR-0019, #1253). The read is what the run and edit
+     * gates consume, so "never configured" has to answer *open* rather than
+     * throw or return null — an exception here would be a workspace-wide
+     * outage on every existing workflow.
+     */
+    it('getWorkflowAccess answers open for a workflow nobody has configured', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      await repo.saveWorkflowDefinition(definitionFor('ws-1'));
+
+      expect(await repo.getWorkflowAccess('ws-1', 'supply-chain-review')).toEqual({
+        run: [],
+        edit: [],
+      });
+      // Including a name that was never registered — absence is not an error.
+      expect(await repo.getWorkflowAccess('ws-1', 'never-registered')).toEqual({
+        run: [],
+        edit: [],
+      });
+    });
+
+    it('setWorkflowAccess round-trips, replaces wholesale, and is per workflow', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      await repo.saveWorkflowDefinition(definitionFor('ws-1'));
+      await repo.saveWorkflowDefinition(definitionFor('ws-1', { name: 'other-flow' }));
+
+      await repo.setWorkflowAccess('ws-1', 'supply-chain-review', {
+        run: ['reviewer'],
+        edit: ['approver', 'PI'],
+      });
+      expect(await repo.getWorkflowAccess('ws-1', 'supply-chain-review')).toEqual({
+        run: ['reviewer'],
+        edit: ['approver', 'PI'],
+      });
+      expect(await repo.getWorkflowAccess('ws-1', 'other-flow')).toEqual({ run: [], edit: [] });
+
+      // Full replace, not a merge: the second write is the whole answer.
+      await repo.setWorkflowAccess('ws-1', 'supply-chain-review', { run: ['PI'], edit: [] });
+      expect(await repo.getWorkflowAccess('ws-1', 'supply-chain-review')).toEqual({
+        run: ['PI'],
+        edit: [],
+      });
+
+      // Clearing both lists is how a gate is removed.
+      await repo.setWorkflowAccess('ws-1', 'supply-chain-review', { run: [], edit: [] });
+      expect(await repo.getWorkflowAccess('ws-1', 'supply-chain-review')).toEqual({
+        run: [],
+        edit: [],
+      });
+    });
+
+    it('listWorkflowAccess answers a whole listing in one read, gated workflows only', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      await registerWorkspace('ws-2');
+      await repo.saveWorkflowDefinition(definitionFor('ws-1'));
+      await repo.saveWorkflowDefinition(definitionFor('ws-1', { name: 'ungated-flow' }));
+      await repo.saveWorkflowDefinition(definitionFor('ws-2', { name: 'other-workspace-flow' }));
+
+      await repo.setWorkflowAccess('ws-1', 'supply-chain-review', { run: ['reviewer'], edit: [] });
+      await repo.setWorkflowAccess('ws-2', 'other-workspace-flow', { run: [], edit: ['PI'] });
+
+      const inWs1 = await repo.listWorkflowAccess(['ws-1']);
+      // Gated workflows only: absence is what "open to any member" looks like,
+      // so an ungated one must not appear as an empty-listed entry.
+      expect([...inWs1.keys()]).toEqual(['ws-1:supply-chain-review']);
+      expect(inWs1.get('ws-1:supply-chain-review')).toEqual({ run: ['reviewer'], edit: [] });
+
+      const both = await repo.listWorkflowAccess(['ws-1', 'ws-2']);
+      expect([...both.keys()].sort()).toEqual([
+        'ws-1:supply-chain-review',
+        'ws-2:other-workspace-flow',
+      ]);
+
+      expect([...(await repo.listWorkflowAccess([])).keys()]).toEqual([]);
+    });
+
+    it('workflow access is scoped to its workspace', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      await registerWorkspace('ws-2');
+      await repo.saveWorkflowDefinition(definitionFor('ws-1'));
+      await repo.saveWorkflowDefinition(definitionFor('ws-2'));
+
+      await repo.setWorkflowAccess('ws-1', 'supply-chain-review', { run: ['reviewer'], edit: [] });
+
+      expect(await repo.getWorkflowAccess('ws-2', 'supply-chain-review')).toEqual({
+        run: [],
+        edit: [],
+      });
+    });
+
     it('unique (workspace, name, version) — duplicate save throws', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');

@@ -90,7 +90,6 @@ beforeEach(async () => {
     processRepo,
     instanceRepo,
     auditRepo,
-    undefined, // rbacService
     undefined, // handoffRepository
     undefined, // notificationService
     humanTaskRepo,
