@@ -2,8 +2,16 @@
 #
 # Usage:
 #   docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml up -d
+#
+# ADR-0021 — production pins the app images to :prod-current (promoted via
+# GitHub Releases). Staging auto-deploys from `main` and must track the moving
+# :latest tag instead, so this overlay overrides the image tag back to :latest
+# for the three app services (image: is a scalar, later file wins on merge).
 
 services:
+  migrate:
+    image: ghcr.io/appsilon/mediforce-migrate:latest
+
   redis:
     command: redis-server --requirepass ${REDIS_PASSWORD}
     healthcheck:
@@ -35,12 +43,14 @@ services:
       - phoenix-data:/mnt/data
 
   platform-ui:
+    image: ghcr.io/appsilon/mediforce-platform-ui:latest
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://phoenix:6006
       - MEDIFORCE_OTEL_CAPTURE_CONTENT=${MEDIFORCE_OTEL_CAPTURE_CONTENT:-true}
 
   container-worker:
+    image: ghcr.io/appsilon/mediforce-container-worker:latest
     expose:
       - "3001"
     environment:
