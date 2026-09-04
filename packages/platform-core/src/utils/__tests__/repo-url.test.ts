@@ -107,6 +107,12 @@ describe('githubPermalink', () => {
     expect(githubPermalink('https://git.example.com/group/repo', 'abc123', 'Dockerfile')).toBeNull();
   });
 
+  it('[DATA] refuses a non-GitHub SSH ref, which no fallback may dress as GitHub', () => {
+    expect(githubPermalink('git@gitlab.com:group/repo.git', 'abc123', 'Dockerfile')).toBeNull();
+    expect(githubPermalink('git@git.example.com:group/repo.git', 'abc123')).toBeNull();
+    expect(githubPermalink('gitlab.com/group/repo', 'abc123', 'Dockerfile')).toBeNull();
+  });
+
   it('[DATA] refuses an empty commit — an unpinned link is not a permalink', () => {
     expect(githubPermalink('Appsilon/mediforce', '', 'Dockerfile')).toBeNull();
   });

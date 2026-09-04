@@ -98,11 +98,14 @@ export default function AdminInfrastructurePage() {
     [images, sortField, sortDir],
   );
 
-  const catalogEntryByImageId = useMemo(
+  // Keyed on `repository:tag`, not the image id: two tags can alias one
+  // immutable id, and an id map would keep whichever entry it saw last and
+  // point both daemon rows at it. The tag is what this table's row *is*.
+  const catalogEntryByImageRef = useMemo(
     () =>
       new Map(
         catalogEntries.flatMap((entry) =>
-          entry.versions.map((version) => [version.imageId, entry] as const),
+          entry.versions.map((version) => [version.imageTag, entry] as const),
         ),
       ),
     [catalogEntries],
@@ -201,7 +204,7 @@ export default function AdminInfrastructurePage() {
                         key={`${img.id}-${idx}`}
                         img={img}
                         handle={handle}
-                        catalogEntry={catalogEntryByImageId.get(img.id)}
+                        catalogEntry={catalogEntryByImageRef.get(`${img.repository}:${img.tag}`)}
                         deleting={deletingId === img.id}
                         onDelete={() => handleDeleteImage(img.id)}
                       />

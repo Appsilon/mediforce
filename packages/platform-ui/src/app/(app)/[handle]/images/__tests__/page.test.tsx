@@ -124,7 +124,13 @@ beforeEach(() => {
             ],
           },
         },
-        TEALFLOW.versions[1],
+        {
+          ...TEALFLOW.versions[1],
+          lineage: {
+            ...TEALFLOW.versions[1].lineage,
+            addedSteps: [{ command: 'RUN install2.r teal', size: '80MB' }],
+          },
+        },
       ],
     },
   });
@@ -232,6 +238,55 @@ describe('ImagesPage', () => {
       '/acme/workflows/sdtm-qc',
     );
     expect(screen.getByText(/acme\/sdtm-qc v4 · analyse/)).toBeInTheDocument();
+  });
+
+  it('carries a layer summary on every version, not only the current one', async () => {
+    renderPage();
+
+    await userEvent.click(
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+    );
+    await screen.findByText(/2 layer commands added over/);
+
+    // The superseded version's summary is collapsed, not missing: the entry
+    // read computes one per version, so every version can be inspected.
+    const superseded = screen.getByText('mediforce-built:bbbb2222').closest('li');
+    expect(superseded).not.toBeNull();
+    await userEvent.click(
+      within(superseded as HTMLElement).getByRole('button', {
+        name: /adds over its base/i,
+      }),
+    );
+
+    expect(
+      await within(superseded as HTMLElement).findByText('RUN install2.r teal'),
+    ).toBeInTheDocument();
+  });
+
+  it('names a workflow in a workspace the reader has not joined, without linking into it', async () => {
+    apiFetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        workflows: [
+          {
+            name: 'shared-qc',
+            namespace: 'beta',
+            title: 'Shared QC',
+            version: 2,
+            steps: ['analyse'],
+            images: ['mediforce-built:aaaa1111'],
+          },
+        ],
+      }),
+    });
+    renderPage();
+
+    await userEvent.click(
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+    );
+
+    expect(await screen.findByText('Shared QC')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Shared QC' })).not.toBeInTheDocument();
   });
 
   it('renders an entry whose image is gone from the daemon as unavailable', async () => {
