@@ -2201,11 +2201,11 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
-  workflowDefinitions['test:Diagram Branch Accordion:1'] = {
-    name: 'Diagram Branch Accordion',
+  workflowDefinitions['test:Diagram Branch Fan Out:1'] = {
+    name: 'Diagram Branch Fan Out',
     namespace: 'test',
     version: 1,
-    description: 'Test workflow for branch accordion diagram feature',
+    description: 'Test workflow for the branch fan-out diagram layout',
     steps: [
       { id: 'classify', name: 'Classify Document', type: 'decision', executor: 'agent', autonomyLevel: 'L2' },
       { id: 'process-standard', name: 'Standard Processing', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },

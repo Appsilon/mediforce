@@ -8,8 +8,11 @@ test.describe('Workflow Home Journey', () => {
     await page.goto(`/${TEST_ORG_HANDLE}`);
     await expect(page.getByRole('heading', { name: 'Workflows' })).toBeVisible({ timeout: 10_000 });
 
-    // Workflow cards visible
-    await expect(page.getByText('Supply Chain Review').first()).toBeVisible();
+    // Workflow cards visible. The heading above renders before the workflow
+    // query resolves, so waiting for it is not waiting for data — the first
+    // card needs a timeout of its own, or the assertion races the list on a
+    // busy server and reports "no workflows" as "element not found".
+    await expect(page.getByText('Supply Chain Review').first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('Data Quality Review')).toBeVisible();
 
     // Run counts visible (exact numbers may vary if other tests mutated state)

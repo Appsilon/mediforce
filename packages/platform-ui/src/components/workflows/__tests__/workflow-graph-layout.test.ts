@@ -78,6 +78,12 @@ describe('computeGraphLayout', () => {
     }
   });
 
+  it('[UNIT] returns the edges top-down, so the first one leaves the first step', () => {
+    const { edges } = layoutTealflow();
+
+    expect(edges[0]).toMatchObject({ from: 'collect', to: 'source-decision' });
+  });
+
   it('[UNIT] lays out a step nothing connects to instead of dropping it', () => {
     const { positions } = computeGraphLayout(
       ['start', 'done', 'orphan'],

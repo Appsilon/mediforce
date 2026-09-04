@@ -25,6 +25,7 @@ export type PlacedEdge = GraphEdge & { isBack: boolean };
 export type GraphLayout = {
   /** Node ids in traversal order — the tie-break for column assignment. */
   order: string[];
+  /** Every edge, in the same top-down order as `order`. */
   edges: PlacedEdge[];
   positions: Map<string, { x: number; y: number }>;
   height: number;
@@ -172,10 +173,21 @@ export function computeGraphLayout(
   const { outgoing, hasIncoming } = outgoingByNode(nodeIds, graphEdges);
   const { order, backEdges } = traverse(nodeIds, outgoing, hasIncoming);
 
-  const placedEdges: PlacedEdge[] = graphEdges.map((edge) => ({
-    ...edge,
-    isBack: edge.from === edge.to || backEdges.has(edgeKey(edge)) === true,
-  }));
+  // Sorted by where their source sits in the traversal, so the edge list reads
+  // top-down like the canvas does. The canvas renders each edge's inline
+  // "add step here" button in this order, so the first one belongs to the first
+  // step of the workflow rather than to whichever step happened to declare a
+  // verdict.
+  const orderIdx = new Map(order.map((id, idx) => [id, idx]));
+  const placedEdges: PlacedEdge[] = graphEdges
+    .map((edge) => ({
+      ...edge,
+      isBack: edge.from === edge.to || backEdges.has(edgeKey(edge)) === true,
+    }))
+    .sort(
+      (a, b) =>
+        (orderIdx.get(a.from)! - orderIdx.get(b.from)!) || (orderIdx.get(a.to)! - orderIdx.get(b.to)!),
+    );
   const forwardEdges = placedEdges.filter((edge) => edge.isBack === false);
 
   const depth = computeDepths(order, forwardEdges);
