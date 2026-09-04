@@ -186,7 +186,7 @@ describe('validateSteps — script config', () => {
       } as WorkflowStep,
     ];
 
-    expect(validateSteps(steps)).toMatch(/script config required.*"Poll SFTP".*needs script/i);
+    expect(validateSteps(steps)).toMatch(/missing step config.*"Poll SFTP" needs a script block/i);
   });
 
   it('rejects a databricks step carrying container script config instead', () => {
@@ -201,6 +201,6 @@ describe('validateSteps — script config', () => {
       } as WorkflowStep,
     ];
 
-    expect(validateSteps(steps)).toMatch(/script config required.*"Run job".*needs databricks/i);
+    expect(validateSteps(steps)).toMatch(/missing step config.*"Run job" needs a databricks block/i);
   });
 });

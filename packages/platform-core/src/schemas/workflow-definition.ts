@@ -330,10 +330,10 @@ const SCRIPT_CONFIG_KEY_PLUGIN: Record<'script' | 'databricks', string> = {
  * no script config (or there is no plugin — e.g. a terminal step, whose
  * `executor` is filler the schema demands but the runtime never honours).
  *
- * Single source of truth for the plugin -> config pairing, shared with the
- * editor's pre-save check so the two cannot drift.
+ * Exported so the editor's pre-save check reads the requirement off the same
+ * map this refinement does, rather than restating it.
  */
-export function scriptConfigKeyForPlugin(
+function scriptConfigKeyForPlugin(
   plugin: string | undefined,
 ): 'script' | 'databricks' | undefined {
   return plugin === undefined ? undefined : SCRIPT_PLUGIN_CONFIG_KEY[plugin];
@@ -726,7 +726,13 @@ export const WorkflowDefinitionSchema = WorkflowDefinitionBaseSchema.superRefine
   },
 );
 
-export { validateInputForNextRun, validateSteps, validateVerdicts, validateTriggerInput };
+export {
+  validateInputForNextRun,
+  validateSteps,
+  validateVerdicts,
+  validateTriggerInput,
+  scriptConfigKeyForPlugin,
+};
 
 /**
  * Default parse path for registering a new WorkflowDefinition (API routes,

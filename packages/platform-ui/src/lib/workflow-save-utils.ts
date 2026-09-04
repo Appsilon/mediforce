@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { scriptConfigKeyForPlugin } from '@mediforce/platform-core';
-import type { WorkflowStep } from '@mediforce/platform-core';
+import { scriptConfigKeyForPlugin, type WorkflowStep } from '@mediforce/platform-core';
 import type { RegistrationWarning } from '@mediforce/platform-api/contract';
 import type { ToastOpts } from '@/components/command-palette/types';
 import { formatStepName } from '@/lib/format';
@@ -155,11 +154,11 @@ export function validateSteps(steps: WorkflowStep[]): string | null {
   const missingScriptConfig = steps.flatMap((s) => {
     const configKey = s.executor === 'script' ? scriptConfigKeyForPlugin(s.plugin) : undefined;
     return configKey !== undefined && s[configKey] === undefined
-      ? [`"${s.name}" (needs ${configKey})`]
+      ? [`"${s.name}" needs a ${configKey} block`]
       : [];
   });
   if (missingScriptConfig.length > 0) {
-    return `Script config required: ${missingScriptConfig.join(', ')}`;
+    return `Missing step config: ${missingScriptConfig.join(', ')}`;
   }
 
   const emptyIds = steps.filter((s) => !s.id);
