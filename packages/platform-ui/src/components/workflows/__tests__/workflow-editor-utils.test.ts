@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, nonGraphFieldsDiffer, spliceStepIntoTransitions } from '../workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, nonGraphFieldsDiffer, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from '../workflow-editor-utils';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -296,5 +296,50 @@ describe('spliceStepIntoTransitions', () => {
     const result = spliceStepIntoTransitions([tr('a', 'b')], 'a', 'b', 'mid');
 
     expect(result).toEqual([{ from: 'a', to: 'mid' }, { from: 'mid', to: 'b' }]);
+  });
+});
+
+describe('retargetCarryOver', () => {
+  const entries = [
+    { stepId: 'scan', output: 'cursor', as: 'cursor' },
+    { stepId: 'review', output: 'notes', as: 'notes' },
+  ];
+
+  it('points entries at the renamed step', () => {
+    expect(retargetCarryOver(entries, 'scan', 'poll')).toEqual([
+      { stepId: 'poll', output: 'cursor', as: 'cursor' },
+      { stepId: 'review', output: 'notes', as: 'notes' },
+    ]);
+  });
+
+  it('returns the same reference when no entry names the renamed step', () => {
+    expect(retargetCarryOver(entries, 'done', 'finish')).toBe(entries);
+  });
+
+  it('tolerates a workflow without carry-over', () => {
+    expect(retargetCarryOver(undefined, 'scan', 'poll')).toBeUndefined();
+  });
+});
+
+describe('pruneCarryOver', () => {
+  const steps = [step('scan'), step('done', 'terminal')];
+
+  it('drops entries whose step no longer exists', () => {
+    const entries = [
+      { stepId: 'scan', output: 'cursor', as: 'cursor' },
+      { stepId: 'deleted', output: 'notes', as: 'notes' },
+    ];
+    expect(pruneCarryOver(entries, steps)).toEqual([
+      { stepId: 'scan', output: 'cursor', as: 'cursor' },
+    ]);
+  });
+
+  it('returns the same reference when every entry still resolves', () => {
+    const entries = [{ stepId: 'scan', output: 'cursor', as: 'cursor' }];
+    expect(pruneCarryOver(entries, steps)).toBe(entries);
+  });
+
+  it('tolerates a workflow without carry-over', () => {
+    expect(pruneCarryOver(undefined, steps)).toBeUndefined();
   });
 });

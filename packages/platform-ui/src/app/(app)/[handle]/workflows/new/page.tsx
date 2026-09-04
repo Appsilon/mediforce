@@ -82,15 +82,21 @@ export default function NewWorkflowPage() {
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>(TEMPLATE_STEPS);
   const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>(TEMPLATE_TRANSITIONS);
+  const currentInputForNextRunRef = useRef<WorkflowDefinition['inputForNextRun']>(undefined);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startAfterSaveResolverRef = useRef<((saved: { version: number; namespace: string } | undefined) => void) | null>(null);
 
   useEffect(() => () => { if (redirectTimerRef.current !== null) clearTimeout(redirectTimerRef.current); }, []);
 
   const handleCanvasChange = useCallback(
-    (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => {
+    (
+      steps: WorkflowStep[],
+      transitions: WorkflowDefinition['transitions'],
+      inputForNextRun: WorkflowDefinition['inputForNextRun'],
+    ) => {
       currentStepsRef.current = steps;
       currentTransitionsRef.current = transitions;
+      currentInputForNextRunRef.current = inputForNextRun;
     },
     [],
   );
@@ -139,6 +145,10 @@ export default function NewWorkflowPage() {
           metadata: { [DISPLAY_NAME_KEY]: workflowName.trim() },
           steps: orderedSteps,
           transitions: mergedTransitions,
+          // Declarable here only through the source-code panel, which applies it
+          // with the rest of the graph — a field that panel accepts has to reach
+          // the registration, not be dropped on the way out.
+          inputForNextRun: currentInputForNextRunRef.current,
         },
         { namespace: effectiveNamespace },
       );

@@ -55,6 +55,7 @@ export default function WorkflowDefinitionVersionPage() {
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>([]);
   const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>([]);
+  const currentInputForNextRunRef = useRef<WorkflowDefinition['inputForNextRun']>(undefined);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startAfterSaveResolverRef = useRef<((saved: { version: number; namespace: string } | undefined) => void) | null>(null);
 
@@ -70,13 +71,19 @@ export default function WorkflowDefinitionVersionPage() {
     setEditedDescription(definition.description ?? '');
     currentStepsRef.current = definition.steps;
     currentTransitionsRef.current = definition.transitions;
+    currentInputForNextRunRef.current = definition.inputForNextRun;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [definition?.version]);
 
   const handleCanvasChange = useCallback(
-    (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => {
+    (
+      steps: WorkflowStep[],
+      transitions: WorkflowDefinition['transitions'],
+      inputForNextRun: WorkflowDefinition['inputForNextRun'],
+    ) => {
       currentStepsRef.current = steps;
       currentTransitionsRef.current = transitions;
+      currentInputForNextRunRef.current = inputForNextRun;
     },
     [],
   );
@@ -105,6 +112,10 @@ export default function WorkflowDefinitionVersionPage() {
           description: editedDescription.trim() || undefined,
           steps: orderedSteps,
           transitions: mergedTransitions,
+          // Retargeted by the canvas when a step it referenced was renamed, and
+          // dropped when that step was deleted — a stale entry here is refused
+          // by the server and unfixable from this page.
+          inputForNextRun: currentInputForNextRunRef.current,
         }),
         { namespace: definition.namespace },
       );
@@ -175,6 +186,19 @@ export default function WorkflowDefinitionVersionPage() {
   if (definition === null) return null;
 
   const hasUnsavedChanges = canvasDirty || editedDescription !== (definition.description ?? '');
+
+  // What the canvas shows around the graph in its JSON panel, and compares
+  // against to refuse an apply that edits a field it cannot apply. The graph it
+  // owns — steps, transitions, inputForNextRun — must therefore not be in here,
+  // or every apply is refused; `version`/`createdAt` are server-assigned.
+  const {
+    steps: _steps,
+    transitions: _transitions,
+    inputForNextRun: _inputForNextRun,
+    version: _version,
+    createdAt: _createdAt,
+    ...wdJsonFields
+  } = definition;
 
   return (
     <div className="flex h-full flex-col relative bg-white dark:bg-background">
@@ -273,10 +297,11 @@ export default function WorkflowDefinitionVersionPage() {
         key={definition.version}
         initialSteps={definition.steps}
         initialTransitions={definition.transitions}
+        initialInputForNextRun={definition.inputForNextRun}
         workflowName={decodedName}
         namespace={handle}
         workflowExternalSkillsRepo={definition.externalSkillsRepo}
-        wdJsonFields={{ ...definition, version: undefined, createdAt: undefined } as Record<string, unknown>}
+        wdJsonFields={wdJsonFields as Record<string, unknown>}
         onChange={handleCanvasChange}
         onDirtyChange={setCanvasDirty}
         stepErrors={stepErrors}

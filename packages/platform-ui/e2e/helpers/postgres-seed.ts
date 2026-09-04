@@ -158,7 +158,7 @@ export async function seedPostgresNamespace(
       await sql`
         INSERT INTO workflow_definitions (
           workspace, name, version, title, description, visibility,
-          steps, transitions, trigger_input, roles, env,
+          steps, transitions, trigger_input, input_for_next_run, roles, env,
           notifications, git_workspace, metadata, created_at
         ) VALUES (
           ${wd.namespace as string},
@@ -170,6 +170,7 @@ export async function seedPostgresNamespace(
           ${sql.json(wd.steps as unknown)},
           ${sql.json(wd.transitions as unknown)},
           ${wd.triggerInput ? sql.json(wd.triggerInput as unknown) : null},
+          ${wd.inputForNextRun ? sql.json(wd.inputForNextRun as unknown) : null},
           ${wd.roles ? sql.json(wd.roles as unknown) : null},
           ${wd.env ? sql.json(wd.env as unknown) : null},
           ${wd.notifications ? sql.json(wd.notifications as unknown) : null},
