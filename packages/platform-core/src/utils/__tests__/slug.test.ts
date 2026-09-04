@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toSlug, uniqueSlug } from '../slug';
+import { toSlug, uniqueName, uniqueSlug } from '../slug';
 
 describe('toSlug', () => {
   it('lowercases and hyphenates', () => {
@@ -30,5 +30,23 @@ describe('uniqueSlug', () => {
 
   it('increments until the slug is unique', () => {
     expect(uniqueSlug('Input Text', ['input-text', 'input-text-2'])).toBe('input-text-3');
+  });
+});
+
+describe('uniqueName', () => {
+  it('returns the candidate untouched when it is free', () => {
+    expect(uniqueName('X-Header', ['Authorization'])).toBe('X-Header');
+  });
+
+  it('keeps the candidate verbatim rather than slugifying it', () => {
+    expect(uniqueName('X-Header', ['X-Header'])).toBe('X-Header-2');
+  });
+
+  it('joins the suffix with the separator the naming convention uses', () => {
+    expect(uniqueName('NEW_VAR', ['NEW_VAR'], '_')).toBe('NEW_VAR_2');
+  });
+
+  it('increments until the name is unique', () => {
+    expect(uniqueName('NEW_VAR', ['NEW_VAR', 'NEW_VAR_2'], '_')).toBe('NEW_VAR_3');
   });
 });
