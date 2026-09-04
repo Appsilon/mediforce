@@ -1,8 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { Eye, EyeOff, Plus, Trash2, Save, Info, ClipboardPaste } from 'lucide-react';
+import { Eye, EyeOff, Plus, Trash2, Save, Info, ClipboardPaste, KeyRound } from 'lucide-react';
 import { mediforce } from '@/lib/mediforce';
+import { cn } from '@/lib/utils';
 
 /** Parse .env-style text into key-value pairs. Handles KEY=VALUE, KEY="VALUE", KEY='VALUE', comments, blank lines. */
 function parseEnvText(text: string): Array<{ key: string; value: string }> | null {
@@ -27,14 +28,23 @@ function parseEnvText(text: string): Array<{ key: string; value: string }> | nul
   return parsed.length > 0 ? parsed : null;
 }
 
+interface SecretRow {
+  key: string;
+  value: string;
+  /** Prepopulated from the definition because the workflow needs it, not yet filled in. */
+  needed?: boolean;
+}
+
 interface WorkflowSecretsEditorProps {
   namespace: string;
   workflowName: string;
-  suggestedKeys?: string[];
+  /** Keys the definition references through `{{KEY}}` — prepopulated as empty rows. */
+  requiredKeys?: string[];
 }
 
-export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }: WorkflowSecretsEditorProps) {
-  const [secrets, setSecrets] = React.useState<Array<{ key: string; value: string }>>([]);
+export function WorkflowSecretsEditor({ namespace, workflowName, requiredKeys }: WorkflowSecretsEditorProps) {
+  const [secrets, setSecrets] = React.useState<SecretRow[]>([]);
+  const [workspaceKeys, setWorkspaceKeys] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [dirty, setDirty] = React.useState(false);
@@ -47,12 +57,20 @@ export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }
   React.useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    mediforce.workflowSecrets
-      .values({ namespace, workflow: workflowName })
-      .then(({ secrets: data }) => {
+    // Workspace secrets satisfy a `{{KEY}}` reference too, so a key already set
+    // there must not come back as a "needed" row here. Best-effort: the tab's
+    // own secrets must still render when that second read fails.
+    Promise.all([
+      mediforce.workflowSecrets.values({ namespace, workflow: workflowName }),
+      mediforce.secrets.list({ namespace }).catch((error) => {
+        console.warn('Failed to load workspace secret keys:', error);
+        return { keys: [] as string[] };
+      }),
+    ])
+      .then(([{ secrets: data }, { keys }]) => {
         if (cancelled) return;
-        const entries = Object.entries(data).map(([key, value]) => ({ key, value }));
-        setSecrets(entries);
+        setSecrets(Object.entries(data).map(([key, value]) => ({ key, value })));
+        setWorkspaceKeys(keys);
         setLoading(false);
       })
       .catch((error) => {
@@ -63,27 +81,29 @@ export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }
     return () => { cancelled = true; };
   }, [namespace, workflowName]);
 
+  // Prepopulating leaves the form clean: an untouched needed row is a prompt,
+  // not an edit, so Save stays hidden until the user types a value.
   React.useEffect(() => {
-    if (loading || !suggestedKeys || suggestedKeys.length === 0) return;
+    if (loading || !requiredKeys || requiredKeys.length === 0) return;
     setSecrets((prev) => {
-      const existingKeys = new Set(prev.map((s) => s.key));
-      const toAdd = suggestedKeys.filter((k) => !existingKeys.has(k));
+      const covered = new Set([...prev.map((row) => row.key), ...workspaceKeys]);
+      const toAdd = requiredKeys.filter((key) => !covered.has(key));
       if (toAdd.length === 0) return prev;
-      setDirty(true);
-      return [...prev, ...toAdd.map((key) => ({ key, value: '' }))];
+      return [...prev, ...toAdd.map((key) => ({ key, value: '', needed: true }))];
     });
-  }, [loading, suggestedKeys]);
+  }, [loading, requiredKeys, workspaceKeys]);
 
   const handleSave = async () => {
     setSaving(true);
     setSaveMessage(null);
     try {
       const record: Record<string, string> = {};
-      for (const { key, value } of secrets) {
+      for (const { key, value, needed } of secrets) {
         const trimmedKey = key.trim();
-        if (trimmedKey !== '') {
-          record[trimmedKey] = value;
-        }
+        // An untouched prepopulated row is a prompt, not a secret — storing it
+        // empty would silence the very warning that put it there.
+        if (trimmedKey === '' || (needed === true && value === '')) continue;
+        record[trimmedKey] = value;
       }
       await mediforce.workflowSecrets.save({ namespace, workflow: workflowName, secrets: record });
       setDirty(false);
@@ -112,6 +132,8 @@ export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }
     setSecrets((prev) => prev.map((row, idx) => (idx === index ? { ...row, [field]: newValue } : row)));
     setDirty(true);
   };
+
+  const neededCount = secrets.filter((row) => row.needed === true && row.value === '').length;
 
   const toggleReveal = (index: number) => {
     setRevealedIndices((prev) => {
@@ -143,6 +165,17 @@ export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }
         </span>
       </div>
 
+      {neededCount > 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 p-3 text-sm text-amber-800 dark:text-amber-300">
+          <KeyRound className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            {neededCount === 1
+              ? 'This workflow references 1 secret that has no value yet. It is listed below — fill it in and save.'
+              : `This workflow references ${neededCount} secrets that have no value yet. They are listed below — fill them in and save.`}
+          </span>
+        </div>
+      )}
+
       {secrets.length === 0 ? (
         <p className="text-sm text-muted-foreground">No secrets configured yet.</p>
       ) : (
@@ -153,15 +186,25 @@ export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }
             <span>Value</span>
             <span />
           </div>
-          {secrets.map((row, index) => (
-            <div key={index} className="grid grid-cols-[1fr_1fr_72px] gap-2 items-center">
-              <input
-                type="text"
-                value={row.key}
-                onChange={(event) => updateRow(index, 'key', event.target.value)}
-                placeholder="SECRET_NAME"
-                className="h-9 rounded-md border bg-background px-3 text-sm font-mono"
-              />
+          {secrets.map((row, index) => {
+            const unset = row.needed === true && row.value === '';
+            return (
+            <div key={index} className="grid grid-cols-[1fr_1fr_72px] gap-2 items-start">
+              <div className="space-y-1">
+                <input
+                  type="text"
+                  value={row.key}
+                  onChange={(event) => updateRow(index, 'key', event.target.value)}
+                  placeholder="SECRET_NAME"
+                  className={cn(
+                    'h-9 w-full rounded-md border bg-background px-3 text-sm font-mono',
+                    unset && 'border-amber-400 dark:border-amber-700',
+                  )}
+                />
+                {unset && (
+                  <p className="text-xs text-amber-600 dark:text-amber-500 px-1">Needed by this workflow</p>
+                )}
+              </div>
               <div className="relative">
                 <input
                   type={revealedIndices.has(index) ? 'text' : 'password'}
@@ -173,7 +216,7 @@ export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }
                 <button
                   type="button"
                   onClick={() => toggleReveal(index)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-2 top-[18px] -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {revealedIndices.has(index) ? (
                     <EyeOff className="h-3.5 w-3.5" />
@@ -190,7 +233,8 @@ export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

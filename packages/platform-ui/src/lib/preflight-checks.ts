@@ -16,6 +16,43 @@ export interface PreflightWarning {
 
 const TEMPLATE_RE = /^\{\{(?:[A-Z]+:)?([A-Za-z0-9_-]+)\}\}$/;
 
+export interface SecretReference {
+  key: string;
+  /** The step env var the key is bound to, e.g. `API_KEY: '{{MY_SECRET}}'`. */
+  envVar: string;
+  stepNames: string[];
+}
+
+/**
+ * Every secret key a definition's container steps reference through `{{KEY}}`
+ * env templates, regardless of whether it is configured. The Secrets tab
+ * prepopulates rows from this; `runPreflightChecks` warns about the subset
+ * that has no value.
+ */
+export function collectSecretReferences(definition: WorkflowDefinition): SecretReference[] {
+  const references = new Map<string, SecretReference>();
+  // `steps` is typed required, but a definition reaching the UI from a stale
+  // bundle, a persisted react-query cache, or a partial fetch can lack it.
+  // Treat a missing/non-array `steps` as empty rather than throwing
+  // `definition.steps is not iterable` and taking down the whole page.
+  const steps = Array.isArray(definition.steps) ? definition.steps : [];
+
+  for (const step of steps) {
+    if (step.executor !== 'agent' && step.executor !== 'script') continue;
+    const env = { ...definition.env, ...step.env };
+    for (const [varName, value] of Object.entries(env)) {
+      const match = TEMPLATE_RE.exec(value);
+      if (match === null) continue;
+      const key = match[1];
+      const existing = references.get(key);
+      if (existing) { existing.stepNames.push(step.name); }
+      else { references.set(key, { key, envVar: varName, stepNames: [step.name] }); }
+    }
+  }
+
+  return [...references.values()];
+}
+
 export interface OpenRouterCreditsInfo {
   available: boolean;
   /** Real spendable budget — `min(key limit remaining, account credits)`. */
@@ -41,7 +78,6 @@ export function runPreflightChecks(
   },
 ): PreflightWarning[] {
   const imageMap = new Map<string, string[]>();
-  const secretMap = new Map<string, { stepNames: string[]; envVar: string }>();
 
   // `steps` is typed required, but a definition reaching the UI from a stale
   // bundle, a persisted react-query cache, or a partial fetch can lack it.
@@ -65,24 +101,6 @@ export function runPreflightChecks(
           const existing = imageMap.get(image);
           if (existing) { existing.push(step.name); }
           else { imageMap.set(image, [step.name]); }
-        }
-      }
-    }
-
-    if (options.secretKeys || options.namespaceSecretKeys) {
-      const allKeys = [
-        ...(options.secretKeys ?? []),
-        ...(options.namespaceSecretKeys ?? []),
-      ];
-      const env = { ...definition.env, ...step.env };
-      for (const [varName, value] of Object.entries(env)) {
-        const match = TEMPLATE_RE.exec(value);
-        if (match === null) continue;
-        const key = match[1];
-        if (!allKeys.includes(key)) {
-          const existing = secretMap.get(key);
-          if (existing) { existing.stepNames.push(step.name); }
-          else { secretMap.set(key, { stepNames: [step.name], envVar: varName }); }
         }
       }
     }
@@ -116,7 +134,16 @@ export function runPreflightChecks(
     });
   }
 
-  for (const [key, { stepNames, envVar }] of secretMap) {
+  const configuredKeys =
+    options.secretKeys || options.namespaceSecretKeys
+      ? [...(options.secretKeys ?? []), ...(options.namespaceSecretKeys ?? [])]
+      : null;
+  const missingSecrets =
+    configuredKeys === null
+      ? []
+      : collectSecretReferences(definition).filter((ref) => !configuredKeys.includes(ref.key));
+
+  for (const { key, stepNames, envVar } of missingSecrets) {
     warnings.push({
       category: 'missing-secret',
       resource: key,
