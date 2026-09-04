@@ -522,7 +522,7 @@ export {
 } from './utils/repo-url';
 export type { RepoCloneTarget } from './utils/repo-url';
 export { getWorkflowStatus, type WorkflowStatus } from './utils/workflow-status';
-export { toSlug, uniqueSlug } from './utils/slug';
+export { toSlug, uniqueName, uniqueSlug } from './utils/slug';
 
 // Pre-made blocks — shared by the Add Block picker and the workflow assistant.
 export { BLOCK_PRESETS, BLOCK_CATEGORIES } from './blocks/block-presets';

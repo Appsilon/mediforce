@@ -11,7 +11,7 @@ import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
-import { DEFAULT_AGENT_IMAGE, uniqueSlug } from '@mediforce/platform-core';
+import { DEFAULT_AGENT_IMAGE, uniqueName, uniqueSlug } from '@mediforce/platform-core';
 import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
@@ -1244,7 +1244,10 @@ export function StepEditor({
                 ))}
                 <div className="px-3 py-1.5">
                   <button
-                    onClick={() => onChange({ action: { ...httpAction, config: { ...httpAction.config, headers: { ...httpAction.config.headers, 'X-Header': '' } } } })}
+                    onClick={() => {
+                      const header = uniqueName('X-Header', Object.keys(httpAction.config.headers ?? {}));
+                      onChange({ action: { ...httpAction, config: { ...httpAction.config, headers: { ...httpAction.config.headers, [header]: '' } } } });
+                    }}
                     className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                   >+ Add header</button>
                 </div>
@@ -1367,13 +1370,15 @@ export function StepEditor({
       {/* ── Verdicts ─────────────────────────────────────────────── */}
         <Section title="Verdicts">
           <FieldGroup>
-            {Object.entries(step.verdicts ?? {}).map(([verdictName, verdict]) => (
-              <FieldRow key={verdictName} label={verdictName} tooltip={TIP.verdictName}>
+            {Object.entries(step.verdicts ?? {}).map(([verdictName, verdict], index) => (
+              // Keyed by position, not name: a name-keyed row remounts on every
+              // keystroke and the input loses focus mid-rename.
+              <FieldRow key={index} label="Verdict" tooltip={TIP.verdictName}>
                 <div className="flex items-center gap-1.5">
                   <input
                     value={verdictName}
                     onChange={(e) => {
-                      const next: Record<string, { target: string }> = {};
+                      const next: NonNullable<WorkflowStep['verdicts']> = {};
                       for (const [k, v] of Object.entries(step.verdicts ?? {})) {
                         next[k === verdictName ? e.target.value : k] = v;
                       }
@@ -1407,7 +1412,10 @@ export function StepEditor({
             )}
           </FieldGroup>
           <button
-            onClick={() => onChange({ verdicts: { ...step.verdicts, 'new-verdict': { target: '' } } })}
+            onClick={() => {
+              const name = uniqueSlug('new-verdict', Object.keys(step.verdicts ?? {}));
+              onChange({ verdicts: { ...step.verdicts, [name]: { target: '' } } });
+            }}
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >+ Add verdict</button>
         </Section>
@@ -1523,7 +1531,10 @@ export function StepEditor({
             )}
           </FieldGroup>
           <button
-            onClick={() => onChange({ env: { ...step.env, NEW_VAR: '' } })}
+            onClick={() => {
+              const variable = uniqueName('NEW_VAR', Object.keys(step.env ?? {}), '_');
+              onChange({ env: { ...step.env, [variable]: '' } });
+            }}
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >+ Add variable</button>
         </Section>
