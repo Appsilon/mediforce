@@ -36,13 +36,32 @@ export function normalizeRepoUrls(repo: string): { gitUrl: string; httpsUrl: str
 }
 
 /**
+ * The `owner/repo` a reference names **on github.com**, or `null` for anything
+ * else — another host, a local path, a shape this cannot read.
+ *
+ * Deliberately parsed from the reference itself rather than from
+ * `normalizeRepoUrls`, whose job is producing a clone URL and which therefore
+ * falls back to github.com for a reference it cannot place. That fallback turns
+ * `git@gitlab.com:group/repo.git` into `https://github.com/git@gitlab.com:…` —
+ * a fine "try this" for a clone, and a guaranteed 404 as a link.
+ */
+function githubOwnerRepo(repo: string): string | null {
+  const ssh = /^git@github\.com:(.+?)(?:\.git)?$/.exec(repo);
+  if (ssh !== null) return ssh[1];
+  const https = /^https:\/\/github\.com\/(.+?)(?:\.git)?\/?$/.exec(repo);
+  if (https !== null) return https[1];
+  // `owner/repo` shorthand, which is github.com by convention everywhere else
+  // in this module. Exactly two segments, so `gitlab.com/group/repo` is a host.
+  return /^[\w.-]+\/[\w.-]+$/.test(repo) ? repo : null;
+}
+
+/**
  * A permalink to a repo at a pinned commit — the file at `path`, or the tree
  * when no path is pinned. `null` when no honest link can be built.
  *
- * Two refusals, both deliberate (AGENTS.md §13). `normalizeRepoUrls` returns an
- * empty `httpsUrl` for a local-path ref (`/…`, `./…`), which nothing can
- * browse; and `/blob/<commit>/<path>` is **GitHub's** URL shape, so a GitLab or
- * self-hosted ref keeps its `httpsUrl` but gets no deep link here — rendering
+ * Two refusals, both deliberate (AGENTS.md §13). A local-path ref (`/…`, `./…`)
+ * names nothing anyone can browse; and `/blob/<commit>/<path>` is **GitHub's**
+ * URL shape, so a GitLab or self-hosted ref gets no deep link here — rendering
  * nothing beats guessing a shape another host does not serve. An unpinned
  * commit is refused for the same reason: a link to a moving ref is not a
  * permalink, and the whole point is that the reader sees the bytes this image
@@ -50,8 +69,9 @@ export function normalizeRepoUrls(repo: string): { gitUrl: string; httpsUrl: str
  */
 export function githubPermalink(repo: string, commit: string, path?: string): string | null {
   if (commit.length === 0) return null;
-  const { httpsUrl } = normalizeRepoUrls(repo);
-  if (!httpsUrl.startsWith('https://github.com/')) return null;
+  const ownerRepo = githubOwnerRepo(repo);
+  if (ownerRepo === null) return null;
+  const httpsUrl = `https://github.com/${ownerRepo}`;
   if (path === undefined || path.length === 0) return `${httpsUrl}/tree/${commit}`;
   const encodedPath = path.split('/').map(encodeURIComponent).join('/');
   return `${httpsUrl}/blob/${commit}/${encodedPath}`;

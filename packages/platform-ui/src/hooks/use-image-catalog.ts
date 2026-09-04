@@ -46,6 +46,13 @@ export function useImageCatalogEntries(namespace: string): {
  * carries `lineage.addedSteps` — a `docker history` per version, which the
  * listing cannot afford for a whole catalog. So the layer summary arrives when
  * a reader expands the entry that needs it, and never before.
+ *
+ * NICE LIVE (30 s) while expanded, the same cadence as the listing: an expanded
+ * card renders this read in preference to the list row, so leaving it un-polled
+ * would freeze versions, availability, capabilities and lineage at the moment
+ * of expansion while the rest of the page kept moving. Collapsed, `enabled` is
+ * false and nothing is polled — and the view expands one entry at a time, so
+ * the `docker history` calls above are paid for one entry, never a catalog.
  */
 export function useImageCatalogEntry(
   namespace: string,
@@ -57,6 +64,7 @@ export function useImageCatalogEntry(
     queryFn: async () => (await mediforce.imageCatalog.get({ namespace, id })).entry,
     enabled: enabled && namespace !== '',
     staleTime: NICE_LIVE_INTERVAL_MS,
+    refetchInterval: (q) => (q.state.error !== null ? false : NICE_LIVE_INTERVAL_MS),
     retry: stopRetryOn4xx,
   });
 

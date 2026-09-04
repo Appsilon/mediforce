@@ -171,14 +171,25 @@ function LayerCommands({
   );
 }
 
+/**
+ * The workflows pinning this image.
+ *
+ * The scan behind it is deployment-wide — a public workflow in a workspace the
+ * reader has not joined pins the same daemon image and belongs in the answer,
+ * since a version nobody pins is what the `unused` chip claims. It is named,
+ * not linked: `/<handle>/workflows/<name>` is member-gated, and a non-member
+ * following it lands on "Workspace unavailable" rather than the workflow.
+ */
 function UsedBy({
   workflows,
   loading,
   error,
+  handle,
 }: {
   workflows: WorkflowImageMatch[] | undefined;
   loading: boolean;
   error: Error | null;
+  handle: string;
 }) {
   if (error !== null) {
     return <p className="text-xs text-destructive">{error.message}</p>;
@@ -200,12 +211,21 @@ function UsedBy({
     <ul className="space-y-1">
       {workflows.map((workflow) => (
         <li key={`${workflow.namespace}:${workflow.name}`} className="text-xs">
-          <Link
-            href={routes.workflow(workflow.namespace, workflow.name)}
-            className="font-medium text-primary hover:underline"
-          >
-            {workflow.title ?? workflow.name}
-          </Link>
+          {workflow.namespace === handle ? (
+            <Link
+              href={routes.workflow(workflow.namespace, workflow.name)}
+              className="font-medium text-primary hover:underline"
+            >
+              {workflow.title ?? workflow.name}
+            </Link>
+          ) : (
+            <span
+              className="font-medium"
+              title={`This workflow lives in @${workflow.namespace}, not in @${handle}`}
+            >
+              {workflow.title ?? workflow.name}
+            </span>
+          )}
           <span className="text-muted-foreground">
             {' '}
             — {workflow.namespace}/{workflow.name} v{workflow.version} · {workflow.steps.join(', ')}
@@ -216,18 +236,32 @@ function UsedBy({
   );
 }
 
+/**
+ * One version: what it is, where it came from, and what it adds over its base.
+ *
+ * The layer summary sits on every version because the entry read computes one
+ * for every version — the CLI's `images show` prints them all, and an author
+ * comparing a superseded build against the current one is asking exactly what
+ * changed. Only the current version's is open on arrival: an entry accumulates
+ * a version per build, and unrolling every layer list at once buries the one
+ * answer almost every reader came for.
+ */
 function VersionRow({
   entry,
   version,
   index,
   usedTags,
+  detailLoading,
 }: {
   entry: ImageCatalogEntryView;
   version: ImageCatalogVersion;
   index: number;
   usedTags: ReadonlySet<string> | null;
+  detailLoading: boolean;
 }) {
   const source = resolveVersionSource(entry, version);
+  const [layersOpen, setLayersOpen] = useState(index === 0);
+  const baseTag = version.lineage.base?.imageTag ?? null;
   return (
     <li className="space-y-1.5 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -244,6 +278,25 @@ function VersionRow({
         )}
       </div>
       <SourceLine source={source} />
+      <button
+        type="button"
+        onClick={() => setLayersOpen((current) => !current)}
+        aria-expanded={layersOpen}
+        className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+      >
+        {layersOpen ? (
+          <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ChevronRight className="h-3 w-3" />
+        )}
+        {baseTag === null ? 'Layer commands' : 'What it adds over its base'}
+      </button>
+      {layersOpen &&
+        (detailLoading ? (
+          <p className="text-xs text-muted-foreground animate-pulse">Reading layer commands…</p>
+        ) : (
+          <LayerCommands version={version} baseTag={baseTag} />
+        ))}
     </li>
   );
 }
@@ -329,28 +382,6 @@ function EntryCard({
 
             <section className="space-y-1.5">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {newest === undefined || newest.lineage.base === null
-                  ? 'Layer commands'
-                  : 'What it adds over its base'}
-              </h4>
-              {newest === undefined ? (
-                <p className="text-xs text-muted-foreground">
-                  No version of this image is on the daemon, so there is nothing to summarise.
-                </p>
-              ) : detail.loading ? (
-                <p className="text-xs text-muted-foreground animate-pulse">
-                  Reading layer commands…
-                </p>
-              ) : (
-                <LayerCommands
-                  version={newest}
-                  baseTag={newest.lineage.base?.imageTag ?? null}
-                />
-              )}
-            </section>
-
-            <section className="space-y-1.5">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Versions
               </h4>
               {versions.length === 0 ? (
@@ -368,6 +399,7 @@ function EntryCard({
                       version={version}
                       index={index}
                       usedTags={usedTags}
+                      detailLoading={detail.loading}
                     />
                   ))}
                 </ul>
@@ -382,6 +414,7 @@ function EntryCard({
                 workflows={usage.workflows}
                 loading={usage.loading}
                 error={usage.error}
+                handle={handle}
               />
             </section>
           </div>
