@@ -90,7 +90,7 @@ function traverse(nodeIds: string[], outgoing: Map<string, GraphEdge[]>, hasInco
 }
 
 /** Longest path from any root, so a step always lands below every step feeding it. */
-function computeDepths(order: string[], forwardEdges: PlacedEdge[]): Map<string, number> {
+function computeDepths(order: string[], forwardEdges: GraphEdge[]): Map<string, number> {
   const children = new Map<string, string[]>();
   const indegree = new Map<string, number>(order.map((id) => [id, 0]));
   for (const edge of forwardEdges) {
@@ -249,6 +249,9 @@ function overlapsSomething(
  *
  * The nodes the new one now feeds are exempt from that search and are pushed
  * down instead, which keeps a step inserted mid-path in line with that path.
+ * That push travels the whole way down: a step two arrows below the insertion
+ * has to make room as well, or the path lands on top of itself. Only steps the
+ * insertion actually crowds move, so a gap the user dragged open survives.
  */
 export function placeNewNodes(
   previous: AnchoredNode[],
@@ -281,16 +284,23 @@ export function placeNewNodes(
     positioned.set(node.id, { x, y: anchor.y });
   }
 
-  for (const node of newNodes) {
+  // Walk the path top-down — a step always sits at a greater depth than the one
+  // feeding it — so a step that moves has already moved by the time the steps it
+  // feeds are looked at, and one pass carries the insertion down to the terminal.
+  const depth = computeDepths(current.map((node) => node.id), forwardEdges);
+  const crowded = new Set(newNodes.map((node) => node.id));
+  const topDown = [...current].sort((a, b) => (depth.get(a.id) ?? 0) - (depth.get(b.id) ?? 0));
+
+  for (const node of topDown) {
+    if (crowded.has(node.id) === false) continue;
     const placed = positioned.get(node.id);
     if (placed === undefined) continue;
     const requiredY = placed.y + node.height + ROW_GAP;
     for (const childId of childrenOf.get(node.id) ?? []) {
-      if (previousIds.has(childId) === false) continue;
       const childPosition = positioned.get(childId);
-      if (childPosition !== undefined && childPosition.y < requiredY) {
-        positioned.set(childId, { ...childPosition, y: requiredY });
-      }
+      if (childPosition === undefined || childPosition.y >= requiredY) continue;
+      positioned.set(childId, { ...childPosition, y: requiredY });
+      crowded.add(childId);
     }
   }
 

@@ -137,6 +137,39 @@ describe('placeNewNodes', () => {
     expect(positions.get('done')).toEqual({ x: 0, y: 316 });
   });
 
+  it('[UNIT] pushes the whole path below an inserted step, not just its successor', () => {
+    // a -> y -> z -> done on the canvas; a step inserted on the a -> y edge has
+    // to clear every step further down the path, or y lands on top of z.
+    const previous = [node('a', 0, 0), node('y', 0, 158), node('z', 0, 316), node('done', 0, 474)];
+    const current = [...previous, node('x', 0, 0)];
+    const edges = [
+      { from: 'a', to: 'x' },
+      { from: 'x', to: 'y' },
+      { from: 'y', to: 'z' },
+      { from: 'z', to: 'done' },
+    ];
+
+    const positions = placeNewNodes(previous, current, edges);
+
+    expect(positions.get('x')).toEqual({ x: 0, y: 158 });
+    expect(positions.get('y')).toEqual({ x: 0, y: 316 });
+    expect(positions.get('z')).toEqual({ x: 0, y: 474 });
+    expect(positions.get('done')).toEqual({ x: 0, y: 632 });
+  });
+
+  it('[UNIT] leaves a path that already has room where it is', () => {
+    // Only the steps an insertion actually crowds move; a gap the user dragged
+    // open further down the path survives the re-render.
+    const previous = [node('a', 0, 0), node('y', 0, 158), node('z', 0, 900)];
+    const current = [...previous, node('x', 0, 0)];
+    const edges = [{ from: 'a', to: 'x' }, { from: 'x', to: 'y' }, { from: 'y', to: 'z' }];
+
+    const positions = placeNewNodes(previous, current, edges);
+
+    expect(positions.get('y')).toEqual({ x: 0, y: 316 });
+    expect(positions.get('z')).toEqual({ x: 0, y: 900 });
+  });
+
   it('[UNIT] staggers several new nodes sharing one parent instead of stacking them', () => {
     const previous = [node('root', 0, 0)];
     const current = [...previous, node('x', 0, 0), node('y', 0, 0)];
