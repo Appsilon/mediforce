@@ -13,7 +13,7 @@ import { StartRunButton } from '@/components/processes/start-run-button';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
 import { mediforceSilent } from '@/lib/mediforce';
-import { validateSteps, toastRegistrationWarnings, handleSaveFailure, workflowDisplayName } from '@/lib/workflow-save-utils';
+import { buildRegisterBody, validateSteps, toastRegistrationWarnings, handleSaveFailure, workflowDisplayName } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
@@ -100,19 +100,12 @@ export default function WorkflowDefinitionVersionPage() {
 
     try {
       const result = await mediforceSilent.workflows.register(
-        {
-          name: definition.name,
+        buildRegisterBody(definition, {
           title: title || undefined,
           description: editedDescription.trim() || undefined,
           steps: orderedSteps,
           transitions: mergedTransitions,
-          roles: definition.roles,
-          env: definition.env,
-          notifications: definition.notifications,
-          metadata: definition.metadata,
-          externalSkillsRepo: definition.externalSkillsRepo,
-          url: definition.url,
-        },
+        }),
         { namespace: definition.namespace },
       );
       if (setAsDefault) {
