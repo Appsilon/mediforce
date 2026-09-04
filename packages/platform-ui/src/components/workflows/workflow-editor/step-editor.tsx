@@ -218,6 +218,7 @@ function StepIdField({ currentId, onChange, error }: { currentId: string; onChan
 
   return (
     <input
+      data-testid="step-id-field"
       value={draft}
       onChange={(e) => { setDraft(e.target.value); setDirty(true); }}
       onBlur={commit}

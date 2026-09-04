@@ -2267,6 +2267,40 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
+  // Owned by the carry-over tests in workflow-editor.journey.ts. Each has its
+  // own fixture because both save a new version, and a shared one would make
+  // the version they land on depend on the order the tests ran in.
+  workflowDefinitions['test:Carry Over Rename:1'] = {
+    name: 'Carry Over Rename',
+    namespace: 'test',
+    version: 1,
+    title: 'Workflow whose next run reads this run\u2019s scan output',
+    description: 'Fixture for retargeting inputForNextRun when a step id changes',
+    steps: [
+      { id: 'scan', name: 'Scan', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'scan', to: 'done' }],
+    inputForNextRun: [{ stepId: 'scan', output: 'cursor', as: 'cursor' }],
+    createdAt: twoDaysAgo,
+  };
+
+  workflowDefinitions['test:Carry Over Delete:1'] = {
+    name: 'Carry Over Delete',
+    namespace: 'test',
+    version: 1,
+    title: 'Workflow whose next run reads a step that gets deleted',
+    description: 'Fixture for dropping inputForNextRun when its step is removed',
+    steps: [
+      { id: 'scan', name: 'Scan', type: 'creation', executor: 'human' },
+      { id: 'review', name: 'Review', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'scan', to: 'review' }, { from: 'review', to: 'done' }],
+    inputForNextRun: [{ stepId: 'review', output: 'notes', as: 'notes' }],
+    createdAt: twoDaysAgo,
+  };
+
   workflowDefinitions['test:Entry Trigger Input:1'] = {
     name: 'Entry Trigger Input',
     namespace: 'test',

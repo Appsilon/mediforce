@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import {
   WorkflowStepSchema,
   TransitionSchema,
+  InputForNextRunEntrySchema,
   WORKFLOW_ASSISTANT_DEFAULT_MODEL,
   mergeVerdictTransitions,
   ensureEntryStepFirst,
@@ -27,7 +28,7 @@ import { StepEditor } from './workflow-editor/step-editor';
 import { ModelPicker } from './workflow-editor/model-picker';
 import { selectBase } from './workflow-editor/step-editor-fields';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
-import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, nonGraphFieldsDiffer, spliceStepIntoTransitions } from './workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, nonGraphFieldsDiffer, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
@@ -115,6 +116,7 @@ function JsonCodeEditor({ value, onChange }: { value: string; onChange: (v: stri
 export interface WorkflowEditorCanvasProps {
   initialSteps: WorkflowStep[];
   initialTransitions: WorkflowDefinition['transitions'];
+  initialInputForNextRun?: WorkflowDefinition['inputForNextRun'];
   wdJsonFields?: Record<string, unknown>;
   workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
   workflowName?: string;
@@ -124,18 +126,34 @@ export interface WorkflowEditorCanvasProps {
     transitions: WorkflowDefinition['transitions'],
     onDiscard: () => void,
   ) => React.ReactNode;
-  onChange?: (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => void;
+  onChange?: (
+    steps: WorkflowStep[],
+    transitions: WorkflowDefinition['transitions'],
+    inputForNextRun: WorkflowDefinition['inputForNextRun'],
+  ) => void;
   onDirtyChange?: (dirty: boolean) => void;
   stepErrors?: Record<string, Record<string, string>>;
 }
 
-function serializeGraph(steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']): string {
-  return JSON.stringify({ steps, transitions });
+/**
+ * The graph the canvas edits. `inputForNextRun` belongs here rather than to the
+ * page's non-graph fields: its entries name step ids, so a rename or a deletion
+ * has to move them the same way it moves transitions and verdict targets.
+ */
+interface CanvasGraph {
+  steps: WorkflowStep[];
+  transitions: WorkflowDefinition['transitions'];
+  inputForNextRun: WorkflowDefinition['inputForNextRun'];
+}
+
+function serializeGraph(graph: CanvasGraph): string {
+  return JSON.stringify(graph);
 }
 
 export function WorkflowEditorCanvas({
   initialSteps,
   initialTransitions,
+  initialInputForNextRun,
   wdJsonFields,
   workflowExternalSkillsRepo,
   workflowName,
@@ -150,9 +168,10 @@ export function WorkflowEditorCanvas({
   const [addBlockContext, setAddBlockContext] = useState<{ fromId: string; toId: string } | null>(null);
   const [aiPaneOpen, setAiPaneOpen] = useState(false);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
+  const [editedInputForNextRun, setEditedInputForNextRun] = useState<WorkflowDefinition['inputForNextRun']>(() => structuredClone(initialInputForNextRun));
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
-  const [editHistory, setEditHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
-  const [redoHistory, setRedoHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
+  const [editHistory, setEditHistory] = useState<CanvasGraph[]>([]);
+  const [redoHistory, setRedoHistory] = useState<CanvasGraph[]>([]);
   const [jsonDraft, setJsonDraft] = useState('');
   const [jsonError, setJsonError] = useState<string | null>(null);
   const lastSyncedJsonRef = useRef('');
@@ -161,6 +180,7 @@ export function WorkflowEditorCanvas({
 
   const { canMoveUp: canMoveUpSet, canMoveDown: canMoveDownSet } = computeMoveEligibility(editedSteps, editedTransitions);
 
+  const { toast } = useToast();
   const { images: dockerImages, isAvailable: dockerAvailable } = useDockerImages();
   const warningStepIds = useMemo(() => {
     if (!dockerAvailable) return undefined;
@@ -176,43 +196,56 @@ export function WorkflowEditorCanvas({
 
   const editedStepsRef = useRef(editedSteps);
   const editedTransitionsRef = useRef(editedTransitions);
+  const editedInputForNextRunRef = useRef(editedInputForNextRun);
   useEffect(() => { editedStepsRef.current = editedSteps; }, [editedSteps]);
   useEffect(() => { editedTransitionsRef.current = editedTransitions; }, [editedTransitions]);
+  useEffect(() => { editedInputForNextRunRef.current = editedInputForNextRun; }, [editedInputForNextRun]);
+
+  const currentGraph = useCallback((): CanvasGraph => ({
+    steps: editedStepsRef.current,
+    transitions: editedTransitionsRef.current,
+    inputForNextRun: editedInputForNextRunRef.current,
+  }), []);
+
+  const restoreGraph = useCallback((graph: CanvasGraph) => {
+    setEditedSteps(graph.steps);
+    setEditedTransitions(graph.transitions);
+    setEditedInputForNextRun(graph.inputForNextRun);
+  }, []);
 
   const saveSnapshot = useCallback(() => {
-    setEditHistory((prev) => [...prev, { steps: editedStepsRef.current, transitions: editedTransitionsRef.current }]);
+    setEditHistory((prev) => [...prev, currentGraph()]);
     setRedoHistory([]);
-  }, []);
+  }, [currentGraph]);
 
   const undoEdit = useCallback(() => {
     setEditHistory((prev) => {
       if (prev.length === 0) return prev;
-      const snapshot = prev[prev.length - 1];
-      setRedoHistory((r) => [...r, { steps: editedStepsRef.current, transitions: editedTransitionsRef.current }]);
-      setEditedSteps(snapshot.steps);
-      setEditedTransitions(snapshot.transitions);
+      setRedoHistory((r) => [...r, currentGraph()]);
+      restoreGraph(prev[prev.length - 1]);
       return prev.slice(0, -1);
     });
-  }, []);
+  }, [currentGraph, restoreGraph]);
 
   const redoEdit = useCallback(() => {
     setRedoHistory((prev) => {
       if (prev.length === 0) return prev;
-      const snapshot = prev[prev.length - 1];
-      setEditHistory((h) => [...h, { steps: editedStepsRef.current, transitions: editedTransitionsRef.current }]);
-      setEditedSteps(snapshot.steps);
-      setEditedTransitions(snapshot.transitions);
+      setEditHistory((h) => [...h, currentGraph()]);
+      restoreGraph(prev[prev.length - 1]);
       return prev.slice(0, -1);
     });
-  }, []);
+  }, [currentGraph, restoreGraph]);
 
   const discardChanges = useCallback(() => {
-    setEditedSteps(structuredClone(initialSteps));
-    setEditedTransitions(structuredClone(initialTransitions));
+    restoreGraph({
+      steps: structuredClone(initialSteps),
+      transitions: structuredClone(initialTransitions),
+      inputForNextRun: structuredClone(initialInputForNextRun),
+    });
     setEditHistory([]);
     setRedoHistory([]);
     setSelectedStepId(null);
-  }, [initialSteps, initialTransitions]);
+  }, [initialSteps, initialTransitions, initialInputForNextRun, restoreGraph]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -242,17 +275,21 @@ export function WorkflowEditorCanvas({
   }, [undoEdit, redoEdit]);
 
   useEffect(() => {
-    onChange?.(editedSteps, editedTransitions);
-  }, [editedSteps, editedTransitions, onChange]);
+    onChange?.(editedSteps, editedTransitions, editedInputForNextRun);
+  }, [editedSteps, editedTransitions, editedInputForNextRun, onChange]);
 
   // Compare against the *normalised* baseline: mounting runs the incoming graph
   // through `ensureTerminalConnected` below, so an un-normalised definition
   // would otherwise read as edited before the user touches anything.
   const baselineGraph = useMemo(() => {
     const normalized = ensureTerminalConnected(initialSteps, initialTransitions);
-    return serializeGraph(normalized.steps, normalized.transitions);
-  }, [initialSteps, initialTransitions]);
-  const isDirty = serializeGraph(editedSteps, editedTransitions) !== baselineGraph;
+    return serializeGraph({ ...normalized, inputForNextRun: initialInputForNextRun });
+  }, [initialSteps, initialTransitions, initialInputForNextRun]);
+  const isDirty = serializeGraph({
+    steps: editedSteps,
+    transitions: editedTransitions,
+    inputForNextRun: editedInputForNextRun,
+  }) !== baselineGraph;
   useEffect(() => {
     onDirtyChange?.(isDirty);
   }, [isDirty, onDirtyChange]);
@@ -268,8 +305,30 @@ export function WorkflowEditorCanvas({
     if (nextTransitions !== editedTransitions) setEditedTransitions(nextTransitions);
   }, [editedSteps, editedTransitions]);
 
+  // A step leaves the canvas by three routes — the diagram's delete, the
+  // assistant's remove_step, an applied JSON document — and all three land
+  // here, so the carry-over entries that named it are dropped once. Keeping a
+  // dangling entry is not an option: the server's cross-field check refuses the
+  // save. Renames never reach this point; `updateStep` retargets them instead.
+  useEffect(() => {
+    const pruned = pruneCarryOver(editedInputForNextRun, editedSteps);
+    if (pruned === editedInputForNextRun) return;
+    const dropped = (editedInputForNextRun ?? []).filter((entry) => !pruned?.includes(entry));
+    setEditedInputForNextRun(pruned);
+    toast({
+      variant: 'warning',
+      title: 'Carry-over to the next run removed',
+      description: `${dropped.map((entry) => `"${entry.as}"`).join(', ')} came from a step that is no longer in this workflow, so the next run will not receive it.`,
+    });
+  }, [editedSteps, editedInputForNextRun, toast]);
+
   const jsonPreviewForSync = JSON.stringify(
-    { ...(wdJsonFields ?? {}), steps: editedSteps, transitions: editedTransitions },
+    {
+      ...(wdJsonFields ?? {}),
+      steps: editedSteps,
+      transitions: editedTransitions,
+      ...(editedInputForNextRun ? { inputForNextRun: editedInputForNextRun } : {}),
+    },
     null,
     2,
   );
@@ -312,6 +371,7 @@ export function WorkflowEditorCanvas({
           return { ...s, verdicts: updatedVerdicts };
         }),
       );
+      setEditedInputForNextRun((prev) => retargetCarryOver(prev, stepId, newId));
       setSelectedStepId((prev) => (prev === stepId ? newId : prev));
     }
   }, []);
@@ -426,7 +486,6 @@ export function WorkflowEditorCanvas({
   const [assistantLoading, setAssistantLoading] = useState(false);
   const [assistantPhase, setAssistantPhase] = useState(0);
   const assistantInputRef = useRef<HTMLTextAreaElement>(null);
-  const { toast } = useToast();
 
   useEffect(() => {
     const el = assistantInputRef.current;
@@ -607,13 +666,13 @@ export function WorkflowEditorCanvas({
   const applyJson = () => {
     try {
       const doc = JSON.parse(jsonDraft) as Record<string, unknown>;
-      // This editor applies the graph (steps + transitions) only — the other
-      // authorable fields (title, triggers, metadata, …) are page state, not
-      // canvas state. Rather than silently discard edits to them, refuse and
-      // point the user at where those fields live.
+      // This editor applies the graph (steps, transitions, inputForNextRun)
+      // only — the other authorable fields (title, triggers, metadata, …) are
+      // page state, not canvas state. Rather than silently discard edits to
+      // them, refuse and point the user at where those fields live.
       if (nonGraphFieldsDiffer(doc, wdJsonFields)) {
         setJsonError(
-          'This editor applies steps & transitions only. Edit other fields (title, triggers, metadata, …) in workflow settings, then reapply.',
+          'This editor applies steps, transitions & inputForNextRun only. Edit other fields (title, triggers, metadata, …) in workflow settings, then reapply.',
         );
         return;
       }
@@ -627,6 +686,11 @@ export function WorkflowEditorCanvas({
       );
       if (!transitionsResult.success) {
         setJsonError(`transitions: ${transitionsResult.error.issues[0]?.message ?? 'invalid'}`);
+        return;
+      }
+      const carryOverResult = InputForNextRunEntrySchema.array().optional().safeParse(doc?.inputForNextRun);
+      if (!carryOverResult.success) {
+        setJsonError(`inputForNextRun: ${carryOverResult.error.issues[0]?.message ?? 'invalid'}`);
         return;
       }
 
@@ -644,12 +708,21 @@ export function WorkflowEditorCanvas({
         setJsonError(validationErrors[0]);
         return;
       }
+      // The same rule the server applies — reported here rather than silently
+      // pruned, because in this panel the entries are what the user just typed.
+      const stepIds = new Set(orderedSteps.map((s) => s.id));
+      const dangling = (carryOverResult.data ?? []).filter((entry) => !stepIds.has(entry.stepId));
+      if (dangling.length > 0) {
+        setJsonError(`inputForNextRun: no step named ${dangling.map((entry) => `'${entry.stepId}'`).join(', ')}`);
+        return;
+      }
 
       // Apply the same ordered/merged graph that was validated, so the canvas
       // stores exactly what passed the gate (not the raw, pre-normalisation input).
       saveSnapshot();
       setEditedSteps(orderedSteps);
       setEditedTransitions(mergedTransitions);
+      setEditedInputForNextRun(carryOverResult.data);
       lastSyncedJsonRef.current = jsonDraft;
       setJsonError(null);
     } catch (err) {

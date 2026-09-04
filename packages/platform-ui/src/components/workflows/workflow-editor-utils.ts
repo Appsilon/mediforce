@@ -1,6 +1,7 @@
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
 type Transitions = WorkflowDefinition['transitions'];
+type CarryOverEntries = NonNullable<WorkflowDefinition['inputForNextRun']>;
 
 /**
  * Returns two sets of step IDs: those that can move up and those that can move
@@ -146,17 +147,18 @@ function stableStringify(value: unknown): string {
 }
 
 /**
- * Whether a pasted workflow document changed any field other than
- * `steps`/`transitions`, relative to the canvas's current non-graph fields. The
- * canvas JSON editor applies the graph only, so this gates whether to refuse the
- * apply. Order-insensitive, so merely reordering keys in the JSON is not treated
- * as a change.
+ * Whether a pasted workflow document changed any field other than the graph —
+ * `steps`, `transitions` and the `inputForNextRun` entries that name their step
+ * ids — relative to the canvas's current non-graph fields. The canvas JSON
+ * editor applies the graph only, so this gates whether to refuse the apply.
+ * Order-insensitive, so merely reordering keys in the JSON is not treated as a
+ * change.
  */
 export function nonGraphFieldsDiffer(
   doc: Record<string, unknown>,
   wdJsonFields: Record<string, unknown> | undefined,
 ): boolean {
-  const { steps: _steps, transitions: _transitions, ...rest } = doc;
+  const { steps: _steps, transitions: _transitions, inputForNextRun: _inputForNextRun, ...rest } = doc;
   return stableStringify(rest) !== stableStringify(wdJsonFields ?? {});
 }
 
@@ -196,4 +198,40 @@ export function ensureTerminalConnected(
   }
 
   return { steps: resultSteps, transitions: resultTransitions };
+}
+
+/**
+ * Points carry-over entries (`inputForNextRun`) at a step that was renamed,
+ * the same way a rename rewires transitions and verdict targets. Without this
+ * the entry keeps the old id, the server's cross-field check rejects the save
+ * (`stepId '…' does not match any step id`), and the only way to correct it is
+ * to retype the block in the source-code panel.
+ *
+ * Returns the original reference when no entry named the renamed step.
+ */
+export function retargetCarryOver(
+  entries: CarryOverEntries | undefined,
+  oldId: string,
+  newId: string,
+): CarryOverEntries | undefined {
+  if (!entries?.some((entry) => entry.stepId === oldId)) return entries;
+  return entries.map((entry) => (entry.stepId === oldId ? { ...entry, stepId: newId } : entry));
+}
+
+/**
+ * Drops carry-over entries whose step is gone — deleted from the diagram,
+ * removed by the assistant, or absent from an applied JSON document. There is
+ * nothing left to read the output from, and keeping the entry would make the
+ * version unsavable.
+ *
+ * Returns the original reference when every entry still resolves.
+ */
+export function pruneCarryOver(
+  entries: CarryOverEntries | undefined,
+  steps: WorkflowStep[],
+): CarryOverEntries | undefined {
+  if (entries === undefined) return entries;
+  const stepIds = new Set(steps.map((s) => s.id));
+  const kept = entries.filter((entry) => stepIds.has(entry.stepId));
+  return kept.length === entries.length ? entries : kept;
 }

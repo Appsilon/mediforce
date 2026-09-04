@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
-import type { WorkflowStep } from '@mediforce/platform-core';
+import { parseWorkflowDefinitionForCreation, WorkflowAuthorableSchema } from '@mediforce/platform-core';
+import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import { ApiError } from '@mediforce/platform-api/client';
-import { handleSaveFailure, validateSteps } from '../workflow-save-utils';
+import { buildRegisterBody, handleSaveFailure, validateSteps } from '../workflow-save-utils';
 
 /**
  * Issues are produced by the real schema rather than hand-written strings:
@@ -202,5 +202,74 @@ describe('validateSteps — script config', () => {
     ];
 
     expect(validateSteps(steps)).toMatch(/missing step config.*"Run job" needs a databricks block/i);
+  });
+});
+
+describe('buildRegisterBody', () => {
+  const definition: WorkflowDefinition = {
+    name: 'landing-zone',
+    version: 30,
+    namespace: 'appsilon',
+    visibility: 'public',
+    title: 'Landing Zone',
+    description: 'Ingest deliveries',
+    preamble: '## Domain Context',
+    env: { STUDY_ID: 'CDISCPILOT01' },
+    workspace: { remote: 'Appsilon/mediforce-landing-zone-study-demo', remoteAuth: 'GITHUB_TOKEN' },
+    steps: [step],
+    transitions: [],
+    inputForNextRun: [{ stepId: 'review', output: 'listing', as: 'previousListing' }],
+    createdAt: '2026-01-01T00:00:00.000Z',
+  } as WorkflowDefinition;
+
+  it('carries every authorable field of the edited version into the new one', () => {
+    const body = buildRegisterBody(definition, {
+      title: 'v31',
+      description: 'Ingest deliveries',
+      steps: [step],
+      transitions: [],
+    });
+
+    expect(body.workspace).toEqual(definition.workspace);
+    expect(body.visibility).toBe('public');
+    expect(body.preamble).toBe('## Domain Context');
+    expect(body.inputForNextRun).toEqual(definition.inputForNextRun);
+    expect(body.env).toEqual(definition.env);
+  });
+
+  it('carries every field the authorable schema declares, so a new one cannot be silently dropped', () => {
+    const body = buildRegisterBody(definition, { steps: [step], transitions: [] });
+    const carried = new Set(Object.keys(body));
+    const missing = Object.keys(WorkflowAuthorableSchema.shape).filter(
+      (field) => definition[field as keyof WorkflowDefinition] !== undefined && !carried.has(field),
+    );
+
+    expect(missing).toEqual([]);
+  });
+
+  it('drops server-managed and lifecycle fields', () => {
+    const body = buildRegisterBody(
+      { ...definition, archived: true, source: { url: 'https://github.com/a/b', commit: 'a'.repeat(40), path: 'w.wd.json' } } as WorkflowDefinition,
+      { steps: [step], transitions: [] },
+    );
+
+    expect(body).not.toHaveProperty('version');
+    expect(body).not.toHaveProperty('createdAt');
+    expect(body).not.toHaveProperty('namespace');
+    expect(body).not.toHaveProperty('archived');
+    expect(body).not.toHaveProperty('source');
+  });
+
+  it('lets the editor override what it changed', () => {
+    const body = buildRegisterBody(definition, {
+      title: 'v31 haiku to Sonnet 4.6',
+      description: 'Updated',
+      steps: [step],
+      transitions: [{ from: 'review', to: 'review' }],
+    });
+
+    expect(body.title).toBe('v31 haiku to Sonnet 4.6');
+    expect(body.description).toBe('Updated');
+    expect(body.transitions).toEqual([{ from: 'review', to: 'review' }]);
   });
 });
