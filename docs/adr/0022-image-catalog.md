@@ -1,7 +1,7 @@
 ---
-status: proposed
+status: finalized
 audience: engineers
-last_reviewed: 2026-09-02
+last_reviewed: 2026-09-04
 ---
 
 # ADR-0022: The Image Catalog is an image the platform offers, keyed on its source
@@ -10,8 +10,7 @@ last_reviewed: 2026-09-02
 **Deciders:** Krystian Zieliński
 **Epic:** [#1292](https://github.com/Appsilon/mediforce/issues/1292) — Step Image Catalog
 
-**Built so far: decisions 1, 2 and 4, apart from rendering a Dockerfile's
-contents inside the platform.** #1294 landed `image_catalog_entries`, the
+**All six decisions are built.** #1294 landed `image_catalog_entries`, the
 source-derived key, the required `intent`, `unknown` as a state, the
 workspace-member write gate, the handlers, the contract, the route adapters and
 `mediforce images`; #1295 landed probed capabilities; #1296 landed lineage — the
@@ -19,24 +18,26 @@ base computed from `RootFS.Layers` prefix containment, the layer delta cut at
 that boundary, and the label delta; #1297 landed the **Images** view at
 `/[handle]/images`, non-admin, grouped by base, searchable across intent and
 capabilities, with the source ladder and the cross-link from Admin →
-Infrastructure. A version's Dockerfile is reached by permalink, not rendered
-inline: that needs #1286, which is still open, so the view states which rung of
-the ladder it reached instead of pretending to the one below it. Still paper:
-the step-editor picker (#1298), which reads the Docker daemon exactly as it does
-today. Read the decisions below as the six those PRs may not relitigate.
-This ADR becomes `finalized` in the PR closing the last issue of the epic.
+Infrastructure; #1298 pointed the step-editor picker at the catalog, which is
+where decision 5 stops being a claim about a future control and starts being the
+behaviour of the one authors use.
+
+One piece of decision 4 is deliberately absent: a version's Dockerfile is
+reached by permalink, never rendered inline. That needs #1286, which is still
+open, so the view states which rung of the source ladder it reached instead of
+pretending to the one below it.
 
 ## Context
 
-Mediforce has no object meaning *"an image the platform offers for steps"*. It
-has only the one meaning *"an image the daemon happens to have"*, and that is
-what the step editor shows an author:
-[`agentImageOptions`](../../packages/platform-ui/src/components/workflows/workflow-editor/step-editor.tsx)
-maps `docker images` into a `<select>`. Every daemon row is an option —
+Mediforce had no object meaning *"an image the platform offers for steps"*. It
+had only the one meaning *"an image the daemon happens to have"*, and that was
+what the step editor showed an author: an `agentImageOptions` helper in
+[step-editor.tsx](../../packages/platform-ui/src/components/workflows/workflow-editor/step-editor.tsx)
+mapped `docker images` into a `<select>`. Every daemon row was an option —
 `postgres`, `redis`, dangling `<none>` layers, whatever ops pulled last week.
-The only intelligence in the list is a string compare against
+The only intelligence in the list was a string compare against
 [`DEFAULT_AGENT_IMAGE`](../../packages/platform-core/src/utils/container-defaults.ts)
-that puts a `★` on `mediforce-golden-image`.
+that put a `★` on `mediforce-golden-image`. #1298 deleted both.
 
 Three consequences. The first two are user reports; the third is in the source.
 
@@ -272,8 +273,9 @@ What replaces enforcement is a better offer: the picker lists only entries that
 suit the step, and the existing preflight `missing-image` warning keeps telling
 an author when the image they named is not there. **Filtering an offer is not
 the same as refusing a value**, and only the first is safe to add to a control
-authors already depend on. Concretely, #1298 keeps the free-text field and the
-branch that appends an unrecognised pinned value as its own option.
+authors already depend on. Concretely, #1298 kept the free-text field beside the
+select and the branch that appends an unrecognised pinned value as its own
+option, so every string that saved before still saves and round-trips.
 
 ### 6. The vocabulary, fixed before the code
 
@@ -304,10 +306,12 @@ image — built from
 by `DEFAULT_AGENT_IMAGE`, and the image an agent step falls back to at
 registration when it names none. It is **not** a quality tier and confers no
 standing: a curated entry is not "golden", and the golden image is not
-"approved". Today the word is a magic string plus a hardcoded compare in the
-picker; after #1295 its standing in the picker is a probed fact
-(agent-capable) and a computed one (the root most lineage hangs off), and the
-compare is deleted.
+"approved". The word used to be a magic string plus a hardcoded compare in the
+picker; since #1298 its standing there is a probed fact (agent-capable) and a
+computed one (the root most lineage hangs off). It survives in the picker in
+exactly one place — the blank option, which names the image registration fills
+in when a step pins none, because that is a fact about the runtime rather than a
+claim about suitability.
 
 ## Consequences
 
@@ -326,19 +330,26 @@ Binding:
   and not for a namespace that has not described it.
 - **A fact that cannot be computed is `unknown`, never an error.**
 
-User-visible changes, all deferred to the issues that make them and each a §12
-gate there rather than here:
+User-visible changes, each a §12 gate in the issue that made it:
 
-- **The step-editor picker stops listing every daemon row** (#1298). This is the
-  only change in the epic that can break authoring, which is why it ships last,
-  keeps the free-text escape hatch, and keeps the branch that preserves an
-  unrecognised pinned value.
+- **The step-editor picker stopped listing every daemon row** (#1298). The only
+  change in the epic that could break authoring, which is why it shipped last,
+  kept the free-text escape hatch, and kept the branch that preserves an
+  unrecognised pinned value. Two consequences a reader should expect: an image
+  on the daemon that no entry describes is no longer one click away — it is
+  typed, not picked — and a catalog that covers images but suits *this* step
+  with none of them offers none, rather than falling back to the daemon list it
+  was built to replace.
 - **Admin → Infrastructure keeps showing raw daemon truth**, `postgres` and
   dangling layers included — an admin hunting 40 GB needs exactly that, and
   curating it would destroy its purpose. Its only change, shipped in #1297, is a
   cross-link on a row some catalog entry describes.
-- **The `★` on `mediforce-golden-image` disappears**, replaced by the probed
-  `agent-capable` property and lineage grouping.
+- **The `★` on `mediforce-golden-image` is gone** (#1298), replaced by the
+  probed `agent-capable` property and lineage grouping.
+- **A deployment with no catalog authors exactly as it did before.** An empty
+  catalog, or a daemon nobody can reach, degrades the picker to the daemon
+  listing it always showed — unranked, since without a probe nothing has been
+  measured (AGENTS.md §13).
 
 ## Out of scope
 
