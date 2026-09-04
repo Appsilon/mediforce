@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { scriptConfigKeyForPlugin } from '@mediforce/platform-core';
 import type { WorkflowStep } from '@mediforce/platform-core';
 import type { RegistrationWarning } from '@mediforce/platform-api/contract';
 import type { ToastOpts } from '@/components/command-palette/types';
@@ -134,6 +135,10 @@ function fallbackMessage(err: unknown): string {
 /**
  * Validates steps for known structural errors before saving.
  * Returns an error message string on failure, or null when valid.
+ *
+ * Script config is required by the step's *plugin*, exactly as the server
+ * requires it (`scriptConfigKeyForPlugin`) — a pluginless script step, i.e. a
+ * terminal whose `executor` is filler the schema demands, needs none.
  */
 export function validateSteps(steps: WorkflowStep[]): string | null {
   const missingPlugin = steps.filter(
@@ -147,9 +152,14 @@ export function validateSteps(steps: WorkflowStep[]): string | null {
   if (missingAction.length > 0) {
     return `Action config required: ${missingAction.map((s) => `"${s.name}"`).join(', ')}`;
   }
-  const missingScript = steps.filter((s) => s.executor === 'script' && !s.script && !s.databricks);
-  if (missingScript.length > 0) {
-    return `Script config required: ${missingScript.map((s) => `"${s.name}"`).join(', ')}`;
+  const missingScriptConfig = steps.flatMap((s) => {
+    const configKey = s.executor === 'script' ? scriptConfigKeyForPlugin(s.plugin) : undefined;
+    return configKey !== undefined && s[configKey] === undefined
+      ? [`"${s.name}" (needs ${configKey})`]
+      : [];
+  });
+  if (missingScriptConfig.length > 0) {
+    return `Script config required: ${missingScriptConfig.join(', ')}`;
   }
 
   const emptyIds = steps.filter((s) => !s.id);

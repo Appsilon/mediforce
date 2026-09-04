@@ -326,6 +326,20 @@ const SCRIPT_CONFIG_KEY_PLUGIN: Record<'script' | 'databricks', string> = {
 };
 
 /**
+ * The step config key `plugin` requires, or `undefined` when the plugin reads
+ * no script config (or there is no plugin — e.g. a terminal step, whose
+ * `executor` is filler the schema demands but the runtime never honours).
+ *
+ * Single source of truth for the plugin -> config pairing, shared with the
+ * editor's pre-save check so the two cannot drift.
+ */
+export function scriptConfigKeyForPlugin(
+  plugin: string | undefined,
+): 'script' | 'databricks' | undefined {
+  return plugin === undefined ? undefined : SCRIPT_PLUGIN_CONFIG_KEY[plugin];
+}
+
+/**
  * executor='action' steps must carry an `action` config; conversely, `action`
  * makes no sense on other executors. executor='script' steps carry their config
  * under `script` / `databricks` (matching the plugin) — the old shape with
@@ -350,7 +364,7 @@ function validateSteps(
   ctx: z.RefinementCtx,
 ): void {
   wd.steps.forEach((step, i) => {
-    const pluginConfigKey = step.plugin !== undefined ? SCRIPT_PLUGIN_CONFIG_KEY[step.plugin] : undefined;
+    const pluginConfigKey = scriptConfigKeyForPlugin(step.plugin);
 
     for (const configKey of ['script', 'databricks'] as const) {
       if (step[configKey] === undefined) continue;

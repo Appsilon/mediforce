@@ -162,3 +162,45 @@ describe('validateSteps — issue #1031 (unnamed parameters)', () => {
     expect(validateSteps(steps)).toBeNull();
   });
 });
+
+describe('validateSteps — script config', () => {
+  const terminal: WorkflowStep = {
+    id: 'no-deliveries',
+    name: 'No deliveries',
+    type: 'terminal',
+    executor: 'script',
+  } as WorkflowStep;
+
+  it('accepts a terminal step whose executor is filler', () => {
+    expect(validateSteps([step, terminal])).toBeNull();
+  });
+
+  it('rejects a script step whose plugin config is missing', () => {
+    const steps: WorkflowStep[] = [
+      {
+        id: 'poll',
+        name: 'Poll SFTP',
+        type: 'creation',
+        executor: 'script',
+        plugin: 'script-container',
+      } as WorkflowStep,
+    ];
+
+    expect(validateSteps(steps)).toMatch(/script config required.*"Poll SFTP".*needs script/i);
+  });
+
+  it('rejects a databricks step carrying container script config instead', () => {
+    const steps: WorkflowStep[] = [
+      {
+        id: 'job',
+        name: 'Run job',
+        type: 'creation',
+        executor: 'script',
+        plugin: 'databricks-job',
+        script: { command: 'python3 run.py', image: 'img:latest' },
+      } as WorkflowStep,
+    ];
+
+    expect(validateSteps(steps)).toMatch(/script config required.*"Run job".*needs databricks/i);
+  });
+});

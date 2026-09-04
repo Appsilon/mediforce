@@ -164,6 +164,10 @@ Pick by intent:
 | `decision` | Routing-only node |
 | `terminal` | End state |
 
+A `terminal` step still needs an `executor` — the schema requires one on every
+step — but it never runs, so the value is inert and carries no executor config:
+no `plugin`, no `script`/`databricks` block, no `agent` block.
+
 Do not set `autonomyLevel` on non-agent steps. Use CM3/L3 when a human must
 approve agent output; use a separate human `type: review` step for custom
 business verdicts.
