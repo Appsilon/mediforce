@@ -28,6 +28,8 @@ export type { DatabricksJobPluginInit } from './plugins/databricks/databricks-jo
 export { DatabricksClient } from './plugins/databricks/databricks-client';
 export type { DatabricksClientInit, DatabricksRunStatus } from './plugins/databricks/databricks-client';
 export type { DockerSpawnStrategy, DockerSpawnRequest, DockerSpawnResult } from './plugins/docker-spawn-strategy';
+export { deriveBuildTag, resolveBuildSource, resolveStepImage } from './plugins/container-plugin';
+export type { BuildSource } from './plugins/container-plugin';
 
 // Runner
 export type { AgentEventLog } from './runner/agent-event-log';

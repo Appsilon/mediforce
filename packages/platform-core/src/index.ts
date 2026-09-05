@@ -522,6 +522,17 @@ export {
   redactRepoCredentials,
 } from './utils/repo-url';
 export type { RepoCloneTarget } from './utils/repo-url';
+export {
+  BUILD_LABELS,
+  OCI_LABELS,
+  IMAGE_LABELS_FORMAT,
+  buildProvenanceLabelArgs,
+  imageLabelsInspectArgs,
+  parseImageProvenance,
+  readProvenanceLabels,
+  shortImageId,
+} from './utils/image-provenance';
+export type { ImageProvenance, ReadImageProvenance } from './utils/image-provenance';
 export { getWorkflowStatus, type WorkflowStatus } from './utils/workflow-status';
 export { toSlug, uniqueName, uniqueSlug } from './utils/slug';
 

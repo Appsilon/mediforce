@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { resolveStepImage } from '@mediforce/agent-runtime';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity } from '@/lib/api-auth';
 
@@ -42,9 +43,14 @@ export async function GET(request: Request): Promise<NextResponse> {
       if (!accessible) continue;
     }
 
+    // A build-mode step that omits `image` runs under the tag `deriveBuildTag`
+    // mints from its build inputs, so matching on the stored string alone is
+    // blind to exactly the `mediforce-built:*` rows that need naming.
+    const workflowRepo = latest.externalSkillsRepo;
     const matchingSteps = latest.steps
       .filter((step) => {
-        const image = step.agent?.image ?? step.script?.image;
+        const image =
+          resolveStepImage(step.agent, workflowRepo) ?? resolveStepImage(step.script, workflowRepo);
         return typeof image === 'string' && normalizeImage(image) === needle;
       })
       .map((step) => step.id);

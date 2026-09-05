@@ -3,7 +3,7 @@
  * Requires Docker daemon running. Skipped if Docker is not available.
  * Uses local bare git repos — no network required.
  */
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   imageExistsLocally,
@@ -11,6 +11,10 @@ import {
   buildImageFromRepo,
   ensureImage,
 } from '../docker-image-builder';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { imageLabelsInspectArgs, parseImageProvenance } from '@mediforce/platform-core';
 import { createTestRepo, addCommitToTestRepo, type TestRepo } from './helpers/create-test-repo';
 
 function dockerAvailable(): boolean {
@@ -66,6 +70,43 @@ describe.skipIf(!dockerAvailable())('docker-image-builder integration', () => {
 
     const buildCommit = await getImageBuildCommit(image);
     expect(buildCommit).toBe(repo.commitSha);
+  }, 60_000);
+
+  it('labels a built image with provenance the listing can read back', async () => {
+    const image = testImageName('provenance');
+
+    await buildImageFromRepo({
+      image,
+      repoUrl: repo.repoPath,
+      commit: repo.commitSha,
+      workflow: 'sdtm-mapping',
+      namespace: 'acme',
+    });
+
+    // An image with no labels at all — the shape a `postgres` row has on a real
+    // daemon, and the one a Go template that dots into `.Config.Labels` trips on.
+    const unlabelled = testImageName('unlabelled');
+    const contextDir = mkdtempSync(join(tmpdir(), 'mediforce-test-unlabelled-'));
+    writeFileSync(join(contextDir, 'Dockerfile'), 'FROM alpine:3.21\n');
+    execFileSync('docker', ['build', '-t', unlabelled, contextDir], { stdio: 'pipe' });
+    rmSync(contextDir, { recursive: true, force: true });
+
+    // Same call the daemon listing makes, over both images at once: tripping on
+    // the unlabelled one would strip the provenance off the labelled one too.
+    const stdout = execFileSync(
+      'docker',
+      imageLabelsInspectArgs([image, unlabelled]),
+      { stdio: 'pipe' },
+    ).toString();
+
+    const provenance = [...parseImageProvenance(stdout).values()];
+    expect(provenance).toContainEqual({
+      buildRepo: repo.repoPath,
+      buildCommit: repo.commitSha,
+      buildDockerfile: 'Dockerfile',
+      buildWorkflow: 'sdtm-mapping',
+      buildNamespace: 'acme',
+    });
   }, 60_000);
 
   it('ensureImage skips rebuild when commit matches', async () => {

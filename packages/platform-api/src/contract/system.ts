@@ -1,11 +1,28 @@
 import { z } from 'zod';
 
+/**
+ * One row of the Docker daemon's image list, plus the build provenance the
+ * platform labels its own images with.
+ *
+ * Every `build*` field is optional: an image pulled from a registry, or built
+ * before the labels existed, carries none of them and lists unannotated.
+ */
 export const DockerImageInfoSchema = z.object({
   repository: z.string(),
   tag: z.string(),
   id: z.string(),
   size: z.string(),
   created: z.string(),
+  /** Git repo the image was built from (`mediforce.build.repo`). */
+  buildRepo: z.string().optional(),
+  /** Commit the build context was checked out at (`mediforce.build.commit`). */
+  buildCommit: z.string().optional(),
+  /** Dockerfile path inside that repo (`mediforce.build.dockerfile`). */
+  buildDockerfile: z.string().optional(),
+  /** Workflow definition whose step triggered the build (`mediforce.build.workflow`). */
+  buildWorkflow: z.string().optional(),
+  /** Namespace owning that definition (`mediforce.build.namespace`). */
+  buildNamespace: z.string().optional(),
 });
 
 export const DockerDiskInfoSchema = z.object({
