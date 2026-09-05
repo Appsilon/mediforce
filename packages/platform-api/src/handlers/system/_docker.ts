@@ -5,9 +5,15 @@ import { z } from 'zod';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
+  imageCapabilityProbeArgs,
   imageLabelsInspectArgs,
+  IMAGE_CAPABILITY_PROBE_TIMEOUT_MS,
+  ImageCapabilitiesSchema,
+  parseImageCapabilities,
   parseImageProvenance,
   shortImageId,
+  unknownImageCapabilities,
+  type ImageCapabilities,
   type ReadImageProvenance,
 } from '@mediforce/platform-core';
 import {
@@ -54,6 +60,70 @@ export interface FetchFromLocalDockerOptions {
     file: string,
     args: readonly string[],
   ) => Promise<{ stdout: string; stderr: string }>;
+}
+
+export interface ProbeImageCapabilitiesOptions {
+  readonly exec?: (
+    file: string,
+    args: readonly string[],
+    options?: { timeout: number },
+  ) => Promise<{ stdout: string; stderr: string }>;
+  readonly fetch?: typeof globalThis.fetch;
+  readonly baseUrl?: string;
+  readonly workerSecret?: string;
+}
+
+export async function probeLocalImageCapabilities(
+  image: string,
+  options: ProbeImageCapabilitiesOptions = {},
+): Promise<ImageCapabilities> {
+  const exec = options.exec ?? ((file, args, execOptions) =>
+    execFileAsync(file, [...args], execOptions) as Promise<{ stdout: string; stderr: string }>);
+  try {
+    const { stdout } = await exec(
+      'docker',
+      imageCapabilityProbeArgs(image),
+      { timeout: IMAGE_CAPABILITY_PROBE_TIMEOUT_MS },
+    );
+    return parseImageCapabilities(stdout);
+  } catch (error) {
+    const stdout = error instanceof Error && 'stdout' in error && typeof error.stdout === 'string'
+      ? error.stdout
+      : '';
+    return stdout.length > 0 ? parseImageCapabilities(stdout) : unknownImageCapabilities();
+  }
+}
+
+export async function probeContainerWorkerImageCapabilities(
+  image: string,
+  options: ProbeImageCapabilitiesOptions = {},
+): Promise<ImageCapabilities> {
+  const fetchImpl = options.fetch ?? globalThis.fetch;
+  const baseUrl = options.baseUrl ?? process.env.CONTAINER_WORKER_URL ?? DEFAULT_CONTAINER_WORKER_URL;
+  // The probe starts a container on the worker host, so it carries the same
+  // secret the image-delete route does. An estate that sets none is unchanged:
+  // the worker only enforces the header once `CONTAINER_WORKER_SECRET` is set.
+  const workerSecret = options.workerSecret ?? process.env.CONTAINER_WORKER_SECRET ?? '';
+  const headers: Record<string, string> = workerSecret === ''
+    ? {}
+    : { 'X-Worker-Secret': workerSecret };
+  try {
+    const response = await fetchImpl(
+      `${baseUrl}/images/${encodeURIComponent(image)}/capabilities`,
+      { headers },
+    );
+    if (!response.ok) return unknownImageCapabilities();
+    const parsed = ImageCapabilitiesSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : unknownImageCapabilities();
+  } catch {
+    return unknownImageCapabilities();
+  }
+}
+
+export async function probeImageCapabilities(image: string): Promise<ImageCapabilities> {
+  return isLocalAgentMode()
+    ? probeLocalImageCapabilities(image)
+    : probeContainerWorkerImageCapabilities(image);
 }
 
 /** Shell out to `docker images` + `docker system df` and normalise the output. */

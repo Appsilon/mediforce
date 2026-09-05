@@ -251,7 +251,7 @@ restricts one — a Step may still name any image string.
 One image the platform offers, identified by its **source**: either `built`
 `(repo, dockerfile)` or `referenced` (an untagged image reference). Deliberately
 **not** keyed on the commit, so a rebuild is another **Version** of a row the
-author already chose rather than a new row. Every fact on it is recomputed from
+author already chose rather than a new row. Every fact on it is derived from
 the Docker daemon; the one thing a human writes is its **Intent**. Any Workspace
 member may create, edit and delete one — an entry executes nothing.
 
@@ -259,6 +259,14 @@ member may create, edit and delete one — an entry executes nothing.
 One built artifact of an entry's source: a commit for a `built` entry, a tag for
 a `referenced` one, carrying the image tag that names it on the daemon. Versions
 are derived on read from the daemon's build labels, never stored.
+
+**Capability** *(of an Image Catalog Version)*:
+The derived set of `claude`, `opencode`, `bash`, `python3`, `Rscript`, and
+`node` binaries that a bounded, network-isolated probe found. It is cached by
+daemon image ID when the entry is registered, so rendering a catalog or picker
+never starts a container. A Version is **agent-capable** only when it has
+`bash` and either agent CLI; an unavailable daemon or timed-out probe is
+explicitly `unknown`, which remains selectable without a suitability claim.
 
 **Intent** *(of an Image Catalog Entry)*:
 The single required human sentence: what the image is *for* — "R-based

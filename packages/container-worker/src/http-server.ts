@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:http';
-import { listImages, getDiskUsage, removeImage } from './docker-info';
+import { listImages, getDiskUsage, probeImageCapabilities, removeImage } from './docker-info';
 
 const WORKER_HTTP_PORT = process.env.WORKER_HTTP_PORT !== undefined
   ? Number(process.env.WORKER_HTTP_PORT)
@@ -57,6 +57,22 @@ export function startHttpServer(): Server {
       } catch (err) {
         jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
       }
+      return;
+    }
+
+    if (url.pathname.startsWith('/images/') && url.pathname.endsWith('/capabilities')) {
+      // Reading this route starts a container from a caller-supplied
+      // reference, so it is gated like the destructive DELETE rather than
+      // like the read-only listings above it.
+      if (!requireSecret(req, res)) return;
+      const image = decodeURIComponent(
+        url.pathname.slice('/images/'.length, -'/capabilities'.length),
+      );
+      if (image.length === 0) {
+        jsonResponse(res, 400, { error: 'Missing image reference' });
+        return;
+      }
+      jsonResponse(res, 200, await probeImageCapabilities(image));
       return;
     }
 

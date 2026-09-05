@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   fetchFromContainerWorker,
   fetchFromLocalDocker,
+  probeContainerWorkerImageCapabilities,
+  probeLocalImageCapabilities,
 } from '../_docker';
 
 describe('fetchFromLocalDocker', () => {
@@ -220,5 +222,33 @@ describe('fetchFromContainerWorker', () => {
       baseUrl: 'http://worker:3001',
     });
     expect(result.available).toBe(false);
+  });
+});
+
+describe('image capability probes', () => {
+  it('normalises the same probe fixture from local Docker and the worker', async () => {
+    const local = await probeLocalImageCapabilities('mediforce-golden-image:latest', {
+      exec: async () => ({ stdout: '/usr/local/bin/opencode\n/usr/bin/bash\n/usr/bin/node\n', stderr: '' }),
+    });
+    const worker = await probeContainerWorkerImageCapabilities('mediforce-golden-image:latest', {
+      baseUrl: 'http://worker.test',
+      fetch: async () => new Response(
+        JSON.stringify({ status: 'known', agentCapable: true, runtimes: ['opencode', 'bash', 'node'] }),
+      ),
+    });
+
+    expect(worker).toEqual(local);
+  });
+
+  it('turns a timeout or unavailable worker into explicit unknown capability', async () => {
+    const local = await probeLocalImageCapabilities('missing', {
+      exec: async () => { throw new Error('timed out'); },
+    });
+    const worker = await probeContainerWorkerImageCapabilities('missing', {
+      fetch: async () => { throw new Error('connection refused'); },
+    });
+
+    expect(local).toEqual({ status: 'unknown' });
+    expect(worker).toEqual({ status: 'unknown' });
   });
 });

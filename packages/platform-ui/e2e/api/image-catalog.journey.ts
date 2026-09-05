@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
@@ -17,13 +18,39 @@ import {
  * id is derived from the source, so a unique repo yields a unique row.
  */
 
+interface VersionView {
+  imageId: string;
+  imageTag: string;
+  capabilities:
+    | { status: 'unknown' }
+    | { status: 'known'; agentCapable: boolean; runtimes: string[] };
+}
+
 interface EntryView {
   id: string;
   name: string;
   intent: string;
   source: { kind: string; repo?: string; dockerfile?: string; reference?: string };
-  versions: unknown[];
+  versions: VersionView[];
   availability: 'present' | 'absent' | 'unknown';
+}
+
+/** The image the capability probe runs against: `alpine` has a shell and none
+ *  of the probed runtimes, so its honest answer is a known, empty set — the
+ *  case the agent picker must drop rather than offer. */
+const PROBE_BASE_IMAGE = 'alpine:3.22';
+
+function docker(...args: string[]): void {
+  execFileSync('docker', args, { stdio: 'pipe' });
+}
+
+function dockerAvailable(): boolean {
+  try {
+    docker('info');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function catalogUrl(namespace: string = TEST_ORG_HANDLE): string {
@@ -120,6 +147,51 @@ test.describe('image catalog API journey', () => {
     await request.delete(`/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`, {
       headers: apiKeyHeaders(),
     });
+  });
+
+  test('a version carries the capabilities probed when it was catalogued', async ({ request }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    // Its own repository name, so the entry resolves to exactly this one
+    // version no matter what else the runner's daemon holds.
+    const reference = `mediforce-e2e-probe-${Date.now()}`;
+    try {
+      docker('image', 'inspect', PROBE_BASE_IMAGE);
+    } catch {
+      docker('pull', PROBE_BASE_IMAGE);
+    }
+    docker('tag', PROBE_BASE_IMAGE, `${reference}:v1`);
+
+    const createRes = await request.post(catalogUrl(), {
+      headers: apiKeyHeaders(),
+      data: {
+        name: 'E2E probe image',
+        intent: 'Proves a catalogued version reports what the probe found',
+        source: { kind: 'referenced', reference },
+      },
+    });
+    expect(createRes.status(), await createRes.text()).toBe(201);
+    const { entry } = (await createRes.json()) as { entry: EntryView };
+    expect(entry.versions.map((version) => version.imageTag)).toEqual([`${reference}:v1`]);
+    expect(entry.versions[0].capabilities).toEqual({
+      status: 'known',
+      agentCapable: false,
+      runtimes: [],
+    });
+
+    // Read back through a fresh request: the probe result is a stored column
+    // (migration 0048), not something the create response computed in flight.
+    const getRes = await request.get(
+      `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
+      { headers: apiKeyHeaders() },
+    );
+    expect(getRes.ok(), await getRes.text()).toBe(true);
+    const view = ((await getRes.json()) as { entry: EntryView }).entry;
+    expect(view.versions[0].capabilities).toEqual(entry.versions[0].capabilities);
+
+    await request.delete(`/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`, {
+      headers: apiKeyHeaders(),
+    });
+    docker('rmi', `${reference}:v1`);
   });
 
   test('intent is rejected when empty, by the contract', async ({ request }) => {

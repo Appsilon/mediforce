@@ -3,6 +3,7 @@ import {
   ImageCatalogDeclaredSourceSchema,
   ImageCatalogEntrySchema,
   ImageCatalogSourceSchema,
+  ImageCapabilitiesSchema,
 } from '@mediforce/platform-core';
 
 const NamespaceQuery = z.object({ namespace: z.string().min(1) });
@@ -23,6 +24,9 @@ export const ImageCatalogVersionSchema = z.object({
   workflow: z.string().optional(),
   /** Namespace owning that workflow, from the build labels. */
   namespace: z.string().optional(),
+  /** Cached probe result. Unknown means the image was not probed or the
+   * daemon could not complete the bounded probe; it is never a render error. */
+  capabilities: ImageCapabilitiesSchema,
 });
 
 /** Present, absent, or unknown. Unknown means the daemon could not be reached,
