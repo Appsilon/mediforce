@@ -1,4 +1,5 @@
-import type { DockerImageInfo, DockerInfoResponse } from '../../../contract/system';
+import type { DockerImageInfo } from '../../../contract/system';
+import type { DaemonImageListing } from '../../system/_docker';
 
 /** The entry every handler test catalogues, minus the namespace. */
 export const TEALFLOW = {
@@ -10,20 +11,17 @@ export const TEALFLOW = {
 /** The canonical form `Appsilon/tealflow` becomes once stored. */
 export const TEALFLOW_REPO_URL = 'git@github.com:Appsilon/tealflow.git';
 
-/** A daemon that answered and holds nothing. */
-export const EMPTY_DAEMON: DockerInfoResponse = daemonWith([]);
+/** A daemon nobody could reach — the `unknown` case, which is a state and not
+ *  an error (ADR-0021 decision 2). */
+export const UNREACHABLE_DAEMON: DaemonImageListing = { available: false, images: [] };
 
-/** A daemon that answered, holding exactly these images. */
-export function daemonWith(images: DockerImageInfo[]): DockerInfoResponse {
-  return {
-    available: true,
-    images,
-    disk: {
-      images: { totalCount: images.length, size: '0B' },
-      containers: { totalCount: 0, active: 0, size: '0B' },
-      buildCache: { size: '0B' },
-    },
-  };
+/** A daemon that answered and holds nothing. */
+export const EMPTY_DAEMON: DaemonImageListing = daemonWith([]);
+
+/** A daemon that answered, holding exactly these images. The catalog reads the
+ *  listing alone — no disk statistics — so neither does this fixture. */
+export function daemonWith(images: DockerImageInfo[]): DaemonImageListing {
+  return { available: true, images };
 }
 
 /** One `docker images` row, defaulting to a TealFlow build. */

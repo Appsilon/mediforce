@@ -27,7 +27,11 @@ import {
   DockerDiskInfoSchema,
   DockerImageInfoSchema,
 } from '../../contract/system';
-import type { DockerInfoResponse } from '../../contract/system';
+import type {
+  DockerDiskInfo,
+  DockerImageInfo,
+  DockerInfoResponse,
+} from '../../contract/system';
 
 const execFileAsync = promisify(execFile);
 
@@ -60,6 +64,12 @@ async function fetchInspected(
   } catch {
     return new Map();
   }
+}
+
+/** What a caller gets when it wants the listing without the disk statistics. */
+export interface DaemonImageListing {
+  available: boolean;
+  images: readonly DockerImageInfo[];
 }
 
 export interface FetchFromLocalDockerOptions {
@@ -201,18 +211,23 @@ export async function fetchImageHistory(image: string): Promise<ImageBuildStep[]
     : fetchContainerWorkerImageHistory(image);
 }
 
-/** Shell out to `docker images` + `docker system df` and normalise the output. */
-export async function fetchFromLocalDocker(
-  options: FetchFromLocalDockerOptions = {},
-): Promise<DockerInfoResponse> {
-  const exec =
-    options.exec ??
-    ((file, args) => execFileAsync(file, [...args]) as Promise<{ stdout: string; stderr: string }>);
+type Exec = (
+  file: string,
+  args: readonly string[],
+) => Promise<{ stdout: string; stderr: string }>;
 
-  const [imagesResult, diskResult] = await Promise.all([
-    exec('docker', ['images', '--format', '{{json .}}']),
-    exec('docker', ['system', 'df', '--format', '{{json .}}']),
-  ]);
+function localExec(options: FetchFromLocalDockerOptions): Exec {
+  return (
+    options.exec ??
+    ((file, args) => execFileAsync(file, [...args]) as Promise<{ stdout: string; stderr: string }>)
+  );
+}
+
+/** `docker images` plus the one `docker image inspect` batch that annotates it.
+ *  `null` on a listing that does not parse, which reads as an unavailable
+ *  daemon. */
+async function localImageRows(exec: Exec): Promise<DockerImageInfo[] | null> {
+  const imagesResult = await exec('docker', ['images', '--format', '{{json .}}']);
 
   const rawImages = imagesResult.stdout.trim();
   const parsedRows =
@@ -237,6 +252,15 @@ export async function fetchFromLocalDocker(
     };
   });
 
+  const parsed = z.array(DockerImageInfoSchema).safeParse(rawImageList);
+  return parsed.success ? parsed.data : null;
+}
+
+/** `docker system df`. Seconds of wall clock on a busy daemon, which is why it
+ *  is its own call: only the infrastructure page reads its result. */
+async function localDisk(exec: Exec): Promise<DockerDiskInfo | null> {
+  const diskResult = await exec('docker', ['system', 'df', '--format', '{{json .}}']);
+
   const diskRows = diskResult.stdout
     .trim()
     .split('\n')
@@ -247,7 +271,7 @@ export async function fetchFromLocalDocker(
   const ctrRow = findRow('Containers');
   const cacheRow = findRow('Build Cache');
 
-  const rawDisk = {
+  const parsed = DockerDiskInfoSchema.safeParse({
     images: {
       totalCount: Number(imgRow?.TotalCount ?? 0),
       size: String(imgRow?.Size ?? '0B'),
@@ -258,16 +282,28 @@ export async function fetchFromLocalDocker(
       size: String(ctrRow?.Size ?? '0B'),
     },
     buildCache: { size: String(cacheRow?.Size ?? '0B') },
-  };
+  });
+  return parsed.success ? parsed.data : null;
+}
 
-  const imagesParsed = z.array(DockerImageInfoSchema).safeParse(rawImageList);
-  const diskParsed = DockerDiskInfoSchema.safeParse(rawDisk);
+/** Shell out to `docker images` + `docker system df` and normalise the output. */
+export async function fetchFromLocalDocker(
+  options: FetchFromLocalDockerOptions = {},
+): Promise<DockerInfoResponse> {
+  const exec = localExec(options);
 
-  if (!imagesParsed.success || !diskParsed.success) {
-    return { available: false };
-  }
+  const [images, disk] = await Promise.all([localImageRows(exec), localDisk(exec)]);
+  if (images === null || disk === null) return { available: false };
 
-  return { available: true, images: imagesParsed.data, disk: diskParsed.data };
+  return { available: true, images, disk };
+}
+
+/** The listing alone, skipping `docker system df`. */
+export async function fetchImagesFromLocalDocker(
+  options: FetchFromLocalDockerOptions = {},
+): Promise<DaemonImageListing> {
+  const images = await localImageRows(localExec(options));
+  return images === null ? { available: false, images: [] } : { available: true, images };
 }
 
 export interface FetchFromContainerWorkerOptions {
@@ -275,32 +311,71 @@ export interface FetchFromContainerWorkerOptions {
   readonly baseUrl?: string;
 }
 
+function workerBaseUrl(options: FetchFromContainerWorkerOptions): string {
+  return options.baseUrl ?? process.env.CONTAINER_WORKER_URL ?? DEFAULT_CONTAINER_WORKER_URL;
+}
+
+async function workerImageRows(
+  fetchImpl: typeof globalThis.fetch,
+  baseUrl: string,
+): Promise<DockerImageInfo[] | null> {
+  const res = await fetchImpl(`${baseUrl}/images`);
+  if (!res.ok) return null;
+  const parsed = z.array(DockerImageInfoSchema).safeParse(await res.json());
+  return parsed.success ? parsed.data : null;
+}
+
+async function workerDisk(
+  fetchImpl: typeof globalThis.fetch,
+  baseUrl: string,
+): Promise<DockerDiskInfo | null> {
+  const res = await fetchImpl(`${baseUrl}/disk`);
+  if (!res.ok) return null;
+  const parsed = DockerDiskInfoSchema.safeParse(await res.json());
+  return parsed.success ? parsed.data : null;
+}
+
 /** Call the container-worker HTTP endpoints and normalise the output. */
 export async function fetchFromContainerWorker(
   options: FetchFromContainerWorkerOptions = {},
 ): Promise<DockerInfoResponse> {
   const fetchImpl = options.fetch ?? globalThis.fetch;
-  const baseUrl =
-    options.baseUrl ?? process.env.CONTAINER_WORKER_URL ?? DEFAULT_CONTAINER_WORKER_URL;
+  const baseUrl = workerBaseUrl(options);
 
-  const [imagesRes, diskRes] = await Promise.all([
-    fetchImpl(`${baseUrl}/images`),
-    fetchImpl(`${baseUrl}/disk`),
+  const [images, disk] = await Promise.all([
+    workerImageRows(fetchImpl, baseUrl),
+    workerDisk(fetchImpl, baseUrl),
   ]);
 
-  if (!imagesRes.ok || !diskRes.ok) {
-    return { available: false };
+  if (images === null || disk === null) return { available: false };
+
+  return { available: true, images, disk };
+}
+
+/** The listing alone, skipping the worker's `/disk` endpoint. */
+export async function fetchImagesFromContainerWorker(
+  options: FetchFromContainerWorkerOptions = {},
+): Promise<DaemonImageListing> {
+  const images = await workerImageRows(options.fetch ?? globalThis.fetch, workerBaseUrl(options));
+  return images === null ? { available: false, images: [] } : { available: true, images };
+}
+
+/**
+ * The daemon's image listing, and nothing else.
+ *
+ * `getDockerInfo` also gathers `docker system df`, which is seconds of wall
+ * clock on a busy daemon and is read by exactly one screen — the infrastructure
+ * page's disk cards. Every Image Catalog read wants the listing and never the
+ * disk stats, and a catalog read now happens on a page load and on a poll, so
+ * it asks for the half it uses. An unreachable daemon is `available: false`
+ * with no images, never a thrown request (ADR-0021 decision 2).
+ */
+export async function fetchDaemonImages(): Promise<DaemonImageListing> {
+  try {
+    return isLocalAgentMode()
+      ? await fetchImagesFromLocalDocker()
+      : await fetchImagesFromContainerWorker();
+  } catch {
+    return { available: false, images: [] };
   }
-
-  const imagesRaw = await imagesRes.json();
-  const diskRaw = await diskRes.json();
-
-  const imagesParsed = z.array(DockerImageInfoSchema).safeParse(imagesRaw);
-  const diskParsed = DockerDiskInfoSchema.safeParse(diskRaw);
-
-  if (!imagesParsed.success || !diskParsed.success) {
-    return { available: false };
-  }
-
-  return { available: true, images: imagesParsed.data, disk: diskParsed.data };
 }

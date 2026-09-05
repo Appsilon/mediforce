@@ -8,17 +8,18 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
-import type { DockerInfoResponse } from '../../../contract/system';
-import { EMPTY_DAEMON, TEALFLOW, builtImage, daemonWith } from './fixtures';
+import type { DaemonImageListing } from '../../system/_docker';
+import { EMPTY_DAEMON, TEALFLOW, builtImage, daemonWith, UNREACHABLE_DAEMON } from './fixtures';
 
-const daemon = vi.hoisted(() => ({ value: { available: false } as DockerInfoResponse }));
-vi.mock('../../system/get-docker-info', () => ({ getDockerInfo: async () => daemon.value }));
-
+const daemon = vi.hoisted(() => ({
+  value: { available: false, images: [] } as DaemonImageListing,
+}));
 /** The layer summary each image id has, by image id — an id absent from it is
  *  one the daemon could not answer for. Mocked rather than left to the real
  *  module, which would otherwise reach for a Docker socket or the worker. */
 const history = vi.hoisted(() => ({ value: new Map<string, { command: string; size: string }[]>() }));
 vi.mock('../../system/_docker', () => ({
+  fetchDaemonImages: async () => daemon.value,
   probeImageCapabilities: async () => ({ status: 'unknown' }),
   fetchImageHistory: async (image: string) => history.value.get(image) ?? null,
 }));
@@ -33,7 +34,7 @@ describe('getImageCatalogEntry handler', () => {
   beforeEach(() => {
     repo = new InMemoryImageCatalogRepository();
     auditRepo = new InMemoryAuditRepository();
-    daemon.value = { available: false };
+    daemon.value = UNREACHABLE_DAEMON;
     history.value = new Map();
   });
 

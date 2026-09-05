@@ -1,11 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { ImageCatalogEntry } from '@mediforce/platform-core';
 import { createTestScope } from '../../../repositories/__tests__/create-test-scope';
-import type { DockerInfoResponse } from '../../../contract/system';
-import { EMPTY_DAEMON, TEALFLOW_REPO_URL, builtImage, daemonWith } from './fixtures';
+import type { DaemonImageListing } from '../../system/_docker';
+import { EMPTY_DAEMON, TEALFLOW_REPO_URL, builtImage, daemonWith, UNREACHABLE_DAEMON } from './fixtures';
 
-const daemon = vi.hoisted(() => ({ value: { available: false } as DockerInfoResponse }));
-vi.mock('../../system/get-docker-info', () => ({ getDockerInfo: async () => daemon.value }));
+const daemon = vi.hoisted(() => ({
+  value: { available: false, images: [] } as DaemonImageListing,
+}));
+vi.mock('../../system/_docker', () => ({
+  fetchDaemonImages: async () => daemon.value,
+  probeImageCapabilities: async () => ({ status: 'unknown' }),
+  fetchImageHistory: async () => null,
+}));
 
 const { toEntryViews } = await import('../_view');
 
@@ -45,7 +51,7 @@ describe('toEntryViews', () => {
   });
 
   it('marks every entry unknown when the daemon could not be reached', async () => {
-    daemon.value = { available: false };
+    daemon.value = UNREACHABLE_DAEMON;
 
     const views = await toEntryViews([ENTRY, { ...ENTRY, id: 'other' }], createTestScope({}));
 

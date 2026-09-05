@@ -171,6 +171,15 @@ export const queryKeys = {
   imageCatalog: {
     list: (handle: string) => ['image-catalog', handle] as const,
   },
+  /** One catalog entry, annotated against the rest of its namespace. Its own
+   *  domain, not a slice of `image-catalog`, because the single-entry read
+   *  carries the per-version layer summary the listing deliberately omits —
+   *  list-prefix invalidation must not clobber it. */
+  imageCatalogEntry: (handle: string, id: string) => ['image-catalog-entry', handle, id] as const,
+  /** Workflows whose steps pin any of the given images, keyed by the set asked
+   *  for — two entries asking about different versions are two answers. */
+  workflowsByImage: (images: readonly string[]) =>
+    ['workflows-by-image', [...images].sort().join(' ')] as const,
   /** Workspace-wide audit trail (Monitoring → Users / Tasks tabs) —
    *  keyset-paginated, server-side filtered by action set + actor +
    *  date range. Each tab passes its own `actions` slice, so the two

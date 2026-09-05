@@ -1,23 +1,17 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Server, HardDrive, Container, AlertTriangle, ArrowUpDown, Trash2, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
-import { apiFetch } from '@/lib/api-fetch';
+import { ArrowLeft, Server, HardDrive, Container, AlertTriangle, ArrowUpDown, Trash2, ChevronDown, ChevronRight, Layers, Loader2 } from 'lucide-react';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { useDockerImages } from '@/hooks/use-docker-images';
+import { useImageCatalogEntries } from '@/hooks/use-image-catalog';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
+import { useWorkflowsByImage } from '@/hooks/use-workflows-by-image';
+import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
-
-interface WorkflowImageMatch {
-  name: string;
-  namespace: string;
-  title: string | undefined;
-  version: number;
-  steps: string[];
-}
 
 type SortField = 'repository' | 'size' | 'created';
 type SortDir = 'asc' | 'desc';
@@ -65,6 +59,10 @@ export default function AdminInfrastructurePage() {
   const router = useRouter();
   const { canAdmin, loading: roleLoading } = useNamespaceRole(handle);
   const { images, disk, isAvailable, isLoading, refresh } = useDockerImages();
+  // The only change this ops view takes from the Image Catalog (#1297): a row
+  // that some entry describes gets a link to it. Every raw daemon row still
+  // renders, catalogued or not — curating this list would destroy its purpose.
+  const { entries: catalogEntries } = useImageCatalogEntries(handle);
   const [sortField, setSortField] = useState<SortField>('size');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -98,6 +96,19 @@ export default function AdminInfrastructurePage() {
   const sortedImages = useMemo(
     () => sortImages(images, sortField, sortDir),
     [images, sortField, sortDir],
+  );
+
+  // Keyed on `repository:tag`, not the image id: two tags can alias one
+  // immutable id, and an id map would keep whichever entry it saw last and
+  // point both daemon rows at it. The tag is what this table's row *is*.
+  const catalogEntryByImageRef = useMemo(
+    () =>
+      new Map(
+        catalogEntries.flatMap((entry) =>
+          entry.versions.map((version) => [version.imageTag, entry] as const),
+        ),
+      ),
+    [catalogEntries],
   );
 
   function toggleSort(field: SortField) {
@@ -192,6 +203,8 @@ export default function AdminInfrastructurePage() {
                       <ImageRow
                         key={`${img.id}-${idx}`}
                         img={img}
+                        handle={handle}
+                        catalogEntry={catalogEntryByImageRef.get(`${img.repository}:${img.tag}`)}
                         deleting={deletingId === img.id}
                         onDelete={() => handleDeleteImage(img.id)}
                       />
@@ -256,51 +269,23 @@ function DiskCard({ icon, title, count, active, size }: {
   );
 }
 
-function ImageRow({ img, deleting, onDelete }: {
+function ImageRow({ img, handle, catalogEntry, deleting, onDelete }: {
   img: DockerImageInfo;
+  handle: string;
+  catalogEntry: { id: string; name: string } | undefined;
   deleting: boolean;
   onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [workflows, setWorkflows] = useState<WorkflowImageMatch[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchWorkflows = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const imageRef = `${img.repository}:${img.tag}`;
-      const res = await apiFetch(
-        `/api/workflow-definitions/by-image?image=${encodeURIComponent(imageRef)}`,
-      );
-      if (!res.ok) {
-        setError(`Failed to load (${res.status})`);
-        return;
-      }
-      const data = await res.json();
-      setWorkflows(data.workflows);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
-  }, [img.repository, img.tag]);
-
-  function toggle() {
-    const next = !expanded;
-    setExpanded(next);
-    if (next && workflows === null && !loading) {
-      fetchWorkflows();
-    }
-  }
+  const imageRef = `${img.repository}:${img.tag}`;
+  const { workflows, loading, error } = useWorkflowsByImage([imageRef], expanded);
 
   return (
     <>
       <tr className="border-b last:border-0 hover:bg-muted/30 transition-colors">
         <td className="px-4 py-2 font-mono text-xs">
           <button
-            onClick={toggle}
+            onClick={() => setExpanded((current) => !current)}
             className="inline-flex items-center gap-1 hover:text-foreground transition-colors text-left"
           >
             {expanded
@@ -319,7 +304,21 @@ function ImageRow({ img, deleting, onDelete }: {
             {img.tag}
           </span>
         </td>
-        <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{img.id}</td>
+        <td className="px-4 py-2 font-mono text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            {img.id}
+            {catalogEntry !== undefined && (
+              <Link
+                href={routes.image(handle, catalogEntry.id)}
+                aria-label={`Open “${catalogEntry.name}” in the image catalog`}
+                title={`Open “${catalogEntry.name}” in the image catalog`}
+                className="text-primary hover:text-primary/80 transition-colors"
+              >
+                <Layers className="h-3.5 w-3.5" />
+              </Link>
+            )}
+          </span>
+        </td>
         <td className="px-4 py-2 text-right text-xs">{humanSize(img.size)}</td>
         <td className="px-4 py-2 text-right text-xs text-muted-foreground">{img.created}</td>
         <td className="px-4 py-2 text-center">
@@ -327,7 +326,7 @@ function ImageRow({ img, deleting, onDelete }: {
             onClick={onDelete}
             disabled={deleting}
             className="text-muted-foreground hover:text-red-500 disabled:opacity-30 transition-colors"
-            title={`Delete ${img.repository}:${img.tag}`}
+            title={`Delete ${imageRef}`}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -342,10 +341,10 @@ function ImageRow({ img, deleting, onDelete }: {
                 Loading workflows...
               </div>
             )}
-            {error && (
-              <p className="text-xs text-red-500">{error}</p>
+            {error !== null && (
+              <p className="text-xs text-red-500">{error.message}</p>
             )}
-            {workflows !== null && !loading && (
+            {workflows !== undefined && !loading && (
               workflows.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No workflows use this image.</p>
               ) : (

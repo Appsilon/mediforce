@@ -549,6 +549,7 @@ export { DOCKER_IMAGE_SETUP_URL, VERIFY_WORKFLOW_URL, CREATE_WORKFLOW_URL } from
 export { DEFAULT_AGENT_IMAGE } from './utils/container-defaults';
 export {
   normalizeRepoUrls,
+  githubPermalink,
   toHttpsWithToken,
   resolveRepoCloneTargets,
   redactRepoCredentials,

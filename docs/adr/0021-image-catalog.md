@@ -10,16 +10,20 @@ last_reviewed: 2026-09-02
 **Deciders:** Krystian Zieliński
 **Epic:** [#1292](https://github.com/Appsilon/mediforce/issues/1292) — Step Image Catalog
 
-**Built so far: decision 1, and decision 2 apart from the Dockerfile-from-git
-preference.** #1294 landed `image_catalog_entries`, the source-derived key, the
-required `intent`, `unknown` as a state, the workspace-member write gate, the
-handlers, the contract, the route adapters and `mediforce images`; #1295 landed
-probed capabilities; #1296 landed lineage — the base computed from
-`RootFS.Layers` prefix containment, the layer delta cut at that boundary, the
-label delta, and the catalog view grouped by base. Still paper: the catalog view
-(#1297) and the step-editor picker (#1298) — which still reads the Docker daemon
-exactly as it does today. Read the decisions below as the six those PRs may not
-relitigate.
+**Built so far: decisions 1, 2 and 4, apart from rendering a Dockerfile's
+contents inside the platform.** #1294 landed `image_catalog_entries`, the
+source-derived key, the required `intent`, `unknown` as a state, the
+workspace-member write gate, the handlers, the contract, the route adapters and
+`mediforce images`; #1295 landed probed capabilities; #1296 landed lineage — the
+base computed from `RootFS.Layers` prefix containment, the layer delta cut at
+that boundary, and the label delta; #1297 landed the **Images** view at
+`/[handle]/images`, non-admin, grouped by base, searchable across intent and
+capabilities, with the source ladder and the cross-link from Admin →
+Infrastructure. A version's Dockerfile is reached by permalink, not rendered
+inline: that needs #1286, which is still open, so the view states which rung of
+the ladder it reached instead of pretending to the one below it. Still paper:
+the step-editor picker (#1298), which reads the Docker daemon exactly as it does
+today. Read the decisions below as the six those PRs may not relitigate.
 This ADR becomes `finalized` in the PR closing the last issue of the epic.
 
 ## Context
@@ -331,8 +335,8 @@ gate there rather than here:
   unrecognised pinned value.
 - **Admin → Infrastructure keeps showing raw daemon truth**, `postgres` and
   dangling layers included — an admin hunting 40 GB needs exactly that, and
-  curating it would destroy its purpose. Its only change is a cross-link to an
-  image's catalog entry where one exists.
+  curating it would destroy its purpose. Its only change, shipped in #1297, is a
+  cross-link on a row some catalog entry describes.
 - **The `★` on `mediforce-golden-image` disappears**, replaced by the probed
   `agent-capable` property and lineage grouping.
 
