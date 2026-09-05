@@ -26,6 +26,7 @@ export type {
 export type { CoworkSessionRepository } from './cowork-session-repository';
 export type { TriggerRepository, TriggerUpdate } from './trigger-repository';
 export type { ToolCatalogRepository } from './tool-catalog-repository';
+export type { ImageCatalogRepository } from './image-catalog-repository';
 export type { NamespaceRepository, NamespaceUpdates } from './namespace-repository';
 export type { NamespaceSecretsRepository } from './namespace-secrets-repository';
 export type { UserProfile, UserProfileRepository } from './user-profile-repository';

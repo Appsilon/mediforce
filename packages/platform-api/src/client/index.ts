@@ -184,6 +184,16 @@ import {
   UpdateToolCatalogEntryOutputSchema,
   DeleteToolCatalogEntryInputSchema,
   DeleteToolCatalogEntryOutputSchema,
+  ListImageCatalogEntriesInputSchema,
+  ListImageCatalogEntriesOutputSchema,
+  GetImageCatalogEntryInputSchema,
+  GetImageCatalogEntryOutputSchema,
+  CreateImageCatalogEntryInputApiSchema,
+  CreateImageCatalogEntryOutputSchema,
+  UpdateImageCatalogEntryInputApiSchema,
+  UpdateImageCatalogEntryOutputSchema,
+  DeleteImageCatalogEntryInputSchema,
+  DeleteImageCatalogEntryOutputSchema,
   ListNamespaceMembersInputSchema,
   ListNamespaceMembersOutputSchema,
   InviteUserInputSchema,
@@ -271,6 +281,16 @@ import {
   type UpdateToolCatalogEntryOutput,
   type DeleteToolCatalogEntryInput,
   type DeleteToolCatalogEntryOutput,
+  type ListImageCatalogEntriesInput,
+  type ListImageCatalogEntriesOutput,
+  type GetImageCatalogEntryInput,
+  type GetImageCatalogEntryOutput,
+  type CreateImageCatalogEntryInputApi,
+  type CreateImageCatalogEntryOutput,
+  type UpdateImageCatalogEntryInputApi,
+  type UpdateImageCatalogEntryOutput,
+  type DeleteImageCatalogEntryInput,
+  type DeleteImageCatalogEntryOutput,
   type ListTasksInput,
   type ListTasksOutput,
   type GetTaskInput,
@@ -758,6 +778,14 @@ export class Mediforce {
     create: (input: CreateToolCatalogEntryInputApi) => Promise<CreateToolCatalogEntryOutput>;
     update: (input: UpdateToolCatalogEntryInputApi) => Promise<UpdateToolCatalogEntryOutput>;
     delete: (input: DeleteToolCatalogEntryInput) => Promise<DeleteToolCatalogEntryOutput>;
+  };
+
+  readonly imageCatalog: {
+    list: (input: ListImageCatalogEntriesInput) => Promise<ListImageCatalogEntriesOutput>;
+    get: (input: GetImageCatalogEntryInput) => Promise<GetImageCatalogEntryOutput>;
+    create: (input: CreateImageCatalogEntryInputApi) => Promise<CreateImageCatalogEntryOutput>;
+    update: (input: UpdateImageCatalogEntryInputApi) => Promise<UpdateImageCatalogEntryOutput>;
+    delete: (input: DeleteImageCatalogEntryInput) => Promise<DeleteImageCatalogEntryOutput>;
   };
 
   readonly users: {
@@ -1956,6 +1984,62 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.delete');
         return DeleteToolCatalogEntryOutputSchema.parse(body);
+      },
+    };
+
+    this.imageCatalog = {
+      list: async (input) => {
+        const validated = ListImageCatalogEntriesInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/image-catalog${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.list');
+        return ListImageCatalogEntriesOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetImageCatalogEntryInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/image-catalog/${encodeURIComponent(validated.id)}${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.get');
+        return GetImageCatalogEntryOutputSchema.parse(body);
+      },
+      create: async (input) => {
+        const validated = CreateImageCatalogEntryInputApiSchema.parse(input);
+        const { namespace, ...createBody } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/image-catalog${qs}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(createBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.create');
+        return CreateImageCatalogEntryOutputSchema.parse(body);
+      },
+      update: async (input) => {
+        const validated = UpdateImageCatalogEntryInputApiSchema.parse(input);
+        const { namespace, id, ...patch } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(
+          `/api/image-catalog/${encodeURIComponent(id)}${qs}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.update');
+        return UpdateImageCatalogEntryOutputSchema.parse(body);
+      },
+      delete: async (input) => {
+        const validated = DeleteImageCatalogEntryInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/image-catalog/${encodeURIComponent(validated.id)}${qs}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.delete');
+        return DeleteImageCatalogEntryOutputSchema.parse(body);
       },
     };
 

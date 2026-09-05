@@ -79,6 +79,10 @@ describe.skipIf(!dockerAvailable())('docker-image-builder integration', () => {
       image,
       repoUrl: repo.repoPath,
       commit: repo.commitSha,
+      // Named explicitly: a step that omits it gets no `dockerfile` label at
+      // all, because the builders label what `deriveBuildTag` hashed. This
+      // case is here to prove all five labels survive a real daemon.
+      dockerfile: 'Dockerfile',
       workflow: 'sdtm-mapping',
       namespace: 'acme',
     });

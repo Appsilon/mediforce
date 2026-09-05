@@ -138,6 +138,12 @@ export { createToolCatalogEntry } from './tool-catalog/create-entry';
 export { updateToolCatalogEntry } from './tool-catalog/update-entry';
 export { deleteToolCatalogEntry } from './tool-catalog/delete-entry';
 
+export { listImageCatalogEntries } from './image-catalog/list-entries';
+export { getImageCatalogEntry } from './image-catalog/get-entry';
+export { createImageCatalogEntry } from './image-catalog/create-entry';
+export { updateImageCatalogEntry } from './image-catalog/update-entry';
+export { deleteImageCatalogEntry } from './image-catalog/delete-entry';
+
 export { listAgentRuns } from './agent-runs/list-agent-runs';
 export { getAgentRunCardStatusCounts } from './agent-runs/get-agent-run-card-status-counts';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';

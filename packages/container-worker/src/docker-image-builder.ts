@@ -127,7 +127,13 @@ export async function buildImageFromRepo(options: {
   /** Namespace owning that definition. Recorded as a label. */
   namespace?: string;
 }): Promise<void> {
-  const { image, repoUrl, commit, dockerfile = 'Dockerfile', repoToken, workflow, namespace } = options;
+  const { image, repoUrl, commit, repoToken, workflow, namespace } = options;
+  // `-f` needs a concrete path, but the label must record what `deriveBuildTag`
+  // actually hashed — `dockerfile ?? ''`. Labelling the resolved default would
+  // make the image claim a Dockerfile its own tag never saw, so an Image
+  // Catalog entry keyed on `(repo, dockerfile)` could not match it
+  // (ADR-0021 decision 1).
+  const dockerfile = options.dockerfile ?? 'Dockerfile';
   const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-build-'));
 
   try {
@@ -143,7 +149,7 @@ export async function buildImageFromRepo(options: {
       [
         'build',
         '-t', image,
-        ...buildProvenanceLabelArgs({ repoUrl, commit, dockerfile, workflow, namespace, repoToken }),
+        ...buildProvenanceLabelArgs({ repoUrl, commit, dockerfile: options.dockerfile ?? '', workflow, namespace, repoToken }),
         '-f', dockerfilePath,
         buildContext,
       ],

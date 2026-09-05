@@ -33,7 +33,14 @@ src/errors.ts            Exit-code mapping
 ```
 
 Sixty-plus commands across workflows, runs, tasks, agents, namespaces,
-secrets, models, cowork, config and system.
+secrets, models, cowork, config, images and system.
+
+`mediforce images` and `mediforce system images` are different things and the
+names are close enough to be worth stating: `images` is the per-namespace
+**Image Catalog** — the images a workspace offers for steps, one row per source
+with a sentence saying what each is for ([ADR-0021](../../docs/adr/0021-image-catalog.md)).
+`system images` is the raw, deployment-wide Docker daemon listing an admin uses
+to hunt disk, `postgres` and dangling layers included.
 
 ## Rules
 

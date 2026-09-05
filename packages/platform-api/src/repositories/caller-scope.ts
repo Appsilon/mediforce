@@ -30,6 +30,7 @@ import type { AuthorizedAuditEventRepository } from './authorized-audit-event-re
 import type { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-repository';
 import type { AuthorizedHandoffRepository } from './authorized-handoff-repository';
 import type { AuthorizedHumanTaskRepository } from './authorized-human-task-repository';
+import type { AuthorizedImageCatalogRepository } from './authorized-image-catalog-repository';
 import type { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
 import type { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import type { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
@@ -73,6 +74,7 @@ export interface CallerScope {
   readonly auditEvents: AuthorizedAuditEventRepository;
   readonly handoffs: AuthorizedHandoffRepository;
   readonly toolCatalog: AuthorizedToolCatalogRepository;
+  readonly imageCatalog: AuthorizedImageCatalogRepository;
   readonly oauthProviders: AuthorizedOAuthProviderRepository;
   readonly agentOAuthTokens: AuthorizedAgentOAuthTokenRepository;
   readonly workspaceSecrets: AuthorizedWorkspaceSecretRepository;

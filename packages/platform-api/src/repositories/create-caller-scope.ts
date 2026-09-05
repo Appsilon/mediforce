@@ -11,6 +11,7 @@ import type {
   EmailProviderInfo,
   HandoffRepository,
   HumanTaskRepository,
+  ImageCatalogRepository,
   TaskAttachmentRepository,
   ModelRegistryRepository,
   NamespaceRepository,
@@ -45,6 +46,7 @@ import { AuthorizedAuditEventRepository } from './authorized-audit-event-reposit
 import { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-repository';
 import { AuthorizedHandoffRepository } from './authorized-handoff-repository';
 import { AuthorizedHumanTaskRepository } from './authorized-human-task-repository';
+import { AuthorizedImageCatalogRepository } from './authorized-image-catalog-repository';
 import { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
 import { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
@@ -73,6 +75,7 @@ export interface CallerScopeServices {
   readonly coworkSessionRepo: CoworkSessionRepository;
   readonly triggerRepo: TriggerRepository;
   readonly toolCatalogRepo: ToolCatalogRepository;
+  readonly imageCatalogRepo: ImageCatalogRepository;
   readonly namespaceRepo: NamespaceRepository;
   readonly userProfileRepo: UserProfileRepository;
   readonly credentialsRepo: CredentialsRepository;
@@ -130,6 +133,7 @@ export function createCallerScope(
     auditEvents: new AuthorizedAuditEventRepository(caller, services.auditRepo),
     handoffs: new AuthorizedHandoffRepository(caller, services.handoffRepo),
     toolCatalog: new AuthorizedToolCatalogRepository(caller, services.toolCatalogRepo),
+    imageCatalog: new AuthorizedImageCatalogRepository(caller, services.imageCatalogRepo),
     oauthProviders: new AuthorizedOAuthProviderRepository(
       caller,
       services.oauthProviderRepo,

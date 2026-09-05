@@ -488,6 +488,35 @@ export {
 } from './tool-catalog';
 
 export {
+  ImageCatalogVersionSchema,
+  ImageCatalogAvailabilitySchema,
+  ImageCatalogEntryViewSchema,
+  ListImageCatalogEntriesInputSchema,
+  ListImageCatalogEntriesOutputSchema,
+  GetImageCatalogEntryInputSchema,
+  GetImageCatalogEntryOutputSchema,
+  CreateImageCatalogEntryInputApiSchema,
+  CreateImageCatalogEntryOutputSchema,
+  UpdateImageCatalogEntryInputApiSchema,
+  UpdateImageCatalogEntryOutputSchema,
+  DeleteImageCatalogEntryInputSchema,
+  DeleteImageCatalogEntryOutputSchema,
+  type ImageCatalogVersion,
+  type ImageCatalogAvailability,
+  type ImageCatalogEntryView,
+  type ListImageCatalogEntriesInput,
+  type ListImageCatalogEntriesOutput,
+  type GetImageCatalogEntryInput,
+  type GetImageCatalogEntryOutput,
+  type CreateImageCatalogEntryInputApi,
+  type CreateImageCatalogEntryOutput,
+  type UpdateImageCatalogEntryInputApi,
+  type UpdateImageCatalogEntryOutput,
+  type DeleteImageCatalogEntryInput,
+  type DeleteImageCatalogEntryOutput,
+} from './image-catalog';
+
+export {
   ListAgentRunsInputSchema,
   ListAgentRunsOutputSchema,
   GetAgentRunInputSchema,
