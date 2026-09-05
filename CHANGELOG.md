@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Added
+- The Image Catalog is grouped by what each image was built on: every entry names its base, derived images list indented under it with roots first, and each version reports the layers it adds over that base. Lineage is computed from `RootFS.Layers` prefix containment rather than parsed from a `FROM` string, so it holds for images the platform never built — an image built on `python3.12-slim` groups under it exactly as a workflow image groups under the golden image. The daemon listing also separates the labels an image sets itself from the ones Docker copied down from its base, so `org.opencontainers.image.source` can no longer be read as this image's provenance when it is really rocker's, and build-arg values in the layer summary are redacted before they reach any client [#1296](https://github.com/Appsilon/mediforce/issues/1296).
 - Image Catalog versions now expose probed runtimes and agent suitability, so known incompatible images are not offered for agent steps while unreachable probes remain explicitly selectable as unknown. Each probe is a CPU-, memory- and process-capped container with no network, the whole refresh of one entry is time-boxed, and the container-worker route that starts one is gated by `CONTAINER_WORKER_SECRET` — now forwarded to both services in `docker-compose.prod.yml`, where an unset value keeps today's ungated behaviour [#1295](https://github.com/Appsilon/mediforce/issues/1295).
 
 ### Fixed

@@ -14,7 +14,11 @@ import {
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { imageLabelsInspectArgs, parseImageProvenance } from '@mediforce/platform-core';
+import {
+  imageInspectArgs,
+  parseImageInspect,
+  readProvenanceLabels,
+} from '@mediforce/platform-core';
 import { createTestRepo, addCommitToTestRepo, type TestRepo } from './helpers/create-test-repo';
 
 function dockerAvailable(): boolean {
@@ -99,12 +103,12 @@ describe.skipIf(!dockerAvailable())('docker-image-builder integration', () => {
     // the unlabelled one would strip the provenance off the labelled one too.
     const stdout = execFileSync(
       'docker',
-      imageLabelsInspectArgs([image, unlabelled]),
+      imageInspectArgs([image, unlabelled]),
       { stdio: 'pipe' },
     ).toString();
 
-    const provenance = [...parseImageProvenance(stdout).values()];
-    expect(provenance).toContainEqual({
+    const inspected = [...parseImageInspect(stdout).values()];
+    expect(inspected.map((entry) => readProvenanceLabels(entry.labels))).toContainEqual({
       buildRepo: repo.repoPath,
       buildCommit: repo.commitSha,
       buildDockerfile: 'Dockerfile',
