@@ -387,3 +387,26 @@ export {
   type ValidationResult,
   type WorkflowGraphValidation,
 } from './graph-validator';
+
+export {
+  SelectOptionSchema,
+  ColumnSpecSchema,
+  COLUMN_KINDS,
+  FileUploadUiConfigSchema,
+  TableEditorUiConfigSchema,
+  AssignmentTableUiConfigSchema,
+  STEP_UI_CONFIG_SCHEMAS,
+  STEP_UI_COMPONENTS,
+  isKnownStepUiComponent,
+  type SelectOption,
+  type ColumnSpec,
+  type StaticColumn,
+  type SingleSelectColumn,
+  type MultiSelectColumn,
+  type TextColumn,
+  type AvatarColumn,
+  type FileUploadUiConfig,
+  type TableEditorUiConfig,
+  type AssignmentTableUiConfig,
+  type StepUiComponent,
+} from './step-ui-config';

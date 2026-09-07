@@ -4,6 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { CheckCircle } from 'lucide-react';
+import { AssignmentTableUiConfigSchema } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import {
@@ -54,13 +55,16 @@ export function AssignmentTableView({ task }: TaskBodyProps) {
 }
 
 function AssignmentTableForm({ task }: { task: TaskBodyProps['task'] }) {
-  const config = (task.ui?.config ?? {}) as Record<string, unknown>;
-  const assignees = (config.assignees as AssigneeOption[] | undefined) ?? [];
-  const priorities = (config.priorities as string[] | undefined) ?? DEFAULT_PRIORITIES;
-  const defaultPriority = (config.defaultPriority as string | undefined) ?? DEFAULT_PRIORITY;
+  // safeParse, not parse: a live task may carry a config written before this
+  // shape was typed, and the defaults below are the ones this view has always
+  // applied when a key was absent.
+  const config = AssignmentTableUiConfigSchema.safeParse(task.ui?.config ?? {}).data ?? { assignees: [] };
+  const assignees = config.assignees as AssigneeOption[];
+  const priorities = config.priorities ?? DEFAULT_PRIORITIES;
+  const defaultPriority = config.defaultPriority ?? DEFAULT_PRIORITY;
   const allowSkip = config.allowSkip !== false;
-  const submitLabel = (config.submitLabel as string | undefined) ?? 'Submit';
-  const itemColumnLabel = (config.itemColumnLabel as string | undefined) ?? 'Item';
+  const submitLabel = config.submitLabel ?? 'Submit';
+  const itemColumnLabel = config.itemColumnLabel ?? 'Item';
   const noteField = config.noteField !== false;
   const items = (task.options ?? []) as unknown as ItemRow[];
 

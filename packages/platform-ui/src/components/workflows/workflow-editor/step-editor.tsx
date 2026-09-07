@@ -21,6 +21,7 @@ import {
   RUNTIME_OPTIONS,
 } from './constants';
 import { CoworkSection } from './cowork-section';
+import { StepUiConfigSection } from './step-ui-config-section';
 import { StepDataFlow } from './step-data-flow';
 import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
@@ -162,10 +163,6 @@ const TIP = {
   allowedRoles:            'Roles that can claim and complete this task. Enforced: a member holding none of them is refused, and a role nobody holds on this workflow makes the step unclaimable. Pick from the roles this workspace already knows, or type a new one. Leave empty to allow any workspace member.',
   assignedTo:              'Pre-assign this human task to a specific user. Pick a workspace member, or type an interpolated value like ${triggerPayload.userId} to assign per run. Human steps only.',
   continueOnError:         'When on, a failure of this step is logged as a warning and the workflow advances anyway instead of failing the whole run. Use for non-critical side-effects (e.g. a notification), never for a step later steps depend on.',
-  uiComponent:             'Custom task body. "File upload" collects files; "Assignment table" and "Table editor" render their own views (configure their columns in the source editor). Default is the params form.',
-  uiAcceptedTypes:         'Accepted file types, comma-separated — MIME types and/or extensions (e.g. text/csv, .csv, application/pdf). If empty, only PDFs are accepted.',
-  uiMinFiles:              'Minimum number of files the user must upload to complete the task.',
-  uiMaxFiles:              'Maximum number of files the user can upload.',
 
   reviewType:              'Who performs the review: human (creates a task), agent (auto-evaluates), or none (skips review).',
   reviewPlugin:            'Plugin used when review.type is agent.',
@@ -407,16 +404,7 @@ export function StepEditor({
   function updateReview(patch: Partial<NonNullable<WorkflowStep['review']>>) {
     onChange({ review: { ...step.review, ...patch } });
   }
-  function setUiComponent(component: string) {
-    if (!component) { onChange({ ui: undefined }); return; }
-    onChange({ ui: { ...step.ui, component } });
-  }
-  function updateUiConfig(key: string, value: unknown) {
-    const component = step.ui?.component ?? 'file-upload';
-    const config = { ...step.ui?.config, [key]: value };
-    if (value === undefined) delete config[key];
-    onChange({ ui: { component, config: Object.keys(config).length > 0 ? config : undefined } });
-  }
+
   function updateSelection(newMin: number | undefined, newMax: number | undefined) {
     if (newMin === undefined && newMax === undefined) { onChange({ selection: undefined }); return; }
     onChange({ selection: { min: newMin ?? 1, max: newMax ?? 1 } });
@@ -541,6 +529,32 @@ export function StepEditor({
                     }}
                     className="w-3.5 h-3.5 accent-primary cursor-pointer"
                   />
+                </FieldRow>
+                <FieldRow label="requiredForVerdicts" tooltip={TIP.paramRequiredForVerdicts}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {Object.keys(step.verdicts ?? {}).map((verdictKey) => (
+                      <label key={verdictKey} className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={param.requiredForVerdicts?.includes(verdictKey) === true}
+                          onChange={(e) => {
+                            const current = param.requiredForVerdicts ?? [];
+                            const keys = e.target.checked
+                              ? [...current, verdictKey]
+                              : current.filter((k) => k !== verdictKey);
+                            const next = [...(step.params ?? [])];
+                            next[idx] = { ...next[idx], requiredForVerdicts: keys.length > 0 ? keys : undefined };
+                            onChange({ params: next });
+                          }}
+                          className="h-3.5 w-3.5 accent-primary cursor-pointer"
+                        />
+                        {verdictKey}
+                      </label>
+                    ))}
+                    {Object.keys(step.verdicts ?? {}).length === 0 && (
+                      <span className="text-[11px] italic text-muted-foreground/40">Define verdicts to make this conditional</span>
+                    )}
+                  </div>
                 </FieldRow>
                 <FieldRow label="description" tooltip={TIP.paramDescription}>
                   <input
@@ -1086,58 +1100,7 @@ export function StepEditor({
       </>)}
 
       {/* ── Task UI (custom body) ────────────────────────────────── */}
-      {isHuman && (
-        <Section title="Task UI">
-          <FieldGroup>
-            <FieldRow label="component" tooltip={TIP.uiComponent}>
-              <select
-                value={step.ui?.component ?? ''}
-                onChange={(e) => setUiComponent(e.target.value)}
-                className={rs}
-              >
-                <option value="">Params form (default)</option>
-                <option value="file-upload">File upload</option>
-                <option value="assignment-table">Assignment table</option>
-                <option value="table-editor">Table editor</option>
-              </select>
-            </FieldRow>
-            {step.ui?.component === 'file-upload' && (<>
-              <FieldRow label="acceptedTypes" tooltip={TIP.uiAcceptedTypes}>
-                <input
-                  value={(step.ui.config?.acceptedTypes as string[] | undefined)?.join(', ') ?? ''}
-                  onChange={(e) => {
-                    const list = e.target.value.split(',').map((t) => t.trim()).filter(Boolean);
-                    updateUiConfig('acceptedTypes', list.length > 0 ? list : undefined);
-                  }}
-                  placeholder="text/csv, .csv, application/pdf"
-                  className={riMono}
-                />
-              </FieldRow>
-              <FieldRow label="minFiles" tooltip={TIP.uiMinFiles}>
-                <input
-                  type="number"
-                  min={0}
-                  value={(step.ui.config?.minFiles as number | undefined) ?? ''}
-                  onChange={(e) => updateUiConfig('minFiles', e.target.value === '' ? undefined : Number(e.target.value))}
-                  className={ri}
-                />
-              </FieldRow>
-              <FieldRow label="maxFiles" tooltip={TIP.uiMaxFiles}>
-                <input
-                  type="number"
-                  min={1}
-                  value={(step.ui.config?.maxFiles as number | undefined) ?? ''}
-                  onChange={(e) => updateUiConfig('maxFiles', e.target.value === '' ? undefined : Number(e.target.value))}
-                  className={ri}
-                />
-              </FieldRow>
-            </>)}
-            {(step.ui?.component === 'assignment-table' || step.ui?.component === 'table-editor') && (
-              <p className="text-xs text-muted-foreground px-0.5">Configure this component&apos;s columns in the source editor.</p>
-            )}
-          </FieldGroup>
-        </Section>
-      )}
+      {isHuman && <StepUiConfigSection step={step} onChange={onChange} />}
 
       {/* ── Review config ────────────────────────────────────────── */}
       {isReview && (
