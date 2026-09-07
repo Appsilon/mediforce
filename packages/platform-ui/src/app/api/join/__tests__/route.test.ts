@@ -129,6 +129,9 @@ describe('public /api/join routes', () => {
       workspaceHandle: 'alpha',
       membership: 'member',
       roles: [],
+      // Nobody vouched for this address: it was typed into a public form by
+      // whoever holds the link, so the seed may only create.
+      vouchedByAdmin: false,
     });
     expect(mockSendActivationEmail).toHaveBeenCalledTimes(1);
   });

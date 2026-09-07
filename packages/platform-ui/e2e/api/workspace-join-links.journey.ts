@@ -8,6 +8,7 @@ import {
   sessionCookieHeaders,
   setupMultiNamespaceCallers,
   TEST_ORG_HANDLE,
+  TEST_USER_EMAIL,
   TEST_USER_ID,
   type MultiNamespaceFixture,
   type UserCaller,
@@ -222,6 +223,41 @@ test.describe('Workspace join links — API E2E', () => {
     expect(redeemed.status).toBe(200);
     expect(redeemed.body).toEqual({ ok: false, reason: 'not_found' });
     expect(await uidForEmail(email)).toBeNull();
+  });
+
+  /**
+   * The redemption path is an unauthenticated write taking whatever email is
+   * typed, so it must not be able to change anything that already exists.
+   * Reproduced end to end through the real public route, because the guard that
+   * stops it lives three layers down in `seedInvite` and the whole point is
+   * that no layer above re-opens it.
+   */
+  test('redeeming against the owner’s address does not demote them', async ({ request }) => {
+    const minted = await mint(request, { membership: 'member' });
+
+    const redeemed = await redeem(request, minted.token, TEST_USER_EMAIL);
+
+    // Anti-enumeration holds: the answer is the ordinary success body.
+    expect(redeemed.body.ok).toBe(true);
+    // …and the owner still owns the workspace.
+    expect(await membershipOf(TEST_USER_ID)).toBe('owner');
+  });
+
+  test('redeeming an admin link against an existing member does not promote them', async ({
+    request,
+  }) => {
+    const email = 'join-links-journey-noescalate@mediforce.dev';
+    const seeded = await request.post('/api/users/invite', {
+      headers: apiKeyHeaders(),
+      data: { email, namespaceHandle: ORG_HANDLE, role: 'member' },
+    });
+    expect(seeded.status(), await seeded.text()).toBe(201);
+    const uid = (await seeded.json()).uid as string;
+
+    const minted = await mint(request, { membership: 'admin' });
+    expect((await redeem(request, minted.token, email)).body.ok).toBe(true);
+
+    expect(await membershipOf(uid)).toBe('member');
   });
 
   test('a plain member cannot mint, list, or revoke', async ({ request }) => {

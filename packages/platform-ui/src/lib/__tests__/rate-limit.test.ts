@@ -37,6 +37,19 @@ describe('createRateLimiter', () => {
     if (!result.ok) expect(result.retryAfterSeconds).toBeGreaterThanOrEqual(1);
   });
 
+  // A limiter whose key includes anything caller-influenced grows one permanent
+  // entry per request otherwise, which is a memory leak a script can drive.
+  it('evicts expired buckets instead of growing without bound', () => {
+    const limiter = createRateLimiter({ limit: 1, windowMs: 1000 });
+
+    for (let i = 0; i < 12_000; i += 1) limiter.consume(`key-${i}`, 0);
+    expect(limiter.size()).toBe(12_000);
+
+    // One write after the window has elapsed sweeps everything stale.
+    limiter.consume('trigger', 5000);
+    expect(limiter.size()).toBe(1);
+  });
+
   it('reset drops every bucket', () => {
     const limiter = createRateLimiter({ limit: 1, windowMs: 1000 });
     limiter.consume('k', 0);
@@ -47,9 +60,32 @@ describe('createRateLimiter', () => {
 });
 
 describe('clientAddress', () => {
-  it('takes the first hop of x-forwarded-for', () => {
+  /**
+   * The LAST hop, not the first. Every proxy appends, so the last entry is what
+   * our own reverse proxy observed and the earlier ones are whatever the client
+   * chose to send. Reading the first would let a caller mint a fresh limiter
+   * key per request by rotating a header — a limiter that does not limit.
+   */
+  it('takes the last hop of x-forwarded-for, which the client cannot forge', () => {
     const request = new Request('http://localhost', {
       headers: { 'x-forwarded-for': '203.0.113.9, 10.0.0.1' },
+    });
+    expect(clientAddress(request)).toBe('10.0.0.1');
+  });
+
+  it('is unmoved by hops a caller prepends', () => {
+    const spoofed = new Request('http://localhost', {
+      headers: { 'x-forwarded-for': 'attacker-chose-this, 198.51.100.7' },
+    });
+    const alsoSpoofed = new Request('http://localhost', {
+      headers: { 'x-forwarded-for': 'and-then-this, 198.51.100.7' },
+    });
+    expect(clientAddress(spoofed)).toBe(clientAddress(alsoSpoofed));
+  });
+
+  it('handles a single-hop header', () => {
+    const request = new Request('http://localhost', {
+      headers: { 'x-forwarded-for': '203.0.113.9' },
     });
     expect(clientAddress(request)).toBe('203.0.113.9');
   });

@@ -24,6 +24,13 @@ export interface SeedMemberParams {
   readonly membership: 'admin' | 'member';
   /** Shown to the invitee as who invited them; defaults to the workspace name. */
   readonly inviterName?: string;
+  /**
+   * `true` for `inviteUser` (an authenticated admin naming this person),
+   * `false` for `redeemJoinLink` (an anonymous holder typing an address into a
+   * public form). Passed straight through to `seedInvite`, which uses it to
+   * decide whether this seed may modify an account that already exists at all.
+   */
+  readonly vouchedByAdmin: boolean;
 }
 
 export interface SeededMember {
@@ -49,6 +56,7 @@ export async function seedMemberAndNotify(
     workspaceHandle: params.namespaceHandle,
     membership: params.membership,
     roles: [],
+    vouchedByAdmin: params.vouchedByAdmin,
   });
 
   // A pending invitee (never activated) is gated into the create-password flow
@@ -64,13 +72,18 @@ export async function seedMemberAndNotify(
     await scope.userProfiles.setMustChangePassword(uid, true);
   }
 
-  const namespace = await scope.workspaces.getNamespace(params.namespaceHandle);
-  const workspaceName = namespace?.displayName ?? params.namespaceHandle;
-
   let emailSent = false;
+  // Defaults to the handle so a workspaces read failure cannot throw here. The
+  // membership is already committed at this point, so raising would 500 AFTER
+  // adding the member and skip the audit append — the caller would see a
+  // failure for a write that succeeded. Everything from here on is
+  // best-effort, and `emailSent: false` is how that is reported.
+  let workspaceName = params.namespaceHandle;
   const notify = scope.system.inviteNotificationService;
   if (notify !== null) {
     try {
+      const namespace = await scope.workspaces.getNamespace(params.namespaceHandle);
+      workspaceName = namespace?.displayName ?? params.namespaceHandle;
       const baseUrl = await resolveConfiguredBaseUrl(scope);
       const inviterName =
         typeof params.inviterName === 'string' && params.inviterName.trim() !== ''

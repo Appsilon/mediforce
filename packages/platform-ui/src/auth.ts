@@ -168,7 +168,7 @@ export function buildAuthConfig(): NextAuthConfig {
         );
         // Skip the lookup when the domain already settles it — the common case
         // on every deployment, and the callback is on the sign-in hot path.
-        if (domainAllowed) return true;
+        if (domainAllowed === true) return true;
         return isSignInAuthorized({
           domainAllowed,
           invited: await authUserWasInvited(db, user.email),

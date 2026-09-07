@@ -55,6 +55,12 @@ export async function redeemJoinLink(
       ...(displayName !== undefined ? { displayName } : {}),
       namespaceHandle: link.workspace,
       membership: link.membership,
+      // The email is whatever the form was given, by someone holding a shared
+      // secret and nothing else. The seed may therefore only CREATE: it must
+      // not rewrite an existing seat (a `member` link would otherwise demote
+      // the workspace owner), stamp `invited_at` on an account the domain
+      // allowlist deliberately blocks, or undo a removal.
+      vouchedByAdmin: false,
       // No inviter to name — `seedMemberAndNotify` falls back to the
       // workspace's display name, so the email reads "<workspace> invited you".
     },

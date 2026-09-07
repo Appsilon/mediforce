@@ -141,6 +141,9 @@ describe('redeemJoinLink handler', () => {
         workspaceHandle: 'alpha',
         membership: 'admin',
         roles: [],
+        // The email came from a public form, held together by nothing but a
+        // shared secret, so the seed may only create.
+        vouchedByAdmin: false,
       },
     ]);
 
@@ -207,6 +210,26 @@ describe('redeemJoinLink handler', () => {
     expect(known).toEqual(stranger);
   });
 
+  /**
+   * The redemption path must never vouch. `seedInvite` reads this flag to
+   * decide whether it may rewrite an existing membership, stamp `invited_at` on
+   * an account that already exists, or clear an auto-join tombstone — and the
+   * email here is attacker-supplied. Passing `true` would let any link holder
+   * demote a workspace owner and re-admit an allowlist-blocked account by
+   * typing their addresses.
+   */
+  it('never vouches for the address it was handed', async () => {
+    const created = await mint();
+    const inviteService = recordingInviteService();
+
+    await redeemJoinLink(
+      { token: created.token, email: 'owner@example.test' },
+      publicScope({ inviteService }),
+    );
+
+    expect(inviteService.seedCalls[0]?.vouchedByAdmin).toBe(false);
+  });
+
   it('refuses once the use cap is reached, and stops consuming', async () => {
     const created = await mint({ maxUses: 1 });
 
@@ -271,6 +294,32 @@ describe('redeemJoinLink handler', () => {
     const redemption = events.find((e) => e.action === 'invitation.link_redeemed');
     expect(redemption?.entityId).toBe(created.link.id);
     expect(JSON.stringify(redemption)).not.toContain(created.token);
+  });
+
+  // Same guard as `previewJoinLink`: the public route hands this a system-actor
+  // scope, which is only safe while the handler ignores `scope.caller`.
+  it('ignores scope.caller — the token is the authorization', async () => {
+    const created = await mint({ maxUses: 5 });
+
+    const asSystem = await redeemJoinLink(
+      { token: created.token, email: 'a@example.test' },
+      publicScope(),
+    );
+    const strangerScope = createTestScope({
+      caller: userCaller('outsider-1', ['unrelated']),
+      namespaceRepo,
+      auditRepo,
+      joinLinkService,
+      inviteService: recordingInviteService(),
+      inviteNotificationService: recordingNotifier(),
+      userProfileRepo: new InMemoryUserProfileRepository(),
+    });
+    const asStranger = await redeemJoinLink(
+      { token: created.token, email: 'b@example.test' },
+      strangerScope,
+    );
+
+    expect(asSystem).toEqual(asStranger);
   });
 
   it('fails cleanly when the deployment has no join-link store', async () => {

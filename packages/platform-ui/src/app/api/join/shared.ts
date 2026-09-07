@@ -29,21 +29,38 @@ export function requireJsonRequest(request: Request): NextResponse | null {
 }
 
 /**
- * Redemption sends mail, so it carries the tighter budget: five attempts per
- * hour per (client address, token) — enough for a fat-fingered email address,
- * far short of a mail relay. ADR-0021 §6: the limit ships with the route.
+ * Redemption sends mail, so it carries two budgets, and the second is the one
+ * that actually holds (ADR-0021 §6).
+ *
+ * Per (client address, token): five an hour. Enough for a fat-fingered email
+ * address, and it costs an ordinary attendee nothing. But the address half is
+ * derived from `x-forwarded-for`, which the client supplies — a script that
+ * rotates it gets a fresh bucket per request, so this budget alone is a
+ * suggestion.
+ *
+ * Per token, ignoring the address entirely: sixty an hour. Nothing a caller
+ * sends can move this key — it is the hash of a secret only the holder has —
+ * so it is the ceiling that survives a spoofed header. Sixty comfortably
+ * covers a room signing up at once and is nowhere near a mail relay. A capped
+ * link is additionally bounded by `max_uses` for its whole lifetime; this is
+ * what bounds an uncapped one.
  */
-const redeemLimiter = createRateLimiter({ limit: 5, windowMs: 60 * 60 * 1000 });
+const redeemPerClientLimiter = createRateLimiter({ limit: 5, windowMs: 60 * 60 * 1000 });
+const redeemPerTokenLimiter = createRateLimiter({ limit: 60, windowMs: 60 * 60 * 1000 });
 
 /**
- * Preview only reads, so it is looser and keyed by address alone: it has to
- * survive a room full of attendees behind one conference NAT opening the link
- * at the same moment.
+ * Preview only reads and sends no mail, so it is looser and keyed by address
+ * alone: it has to survive a room of attendees behind one conference NAT
+ * opening the link at the same moment.
+ *
+ * Keys everywhere here carry the token's SHA-256, never the token: a limiter's
+ * map outlives the request, and a live secret has no business sitting in it.
  */
 const previewLimiter = createRateLimiter({ limit: 120, windowMs: 60 * 60 * 1000 });
 
 export function __resetJoinRateLimitsForTests(): void {
-  redeemLimiter.reset();
+  redeemPerClientLimiter.reset();
+  redeemPerTokenLimiter.reset();
   previewLimiter.reset();
 }
 
@@ -51,16 +68,18 @@ export function consumePreviewBudget(request: Request): NextResponse | null {
   return toResponse(previewLimiter.consume(clientAddress(request), Date.now()));
 }
 
-/**
- * Keys carry the token's SHA-256, never the token: the limiter's map outlives
- * the request, and a live secret has no business sitting in it.
- */
-function limiterKey(request: Request, token: string): string {
-  return `${clientAddress(request)}:${hashJoinToken(token)}`;
-}
-
 export function consumeRedeemBudget(request: Request, token: string): NextResponse | null {
-  return toResponse(redeemLimiter.consume(limiterKey(request, token), Date.now()));
+  const now = Date.now();
+  const tokenHash = hashJoinToken(token);
+  // Both are charged on every attempt, and the per-token ceiling is charged
+  // first so a caller cannot spend the unspoofable budget more slowly by
+  // rotating the spoofable one.
+  const perToken = redeemPerTokenLimiter.consume(tokenHash, now);
+  const perClient = redeemPerClientLimiter.consume(
+    `${clientAddress(request)}:${tokenHash}`,
+    now,
+  );
+  return toResponse(perToken.ok ? perClient : perToken);
 }
 
 function toResponse(result: RateLimitResult): NextResponse | null {

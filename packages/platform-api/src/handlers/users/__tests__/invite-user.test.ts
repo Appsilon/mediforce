@@ -85,6 +85,7 @@ describe('inviteUser handler', () => {
       workspaceHandle: 'alpha',
       membership: 'member',
       roles: [],
+      vouchedByAdmin: true,
     });
     expect((await userProfileRepo.getProfile('uid-new'))?.mustChangePassword).toBe(true);
     expect(notifier.sendActivationCalls).toEqual([
@@ -188,7 +189,22 @@ describe('inviteUser handler', () => {
       workspaceHandle: 'alpha',
       membership: 'member',
       roles: [],
+      vouchedByAdmin: true,
     });
+  });
+
+  // An authenticated owner/admin naming a person is the privileged half of the
+  // seed: only it may rewrite an existing membership or stamp `invited_at` on
+  // an account that already exists (ADR-0021). `redeemJoinLink` passes `false`.
+  it('vouches for the invitee, so the seed may touch an existing account', async () => {
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
+    const scope = createTestScope({ namespaceRepo, auditRepo, inviteService });
+
+    await inviteUser(baseInput, scope);
+
+    expect(inviteService.seedInvite).toHaveBeenCalledWith(
+      expect.objectContaining({ vouchedByAdmin: true }),
+    );
   });
 
   it('forwards an admin membership to seedInvite', async () => {

@@ -100,5 +100,5 @@ export async function authUserWasInvited(
     .from(authUsers)
     .where(eq(authUsers.email, email.toLowerCase()))
     .limit(1);
-  return row?.invitedAt != null;
+  return row?.invitedAt !== undefined && row.invitedAt !== null;
 }

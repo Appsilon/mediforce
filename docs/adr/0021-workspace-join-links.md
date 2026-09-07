@@ -196,11 +196,27 @@ Implemented 2026-09-07. Deviations and additions worth recording:
   to start making exceptions. Both routes take the token in the **body**, so it
   stays out of the API's access logs; the page URL that carries it is
   unavoidable, but there was no reason to copy it into a second log line.
-- **The limiter is two budgets.** Redemption sends mail, so five attempts per
-  hour per (client address, token) — its key carries the token's SHA-256, never
-  the token, since the limiter's map outlives the request. Preview only reads,
-  so 120 per hour per address: it has to survive a room behind one conference
-  NAT opening the link at once.
+- **The limiter is three budgets, because one of them is spoofable.** Any key
+  derived from `x-forwarded-for` is caller-controlled, so a script that rotates
+  the header gets a fresh bucket per request — an address-keyed budget alone is
+  a suggestion, and §6's whole point is that this endpoint must not become a
+  mail relay. Redemption therefore also carries a budget keyed on the token
+  hash **alone** (60/hour): nothing a caller sends can move it, and it is what
+  actually holds. The per-(address, token) budget stays at 5/hour as the cheap
+  first line. Preview only reads and sends no mail: 120/hour per address, loose
+  enough for a room behind one conference NAT.
+
+  `clientAddress` reads the **last** hop of `x-forwarded-for`, not the first —
+  every proxy appends, so the last entry is what our own reverse proxy observed
+  and anything earlier is what the client chose to send. `password-login`'s
+  `clientIpFrom` deliberately still reads the first: an audit record wants the
+  conventional "original client" and understands it is spoofable. The two look
+  alike and want opposite things, which is why they were not merged.
+
+  Keys everywhere carry the token's SHA-256, never the token — a limiter's map
+  outlives the request. The limiter also sweeps expired buckets, since a map
+  keyed on anything caller-influenced otherwise grows one permanent entry per
+  request.
 - **Decision 4's "same `seedInvite`, same activation email" is now literal.**
   The step `inviteUser` performed inline was extracted to
   `handlers/users/seed-member.ts` and both callers use it, so a redemption
@@ -256,11 +272,36 @@ Implemented 2026-09-07. Deviations and additions worth recording:
   unrepresentable at rest rather than only in the contract, and
   `max_uses IS NULL OR max_uses > 0` keeps a zero-use link from being minted.
   Migration `0048_auth_users_invited_at` adds the decision-5 column above.
-- **A link holder can seed an address that is not their own.** Redemption is an
-  unauthenticated write that takes whatever email is typed, so a holder can add
-  a colleague — as `admin`, on an admin link — and cause mail to be sent to
-  them. The decision is unchanged by this: the person still has to open their
-  own mailbox to get a session, so nobody gains access to an account they do
-  not control, and the blast radius is a workspace membership plus one email.
-  It is named here because §4 only ever reasons about the redeemer's own
-  address, and a reader should not have to notice this for themselves.
+- **A redemption may only CREATE — it must never modify what already exists.**
+  §4 reasons throughout about the redeemer's own address ("collects an email"),
+  but redemption is an unauthenticated write that takes whatever is typed. Read
+  literally, and routed through the `seedInvite` an admin invite uses, that
+  handed any link holder three escalations this ADR never granted:
+
+  1. **Demoting the workspace owner.** `seedInvite` upserts the membership row
+     (`onConflictDoUpdate { role }`), so typing the owner's address at a
+     `member` link set their `workspace_members.role` to `member`. Reproduced
+     against Postgres before the fix. It inverts decision 3 — a link that may
+     never *grant* owner could nonetheless *remove* it — and it did so silently,
+     because the anti-enumeration property makes the response identical either
+     way.
+  2. **Promoting an existing member**, by redeeming an `admin` link against an
+     address already in the workspace.
+  3. **Re-admitting an allowlist-blocked account**, by stamping `invited_at`
+     (the decision-5 column above) on a row that already existed — reaching
+     around the very control that column was introduced to preserve.
+
+  The fix is one rule rather than three patches, and it is what a join link
+  already meant: an entrance, so walking through one twice is a no-op.
+  `SeedInviteInput` carries a required `vouchedByAdmin`, with no default so a
+  future third caller must choose. `inviteUser` passes `true` and keeps today's
+  behaviour exactly; `redeemJoinLink` passes `false`, which restricts the seed
+  to inserting — no membership rewrite in either direction, no stamp on an
+  existing account, no clearing of an auto-join tombstone. A brand-new address
+  is still stamped, because nobody held it and the link it arrived through was
+  minted by an admin.
+
+  What remains accepted, and is genuinely bounded: a holder can cause a
+  **new** membership row plus one email for an address that is not theirs. They
+  gain nothing by it — a session still requires that mailbox — and the person
+  can leave.

@@ -55,6 +55,7 @@ const baseParams = {
   email: 'newbie@example.test',
   namespaceHandle: 'alpha',
   membership: 'member' as const,
+  vouchedByAdmin: true,
 };
 
 describe('seedMemberAndNotify', () => {
@@ -182,6 +183,25 @@ describe('seedMemberAndNotify', () => {
 
     expect(result.emailSent).toBe(false);
     expect(inviteService.seedInvite).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes the caller\u2019s vouching straight through to the seed', async () => {
+    // The flag decides whether the seed may touch an account that already
+    // exists at all, so `seedMemberAndNotify` must not have an opinion of its
+    // own about it — `redeemJoinLink` is the caller that passes `false`.
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      inviteService,
+      inviteNotificationService: recordingNotifier(),
+    });
+
+    await seedMemberAndNotify({ ...baseParams, vouchedByAdmin: false }, scope);
+
+    expect(inviteService.seedInvite).toHaveBeenCalledWith(
+      expect.objectContaining({ vouchedByAdmin: false }),
+    );
   });
 
   it('refuses when the deployment is not wired for invites', async () => {

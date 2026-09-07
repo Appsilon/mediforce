@@ -84,7 +84,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     ),
     invited: await authUserWasInvited(db, email),
   });
-  if (!authorized) {
+  if (authorized !== true) {
     return NextResponse.json(GENERIC_OK);
   }
 

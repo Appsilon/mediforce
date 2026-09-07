@@ -114,6 +114,35 @@ describe('previewJoinLink handler', () => {
     });
   });
 
+  /**
+   * The public routes hand these handlers a SYSTEM-actor scope, because an
+   * unauthenticated request has no caller to resolve. That is only safe while
+   * the handlers genuinely ignore `scope.caller` — a system actor bypasses
+   * `assertCallerIsNamespaceAdmin` wholesale, so a future edit that started
+   * consulting it would turn the public route into an admin one silently.
+   * Asserting the answer is identical for a system actor and a plain member is
+   * what keeps that honest.
+   */
+  it('ignores scope.caller — the token is the authorization', async () => {
+    const created = await createJoinLink(
+      { namespaceHandle: 'alpha', membership: 'member', expiresInDays: 7 },
+      adminScope(),
+    );
+
+    const asSystem = await previewJoinLink({ token: created.token }, publicScope());
+    const asStranger = await previewJoinLink(
+      { token: created.token },
+      createTestScope({
+        caller: userCaller('outsider-1', ['unrelated']),
+        namespaceRepo,
+        auditRepo,
+        joinLinkService,
+      }),
+    );
+
+    expect(asSystem).toEqual(asStranger);
+  });
+
   it('fails cleanly when the deployment has no join-link store', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo, joinLinkService: null });
 

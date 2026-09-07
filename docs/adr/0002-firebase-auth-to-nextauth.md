@@ -188,8 +188,9 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
 
    **Still true after [ADR-0021](./0021-workspace-join-links.md) §5.** That
    amendment relaxes §4a's gate, not this one: auto-link is safe because Google
-   *verifies* the email, and the second term §5 adds ("an `auth_users` row
-   already exists") is precisely the seeded row this section links onto.
+   *verifies* the email, and the second term §5 adds — an account an admin
+   deliberately seeded, `auth_users.invited_at` — names exactly the seeded row
+   this section links onto.
 
 5. **Role / claim resolution.** Firebase custom claims map onto three
    different storage locations:

@@ -41,6 +41,9 @@ export async function inviteUser(
       ...(displayName !== undefined ? { displayName } : {}),
       namespaceHandle: input.namespaceHandle,
       membership: input.role,
+      // An authenticated owner/admin is naming this person, so the seed may
+      // rewrite an existing membership and stamp a pre-0048 account.
+      vouchedByAdmin: true,
       ...(input.inviterName !== undefined ? { inviterName: input.inviterName } : {}),
     },
     scope,
