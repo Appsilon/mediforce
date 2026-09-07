@@ -390,6 +390,7 @@ export {
 
 export {
   SelectOptionSchema,
+  AssigneeOptionSchema,
   ColumnSpecSchema,
   COLUMN_KINDS,
   FileUploadUiConfigSchema,
@@ -399,6 +400,7 @@ export {
   STEP_UI_COMPONENTS,
   isKnownStepUiComponent,
   type SelectOption,
+  type AssigneeOption,
   type ColumnSpec,
   type StaticColumn,
   type SingleSelectColumn,

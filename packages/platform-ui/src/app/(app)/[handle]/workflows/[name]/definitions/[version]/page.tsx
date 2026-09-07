@@ -111,9 +111,11 @@ export default function WorkflowDefinitionVersionPage() {
     try {
       const result = await mediforceSilent.workflows.register(
         buildRegisterBody(definition, {
-          ...pastedFields,
+          // After the page's own fields, not before: spreading first meant a
+          // pasted title showed in the panel and was overwritten on save.
           title: title || undefined,
           description: editedDescription.trim() || undefined,
+          ...pastedFields,
           steps: orderedSteps,
           transitions: mergedTransitions,
           // Retargeted by the canvas when a step it referenced was renamed, and
@@ -194,10 +196,9 @@ export default function WorkflowDefinitionVersionPage() {
     editedDescription !== (definition.description ?? '') ||
     Object.keys(pastedFields).length > 0;
 
-  // What the canvas shows around the graph in its JSON panel, and compares
-  // against to refuse an apply that edits a field it cannot apply. The graph it
-  // owns — steps, transitions, inputForNextRun — must therefore not be in here,
-  // or every apply is refused; `version`/`createdAt` are server-assigned.
+  // What the canvas shows around the graph in its JSON panel. The graph it owns
+  // — steps, transitions, inputForNextRun — is excluded because the canvas
+  // supplies those; `version`/`createdAt` are server-assigned.
   const {
     steps: _steps,
     transitions: _transitions,

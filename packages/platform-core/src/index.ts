@@ -535,6 +535,7 @@ export type { BlockPreset, BlockPresetPayload, BlockCategory } from './blocks/bl
 
 export {
   SelectOptionSchema,
+  AssigneeOptionSchema,
   ColumnSpecSchema,
   COLUMN_KINDS,
   FileUploadUiConfigSchema,
@@ -544,6 +545,7 @@ export {
   STEP_UI_COMPONENTS,
   isKnownStepUiComponent,
   type SelectOption,
+  type AssigneeOption,
   type ColumnSpec,
   type StaticColumn,
   type SingleSelectColumn,

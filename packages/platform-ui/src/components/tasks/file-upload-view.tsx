@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { FileUploadUiConfigSchema } from '@mediforce/platform-core';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -19,6 +20,9 @@ function formatFileSize(bytes: number): string {
 }
 
 export function FileUploadView({ task }: TaskBodyProps) {
+  // The same schema the engine validates completions against, so the bounds
+  // shown here and the bounds enforced on submit cannot drift.
+  const uploadConfig = FileUploadUiConfigSchema.parse(task.ui?.config ?? {});
   const [uploadComplete, setUploadComplete] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [uploading, setUploading] = React.useState(false);
@@ -86,9 +90,9 @@ export function FileUploadView({ task }: TaskBodyProps) {
           </div>
         ) : (
           <FileUploadZone
-            acceptedTypes={(task.ui?.config?.acceptedTypes as string[]) ?? ['application/pdf']}
-            minFiles={(task.ui?.config?.minFiles as number) ?? 1}
-            maxFiles={(task.ui?.config?.maxFiles as number) ?? 10}
+            acceptedTypes={uploadConfig.acceptedTypes ?? ['application/pdf']}
+            minFiles={uploadConfig.minFiles ?? 1}
+            maxFiles={uploadConfig.maxFiles ?? 10}
             onSubmit={handleFileUpload}
           />
         )}

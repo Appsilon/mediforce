@@ -78,36 +78,67 @@ export type MultiSelectColumn = Extract<ColumnSpec, { kind: 'multi-select' }>;
 export type TextColumn = Extract<ColumnSpec, { kind: 'text' }>;
 export type AvatarColumn = Extract<ColumnSpec, { kind: 'avatar' }>;
 
-export const COLUMN_KINDS = ['static', 'single-select', 'multi-select', 'text', 'avatar'] as const;
+/** Derived, so the editor's kind dropdown cannot drift from the union. */
+export const COLUMN_KINDS = ColumnSpecSchema.options.map(
+  (option) => option.shape.kind.value,
+) as [ColumnSpec['kind'], ...ColumnSpec['kind'][]];
 
-/** `minFiles`/`maxFiles` are enforced server-side by `validateUploadPayload`. */
-export const FileUploadUiConfigSchema = z.object({
-  acceptedTypes: z.array(z.string().min(1)).optional(),
-  minFiles: z.number().int().nonnegative().optional(),
-  maxFiles: z.number().int().positive().optional(),
+/**
+ * Each field carries its own `.catch(undefined)`, so a malformed value drops
+ * that key alone. A whole-object parse with a whole-object fallback is not safe
+ * here: these configs come from definitions authored before the shape was typed,
+ * and `validateUploadPayload` reading `{}` means *no* limits — one bad key would
+ * silently disable the file-count and MIME checks the author asked for.
+ *
+ * `looseObject`, so a key this build does not know about survives a round-trip
+ * through the editor rather than being stripped on save.
+ */
+export const FileUploadUiConfigSchema = z.looseObject({
+  acceptedTypes: z.array(z.string().min(1)).optional().catch(undefined),
+  minFiles: z.number().int().nonnegative().optional().catch(undefined),
+  maxFiles: z.number().int().positive().optional().catch(undefined),
 });
 export type FileUploadUiConfig = z.infer<typeof FileUploadUiConfigSchema>;
 
-export const TableEditorUiConfigSchema = z.object({
-  columns: z.array(ColumnSpecSchema).default([]),
-  submitLabel: z.string().min(1).optional(),
-  emptyMessage: z.string().min(1).optional(),
+export const TableEditorUiConfigSchema = z.looseObject({
+  // Per element: one malformed column must not blank the whole table.
+  columns: z.array(z.unknown())
+    .transform((cols) => cols.flatMap((c) => {
+      const parsed = ColumnSpecSchema.safeParse(c);
+      return parsed.success ? [parsed.data] : [];
+    }))
+    .optional()
+    .catch(undefined)
+    .transform((cols) => cols ?? []),
+  submitLabel: z.string().min(1).optional().catch(undefined),
+  emptyMessage: z.string().min(1).optional().catch(undefined),
 });
 export type TableEditorUiConfig = z.infer<typeof TableEditorUiConfigSchema>;
 
-export const AssignmentTableUiConfigSchema = z.object({
-  assignees: z.array(
-    SelectOptionSchema.extend({
-      kind: z.enum(['human', 'agent']),
-      role: z.string().optional(),
-    }),
-  ).default([]),
-  priorities: z.array(z.string().min(1)).optional(),
-  defaultPriority: z.string().min(1).optional(),
-  allowSkip: z.boolean().optional(),
-  submitLabel: z.string().min(1).optional(),
-  itemColumnLabel: z.string().min(1).optional(),
-  noteField: z.boolean().optional(),
+export const AssigneeOptionSchema = SelectOptionSchema.extend({
+  kind: z.enum(['human', 'agent']),
+  role: z.string().optional(),
+});
+export type AssigneeOption = z.infer<typeof AssigneeOptionSchema>;
+
+export const AssignmentTableUiConfigSchema = z.looseObject({
+  // Per element, for the same reason as `columns`: dropping every assignee
+  // because one lacks a `kind` would also revert `allowSkip` and `noteField`
+  // to their defaults, handing back a skip button the author turned off.
+  assignees: z.array(z.unknown())
+    .transform((list) => list.flatMap((a) => {
+      const parsed = AssigneeOptionSchema.safeParse(a);
+      return parsed.success ? [parsed.data] : [];
+    }))
+    .optional()
+    .catch(undefined)
+    .transform((list) => list ?? []),
+  priorities: z.array(z.string().min(1)).optional().catch(undefined),
+  defaultPriority: z.string().min(1).optional().catch(undefined),
+  allowSkip: z.boolean().optional().catch(undefined),
+  submitLabel: z.string().min(1).optional().catch(undefined),
+  itemColumnLabel: z.string().min(1).optional().catch(undefined),
+  noteField: z.boolean().optional().catch(undefined),
 });
 export type AssignmentTableUiConfig = z.infer<typeof AssignmentTableUiConfigSchema>;
 

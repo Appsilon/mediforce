@@ -459,6 +459,58 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByRole('button', { name: /apply json/i })).toBeVisible();
   });
 
+  // A definition copied out of a registered version used to be un-pasteable:
+  // the panel compared every non-graph field against page state and refused.
+  // This is the path that proves a pasted field survives all the way to the
+  // registered version, which is where the merge order got it wrong.
+  test('a pasted definition applies its non-graph fields and they reach the saved version', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
+
+    // Take the definition the panel is showing and paste it back with a
+    // `preamble` added — a field the canvas does not own and the form has no
+    // input for, so only the paste can have supplied it.
+    const pasted = await page.evaluate(async () => {
+      const response = await fetch(
+        `/api/workflow-definitions/Supply%20Chain%20Review?namespace=${'test'}&version=1`,
+      );
+      const body = (await response.json()) as Record<string, unknown>;
+      return JSON.stringify({ ...body, preamble: 'Pasted house rules.' }, null, 2);
+    });
+
+    // Typing 4KB of JSON through the keyboard is too slow to be worth it, so
+    // the document is replaced through CodeMirror's own dispatch.
+    await page.evaluate((text) => {
+      const view = (document.querySelector('.cm-editor') as unknown as { cmView?: { view?: { dispatch: (t: unknown) => void; state: { doc: { length: number } } } } })?.cmView?.view;
+      if (view === undefined) throw new Error('CodeMirror view not reachable');
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
+    }, pasted);
+
+    await page.getByRole('button', { name: /apply json/i }).click();
+
+    // The apply is accepted — the old refusal rendered an error instead.
+    await expect(page.getByText(/applies steps, transitions/i)).toHaveCount(0);
+
+    await page.getByRole('button', { name: /^save$/i }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('textbox').first().fill('paste round-trip');
+    await dialog.getByRole('button', { name: /save/i }).click();
+
+    // Read the version the save produced and assert the pasted field is on it.
+    await expect(async () => {
+      const preamble = await page.evaluate(async () => {
+        const response = await fetch('/api/workflow-definitions/Supply%20Chain%20Review?namespace=test');
+        const body = (await response.json()) as { preamble?: string };
+        return body.preamble;
+      });
+      expect(preamble).toBe('Pasted house rules.');
+    }).toPass({ timeout: 15_000 });
+  });
+
   // ── Authoring paths are stated where the workflow is created (#1185) ──────
 
   test('ways to author names every path and its import entry opens the importer', async ({ page }) => {

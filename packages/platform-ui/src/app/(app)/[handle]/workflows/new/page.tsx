@@ -144,8 +144,6 @@ export default function NewWorkflowPage() {
     try {
       const result = await mediforceSilent.workflows.register(
         {
-          ...pastedFields,
-          name: workflowId,
           title: versionTitle || undefined,
           description: description.trim() || undefined,
           metadata: { [DISPLAY_NAME_KEY]: workflowName.trim() },
@@ -155,6 +153,11 @@ export default function NewWorkflowPage() {
           // with the rest of the graph — a field that panel accepts has to reach
           // the registration, not be dropped on the way out.
           inputForNextRun: currentInputForNextRunRef.current,
+          // After the page's own fields: a pasted title shown in the panel has
+          // to be the one that registers. `name` stays the page's, since the
+          // route and the save dialog both key off it.
+          ...pastedFields,
+          name: workflowId,
         },
         { namespace: effectiveNamespace },
       );
