@@ -9,7 +9,7 @@ import { requireJoinLinkService } from './_shared';
  * **The token is the authorization; `scope.caller` is deliberately unused.**
  * This handler runs behind a public route, so it must never consult the caller
  * — there isn't one. Everything it discloses is already implied by possession
- * of the secret: which workspace the link opens, and what membership it grants.
+ * of the secret: which workspace the link opens.
  *
  * Non-throwing: an expired, revoked, exhausted or unknown token is a `reason`,
  * not an error. The holder possesses the secret, so naming the reason leaks

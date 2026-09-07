@@ -97,9 +97,17 @@ round-trip during onboarding, which is the cost the invite path already pays.
 
 **5. A seeded account is authorized to sign in, regardless of its domain.**
 ADR-0002 §4a is amended: the `signIn` callback admits an email when its domain
-is allowlisted **or** an `auth_users` row already exists for it. The same
-relaxation applies to the `shouldSendMagicLink` gate, whose `domainAllowed`
-term becomes redundant with its `userExists` term and is dropped.
+is allowlisted **or** an admin deliberately seeded the account
+(`auth_users.invited_at`). A row merely existing is *not* that evidence —
+this paragraph first said it was, which would have been a regression; see
+"Decision 5's second term is a column" under **Shipped as** for why.
+
+The magic-link path applies the same two-term rule; it does **not** drop its
+domain term. `shouldSendMagicLink` is gone, but only because its two terms
+answer different questions: the caller now asks the account-creation one
+(`userExists`) directly, and the domain one is folded into the shared
+`isSignInAuthorized`. Dropping it outright would silently re-admit everyone an
+allowlist eviction was meant to remove.
 
 `ALLOWED_EMAIL_DOMAINS` keeps doing the job it was introduced for: it is what
 stops an arbitrary Google account from self-registering on a deployment. It was
@@ -285,10 +293,10 @@ Implemented 2026-09-07. Deviations and additions worth recording:
   limit; the ADR listed the column without saying so. `expiresInDays` (1–90,
   default 7) is the contract's shape rather than an absolute instant, because a
   link is minted for an event.
-- **Migration `0047_workspace_join_links`** carries CHECK constraints the ADR
-  did not call for: `membership IN ('admin','member')` makes decision 3
-  unrepresentable at rest rather than only in the contract, and
-  `max_uses IS NULL OR max_uses > 0` keeps a zero-use link from being minted.
+- **Migration `0047_workspace_join_links`** carries a CHECK constraint the ADR
+  did not call for: `max_uses IS NULL OR max_uses > 0` keeps a zero-use link
+  from being minted. There is no `membership` column at all — decision 3's
+  narrowing took it out, so `member` is not stored as a dimension of the link.
   Migration `0048_auth_users_invited_at` adds the decision-5 column above.
 - **A redemption may only CREATE — it must never modify what already exists.**
   §4 reasons throughout about the redeemer's own address ("collects an email"),

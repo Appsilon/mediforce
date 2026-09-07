@@ -7,7 +7,7 @@ import { publicJoinScope } from '@/lib/join-link-scope';
 import { consumePreviewBudget, requireJsonRequest } from '../shared';
 
 /**
- * POST — what workspace does this token open, and what does it grant?
+ * POST — what workspace does this token open?
  *
  * Public: the token is the authorization. Read-only — opening `/join/<token>`
  * must not spend a seat of a capped link, so nothing here consumes a use.

@@ -13,6 +13,11 @@ import { defaultBuildScope } from './route-adapter';
  *
  * Shared by both public join routes so there is exactly one place where an
  * unauthenticated request acquires a system scope.
+ *
+ * **`isSystemActor` bypasses `assertCallerIsNamespaceAdmin`.** Neither join
+ * handler asserts anything, so this is inert today — but a future public route
+ * that reuses this scope inherits an admin bypass for free. Any handler
+ * reached through it must be one that never consults `scope.caller`.
  */
 export function publicJoinScope(): CallerScope {
   return defaultBuildScope({ kind: 'apiKey', isSystemActor: true });
