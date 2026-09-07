@@ -1,5 +1,5 @@
 import { defineCommand } from '../define-command';
-import { printJson } from '../output';
+import { columnWidth, printJson } from '../output';
 
 /**
  * The read half of `create-join-link` — which link is still live, how many
@@ -36,9 +36,9 @@ export const namespaceListJoinLinksCommand = defineCommand({
     }));
 
     output.stdout(`Join links in ${args.handle} (${rows.length}):`);
-    const idWidth = width('ID', rows, (row) => row.id);
-    const statusWidth = width('STATUS', rows, (row) => row.status);
-    const usesWidth = width('USES', rows, (row) => row.uses);
+    const idWidth = columnWidth('ID', rows, (row) => row.id);
+    const statusWidth = columnWidth('STATUS', rows, (row) => row.status);
+    const usesWidth = columnWidth('USES', rows, (row) => row.uses);
     const line = (id: string, status: string, uses: string, expires: string): string =>
       `  ${id.padEnd(idWidth)}  ${status.padEnd(statusWidth)}  ${uses.padEnd(usesWidth)}  ${expires}`.trimEnd();
 
@@ -49,7 +49,3 @@ export const namespaceListJoinLinksCommand = defineCommand({
     return 0;
   },
 });
-
-function width<TRow>(header: string, rows: readonly TRow[], pick: (row: TRow) => string): number {
-  return Math.max(header.length, ...rows.map((row) => pick(row).length));
-}

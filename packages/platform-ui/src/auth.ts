@@ -116,7 +116,7 @@ export function buildProviders(db: Database): Provider[] {
           ),
           invited: await authUserWasInvited(db, identifier),
         });
-        if (!authorized) return;
+        if (authorized !== true) return;
         const { subject, text, html } = buildMagicLinkEmail(url, resolvedEmail.senderName);
         await resolvedEmail.send({ to: [identifier], subject, text, html });
       },

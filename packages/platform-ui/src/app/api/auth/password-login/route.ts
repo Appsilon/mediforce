@@ -113,7 +113,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     invited: await authUserWasInvited(db, email),
   });
   const passwordMatches = await compare(password, user?.passwordHash ?? DUMMY_HASH);
-  if (!authorized || user === null || user.passwordHash === null || !passwordMatches) {
+  if (
+    authorized !== true ||
+    user === null ||
+    user.passwordHash === null ||
+    passwordMatches !== true
+  ) {
     return NextResponse.json(INVALID_CREDENTIALS, { status: 401 });
   }
 

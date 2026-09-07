@@ -65,6 +65,19 @@ export function printKv(
 }
 
 /**
+ * Width of one column in a `padEnd` table: the widest of its header and the
+ * values `pick` reads out of `rows`. Used by the `*-list` commands that print
+ * a header row followed by aligned data rows.
+ */
+export function columnWidth<TRow>(
+  header: string,
+  rows: readonly TRow[],
+  pick: (row: TRow) => string,
+): number {
+  return Math.max(header.length, ...rows.map((row) => pick(row).length));
+}
+
+/**
  * Stream contract — load-bearing, do not change without updating tests:
  *
  *   --json mode:  error payload is written to STDOUT (single channel for
