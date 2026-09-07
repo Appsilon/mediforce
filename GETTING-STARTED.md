@@ -146,7 +146,8 @@ accounts:
 3. Put `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in
    `packages/platform-ui/.env.local`.
 4. Set `ALLOWED_EMAIL_DOMAINS` — with an OAuth provider on, the `signIn` callback
-   rejects every address outside the allowlist.
+   rejects every address outside the allowlist except the ones an admin
+   deliberately invited ([ADR-0021](docs/adr/0021-workspace-join-links.md) §5).
 
 `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` enable customer SSO the
 same way. Every variable is documented in
@@ -161,7 +162,7 @@ migration errors, resetting local data, missing API key, missing images):
 Sign-in failing is the one first-run symptom not in that table: check
 `AUTH_SECRET` is set in `packages/platform-ui/.env.local`, that you ran
 `pnpm seed` (`pnpm dev` seeds no users), and — if `ALLOWED_EMAIL_DOMAINS` is set
-— that your address matches it.
+and the address was never invited — that it matches.
 
 ## Next steps
 

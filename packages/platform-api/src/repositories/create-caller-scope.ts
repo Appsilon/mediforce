@@ -36,6 +36,7 @@ import type { CallerIdentity } from '../auth';
 import type { RunKicker } from '../runtime/run-kicker';
 import type { DockerImagesService } from '../services/docker-images-service';
 import type { InviteNotificationService, InviteService } from '../services/invite-notification';
+import type { JoinLinkService } from '../services/join-link';
 import type { CallerScope } from './caller-scope';
 import { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository';
 import { AuthorizedAgentEventRepository } from './authorized-agent-event-repository';
@@ -89,6 +90,7 @@ export interface CallerScopeServices {
   readonly agentRunner: AgentRunner;
   readonly runKicker: RunKicker;
   readonly inviteService: InviteService | null;
+  readonly joinLinkService: JoinLinkService | null;
   readonly inviteNotificationService: InviteNotificationService | null;
   readonly dockerImages: DockerImagesService | null;
   readonly userDirectory: UserDirectoryService | null;
@@ -163,6 +165,7 @@ export function createCallerScope(
       audit: services.auditRepo,
       runKicker: services.runKicker,
       inviteService: services.inviteService,
+      joinLinkService: services.joinLinkService,
       inviteNotificationService: services.inviteNotificationService,
       dockerImages: services.dockerImages,
       userDirectory: services.userDirectory,

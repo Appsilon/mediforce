@@ -9,10 +9,15 @@ import {
   recordSignIn,
   recordSignInAuditEvent,
   SESSION_TTL_MS,
+  authUserWasInvited,
 } from '@mediforce/platform-infra';
 import { isPasswordAuthEnabled } from '@mediforce/platform-core';
-import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist';
 import { sessionCookieName, isSecureRequest } from '@/lib/session-cookie';
+import {
+  parseAllowedDomains,
+  isEmailDomainAllowed,
+  isSignInAuthorized,
+} from '@/lib/email-allowlist';
 
 /**
  * Password sign-in (ADR-0002 §4: dev / E2E / air-gapped demos).
@@ -37,8 +42,8 @@ const INVALID_CREDENTIALS = { error: 'Incorrect email or password.' } as const;
 
 /**
  * Compared against when the email is unknown, has no password, or fails the
- * domain allowlist, so every rejection costs one bcrypt round. Without it the
- * "no such user" answer comes back ~250 ms early and enumerates the directory.
+ * sign-in authorization rule, so every rejection costs one bcrypt round. Without it the "no such user" answer comes
+ * back ~250 ms early and enumerates the directory.
  */
 const DUMMY_HASH = '$2b$12$C6UzMDM.H6dfI/f/IKcEe.4nJmXQXbYCiL5C1xCtBHqAFwUeXPuLW';
 
@@ -89,15 +94,26 @@ export async function POST(request: Request): Promise<NextResponse> {
   const { db } = getSharedPostgresClient();
   const user = await findPasswordCredentialByEmail(db, email);
 
-  // The allowlist gate matches the Auth.js `signIn` callback for OAuth
-  // (ADR-0002 §4a), but it answers with the SAME 401 as a bad password: a
-  // distinct 403 would tell an anonymous caller which domains are allowed.
-  const allowed = isEmailDomainAllowed(
-    email,
-    parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS),
-  );
+  // The same two-term rule the Auth.js `signIn` callback applies (ADR-0021 §5,
+  // amending ADR-0002 §4a) — an allowlisted domain, or an account an admin
+  // deliberately seeded. Applying the allowlist alone here used to lock a
+  // legitimately invited external colleague out of the password she had just
+  // been asked to set; dropping it altogether would have let anyone evicted by
+  // a domain being removed keep signing in.
+  //
+  // It answers with the SAME 401 as a bad password: a distinct 403 would tell
+  // an anonymous caller which domains are allowed. The bcrypt compare runs
+  // against a dummy hash on a miss so a non-existent account costs the same
+  // time as a wrong password.
+  const authorized = isSignInAuthorized({
+    domainAllowed: isEmailDomainAllowed(
+      email,
+      parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS),
+    ),
+    invited: await authUserWasInvited(db, email),
+  });
   const passwordMatches = await compare(password, user?.passwordHash ?? DUMMY_HASH);
-  if (!allowed || user === null || user.passwordHash === null || !passwordMatches) {
+  if (!authorized || user === null || user.passwordHash === null || !passwordMatches) {
     return NextResponse.json(INVALID_CREDENTIALS, { status: 401 });
   }
 

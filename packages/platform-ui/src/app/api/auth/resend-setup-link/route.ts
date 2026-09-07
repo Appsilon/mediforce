@@ -3,10 +3,15 @@ import { z } from 'zod';
 import {
   getSharedPostgresClient,
   findPasswordCredentialByEmail,
+  authUserWasInvited,
 } from '@mediforce/platform-infra';
 import { PLATFORM_BASE_URL_SETTING_KEY, normalizeBaseUrl } from '@mediforce/platform-api/contract';
 import { getPlatformServices } from '@/lib/platform-services';
-import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist';
+import {
+  parseAllowedDomains,
+  isEmailDomainAllowed,
+  isSignInAuthorized,
+} from '@/lib/email-allowlist';
 
 /**
  * Self-service "resend my setup link" recovery.
@@ -25,7 +30,14 @@ import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist
  * Public by design (`proxy.ts` exempts `/api/auth/*`) — like `password-login`,
  * this is the accepted plain-route exception, not a Server Action.
  *
- * Rate-limiting is deferred to #1048.
+ * Authorization is the shared two-term rule (ADR-0021 §5, amending ADR-0002
+ * §4a): an allowlisted domain, or an account an admin deliberately seeded.
+ *
+ * Rate-limiting is still outstanding here. ADR-0002's "Deferred (issue
+ * #1048)" list carried a bullet for it, but #1048 covers only the
+ * forced-password-change guard and the Google exemption; ADR-0021 §6 shipped
+ * the limiter for `/api/join/*` (`@/lib/rate-limit`), and applying the same
+ * keyed limiter here is the remaining work.
  */
 const BodySchema = z.object({
   email: z.string().email(),
@@ -61,11 +73,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(GENERIC_OK);
   }
 
-  const allowed = isEmailDomainAllowed(
-    email,
-    parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS),
-  );
-  if (allowed !== true) {
+  // The same two-term rule every sign-in path applies (ADR-0021 §5). Recovery
+  // must not become the way back in for someone a dropped domain evicted, and
+  // must not refuse a legitimately invited external colleague the setup link
+  // for the account an admin just created for them.
+  const authorized = isSignInAuthorized({
+    domainAllowed: isEmailDomainAllowed(
+      email,
+      parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS),
+    ),
+    invited: await authUserWasInvited(db, email),
+  });
+  if (!authorized) {
     return NextResponse.json(GENERIC_OK);
   }
 

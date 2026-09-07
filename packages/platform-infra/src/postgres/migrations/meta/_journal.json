@@ -330,6 +330,20 @@
       "when": 1784720152313,
       "tag": "0046_builtin_access_floor",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1788782729847,
+      "tag": "0047_workspace_join_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1788786295190,
+      "tag": "0048_auth_users_invited_at",
+      "breakpoints": true
     }
   ]
 }

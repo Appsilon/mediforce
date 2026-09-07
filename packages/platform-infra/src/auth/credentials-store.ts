@@ -71,3 +71,34 @@ export async function findPasswordCredentialByEmail(
     .limit(1);
   return user ?? null;
 }
+
+/**
+ * Whether an admin deliberately seeded this account — an invite, or a redeemed
+ * join link (ADR-0021 §5, amending ADR-0002 §4a). Reads `auth_users.invited_at`
+ * (migration 0048), which `PostgresInviteService.seedInvite` is the only writer
+ * of.
+ *
+ * Deliberately NOT "an `auth_users` row exists", which is what §5's own text
+ * proposed: `@auth/drizzle-adapter` writes such a row for every self-registered
+ * OAuth user, and the Firebase migration wrote one for every account it carried
+ * over, so an existence test would exempt those populations from the domain
+ * allowlist too. The staging runbook records `ALLOWED_EMAIL_DOMAINS` being used
+ * to block two migrated accounts by name — removing a domain is a live eviction
+ * control, and only this narrower column leaves it working.
+ *
+ * Deliberately not `findPasswordCredentialByEmail` either: the question is
+ * whether somebody vouched for this address, not what credentials it holds, and
+ * an OAuth-only account has no password hash to read.
+ */
+export async function authUserWasInvited(
+  db: Database,
+  email: string | null | undefined,
+): Promise<boolean> {
+  if (typeof email !== 'string' || email === '') return false;
+  const [row] = await db
+    .select({ invitedAt: authUsers.invitedAt })
+    .from(authUsers)
+    .where(eq(authUsers.email, email.toLowerCase()))
+    .limit(1);
+  return row?.invitedAt != null;
+}

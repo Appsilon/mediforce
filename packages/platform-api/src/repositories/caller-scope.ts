@@ -22,6 +22,7 @@ import type { CallerIdentity } from '../auth';
 import type { RunKicker } from '../runtime/run-kicker';
 import type { DockerImagesService } from '../services/docker-images-service';
 import type { InviteNotificationService, InviteService } from '../services/invite-notification';
+import type { JoinLinkService } from '../services/join-link';
 import type { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository';
 import type { AuthorizedAgentEventRepository } from './authorized-agent-event-repository';
 import type { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository';
@@ -137,6 +138,13 @@ export interface SystemServices {
    * case so tests can run without a database.
    */
   readonly inviteService: InviteService | null;
+  /**
+   * Join-link store (ADR-0021) — mint, list, revoke, and atomically consume a
+   * workspace join link. `null` when not wired, same contract as
+   * `inviteService`: the handler throws `PreconditionFailedError` rather than
+   * 500ing on a deployment without a database.
+   */
+  readonly joinLinkService: JoinLinkService | null;
   /**
    * Invite/workspace email surface. `null` when Mailgun/SMTP env vars are
    * unset — handlers detect that and skip email delivery while still seeding

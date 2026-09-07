@@ -48,6 +48,7 @@ import { createCallerScope, type CallerScopeServices } from '../create-caller-sc
 import { noopRunKicker, type RunKicker } from '../../runtime/run-kicker';
 import type { DockerImagesService } from '../../services/docker-images-service';
 import type { InviteNotificationService, InviteService } from '../../services/invite-notification';
+import type { JoinLinkService } from '../../services/join-link';
 
 const stubNamespaceRepo: NamespaceRepository = {
   async getNamespace() {
@@ -193,6 +194,7 @@ export interface TestScopeOverrides {
   readonly namespaceSecretsRepo?: NamespaceSecretsRepository;
   readonly runKicker?: RunKicker;
   readonly inviteService?: InviteService | null;
+  readonly joinLinkService?: JoinLinkService | null;
   readonly inviteNotificationService?: InviteNotificationService | null;
   readonly dockerImages?: DockerImagesService | null;
   readonly namespaceRepo?: NamespaceRepository;
@@ -256,6 +258,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     agentRunner: null as unknown as CallerScopeServices['agentRunner'],
     runKicker: overrides.runKicker ?? noopRunKicker(),
     inviteService: overrides.inviteService ?? null,
+    joinLinkService: overrides.joinLinkService ?? null,
     inviteNotificationService: overrides.inviteNotificationService ?? null,
     dockerImages: overrides.dockerImages ?? null,
     userDirectory: overrides.userDirectory ?? null,

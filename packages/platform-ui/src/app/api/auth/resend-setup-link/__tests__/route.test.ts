@@ -6,9 +6,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // pending + allowlisted invitee triggers an activation email.
 
 const mockFindPasswordCredentialByEmail = vi.fn();
+// ADR-0021 §5's second term: `auth_users.invited_at`. Default `false` = a
+// self-registered account, so the allowlist alone decides unless a test says
+// this address was deliberately seeded.
+const mockAuthUserWasInvited = vi.fn(async () => false);
 
 vi.mock('@mediforce/platform-infra', () => ({
   getSharedPostgresClient: () => ({ db: {} }),
+  authUserWasInvited: (...args: unknown[]) => mockAuthUserWasInvited(...args),
   findPasswordCredentialByEmail: (...args: unknown[]) =>
     mockFindPasswordCredentialByEmail(...args),
 }));
@@ -62,6 +67,7 @@ describe('POST /api/auth/resend-setup-link', () => {
     vi.unstubAllEnvs();
     inviteNotificationService = { sendActivationEmail: mockSendActivationEmail };
     passwordAuthEnabled = true;
+    mockAuthUserWasInvited.mockResolvedValue(false);
     mockFindPasswordCredentialByEmail.mockResolvedValue(pendingUser);
     mockIsInvitePending.mockResolvedValue(true);
     mockSetMustChangePassword.mockResolvedValue(undefined);
@@ -131,7 +137,24 @@ describe('POST /api/auth/resend-setup-link', () => {
     expect(mockSetMustChangePassword).not.toHaveBeenCalled();
   });
 
-  it('[ENUM] out-of-allowlist domain → no send, same generic 200', async () => {
+  // ADR-0021 §5: the domain allowlist no longer gates recovery. Only a PENDING
+  // seeded account gets a link at all, and that account exists because an admin
+  // created it — denying its owner the recovery link for it was the bug, not
+  // the protection.
+  // ADR-0021 §5: recovery applies the same two-term rule as every sign-in path.
+  it('sends to an out-of-allowlist pending invitee — the seeding was the authorization', async () => {
+    vi.stubEnv('ALLOWED_EMAIL_DOMAINS', 'allowed.test');
+    mockAuthUserWasInvited.mockResolvedValue(true);
+
+    const res = await POST(makeJsonRequest({ email: 'pending@example.test' }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(mockSendActivationEmail).toHaveBeenCalledTimes(1);
+  });
+
+  // Recovery must not be the way back in for someone a dropped domain evicted.
+  it('[ENUM] out-of-allowlist and never invited → no send, same generic 200', async () => {
     vi.stubEnv('ALLOWED_EMAIL_DOMAINS', 'allowed.test');
 
     const res = await POST(makeJsonRequest({ email: 'pending@example.test' }));

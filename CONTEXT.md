@@ -257,6 +257,24 @@ manage other owners; admins can manage members and workspace settings; members
 can use the Workspace.
 _Avoid_: "Role" alone — that's overloaded with process-domain roles below.
 
+**Join Link** *(a shared entrance to one Workspace)*:
+A secret an owner or admin mints from workspace settings and hands to a room —
+a workshop, a demo, a pilot cohort — for people whose addresses they do not
+have in advance ([ADR-0021](docs/adr/0021-workspace-join-links.md)). Redeeming
+one at `/join/<token>` grants a **Membership** (`member` or `admin`, never
+`owner`) and nothing else — never a **Role**. It does **not** open a Session:
+redemption seeds the account and sends the same activation email an invite
+does, so a link on a slide, or a photograph of that slide, is not an account.
+Organizations only; a Join Link carries an expiry and an optional use cap, and
+only its hash is stored, so the token is shown once at creation and is never
+recoverable.
+_Avoid_: "invite link" — an **Invite** names one address the admin already
+knows and writes that person's rows; a Join Link names nobody and is redeemed
+by whoever holds it. Both end in the same activation email.
+_Note_: Revoking a Join Link closes the entrance; it removes nobody who already
+walked through it. That is `mediforce namespace remove-member`, as for any
+other member.
+
 **Roles** *(process-domain, plural)*:
 Functional roles a User holds for workflow purposes — e.g. `reviewer`, `PI`,
 `approver`. Free-form strings; there is no fixed vocabulary. A Role is held

@@ -83,6 +83,61 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
     expect(roles).toEqual(['approver', 'reviewer']);
   });
 
+  /**
+   * `invited_at` (migration 0048) is the second term of the ADR-0021 §5 sign-in
+   * gate, and `seedInvite` is its only writer. These three cases are the whole
+   * contract: an admin's add stamps it, a re-add repairs a row that predates the
+   * column without rewriting history, and nothing else can set it — which is
+   * what leaves `ALLOWED_EMAIL_DOMAINS` able to evict a self-registered account.
+   */
+  it('stamps invited_at on a freshly seeded account', async () => {
+    const before = new Date();
+    const { uid } = await service.seedInvite({
+      email: 'stamped@acme.com',
+      workspaceHandle: 'acme',
+      membership: 'member',
+    });
+
+    const [user] = await db.select().from(authUsers).where(eq(authUsers.id, uid));
+    expect(user?.invitedAt).not.toBeNull();
+    expect(user!.invitedAt!.getTime()).toBeGreaterThanOrEqual(before.getTime() - 1000);
+  });
+
+  it('stamps invited_at on an account that already existed but was never invited', async () => {
+    // The shape the Auth.js adapter leaves behind for a self-registered user,
+    // and the shape every row had the moment migration 0048 ran.
+    await db.insert(authUsers).values({ id: 'self-registered', email: 'self@acme.com' });
+
+    await service.seedInvite({
+      email: 'self@acme.com',
+      workspaceHandle: 'acme',
+      membership: 'member',
+    });
+
+    const [user] = await db.select().from(authUsers).where(eq(authUsers.id, 'self-registered'));
+    expect(user?.invitedAt).not.toBeNull();
+  });
+
+  it('keeps the first invited_at across a re-invite', async () => {
+    const { uid } = await service.seedInvite({
+      email: 'reinvited@acme.com',
+      workspaceHandle: 'acme',
+      membership: 'member',
+    });
+    const [first] = await db.select().from(authUsers).where(eq(authUsers.id, uid));
+
+    await service.seedInvite({
+      email: 'reinvited@acme.com',
+      workspaceHandle: 'acme',
+      membership: 'admin',
+    });
+
+    const [second] = await db.select().from(authUsers).where(eq(authUsers.id, uid));
+    // It records when they were first vouched for; a later re-invite must not
+    // rewrite that.
+    expect(second?.invitedAt?.getTime()).toBe(first?.invitedAt?.getTime());
+  });
+
   it('seeds no roles when none are given', async () => {
     const { uid } = await service.seedInvite({
       email: 'norole@acme.com',

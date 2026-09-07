@@ -5,6 +5,14 @@
 export { PostgresUserDirectoryService } from './auth/postgres-user-directory-service';
 export { PostgresInviteService } from './auth/postgres-invite-service';
 export type { SeedInviteInput, SeededInvite } from './auth/postgres-invite-service';
+export { PostgresJoinLinkService } from './auth/postgres-join-link-service';
+export type {
+  JoinLinkRecord,
+  JoinLinkLookup,
+  JoinLinkRejection,
+  JoinLinkMembership,
+  CreateJoinLinkRecord,
+} from './auth/postgres-join-link-service';
 export { buildUserRolesSeed } from './auth/seed-user-roles';
 export {
   resolveSessionUserId,
@@ -20,6 +28,7 @@ export {
   setUserPasswordHash,
   getUserPasswordHash,
   findPasswordCredentialByEmail,
+  authUserWasInvited,
 } from './auth/credentials-store';
 export { mintVerificationToken, hashVerificationToken } from './auth/verification-token';
 export type {

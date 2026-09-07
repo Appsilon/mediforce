@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Database } from '../postgres/client';
 import { authAccounts } from '../postgres/schema/auth-account';
 import { authSessions } from '../postgres/schema/auth-session';
@@ -42,6 +42,11 @@ export interface SeededInvite {
  * with a different membership updates the existing workspace membership row
  * (role parity with the pre-cutover `addMember` upsert); roles are
  * additive.
+ *
+ * This is also the ONLY writer of `auth_users.invited_at` (migration 0048) —
+ * the marker the ADR-0021 §5 sign-in gate reads to tell an admin's deliberate
+ * add apart from a self-registration the Auth.js adapter wrote. Both admin
+ * invites and redeemed join links reach it here, and nothing else may set it.
  */
 export class PostgresInviteService {
   constructor(private readonly db: Database) {}
@@ -66,7 +71,21 @@ export class PostgresInviteService {
           id: uid,
           email: normalisedEmail,
           name: input.displayName ?? null,
+          invitedAt: new Date(),
         });
+      } else {
+        // Stamp an account that already existed, because being deliberately
+        // added to a workspace is the same authorization whether or not the row
+        // was already there (ADR-0021 §5). This is also the repair path for
+        // someone invited before migration 0048 shipped, and for a migrated
+        // account an admin now genuinely wants in.
+        //
+        // First stamp wins: `invited_at` records when they were first vouched
+        // for, so a later re-invite does not rewrite that history.
+        await tx
+          .update(authUsers)
+          .set({ invitedAt: sql`now()` })
+          .where(and(eq(authUsers.id, uid), isNull(authUsers.invitedAt)));
       }
 
       await tx

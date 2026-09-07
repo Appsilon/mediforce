@@ -139,6 +139,42 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    same allowlist check itself, answering with the same 401 as a bad password
    so an anonymous caller cannot enumerate the allowed domains.
 
+   **Amended 2026-09-07 by [ADR-0021](./0021-workspace-join-links.md) §5 — the
+   allowlist is no longer the only thing that authorizes a sign-in.** The
+   `signIn` callback now admits an email when its domain is allowlisted **OR**
+   an admin deliberately seeded the account — `auth_users.invited_at`
+   (migration 0048), which only `seedInvite` writes. An admin invite and a
+   redeemed join link are authorizations in their own right, and this section
+   was never meant to overrule one. The allowlist keeps doing the job it was
+   introduced for: closing the door where *any* Google account on earth could
+   self-register. It governs **self-service** sign-in; an admin's act of seeding
+   governs the rest.
+
+   Note the second term precisely: **seeded**, not "has an `auth_users` row".
+   The adapter writes that row for every self-registered OAuth user, and the §7
+   migration wrote one for every account it carried over, so a row-existence
+   test would have quietly retired this section's other job — *evicting* the
+   people at a domain by removing it from the list. The staging runbook uses it
+   exactly that way. Nothing is backfilled, so no account the allowlist blocks
+   today is admitted by the amendment.
+
+   This also fixed a pre-existing defect. `inviteUser` never consulted
+   `ALLOWED_EMAIL_DOMAINS` but sign-in did, so an admin could invite
+   `alice@external.com`, `seedInvite` would write her rows and the activation
+   email would go out — and every route she could reach with that link rejected
+   her. The invite succeeded and the account was unusable.
+
+   All four sign-in paths now apply one shared, named rule —
+   `isSignInAuthorized({ domainAllowed, invited })` in
+   `platform-ui/src/lib/email-allowlist.ts`: this callback, the Email provider's
+   `sendVerificationRequest`, `POST /api/auth/password-login`, and
+   `POST /api/auth/resend-setup-link`. Previously each spelled the domain check
+   out for itself, which is how the amendment could have been applied to one and
+   missed on three. The `shouldSendMagicLink` helper this section spawned is
+   gone: its `userExists` term answers a different question — can the adapter
+   self-register? — which its caller now asks directly, and its domain term
+   became this rule.
+
 4b. **Account linking by verified email (decision 2026-06-29).** A Google
    sign-in whose email matches an existing `auth_users` row (a migration-seeded
    user, §7) **links automatically** onto that user — `allowDangerousEmailAccountLinking:
@@ -149,6 +185,11 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    account takeover). Today's explicit `pendingGoogleLink` password-link dance
    (sign in with password to attach a same-email Google account) is **dropped** —
    verified-email auto-link replaces it, and passwords are test-only anyway.
+
+   **Still true after [ADR-0021](./0021-workspace-join-links.md) §5.** That
+   amendment relaxes §4a's gate, not this one: auto-link is safe because Google
+   *verifies* the email, and the second term §5 adds ("an `auth_users` row
+   already exists") is precisely the seeded row this section links onto.
 
 5. **Role / claim resolution.** Firebase custom claims map onto three
    different storage locations:
@@ -478,5 +519,13 @@ An invite to a **pending** invitee (no session, no password) now:
   should force the gate everywhere.
 - Google exemption: a user who signs in via Google should not be forced to create
   a local password.
+
+### Deferred (no issue yet)
 - Rate-limiting on the activation / magic-link / resend-setup-link sends (spam
-  protection; sibling of the password-login rate-limit #1003).
+  protection). **This was listed under #1048 above and is not in it** — that
+  issue's body covers only the forced-password-change guard and the Google
+  exemption, and the sibling #1003 covers password-login rate limiting only.
+  [ADR-0021](./0021-workspace-join-links.md) §6 shipped a shared keyed limiter
+  (`platform-ui/src/lib/rate-limit.ts`) and applied it to `/api/join/*`;
+  applying the same limiter to these three sends is the remaining work and
+  needs an issue of its own.

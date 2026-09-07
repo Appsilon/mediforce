@@ -16,6 +16,12 @@ const PUBLIC_ROUTE_PATTERNS: RegExp[] = [
   // Per-provider OAuth callback — no user session at this point; the signed
   // state HMAC inside the callback handler is the sole integrity check.
   /^\/api\/oauth\/[^/]+\/callback$/,
+  // Join-link preview + redemption (ADR-0021). A joiner has no session — the
+  // token in the body is the authorization, and redemption deliberately hands
+  // back an emailed activation link rather than a session. Both routes carry
+  // their own rate limit (§6) because this exemption is what makes them
+  // reachable by anyone.
+  /^\/api\/join\//,
 ];
 
 function isPublicRoute(pathname: string): boolean {

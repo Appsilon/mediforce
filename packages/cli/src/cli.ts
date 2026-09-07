@@ -75,6 +75,7 @@ import { coworkListCommand } from './commands/cowork-list';
 import { coworkChatCommand } from './commands/cowork-chat';
 import { usersMeCommand } from './commands/users-me';
 import { usersClearMustChangePasswordCommand } from './commands/users-clear-must-change-password';
+import { usersInviteCommand } from './commands/users-invite';
 import { namespaceGetCommand } from './commands/namespace-get';
 import { namespaceListMembersCommand } from './commands/namespace-list-members';
 import { namespaceCreateCommand } from './commands/namespace-create';
@@ -87,6 +88,9 @@ import { namespaceLeaveCommand } from './commands/namespace-leave';
 import { namespaceRemoveMemberCommand } from './commands/namespace-remove-member';
 import { namespaceSetMemberRoleCommand } from './commands/namespace-set-member-role';
 import { namespaceSetMemberRolesCommand } from './commands/namespace-set-member-roles';
+import { namespaceCreateJoinLinkCommand } from './commands/namespace-create-join-link';
+import { namespaceListJoinLinksCommand } from './commands/namespace-list-join-links';
+import { namespaceRevokeJoinLinkCommand } from './commands/namespace-revoke-join-link';
 import { processesAgentEventsCommand } from './commands/processes-agent-events';
 import { configSetCommand } from './commands/config-set';
 import { configGetCommand } from './commands/config-get';
@@ -221,6 +225,7 @@ export const TREE: Record<string, BranchEntry> = {
     description: 'User identity + workspace memberships',
     leaves: {
       me: { description: 'Show the signed-in user + their workspaces', fn: usersMeCommand },
+      invite: { description: 'Invite someone to a workspace by email', fn: usersInviteCommand },
       'clear-must-change-password': {
         description: 'Acknowledge a forced password change',
         fn: usersClearMustChangePasswordCommand,
@@ -240,6 +245,9 @@ export const TREE: Record<string, BranchEntry> = {
       'remove-member': { description: 'Remove a member from a workspace', fn: namespaceRemoveMemberCommand },
       'set-member-role': { description: 'Flip a member to admin|member (workspace membership)', fn: namespaceSetMemberRoleCommand },
       'set-member-roles': { description: 'Set a member\'s process roles (reviewer, PI, …)', fn: namespaceSetMemberRolesCommand },
+      'create-join-link': { description: 'Mint a join link (printed once — the token is never recoverable)', fn: namespaceCreateJoinLinkCommand },
+      'list-join-links': { description: 'List join links, live and spent', fn: namespaceListJoinLinksCommand },
+      'revoke-join-link': { description: 'Revoke a join link (removes nobody who already joined)', fn: namespaceRevokeJoinLinkCommand },
     },
   },
   processes: {

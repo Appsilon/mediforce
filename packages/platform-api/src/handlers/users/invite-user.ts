@@ -1,8 +1,8 @@
 import { assertCallerIsNamespaceAdmin } from '../../auth';
-import { PreconditionFailedError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type { InviteUserInput, InviteUserOutput } from '../../contract/users';
-import { actorFromCaller, resolveConfiguredBaseUrl } from '../_helpers';
+import { actorFromCaller } from '../_helpers';
+import { seedMemberAndNotify } from './seed-member';
 
 /**
  * Invite a user to a workspace.
@@ -12,17 +12,13 @@ import { actorFromCaller, resolveConfiguredBaseUrl } from '../_helpers';
  * flow:
  *
  *   1. Caller must be `owner`/`admin` of `namespaceHandle` (apiKey bypass).
- *   2. Pre-seed the invitee via `scope.system.inviteService.seedInvite`: it
- *      writes the `auth_users` row + the workspace membership + any global
- *      roles in one transaction. No temp password is issued; `isExisting` is
- *      `true` when the account already existed (idempotent on email collision).
- *   3. If the invite is still pending (never activated) AND password auth is
- *      enabled, gate the invitee into the create-password flow
- *      (`setMustChangePassword`) and send a best-effort activation email — a
- *      one-time 7-day sign-in link. Otherwise the plain workspace-notification
- *      email goes out instead (see the branch below for why). Email failures
- *      don't fail the response — `emailSent` flips to `false`.
- *   4. Append `invitation.created` to the audit log.
+ *   2. `seedMemberAndNotify` writes the `auth_users` row + the workspace
+ *      membership in one transaction, gates a pending invitee into the
+ *      create-password flow where password auth is on, and sends the
+ *      activation email (or the plain workspace notification for an already
+ *      active user). Shared verbatim with `redeemJoinLink` — ADR-0021 §4 makes
+ *      a join-link redemption the same seed and the same email as this.
+ *   3. Append `invitation.created` to the audit log.
  *
  * `scope.system.inviteService === null` → `PreconditionFailedError` (the
  * deployment isn't wired for invites — surface clearly rather than 500).
@@ -33,67 +29,22 @@ export async function inviteUser(
 ): Promise<InviteUserOutput> {
   assertCallerIsNamespaceAdmin(scope.caller, input.namespaceHandle);
 
-  const invite = scope.system.inviteService;
-  if (invite === null) {
-    throw new PreconditionFailedError('Invite service is not configured');
-  }
-
   const email = input.email.trim().toLowerCase();
   const displayName =
     typeof input.displayName === 'string' && input.displayName.trim() !== ''
       ? input.displayName.trim()
       : undefined;
 
-  const { uid, isExisting } = await invite.seedInvite({
-    email,
-    ...(displayName !== undefined ? { displayName } : {}),
-    workspaceHandle: input.namespaceHandle,
-    membership: input.role,
-    roles: [],
-  });
-
-  // A pending invitee (never activated) is gated into the create-password flow
-  // only when password auth is the intended first-credential method. On a
-  // Google/OIDC-only or magic-link-only deployment, forcing a password (and the
-  // activation-link → /change-password path) strands the invitee: they set a
-  // password they cannot use and could simply have signed in with their
-  // provider. An already-active user re-added to the workspace always keeps the
-  // plain workspace-notification path — they already have a session/password.
-  const pending = await invite.isInvitePending(uid);
-  const forcePasswordSetup = pending === true && scope.system.passwordAuthEnabled === true;
-  if (forcePasswordSetup) {
-    await scope.userProfiles.setMustChangePassword(uid, true);
-  }
-
-  let emailSent = false;
-  const notify = scope.system.inviteNotificationService;
-  if (notify !== null) {
-    try {
-      const baseUrl = await resolveConfiguredBaseUrl(scope);
-      const namespace = await scope.workspaces.getNamespace(input.namespaceHandle);
-      const workspaceName = namespace?.displayName ?? input.namespaceHandle;
-      const inviterName =
-        typeof input.inviterName === 'string' && input.inviterName.trim() !== ''
-          ? input.inviterName.trim()
-          : workspaceName;
-      const payload = {
-        toEmail: email,
-        inviterName,
-        workspaceName,
-        workspaceHandle: input.namespaceHandle,
-        ...(baseUrl !== undefined ? { baseUrl } : {}),
-      };
-      if (forcePasswordSetup) {
-        await notify.sendActivationEmail(payload);
-      } else {
-        await notify.sendWorkspaceNotificationEmail(payload);
-      }
-      emailSent = true;
-    } catch (emailErr) {
-      console.error('[invite-user] Failed to send email:', emailErr);
-      emailSent = false;
-    }
-  }
+  const { uid, isExisting, emailSent } = await seedMemberAndNotify(
+    {
+      email,
+      ...(displayName !== undefined ? { displayName } : {}),
+      namespaceHandle: input.namespaceHandle,
+      membership: input.role,
+      ...(input.inviterName !== undefined ? { inviterName: input.inviterName } : {}),
+    },
+    scope,
+  );
 
   await scope.system.audit.append({
     ...actorFromCaller(scope),

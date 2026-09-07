@@ -33,12 +33,19 @@ src/errors.ts            Exit-code mapping
 ```
 
 Sixty-plus commands across workflows, runs, tasks, agents, namespaces,
-secrets, models, cowork, config and system.
+users, secrets, models, cowork, config and system.
 
 ## Rules
 
 **Never point it at production.** Development targets a local platform; staging
 is explicit and deliberate.
+
+**A secret the platform shows once, the CLI prints first.**
+`namespace create-join-link` leads with the URL and then says the token cannot
+be shown again, because only its hash is stored
+([ADR-0021](../../docs/adr/0021-workspace-join-links.md)). A command that buries
+a once-only value under its metadata is a command whose output gets truncated
+past the part that mattered.
 
 **Every command supports machine-readable output.** Agents parse this. Adding a
 command that only prints prose makes it unusable by half its callers.
