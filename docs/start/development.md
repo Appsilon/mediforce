@@ -195,7 +195,11 @@ would ship a dead `http://localhost` link.
 
 > **Inviting users to set a first password requires `ENABLE_PASSWORD_AUTH` (on by
 > default) and a configured email provider.** Existing Google users just sign in
-> with Google after their account is seeded — no invite, no password.
+> with Google after their account is seeded — no invite, no password. With
+> `ENABLE_PASSWORD_AUTH=false`, an invitee who has never activated (seeded by an
+> admin invite or by redeeming a join link) still gets the one-time sign-in
+> link — it simply signs them in and lands them on workspace selection instead
+> of a create-password page they could not complete.
 
 ### Authentication setup (ADR-0002)
 

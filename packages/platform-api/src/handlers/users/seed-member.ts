@@ -59,16 +59,23 @@ export async function seedMemberAndNotify(
     vouchedByAdmin: params.vouchedByAdmin,
   });
 
-  // A pending invitee (never activated) is gated into the create-password flow
-  // only when password auth is the intended first-credential method. On a
+  // Two independent decisions, and conflating them is what strands an invitee.
+  //
+  // WHICH EMAIL is decided by `pending` alone: an invitee who never activated
+  // has no way in, so they always get the one-time sign-in link. An
+  // already-active user re-added to the workspace gets the plain
+  // workspace notification — they already have a session/password.
+  //
+  // WHETHER A PASSWORD IS PART OF IT is decided by the deployment flag. On a
   // Google/OIDC-only or magic-link-only deployment, forcing a password (and the
   // activation-link → /change-password path) strands the invitee: they set a
-  // password they cannot use and could simply have signed in with their
-  // provider. An already-active user re-added to the workspace always keeps the
-  // plain workspace-notification path — they already have a session/password.
+  // password they cannot use. There the same link simply signs them in and
+  // lands them on workspace selection. Same split as `resendInvite` and
+  // `/api/auth/resend-setup-link`, the other two paths that mail a pending
+  // invitee.
   const pending = await invite.isInvitePending(uid);
-  const forcePasswordSetup = pending === true && scope.system.passwordAuthEnabled === true;
-  if (forcePasswordSetup) {
+  const passwordSetupEnabled = scope.system.passwordAuthEnabled === true;
+  if (pending === true && passwordSetupEnabled) {
     await scope.userProfiles.setMustChangePassword(uid, true);
   }
 
@@ -106,8 +113,8 @@ export async function seedMemberAndNotify(
         workspaceHandle: params.namespaceHandle,
         ...(baseUrl !== undefined ? { baseUrl } : {}),
       };
-      if (forcePasswordSetup) {
-        await notify.sendActivationEmail(payload);
+      if (pending === true) {
+        await notify.sendActivationEmail({ ...payload, passwordSetupEnabled });
       } else {
         await notify.sendWorkspaceNotificationEmail(payload);
       }

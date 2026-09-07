@@ -222,15 +222,22 @@ Implemented 2026-09-07. Deviations and additions worth recording:
   to start making exceptions. Both routes take the token in the **body**, so it
   stays out of the API's access logs; the page URL that carries it is
   unavoidable, but there was no reason to copy it into a second log line.
-- **The limiter is three budgets, because one of them is spoofable.** Any key
-  derived from `x-forwarded-for` is caller-controlled, so a script that rotates
-  the header gets a fresh bucket per request — an address-keyed budget alone is
-  a suggestion, and §6's whole point is that this endpoint must not become a
-  mail relay. Redemption therefore also carries a budget keyed on the token
-  hash **alone** (60/hour): nothing a caller sends can move it, and it is what
-  actually holds. The per-(address, token) budget stays at 5/hour as the cheap
-  first line. Preview only reads and sends no mail: 120/hour per address, loose
-  enough for a room behind one conference NAT.
+- **The limiter is three budgets, and each key deliberately drops half of what
+  §6 first proposed ("keyed by IP plus token").** A key holding both is the one
+  shape that bounds neither side: the address half is caller-controlled
+  (`x-forwarded-for`), so rotating the header buys a fresh bucket, and the token
+  half is also caller-supplied, so a script sending a fresh invalid token per
+  request resets the budget and charges the Postgres claim without bound. The
+  pair is additionally the worst possible key for the primary scenario — a
+  workshop behind one conference NAT is one address redeeming one token, so a
+  per-(address, token) budget counts the whole room as a single attendee.
+
+  So: redemption per token **alone** (60/hour), the budget nothing a caller
+  sends can move — it is the hash of a secret only the holder has, and it is
+  what stops a leaked link from becoming a mail relay. Redemption per address
+  **alone** (120/hour), room-sized for exactly the NAT case and unresettable by
+  rotating tokens. Preview only reads and sends no mail: 120/hour per address,
+  the same room-sized figure.
 
   `clientAddress` reads the **last** hop of `x-forwarded-for`, not the first —
   every proxy appends, so the last entry is what our own reverse proxy observed

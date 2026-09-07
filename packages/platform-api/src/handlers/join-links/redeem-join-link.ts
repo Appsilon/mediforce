@@ -71,9 +71,14 @@ export async function redeemJoinLink(
   );
 
   await scope.system.audit.append({
-    actorId: uid,
-    actorType: 'user',
-    actorRole: 'operator',
+    // The actor is the public route, NOT the account the email resolved to.
+    // Nobody authenticated here: the form takes whatever address the holder
+    // typed, so recording `uid` as the actor would let a holder who types the
+    // owner's address produce an audit event claiming the owner did this. The
+    // resolved account is the redemption's OUTPUT, and that is where it stays.
+    actorId: 'join-link',
+    actorType: 'system',
+    actorRole: 'system',
     action: 'invitation.link_redeemed',
     description: `Join link '${link.id}' redeemed by '${email}' in namespace '${link.workspace}'`,
     timestamp: now.toISOString(),

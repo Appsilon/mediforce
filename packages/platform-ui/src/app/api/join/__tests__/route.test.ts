@@ -148,24 +148,78 @@ describe('public /api/join routes', () => {
     expect(mockSeedInvite).not.toHaveBeenCalled();
   });
 
-  it('[RATE-LIMIT] caps redemption attempts per address+token and never mails past the cap', async () => {
-    const token = await mintToken({ maxUses: 100 });
-    const headers = { 'x-forwarded-for': '203.0.113.9' };
+  it('[RATE-LIMIT] caps redemptions per token and never mails past the cap', async () => {
+    const token = await mintToken({ maxUses: 200 });
 
-    for (let attempt = 0; attempt < 5; attempt += 1) {
+    // Each attendee gets their own address so only the per-token ceiling is in
+    // play — it is the budget nothing a caller sends can move, and the one that
+    // stops a leaked link from becoming a mail relay.
+    for (let attempt = 0; attempt < 60; attempt += 1) {
       const ok = await REDEEM(
-        jsonPost('/api/join/redeem', { token, email: `a${attempt}@example.test` }, headers),
+        jsonPost(
+          '/api/join/redeem',
+          { token, email: `a${attempt}@example.test` },
+          { 'x-forwarded-for': `203.0.113.${attempt}` },
+        ),
       );
       expect(ok.status).toBe(200);
     }
 
     const blocked = await REDEEM(
-      jsonPost('/api/join/redeem', { token, email: 'sixth@example.test' }, headers),
+      jsonPost(
+        '/api/join/redeem',
+        { token, email: 'past-the-cap@example.test' },
+        { 'x-forwarded-for': '198.51.100.7' },
+      ),
     );
 
     expect(blocked.status).toBe(429);
     expect(blocked.headers.get('Retry-After')).not.toBeNull();
-    expect(mockSendActivationEmail).toHaveBeenCalledTimes(5);
+    expect(mockSendActivationEmail).toHaveBeenCalledTimes(60);
+  });
+
+  it('[RATE-LIMIT] a room sharing one NAT address redeems the same link past the old five-attempt cap', async () => {
+    const token = await mintToken({ maxUses: 200 });
+    // The scenario the feature exists for: a workshop behind one conference
+    // NAT, so every attendee presents the same address and the same token. A
+    // budget keyed on that pair treats the whole room as one attendee.
+    const headers = { 'x-forwarded-for': '203.0.113.9' };
+
+    for (let attendee = 0; attendee < 30; attendee += 1) {
+      const ok = await REDEEM(
+        jsonPost('/api/join/redeem', { token, email: `seat${attendee}@example.test` }, headers),
+      );
+      expect(ok.status).toBe(200);
+    }
+
+    expect(mockSendActivationEmail).toHaveBeenCalledTimes(30);
+  });
+
+  it('[RATE-LIMIT] rotating the token does not buy a fresh budget', async () => {
+    const headers = { 'x-forwarded-for': '203.0.113.9' };
+
+    // Every key that contains the token hash is a key the caller picks. A
+    // script sending a fresh invalid token per request would reset such a
+    // budget every time and charge the Postgres claim without bound, so the
+    // address budget deliberately ignores the token.
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const res = await REDEEM(
+        jsonPost(
+          '/api/join/redeem',
+          { token: `bogus-${attempt}`, email: 'x@example.test' },
+          headers,
+        ),
+      );
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: false, reason: 'not_found' });
+    }
+
+    const blocked = await REDEEM(
+      jsonPost('/api/join/redeem', { token: 'bogus-120', email: 'x@example.test' }, headers),
+    );
+
+    expect(blocked.status).toBe(429);
+    expect(mockSeedInvite).not.toHaveBeenCalled();
   });
 
   it('[VALIDATION] a malformed preview body reads as an unusable token, not a 400', async () => {

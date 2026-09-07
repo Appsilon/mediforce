@@ -171,17 +171,31 @@ describe('redeemJoinLink handler', () => {
     expect(notifier.workspaceCalls).toHaveLength(0);
   });
 
-  it('gates a pending joiner into the create-password flow only where passwords exist', async () => {
+  it('gates a pending joiner into the create-password flow only where passwords exist, and still mails them a way in', async () => {
     const created = await mint();
     const userProfileRepo = new InMemoryUserProfileRepository();
+    const notifier = recordingNotifier();
     const setMustChangePassword = vi.spyOn(userProfileRepo, 'setMustChangePassword');
 
     await redeemJoinLink(
       { token: created.token, email: 'newbie@example.test' },
-      publicScope({ userProfileRepo, passwordAuthEnabled: false }),
+      publicScope({
+        userProfileRepo,
+        inviteNotificationService: notifier,
+        passwordAuthEnabled: false,
+      }),
     );
 
     expect(setMustChangePassword).not.toHaveBeenCalled();
+    // The password gate is off; the sign-in link is not. `/join` promises "we
+    // sent a sign-in link — open it to finish joining", and a plain workspace
+    // notification here would break that promise on every Google-only or
+    // magic-link-only deployment: it links to a workspace the joiner has no
+    // session for. `passwordSetupEnabled: false` lands them on workspace
+    // selection instead of a create-password page they cannot complete.
+    expect(notifier.activationCalls).toHaveLength(1);
+    expect(notifier.activationCalls[0]?.passwordSetupEnabled).toBe(false);
+    expect(notifier.workspaceCalls).toHaveLength(0);
   });
 
   it('answers identically for an address that is already a member (no enumeration oracle)', async () => {
@@ -294,6 +308,22 @@ describe('redeemJoinLink handler', () => {
     const redemption = events.find((e) => e.action === 'invitation.link_redeemed');
     expect(redemption?.entityId).toBe(created.link.id);
     expect(JSON.stringify(redemption)).not.toContain(created.token);
+  });
+
+  it('attributes the redemption to the link, never to the account the typed address resolved to', async () => {
+    const created = await mint({ maxUses: 5 });
+
+    // Nobody authenticated, and the form takes whatever address it is given.
+    // Recording the resolved account as the actor would let a holder type the
+    // owner's address and manufacture an audit event saying the owner did this.
+    await redeemJoinLink({ token: created.token, email: 'owner@example.test' }, publicScope());
+
+    const events = (await auditRepo.getByNamespace('alpha')).items;
+    const redemption = events.find((e) => e.action === 'invitation.link_redeemed');
+    expect(redemption?.actorType).toBe('system');
+    expect(redemption?.actorId).toBe('join-link');
+    // The resolved account is the redemption's output, and stays there.
+    expect(redemption?.outputSnapshot).toMatchObject({ uid: 'uid-owner@example.test' });
   });
 
   // Same guard as `previewJoinLink`: the public route hands this a system-actor

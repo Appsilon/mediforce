@@ -16,11 +16,12 @@ export interface UseJoinLinksResult {
 /**
  * A workspace's join links (ADR-0021), newest first.
  *
- * ONE-SHOT per ADR-0006 §4 sub-case (a): links change only through deliberate
- * action on this page (mint, revoke), and each invalidates. A redemption
- * elsewhere moves the `uses` count without a local action, but a stale count on
- * a settings page nobody is watching is not worth a poll — reopening the page
- * refetches.
+ * ONE-SHOT per ADR-0006 §4 sub-case (a): links change through deliberate
+ * action — mint and revoke here (each invalidates), and an anonymous redemption
+ * or another admin elsewhere. The second kind is why focus refetch is on:
+ * `uses`, exhaustion and revocation all move while this tab is backgrounded,
+ * and a settings page nobody is watching is not worth a poll but is worth being
+ * true the moment somebody looks at it again.
  *
  * `enabled` is the caller's call: only owner/admin may read this, and asking as
  * a plain member would 403 on every render.
@@ -32,6 +33,7 @@ export function useJoinLinks(handle: string, enabled: boolean): UseJoinLinksResu
     queryKey: queryKeys.namespaceJoinLinks(active ? handle : '__noop__'),
     queryFn: async () => mediforce.joinLinks.list({ namespaceHandle: handle }),
     enabled: active,
+    refetchOnWindowFocus: true,
     retry: stopRetryOn4xx,
   });
 
