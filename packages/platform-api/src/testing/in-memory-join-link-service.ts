@@ -29,7 +29,6 @@ export class InMemoryJoinLinkService implements JoinLinkService {
       id: record.id,
       workspace: record.workspace,
       tokenHash: record.tokenHash,
-      membership: record.membership,
       expiresAt: record.expiresAt.toISOString(),
       maxUses: record.maxUses,
       uses: 0,

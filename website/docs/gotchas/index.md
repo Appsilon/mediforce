@@ -86,6 +86,12 @@ the people who signed themselves in at it are locked out on their next attempt.
 Only accounts you invited are exempt, and getting an invited person out means
 removing their account or their membership.
 
+## A join link cannot grant admin
+
+Everyone who redeems one joins as a plain **member**, and there is no option to
+change that. The email round-trip proves who controls a mailbox, not who you
+trust — so promoting someone stays a separate, deliberate step.
+
 ## A join link does not sign anyone in
 
 Opening `/join/<token>` asks for an email and sends the ordinary activation link

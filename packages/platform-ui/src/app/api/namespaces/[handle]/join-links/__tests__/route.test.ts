@@ -86,7 +86,7 @@ describe('/api/namespaces/[handle]/join-links', () => {
   });
 
   it('[HAPPY] POST returns 201 with the plaintext token and a /join URL', async () => {
-    const res = await POST(postRequest({ membership: 'member', expiresInDays: 7 }), context);
+    const res = await POST(postRequest({ expiresInDays: 7 }), context);
     const json = (await res.json()) as { token: string; url: string; link: { status: string } };
 
     expect(res.status).toBe(201);
@@ -96,22 +96,24 @@ describe('/api/namespaces/[handle]/join-links', () => {
   });
 
   it('[HAPPY] GET lists what POST minted, without the token', async () => {
-    const created = await POST(postRequest({ membership: 'admin', expiresInDays: 7 }), context);
-    const { token } = (await created.json()) as { token: string };
+    const created = await POST(postRequest({ expiresInDays: 7 }), context);
+    const { token, link } = (await created.json()) as { token: string; link: { id: string } };
 
     const res = await GET(
       new NextRequest('http://localhost/api/namespaces/alpha/join-links'),
       context,
     );
-    const json = (await res.json()) as { links: Array<{ membership: string }> };
+    const json = (await res.json()) as { links: Array<{ id: string }> };
 
     expect(res.status).toBe(200);
-    expect(json.links.some((link) => link.membership === 'admin')).toBe(true);
+    // The store is shared across this file's cases, so assert the minted link
+    // is present rather than that it is the only one.
+    expect(json.links.map((row) => row.id)).toContain(link.id);
     expect(JSON.stringify(json)).not.toContain(token);
   });
 
   it('[HAPPY] DELETE revokes the link the id names', async () => {
-    const created = await POST(postRequest({ membership: 'member', expiresInDays: 7 }), context);
+    const created = await POST(postRequest({ expiresInDays: 7 }), context);
     const { link } = (await created.json()) as { link: { id: string } };
 
     const res = await DELETE(
@@ -130,7 +132,7 @@ describe('/api/namespaces/[handle]/join-links', () => {
     mockResolveCallerIdentity.mockResolvedValue(memberCaller('alpha', 'member'));
 
     expect(
-      (await POST(postRequest({ membership: 'member', expiresInDays: 7 }), context)).status,
+      (await POST(postRequest({ expiresInDays: 7 }), context)).status,
     ).toBe(403);
     expect(
       (await GET(new NextRequest('http://localhost/api/namespaces/alpha/join-links'), context))
@@ -149,7 +151,7 @@ describe('/api/namespaces/[handle]/join-links', () => {
   });
 
   it('[VALIDATION] rejects an expiry outside the contract window', async () => {
-    const res = await POST(postRequest({ membership: 'member', expiresInDays: 3650 }), context);
+    const res = await POST(postRequest({ expiresInDays: 3650 }), context);
     expect(res.status).toBe(400);
   });
 
@@ -160,7 +162,7 @@ describe('/api/namespaces/[handle]/join-links', () => {
       displayName: 'Ada',
     });
 
-    const res = await POST(postRequest({ membership: 'member', expiresInDays: 7 }), context);
+    const res = await POST(postRequest({ expiresInDays: 7 }), context);
     expect(res.status).toBe(409);
   });
 });

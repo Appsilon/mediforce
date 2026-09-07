@@ -72,18 +72,28 @@ export async function seedMemberAndNotify(
     await scope.userProfiles.setMustChangePassword(uid, true);
   }
 
-  let emailSent = false;
-  // Defaults to the handle so a workspaces read failure cannot throw here. The
-  // membership is already committed at this point, so raising would 500 AFTER
-  // adding the member and skip the audit append — the caller would see a
-  // failure for a write that succeeded. Everything from here on is
-  // best-effort, and `emailSent: false` is how that is reported.
+  // Read outside the email branch — the caller returns this whether or not a
+  // notification service is wired, and `/join`'s success page shows it, so
+  // resolving it only when an email goes out would print the handle on a
+  // deployment with email disabled while the preview beside it printed the
+  // display name.
+  //
+  // Guarded on its own, because the membership is already committed by this
+  // point: raising here would 500 AFTER adding the member and skip the audit
+  // append, reporting failure for a write that succeeded. Everything past the
+  // seed is best-effort; the handle is a truthful fallback.
   let workspaceName = params.namespaceHandle;
+  try {
+    const namespace = await scope.workspaces.getNamespace(params.namespaceHandle);
+    workspaceName = namespace?.displayName ?? params.namespaceHandle;
+  } catch (lookupErr) {
+    console.error('[seed-member] Failed to read the workspace name:', lookupErr);
+  }
+
+  let emailSent = false;
   const notify = scope.system.inviteNotificationService;
   if (notify !== null) {
     try {
-      const namespace = await scope.workspaces.getNamespace(params.namespaceHandle);
-      workspaceName = namespace?.displayName ?? params.namespaceHandle;
       const baseUrl = await resolveConfiguredBaseUrl(scope);
       const inviterName =
         typeof params.inviterName === 'string' && params.inviterName.trim() !== ''

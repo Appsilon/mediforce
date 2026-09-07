@@ -2,16 +2,9 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { Database } from '../postgres/client';
 import { workspaceJoinLinks } from '../postgres/schema/workspace';
 
-/**
- * Membership a join link may grant. Never `owner` (ADR-0021 §3) — owner is the
- * seat that can delete the workspace, and no link handed to a room grants it.
- */
-export type JoinLinkMembership = 'admin' | 'member';
-
 export interface JoinLinkRecord {
   readonly id: string;
   readonly workspace: string;
-  readonly membership: JoinLinkMembership;
   readonly expiresAt: string;
   readonly maxUses: number | null;
   readonly uses: number;
@@ -24,7 +17,6 @@ export interface CreateJoinLinkRecord {
   readonly id: string;
   readonly workspace: string;
   readonly tokenHash: string;
-  readonly membership: JoinLinkMembership;
   readonly expiresAt: Date;
   readonly maxUses: number | null;
   readonly createdBy: string;
@@ -42,7 +34,6 @@ function toRecord(row: Row): JoinLinkRecord {
   return {
     id: row.id,
     workspace: row.workspace,
-    membership: row.membership as JoinLinkMembership,
     expiresAt: row.expiresAt.toISOString(),
     maxUses: row.maxUses,
     uses: row.uses,
@@ -82,7 +73,6 @@ export class PostgresJoinLinkService {
         id: record.id,
         workspace: record.workspace,
         tokenHash: record.tokenHash,
-        membership: record.membership,
         expiresAt: record.expiresAt,
         maxUses: record.maxUses,
         createdBy: record.createdBy,

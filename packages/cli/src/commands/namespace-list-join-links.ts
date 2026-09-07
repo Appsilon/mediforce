@@ -31,7 +31,6 @@ export const namespaceListJoinLinksCommand = defineCommand({
     const rows = result.links.map((link) => ({
       id: link.id,
       status: link.status,
-      grants: link.membership,
       uses: link.maxUses === null ? `${link.uses}` : `${link.uses}/${link.maxUses}`,
       expires: link.expiresAt,
     }));
@@ -39,14 +38,13 @@ export const namespaceListJoinLinksCommand = defineCommand({
     output.stdout(`Join links in ${args.handle} (${rows.length}):`);
     const idWidth = width('ID', rows, (row) => row.id);
     const statusWidth = width('STATUS', rows, (row) => row.status);
-    const grantsWidth = width('GRANTS', rows, (row) => row.grants);
     const usesWidth = width('USES', rows, (row) => row.uses);
-    const line = (id: string, status: string, grants: string, uses: string, expires: string): string =>
-      `  ${id.padEnd(idWidth)}  ${status.padEnd(statusWidth)}  ${grants.padEnd(grantsWidth)}  ${uses.padEnd(usesWidth)}  ${expires}`.trimEnd();
+    const line = (id: string, status: string, uses: string, expires: string): string =>
+      `  ${id.padEnd(idWidth)}  ${status.padEnd(statusWidth)}  ${uses.padEnd(usesWidth)}  ${expires}`.trimEnd();
 
-    output.stdout(line('ID', 'STATUS', 'GRANTS', 'USES', 'EXPIRES'));
+    output.stdout(line('ID', 'STATUS', 'USES', 'EXPIRES'));
     for (const row of rows) {
-      output.stdout(line(row.id, row.status, row.grants, row.uses, row.expires));
+      output.stdout(line(row.id, row.status, row.uses, row.expires));
     }
     return 0;
   },

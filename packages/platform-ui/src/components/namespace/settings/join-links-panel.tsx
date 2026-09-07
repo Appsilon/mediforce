@@ -31,7 +31,6 @@ export function JoinLinksPanel({
   const { links, loading, error: listError, refresh } = useJoinLinks(handle, canManageMembers);
 
   const [showForm, setShowForm] = useState(false);
-  const [membership, setMembership] = useState<'member' | 'admin'>('member');
   const [expiresInDays, setExpiresInDays] = useState(String(DEFAULT_JOIN_LINK_EXPIRY_DAYS));
   const [maxUses, setMaxUses] = useState('');
   const [creating, setCreating] = useState(false);
@@ -49,7 +48,6 @@ export function JoinLinksPanel({
       const parsedMaxUses = maxUses.trim() === '' ? undefined : Number.parseInt(maxUses, 10);
       const result = await mediforce.joinLinks.create({
         namespaceHandle: handle,
-        membership,
         expiresInDays: Number.parseInt(expiresInDays, 10),
         ...(parsedMaxUses !== undefined ? { maxUses: parsedMaxUses } : {}),
       });
@@ -105,8 +103,9 @@ export function JoinLinksPanel({
       </div>
 
       <p className="mb-4 text-xs text-muted-foreground">
-        Anyone with the link can join this workspace by entering their email. They are sent a
-        sign-in link — the join link never signs anybody in on its own, so it is safe on a slide.
+        Anyone with the link joins as a <strong>member</strong> by entering their email. They are
+        sent a sign-in link — the join link never signs anybody in on its own, so it is safe on a
+        slide. Promoting someone to admin stays a separate, deliberate step.
       </p>
 
       {minted !== null && (
@@ -156,20 +155,6 @@ export function JoinLinksPanel({
 
       {showForm && (
         <form onSubmit={handleCreate} className="mb-4 flex flex-col gap-3 rounded-lg border bg-card px-4 py-5">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="joinLinkMembership" className="text-sm font-medium">Joins as</label>
-            <select
-              id="joinLinkMembership"
-              value={membership}
-              onChange={(e) => setMembership(e.target.value as 'member' | 'admin')}
-              className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-              disabled={creating}
-            >
-              <option value="member">member</option>
-              <option value="admin">admin</option>
-            </select>
-          </div>
-
           <div className="flex flex-col gap-1.5">
             <label htmlFor="joinLinkExpiry" className="text-sm font-medium">Expires in (days)</label>
             <input
@@ -257,7 +242,6 @@ function JoinLinksTable({
         <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-medium">Status</th>
-            <th className="px-4 py-2 font-medium">Joins as</th>
             <th className="px-4 py-2 font-medium">Used</th>
             <th className="px-4 py-2 font-medium">Expires</th>
             <th className="px-4 py-2" />
@@ -267,7 +251,6 @@ function JoinLinksTable({
           {links.map((link) => (
             <tr key={link.id} className="border-b last:border-b-0">
               <td className="px-4 py-2">{STATUS_LABEL[link.status]}</td>
-              <td className="px-4 py-2">{link.membership}</td>
               <td className="px-4 py-2">
                 {link.maxUses === null ? link.uses : `${link.uses} / ${link.maxUses}`}
               </td>

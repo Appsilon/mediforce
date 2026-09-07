@@ -47,7 +47,7 @@ let plainMember: UserCaller;
 interface MintedLink {
   token: string;
   url: string;
-  link: { id: string; status: string; membership: string; maxUses: number | null; uses: number };
+  link: { id: string; status: string; maxUses: number | null; uses: number };
 }
 
 async function mint(
@@ -56,7 +56,7 @@ async function mint(
 ): Promise<MintedLink> {
   const res = await request.post(`/api/namespaces/${ORG_HANDLE}/join-links`, {
     headers: apiKeyHeaders(),
-    data: { membership: 'member', expiresInDays: 7, ...body },
+    data: { expiresInDays: 7, ...body },
   });
   expect(res.status(), await res.text()).toBe(201);
   return (await res.json()) as MintedLink;
@@ -110,6 +110,29 @@ async function uidForEmail(email: string): Promise<string | null> {
   return (await seededUser(email))?.id ?? null;
 }
 
+/**
+ * Drop any account and membership a previous run left for `email`.
+ *
+ * The suite runs against a shared database and reuses fixed addresses, and
+ * redemption is deliberately create-only — so a case asserting what a FIRST
+ * redemption writes has to start from nothing, or it silently asserts against
+ * a row some earlier run made.
+ */
+async function forgetUser(email: string): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error('DATABASE_URL must be set for this journey.');
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await sql`
+      DELETE FROM workspace_members
+      WHERE uid IN (SELECT id FROM auth_users WHERE email = ${email.toLowerCase()})
+    `;
+    await sql`DELETE FROM auth_users WHERE email = ${email.toLowerCase()}`;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
 test.describe('Workspace join links — API E2E', () => {
   test.beforeAll(async () => {
     callers = await setupMultiNamespaceCallers();
@@ -128,8 +151,9 @@ test.describe('Workspace join links — API E2E', () => {
   test('an unauthenticated visitor previews a link and redeems it into a real membership', async ({
     request,
   }) => {
-    const minted = await mint(request, { membership: 'admin' });
     const email = 'join-links-journey-newbie@mediforce.dev';
+    await forgetUser(email);
+    const minted = await mint(request);
 
     // No api key, no cookie — `proxy.ts` exempts `/api/join/*` because a joiner
     // cannot present a session while obtaining one.
@@ -138,7 +162,6 @@ test.describe('Workspace join links — API E2E', () => {
     expect(await preview.json()).toMatchObject({
       ok: true,
       namespaceHandle: ORG_HANDLE,
-      membership: 'admin',
     });
 
     const redeemed = await redeem(request, minted.token, email);
@@ -147,7 +170,7 @@ test.describe('Workspace join links — API E2E', () => {
 
     const user = await seededUser(email);
     expect(user, 'redeeming must seed an auth_users row').not.toBeNull();
-    expect(await membershipOf(user!.id)).toBe('admin');
+    expect(await membershipOf(user!.id)).toBe('member');
     // The link between this feature and the ADR-0021 §5 sign-in gate: a
     // redemption is a deliberate seeding, so it stamps `invited_at` and the
     // joiner can sign in whatever their email domain. Without this the joiner
@@ -178,8 +201,9 @@ test.describe('Workspace join links — API E2E', () => {
   test('a revoked link refuses redemption but keeps everyone it already admitted', async ({
     request,
   }) => {
-    const minted = await mint(request);
     const email = 'join-links-journey-revoked@mediforce.dev';
+    await forgetUser(email);
+    const minted = await mint(request);
 
     expect((await redeem(request, minted.token, email)).body.ok).toBe(true);
     const uid = await uidForEmail(email);
@@ -233,7 +257,7 @@ test.describe('Workspace join links — API E2E', () => {
    * that no layer above re-opens it.
    */
   test('redeeming against the owner’s address does not demote them', async ({ request }) => {
-    const minted = await mint(request, { membership: 'member' });
+    const minted = await mint(request);
 
     const redeemed = await redeem(request, minted.token, TEST_USER_EMAIL);
 
@@ -247,6 +271,7 @@ test.describe('Workspace join links — API E2E', () => {
     request,
   }) => {
     const email = 'join-links-journey-noescalate@mediforce.dev';
+    await forgetUser(email);
     const seeded = await request.post('/api/users/invite', {
       headers: apiKeyHeaders(),
       data: { email, namespaceHandle: ORG_HANDLE, role: 'member' },
@@ -254,7 +279,7 @@ test.describe('Workspace join links — API E2E', () => {
     expect(seeded.status(), await seeded.text()).toBe(201);
     const uid = (await seeded.json()).uid as string;
 
-    const minted = await mint(request, { membership: 'admin' });
+    const minted = await mint(request);
     expect((await redeem(request, minted.token, email)).body.ok).toBe(true);
 
     expect(await membershipOf(uid)).toBe('member');
@@ -265,7 +290,7 @@ test.describe('Workspace join links — API E2E', () => {
 
     const create = await request.post(`/api/namespaces/${ORG_HANDLE}/join-links`, {
       headers: sessionCookieHeaders(plainMember),
-      data: { membership: 'member', expiresInDays: 7 },
+      data: { expiresInDays: 7 },
     });
     const list = await request.get(`/api/namespaces/${ORG_HANDLE}/join-links`, {
       headers: sessionCookieHeaders(plainMember),
@@ -298,7 +323,7 @@ test.describe('Workspace join links — API E2E', () => {
   test('a personal workspace cannot mint one', async ({ request }) => {
     const res = await request.post(`/api/namespaces/${PERSONAL_HANDLE}/join-links`, {
       headers: apiKeyHeaders(),
-      data: { membership: 'member', expiresInDays: 7 },
+      data: { expiresInDays: 7 },
     });
 
     expect(res.status(), await res.text()).toBe(409);

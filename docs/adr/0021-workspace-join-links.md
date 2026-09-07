@@ -66,9 +66,21 @@ server-side. Organizations only — a workspace with `type === 'personal'` may
 not mint one. A personal workspace is one person's own space; strangers
 joining it is not a shape we want to have to reason about.
 
-**3. Membership is `member` or `admin`. Never `owner`.**
-The minting admin chooses; the default is `member`. Owner is the seat that can
-delete the workspace, and no link handed to a room grants it.
+**3. A link grants `member`. Always.**
+Not `owner` — that is the seat that can delete the workspace. And not `admin`
+either: **revised 2026-09-07, during implementation.** The original text let the
+minting admin choose between `member` and `admin`, on the reasoning that the
+admin is making a deliberate choice. They are, but not about a *person* — the
+mailbox round-trip decision 4 turns on controls who gets the **session**, never
+who gets the **seat**. Whoever holds the link types an address, so an `admin`
+link hands workspace administration — inviting, minting further links, managing
+members — to whoever photographs a slide. Nothing in the workshop motion that
+justifies this ADR needs an admin cohort, and the choice's whole value was
+saving a promotion that is one command.
+
+So there is no membership dimension: no input, no column, and nothing for a
+future reader to wonder about. Promoting someone stays a deliberate act by a
+named admin (`namespace set-member-role`).
 
 **4. Redeeming seeds an account; it does not open a session.**
 `/join/<token>` validates the token, collects an email, and then calls the
@@ -182,6 +194,12 @@ work up has the tool already built.
 
 Implemented 2026-09-07. Deviations and additions worth recording:
 
+- **Decision 3 narrowed to `member`-only during implementation**, for the
+  reasoning now written into the decision itself. The membership column,
+  contract field, CHECK constraint, UI select and CLI flag all came out with
+  it; migration `0047` was edited in place rather than stacked on, since it had
+  not merged anywhere (`platform-infra/README.md`: forward-only and immutable
+  *once merged*).
 - **The settings placement differs from decision 2.** §2 says **Create join
   link** "sits beside" **Invite user**. It ships as its own **Join links**
   section directly below Members, because the feature needs a list (which link
@@ -279,14 +297,15 @@ Implemented 2026-09-07. Deviations and additions worth recording:
   handed any link holder three escalations this ADR never granted:
 
   1. **Demoting the workspace owner.** `seedInvite` upserts the membership row
-     (`onConflictDoUpdate { role }`), so typing the owner's address at a
-     `member` link set their `workspace_members.role` to `member`. Reproduced
-     against Postgres before the fix. It inverts decision 3 — a link that may
-     never *grant* owner could nonetheless *remove* it — and it did so silently,
+     (`onConflictDoUpdate { role }`), so typing the owner's address at a link
+     set their `workspace_members.role` to `member`. Reproduced against
+     Postgres before the fix. It inverts decision 3 — a link that may never
+     *grant* owner could nonetheless *remove* it — and it did so silently,
      because the anti-enumeration property makes the response identical either
      way.
-  2. **Promoting an existing member**, by redeeming an `admin` link against an
-     address already in the workspace.
+  2. **Promoting an existing member**, back when a link could carry `admin`.
+     Decision 3 has since removed that dimension entirely, but the guard stays:
+     a redemption has no business rewriting a seat in either direction.
   3. **Re-admitting an allowlist-blocked account**, by stamping `invited_at`
      (the decision-5 column above) on a row that already existed — reaching
      around the very control that column was introduced to preserve.

@@ -81,11 +81,7 @@ export function JoinFlow({ token }: { token: string }) {
   }
 
   return (
-    <JoinForm
-      token={token}
-      workspaceName={preview.workspaceName}
-      membership={preview.membership}
-    />
+    <JoinForm token={token} workspaceName={preview.workspaceName} />
   );
 }
 
@@ -137,15 +133,7 @@ function Notice({
   );
 }
 
-function JoinForm({
-  token,
-  workspaceName,
-  membership,
-}: {
-  token: string;
-  workspaceName: string;
-  membership: 'member' | 'admin';
-}) {
+function JoinForm({ token, workspaceName }: { token: string; workspaceName: string }) {
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -212,7 +200,7 @@ function JoinForm({
       <div className="space-y-1">
         <h1 className="font-display text-lg font-semibold">Join {workspaceName}</h1>
         <p className="text-sm text-muted-foreground">
-          You will join as {membership}. Enter your email and we will send you a sign-in link.
+          Enter your email and we will send you a sign-in link. You will join as a member.
         </p>
       </div>
 

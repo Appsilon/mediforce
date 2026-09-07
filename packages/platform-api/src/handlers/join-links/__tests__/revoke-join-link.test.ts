@@ -58,7 +58,7 @@ describe('revokeJoinLink handler', () => {
   it('closes a live link and audits it', async () => {
     const scope = scopeFor();
     const created = await createJoinLink(
-      { namespaceHandle: 'alpha', membership: 'member', expiresInDays: 7 },
+      { namespaceHandle: 'alpha', expiresInDays: 7 },
       scope,
     );
 
@@ -73,7 +73,7 @@ describe('revokeJoinLink handler', () => {
   it('stops the link from being redeemed afterwards', async () => {
     const scope = scopeFor();
     const created = await createJoinLink(
-      { namespaceHandle: 'alpha', membership: 'member', expiresInDays: 7 },
+      { namespaceHandle: 'alpha', expiresInDays: 7 },
       scope,
     );
     await revokeJoinLink({ namespaceHandle: 'alpha', id: created.link.id }, scope);
@@ -88,7 +88,7 @@ describe('revokeJoinLink handler', () => {
   it('404s on a second revoke — there is nothing live left to close', async () => {
     const scope = scopeFor();
     const created = await createJoinLink(
-      { namespaceHandle: 'alpha', membership: 'member', expiresInDays: 7 },
+      { namespaceHandle: 'alpha', expiresInDays: 7 },
       scope,
     );
     await revokeJoinLink({ namespaceHandle: 'alpha', id: created.link.id }, scope);
@@ -120,7 +120,7 @@ describe('revokeJoinLink handler', () => {
       inviteService,
     });
     const created = await createJoinLink(
-      { namespaceHandle: 'beta', membership: 'member', expiresInDays: 7 },
+      { namespaceHandle: 'beta', expiresInDays: 7 },
       scope,
     );
 

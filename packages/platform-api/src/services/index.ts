@@ -26,7 +26,6 @@ export {
   buildJoinUrl,
   joinLinkStatus,
   type JoinLink,
-  type JoinLinkMembership,
   type JoinLinkStatus,
   type JoinLinkService,
   type JoinLinkLookup,

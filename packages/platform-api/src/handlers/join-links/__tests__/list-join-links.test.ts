@@ -48,11 +48,11 @@ describe('listJoinLinks handler', () => {
   it('keeps revoked links in the list — a closed entrance is the answer to "was it closed?"', async () => {
     const scope = scopeFor();
     const live = await createJoinLink(
-      { namespaceHandle: 'alpha', membership: 'member', expiresInDays: 7 },
+      { namespaceHandle: 'alpha', expiresInDays: 7 },
       scope,
     );
     const closed = await createJoinLink(
-      { namespaceHandle: 'alpha', membership: 'admin', expiresInDays: 7 },
+      { namespaceHandle: 'alpha', expiresInDays: 7 },
       scope,
     );
     await revokeJoinLink({ namespaceHandle: 'alpha', id: closed.link.id }, scope);
@@ -66,7 +66,7 @@ describe('listJoinLinks handler', () => {
   it('never returns a token or its hash', async () => {
     const scope = scopeFor();
     const created = await createJoinLink(
-      { namespaceHandle: 'alpha', membership: 'member', expiresInDays: 7 },
+      { namespaceHandle: 'alpha', expiresInDays: 7 },
       scope,
     );
 

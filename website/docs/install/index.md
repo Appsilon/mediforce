@@ -98,13 +98,17 @@ cohort where you do not, mint a **join link** from **Workspace settings →
 Members → Join links**, or from the CLI:
 
 ```bash
-mediforce namespace create-join-link acme --membership member --expires-in-days 7 --max-uses 30
+mediforce namespace create-join-link acme --expires-in-days 7 --max-uses 30
 ```
 
 The link is printed once — only its hash is stored — and it is safe on a slide
 or in a QR code, because redeeming it does **not** sign anybody in. Whoever
 opens it enters their email and receives the same activation link an invite
 sends, so everyone who ends up in the workspace has a mailbox they control.
+
+Everyone joins as a plain **member**. A link cannot grant admin: it controls who
+gets a session, not who you trust, so promoting someone stays a separate
+decision (`mediforce namespace set-member-role acme <uid> admin`).
 
 `mediforce namespace list-join-links acme` shows which links are still live and
 how many people used each; `mediforce namespace revoke-join-link acme <id>`

@@ -49,9 +49,9 @@ describe('previewJoinLink handler', () => {
     return createTestScope({ namespaceRepo, auditRepo, joinLinkService });
   }
 
-  it('names the workspace and the membership a live token grants', async () => {
+  it('names the workspace a live token opens', async () => {
     const created = await createJoinLink(
-      { namespaceHandle: 'alpha', membership: 'admin', expiresInDays: 7 },
+      { namespaceHandle: 'alpha', expiresInDays: 7 },
       adminScope(),
     );
 
@@ -59,7 +59,6 @@ describe('previewJoinLink handler', () => {
       ok: true,
       namespaceHandle: 'alpha',
       workspaceName: 'Alpha Labs',
-      membership: 'admin',
     });
   });
 
@@ -73,7 +72,7 @@ describe('previewJoinLink handler', () => {
   it('names a revoked token plainly — the holder has the secret, so this leaks nothing', async () => {
     const scope = adminScope();
     const created = await createJoinLink(
-      { namespaceHandle: 'alpha', membership: 'member', expiresInDays: 7 },
+      { namespaceHandle: 'alpha', expiresInDays: 7 },
       scope,
     );
     await revokeJoinLink({ namespaceHandle: 'alpha', id: created.link.id }, scope);
@@ -87,7 +86,7 @@ describe('previewJoinLink handler', () => {
   it('consumes nothing — opening the page must not spend a seat', async () => {
     const scope = adminScope();
     const created = await createJoinLink(
-      { namespaceHandle: 'alpha', membership: 'member', expiresInDays: 7, maxUses: 1 },
+      { namespaceHandle: 'alpha', expiresInDays: 7, maxUses: 1 },
       scope,
     );
 
@@ -101,7 +100,7 @@ describe('previewJoinLink handler', () => {
 
   it('falls back to the handle when the workspace has no display name to read', async () => {
     const created = await createJoinLink(
-      { namespaceHandle: 'alpha', membership: 'member', expiresInDays: 7 },
+      { namespaceHandle: 'alpha', expiresInDays: 7 },
       adminScope(),
     );
     namespaceRepo.namespaces.delete('alpha');
@@ -110,7 +109,6 @@ describe('previewJoinLink handler', () => {
       ok: true,
       namespaceHandle: 'alpha',
       workspaceName: 'alpha',
-      membership: 'member',
     });
   });
 
@@ -125,7 +123,7 @@ describe('previewJoinLink handler', () => {
    */
   it('ignores scope.caller — the token is the authorization', async () => {
     const created = await createJoinLink(
-      { namespaceHandle: 'alpha', membership: 'member', expiresInDays: 7 },
+      { namespaceHandle: 'alpha', expiresInDays: 7 },
       adminScope(),
     );
 

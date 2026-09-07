@@ -14,15 +14,20 @@ const NamespaceHandleSchema = z
   .min(1)
   .regex(/^[a-z0-9-]+$/, 'namespaceHandle must be lowercase alphanumeric with hyphens only');
 
-/** Never `owner`: no link handed to a room grants the seat that can delete the workspace. */
-export const JoinLinkMembershipSchema = z.enum(['member', 'admin']);
+/**
+ * The seat a redemption grants, always. Not an input and not a stored column —
+ * a link handed to a room, or photographed off a slide, must not be able to
+ * confer workspace administration on whoever types an address into a public
+ * form (ADR-0021 §3). Promoting someone stays a deliberate act by a named
+ * admin.
+ */
+export const JOIN_LINK_MEMBERSHIP = 'member';
 
 export const JoinLinkStatusSchema = z.enum(['active', 'revoked', 'expired', 'exhausted']);
 
 export const JoinLinkSchema = z.object({
   id: z.string(),
   namespaceHandle: z.string(),
-  membership: JoinLinkMembershipSchema,
   expiresAt: z.string(),
   /** `null` = uncapped; the expiry is then the only limit. */
   maxUses: z.number().int().nullable(),
@@ -47,7 +52,6 @@ export const MAX_JOIN_LINK_EXPIRY_DAYS = 90;
 export const CreateJoinLinkInputSchema = z
   .object({
     namespaceHandle: NamespaceHandleSchema,
-    membership: JoinLinkMembershipSchema.optional().default('member'),
     expiresInDays: z
       .number()
       .int()
@@ -110,7 +114,6 @@ export const PreviewJoinLinkOutputSchema = z.discriminatedUnion('ok', [
     ok: z.literal(true),
     namespaceHandle: z.string(),
     workspaceName: z.string(),
-    membership: JoinLinkMembershipSchema,
   }),
   z.object({ ok: z.literal(false), reason: JoinLinkRejectionSchema }),
 ]);

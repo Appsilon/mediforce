@@ -76,6 +76,9 @@ export const workspaceAutojoinBlocks = pgTable(
  *
  * Deliberately not `authVerificationTokens`: those are single-use and bound to
  * one identifier, which is the opposite of what a link handed to a cohort is.
+ *
+ * No `membership` column: a link always grants `member` (ADR-0021 §3), so the
+ * seat is not a dimension of the link and is not stored as one.
  */
 export const workspaceJoinLinks = pgTable(
   'workspace_join_links',
@@ -85,8 +88,6 @@ export const workspaceJoinLinks = pgTable(
       .notNull()
       .references(() => workspaces.handle, { onDelete: 'cascade' }),
     tokenHash: text('token_hash').notNull().unique(),
-    /** `admin` or `member` — never `owner` (ADR-0021 §3). */
-    membership: text('membership').notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     /** `null` = uncapped; the expiry is then the only limit. */
     maxUses: integer('max_uses'),
@@ -98,12 +99,7 @@ export const workspaceJoinLinks = pgTable(
   (table) => ({
     workspaceIdx: index('workspace_join_links_workspace_idx').on(table.workspace),
     // Declared here as well as in migration 0047 so `drizzle-kit generate` does
-    // not read them as drift and re-emit the DDL. They make ADR-0021 §3
-    // unrepresentable at rest rather than only in the contract.
-    membershipCheck: check(
-      'workspace_join_links_membership_check',
-      sql`${table.membership} IN ('admin', 'member')`,
-    ),
+    // not read it as drift and re-emit the DDL.
     maxUsesCheck: check(
       'workspace_join_links_max_uses_check',
       sql`${table.maxUses} IS NULL OR ${table.maxUses} > 0`,

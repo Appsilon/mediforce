@@ -204,6 +204,43 @@ describe('seedMemberAndNotify', () => {
     );
   });
 
+  it('resolves the workspace name even with no notification service wired', async () => {
+    // `/join`'s success page shows this, and the preview beside it always has
+    // the display name — printing the handle on an email-disabled deployment
+    // would make the two disagree about what the workspace is called.
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      inviteService: inviteServiceReturning({ uid: 'uid-new', isExisting: false }),
+      inviteNotificationService: null,
+    });
+
+    const result = await seedMemberAndNotify(baseParams, scope);
+
+    expect(result.workspaceName).toBe('Alpha Labs');
+    expect(result.emailSent).toBe(false);
+  });
+
+  it('falls back to the handle when the workspace read fails', async () => {
+    // The membership is committed by this point, so a failed read must not
+    // throw — that would 500 after a successful write and skip the audit.
+    const failingRepo = new InMemoryNamespaceRepo();
+    failingRepo.getNamespace = async () => {
+      throw new Error('workspaces unavailable');
+    };
+    const scope = createTestScope({
+      namespaceRepo: failingRepo,
+      auditRepo,
+      inviteService: inviteServiceReturning({ uid: 'uid-new', isExisting: false }),
+      inviteNotificationService: recordingNotifier(),
+    });
+
+    const result = await seedMemberAndNotify(baseParams, scope);
+
+    expect(result.workspaceName).toBe('alpha');
+    expect(result.uid).toBe('uid-new');
+  });
+
   it('refuses when the deployment is not wired for invites', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo, inviteService: null });
 

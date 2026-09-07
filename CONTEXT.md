@@ -261,8 +261,11 @@ _Avoid_: "Role" alone — that's overloaded with process-domain roles below.
 A secret an owner or admin mints from workspace settings and hands to a room —
 a workshop, a demo, a pilot cohort — for people whose addresses they do not
 have in advance ([ADR-0021](docs/adr/0021-workspace-join-links.md)). Redeeming
-one at `/join/<token>` grants a **Membership** (`member` or `admin`, never
-`owner`) and nothing else — never a **Role**. It does **not** open a Session:
+one at `/join/<token>` grants the plain `member` **Membership** and nothing
+else — never `admin`, never `owner`, and never a **Role**. The seat is not a
+property of the link: whoever holds it types an address, so the mailbox check
+controls who gets the *session*, never who gets the *seat*. Promoting someone
+stays a deliberate act by a named admin. It does **not** open a Session:
 redemption seeds the account and sends the same activation email an invite
 does, so a link on a slide, or a photograph of that slide, is not an account.
 Organizations only; a Join Link carries an expiry and an optional use cap, and

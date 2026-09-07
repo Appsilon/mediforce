@@ -1,5 +1,5 @@
 import { DEFAULT_JOIN_LINK_EXPIRY_DAYS } from '@mediforce/platform-api/contract';
-import { defineCommand, enumArg } from '../define-command';
+import { defineCommand } from '../define-command';
 import { printJson, printKv } from '../output';
 
 /**
@@ -12,16 +12,13 @@ import { printJson, printKv } from '../output';
  *
  * Redeeming the link does not sign anybody in: it seeds their account and
  * emails them the same activation link an invite sends. The link on the slide
- * is safe to photograph.
+ * is safe to photograph, and it only ever grants the plain `member` seat.
  */
 export const namespaceCreateJoinLinkCommand = defineCommand({
   name: 'mediforce namespace create-join-link',
   description: 'Mint a join link for a workspace. Printed once — the token is never recoverable.',
   args: {
     handle: { type: 'positional', required: true, description: 'Workspace handle (organizations only)' },
-    membership: enumArg(['member', 'admin'] as const, {
-      description: 'Membership the link grants (default: member). Never owner.',
-    }),
     'expires-in-days': { type: 'string', description: `Validity window in days, 1-90 (default: ${DEFAULT_JOIN_LINK_EXPIRY_DAYS})` },
     'max-uses': { type: 'string', description: 'Cap on redemptions (default: uncapped)' },
   },
@@ -39,7 +36,6 @@ export const namespaceCreateJoinLinkCommand = defineCommand({
 
     const result = await mediforce.joinLinks.create({
       namespaceHandle: args.handle,
-      membership: args.membership ?? 'member',
       expiresInDays: expiresInDays ?? DEFAULT_JOIN_LINK_EXPIRY_DAYS,
       ...(maxUses !== undefined ? { maxUses } : {}),
     });
@@ -53,7 +49,7 @@ export const namespaceCreateJoinLinkCommand = defineCommand({
     output.stdout('');
     printKv(output, [
       ['id', result.link.id],
-      ['grants', result.link.membership],
+      ['grants', 'member'],
       ['expires', result.link.expiresAt],
       ['max uses', result.link.maxUses === null ? 'uncapped' : String(result.link.maxUses)],
     ]);

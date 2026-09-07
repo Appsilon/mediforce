@@ -1,4 +1,5 @@
 import type { CallerScope } from '../../repositories/index';
+import { JOIN_LINK_MEMBERSHIP } from '../../contract/join-links';
 import type { RedeemJoinLinkInput, RedeemJoinLinkOutput } from '../../contract/join-links';
 import { hashJoinToken } from '../../services/join-link';
 import { seedMemberAndNotify } from '../users/seed-member';
@@ -54,7 +55,9 @@ export async function redeemJoinLink(
       email,
       ...(displayName !== undefined ? { displayName } : {}),
       namespaceHandle: link.workspace,
-      membership: link.membership,
+      // Always the plain `member` seat (ADR-0021 §3) — never read off the
+      // link, because there is nothing on it to read.
+      membership: JOIN_LINK_MEMBERSHIP,
       // The email is whatever the form was given, by someone holding a shared
       // secret and nothing else. The seed may therefore only CREATE: it must
       // not rewrite an existing seat (a `member` link would otherwise demote
@@ -72,7 +75,7 @@ export async function redeemJoinLink(
     actorType: 'user',
     actorRole: 'operator',
     action: 'invitation.link_redeemed',
-    description: `Join link '${link.id}' redeemed by '${email}' in namespace '${link.workspace}' as ${link.membership}`,
+    description: `Join link '${link.id}' redeemed by '${email}' in namespace '${link.workspace}'`,
     timestamp: now.toISOString(),
     // The link id, never the token — an audit reader must not be able to
     // redeem what they are auditing.

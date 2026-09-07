@@ -644,7 +644,7 @@ export {
   JoinLinkSchema,
   DEFAULT_JOIN_LINK_EXPIRY_DAYS,
   MAX_JOIN_LINK_EXPIRY_DAYS,
-  JoinLinkMembershipSchema,
+  JOIN_LINK_MEMBERSHIP,
   JoinLinkStatusSchema,
   JoinLinkRejectionSchema,
   CreateJoinLinkInputSchema,

@@ -12,7 +12,6 @@ function link(overrides: Partial<JoinLink> = {}): JoinLink {
   return {
     id: 'link-1',
     workspace: 'alpha',
-    membership: 'member',
     expiresAt: new Date(NOW.getTime() + HOUR).toISOString(),
     maxUses: null,
     uses: 0,
@@ -41,7 +40,6 @@ describe('toJoinLinkView', () => {
     expect(toJoinLinkView(link(), NOW)).toEqual({
       id: 'link-1',
       namespaceHandle: 'alpha',
-      membership: 'member',
       expiresAt: new Date(NOW.getTime() + HOUR).toISOString(),
       maxUses: null,
       uses: 0,

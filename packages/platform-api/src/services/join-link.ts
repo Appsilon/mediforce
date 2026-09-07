@@ -3,7 +3,8 @@ import { createHash, randomBytes } from 'node:crypto';
 /**
  * Workspace join links (ADR-0021).
  *
- * A join link authorizes MEMBERSHIP; the mailbox still authorizes the session.
+ * A join link authorizes MEMBERSHIP — always the plain `member` seat (ADR-0021
+ * §3) — while the mailbox still authorizes the session.
  * Redeeming one seeds an account and sends the ordinary activation email, so a
  * link on a slide — or a photograph of that slide — can never be replayed into
  * anybody's account.
@@ -12,13 +13,9 @@ import { createHash, randomBytes } from 'node:crypto';
  * adapter (`PostgresJoinLinkService`) is wired through `CallerScope.system`.
  */
 
-/** Membership a link may grant. Never `owner` (ADR-0021 §3). */
-export type JoinLinkMembership = 'admin' | 'member';
-
 export interface JoinLink {
   readonly id: string;
   readonly workspace: string;
-  readonly membership: JoinLinkMembership;
   /** ISO-8601. */
   readonly expiresAt: string;
   /** `null` = uncapped; the expiry is then the only limit. */
@@ -35,7 +32,6 @@ export interface CreateJoinLinkRecord {
   readonly id: string;
   readonly workspace: string;
   readonly tokenHash: string;
-  readonly membership: JoinLinkMembership;
   readonly expiresAt: Date;
   readonly maxUses: number | null;
   readonly createdBy: string;

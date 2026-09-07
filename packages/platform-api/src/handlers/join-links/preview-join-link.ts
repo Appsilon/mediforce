@@ -32,6 +32,5 @@ export async function previewJoinLink(
     ok: true,
     namespaceHandle: lookup.link.workspace,
     workspaceName: namespace?.displayName ?? lookup.link.workspace,
-    membership: lookup.link.membership,
   };
 }

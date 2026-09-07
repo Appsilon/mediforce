@@ -17,9 +17,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  *      `canManageMembers` gate that reveals **Invite user** (apiKey bypass).
  *   2. Organizations only. A personal workspace is one person's own space;
  *      strangers joining it is not a shape we want to have to reason about.
- *   3. Membership is `member` or `admin`, defaulting to `member`. `owner` is
- *      unrepresentable in the contract — it is the seat that can delete the
- *      workspace, and no link handed to a room grants it.
+ *   3. The link grants the plain `member` seat, always — there is no choice to
+ *      make and no column to store it in. A link handed to a room, or
+ *      photographed off a slide, must not be able to confer workspace
+ *      administration on whoever types an address into a public form.
  *   4. Mint a 32-byte token, store ONLY its SHA-256, and return the plaintext
  *      exactly once. A lost token is re-minted, never recovered.
  *   5. Append `invitation.link_created` to the audit log — recording the link
@@ -49,7 +50,6 @@ export async function createJoinLink(
     id: randomUUID(),
     workspace: input.namespaceHandle,
     tokenHash: hashJoinToken(token),
-    membership: input.membership,
     expiresAt: new Date(now.getTime() + input.expiresInDays * DAY_MS),
     maxUses: input.maxUses ?? null,
     createdBy: actor.actorId,
@@ -63,11 +63,10 @@ export async function createJoinLink(
   await scope.system.audit.append({
     ...actor,
     action: 'invitation.link_created',
-    description: `Join link created for namespace '${input.namespaceHandle}' granting ${input.membership}`,
+    description: `Join link created for namespace '${input.namespaceHandle}'`,
     timestamp: now.toISOString(),
     inputSnapshot: {
       namespaceHandle: input.namespaceHandle,
-      membership: input.membership,
       expiresInDays: input.expiresInDays,
       maxUses: input.maxUses ?? null,
     },

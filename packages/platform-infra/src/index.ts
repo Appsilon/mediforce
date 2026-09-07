@@ -10,7 +10,6 @@ export type {
   JoinLinkRecord,
   JoinLinkLookup,
   JoinLinkRejection,
-  JoinLinkMembership,
   CreateJoinLinkRecord,
 } from './auth/postgres-join-link-service';
 export { buildUserRolesSeed } from './auth/seed-user-roles';

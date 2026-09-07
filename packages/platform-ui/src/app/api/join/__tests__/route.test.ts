@@ -73,7 +73,6 @@ async function mintToken(options: { maxUses?: number } = {}): Promise<string> {
   const { token } = await createJoinLink(
     {
       namespaceHandle: 'alpha',
-      membership: 'member',
       expiresInDays: 7,
       ...(options.maxUses !== undefined ? { maxUses: options.maxUses } : {}),
     },
@@ -106,7 +105,6 @@ describe('public /api/join routes', () => {
       ok: true,
       namespaceHandle: 'alpha',
       workspaceName: 'Alpha Labs',
-      membership: 'member',
     });
   });
 

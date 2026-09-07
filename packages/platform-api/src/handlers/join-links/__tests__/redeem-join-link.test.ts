@@ -106,11 +106,10 @@ describe('redeemJoinLink handler', () => {
     });
   }
 
-  async function mint(options: { maxUses?: number; membership?: 'member' | 'admin' } = {}) {
+  async function mint(options: { maxUses?: number } = {}) {
     return createJoinLink(
       {
         namespaceHandle: 'alpha',
-        membership: options.membership ?? 'member',
         expiresInDays: 7,
         ...(options.maxUses !== undefined ? { maxUses: options.maxUses } : {}),
       },
@@ -118,8 +117,8 @@ describe('redeemJoinLink handler', () => {
     );
   }
 
-  it('seeds the account with the link’s workspace and membership, and consumes a use', async () => {
-    const created = await mint({ membership: 'admin', maxUses: 5 });
+  it('seeds the account into the link’s workspace as a member, and consumes a use', async () => {
+    const created = await mint({ maxUses: 5 });
     const inviteService = recordingInviteService();
     const scope = publicScope({ inviteService });
 
@@ -139,7 +138,8 @@ describe('redeemJoinLink handler', () => {
         email: 'newbie@example.test',
         displayName: 'Newbie',
         workspaceHandle: 'alpha',
-        membership: 'admin',
+        // Always the plain seat, whatever the link (ADR-0021 §3).
+        membership: 'member',
         roles: [],
         // The email came from a public form, held together by nothing but a
         // shared secret, so the seed may only create.

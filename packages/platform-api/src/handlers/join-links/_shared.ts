@@ -30,7 +30,6 @@ export function toJoinLinkView(link: JoinLink, now: Date): JoinLinkView {
   return {
     id: link.id,
     namespaceHandle: link.workspace,
-    membership: link.membership,
     expiresAt: link.expiresAt,
     maxUses: link.maxUses,
     uses: link.uses,
