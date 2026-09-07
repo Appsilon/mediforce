@@ -125,6 +125,9 @@ export default function WorkflowDefinitionVersionPage() {
         }),
         { namespace: definition.namespace },
       );
+      // The version that just registered carries them, so they are no longer
+      // pending — without this the page reports unsaved changes forever.
+      setPastedFields({});
       if (setAsDefault) {
         await mediforceSilent.workflows.setDefaultVersion({
           name: definition.name,
@@ -310,7 +313,7 @@ export default function WorkflowDefinitionVersionPage() {
         namespace={handle}
         workflowExternalSkillsRepo={definition.externalSkillsRepo}
         wdJsonFields={{ ...(wdJsonFields as Record<string, unknown>), ...pastedFields }}
-        onNonGraphFieldsChange={(fields) => setPastedFields((prev) => ({ ...prev, ...fields }))}
+        onNonGraphFieldsChange={setPastedFields}
         onChange={handleCanvasChange}
         onDirtyChange={setCanvasDirty}
         stepErrors={stepErrors}

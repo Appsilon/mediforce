@@ -174,6 +174,9 @@ const TIP = {
   actionKind:              'Action type: http (outbound API call), reshape (update workflow variables), email, spawn (run another workflow) or wait (pause). Fixed at creation.',
   actionTargets:           'The workflow(s) this step starts. Each target names a registered workflow; leave the version unset to use its default.',
   actionForEach:           'Interpolation path to an array — the step spawns one child per element, with ${item} bound to it. Leave empty to spawn each target once.',
+  // Written explicitly rather than as absence, unlike the optional `allowSkip`
+  // and `noteField`: `SpawnActionConfigSchema` gives this a `.default(true)`, so
+  // its parsed type is a required boolean.
   actionContinueOnSpawnError: 'On by default: one child failing to start does not fail this step. Turn off to fail the step on the first error.',
   actionWaitDuration:      'How long to pause. Fields combine, so 1 hour 30 minutes is hours 1 + minutes 30.',
   actionWaitDeadline:      'Absolute time to wait until — an ISO timestamp, or an interpolation like ${steps.x.dueAt}. Takes precedence over a duration.',

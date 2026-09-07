@@ -337,7 +337,7 @@ export default function NewWorkflowPage() {
         initialTransitions={TEMPLATE_TRANSITIONS}
         namespace={effectiveNamespace}
         wdJsonFields={{ ...wdJsonFields, ...pastedFields }}
-        onNonGraphFieldsChange={(fields) => setPastedFields((prev) => ({ ...prev, ...fields }))}
+        onNonGraphFieldsChange={setPastedFields}
         onChange={handleCanvasChange}
         onDirtyChange={setCanvasDirty}
         stepErrors={stepErrors}
