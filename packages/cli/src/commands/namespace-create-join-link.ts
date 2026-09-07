@@ -1,6 +1,6 @@
 import { DEFAULT_JOIN_LINK_EXPIRY_DAYS } from '@mediforce/platform-api/contract';
-import { defineCommand } from '../define-command';
-import { printJson, printKv } from '../output';
+import { defineCommand, parsePositiveIntArg } from '../define-command';
+import { printError, printJson, printKv } from '../output';
 
 /**
  * Mint a workspace join link (ADR-0021).
@@ -23,14 +23,22 @@ export const namespaceCreateJoinLinkCommand = defineCommand({
     'max-uses': { type: 'string', description: 'Cap on redemptions (default: uncapped)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
-    const expiresInDays = parsePositiveInt(args['expires-in-days']);
+    const expiresInDays = parsePositiveIntArg(args['expires-in-days']);
     if (expiresInDays === 'invalid') {
-      output.stderr(`Invalid --expires-in-days '${args['expires-in-days']}' — expected a positive integer`);
+      printError(
+        output,
+        { error: `--expires-in-days must be a positive integer, got '${String(args['expires-in-days'])}'` },
+        jsonMode,
+      );
       return 2;
     }
-    const maxUses = parsePositiveInt(args['max-uses']);
+    const maxUses = parsePositiveIntArg(args['max-uses']);
     if (maxUses === 'invalid') {
-      output.stderr(`Invalid --max-uses '${args['max-uses']}' — expected a positive integer`);
+      printError(
+        output,
+        { error: `--max-uses must be a positive integer, got '${String(args['max-uses'])}'` },
+        jsonMode,
+      );
       return 2;
     }
 
@@ -58,10 +66,3 @@ export const namespaceCreateJoinLinkCommand = defineCommand({
     return 0;
   },
 });
-
-/** `undefined` = flag absent, `'invalid'` = present but not a positive integer. */
-function parsePositiveInt(raw: unknown): number | undefined | 'invalid' {
-  if (typeof raw !== 'string' || raw === '') return undefined;
-  const value = Number.parseInt(raw, 10);
-  return Number.isInteger(value) && value > 0 && String(value) === raw.trim() ? value : 'invalid';
-}

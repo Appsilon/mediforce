@@ -267,7 +267,7 @@ test.describe('Workspace join links — API E2E', () => {
     expect(await membershipOf(TEST_USER_ID)).toBe('owner');
   });
 
-  test('redeeming an admin link against an existing member does not promote them', async ({
+  test('redeeming against an existing member leaves their seat untouched', async ({
     request,
   }) => {
     const email = 'join-links-journey-noescalate@mediforce.dev';
