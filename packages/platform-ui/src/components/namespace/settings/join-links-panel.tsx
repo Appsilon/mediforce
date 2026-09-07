@@ -119,6 +119,7 @@ export function JoinLinksPanel({
               <div className="flex items-center gap-2">
                 <input
                   readOnly
+                  aria-label="Join link URL"
                   value={minted.url}
                   onFocus={(e) => e.currentTarget.select()}
                   className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1.5 font-mono text-xs"
@@ -238,7 +239,7 @@ function JoinLinksTable({
 }) {
   return (
     <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full text-sm">
+      <table aria-label="Join links" className="w-full text-sm">
         <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-medium">Status</th>
@@ -264,6 +265,7 @@ function JoinLinksTable({
                   <button
                     type="button"
                     onClick={() => onRevoke(link.id)}
+                    aria-label={`Revoke join link ${link.id}`}
                     className="text-xs font-medium text-destructive hover:underline"
                   >
                     Revoke
