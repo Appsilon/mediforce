@@ -109,6 +109,11 @@ export default function NewWorkflowPage() {
   const routeIsWritable = namespacesLoading || namespaces.some((ns) => ns.handle === handle);
   const effectiveNamespace = namespace || (routeIsWritable ? handle : namespaces[0]?.handle ?? handle);
 
+  // Fields outside the graph that a pasted definition carried — the only way
+  // to declare them when creating a workflow, since there is no settings form
+  // yet. Merged under the page's own fields on register.
+  const [pastedFields, setPastedFields] = useState<Record<string, unknown>>({});
+
   const registerCurrentCanvas = useCallback(async (versionTitle: string) => {
     const steps = currentStepsRef.current;
     const transitions = currentTransitionsRef.current;
@@ -139,6 +144,7 @@ export default function NewWorkflowPage() {
     try {
       const result = await mediforceSilent.workflows.register(
         {
+          ...pastedFields,
           name: workflowId,
           title: versionTitle || undefined,
           description: description.trim() || undefined,
@@ -162,7 +168,7 @@ export default function NewWorkflowPage() {
       toast({ title: 'Save failed', description: message, variant: 'error' });
       throw err;
     }
-  }, [workflowName, effectiveNamespace, description, toast]);
+  }, [workflowName, effectiveNamespace, description, pastedFields, toast]);
 
   const handleSave = useCallback(async (versionTitle: string) => {
     setDialogOpen(false);
@@ -327,7 +333,8 @@ export default function NewWorkflowPage() {
         initialSteps={TEMPLATE_STEPS}
         initialTransitions={TEMPLATE_TRANSITIONS}
         namespace={effectiveNamespace}
-        wdJsonFields={wdJsonFields}
+        wdJsonFields={{ ...wdJsonFields, ...pastedFields }}
+        onNonGraphFieldsChange={(fields) => setPastedFields((prev) => ({ ...prev, ...fields }))}
         onChange={handleCanvasChange}
         onDirtyChange={setCanvasDirty}
         stepErrors={stepErrors}

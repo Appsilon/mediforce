@@ -1,3 +1,4 @@
+import { WorkflowAuthorableSchema } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
 type Transitions = WorkflowDefinition['transitions'];
@@ -135,31 +136,69 @@ export function bridgeTargetForDeletion(
 }
 
 /** Order-insensitive canonical serialization (object keys sorted recursively). */
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([key, val]) => `${JSON.stringify(key)}:${stableStringify(val)}`);
-    return `{${entries.join(',')}}`;
-  }
-  return JSON.stringify(value) ?? 'null';
-}
+
+/** The graph the canvas owns; everything else is applied as a non-graph edit. */
+const GRAPH_KEYS = { steps: true, transitions: true, inputForNextRun: true } as const;
+
+export type SplitPastedDefinition = {
+  graph: {
+    steps: unknown;
+    transitions: unknown;
+    inputForNextRun: unknown;
+  };
+  nonGraph: Record<string, unknown>;
+  error: string | null;
+};
 
 /**
- * Whether a pasted workflow document changed any field other than the graph —
- * `steps`, `transitions` and the `inputForNextRun` entries that name their step
- * ids — relative to the canvas's current non-graph fields. The canvas JSON
- * editor applies the graph only, so this gates whether to refuse the apply.
- * Order-insensitive, so merely reordering keys in the JSON is not treated as a
- * change.
+ * Splits a pasted workflow document into the graph the canvas applies and the
+ * non-graph fields the page applies, validating the latter against
+ * `WorkflowAuthorableSchema`.
+ *
+ * The canvas used to refuse any document whose non-graph fields differed from
+ * the loaded ones, which made the product unable to round-trip its own output:
+ * a definition copied from a registered version carries `title`, `triggerInput`
+ * and the server-assigned fields, so pasting it back was always refused.
+ *
+ * Server-managed and lifecycle fields need no strip list here — the authorable
+ * schema excludes them by construction and the parse drops them. Only keys the
+ * document actually carried are returned, so a paste cannot silently apply a
+ * schema default (`visibility`) the author never wrote.
  */
-export function nonGraphFieldsDiffer(
-  doc: Record<string, unknown>,
-  wdJsonFields: Record<string, unknown> | undefined,
-): boolean {
-  const { steps: _steps, transitions: _transitions, inputForNextRun: _inputForNextRun, ...rest } = doc;
-  return stableStringify(rest) !== stableStringify(wdJsonFields ?? {});
+export function splitPastedDefinition(doc: unknown): SplitPastedDefinition {
+  const empty = { steps: undefined, transitions: undefined, inputForNextRun: undefined };
+  if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) {
+    return { graph: empty, nonGraph: {}, error: 'Expected a workflow definition object.' };
+  }
+
+  const source = doc as Record<string, unknown>;
+  const graph = {
+    steps: source.steps,
+    transitions: source.transitions,
+    inputForNextRun: source.inputForNextRun,
+  };
+
+  const nonGraph: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (key in GRAPH_KEYS === false) nonGraph[key] = value;
+  }
+
+  // Graph keys are validated separately by the caller against the step and
+  // transition schemas, so only the non-graph half is checked here.
+  const parsed = WorkflowAuthorableSchema.omit(GRAPH_KEYS).partial().safeParse(nonGraph);
+
+  if (parsed.success === false) {
+    const issue = parsed.error.issues[0];
+    const field = issue?.path.join('.') ?? 'definition';
+    return { graph, nonGraph, error: `${field}: ${issue?.message ?? 'invalid'}` };
+  }
+
+  const applied: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(parsed.data as Record<string, unknown>)) {
+    if (key in nonGraph) applied[key] = value;
+  }
+
+  return { graph, nonGraph: applied, error: null };
 }
 
 /**

@@ -51,6 +51,9 @@ export default function WorkflowDefinitionVersionPage() {
   const [stepErrors, setStepErrors] = useState<Record<string, Record<string, string>>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [canvasDirty, setCanvasDirty] = useState(false);
+  // Fields outside the graph that a pasted definition carried. Empty until the
+  // source panel applies one; merged over the loaded definition on save.
+  const [pastedFields, setPastedFields] = useState<Record<string, unknown>>({});
 
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>([]);
@@ -108,6 +111,7 @@ export default function WorkflowDefinitionVersionPage() {
     try {
       const result = await mediforceSilent.workflows.register(
         buildRegisterBody(definition, {
+          ...pastedFields,
           title: title || undefined,
           description: editedDescription.trim() || undefined,
           steps: orderedSteps,
@@ -136,7 +140,7 @@ export default function WorkflowDefinitionVersionPage() {
       toast({ title: 'Save failed', description: message, variant: 'error' });
       throw err;
     }
-  }, [definition, editedDescription, toast]);
+  }, [definition, editedDescription, pastedFields, toast]);
 
   const handleSave = useCallback(async (title: string, setAsDefault: boolean) => {
     setDialogOpen(false);
@@ -185,7 +189,10 @@ export default function WorkflowDefinitionVersionPage() {
 
   if (definition === null) return null;
 
-  const hasUnsavedChanges = canvasDirty || editedDescription !== (definition.description ?? '');
+  const hasUnsavedChanges =
+    canvasDirty ||
+    editedDescription !== (definition.description ?? '') ||
+    Object.keys(pastedFields).length > 0;
 
   // What the canvas shows around the graph in its JSON panel, and compares
   // against to refuse an apply that edits a field it cannot apply. The graph it
@@ -301,7 +308,8 @@ export default function WorkflowDefinitionVersionPage() {
         workflowName={decodedName}
         namespace={handle}
         workflowExternalSkillsRepo={definition.externalSkillsRepo}
-        wdJsonFields={wdJsonFields as Record<string, unknown>}
+        wdJsonFields={{ ...(wdJsonFields as Record<string, unknown>), ...pastedFields }}
+        onNonGraphFieldsChange={(fields) => setPastedFields((prev) => ({ ...prev, ...fields }))}
         onChange={handleCanvasChange}
         onDirtyChange={setCanvasDirty}
         stepErrors={stepErrors}
