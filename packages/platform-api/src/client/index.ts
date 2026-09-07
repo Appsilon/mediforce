@@ -469,6 +469,18 @@ import {
   type TestWebhookOutput,
   GetEmailStatusOutputSchema,
   type GetEmailStatusOutput,
+  CreateJoinLinkInputSchema,
+  CreateJoinLinkOutputSchema,
+  ListJoinLinksInputSchema,
+  ListJoinLinksOutputSchema,
+  RevokeJoinLinkInputSchema,
+  RevokeJoinLinkOutputSchema,
+  type CreateJoinLinkInput,
+  type CreateJoinLinkOutput,
+  type ListJoinLinksInput,
+  type ListJoinLinksOutput,
+  type RevokeJoinLinkInput,
+  type RevokeJoinLinkOutput,
 } from '../contract/index';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
@@ -779,6 +791,18 @@ export class Mediforce {
     removeMember: (input: RemoveNamespaceMemberInput) => Promise<RemoveNamespaceMemberOutput>;
     updateMemberRole: (input: UpdateNamespaceMemberRoleInput) => Promise<UpdateNamespaceMemberRoleOutput>;
     setMemberRoles: (input: SetNamespaceMemberRolesInput) => Promise<SetNamespaceMemberRolesOutput>;
+  };
+
+  /**
+   * Workspace join links (ADR-0021). Owner/admin only — the public redemption
+   * half of `/join` has no client method on purpose: it is redeemed from a
+   * browser with no credentials, so a credentialed client has no business
+   * calling it.
+   */
+  readonly joinLinks: {
+    create: (input: CreateJoinLinkInput) => Promise<CreateJoinLinkOutput>;
+    list: (input: ListJoinLinksInput) => Promise<ListJoinLinksOutput>;
+    revoke: (input: RevokeJoinLinkInput) => Promise<RevokeJoinLinkOutput>;
   };
 
   readonly agentRuns: {
@@ -2156,6 +2180,38 @@ export class Mediforce {
           body,
           SetNamespaceMemberRolesOutputSchema,
           'mediforce.namespaces.setMemberRoles',
+        );
+      },
+    };
+
+    this.joinLinks = {
+      create: async (input) => {
+        const validated = CreateJoinLinkInputSchema.parse(input);
+        const { namespaceHandle, ...body } = validated;
+        return this.sendJson(
+          'POST',
+          `/api/namespaces/${encodeURIComponent(namespaceHandle)}/join-links`,
+          body,
+          CreateJoinLinkOutputSchema,
+          'mediforce.joinLinks.create',
+        );
+      },
+      list: async (input) => {
+        const validated = ListJoinLinksInputSchema.parse(input);
+        const res = await this.request(
+          `/api/namespaces/${encodeURIComponent(validated.namespaceHandle)}/join-links`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.joinLinks.list');
+        return ListJoinLinksOutputSchema.parse(body);
+      },
+      revoke: async (input) => {
+        const validated = RevokeJoinLinkInputSchema.parse(input);
+        return this.sendJson(
+          'DELETE',
+          `/api/namespaces/${encodeURIComponent(validated.namespaceHandle)}/join-links/${encodeURIComponent(validated.id)}`,
+          undefined,
+          RevokeJoinLinkOutputSchema,
+          'mediforce.joinLinks.revoke',
         );
       },
     };

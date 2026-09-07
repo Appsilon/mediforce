@@ -1,4 +1,4 @@
-import { defineCommand } from '../define-command';
+import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson, printError } from '../output';
 
 export const workflowArchiveCommand = defineCommand({
@@ -31,9 +31,9 @@ export const workflowArchiveCommand = defineCommand({
       return 2;
     }
 
-    const version = args.version !== undefined ? Number(args.version) : undefined;
-    if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
-      printError(output, { error: `Invalid --version: ${args.version}` }, jsonMode);
+    const version = parsePositiveIntArg(args.version);
+    if (version === 'invalid') {
+      printError(output, { error: `Invalid --version: ${String(args.version)}` }, jsonMode);
       return 2;
     }
 

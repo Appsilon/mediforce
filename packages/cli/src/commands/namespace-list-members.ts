@@ -1,6 +1,6 @@
 import { formatRoleGrant } from '@mediforce/platform-core';
 import { defineCommand } from '../define-command';
-import { printJson } from '../output';
+import { columnWidth, printJson } from '../output';
 
 /**
  * The read half of `set-member-roles`. Granting a process role from the CLI
@@ -53,9 +53,9 @@ export const namespaceListMembersCommand = defineCommand({
     }));
 
     output.stdout(`Members of ${args.handle} (${rows.length}):`);
-    const membershipWidth = width('MEMBERSHIP', rows, (row) => row.membership);
-    const uidWidth = width('UID', rows, (row) => row.uid);
-    const rolesWidth = width('PROCESS ROLES', rows, (row) => row.roles);
+    const membershipWidth = columnWidth('MEMBERSHIP', rows, (row) => row.membership);
+    const uidWidth = columnWidth('UID', rows, (row) => row.uid);
+    const rolesWidth = columnWidth('PROCESS ROLES', rows, (row) => row.roles);
     const line = (
       membership: string,
       uid: string,
@@ -71,11 +71,3 @@ export const namespaceListMembersCommand = defineCommand({
     return 0;
   },
 });
-
-function width<TRow>(
-  header: string,
-  rows: readonly TRow[],
-  pick: (row: TRow) => string,
-): number {
-  return Math.max(header.length, ...rows.map((row) => pick(row).length));
-}

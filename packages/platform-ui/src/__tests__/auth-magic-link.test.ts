@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
  * registered at all (registration follows email configuration, NOT the
  * `ENABLE_MAGIC_LINK` login-page display flag, so invite-activation links keep
  * working with login magic-link off), and (2) the `sendVerificationRequest`
- * that wires the account/domain gate to the email builder to the resolved
+ * that wires the account-existence gate to the email builder to the resolved
  * sender. Auth.js's own token + session-mint flow is the library's concern;
  * this pins OUR code: who gets a link and who silently does not
  * (anti-enumeration + no self-registration).
@@ -24,6 +24,7 @@ vi.mock('next-auth/providers/google', () => ({
 vi.mock('@auth/drizzle-adapter', () => ({ DrizzleAdapter: () => ({}) }));
 
 const mockFindPasswordCredentialByEmail = vi.fn();
+const mockAuthUserWasInvited = vi.fn();
 const mockSend = vi.fn(async () => ({ messageId: 'test-message-id' }));
 
 interface ResolvedEmailStub {
@@ -53,6 +54,7 @@ vi.mock('@mediforce/platform-infra', () => ({
   getUserRoles: vi.fn(async () => []),
   recordSignIn: vi.fn(),
   findPasswordCredentialByEmail: (...args: unknown[]) => mockFindPasswordCredentialByEmail(...args),
+  authUserWasInvited: (...args: unknown[]) => mockAuthUserWasInvited(...args),
   resolveEmailSenderFromEnv: () => mockResolvedEmail,
 }));
 
@@ -64,6 +66,10 @@ interface EmailProviderShape {
 }
 
 const MAGIC_URL = 'https://app.example.com/api/auth/callback/email?token=abc123';
+
+function existingUser(email: string) {
+  return { id: 'user-1', email, name: null, image: null, passwordHash: null };
+}
 
 function emailProvider(): (args: { identifier: string; url: string }) => Promise<void> {
   const provider = buildProviders({} as never).find(
@@ -130,13 +136,8 @@ describe('buildProviders magic-link sendVerificationRequest', () => {
   });
 
   it('sends the link to an existing user on an allowlisted domain', async () => {
-    mockFindPasswordCredentialByEmail.mockResolvedValue({
-      id: 'user-1',
-      email: 'alice@example.com',
-      name: 'Alice',
-      image: null,
-      passwordHash: null,
-    });
+    mockFindPasswordCredentialByEmail.mockResolvedValue(existingUser('alice@example.com'));
+    mockAuthUserWasInvited.mockResolvedValue(false);
 
     await emailProvider()({ identifier: 'alice@example.com', url: MAGIC_URL });
 
@@ -158,16 +159,25 @@ describe('buildProviders magic-link sendVerificationRequest', () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
-  it('does not send when the domain is not allowlisted', async () => {
-    mockFindPasswordCredentialByEmail.mockResolvedValue({
-      id: 'user-2',
-      email: 'mallory@evil.com',
-      name: null,
-      image: null,
-      passwordHash: null,
-    });
+  // ADR-0021 §5: an admin's deliberate seeding authorizes the address whatever
+  // its domain. The allowlist still governs self-service sign-in.
+  it('sends to an out-of-allowlist address an admin deliberately seeded', async () => {
+    mockFindPasswordCredentialByEmail.mockResolvedValue(existingUser('alice@external.test'));
+    mockAuthUserWasInvited.mockResolvedValue(true);
 
-    await emailProvider()({ identifier: 'mallory@evil.com', url: MAGIC_URL });
+    await emailProvider()({ identifier: 'alice@external.test', url: MAGIC_URL });
+
+    expect(mockSend).toHaveBeenCalledTimes(1);
+  });
+
+  // The complement, and the reason the second term is `invited_at` rather than
+  // "a row exists": dropping a domain from the allowlist has to keep evicting
+  // the people who signed themselves in at it, magic link included.
+  it('does not send to an out-of-allowlist address that merely has an account', async () => {
+    mockFindPasswordCredentialByEmail.mockResolvedValue(existingUser('mallory@external.test'));
+    mockAuthUserWasInvited.mockResolvedValue(false);
+
+    await emailProvider()({ identifier: 'mallory@external.test', url: MAGIC_URL });
 
     expect(mockSend).not.toHaveBeenCalled();
   });

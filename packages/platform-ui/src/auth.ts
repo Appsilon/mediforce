@@ -14,12 +14,12 @@ import {
   recordSignIn,
   recordSignInAuditEvent,
   resolveEmailSenderFromEnv,
+  authUserWasInvited,
   findPasswordCredentialByEmail,
 } from '@mediforce/platform-infra';
 import type { Database } from '@mediforce/platform-infra';
-import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist';
+import { parseAllowedDomains, isEmailDomainAllowed, isSignInAuthorized } from '@/lib/email-allowlist';
 import { buildMagicLinkEmail } from '@/lib/magic-link-email';
-import { shouldSendMagicLink } from '@/lib/magic-link-gate';
 
 /**
  * NextAuth (Auth.js v5) — the single source of truth for authentication after
@@ -95,21 +95,28 @@ export function buildProviders(db: Database): Provider[] {
       maxAge: 60 * 15,
       async sendVerificationRequest(params: { identifier: string; url: string }) {
         const { identifier, url } = params;
-        // Account-creation gate (ADR-0002 §4). The Email provider would
-        // otherwise let ANY address request a link, and the adapter would
-        // self-register a new `auth_users` row on callback. Only send when the
-        // address already belongs to a user AND its domain is allowlisted; the
-        // adapter can never create a user because no link was ever minted.
+        // Two gates, answering different questions (ADR-0002 §4, amended by
+        // ADR-0021 §5):
+        //   1. Account-creation. The Email provider would otherwise let ANY
+        //      address request a link, and the adapter would self-register a
+        //      new `auth_users` row on callback. Only an address that already
+        //      belongs to a user gets one minted.
+        //   2. Sign-in authorization — the same two-term rule every other
+        //      provider applies. An existing account is not automatically
+        //      entitled to a link: someone evicted by a domain being dropped
+        //      from the allowlist must not be able to mail themselves back in.
         // On a miss we return WITHOUT sending and WITHOUT throwing, so the UI
         // shows the same "check your email" either way (anti-enumeration).
         const credential = await findPasswordCredentialByEmail(db, identifier);
-        const domainAllowed = isEmailDomainAllowed(
-          identifier,
-          parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS),
-        );
-        if (!shouldSendMagicLink({ userExists: credential !== null, domainAllowed })) {
-          return;
-        }
+        if (credential === null) return;
+        const authorized = isSignInAuthorized({
+          domainAllowed: isEmailDomainAllowed(
+            identifier,
+            parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS),
+          ),
+          invited: await authUserWasInvited(db, identifier),
+        });
+        if (authorized !== true) return;
         const { subject, text, html } = buildMagicLinkEmail(url, resolvedEmail.senderName);
         await resolvedEmail.send({ to: [identifier], subject, text, html });
       },
@@ -148,11 +155,24 @@ export function buildAuthConfig(): NextAuthConfig {
     providers: buildProviders(db),
     callbacks: {
       async signIn({ user }) {
-        // ADR-0002 §4a: reject a sign-in whose email domain is not allowlisted.
+        // Sign-in authorization is two-term (ADR-0021 §5, amending ADR-0002
+        // §4a) — the rule itself lives in `isSignInAuthorized`, which is also
+        // where the reasoning for each term is written down.
+        //
         // Personal-workspace bootstrap is NOT done here — it stays the lazy,
         // idempotent `GET /api/users/me` bootstrap (get-me handler), so the
         // handle-generation logic lives in exactly one place.
-        return isEmailDomainAllowed(user.email, parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS));
+        const domainAllowed = isEmailDomainAllowed(
+          user.email,
+          parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS),
+        );
+        // Skip the lookup when the domain already settles it — the common case
+        // on every deployment, and the callback is on the sign-in hot path.
+        if (domainAllowed === true) return true;
+        return isSignInAuthorized({
+          domainAllowed,
+          invited: await authUserWasInvited(db, user.email),
+        });
       },
       async session({ session, user }) {
         // Explicit allowlist — NEVER spread `user`, which carries `passwordHash`.

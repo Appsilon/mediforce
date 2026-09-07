@@ -72,13 +72,48 @@ refuses to start rather than serve a deployment nobody can use.
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | off | Adds "Sign in with Google" |
 | `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | off | One IdP per deployment — Keycloak, Entra, Okta. `OIDC_DISPLAY_NAME` names the button |
 | `ENABLE_MAGIC_LINK` | off | Passwordless email links. Needs a working mail transport |
-| `ALLOWED_EMAIL_DOMAINS` | unset | Comma-separated allowlist, enforced across **every** provider |
+| `ALLOWED_EMAIL_DOMAINS` | unset | Comma-separated allowlist gating **self-service** sign-in. Accounts you invited are exempt; dropping a domain still locks out everyone who signed themselves in at it |
 | `AUTO_JOIN_WORKSPACES` | unset | `domain:handle` pairs — everyone at a domain joins that workspace as `member` |
 
 :::warning Google without an allowlist lets anyone in
-`ALLOWED_EMAIL_DOMAINS` is what stops any Google account on earth signing in.
-If you enable Google, set it — for example `ALLOWED_EMAIL_DOMAINS=acme.com`.
+`ALLOWED_EMAIL_DOMAINS` is what stops any Google account on earth signing itself
+in. If you enable Google, set it — for example `ALLOWED_EMAIL_DOMAINS=acme.com`.
 :::
+
+The allowlist governs **self-service** sign-in. Someone you deliberately added —
+an invite, or a redeemed [join link](#inviting-a-room-at-once) — can sign in
+whatever their email domain. That is what lets you invite an external
+collaborator without listing their employer's domain, and it is why an invite to
+an outside address now actually works.
+
+It is still how you lock a domain out: remove it and everyone who signed
+themselves in at it is refused on their next attempt. Only the accounts you
+invited are exempt, and removing one of those means removing the account or its
+workspace membership.
+
+### Inviting a room at once
+
+An invite needs an address you already have. For a workshop, a demo, or a pilot
+cohort where you do not, mint a **join link** from **Workspace settings →
+Members → Join links**, or from the CLI:
+
+```bash
+mediforce namespace create-join-link acme --expires-in-days 7 --max-uses 30
+```
+
+The link is printed once — only its hash is stored — and it is safe on a slide
+or in a QR code, because redeeming it does **not** sign anybody in. Whoever
+opens it enters their email and receives the same activation link an invite
+sends, so everyone who ends up in the workspace has a mailbox they control.
+
+Everyone joins as a plain **member**. A link cannot grant admin: it controls who
+gets a session, not who you trust, so promoting someone stays a separate
+decision (`mediforce namespace set-member-role acme <uid> admin`).
+
+`mediforce namespace list-join-links acme` shows which links are still live and
+how many people used each; `mediforce namespace revoke-join-link acme <id>`
+closes one. Revoking removes nobody who already joined — that is
+`mediforce namespace remove-member`.
 
 ### Putting a whole company in one workspace
 

@@ -72,8 +72,37 @@ It is not missing; it is unavailable.
 
 ## Enabling Google without an allowlist lets anyone in
 
-`ALLOWED_EMAIL_DOMAINS` is enforced across every provider and is what stops any
-Google account on earth signing in. With Google or OIDC enabled, set it.
+`ALLOWED_EMAIL_DOMAINS` is what stops any Google account on earth signing itself
+in. With Google or OIDC enabled, set it.
+
+## The allowlist does not overrule an invite
+
+It gates **self-service** sign-in. Somebody you deliberately added — an invite,
+or a redeemed join link — signs in whatever their email domain, so you can
+invite an external collaborator without listing their employer's domain.
+
+It still evicts everyone else: drop a domain from `ALLOWED_EMAIL_DOMAINS` and
+the people who signed themselves in at it are locked out on their next attempt.
+Only accounts you invited are exempt, and getting an invited person out means
+removing their account or their membership.
+
+## A join link cannot grant admin
+
+Everyone who redeems one joins as a plain **member**, and there is no option to
+change that. The email round-trip proves who controls a mailbox, not who you
+trust — so promoting someone stays a separate, deliberate step.
+
+## A join link does not sign anyone in
+
+Opening `/join/<token>` asks for an email and sends the ordinary activation link
+to it. That is deliberate: it means a photograph of the link on a slide is not
+an account. It also means everyone joining needs a working mail transport —
+see below.
+
+## Revoking a join link removes nobody
+
+It closes the entrance. People who already joined keep their membership; take it
+away with **remove member**.
 
 ## No mail transport means invitations are silent
 

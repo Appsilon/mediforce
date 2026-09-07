@@ -212,5 +212,23 @@ export function enumArg<const TValues extends readonly string[]>(
   };
 }
 
+/**
+ * Parse a flag that must be a positive integer.
+ *
+ * Not shaped like `enumArg`: citty has no integer arg type, so the value
+ * always arrives as a string and the check has to happen in `run`. Returns
+ * `undefined` for an absent flag and the literal `'invalid'` for a present but
+ * unparseable one, so the caller can tell those apart and name its own flag in
+ * the error.
+ *
+ * Rejects trailing garbage — `Number.parseInt('7abc', 10)` is `7`, which would
+ * silently accept a typo as a valid version or cap.
+ */
+export function parsePositiveIntArg(raw: unknown): number | undefined | 'invalid' {
+  if (typeof raw !== 'string' || raw === '') return undefined;
+  const value = Number.parseInt(raw, 10);
+  return Number.isInteger(value) && value > 0 && String(value) === raw.trim() ? value : 'invalid';
+}
+
 export { renderUsage };
 export type { ArgsDef, ParsedArgs };

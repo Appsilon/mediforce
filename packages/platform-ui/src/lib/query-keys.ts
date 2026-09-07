@@ -132,6 +132,9 @@ export const queryKeys = {
   /** Single-namespace detail (members + metadata). */
   namespace: (handle: string) => ['namespace', handle] as const,
   namespaceMembers: (handle: string) => ['namespace-members', handle] as const,
+  /** Join links of a workspace (ADR-0021). Owner/admin-only read, so it lives
+   *  under its own key rather than riding the members list. */
+  namespaceJoinLinks: (handle: string) => ['namespace-join-links', handle] as const,
   agentRuns: {
     /** Prefix matcher — `['agent-runs']` invalidates every list slice. */
     all: () => ['agent-runs'] as const,
