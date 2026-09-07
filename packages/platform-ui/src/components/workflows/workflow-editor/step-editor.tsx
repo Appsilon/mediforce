@@ -11,8 +11,8 @@ import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
-import { DEFAULT_AGENT_IMAGE, uniqueName, uniqueSlug } from '@mediforce/platform-core';
-import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
+import { DEFAULT_AGENT_IMAGE, defaultVerdictLabel, uniqueName, uniqueSlug } from '@mediforce/platform-core';
+import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
@@ -174,7 +174,18 @@ const TIP = {
   selectionMin:            'Minimum number of reviewers required to reach a binding verdict.',
   selectionMax:            'Maximum number of reviewers who may participate in this review step.',
 
-  actionKind:              'Action type: http (outbound API call), reshape (update workflow variables), or email. Fixed at creation.',
+  actionKind:              'Action type: http (outbound API call), reshape (update workflow variables), email, spawn (run another workflow) or wait (pause). Fixed at creation.',
+  actionTargets:           'The workflow(s) this step starts. Each target names a registered workflow; leave the version unset to use its default.',
+  actionForEach:           'Interpolation path to an array — the step spawns one child per element, with ${item} bound to it. Leave empty to spawn each target once.',
+  actionContinueOnSpawnError: 'On by default: one child failing to start does not fail this step. Turn off to fail the step on the first error.',
+  actionWaitDuration:      'How long to pause. Fields combine, so 1 hour 30 minutes is hours 1 + minutes 30.',
+  actionWaitDeadline:      'Absolute time to wait until — an ISO timestamp, or an interpolation like ${steps.x.dueAt}. Takes precedence over a duration.',
+  actionWaitCondition:     'Transition-language expression checked while waiting; the step proceeds as soon as it is true.',
+  scriptTimeoutMinutes:    'Maximum run time in minutes. Without it a long script is killed at the 30-minute default.',
+  verdictLabel:            'Button text shown to the reviewer. Defaults to a title-cased form of the verdict key.',
+  verdictIntent:           'Button styling: success, danger, warning or neutral. Defaults from the key for the common names.',
+  verdictRequiresComment:  'Enforced server-side — the task cannot be completed on this verdict without a comment.',
+  paramRequiredForVerdicts: 'Verdict keys that make this parameter mandatory. Leave empty to use the plain required flag.',
   actionMethod:            'HTTP method for the outbound request.',
   actionUrl:               'Target URL. Supports ${steps.<id>.<field>} and ${triggerPayload.<field>} interpolation — never put ${secrets.NAME} here, the resolved URL is persisted as this step\'s output.',
   actionBody:              'JSON body sent with the request. Supports ${steps.<id>.<field>} interpolation. Only the response is stored, so ${secrets.NAME} is safe here.',
@@ -338,6 +349,25 @@ export function StepEditor({
   const httpAction    = step.action?.kind === 'http'    ? step.action : undefined;
   const reshapeAction = step.action?.kind === 'reshape' ? step.action : undefined;
   const emailAction   = step.action?.kind === 'email'   ? step.action : undefined;
+  const spawnAction   = step.action?.kind === 'spawn'   ? step.action : undefined;
+  const waitAction    = step.action?.kind === 'wait'    ? step.action : undefined;
+
+  // `targets` is one target or a list; the editor always works on a list and
+  // writes back a bare object when there is exactly one, so a hand-authored
+  // single-target definition round-trips unchanged.
+  const spawnTargets = spawnAction === undefined
+    ? []
+    : Array.isArray(spawnAction.config.targets) ? spawnAction.config.targets : [spawnAction.config.targets];
+
+  const writeSpawnTargets = (targets: SpawnTargetConfig[]): void => {
+    if (spawnAction === undefined) return;
+    onChange({
+      action: {
+        ...spawnAction,
+        config: { ...spawnAction.config, targets: targets.length === 1 ? targets[0] : targets },
+      },
+    });
+  };
 
   const selMin = typeof step.selection === 'number' ? step.selection : step.selection?.min;
   const selMax = typeof step.selection === 'number' ? step.selection : step.selection?.max;
@@ -901,6 +931,16 @@ export function StepEditor({
               className={cn(rt, 'font-mono text-[11px] placeholder:italic placeholder:text-muted-foreground/40')}
             />
           </FieldRow>
+
+          <FieldRow label="script.timeoutMinutes" tooltip={TIP.scriptTimeoutMinutes}>
+            <input
+              type="number"
+              min={1}
+              value={step.script?.timeoutMinutes ?? ''}
+              onChange={(e) => updateScript({ timeoutMinutes: e.target.value ? Number(e.target.value) : undefined })}
+              className={ri}
+            />
+          </FieldRow>
           </>)}
 
           {step.plugin === 'databricks-job' && (<>
@@ -1353,6 +1393,117 @@ export function StepEditor({
               </FieldRow>
             </>
           )}
+
+          {spawnAction && (
+            <>
+              <FieldRow label="action.targets" tooltip={TIP.actionTargets} alignStart>
+                <div className="space-y-1.5">
+                  {spawnTargets.map((target, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5">
+                      <input
+                        value={target.definitionName}
+                        placeholder="workflow-name"
+                        onChange={(e) => writeSpawnTargets(
+                          spawnTargets.map((t, i) => (i === idx ? { ...t, definitionName: e.target.value } : t)),
+                        )}
+                        className={cn(riMono, 'flex-1 placeholder:italic placeholder:text-muted-foreground/40')}
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        value={target.definitionVersion ?? ''}
+                        placeholder="default"
+                        onChange={(e) => writeSpawnTargets(
+                          spawnTargets.map((t, i) => (
+                            i === idx
+                              ? { ...t, definitionVersion: e.target.value ? Number(e.target.value) : undefined }
+                              : t
+                          )),
+                        )}
+                        className={cn(ri, 'w-20 placeholder:italic placeholder:text-muted-foreground/40')}
+                      />
+                      <button
+                        type="button"
+                        aria-label={`Remove target ${idx + 1}`}
+                        onClick={() => writeSpawnTargets(spawnTargets.filter((_, i) => i !== idx))}
+                        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => writeSpawnTargets([...spawnTargets, { definitionName: '' }])}
+                    className="text-[11px] font-medium text-primary hover:underline"
+                  >
+                    + Add workflow
+                  </button>
+                </div>
+              </FieldRow>
+
+              <FieldRow label="action.forEach" tooltip={TIP.actionForEach}>
+                <input
+                  value={spawnAction.config.forEach ?? ''}
+                  placeholder="${steps.split.items}"
+                  onChange={(e) => onChange({ action: { ...spawnAction, config: { ...spawnAction.config, forEach: e.target.value || undefined } } })}
+                  className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
+                />
+              </FieldRow>
+
+              <FieldRow label="action.continueOnSpawnError" tooltip={TIP.actionContinueOnSpawnError}>
+                <input
+                  type="checkbox"
+                  checked={spawnAction.config.continueOnSpawnError !== false}
+                  onChange={(e) => onChange({ action: { ...spawnAction, config: { ...spawnAction.config, continueOnSpawnError: e.target.checked } } })}
+                  className="h-3.5 w-3.5 accent-primary"
+                />
+              </FieldRow>
+            </>
+          )}
+
+          {waitAction && (
+            <>
+              <FieldRow label="action.duration" tooltip={TIP.actionWaitDuration}>
+                <div className="flex items-center gap-1.5">
+                  {(['hours', 'minutes', 'seconds'] as const).map((unit) => (
+                    <label key={unit} className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <input
+                        type="number"
+                        min={0}
+                        value={waitAction.config.duration?.[unit] ?? ''}
+                        onChange={(e) => {
+                          const next = { ...waitAction.config.duration, [unit]: e.target.value ? Number(e.target.value) : undefined };
+                          const empty = Object.values(next).every((v) => v === undefined);
+                          onChange({ action: { ...waitAction, config: { ...waitAction.config, duration: empty ? undefined : next } } });
+                        }}
+                        className={cn(ri, 'w-16')}
+                      />
+                      {unit}
+                    </label>
+                  ))}
+                </div>
+              </FieldRow>
+
+              <FieldRow label="action.deadline" tooltip={TIP.actionWaitDeadline}>
+                <input
+                  value={waitAction.config.deadline ?? ''}
+                  placeholder="2026-01-01T00:00:00Z"
+                  onChange={(e) => onChange({ action: { ...waitAction, config: { ...waitAction.config, deadline: e.target.value || undefined } } })}
+                  className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
+                />
+              </FieldRow>
+
+              <FieldRow label="action.condition" tooltip={TIP.actionWaitCondition}>
+                <input
+                  value={waitAction.config.condition ?? ''}
+                  placeholder="steps.poll.ready == true"
+                  onChange={(e) => onChange({ action: { ...waitAction, config: { ...waitAction.config, condition: e.target.value || undefined } } })}
+                  className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
+                />
+              </FieldRow>
+            </>
+          )}
         </FieldGroup>
       )}
 
@@ -1405,6 +1556,36 @@ export function StepEditor({
                     }}
                     className="text-[10px] text-muted-foreground/30 hover:text-red-500 transition-colors shrink-0"
                   >×</button>
+                </div>
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <input
+                    value={verdict.label ?? ''}
+                    placeholder={defaultVerdictLabel(verdictName)}
+                    title={TIP.verdictLabel}
+                    onChange={(e) => onChange({ verdicts: { ...step.verdicts, [verdictName]: { ...verdict, label: e.target.value || undefined } } })}
+                    className={cn(ri, 'flex-1 placeholder:italic placeholder:text-muted-foreground/40')}
+                  />
+                  <select
+                    value={verdict.intent ?? ''}
+                    title={TIP.verdictIntent}
+                    onChange={(e) => onChange({ verdicts: { ...step.verdicts, [verdictName]: { ...verdict, intent: (e.target.value || undefined) as typeof verdict.intent } } })}
+                    className={cn(rs, 'w-24 shrink-0')}
+                  >
+                    <option value="">Default</option>
+                    <option value="success">Success</option>
+                    <option value="danger">Danger</option>
+                    <option value="warning">Warning</option>
+                    <option value="neutral">Neutral</option>
+                  </select>
+                  <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground" title={TIP.verdictRequiresComment}>
+                    <input
+                      type="checkbox"
+                      checked={verdict.requiresComment === true}
+                      onChange={(e) => onChange({ verdicts: { ...step.verdicts, [verdictName]: { ...verdict, requiresComment: e.target.checked ? true : undefined } } })}
+                      className="h-3.5 w-3.5 accent-primary"
+                    />
+                    comment
+                  </label>
                 </div>
               </FieldRow>
             ))}
