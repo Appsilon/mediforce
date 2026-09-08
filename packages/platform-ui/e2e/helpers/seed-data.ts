@@ -2371,9 +2371,15 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     description: 'Test workflow for the files panel',
     steps: [
       { id: 'review', name: 'Review', type: 'creation', executor: 'human' },
+      // An agent step, so the journey can check that a skill uploaded into the
+      // files is offered where a step picks one.
+      { id: 'interpret', name: 'Interpret', type: 'creation', executor: 'agent', plugin: 'claude-code-agent', agent: { image: 'mediforce-golden-image' } },
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
     ],
-    transitions: [{ from: 'review', to: 'done' }],
+    transitions: [
+      { from: 'review', to: 'interpret' },
+      { from: 'interpret', to: 'done' },
+    ],
     createdAt: twoDaysAgo,
   };
 

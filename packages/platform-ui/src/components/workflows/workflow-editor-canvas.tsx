@@ -856,6 +856,7 @@ export function WorkflowEditorCanvas({
               errors={stepErrors?.[selectedStep.id]}
               imageWarning={warningStepIds?.get(selectedStep.id)}
               dockerImages={dockerImages}
+              workflowArtifacts={settingsDraft?.artifacts}
               workflowExternalSkillsRepo={workflowExternalSkillsRepo}
             />
           </div>

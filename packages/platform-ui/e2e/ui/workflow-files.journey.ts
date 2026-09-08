@@ -139,4 +139,31 @@ test.describe('Workflow Files Journey', () => {
     // here rather than losing a save to a 400.
     await expect(page.getByText(/artifact path must not contain/i)).toBeVisible();
   });
+
+  test('an uploaded skills folder is offered where an agent step picks its skill', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(EDITOR_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: 'Files', exact: true }).click();
+    await page.getByLabel('Files to upload').setInputFiles([
+      { name: 'SKILL.md', mimeType: 'text/markdown', buffer: Buffer.from('# Data validator\n') },
+    ]);
+    // Uploaded flat, then given the path a skill needs: `<dir>/<skill>/SKILL.md`
+    // is what the runtime reads, and the picker below is what proves it.
+    await page.getByLabel('File path').fill('skills/data-validator/SKILL.md');
+    await page.keyboard.press('Escape');
+
+    await page.locator('.react-flow__node', { hasText: 'Interpret' }).first().click();
+    await page.getByText('Prompt & model').click();
+
+    const picker = page.getByLabel('Skill', { exact: true });
+    await expect(picker).toBeVisible();
+    await expect(picker.locator('option')).toHaveText(['None', 'data-validator']);
+
+    // Picking it fills in both fields the runtime needs, which is what typing a
+    // repo path by hand used to be for.
+    await picker.selectOption('skills/data-validator');
+    await expect(page.getByLabel('Skills directory')).toHaveValue('skills');
+  });
 });

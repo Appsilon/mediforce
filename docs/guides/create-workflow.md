@@ -43,8 +43,10 @@ placing and wiring blocks by hand.
   `notifications`, `workspace`, `externalSkillsRepo`, `url` — and writes the
   files the workflow carries (a script, a Dockerfile, a SKILL.md), one file per
   call. Files appear in the **Files** panel, where you can edit them, upload
-  more from disk (a folder keeps its structure) or drop them in, and a run
-  reads them from `/artifacts`. It does not edit secrets or other workspace
+  more from disk (a folder keeps its structure, so a `skills/` directory
+  uploads whole) or drop them in, and a run reads them from `/artifacts`. A
+  skill among those files is offered by name on an agent step, which fills in
+  the directory it lives in — no repository path to type. It does not edit secrets or other workspace
   state — set those yourself (triggers are attached after registration; see
   below).
 - **Validation & retry.** Every proposed change is validated against the same
