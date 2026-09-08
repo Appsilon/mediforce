@@ -1,5 +1,7 @@
 'use client';
 
+import { pruneWorkflowSettings } from '@/components/workflows/workflow-settings-utils';
+import type { WorkflowSettingsDraft } from '@/components/workflows/workflow-settings-utils';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Save } from 'lucide-react';
@@ -113,7 +115,9 @@ export default function NewWorkflowPage() {
   // Fields outside the graph that a pasted definition carried — the only way
   // to declare them when creating a workflow, since there is no settings form
   // yet. Merged under the page's own fields on register.
-  const [pastedFields, setPastedFields] = useState<Record<string, unknown>>({});
+  // The workflow-level fields: what the settings panel edits and what a pasted
+  // definition supplies. One state, so the two surfaces cannot disagree.
+  const [settingsDraft, setSettingsDraft] = useState<WorkflowSettingsDraft>({});
 
   const registerCurrentCanvas = useCallback(async (versionTitle: string) => {
     const steps = currentStepsRef.current;
@@ -156,7 +160,7 @@ export default function NewWorkflowPage() {
           // After the page's own fields: a pasted title shown in the panel has
           // to be the one that registers. `name` stays the page's, since the
           // route and the save dialog both key off it.
-          ...pastedFields,
+          ...pruneWorkflowSettings(settingsDraft),
           name: workflowId,
           // After the spread as well: a pasted `metadata` carries its own keys,
           // and letting it replace this one wholesale drops the display name
@@ -180,7 +184,7 @@ export default function NewWorkflowPage() {
       toast({ title: 'Save failed', description: message, variant: 'error' });
       throw err;
     }
-  }, [workflowName, effectiveNamespace, description, pastedFields, toast]);
+  }, [workflowName, effectiveNamespace, description, settingsDraft, toast]);
 
   const handleSave = useCallback(async (versionTitle: string) => {
     setDialogOpen(false);
@@ -345,9 +349,11 @@ export default function NewWorkflowPage() {
         initialSteps={TEMPLATE_STEPS}
         initialTransitions={TEMPLATE_TRANSITIONS}
         namespace={effectiveNamespace}
-        wdJsonFields={{ ...wdJsonFields, ...pastedFields }}
+        wdJsonFields={{ ...wdJsonFields, ...settingsDraft }}
+        settingsDraft={settingsDraft}
+        onSettingsChange={setSettingsDraft}
         onNonGraphFieldsChange={(fields) => {
-          setPastedFields(fields);
+          setSettingsDraft(fields);
           // The create page owns name and description as form state, so a paste
           // has to fill the inputs rather than register values the author
           // cannot see. `title` is the version title, asked for on save.
@@ -365,7 +371,7 @@ export default function NewWorkflowPage() {
       <UnsavedChangesGuard when={hasUnsavedChanges} />
 
       <SaveVersionDialog
-        suggestedTitle={typeof pastedFields.title === 'string' ? pastedFields.title : undefined}
+        suggestedTitle={typeof settingsDraft.title === 'string' ? settingsDraft.title : undefined}
         open={dialogOpen}
         nextVersion={1}
         confirmLabel="Publish workflow"
