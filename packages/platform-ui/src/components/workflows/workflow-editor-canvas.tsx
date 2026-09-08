@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, Check, AlertTriangle } from 'lucide-react';
+import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Check, AlertTriangle } from 'lucide-react';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
@@ -28,6 +28,8 @@ import { StepEditor } from './workflow-editor/step-editor';
 import { ModelPicker } from './workflow-editor/model-picker';
 import { selectBase } from './workflow-editor/step-editor-fields';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
+import { WorkflowSettingsPanel } from './workflow-settings-panel';
+import type { WorkflowSettingsDraft } from './workflow-settings-utils';
 import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 import { mediforce, ApiError } from '@/lib/mediforce';
@@ -121,6 +123,11 @@ export interface WorkflowEditorCanvasProps {
   /** Applied when a pasted document carries fields outside the graph, so the
    *  source panel can round-trip a whole definition instead of refusing it. */
   onNonGraphFieldsChange?: (fields: Record<string, unknown>) => void;
+  /** The workflow-level fields the settings panel edits. Owned by the page,
+   *  which is what registers them. */
+  settingsDraft?: WorkflowSettingsDraft;
+  onSettingsChange?: (draft: WorkflowSettingsDraft) => void;
+  workspaceRoles?: string[];
   workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
   workflowName?: string;
   namespace?: string;
@@ -159,6 +166,9 @@ export function WorkflowEditorCanvas({
   initialInputForNextRun,
   wdJsonFields,
   onNonGraphFieldsChange,
+  settingsDraft,
+  onSettingsChange,
+  workspaceRoles,
   workflowExternalSkillsRepo,
   workflowName,
   namespace,
@@ -168,7 +178,7 @@ export function WorkflowEditorCanvas({
   stepErrors,
 }: WorkflowEditorCanvasProps) {
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
-  const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'add-block' | null>(null);
+  const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'settings' | 'add-block' | null>(null);
   const [addBlockContext, setAddBlockContext] = useState<{ fromId: string; toId: string } | null>(null);
   const [aiPaneOpen, setAiPaneOpen] = useState(false);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
@@ -776,6 +786,15 @@ export function WorkflowEditorCanvas({
           <AuthoringPathsPopover />
 
           <button
+            onClick={() => setRightPanelView('settings')}
+            title="Workflow settings — the input contract, agent preamble, env and repositories"
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Settings
+          </button>
+
+          <button
             onClick={() => setRightPanelView('secrets')}
             title="Workflow secrets"
             className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground"
@@ -1019,6 +1038,36 @@ export function WorkflowEditorCanvas({
             ) : (
               <p className="text-sm text-muted-foreground">Save the workflow first to manage secrets.</p>
             )}
+          </div>
+        </div>
+      )}
+
+      {rightPanelView === 'settings' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
+          <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-2xl mx-4 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="shrink-0 flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">Workflow settings</h2>
+              </div>
+              <button
+                onClick={() => setRightPanelView(null)}
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="shrink-0 text-xs text-muted-foreground">
+              These apply to the whole workflow, not a single step. They save with the next version.
+            </p>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <WorkflowSettingsPanel
+                draft={settingsDraft ?? {}}
+                onChange={(patch) => onSettingsChange?.({ ...settingsDraft, ...patch })}
+                workspaceRoles={workspaceRoles}
+              />
+            </div>
           </div>
         </div>
       )}
