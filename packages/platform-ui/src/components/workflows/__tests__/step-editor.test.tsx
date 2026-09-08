@@ -1345,3 +1345,75 @@ describe('StepEditor — verdict presentation and conditional params', () => {
       .params?.[0]?.requiredForVerdicts).toEqual(['reject']);
   });
 });
+
+// Skills used to be a repo path typed by hand, which is why uploading one had
+// nowhere to land. A skill the workflow carries is picked here instead, and
+// picking it fills in the directory the runtime reads it from.
+describe('StepEditor — skills the workflow carries', () => {
+  beforeEach(() => {
+    pluginState.plugins = [];
+    agentState.response = { agents: [] };
+    modelState.models = [];
+    rolesState.workspaceRoles = {
+      roles: [], workflowNames: [], heldRoles: null, loading: false, error: null,
+    };
+    rolesState.members = [];
+  });
+
+  const agentStep = (agent: Record<string, unknown> = {}): WorkflowStep =>
+    buildStep({ id: 'interpret', name: 'Interpret', executor: 'agent', agent });
+
+  it('offers each carried skill, and sets both fields when one is picked', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={agentStep()}
+        allSteps={[agentStep()]}
+        onChange={onChange}
+        workflowArtifacts={[
+          { path: 'skills/data-validator/SKILL.md', contents: '# Validator' },
+          { path: 'plugins/lz/skills/router/SKILL.md', contents: '# Router' },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Prompt & model'));
+    const picker = screen.getByLabelText('Skill') as HTMLSelectElement;
+    expect([...picker.options].map((option) => option.textContent)).toEqual([
+      'None',
+      'router (plugins/lz/skills)',
+      'data-validator',
+    ]);
+
+    fireEvent.change(picker, { target: { value: 'skills/data-validator' } });
+    // Both fields, because a skill name alone does not tell the runtime where
+    // to read it from — that pair is what this replaces typing by hand.
+    expect(onChange).toHaveBeenLastCalledWith({
+      agent: expect.objectContaining({ skill: 'data-validator', skillsDir: 'skills' }),
+    });
+  });
+
+  it('clears both fields when the skill is set back to none', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={agentStep({ skill: 'data-validator', skillsDir: 'skills' })}
+        allSteps={[agentStep()]}
+        onChange={onChange}
+        workflowArtifacts={[{ path: 'skills/data-validator/SKILL.md', contents: '' }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Prompt & model'));
+    fireEvent.change(screen.getByLabelText('Skill'), { target: { value: '' } });
+    expect(onChange).toHaveBeenLastCalledWith({
+      agent: expect.objectContaining({ skill: undefined, skillsDir: undefined }),
+    });
+  });
+
+  it('stays a text field when the workflow carries no skills, so a repo path can still be typed', () => {
+    render(<StepEditor step={agentStep()} allSteps={[agentStep()]} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByText('Prompt & model'));
+    expect(screen.queryByLabelText('Skill')).toBeNull();
+  });
+});

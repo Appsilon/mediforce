@@ -114,8 +114,10 @@ export function WorkflowFilesPanel({
       <div className="flex w-56 shrink-0 flex-col gap-1">
         {artifacts.length === 0 && (
           <p className="mb-1 text-xs text-muted-foreground">
-            No files yet. Add, upload or drop one and a step can run it: a
-            command reads it from <code className="font-mono">/artifacts</code>.
+            No files yet. Add, upload or drop them here — a script a step runs
+            (read from <code className="font-mono">/artifacts</code>), a
+            Dockerfile to build its image, or a skills folder an agent step can
+            then pick.
           </p>
         )}
         <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
