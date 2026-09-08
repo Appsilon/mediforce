@@ -1,13 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle } from 'lucide-react';
-import { EditorState } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
-import { basicSetup } from 'codemirror';
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
-import { json as jsonLang } from '@codemirror/lang-json';
-import { tags } from '@lezer/highlight';
+import { X, HelpCircle, Save, KeyRound, Code2, FileCode, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle } from 'lucide-react';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import {
@@ -39,6 +33,8 @@ import { mediforce, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { applyWorkflowAssistantToolCalls, type WorkflowAssistantToolCall } from '@mediforce/platform-core';
+import { CodeEditor } from './workflow-editor/code-editor';
+import { WorkflowFilesPanel } from './workflow-files-panel';
 
 interface AssistantMessage {
   role: 'user' | 'assistant';
@@ -49,74 +45,6 @@ interface AssistantMessage {
 // Rotating status shown while the assistant works — the request is a single
 // non-streaming call, so these are indicative phases, not live server progress.
 const ASSISTANT_PHASES = ['Thinking…', 'Planning the workflow…', 'Building steps…', 'Wiring transitions…', 'Validating…'] as const;
-
-function JsonCodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<EditorView | null>(null);
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-  const externalUpdateRef = useRef(false);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const state = EditorState.create({
-      doc: value,
-      extensions: [
-        basicSetup,
-        jsonLang(),
-        EditorView.updateListener.of((update) => {
-          if (update.docChanged && !externalUpdateRef.current) {
-            onChangeRef.current(update.state.doc.toString());
-          }
-        }),
-        EditorView.theme({
-          '&': { fontSize: '11px', height: 'auto' },
-          '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', overflow: 'visible' },
-          '.cm-content': { padding: '8px 0' },
-          '.cm-gutters': { borderRight: '1px solid var(--border)', background: 'transparent', color: 'hsl(var(--muted-foreground))', fontSize: '10px' },
-          '.cm-activeLineGutter': { background: 'transparent' },
-          '.cm-tok-key':     { color: 'hsl(var(--primary))', fontWeight: '500' },
-          '.cm-tok-string':  { color: 'hsl(var(--color-status-warn))' },
-          '.cm-tok-number':  { color: 'hsl(38 75% 45%)' },
-          '.cm-tok-bool':    { color: 'hsl(var(--color-status-ok))' },
-          '.cm-tok-null':    { color: 'hsl(var(--muted-foreground))' },
-          '.cm-tok-comment': { color: 'hsl(var(--muted-foreground))', fontStyle: 'italic' },
-          '.cm-tok-punct':   { color: 'hsl(var(--muted-foreground) / 0.6)' },
-        }),
-        syntaxHighlighting(HighlightStyle.define([
-          { tag: tags.propertyName,              class: 'cm-tok-key' },
-          { tag: tags.string,                    class: 'cm-tok-string' },
-          { tag: tags.number,                    class: 'cm-tok-number' },
-          { tag: [tags.bool, tags.atom],         class: 'cm-tok-bool' },
-          { tag: tags.null,                      class: 'cm-tok-null' },
-          { tag: tags.comment,                   class: 'cm-tok-comment' },
-          { tag: [tags.separator, tags.bracket], class: 'cm-tok-punct' },
-        ])),
-      ],
-    });
-
-    const view = new EditorView({ state, parent: containerRef.current });
-    viewRef.current = view;
-    return () => { view.destroy(); viewRef.current = null; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view || view.state.doc.toString() === value) return;
-    externalUpdateRef.current = true;
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
-    externalUpdateRef.current = false;
-  }, [value]);
-
-  return (
-    <div
-      ref={containerRef}
-      className="rounded-lg border overflow-hidden [&_.cm-editor]:outline-none [&_.cm-editor.cm-focused]:outline-none"
-    />
-  );
-}
 
 export interface WorkflowEditorCanvasProps {
   initialSteps: WorkflowStep[];
@@ -179,7 +107,7 @@ export function WorkflowEditorCanvas({
   stepErrors,
 }: WorkflowEditorCanvasProps) {
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
-  const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'settings' | 'notifications' | 'add-block' | null>(null);
+  const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'settings' | 'notifications' | 'files' | 'add-block' | null>(null);
   const [addBlockContext, setAddBlockContext] = useState<{ fromId: string; toId: string } | null>(null);
   const [aiPaneOpen, setAiPaneOpen] = useState(false);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
@@ -264,11 +192,14 @@ export function WorkflowEditorCanvas({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Escape closes the Advanced and Notifications panels, including from
-      // inside their own fields, which is where a person editing them is. The
-      // JSON panel is left out on purpose: closing it asks about unapplied
+      // Escape closes the Advanced, Notifications and Files panels, including
+      // from inside their own fields, which is where a person editing them is.
+      // The JSON panel is left out on purpose: closing it asks about unapplied
       // changes first, so it cannot be dismissed by a keystroke.
-      if (e.key === 'Escape' && (rightPanelView === 'settings' || rightPanelView === 'notifications')) {
+      if (
+        e.key === 'Escape' &&
+        (rightPanelView === 'settings' || rightPanelView === 'notifications' || rightPanelView === 'files')
+      ) {
         setRightPanelView(null);
         return;
       }
@@ -575,6 +506,16 @@ export function WorkflowEditorCanvas({
     if (counts.set_transition_condition) {
       parts.push(`set ${String(counts.set_transition_condition)} routing condition${counts.set_transition_condition > 1 ? 's' : ''}`);
     }
+    // Named rather than counted: a file the assistant wrote is something to go
+    // and read, and the Files panel is where it landed.
+    if (counts.write_workflow_file) {
+      const paths = result.outcomes.filter((o) => o.tool === 'write_workflow_file').map((o) => o.stepId).join(', ');
+      parts.push(`wrote ${paths}`);
+    }
+    if (counts.remove_workflow_file) {
+      const paths = result.outcomes.filter((o) => o.tool === 'remove_workflow_file').map((o) => o.stepId).join(', ');
+      parts.push(`removed ${paths}`);
+    }
     return {
       summary: parts.length > 0 ? `Updated the workflow: ${parts.join(', ')}.` : '',
       error: errors.length > 0 ? errors.join(' ') : null,
@@ -837,6 +778,15 @@ export function WorkflowEditorCanvas({
             className="inline-flex items-center rounded-md border p-1.5 text-foreground transition-colors hover:bg-muted"
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            onClick={() => setRightPanelView('files')}
+            title="Files this workflow carries: scripts, a Dockerfile, skills"
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground"
+          >
+            <FileCode className="h-3.5 w-3.5" />
+            Files
           </button>
 
           <button
@@ -1139,6 +1089,38 @@ export function WorkflowEditorCanvas({
         </div>
       )}
 
+      {rightPanelView === 'files' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
+          <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-4xl mx-4 space-y-4 h-[85vh] flex flex-col">
+            <div className="shrink-0 flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <FileCode className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-semibold">Files</h2>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Scripts, a Dockerfile, skills — whatever this workflow needs to run.
+                  They save with the next version, and a run reads them from{' '}
+                  <code className="font-mono">/artifacts</code>. No repository required.
+                </p>
+              </div>
+              <button
+                onClick={() => setRightPanelView(null)}
+                aria-label="Close files"
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <WorkflowFilesPanel
+              artifacts={settingsDraft?.artifacts ?? []}
+              onChange={(artifacts) => onSettingsChange?.({ ...settingsDraft, artifacts })}
+            />
+          </div>
+        </div>
+      )}
+
       {rightPanelView === 'json' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={closeJsonPanel} />
@@ -1157,7 +1139,7 @@ export function WorkflowEditorCanvas({
               </button>
             </div>
             <div className="flex-1 overflow-y-auto space-y-4">
-              <JsonCodeEditor
+              <CodeEditor
                 value={jsonDraft}
                 onChange={(v) => { setJsonDraft(v); setJsonError(null); }}
               />
