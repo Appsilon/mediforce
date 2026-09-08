@@ -115,11 +115,12 @@ export default function WorkflowDefinitionVersionPage() {
     try {
       const result = await mediforceSilent.workflows.register(
         buildRegisterBody(definition, {
-          // After the page's own fields, not before: spreading first meant a
-          // pasted title showed in the panel and was overwritten on save.
+          ...pruneWorkflowSettings(settingsDraft),
+          // The dialog's fields last: a pasted title pre-fills the dialog, so
+          // it is already what a person sees there, and putting the paste after
+          // meant editing that name in the dialog was silently discarded.
           title: title || undefined,
           description: editedDescription.trim() || undefined,
-          ...pruneWorkflowSettings(settingsDraft),
           steps: orderedSteps,
           transitions: mergedTransitions,
           // Retargeted by the canvas when a step it referenced was renamed, and
