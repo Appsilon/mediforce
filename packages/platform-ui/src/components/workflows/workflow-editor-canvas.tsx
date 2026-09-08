@@ -782,20 +782,20 @@ export function WorkflowEditorCanvas({
 
           <button
             onClick={() => setRightPanelView('files')}
-            title="Files this workflow carries: scripts, a Dockerfile, skills"
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground"
+            aria-label="Files"
+            title="Files: the scripts, Dockerfile and skills this workflow carries"
+            className="inline-flex items-center rounded-md border p-1.5 text-foreground transition-colors hover:bg-muted"
           >
             <FileCode className="h-3.5 w-3.5" />
-            Files
           </button>
 
           <button
             onClick={() => setRightPanelView('secrets')}
-            title="Workflow secrets"
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground"
+            aria-label="Secrets"
+            title="Secrets: the values this workflow reads at run time"
+            className="inline-flex items-center rounded-md border p-1.5 text-foreground transition-colors hover:bg-muted"
           >
             <KeyRound className="h-3.5 w-3.5" />
-            Secrets
           </button>
 
           <span className="group relative inline-flex">
