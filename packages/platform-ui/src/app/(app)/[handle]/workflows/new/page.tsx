@@ -353,6 +353,7 @@ export default function NewWorkflowPage() {
       <UnsavedChangesGuard when={hasUnsavedChanges} />
 
       <SaveVersionDialog
+        suggestedTitle={typeof pastedFields.title === 'string' ? pastedFields.title : undefined}
         open={dialogOpen}
         nextVersion={1}
         confirmLabel="Publish workflow"

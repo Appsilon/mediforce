@@ -339,6 +339,23 @@ describe('splitPastedDefinition', () => {
     });
   });
 
+  it('names the fields it overwrote rather than dropping them in silence', () => {
+    const result = splitPastedDefinition({
+      ...graph,
+      name: 'kept',
+      namespace: 'other-workspace',
+      version: 7,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    expect(result.error).toBeNull();
+    expect(result.ignored.sort()).toEqual(['createdAt', 'namespace', 'version']);
+    expect(result.nonGraph).toEqual({ name: 'kept' });
+  });
+
+  it('reports nothing ignored when the document carries only authorable fields', () => {
+    expect(splitPastedDefinition({ ...graph, title: 'T' }).ignored).toEqual([]);
+  });
+
   it('drops the server-assigned fields a copied definition carries', () => {
     const result = splitPastedDefinition({
       ...graph,

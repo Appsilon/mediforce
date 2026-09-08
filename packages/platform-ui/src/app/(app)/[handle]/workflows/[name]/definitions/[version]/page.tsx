@@ -327,6 +327,7 @@ export default function WorkflowDefinitionVersionPage() {
       <UnsavedChangesGuard when={hasUnsavedChanges} />
 
       <SaveVersionDialog
+        suggestedTitle={typeof pastedFields.title === 'string' ? pastedFields.title : undefined}
         open={dialogOpen}
         nextVersion={definition.version + 1}
         confirmLabel="Save new version"

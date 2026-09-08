@@ -147,6 +147,10 @@ export type SplitPastedDefinition = {
     inputForNextRun: unknown;
   };
   nonGraph: Record<string, unknown>;
+  /** Keys the document carried that the platform assigns itself, so the apply
+   *  overwrote them rather than honouring them. Reported so a pasted
+   *  `namespace` does not look like it was accepted. */
+  ignored: string[];
   error: string | null;
 };
 
@@ -168,7 +172,7 @@ export type SplitPastedDefinition = {
 export function splitPastedDefinition(doc: unknown): SplitPastedDefinition {
   const empty = { steps: undefined, transitions: undefined, inputForNextRun: undefined };
   if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) {
-    return { graph: empty, nonGraph: {}, error: 'Expected a workflow definition object.' };
+    return { graph: empty, nonGraph: {}, ignored: [], error: 'Expected a workflow definition object.' };
   }
 
   const source = doc as Record<string, unknown>;
@@ -190,7 +194,7 @@ export function splitPastedDefinition(doc: unknown): SplitPastedDefinition {
   if (parsed.success === false) {
     const issue = parsed.error.issues[0];
     const field = issue?.path.join('.') ?? 'definition';
-    return { graph, nonGraph, error: `${field}: ${issue?.message ?? 'invalid'}` };
+    return { graph, nonGraph, ignored: [], error: `${field}: ${issue?.message ?? 'invalid'}` };
   }
 
   const applied: Record<string, unknown> = {};
@@ -198,7 +202,12 @@ export function splitPastedDefinition(doc: unknown): SplitPastedDefinition {
     if (key in nonGraph) applied[key] = value;
   }
 
-  return { graph, nonGraph: applied, error: null };
+  // Whatever the parse dropped was either server-assigned or a lifecycle field:
+  // the platform decides those, so the apply overwrites rather than honours
+  // them, and the visitor is told which.
+  const ignored = Object.keys(nonGraph).filter((key) => key in applied === false);
+
+  return { graph, nonGraph: applied, ignored, error: null };
 }
 
 /**

@@ -8,6 +8,9 @@ interface SaveVersionDialogProps {
   open: boolean;
   nextVersion: number;
   confirmLabel?: string;
+  /** Prefills the field — a pasted definition's own `title`, so a field the
+   *  document supplied is not retyped. Still editable before confirming. */
+  suggestedTitle?: string;
   onClose: () => void;
   onConfirm: (title: string, setAsDefault: boolean) => void;
 }
@@ -16,6 +19,7 @@ export function SaveVersionDialog({
   open,
   nextVersion,
   confirmLabel = 'Confirm',
+  suggestedTitle,
   onClose,
   onConfirm,
 }: SaveVersionDialogProps) {
@@ -25,12 +29,12 @@ export function SaveVersionDialog({
 
   useEffect(() => {
     if (open) {
-      setTitle('');
+      setTitle(suggestedTitle ?? '');
       setSetAsDefault(false);
       // Defer focus so the dialog is mounted before we focus
       setTimeout(() => inputRef.current?.focus(), 30);
     }
-  }, [open]);
+  }, [open, suggestedTitle]);
 
   if (!open) return null;
 

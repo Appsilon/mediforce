@@ -729,6 +729,13 @@ export function WorkflowEditorCanvas({
       onNonGraphFieldsChange?.(split.nonGraph);
       lastSyncedJsonRef.current = jsonDraft;
       setJsonError(null);
+      if (split.ignored.length > 0) {
+        toast({
+          variant: 'warning',
+          title: 'Some fields come from the platform',
+          description: `${split.ignored.join(', ')} ${split.ignored.length === 1 ? 'is' : 'are'} assigned when a version registers, so the pasted value was not used. Everything else was applied.`,
+        });
+      }
     } catch (err) {
       setJsonError(err instanceof Error ? err.message : 'Invalid JSON');
     }
