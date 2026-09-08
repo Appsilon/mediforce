@@ -89,6 +89,13 @@ describe('pruneWorkflowSettings', () => {
       .toEqual({ metadata: { displayName: '' } });
   });
 
+  it('drops a notification that reaches nobody, like a half-finished skills repo', () => {
+    expect(pruneWorkflowSettings({ notifications: [{ event: 'task_assigned', roles: [] }] }))
+      .toEqual({ notifications: undefined });
+    const real = [{ event: 'task_assigned' as const, roles: ['reviewer'] }];
+    expect(pruneWorkflowSettings({ notifications: real })).toEqual({ notifications: real });
+  });
+
   it('never invents a key the draft did not carry', () => {
     expect(Object.keys(pruneWorkflowSettings({}))).toEqual([]);
   });

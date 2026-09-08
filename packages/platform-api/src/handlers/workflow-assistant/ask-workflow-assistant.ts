@@ -13,6 +13,7 @@ import {
   parseWorkflowTemplate,
   applyWorkflowAssistantToolCalls,
   type WorkflowAssistantToolName,
+  type WorkflowSettings,
   type WorkflowStep,
   type WorkflowDefinition,
 } from '@mediforce/platform-core';
@@ -136,7 +137,7 @@ export function parseMutationToolCall(toolName: string, parsedArguments: unknown
 type Transitions = WorkflowDefinition['transitions'];
 
 export function validateResultingGraph(
-  currentDefinition: { steps: WorkflowStep[]; transitions: Transitions },
+  currentDefinition: { steps: WorkflowStep[]; transitions: Transitions; settings?: WorkflowSettings },
   toolCalls: WorkflowAssistantToolCall[],
   namespace: string,
 ): { valid: true } | { valid: false; errors: string[] } {
@@ -144,6 +145,7 @@ export function validateResultingGraph(
     currentDefinition.steps,
     currentDefinition.transitions,
     toolCalls,
+    currentDefinition.settings ?? {},
   );
   const mergedTransitions = mergeVerdictTransitions(applied.steps, applied.transitions);
   const orderedSteps = ensureEntryStepFirst(applied.steps, mergedTransitions);
@@ -166,8 +168,12 @@ export function validateResultingGraph(
   // Canonical cross-field validation (same gate register uses): catches rules the
   // graph/reference checks don't — e.g. an `action` executor with no action config,
   // a wait action with neither duration nor deadline. Templates carry no namespace.
+  // The workflow-level fields go through the same parse, so a model writing
+  // `url: 'not-a-url'` is told at the gate rather than failing the whole save
+  // later at register — which is what the guide promises this gate does.
   const templateParse = parseWorkflowTemplate({
     name: 'simulated',
+    ...applied.settings,
     steps: orderedSteps,
     transitions: mergedTransitions,
   });

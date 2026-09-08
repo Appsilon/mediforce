@@ -54,4 +54,37 @@ describe('validateResultingGraph', () => {
       expect(result.errors.join(' ')).toMatch(/duration|deadline|wait/i);
     }
   });
+
+  // The guide promises the assistant's edits pass "the same schema gates as
+  // registration". That was true of the graph and false of the workflow level,
+  // so a bad url passed the gate and failed the whole save at register.
+  it('rejects a workflow-level value the register schema would refuse', () => {
+    const result = validateResultingGraph(
+      {
+        steps: [
+          { id: 'draft', name: 'Draft', type: 'creation', executor: 'human' },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'draft', to: 'done' }],
+      },
+      [{ tool: 'update_workflow', arguments: { url: 'not-a-url' } }],
+      'test',
+    );
+    expect(result.valid).toBe(false);
+  });
+
+  it('accepts a valid workflow-level edit', () => {
+    const result = validateResultingGraph(
+      {
+        steps: [
+          { id: 'draft', name: 'Draft', type: 'creation', executor: 'human' },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'draft', to: 'done' }],
+      },
+      [{ tool: 'update_workflow', arguments: { preamble: 'House rules.' } }],
+      'test',
+    );
+    expect(result.valid).toBe(true);
+  });
 });
