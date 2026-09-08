@@ -469,20 +469,20 @@ test.describe('Workflow Editor Journey', () => {
   // cannot: the round trip from the panel through prune and the register body.
   // Clearing a field is the half that was silently a no-op — `buildRegisterBody`
   // spreads the loaded definition first, so an absent key means "keep".
-  test('workflow settings save, reopen showing what was set, and can be cleared', async ({ page }) => {
+  test('advanced settings save, reopen showing what was set, and can be cleared', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
 
-    const openSettings = async () => {
-      await page.getByRole('button', { name: /^settings$/i }).click();
-      await expect(page.getByRole('heading', { name: /workflow settings/i })).toBeVisible();
+    const openAdvanced = async () => {
+      await page.getByRole('button', { name: /^advanced$/i }).click();
+      await expect(page.getByRole('heading', { name: /^advanced$/i })).toBeVisible();
     };
     // Escape rather than hunting a close control: the panel is a modal and the
     // keyboard path is the one every other panel test uses.
-    const closeSettings = async () => {
+    const closeAdvanced = async () => {
       await page.keyboard.press('Escape');
-      await expect(page.getByRole('heading', { name: /workflow settings/i })).toBeHidden();
+      await expect(page.getByRole('heading', { name: /^advanced$/i })).toBeHidden();
     };
     const saveVersion = async (title: string) => {
       await page.getByRole('button', { name: /^save$/i }).click();
@@ -496,12 +496,12 @@ test.describe('Workflow Editor Journey', () => {
     });
 
     // ── Set ──────────────────────────────────────────────────────────────
-    await openSettings();
+    await openAdvanced();
     await page.getByPlaceholder(/domain context and house rules/i).fill('Study CDISCPILOT01 house rules.');
     await page.getByRole('button', { name: /add input/i }).click();
     await page.getByLabel('Input 1 name').fill('studyId');
     await page.getByLabel('Input 1 required').check();
-    await closeSettings();
+    await closeAdvanced();
     await saveVersion('with settings');
 
     await expect(async () => {
@@ -516,7 +516,7 @@ test.describe('Workflow Editor Journey', () => {
     // ── Reopen: the panel shows what the version carries ─────────────────
     await page.reload();
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
-    await openSettings();
+    await openAdvanced();
     await expect(page.getByPlaceholder(/domain context and house rules/i))
       .toHaveValue('Study CDISCPILOT01 house rules.');
 
@@ -525,7 +525,7 @@ test.describe('Workflow Editor Journey', () => {
     // means "keep". Clearing has to register an explicit unset, or the old
     // preamble stays prepended to every agent prompt.
     await page.getByPlaceholder(/domain context and house rules/i).fill('');
-    await closeSettings();
+    await closeAdvanced();
     await saveVersion('cleared preamble');
 
     await expect(async () => {
