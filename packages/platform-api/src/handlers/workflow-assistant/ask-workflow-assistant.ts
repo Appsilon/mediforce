@@ -96,12 +96,14 @@ function getValueAtPath(input: unknown, path: readonly PropertyKey[]): unknown {
 }
 
 export function parseMutationToolCall(toolName: string, parsedArguments: unknown): ParsedMutationCall {
-  const schema = toolName === 'add_step' ? AddStepToolSchema
-    : toolName === 'update_step' ? UpdateStepToolSchema
-    : toolName === 'remove_step' ? RemoveStepToolSchema
-    : null;
-  if (!schema) {
-    return { ok: false, error: `Unknown tool '${toolName}'. Valid tools: add_step, update_step, remove_step, list_models.` };
+  // Driven off the registry that `buildToolDefinitions` advertises to the
+  // model. A hand-written ladder here meant a tool could be offered and then
+  // rejected on arrival — and because the completeness gate requires every
+  // resolved call to be a mutation, a rejected one discarded the whole batch.
+  const schema: z.ZodType | undefined = WORKFLOW_ASSISTANT_TOOLS[toolName as WorkflowAssistantToolName];
+  if (schema === undefined) {
+    const valid = [...Object.keys(WORKFLOW_ASSISTANT_TOOLS), 'list_models'].join(', ');
+    return { ok: false, error: `Unknown tool '${toolName}'. Valid tools: ${valid}.` };
   }
   const result = schema.safeParse(parsedArguments);
   if (!result.success) {

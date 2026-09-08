@@ -2,12 +2,21 @@ import { describe, it, expect } from 'vitest';
 import { pruneWorkflowSettings } from '../workflow-settings-utils';
 
 describe('pruneWorkflowSettings', () => {
-  it('drops a field the author emptied rather than registering an empty string', () => {
+  it('unsets a field the author emptied, rather than registering an empty string', () => {
     // A text input yields '' when cleared. Registering that is not the same as
     // not setting the field: `url` is `z.string().url()`, so '' is refused, and
     // an empty `preamble` would be prepended to every agent prompt.
     const pruned = pruneWorkflowSettings({ preamble: '', url: '', title: '' });
-    expect(pruned).toEqual({});
+    expect(pruned).toEqual({ preamble: undefined, url: undefined, title: undefined });
+  });
+
+  it('marks the cleared key present so the save can override the loaded value', () => {
+    // `buildRegisterBody` spreads the loaded definition first, so an absent key
+    // means "keep the old value". Omitting a cleared field left the previous
+    // preamble prepended to every agent prompt.
+    const pruned = pruneWorkflowSettings({ preamble: '' });
+    expect('preamble' in pruned).toBe(true);
+    expect(pruned.preamble).toBeUndefined();
   });
 
   it('keeps a field the author actually filled', () => {
@@ -16,12 +25,12 @@ describe('pruneWorkflowSettings', () => {
   });
 
   it('trims surrounding whitespace, so a space is not a value', () => {
-    expect(pruneWorkflowSettings({ preamble: '   ' })).toEqual({});
+    expect(pruneWorkflowSettings({ preamble: '   ' })).toEqual({ preamble: undefined });
     expect(pruneWorkflowSettings({ preamble: '  rules  ' })).toEqual({ preamble: 'rules' });
   });
 
   it('drops an env map once its last entry is removed', () => {
-    expect(pruneWorkflowSettings({ env: {} })).toEqual({});
+    expect(pruneWorkflowSettings({ env: {} })).toEqual({ env: undefined });
     expect(pruneWorkflowSettings({ env: { STUDY_ID: 'CDISCPILOT01' } }))
       .toEqual({ env: { STUDY_ID: 'CDISCPILOT01' } });
   });
@@ -39,11 +48,13 @@ describe('pruneWorkflowSettings', () => {
   });
 
   it('drops empty arrays', () => {
-    expect(pruneWorkflowSettings({ triggerInput: [], notifications: [] })).toEqual({});
+    expect(pruneWorkflowSettings({ triggerInput: [], notifications: [] }))
+      .toEqual({ triggerInput: undefined, notifications: undefined });
   });
 
   it('drops a workspace whose fields are all blank', () => {
-    expect(pruneWorkflowSettings({ workspace: { remote: '', remoteAuth: '' } })).toEqual({});
+    expect(pruneWorkflowSettings({ workspace: { remote: '', remoteAuth: '' } }))
+      .toEqual({ workspace: undefined });
     expect(pruneWorkflowSettings({ workspace: { remote: 'Appsilon/repo', remoteAuth: '' } }))
       .toEqual({ workspace: { remote: 'Appsilon/repo' } });
   });
@@ -52,9 +63,13 @@ describe('pruneWorkflowSettings', () => {
     // Neither half works alone: no url means nothing to clone, no commit means
     // the runtime silently fetches nothing. The panel warns about the second
     // rather than letting it look saved.
-    expect(pruneWorkflowSettings({ externalSkillsRepo: { url: '', commit: '', auth: '' } })).toEqual({});
-    expect(pruneWorkflowSettings({ externalSkillsRepo: { url: 'https://github.com/org/skills' } })).toEqual({});
-    expect(pruneWorkflowSettings({ externalSkillsRepo: { commit: '0'.repeat(40) } })).toEqual({});
+    for (const half of [
+      { url: '', commit: '', auth: '' },
+      { url: 'https://github.com/org/skills' },
+      { commit: '0'.repeat(40) },
+    ]) {
+      expect(pruneWorkflowSettings({ externalSkillsRepo: half })).toEqual({ externalSkillsRepo: undefined });
+    }
   });
 
   it('keeps an externalSkillsRepo intact once it has a url and commit', () => {

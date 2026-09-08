@@ -128,9 +128,26 @@ export function applyWorkflowAssistantToolCalls(
     } else if (call.tool === 'update_workflow') {
       // Patch, not replace: a call naming one field must leave the others
       // alone, or "also set the preamble" would clear the env set a turn ago.
-      const changed = Object.keys(call.arguments);
-      workingSettings = { ...workingSettings, ...call.arguments };
-      outcomes.push({ tool: 'update_workflow', stepId: changed.join(', ') });
+      //
+      // `visibility` carries a `.default('private')` that `.partial()` does not
+      // strip, so a parsed patch always claims a visibility the model never
+      // wrote — narrowing a public workflow on an unrelated edit. Only keys the
+      // call actually supplied are applied.
+      const supplied = Object.entries(call.arguments).filter(([, value]) => value !== undefined);
+      const patch = Object.fromEntries(supplied) as WorkflowSettings;
+      // `env` and `metadata` are maps: a shallow spread would make "add
+      // STUDY_ID" drop every other variable, and "set a category" wipe the
+      // display name. Merged key by key, so a patch adds rather than replaces.
+      workingSettings = {
+        ...workingSettings,
+        ...patch,
+        ...(patch.env === undefined ? {} : { env: { ...workingSettings.env, ...patch.env } }),
+        ...(patch.metadata === undefined ? {} : { metadata: { ...workingSettings.metadata, ...patch.metadata } }),
+        ...(patch.externalSkillsRepo === undefined
+          ? {}
+          : { externalSkillsRepo: { ...workingSettings.externalSkillsRepo, ...patch.externalSkillsRepo } }),
+      };
+      outcomes.push({ tool: 'update_workflow', stepId: supplied.map(([key]) => key).join(', ') });
     } else if (call.tool === 'set_transition_condition') {
       const { from, to, when } = call.arguments;
       const edge = workingTransitions.find((t) => t.from === from && t.to === to);

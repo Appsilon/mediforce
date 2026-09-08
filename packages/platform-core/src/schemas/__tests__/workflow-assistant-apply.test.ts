@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { WorkflowStep, WorkflowDefinition } from '../workflow-definition';
 import { applyWorkflowAssistantToolCalls } from '../workflow-assistant-apply';
+import { UpdateWorkflowToolSchema } from '../workflow-assistant-tools';
 import type { WorkflowAssistantToolCall } from '../workflow-assistant-tools';
 
 type Transitions = WorkflowDefinition['transitions'];
@@ -130,6 +131,36 @@ describe('applyWorkflowAssistantToolCalls — the workflow level', () => {
     );
     expect(settings.preamble).toBe('House rules.');
     expect(settings.env).toEqual({ STUDY_ID: 'CDISCPILOT01' });
+  });
+
+  it('does not narrow visibility on an unrelated edit', () => {
+    // `visibility` carries a `.default('private')` that `.partial()` does not
+    // strip, so a parsed patch claims a visibility the model never wrote. A
+    // public workflow going private because someone set the preamble is an
+    // access change nobody asked for.
+    const parsed = UpdateWorkflowToolSchema.parse({ preamble: 'house rules' });
+    expect(parsed.visibility).toBeUndefined();
+
+    const { settings } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps,
+      baseCanvas().transitions,
+      [{ tool: 'update_workflow', arguments: parsed }],
+      { visibility: 'public' },
+    );
+    expect(settings.visibility).toBe('public');
+  });
+
+  it('merges env and metadata rather than replacing them', () => {
+    // "add STUDY_ID to env" must not drop the other variables, and setting a
+    // metadata key must not wipe the display name.
+    const { settings } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps,
+      baseCanvas().transitions,
+      [{ tool: 'update_workflow', arguments: { env: { STUDY_ID: 'X' }, metadata: { category: 'safety' } } }],
+      { env: { LAKE_PATH: '/output/lake' }, metadata: { displayName: 'Landing Zone' } },
+    );
+    expect(settings.env).toEqual({ LAKE_PATH: '/output/lake', STUDY_ID: 'X' });
+    expect(settings.metadata).toEqual({ displayName: 'Landing Zone', category: 'safety' });
   });
 
   it('reports which fields it changed, so the pane can summarise the edit', () => {

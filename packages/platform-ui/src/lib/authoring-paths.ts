@@ -28,7 +28,7 @@ export const AUTHORING_PATHS: AuthoringPath[] = [
     id: 'assistant',
     label: 'AI Assistant',
     reason:
-      'Describe the workflow in plain language and it edits the canvas for you — a first draft, or a bulk edit across steps.',
+      'Describe the workflow in plain language and it edits the definition for you — steps, routing conditions, and the workflow-level settings. A first draft, or a bulk edit.',
     how: 'Type into the AI Assistant pane on the right. Needs the OPENROUTER_API_KEY workspace secret.',
     icon: Sparkles,
   },

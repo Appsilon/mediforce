@@ -28,6 +28,7 @@ import { StepEditor } from './workflow-editor/step-editor';
 import { ModelPicker } from './workflow-editor/model-picker';
 import { selectBase } from './workflow-editor/step-editor-fields';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
+import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 import { WorkflowSettingsPanel } from './workflow-settings-panel';
 import { pruneWorkflowSettings } from './workflow-settings-utils';
 import type { WorkflowSettingsDraft } from './workflow-settings-utils';
@@ -128,7 +129,6 @@ export interface WorkflowEditorCanvasProps {
    *  which is what registers them. */
   settingsDraft?: WorkflowSettingsDraft;
   onSettingsChange?: (draft: WorkflowSettingsDraft) => void;
-  workspaceRoles?: string[];
   workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
   workflowName?: string;
   namespace?: string;
@@ -169,7 +169,6 @@ export function WorkflowEditorCanvas({
   onNonGraphFieldsChange,
   settingsDraft,
   onSettingsChange,
-  workspaceRoles,
   workflowExternalSkillsRepo,
   workflowName,
   namespace,
@@ -523,6 +522,14 @@ export function WorkflowEditorCanvas({
   // Applies the whole batch through the shared reducer in one atomic state
   // update. Returns a success summary and any tool-call errors separately so the
   // UI never presents a failure as a confirmed change.
+  // Seeds the notifications role pick-list. Fetched here rather than threaded
+  // through the pages: the canvas already knows the handle, and the settings
+  // panel is the only consumer.
+  const { roles: workspaceRoles } = useWorkspaceRoles(namespace ?? '', {
+    enabled: rightPanelView === 'settings',
+    workflowName,
+  });
+
   const settingsDraftRef = useRef(settingsDraft);
   settingsDraftRef.current = settingsDraft;
 
@@ -578,7 +585,7 @@ export function WorkflowEditorCanvas({
         {
           messages: nextMessages,
           model: assistantModel,
-          workflowDefinition: { steps: editedSteps, transitions: editedTransitions, settings: pruneWorkflowSettings(settingsDraft ?? {}) },
+          workflowDefinition: { steps: editedSteps, transitions: editedTransitions, settings: pruneWorkflowSettings(settingsDraftRef.current ?? {}) },
         },
         { namespace },
       );
