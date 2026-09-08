@@ -814,11 +814,11 @@ export function WorkflowEditorCanvas({
 
           <button
             onClick={() => setRightPanelView('settings')}
-            title="Workflow settings — the input contract, agent preamble, env and repositories"
+            title="Input this workflow accepts, and the preamble every agent step gets"
             className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground"
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
-            Settings
+            Input & preamble
           </button>
 
           <button
@@ -1076,7 +1076,7 @@ export function WorkflowEditorCanvas({
             <div className="shrink-0 flex items-start justify-between gap-4">
               <div className="flex items-center gap-2">
                 <SlidersHorizontal className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-semibold">Workflow settings</h2>
+                <h2 className="text-sm font-semibold">Input &amp; preamble</h2>
               </div>
               <button
                 onClick={() => setRightPanelView(null)}
@@ -1086,7 +1086,7 @@ export function WorkflowEditorCanvas({
               </button>
             </div>
             <p className="shrink-0 text-xs text-muted-foreground">
-              These apply to the whole workflow, not a single step. They save with the next version.
+              These apply to the whole workflow, not a single step, and save with the next version.
             </p>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <WorkflowSettingsPanel
