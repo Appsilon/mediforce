@@ -1,4 +1,4 @@
-import type { WorkflowDefinition } from '@mediforce/platform-core';
+import type { WorkflowDefinition, WorkflowSettings } from '@mediforce/platform-core';
 
 /**
  * The workflow-level fields the settings panel edits — everything authorable
@@ -6,27 +6,13 @@ import type { WorkflowDefinition } from '@mediforce/platform-core';
  * input is `''` here rather than absent, and `pruneWorkflowSettings` is what
  * turns that back into an absence at save time.
  */
-export type WorkflowSettingsDraft = Partial<
-  Pick<
-    WorkflowDefinition,
-    | 'title'
-    | 'description'
-    | 'preamble'
-    | 'url'
-    | 'env'
-    | 'notifications'
-    | 'workspace'
-    | 'triggerInput'
-    | 'visibility'
-    | 'roles'
-    | 'metadata'
-  >
-> & {
-  /** Partial while being filled in: the definition requires `commit`, but
-   *  demanding it on the first keystroke would make the field unfillable.
-   *  Registration validates the finished value. */
-  externalSkillsRepo?: Partial<NonNullable<WorkflowDefinition['externalSkillsRepo']>>;
-};
+/**
+ * What the settings panel edits: the reducer's own type, so the assistant and
+ * the form cannot drift about what a workflow-level field is. Values are held
+ * as the author typed them, so a cleared input is `''` rather than absent, and
+ * `pruneWorkflowSettings` turns that back into an absence at save time.
+ */
+export type WorkflowSettingsDraft = WorkflowSettings;
 
 /** What registers: the draft with every half-finished value resolved away, so
  *  `externalSkillsRepo` is either complete or absent. */
