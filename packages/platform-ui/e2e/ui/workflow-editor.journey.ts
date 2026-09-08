@@ -3,10 +3,9 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { allowPageErrors, trackPageErrors } from '../helpers/page-errors';
 
 const SUPPLY_CHAIN_DEFINITION_URL = `/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`;
-/** The workflow this journey saves a version of. Only this test saves it, so
- *  the newest version is always the one it just cut. `Supply Chain Review`'s agent
- *  steps carry no `plugin`, which `validateSteps` refuses before a request is
- *  made, so a save of it can never succeed from this page. */
+/** The workflow the two saving tests cut versions of. `Supply Chain Review`'s
+ *  agent steps carry no `plugin`, which `validateSteps` refuses before a request
+ *  is made, so a save of it can never succeed from this page. */
 const SAVEABLE_WORKFLOW = 'Editor Save Test';
 const SAVEABLE_DEFINITION_URL = `/${TEST_ORG_HANDLE}/workflows/${encodeURIComponent(SAVEABLE_WORKFLOW)}/definitions/1`;
 
@@ -469,9 +468,12 @@ test.describe('Workflow Editor Journey', () => {
   // cannot: the round trip from the panel through prune and the register body.
   // Clearing a field is the half that was silently a no-op — `buildRegisterBody`
   // spreads the loaded definition first, so an absent key means "keep".
-  test('advanced settings save, reopen showing what was set, and can be cleared', async ({ page }) => {
+  //
+  // The input contract is edited on the Triggers tab instead
+  // (trigger-input-editor.journey.ts); this panel holds the preamble.
+  test('the preamble saves, reopens showing what was set, and can be cleared', async ({ page }) => {
     trackPageErrors(page);
-    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+    await page.goto(SAVEABLE_DEFINITION_URL);
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
 
     const openAdvanced = async () => {
@@ -486,53 +488,62 @@ test.describe('Workflow Editor Journey', () => {
     };
     const saveVersion = async (title: string) => {
       await page.getByRole('button', { name: /^save$/i }).click();
-      const dialog = page.getByRole('dialog');
-      await dialog.getByRole('textbox').first().fill(title);
-      await dialog.getByRole('button', { name: /save/i }).click();
+      await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({
+        timeout: 10_000,
+      });
+      await page.getByPlaceholder('e.g. Added AI review step').fill(title);
+      await page.getByRole('button', { name: /save new version/i }).click();
     };
-    const readDefinition = async () => page.evaluate(async () => {
-      const response = await fetch('/api/workflow-definitions/Supply%20Chain%20Review?namespace=test');
-      return (await response.json()) as { preamble?: string; triggerInput?: { name: string }[]; title?: string };
-    });
+    // Both saving tests in this file cut versions of the same workflow, and the
+    // workers run in parallel, so "the latest version" is whichever test saved
+    // last. Read the version by the title this test gave it instead.
+    const readVersionTitled = async (title: string) => page.evaluate(async ([workflow, wanted]) => {
+      const base = `/api/workflow-definitions/${encodeURIComponent(workflow)}`;
+      const list = await fetch(`${base}/versions?namespace=test`);
+      const { versions } = (await list.json()) as { versions: { version: number; title?: string }[] };
+      const match = versions.find((entry) => entry.title === wanted);
+      if (match === undefined) return null;
+      const response = await fetch(`${base}?namespace=test&version=${String(match.version)}`);
+      const body = (await response.json()) as { definition: { preamble?: string; title?: string } };
+      return { version: match.version, definition: body.definition };
+    }, [SAVEABLE_WORKFLOW, title] as const);
 
     // ── Set ──────────────────────────────────────────────────────────────
     await openAdvanced();
-    await page.getByPlaceholder(/domain context and house rules/i).fill('Study CDISCPILOT01 house rules.');
-    await page.getByRole('button', { name: /add input/i }).click();
-    await page.getByLabel('Input 1 name').fill('studyId');
-    await page.getByLabel('Input 1 required').check();
+    await page.getByPlaceholder(/house rules for every agent step/i).fill('Study CDISCPILOT01 house rules.');
     await closeAdvanced();
     await saveVersion('with settings');
 
+    // The version the dialog asked for exists under that name, which is also
+    // what proves the dialog's title reaches the register body rather than the
+    // previous version's.
     await expect(async () => {
-      const saved = await readDefinition();
-      expect(saved.preamble).toBe('Study CDISCPILOT01 house rules.');
-      expect(saved.triggerInput?.[0]?.name).toBe('studyId');
-      // The version title the dialog asked for, not the previous version's:
-      // seeding the panel with `title` used to let the old one win.
-      expect(saved.title).toBe('with settings');
+      const pending = await readVersionTitled('with settings');
+      expect(pending?.definition.preamble).toBe('Study CDISCPILOT01 house rules.');
     }).toPass({ timeout: 20_000 });
+    const saved = await readVersionTitled('with settings');
 
     // ── Reopen: the panel shows what the version carries ─────────────────
-    await page.reload();
+    // The save appended a version, so what carries the preamble is that one and
+    // not the version this page was opened on.
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/${encodeURIComponent(SAVEABLE_WORKFLOW)}/definitions/${String(saved?.version ?? 0)}`);
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
     await openAdvanced();
-    await expect(page.getByPlaceholder(/domain context and house rules/i))
+    await expect(page.getByPlaceholder(/house rules for every agent step/i))
       .toHaveValue('Study CDISCPILOT01 house rules.');
 
     // ── Clear: the half that was a silent no-op ──────────────────────────
     // `buildRegisterBody` spreads the loaded definition first, so an absent key
     // means "keep". Clearing has to register an explicit unset, or the old
     // preamble stays prepended to every agent prompt.
-    await page.getByPlaceholder(/domain context and house rules/i).fill('');
+    await page.getByPlaceholder(/house rules for every agent step/i).fill('');
     await closeAdvanced();
     await saveVersion('cleared preamble');
 
     await expect(async () => {
-      const saved = await readDefinition();
-      expect(saved.preamble ?? '').toBe('');
-      // Untouched fields survive the clear of a sibling.
-      expect(saved.triggerInput?.[0]?.name).toBe('studyId');
+      const cleared = await readVersionTitled('cleared preamble');
+      expect(cleared).not.toBeNull();
+      expect(cleared?.definition.preamble ?? '').toBe('');
     }).toPass({ timeout: 20_000 });
   });
 
@@ -582,19 +593,17 @@ test.describe('Workflow Editor Journey', () => {
     await page.getByPlaceholder('e.g. Added AI review step').fill('paste round-trip');
     await page.getByRole('button', { name: /save new version/i }).click();
 
-    // Read the newest version and assert the pasted field is on it. Found by
-    // version number rather than by the name typed into the dialog: a pasted
-    // `title` currently wins over that name, so the saved version still carries
-    // the one it was pasted with. This test is the only one saving this
-    // workflow, so the highest version is the one it just cut.
+    // Read the version this save produced, by the title it was given: the other
+    // saving test in this file cuts versions of the same workflow in parallel,
+    // so "the latest version" is not necessarily this one.
     await expect(async () => {
       const saved = await page.evaluate(async (workflow) => {
         const base = `/api/workflow-definitions/${encodeURIComponent(workflow)}`;
         const list = await fetch(`${base}/versions?namespace=test`);
-        const { versions } = (await list.json()) as { versions: { version: number }[] };
-        const newest = versions.reduce((max, entry) => Math.max(max, entry.version), 0);
-        if (newest < 2) return null;
-        const response = await fetch(`${base}?namespace=test&version=${String(newest)}`);
+        const { versions } = (await list.json()) as { versions: { version: number; title?: string }[] };
+        const match = versions.find((entry) => entry.title === 'paste round-trip');
+        if (match === undefined) return null;
+        const response = await fetch(`${base}?namespace=test&version=${String(match.version)}`);
         const body = (await response.json()) as { definition: { preamble?: string } };
         return body.definition;
       }, SAVEABLE_WORKFLOW);

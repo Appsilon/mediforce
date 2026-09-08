@@ -2,9 +2,13 @@
 
 import * as React from 'react';
 import { Clock, Play, Square, Trash2, Pencil, Plus, Check, X, MousePointerClick, Webhook, Download, Upload } from 'lucide-react';
-import { mediforce, ApiError } from '@/lib/mediforce';
+import { mediforce, mediforceSilent, ApiError } from '@/lib/mediforce';
 import { saveBlobToDevice } from '@/lib/save-blob';
-import { TriggerConfigFileSchema, type TriggerInputField } from '@mediforce/platform-core';
+import {
+  TriggerConfigFileSchema,
+  type TriggerInputField,
+  type WorkflowDefinition,
+} from '@mediforce/platform-core';
 import {
   useWorkflowTriggers,
   type CronTrigger,
@@ -12,7 +16,12 @@ import {
   type WebhookTrigger,
 } from '@/hooks/use-workflow-triggers';
 import { formatCron } from '@/lib/format-cron';
-import { parseCronPayloadText } from '@/lib/trigger-input-payload';
+import {
+  normalizeTriggerInput,
+  parseCronPayloadText,
+  triggerInputIssue,
+} from '@/lib/trigger-input-payload';
+import { buildRegisterBody } from '@/lib/workflow-save-utils';
 import { cn } from '@/lib/utils';
 
 const SCHEDULE_HELPER_TEXT =
@@ -118,11 +127,9 @@ function WebhookUsageExample({
         </p>
       ) : triggerInput.length === 0 ? (
         <p className="mt-1 text-xs text-muted-foreground">
-          This workflow declares no trigger input, so the body must be empty — a
-          request carrying any field is rejected with 400. Declare fields under{' '}
-          <code className="font-mono">triggerInput</code> under{' '}
-          <strong>Input &amp; preamble</strong> in the version editor, which saves them
-          with a new version.
+          This workflow accepts no input, so the body must be empty. A request
+          carrying any field is rejected with 400. Add the fields it should
+          accept under <strong>Input</strong> above.
         </p>
       ) : (
         <p className="mt-1 text-xs text-muted-foreground">
@@ -208,6 +215,9 @@ export function TriggersPanel({
   definitionName,
   triggerInput,
   contractLoading,
+  editableDefinition,
+  mayEdit,
+  onRegistered,
 }: {
   handle: string;
   definitionName: string;
@@ -217,12 +227,29 @@ export function TriggersPanel({
   triggerInput: TriggerInputField[];
   /** True until that definition has loaded. An unloaded contract is
    *  indistinguishable from an empty one, and the empty-contract copy tells the
-   *  user their body must be empty — advice the server would then reject. */
+   *  user their body must be empty, advice the server would then reject. */
   contractLoading: boolean;
+  /** The definition a save cuts a new version from, or null when the input is
+   *  not editable here. It is only ever the version a firing resolves, so what
+   *  this tab edits is the contract it explains; when the workflow's default
+   *  version is pinned to an older one, editing belongs in that version's
+   *  editor and the fields render read-only. */
+  editableDefinition: WorkflowDefinition | null;
+  /** Whether this visitor may edit the workflow at all. Separates the two
+   *  reasons the fields are read-only, so a viewer is not told to go and edit a
+   *  version they cannot open. */
+  mayEdit: boolean;
+  /** Called with the version a save produced, so the page can point the
+   *  workflow at it and refetch. */
+  onRegistered: (version: number) => Promise<void>;
 }) {
   const { cronTriggers, manualTriggers, webhookTriggers, loading, error, invalidate } =
     useWorkflowTriggers(definitionName, handle);
   const loadError = error !== null ? errorMessage(error) : '';
+  // Held here rather than in the section: saving remounts it on the version it
+  // produced, which is how its draft follows the definition, and state inside
+  // would go with the old mount.
+  const [savedInputVersion, setSavedInputVersion] = React.useState<number | null>(null);
 
   if (loading) {
     return (
@@ -238,6 +265,19 @@ export function TriggersPanel({
       {loadError && <p className="text-sm text-destructive">{loadError}</p>}
 
       <PortTriggersToolbar handle={handle} definitionName={definitionName} onImported={invalidate} />
+
+      <TriggerInputSection
+        key={editableDefinition?.version ?? 'read-only'}
+        triggerInput={triggerInput}
+        contractLoading={contractLoading}
+        editableDefinition={editableDefinition}
+        mayEdit={mayEdit}
+        savedVersion={savedInputVersion}
+        onRegistered={async (version) => {
+          setSavedInputVersion(version);
+          await onRegistered(version);
+        }}
+      />
 
       <section className="space-y-3">
         <div>
@@ -319,6 +359,249 @@ export function TriggersPanel({
         )}
       </section>
     </div>
+  );
+}
+
+/** `TriggerInputFieldSchema` narrows `StepParamSchema`'s open `type` to this
+ *  enum, so unlike a step param these are the only accepted values. */
+const TRIGGER_INPUT_TYPES: TriggerInputField['type'][] = [
+  'string',
+  'number',
+  'boolean',
+  'date',
+  'datetime',
+  'select',
+  'multiselect',
+  'textarea',
+  'object',
+];
+
+const fieldInput =
+  'w-full rounded-md border bg-background px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring disabled:opacity-60';
+
+/**
+ * The input this workflow accepts, edited where it is explained: every trigger
+ * on this tab is validated against it, and both the cron payload editor and the
+ * webhook example are generated from it.
+ *
+ * Saving registers a new version, which is how a definition changes at all. The
+ * version it cuts from is the one a firing resolves, so an edit here takes
+ * effect on the next firing rather than landing on a version nothing runs.
+ */
+function TriggerInputSection({
+  triggerInput,
+  contractLoading,
+  editableDefinition,
+  mayEdit,
+  savedVersion,
+  onRegistered,
+}: {
+  triggerInput: TriggerInputField[];
+  contractLoading: boolean;
+  editableDefinition: WorkflowDefinition | null;
+  mayEdit: boolean;
+  /** The version the last save produced, so the confirmation survives the
+   *  remount that save causes. */
+  savedVersion: number | null;
+  onRegistered: (version: number) => Promise<void>;
+}) {
+  const [fields, setFields] = React.useState<TriggerInputField[]>(triggerInput);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string>('');
+
+  const issue = triggerInputIssue(fields);
+  // Both sides go through the same normalisation, so the comparison is about
+  // values rather than the key order the server happened to serialise.
+  const edited =
+    JSON.stringify(normalizeTriggerInput(fields)) !==
+    JSON.stringify(normalizeTriggerInput(triggerInput));
+
+  const replace = (index: number, field: TriggerInputField): void =>
+    setFields(fields.map((existing, i) => (i === index ? field : existing)));
+
+  async function save() {
+    if (editableDefinition === null || issue !== null) return;
+    setBusy(true);
+    setError('');
+    try {
+      const { version } = await mediforceSilent.workflows.register(
+        buildRegisterBody(editableDefinition, { triggerInput: normalizeTriggerInput(fields) }),
+        { namespace: editableDefinition.namespace },
+      );
+      await onRegistered(version);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold">Input</h2>
+        <p className="text-xs text-muted-foreground">
+          What this workflow accepts when it starts. Every trigger below is
+          checked against these fields, and steps read the values as{' '}
+          <code className="font-mono">{'${triggerPayload.<name>}'}</code>.
+        </p>
+      </div>
+
+      {contractLoading ? (
+        <div className="h-16 animate-pulse rounded-md bg-muted" />
+      ) : editableDefinition === null ? (
+        <div className="rounded-md border p-4">
+          {triggerInput.length === 0 ? (
+            <p className="text-sm text-muted-foreground">This workflow accepts no input.</p>
+          ) : (
+            <ul className="space-y-1 text-sm">
+              {triggerInput.map((field) => (
+                <li key={field.name} className="flex items-center gap-2">
+                  <span className="font-mono">{field.name}</span>
+                  <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                    {field.type}
+                  </span>
+                  {field.required === true && (
+                    <span className="text-xs text-muted-foreground">required</span>
+                  )}
+                  {field.description !== undefined && (
+                    <span className="truncate text-xs text-muted-foreground">
+                      {field.description}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {mayEdit && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              This workflow runs a pinned version, so its input is edited in
+              that version&rsquo;s editor.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2 rounded-md border p-4">
+          {fields.map((field, index) => (
+            <div key={index} className="space-y-1 rounded-md border border-border/60 p-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={field.name}
+                  placeholder="studyId"
+                  aria-label={`Input ${String(index + 1)} name`}
+                  disabled={busy}
+                  onChange={(e) => replace(index, { ...field, name: e.target.value })}
+                  className={cn(fieldInput, 'flex-1 font-mono')}
+                />
+                <select
+                  value={field.type}
+                  aria-label={`Input ${String(index + 1)} type`}
+                  disabled={busy}
+                  onChange={(e) =>
+                    replace(index, { ...field, type: e.target.value as TriggerInputField['type'] })
+                  }
+                  className={cn(fieldInput, 'w-32 shrink-0 cursor-pointer')}
+                >
+                  {TRIGGER_INPUT_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+                <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={field.required === true}
+                    aria-label={`Input ${String(index + 1)} required`}
+                    disabled={busy}
+                    onChange={(e) => replace(index, { ...field, required: e.target.checked })}
+                  />
+                  required
+                </label>
+                <button
+                  type="button"
+                  aria-label={`Remove input ${String(index + 1)}`}
+                  disabled={busy}
+                  onClick={() => setFields(fields.filter((_, i) => i !== index))}
+                  className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <input
+                type="text"
+                value={field.description ?? ''}
+                placeholder="What this input is for"
+                aria-label={`Input ${String(index + 1)} description`}
+                disabled={busy}
+                onChange={(e) =>
+                  replace(index, { ...field, description: e.target.value || undefined })
+                }
+                className={fieldInput}
+              />
+              {(field.type === 'select' || field.type === 'multiselect') && (
+                <input
+                  type="text"
+                  value={field.options?.join(', ') ?? ''}
+                  placeholder="option-a, option-b"
+                  aria-label={`Input ${String(index + 1)} options`}
+                  disabled={busy}
+                  onChange={(e) => {
+                    const options = e.target.value
+                      .split(',')
+                      .map((option) => option.trim())
+                      .filter((option) => option !== '');
+                    replace(index, { ...field, options: options.length > 0 ? options : undefined });
+                  }}
+                  className={cn(fieldInput, 'font-mono')}
+                />
+              )}
+            </div>
+          ))}
+
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                setFields([...fields, { name: '', type: 'string', required: false }])
+              }
+              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add input
+            </button>
+            <div className="flex items-center gap-3">
+              {savedVersion !== null && edited === false && (
+                <span className="text-xs text-muted-foreground">
+                  Saved as version {savedVersion}.
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => void save()}
+                disabled={busy || edited === false || issue !== null}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  'bg-primary text-primary-foreground hover:bg-primary/90',
+                  'disabled:opacity-50 disabled:cursor-not-allowed',
+                )}
+              >
+                {busy ? 'Saving...' : 'Save input'}
+              </button>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Saving adds a new version of this workflow and points it at that
+            version. Runs already in flight keep the version they started on.
+          </p>
+          {issue !== null && edited && <p className="text-xs text-destructive">{issue}</p>}
+          {error && <p className="text-xs text-destructive">{error}</p>}
+        </div>
+      )}
+    </section>
   );
 }
 
