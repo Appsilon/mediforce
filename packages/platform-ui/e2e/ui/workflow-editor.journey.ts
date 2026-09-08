@@ -465,6 +465,46 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByRole('button', { name: /apply json/i })).toBeVisible();
   });
 
+  // The workflow-level fields had no surface at all, so this covers what L1
+  // cannot: the round trip from the panel through prune and the register body.
+  // Clearing a field is the half that was silently a no-op — `buildRegisterBody`
+  // spreads the loaded definition first, so an absent key means "keep".
+  test('workflow settings save, reopen showing what was set, and can be cleared', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: /^settings$/i }).click();
+    await expect(page.getByRole('heading', { name: /workflow settings/i })).toBeVisible();
+
+    const preamble = page.getByPlaceholder(/domain context and house rules/i);
+    await preamble.fill('Study CDISCPILOT01 house rules.');
+
+    await page.getByRole('button', { name: /add input/i }).click();
+    await page.getByLabel('Input 1 name').fill('studyId');
+    await page.getByLabel('Input 1 required').check();
+
+    await page.getByRole('button', { name: /^close$|^×$/i }).first().click().catch(() => undefined);
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: /^save$/i }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('textbox').first().fill('with settings');
+    await dialog.getByRole('button', { name: /save/i }).click();
+
+    await expect(async () => {
+      const saved = await page.evaluate(async () => {
+        const response = await fetch('/api/workflow-definitions/Supply%20Chain%20Review?namespace=test');
+        return (await response.json()) as { preamble?: string; triggerInput?: { name: string }[]; title?: string };
+      });
+      expect(saved.preamble).toBe('Study CDISCPILOT01 house rules.');
+      expect(saved.triggerInput?.[0]?.name).toBe('studyId');
+      // The version title the dialog asked for, not the previous version's:
+      // seeding the panel with `title` used to let the old one win.
+      expect(saved.title).toBe('with settings');
+    }).toPass({ timeout: 20_000 });
+  });
+
   // A definition copied out of a registered version used to be un-pasteable:
   // the panel compared every non-graph field against page state and refused.
   // This is the path that proves a pasted field survives all the way to the

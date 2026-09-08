@@ -19,13 +19,6 @@ const riMono = inputBaseMono;
 const rs = selectBase;
 const rt = textareaBase;
 
-/**
- * The workflow-level fields, which had no surface at all: the source panel
- * refused them and pointed at "workflow settings", the Triggers panel rendered
- * `triggerInput` read-only and told the reader to go and define it in the
- * definition, and neither place existed.
- */
-
 const TIP = {
   triggerInput: 'The input contract for the whole workflow (ADR-0012). Every trigger and every spawned child validates its payload against this, and steps read the values as ${triggerPayload.<name>}.',
   preamble: 'Prepended to every agent prompt in this workflow — house rules, domain context, terminology.',
@@ -353,14 +346,20 @@ export function WorkflowSettingsPanel({
               className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
             />
           </FieldRow>
-          {draft.externalSkillsRepo?.url !== undefined
-            && draft.externalSkillsRepo.url.trim() !== ''
-            && (draft.externalSkillsRepo.commit ?? '').trim() === '' && (
-            <p className="px-0.5 text-[11px] leading-relaxed text-amber-600 dark:text-amber-500">
-              A skills repo needs a commit — the runtime fetches nothing without one, so
-              this repo is not saved until you supply it.
-            </p>
-          )}
+          {(() => {
+            // Symmetric: either half alone is unusable, so both cases warn.
+            const url = (draft.externalSkillsRepo?.url ?? '').trim();
+            const commit = (draft.externalSkillsRepo?.commit ?? '').trim();
+            if (url === '' && commit === '') return null;
+            if (url !== '' && commit !== '') return null;
+            return (
+              <p className="px-0.5 text-[11px] leading-relaxed text-amber-600 dark:text-amber-500">
+                A skills repo needs both a url and a commit — with only one the runtime
+                fetches nothing, so this repo is not saved until you supply the{' '}
+                {url === '' ? 'url' : 'commit'}.
+              </p>
+            );
+          })()}
           <FieldRow label="externalSkillsRepo.auth" tooltip={TIP.skillsRepoAuth}>
             <input
               value={draft.externalSkillsRepo?.auth ?? ''}

@@ -318,7 +318,6 @@ export default function WorkflowDefinitionVersionPage() {
         workflowExternalSkillsRepo={definition.externalSkillsRepo}
         wdJsonFields={{ ...(wdJsonFields as Record<string, unknown>), ...settingsDraft }}
         settingsDraft={{
-          title: definition.title,
           preamble: definition.preamble,
           url: definition.url,
           env: definition.env,

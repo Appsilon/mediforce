@@ -39,6 +39,13 @@ function pruneString(value: string): string | undefined {
  * prompt in the workflow. Empty maps, arrays and all-blank objects go the same
  * way — an author who removed the last env entry meant to remove `env`.
  *
+ * A cleared field becomes an explicit `undefined` rather than a missing key,
+ * because `buildRegisterBody` spreads the loaded definition first: an absent
+ * key there means *keep the old value*, so omitting a cleared `preamble` left
+ * the previous one prepended to every agent prompt — the exact harm this
+ * function exists to prevent. `undefined` overrides the spread, and
+ * `JSON.stringify` drops it on the way out, so the field registers as unset.
+ *
  * The one deliberate exception is an env *value*: `''` there is how an author
  * declares a variable the runtime supplies, which the landing-zone package
  * relies on for `ANTHROPIC_API_KEY`. Only a blank env *name* is dropped, since
@@ -51,13 +58,12 @@ export function pruneWorkflowSettings(draft: WorkflowSettingsDraft): Registerabl
     if (value === undefined || value === null) continue;
 
     if (typeof value === 'string') {
-      const kept = pruneString(value);
-      if (kept !== undefined) Object.assign(pruned, { [key]: kept });
+      Object.assign(pruned, { [key]: pruneString(value) });
       continue;
     }
 
     if (Array.isArray(value)) {
-      if (value.length > 0) Object.assign(pruned, { [key]: value });
+      Object.assign(pruned, { [key]: value.length > 0 ? value : undefined });
       continue;
     }
 
@@ -65,7 +71,7 @@ export function pruneWorkflowSettings(draft: WorkflowSettingsDraft): Registerabl
       if (key === 'env' || key === 'metadata') {
         const entries = Object.entries(value as Record<string, unknown>)
           .filter(([name]) => name.trim() !== '');
-        if (entries.length > 0) Object.assign(pruned, { [key]: Object.fromEntries(entries) });
+        Object.assign(pruned, { [key]: entries.length > 0 ? Object.fromEntries(entries) : undefined });
         continue;
       }
 
@@ -84,8 +90,11 @@ export function pruneWorkflowSettings(draft: WorkflowSettingsDraft): Registerabl
       // without a commit the runtime silently fetches nothing. Half of one is
       // held in the draft so the author can finish typing it, but it is not
       // registered — the panel says so inline rather than dropping it quietly.
-      if (key === 'externalSkillsRepo' && (kept.url === undefined || kept.commit === undefined)) continue;
-      if (Object.keys(kept).length > 0) Object.assign(pruned, { [key]: kept });
+      if (key === 'externalSkillsRepo' && (kept.url === undefined || kept.commit === undefined)) {
+        Object.assign(pruned, { [key]: undefined });
+        continue;
+      }
+      Object.assign(pruned, { [key]: Object.keys(kept).length > 0 ? kept : undefined });
       continue;
     }
 

@@ -3,7 +3,7 @@ import {
   WorkflowStepSchema,
   TransitionSchema,
   WorkflowAssistantToolCallSchema,
-  WorkflowAuthorableSchema,
+  UpdateWorkflowToolSchema,
 } from '@mediforce/platform-core';
 
 // Size caps bound a single request before it reaches OpenRouter — the whole
@@ -30,12 +30,7 @@ export const AskWorkflowAssistantInputSchema = z.object({
     // set rather than blind — and so the assistant can answer what the input
     // contract or the preamble currently is. Optional: a caller that only
     // edits the graph need not send it.
-    settings: WorkflowAuthorableSchema.omit({
-      name: true,
-      steps: true,
-      transitions: true,
-      inputForNextRun: true,
-    }).partial().optional(),
+    settings: UpdateWorkflowToolSchema.optional(),
   }),
 });
 export type AskWorkflowAssistantInput = z.infer<typeof AskWorkflowAssistantInputSchema>;

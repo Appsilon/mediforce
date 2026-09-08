@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WorkflowStepSchema, WorkflowAuthorableSchema } from './workflow-definition';
+import { WorkflowStepSchema, WorkflowAuthorableSchema, WorkflowVisibilitySchema } from './workflow-definition';
 import { BLOCK_PRESETS } from '../blocks/block-presets';
 
 const ACTION_KIND_ALIASES: Record<string, 'http' | 'reshape' | 'email' | 'spawn' | 'wait'> = {
@@ -145,7 +145,13 @@ export const UpdateWorkflowToolSchema = WorkflowAuthorableSchema.omit({
   steps: true,
   transitions: true,
   inputForNextRun: true,
-}).partial();
+}).partial().extend({
+  // `.partial()` does not strip a `.default()`, so the base schema's
+  // `visibility: default('private')` made every patch claim a visibility the
+  // caller never sent — quietly narrowing a public workflow on an unrelated
+  // edit. Re-declared without the default so an absent field stays absent.
+  visibility: WorkflowVisibilitySchema.optional(),
+});
 export type UpdateWorkflowTool = z.infer<typeof UpdateWorkflowToolSchema>;
 
 /**
