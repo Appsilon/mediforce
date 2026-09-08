@@ -18,14 +18,24 @@ const daemon = vi.hoisted(() => ({
  *  one the daemon could not answer for. Mocked rather than left to the real
  *  module, which would otherwise reach for a Docker socket or the worker. */
 const history = vi.hoisted(() => ({ value: new Map<string, { command: string; size: string }[]>() }));
+/** What a probe answers, and how many were run — the lazy read path is defined
+ *  by which versions it probes and which it leaves alone. */
+const probe = vi.hoisted(() => ({
+  answer: { status: 'unknown' } as { status: string; agentCapable?: boolean; runtimes?: string[] },
+  calls: [] as string[],
+}));
 vi.mock('../../system/_docker', () => ({
   fetchDaemonImages: async () => daemon.value,
-  probeImageCapabilities: async () => ({ status: 'unknown' }),
+  probeImageCapabilities: async (image: string) => {
+    probe.calls.push(image);
+    return probe.answer;
+  },
   fetchImageHistory: async (image: string) => history.value.get(image) ?? null,
 }));
 
 const { createImageCatalogEntry } = await import('../create-entry');
 const { getImageCatalogEntry } = await import('../get-entry');
+const { listImageCatalogEntries } = await import('../list-entries');
 
 describe('getImageCatalogEntry handler', () => {
   let repo: InMemoryImageCatalogRepository;
@@ -36,6 +46,8 @@ describe('getImageCatalogEntry handler', () => {
     auditRepo = new InMemoryAuditRepository();
     daemon.value = UNREACHABLE_DAEMON;
     history.value = new Map();
+    probe.answer = { status: 'unknown' };
+    probe.calls = [];
   });
 
   const scopeFor = (uid: string, namespaces: string[]) =>
@@ -47,12 +59,97 @@ describe('getImageCatalogEntry handler', () => {
     return { scope, id: entry.id };
   }
 
+  it('probes on read a version that was catalogued before its image existed', async () => {
+    // The ordinary build-mode sequence: the entry is catalogued while the
+    // daemon holds nothing, and the image only appears on the first run. No
+    // write follows that build, so without a probe here the entry would read
+    // "Capabilities not probed" for ever.
+    const { scope, id } = await seedEntry();
+    expect(probe.calls).toEqual([]);
+
+    probe.answer = { status: 'known', agentCapable: true, runtimes: ['Rscript'] };
+    daemon.value = daemonWith([builtImage({ tag: 'built-later' })]);
+
+    const { entry } = await getImageCatalogEntry({ namespace: 'alpha', id }, scope);
+
+    expect(probe.calls).toEqual(['mediforce-built:built-later']);
+    expect(entry.versions[0].capabilities).toEqual({
+      status: 'known',
+      agentCapable: true,
+      runtimes: ['Rscript'],
+    });
+  });
+
+  it('does not re-probe a version whose probe already answered unknown', async () => {
+    // A read runs on a 30 s poll. Retrying every version that is not `known`
+    // would turn an image the probe cannot answer for into a container start
+    // per poll, for as long as anyone leaves the card open.
+    const { scope, id } = await seedEntry();
+    daemon.value = daemonWith([builtImage({ tag: 'unprobeable' })]);
+
+    await getImageCatalogEntry({ namespace: 'alpha', id }, scope);
+    expect(probe.calls).toHaveLength(1);
+
+    await getImageCatalogEntry({ namespace: 'alpha', id }, scope);
+    expect(probe.calls).toHaveLength(1);
+  });
+
   it('404s an id nobody catalogued', async () => {
     const scope = scopeFor('u-member', ['alpha']);
 
     await expect(
       getImageCatalogEntry({ namespace: 'alpha', id: 'nope-00000000' }, scope),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('resolves a discovered id rather than 404ing it', async () => {
+    const scope = scopeFor('u-member', ['alpha']);
+    daemon.value = daemonWith([builtImage({ buildNamespace: 'alpha' })]);
+    const { entries } = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+
+    const { entry } = await getImageCatalogEntry({ namespace: 'alpha', id: entries[0].id }, scope);
+
+    expect(entry.origin).toBe('discovered');
+    expect(entry.intent).toBe('');
+    expect(entry.versions.map((v) => v.imageTag)).toEqual(['mediforce-built:aaaaaaaaaaaa']);
+  });
+
+  // Every case below keeps its own image id: the memo behind a discovered
+  // entry's probe is module state keyed by image id, so two tests sharing one
+  // id would see each other's probes.
+  it('probes a discovered entry on read, exactly like a stored one', async () => {
+    const scope = scopeFor('u-member', ['alpha']);
+    probe.answer = { status: 'known', agentCapable: true, runtimes: ['bash', 'claude'] };
+    daemon.value = daemonWith([
+      builtImage({ buildNamespace: 'alpha', id: 'sha-probe-1', tag: 'probe-1' }),
+    ]);
+    const { entries } = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+
+    const { entry } = await getImageCatalogEntry({ namespace: 'alpha', id: entries[0].id }, scope);
+
+    expect(probe.calls).toEqual(['mediforce-built:probe-1']);
+    expect(entry.versions[0].capabilities).toEqual({
+      status: 'known',
+      agentCapable: true,
+      runtimes: ['bash', 'claude'],
+    });
+  });
+
+  it('does not re-probe a discovered version it has already answered for', async () => {
+    const scope = scopeFor('u-member', ['alpha']);
+    daemon.value = daemonWith([
+      builtImage({ buildNamespace: 'alpha', id: 'sha-probe-2', tag: 'probe-2' }),
+    ]);
+    const { entries } = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+    await getImageCatalogEntry({ namespace: 'alpha', id: entries[0].id }, scope);
+    probe.calls = [];
+
+    // The second read is the 30 s poll of a card left open: an image whose
+    // probe already answered — `unknown` included — must not start another
+    // container.
+    await getImageCatalogEntry({ namespace: 'alpha', id: entries[0].id }, scope);
+
+    expect(probe.calls).toEqual([]);
   });
 
   it('returns the entry with its versions when the daemon holds the image', async () => {

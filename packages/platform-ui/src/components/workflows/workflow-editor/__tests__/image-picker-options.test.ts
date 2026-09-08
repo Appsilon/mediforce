@@ -16,6 +16,7 @@ function entry(
     intent: `what ${overrides.name} is for`,
     source: { kind: 'referenced', reference: overrides.name },
     capabilities: {},
+    origin: 'catalogued',
     versions: [],
     availability: 'present',
     baseEntryId: null,
@@ -40,6 +41,36 @@ function version(
 const agentCapable: ImageCapabilities = { status: 'known', agentCapable: true, runtimes: ['claude', 'bash'] };
 const notAgentCapable: ImageCapabilities = { status: 'known', agentCapable: false, runtimes: ['bash'] };
 const unprobed: ImageCapabilities = { status: 'unknown' };
+
+describe('what a discovered entry reads as', () => {
+  it('says the image has no description instead of trailing an empty dash', () => {
+    const discovered = entry({
+      id: 'cdisc-case-1-1a2b3c4d',
+      name: 'cdisc-case-1',
+      origin: 'discovered',
+      intent: '',
+      versions: [version('mediforce-agent:cdisc-case-1', unprobed)],
+    });
+
+    const [group] = buildCatalogImageGroups([discovered], 'agent');
+
+    expect(group.options[0].label).toBe('cdisc-case-1 — not described yet · not probed');
+  });
+
+  it('offers it: an image this namespace built is a real answer to "which image?"', () => {
+    const discovered = entry({
+      id: 'cdisc-case-1-1a2b3c4d',
+      name: 'cdisc-case-1',
+      origin: 'discovered',
+      intent: '',
+      versions: [version('mediforce-agent:cdisc-case-1', unprobed)],
+    });
+
+    expect(buildCatalogImageGroups([discovered], 'agent')[0].options.map((o) => o.value)).toEqual([
+      'mediforce-agent:cdisc-case-1',
+    ]);
+  });
+});
 
 describe('image picker options — issue #1298', () => {
   describe('what an agent step is offered', () => {

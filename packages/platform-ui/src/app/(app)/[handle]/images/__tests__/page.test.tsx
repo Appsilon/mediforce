@@ -48,6 +48,7 @@ const GOLDEN: ImageCatalogEntryView = {
   intent: 'The image every agent step runs in unless a workflow says otherwise',
   source: { kind: 'referenced', reference: 'mediforce-golden-image' },
   capabilities: {},
+  origin: 'catalogued',
   availability: 'present',
   baseEntryId: null,
   versions: [
@@ -68,6 +69,7 @@ const TEALFLOW: ImageCatalogEntryView = {
   intent: 'R-based interactive exploration of ADaM datasets',
   source: { kind: 'built', repo: 'Appsilon/tealflow', dockerfile: 'container/Dockerfile' },
   capabilities: {},
+  origin: 'catalogued',
   availability: 'present',
   baseEntryId: 'golden',
   versions: [
@@ -89,6 +91,33 @@ const TEALFLOW: ImageCatalogEntryView = {
       commit: 'deadbee7654321',
       created: '3 weeks ago',
       size: '2.4GB',
+      capabilities: { status: 'unknown' },
+      lineage: {
+        base: { entryId: 'golden', imageId: 'sha256:golden', imageTag: 'mediforce-golden-image:latest' },
+        ownLabels: {},
+      },
+    },
+  ],
+};
+
+/** An image a workflow in this workspace built, which nobody has described. */
+const DISCOVERED: ImageCatalogEntryView = {
+  id: 'cdisc-case-1-1a2b3c4d',
+  name: 'cdisc-case-1',
+  intent: '',
+  source: { kind: 'built', repo: 'git@github.com:vedhav/cdisc-case-1.git', dockerfile: 'Dockerfile' },
+  capabilities: {},
+  origin: 'discovered',
+  availability: 'present',
+  baseEntryId: 'golden',
+  versions: [
+    {
+      imageTag: 'mediforce-agent:cdisc-case-1',
+      imageId: 'sha256:case-1',
+      commit: 'bf0353b123bee14',
+      created: '3 minutes ago',
+      size: '3.1GB',
+      workflow: 'Use Case 1: AI enabled Synthetic Data Generation',
       capabilities: { status: 'unknown' },
       lineage: {
         base: { entryId: 'golden', imageId: 'sha256:golden', imageTag: 'mediforce-golden-image:latest' },
@@ -152,6 +181,41 @@ beforeEach(() => {
 });
 
 describe('ImagesPage', () => {
+  it('shows an image this workspace built and nobody described, with what to do about it', async () => {
+    listMock.mockResolvedValue({ entries: [GOLDEN, DISCOVERED] });
+
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-cdisc-case-1-1a2b3c4d');
+    expect(within(card).getByText('Needs a description')).toBeInTheDocument();
+    expect(
+      within(card).getByText(/built this image. Nobody has said what it is for yet/),
+    ).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Describe' })).toBeInTheDocument();
+  });
+
+  it('opens the describe form on the source the build recorded, asking only for the sentence', async () => {
+    listMock.mockResolvedValue({ entries: [GOLDEN, DISCOVERED] });
+    const user = userEvent.setup();
+
+    renderPage();
+    const card = await screen.findByTestId('image-entry-cdisc-case-1-1a2b3c4d');
+    await user.click(within(card).getByRole('button', { name: 'Describe' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('git@github.com:vedhav/cdisc-case-1.git · Dockerfile')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Name')).toHaveValue('cdisc-case-1');
+    expect(within(dialog).getByLabelText('Intent')).toHaveValue('');
+  });
+
+  it('leaves a catalogued entry alone — no badge, no describe button', async () => {
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    expect(within(card).queryByText('Needs a description')).not.toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: 'Describe' })).not.toBeInTheDocument();
+  });
+
   it('groups an entry under the image it was built on, not alphabetically', async () => {
     renderPage();
 

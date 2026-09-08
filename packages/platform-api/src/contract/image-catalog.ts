@@ -68,8 +68,21 @@ export const ImageCatalogVersionSchema = z.object({
  *  never that the entry is broken (ADR-0022 decision 2). */
 export const ImageCatalogAvailabilitySchema = z.enum(['present', 'absent', 'unknown']);
 
+/** Whether anybody has described this entry yet.
+ *
+ * `discovered` is an entry the platform derived from an image it built for
+ * this namespace and nobody has written a sentence about — every other field
+ * on it is as derived as a catalogued entry's, and it is not a stored row.
+ * The distinction exists so a reader is never shown a blank `intent` with no
+ * explanation of why it is blank. */
+export const ImageCatalogOriginSchema = z.enum(['catalogued', 'discovered']);
+
 /** A stored entry plus the facts recomputed for this read. */
 export const ImageCatalogEntryViewSchema = ImageCatalogEntrySchema.extend({
+  origin: ImageCatalogOriginSchema,
+  /** Empty for a discovered entry — the one field no build can derive. Stored
+   *  entries still require it; only the view admits the empty case. */
+  intent: z.string(),
   versions: z.array(ImageCatalogVersionSchema),
   availability: ImageCatalogAvailabilitySchema,
   /**
@@ -137,6 +150,7 @@ export type ImageCatalogVersionBase = z.infer<typeof ImageCatalogVersionBaseSche
 export type ImageVersionLineage = z.infer<typeof ImageVersionLineageSchema>;
 export type ImageCatalogVersion = z.infer<typeof ImageCatalogVersionSchema>;
 export type ImageCatalogAvailability = z.infer<typeof ImageCatalogAvailabilitySchema>;
+export type ImageCatalogOrigin = z.infer<typeof ImageCatalogOriginSchema>;
 export type ImageCatalogEntryView = z.infer<typeof ImageCatalogEntryViewSchema>;
 export type ListImageCatalogEntriesInput = z.infer<typeof ListImageCatalogEntriesInputSchema>;
 export type ListImageCatalogEntriesOutput = z.infer<typeof ListImageCatalogEntriesOutputSchema>;

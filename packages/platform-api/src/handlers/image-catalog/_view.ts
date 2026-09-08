@@ -1,6 +1,6 @@
 import type { ImageCatalogEntry } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
-import type { ImageCatalogEntryView } from '../../contract/image-catalog';
+import type { ImageCatalogEntryView, ImageCatalogOrigin } from '../../contract/image-catalog';
 import { fetchDaemonImages, type DaemonImageListing } from '../system/_docker';
 import { entryAvailability, resolveEntryVersions } from './_versions';
 import { resolveCatalogLineage } from './_lineage';
@@ -17,9 +17,9 @@ import { resolveCatalogLineage } from './_lineage';
  */
 export async function toEntryViews(
   entries: readonly ImageCatalogEntry[],
-  scope: CallerScope,
   catalog: readonly ImageCatalogEntry[] = entries,
   daemon?: DaemonImageListing,
+  origin: ImageCatalogOrigin = 'catalogued',
 ): Promise<ImageCatalogEntryView[]> {
   const docker = daemon ?? (await fetchDaemonImages());
   const images = docker.available ? docker.images : [];
@@ -31,6 +31,7 @@ export async function toEntryViews(
       const versions = resolveEntryVersions(entry.source, images, entry.capabilities);
       return {
         ...entry,
+        origin,
         versions,
         availability: entryAvailability(versions.length, docker.available),
       };
@@ -49,6 +50,10 @@ export async function toEntryViews(
  * The extra read is what makes a single-entry response agree with the listing:
  * an entry's base is another entry, so answering `GET /image-catalog/:id` from
  * that entry alone would call every image a root.
+ *
+ * Stored entries only. A discovered entry is not in that read — it is not a row
+ * — so `get-entry` resolves it against the catalog it computed, which holds the
+ * other discovered entries too.
  */
 export async function toEntryView(
   namespace: string,
@@ -57,6 +62,6 @@ export async function toEntryView(
   daemon?: DaemonImageListing,
 ): Promise<ImageCatalogEntryView> {
   const catalog = await scope.imageCatalog.list(namespace);
-  const [view] = await toEntryViews([entry], scope, catalog, daemon);
+  const [view] = await toEntryViews([entry], catalog, daemon);
   return view;
 }

@@ -69,7 +69,12 @@ function versionLabel(entry: ImageCatalogEntryView, imageTag: string, unvouched:
   // it repeats what the name already said.
   const tag = entry.versions.length > 1 ? ` (${imageTag.split(':').at(-1) ?? imageTag})` : '';
   const caveat = unvouched ? ' · not probed' : '';
-  return `${entry.name}${tag} — ${entry.intent}${caveat}`;
+  // A discovered entry is an image this namespace built that nobody has
+  // described. It is still offered — it is the image the author's own workflow
+  // produced — but the slot the sentence would fill says why it is empty
+  // rather than trailing a dash into nothing.
+  const intent = entry.intent.length > 0 ? entry.intent : 'not described yet';
+  return `${entry.name}${tag} — ${intent}${caveat}`;
 }
 
 function groupLabel(baseEntryId: string | null, nameById: ReadonlyMap<string, string>): string {
