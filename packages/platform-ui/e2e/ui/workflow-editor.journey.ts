@@ -474,34 +474,65 @@ test.describe('Workflow Editor Journey', () => {
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
 
-    await page.getByRole('button', { name: /^settings$/i }).click();
-    await expect(page.getByRole('heading', { name: /workflow settings/i })).toBeVisible();
+    const openSettings = async () => {
+      await page.getByRole('button', { name: /^settings$/i }).click();
+      await expect(page.getByRole('heading', { name: /workflow settings/i })).toBeVisible();
+    };
+    // Escape rather than hunting a close control: the panel is a modal and the
+    // keyboard path is the one every other panel test uses.
+    const closeSettings = async () => {
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('heading', { name: /workflow settings/i })).toBeHidden();
+    };
+    const saveVersion = async (title: string) => {
+      await page.getByRole('button', { name: /^save$/i }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('textbox').first().fill(title);
+      await dialog.getByRole('button', { name: /save/i }).click();
+    };
+    const readDefinition = async () => page.evaluate(async () => {
+      const response = await fetch('/api/workflow-definitions/Supply%20Chain%20Review?namespace=test');
+      return (await response.json()) as { preamble?: string; triggerInput?: { name: string }[]; title?: string };
+    });
 
-    const preamble = page.getByPlaceholder(/domain context and house rules/i);
-    await preamble.fill('Study CDISCPILOT01 house rules.');
-
+    // ── Set ──────────────────────────────────────────────────────────────
+    await openSettings();
+    await page.getByPlaceholder(/domain context and house rules/i).fill('Study CDISCPILOT01 house rules.');
     await page.getByRole('button', { name: /add input/i }).click();
     await page.getByLabel('Input 1 name').fill('studyId');
     await page.getByLabel('Input 1 required').check();
-
-    await page.getByRole('button', { name: /^close$|^×$/i }).first().click().catch(() => undefined);
-    await page.keyboard.press('Escape');
-
-    await page.getByRole('button', { name: /^save$/i }).click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByRole('textbox').first().fill('with settings');
-    await dialog.getByRole('button', { name: /save/i }).click();
+    await closeSettings();
+    await saveVersion('with settings');
 
     await expect(async () => {
-      const saved = await page.evaluate(async () => {
-        const response = await fetch('/api/workflow-definitions/Supply%20Chain%20Review?namespace=test');
-        return (await response.json()) as { preamble?: string; triggerInput?: { name: string }[]; title?: string };
-      });
+      const saved = await readDefinition();
       expect(saved.preamble).toBe('Study CDISCPILOT01 house rules.');
       expect(saved.triggerInput?.[0]?.name).toBe('studyId');
       // The version title the dialog asked for, not the previous version's:
       // seeding the panel with `title` used to let the old one win.
       expect(saved.title).toBe('with settings');
+    }).toPass({ timeout: 20_000 });
+
+    // ── Reopen: the panel shows what the version carries ─────────────────
+    await page.reload();
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+    await openSettings();
+    await expect(page.getByPlaceholder(/domain context and house rules/i))
+      .toHaveValue('Study CDISCPILOT01 house rules.');
+
+    // ── Clear: the half that was a silent no-op ──────────────────────────
+    // `buildRegisterBody` spreads the loaded definition first, so an absent key
+    // means "keep". Clearing has to register an explicit unset, or the old
+    // preamble stays prepended to every agent prompt.
+    await page.getByPlaceholder(/domain context and house rules/i).fill('');
+    await closeSettings();
+    await saveVersion('cleared preamble');
+
+    await expect(async () => {
+      const saved = await readDefinition();
+      expect(saved.preamble ?? '').toBe('');
+      // Untouched fields survive the clear of a sibling.
+      expect(saved.triggerInput?.[0]?.name).toBe('studyId');
     }).toPass({ timeout: 20_000 });
   });
 

@@ -519,9 +519,6 @@ export function WorkflowEditorCanvas({
     return () => clearInterval(timer);
   }, [assistantLoading]);
 
-  // Applies the whole batch through the shared reducer in one atomic state
-  // update. Returns a success summary and any tool-call errors separately so the
-  // UI never presents a failure as a confirmed change.
   // Seeds the notifications role pick-list. Fetched here rather than threaded
   // through the pages: the canvas already knows the handle, and the settings
   // panel is the only consumer.
@@ -529,6 +526,10 @@ export function WorkflowEditorCanvas({
     enabled: rightPanelView === 'settings',
     workflowName,
   });
+
+  // Applies the whole batch through the shared reducer in one atomic state
+  // update. Returns a success summary and any tool-call errors separately so the
+  // UI never presents a failure as a confirmed change.
 
   const settingsDraftRef = useRef(settingsDraft);
   settingsDraftRef.current = settingsDraft;
