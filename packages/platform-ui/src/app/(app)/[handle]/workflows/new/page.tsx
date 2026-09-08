@@ -337,7 +337,14 @@ export default function NewWorkflowPage() {
         initialTransitions={TEMPLATE_TRANSITIONS}
         namespace={effectiveNamespace}
         wdJsonFields={{ ...wdJsonFields, ...pastedFields }}
-        onNonGraphFieldsChange={setPastedFields}
+        onNonGraphFieldsChange={(fields) => {
+          setPastedFields(fields);
+          // The create page owns name and description as form state, so a paste
+          // has to fill the inputs rather than register values the author
+          // cannot see. `title` is the version title, asked for on save.
+          if (typeof fields.description === 'string') setDescription(fields.description);
+          if (typeof fields.name === 'string') setWorkflowName(fields.name);
+        }}
         onChange={handleCanvasChange}
         onDirtyChange={setCanvasDirty}
         stepErrors={stepErrors}

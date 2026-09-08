@@ -313,7 +313,12 @@ export default function WorkflowDefinitionVersionPage() {
         namespace={handle}
         workflowExternalSkillsRepo={definition.externalSkillsRepo}
         wdJsonFields={{ ...(wdJsonFields as Record<string, unknown>), ...pastedFields }}
-        onNonGraphFieldsChange={setPastedFields}
+        onNonGraphFieldsChange={(fields) => {
+          setPastedFields(fields);
+          // The fields with an input on this page have to show what was pasted,
+          // or the header reads one description while the save writes another.
+          if (typeof fields.description === 'string') setEditedDescription(fields.description);
+        }}
         onChange={handleCanvasChange}
         onDirtyChange={setCanvasDirty}
         stepErrors={stepErrors}
