@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Check, AlertTriangle } from 'lucide-react';
+import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle } from 'lucide-react';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
@@ -30,6 +30,7 @@ import { selectBase } from './workflow-editor/step-editor-fields';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
 import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 import { WorkflowSettingsPanel } from './workflow-settings-panel';
+import { WorkflowNotificationsPanel } from './workflow-notifications-panel';
 import { pruneWorkflowSettings } from './workflow-settings-utils';
 import type { WorkflowSettingsDraft } from './workflow-settings-utils';
 import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
@@ -178,7 +179,7 @@ export function WorkflowEditorCanvas({
   stepErrors,
 }: WorkflowEditorCanvasProps) {
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
-  const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'settings' | 'add-block' | null>(null);
+  const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'settings' | 'notifications' | 'add-block' | null>(null);
   const [addBlockContext, setAddBlockContext] = useState<{ fromId: string; toId: string } | null>(null);
   const [aiPaneOpen, setAiPaneOpen] = useState(false);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
@@ -523,7 +524,7 @@ export function WorkflowEditorCanvas({
   // through the pages: the canvas already knows the handle, and the settings
   // panel is the only consumer.
   const { roles: workspaceRoles } = useWorkspaceRoles(namespace ?? '', {
-    enabled: rightPanelView === 'settings',
+    enabled: rightPanelView === 'settings' || rightPanelView === 'notifications',
     workflowName,
   });
 
@@ -813,12 +814,21 @@ export function WorkflowEditorCanvas({
           <AuthoringPathsPopover />
 
           <button
+            onClick={() => setRightPanelView('notifications')}
+            aria-label="Notifications"
+            title="Who is told when a task is assigned or an agent escalates"
+            className="inline-flex items-center rounded-md border p-1.5 text-foreground transition-colors hover:bg-muted"
+          >
+            <Bell className="h-3.5 w-3.5" />
+          </button>
+
+          <button
             onClick={() => setRightPanelView('settings')}
-            title="Input this workflow accepts, and the preamble every agent step gets"
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground"
+            aria-label="Advanced"
+            title="Advanced — the input this workflow accepts, and the preamble every agent step gets"
+            className="inline-flex items-center rounded-md border p-1.5 text-foreground transition-colors hover:bg-muted"
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
-            Input & preamble
           </button>
 
           <button
@@ -1076,7 +1086,7 @@ export function WorkflowEditorCanvas({
             <div className="shrink-0 flex items-start justify-between gap-4">
               <div className="flex items-center gap-2">
                 <SlidersHorizontal className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-semibold">Input &amp; preamble</h2>
+                <h2 className="text-sm font-semibold">Advanced</h2>
               </div>
               <button
                 onClick={() => setRightPanelView(null)}
@@ -1092,9 +1102,33 @@ export function WorkflowEditorCanvas({
               <WorkflowSettingsPanel
                 draft={settingsDraft ?? {}}
                 onChange={(patch) => onSettingsChange?.({ ...settingsDraft, ...patch })}
-                workspaceRoles={workspaceRoles}
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {rightPanelView === 'notifications' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
+          <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-lg mx-4 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Bell className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">Notifications</h2>
+              </div>
+              <button
+                onClick={() => setRightPanelView(null)}
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <WorkflowNotificationsPanel
+              draft={settingsDraft ?? {}}
+              onChange={(patch) => onSettingsChange?.({ ...settingsDraft, ...patch })}
+              workspaceRoles={workspaceRoles}
+            />
           </div>
         </div>
       )}
