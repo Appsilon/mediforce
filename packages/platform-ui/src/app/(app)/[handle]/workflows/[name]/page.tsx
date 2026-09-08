@@ -251,6 +251,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
     versions,
     defaultVersion,
     loading: versionsLoading,
+    refreshDefault,
   } = useWorkflowVersions(decodedName, handle);
   // The page header reads the full latest definition (visibility, steps[], repo,
   // url, copiedFrom) which the metadata summary does not carry. Fetch it once
@@ -286,6 +287,24 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
     decodedName,
     handle,
     runnableVersionNumber,
+  );
+  // The Triggers tab edits the input contract it explains, which means saving a
+  // new version of the version a firing resolves. Offered only when that
+  // version is also the head: registering appends, so editing a version with
+  // newer ones above it would fork the history from a page that shows none of
+  // it. A pinned older default falls back to the read-only list.
+  const editableRunnable =
+    mayEdit && runnable !== null && runnableVersionNumber === latestVersionNumber ? runnable : null;
+  // Registering appends a version, so a default pinned to the old head would
+  // leave the save unrunnable. Move the pin, which is where it already pointed.
+  const handleTriggerInputRegistered = React.useCallback(
+    async (version: number) => {
+      if (defaultVersion !== null) {
+        await mediforce.workflows.setDefaultVersion({ name: decodedName, namespace: handle, version });
+      }
+      await refreshDefault();
+    },
+    [decodedName, handle, defaultVersion, refreshDefault],
   );
   // Live trigger rows (enabled/schedule) drive the header summary, so stopping
   // a cron trigger in the Triggers tab immediately updates the header.
@@ -695,6 +714,9 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
               definitionName={decodedName}
               triggerInput={runnable?.triggerInput ?? []}
               contractLoading={versionsLoading || runnableLoading}
+              editableDefinition={editableRunnable}
+              mayEdit={mayEdit}
+              onRegistered={handleTriggerInputRegistered}
             />
           </div>
         </Tabs.Content>

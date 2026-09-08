@@ -3,7 +3,9 @@ import type { TriggerInputField } from '@mediforce/platform-core';
 import {
   buildTriggerPayload,
   hasInvalidObjectInput,
+  normalizeTriggerInput,
   parseCronPayloadText,
+  triggerInputIssue,
 } from '../trigger-input-payload';
 
 function field(partial: Partial<TriggerInputField> & { name: string }): TriggerInputField {
@@ -104,5 +106,71 @@ describe('hasInvalidObjectInput', () => {
 
   it('ignores non-object field types', () => {
     expect(hasInvalidObjectInput(fields, { title: 'not json' })).toBe(false);
+  });
+});
+
+describe('triggerInputIssue', () => {
+  it('accepts a contract that would register', () => {
+    expect(
+      triggerInputIssue([
+        { name: 'studyId', type: 'string', required: true },
+        { name: 'phase', type: 'select', required: false, options: ['I', 'II'] },
+      ]),
+    ).toBeNull();
+  });
+
+  it('accepts having no inputs at all', () => {
+    expect(triggerInputIssue([])).toBeNull();
+  });
+
+  it('names the input that has no name, which the server refuses', () => {
+    // `TriggerInputFieldSchema` is `name: z.string().min(1)`, so registering
+    // this loses the whole save to a 400 the form could have caught.
+    const issue = triggerInputIssue([{ name: '  ', type: 'string', required: false }]);
+    expect(issue).toBe('Input 1 needs a name.');
+  });
+
+  it('rejects two inputs with the same name, which the schema does not catch', () => {
+    // The payload is a JSON object keyed by field name, so a duplicate silently
+    // shadows the first field instead of failing anywhere.
+    const issue = triggerInputIssue([
+      { name: 'studyId', type: 'string', required: false },
+      { name: ' studyId ', type: 'number', required: false },
+    ]);
+    expect(issue).toBe('Two inputs are named studyId. Each name has to be different.');
+  });
+
+  it('rejects a choice list with nothing to choose from', () => {
+    for (const type of ['select', 'multiselect'] as const) {
+      expect(triggerInputIssue([{ name: 'phase', type, required: false }])).toBe(
+        'phase is a choice list, so it needs at least one option.',
+      );
+    }
+  });
+});
+
+describe('normalizeTriggerInput', () => {
+  it('trims the name, since a stray space makes the value unreadable in a step', () => {
+    // Steps read a value as ${triggerPayload.<name>}, which cannot name a field
+    // with a space in it, so the field would be set and never readable.
+    expect(normalizeTriggerInput([{ name: ' studyId ', type: 'string', required: false }])).toEqual([
+      { name: 'studyId', type: 'string', required: false },
+    ]);
+  });
+
+  it('drops a description and options the author left empty', () => {
+    expect(
+      normalizeTriggerInput([
+        { name: 'studyId', type: 'string', required: false, description: '   ', options: [] },
+      ]),
+    ).toEqual([{ name: 'studyId', type: 'string', required: false }]);
+  });
+
+  it('keeps a description and options the author filled', () => {
+    expect(
+      normalizeTriggerInput([
+        { name: 'phase', type: 'select', required: true, description: ' The phase ', options: ['I'] },
+      ]),
+    ).toEqual([{ name: 'phase', type: 'select', required: true, description: 'The phase', options: ['I'] }]);
   });
 });
