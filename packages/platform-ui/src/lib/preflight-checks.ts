@@ -1,5 +1,5 @@
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
-import { type WorkflowDefinition, normaliseModelId, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
+import { type WorkflowDefinition, normaliseModelId, stepHasBuildSource, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
 
 export interface PreflightAction {
   label: string;
@@ -97,9 +97,13 @@ export function runPreflightChecks(
 
     if (options.dockerAvailable && options.dockerImages) {
       const image = containerConfig?.image;
-      const hasBuildSource = typeof containerConfig?.repo === 'string' && containerConfig.repo.length > 0
-        && typeof containerConfig?.commit === 'string' && containerConfig.commit.length > 0;
-      if (typeof image === 'string' && image.length > 0 && !hasBuildSource) {
+      // A step that builds its own image is not missing one — including from a
+      // Dockerfile the workflow carries, which the build resolves before the
+      // step's `image` is ever looked up.
+      if (
+        typeof image === 'string' && image.length > 0 &&
+        stepHasBuildSource(containerConfig, definition.artifacts) === false
+      ) {
         const [repo, tag = 'latest'] = image.split(':');
         const found = options.dockerImages.some((img) => img.repository === repo && img.tag === tag);
         if (!found) {
@@ -253,9 +257,10 @@ export function findSkippedChecks(
     const containerConfig = step.executor === 'script' ? step.script : step.agent;
 
     const image = containerConfig?.image;
-    const hasBuildSource = typeof containerConfig?.repo === 'string' && containerConfig.repo.length > 0
-      && typeof containerConfig?.commit === 'string' && containerConfig.commit.length > 0;
-    if (typeof image === 'string' && image.length > 0 && !hasBuildSource) {
+    if (
+      typeof image === 'string' && image.length > 0 &&
+      stepHasBuildSource(containerConfig, definition.artifacts) === false
+    ) {
       needsImageLookup = true;
     }
 

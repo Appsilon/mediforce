@@ -489,6 +489,7 @@ export type {
   VersionCandidate,
   WorkflowVersionSource,
 } from './workflows/resolve-runnable-version';
+export { stepHasBuildSource } from './workflows/build-source';
 
 // MCP resolver (pure; wires AgentDefinition + step restrictions + catalog)
 export {
