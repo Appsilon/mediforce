@@ -24,8 +24,8 @@ const TIP = {
   preamble: 'Prepended to every agent prompt in this workflow — house rules, domain context, terminology.',
   env: 'Workflow-wide environment defaults. A step’s own env overrides these key by key. A {{SECRET_NAME}} value resolves from workspace or workflow secrets.',
   notifications: 'Who is told when a task is assigned or an agent escalates. Roles, not people — the workspace resolves them to members.',
-  workspaceRemote: 'Git remote for the run-scoped worktree, as "org/repo" or a full URL. Unset means the bare repo stays local to the run.',
-  workspaceAuth: 'Name of a secret holding the token used to push to that remote.',
+  workspaceRemote: 'Git repository the run’s working directory is cloned from and committed to — mounted at /workspace inside every step. Not the Mediforce workspace you are in. Leave empty to keep the run’s files local to the run.',
+  workspaceAuth: 'Name of a secret holding the token used to reach that repository.',
   skillsRepoUrl: 'Repository the runtime clones to mount agent skills.',
   skillsRepoCommit: 'Commit to clone. Required — without it the skills fetch silently does nothing.',
   skillsRepoAuth: 'Name of a secret holding a token, for a private skills repo.',
@@ -317,7 +317,7 @@ export function WorkflowSettingsPanel({
 
       <Section title="Repositories">
         <FieldGroup>
-          <FieldRow label="workspace.remote" tooltip={TIP.workspaceRemote}>
+          <FieldRow label="Run files repository" tooltip={TIP.workspaceRemote}>
             <input
               value={draft.workspace?.remote ?? ''}
               placeholder="Appsilon/my-workflow-workspace"
@@ -325,7 +325,7 @@ export function WorkflowSettingsPanel({
               className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
             />
           </FieldRow>
-          <FieldRow label="workspace.remoteAuth" tooltip={TIP.workspaceAuth}>
+          <FieldRow label="Run files repo token" tooltip={TIP.workspaceAuth}>
             <input
               value={draft.workspace?.remoteAuth ?? ''}
               placeholder="GITHUB_TOKEN"
