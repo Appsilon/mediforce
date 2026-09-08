@@ -403,6 +403,10 @@ export function StartRunButton({
                     warnings={warnings.filter((w) => w.category === 'missing-secret')}
                   />
                   <WarningGroup
+                    title="Missing files"
+                    warnings={warnings.filter((w) => w.category === 'missing-file')}
+                  />
+                  <WarningGroup
                     title="LLM credits"
                     warnings={warnings.filter((w) => w.category === 'low-credits')}
                   />
