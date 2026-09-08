@@ -121,8 +121,8 @@ function WebhookUsageExample({
           This workflow declares no trigger input, so the body must be empty — a
           request carrying any field is rejected with 400. Declare fields under{' '}
           <code className="font-mono">triggerInput</code> under{' '}
-          <strong>Settings &rarr; Triggers</strong> in the version editor, which saves
-          them with a new version.
+          <strong>Input &amp; preamble</strong> in the version editor, which saves them
+          with a new version.
         </p>
       ) : (
         <p className="mt-1 text-xs text-muted-foreground">
