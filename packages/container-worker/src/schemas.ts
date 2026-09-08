@@ -9,8 +9,9 @@ import { z } from 'zod';
  */
 export const DockerJobDataSchema = z.object({
   /** Discriminator so the worker can handle future job types. */
-  jobType: z.enum(['agent-container', 'script-container']),
-  /** Full `docker run` argument list (everything after `docker`). */
+  jobType: z.enum(['agent-container', 'script-container', 'build-image']),
+  /** Full `docker run` argument list (everything after `docker`). Empty for a
+   *  `build-image` job, which builds and runs nothing. */
   dockerArgs: z.array(z.string()),
   /** Prompt piped to container stdin (null = no stdin). */
   stdinPayload: z.string().nullable(),
