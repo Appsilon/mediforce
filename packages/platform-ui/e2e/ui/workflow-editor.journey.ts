@@ -842,6 +842,82 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByText(/not found|could not find|cannot find/i)).toHaveCount(0);
   });
 
+  // A package's `name` is its id, so filling the create page's name field with
+  // it put "landing-zone-CDISCPILOT01" where "Landing Zone — CDISCPILOT01"
+  // belongs, and the workflow was listed under the id from then on.
+  test('a pasted definition names the workflow after its title, not its id', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    const stamp = String(Date.now());
+    const pasted = JSON.stringify(
+      {
+        name: `landing-zone-CDISCPILOT01-${stamp}`,
+        namespace: 'somebody-elses-workspace',
+        title: `Landing Zone ${stamp}`,
+        description: 'Auto-ingest clinical trial data deliveries for study CDISCPILOT01.',
+        steps: [
+          { id: 'poll', name: 'Poll SFTP', type: 'creation', executor: 'human' },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'poll', to: 'done' }],
+      },
+      null,
+      2,
+    );
+
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
+    await page.locator('.cm-content').click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText(pasted);
+    await page.getByRole('button', { name: /apply json/i }).click();
+
+    // Both the id and the workspace are this page's to decide, so the paste is
+    // told they were not used.
+    // `.first()`: the toast renders its text twice, once for screen readers.
+    await expect(page.getByText(/name, namespace are decided here/i).first())
+      .toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(page.getByRole('heading', { name: /workflow source code/i })).toBeHidden();
+
+    // The name field holds the person-facing title, and the description came
+    // across with it.
+    await expect(page.getByPlaceholder('Add a Workflow Name…')).toHaveValue(`Landing Zone ${stamp}`);
+    await expect(page.getByPlaceholder('Add a workflow description…'))
+      .toHaveValue('Auto-ingest clinical trial data deliveries for study CDISCPILOT01.');
+
+    // Saving registers the slug of that name, in this workspace, with the name
+    // as its display name. The version title is the dialog's, even though the
+    // paste carried one.
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
+    await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('typed in the dialog');
+    await page.getByRole('button', { name: /publish workflow/i }).click();
+
+    const slug = `landing-zone-${stamp}`;
+    await page.waitForURL(new RegExp(`/${TEST_ORG_HANDLE}/workflows/${slug}/?$`), { timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: `Landing Zone ${stamp}` })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    const saved = await page.evaluate(async ([workflow, namespace]) => {
+      const response = await fetch(
+        `/api/workflow-definitions/${encodeURIComponent(workflow)}?namespace=${namespace}`,
+      );
+      const body = (await response.json()) as {
+        definition: { name: string; namespace: string; title?: string; metadata?: Record<string, unknown> };
+      };
+      return body.definition;
+    }, [slug, TEST_ORG_HANDLE] as const);
+    expect(saved.name).toBe(slug);
+    expect(saved.namespace).toBe(TEST_ORG_HANDLE);
+    expect(saved.title).toBe('typed in the dialog');
+    expect(saved.metadata?.displayName).toBe(`Landing Zone ${stamp}`);
+  });
+
   test('Save & Dry Run starts the run in the workspace the save targeted', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
