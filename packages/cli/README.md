@@ -43,7 +43,10 @@ with a sentence saying what each is for ([ADR-0022](../../docs/adr/0022-image-ca
 to hunt disk, `postgres` and dangling layers included. `images list` indents each
 entry under the one its images were built on — computed from image layers, not
 from a `FROM` string — and `images show` prints, per version, that base and the
-layer summary the version adds over it.
+layer summary the version adds over it. A row reading *"built here, not
+described yet"* is a source the platform built for that namespace which nobody
+has written a sentence for; `images create` on its source registers it
+([ADR-0022](../../docs/adr/0022-image-catalog.md) decision 7).
 
 ## Rules
 
