@@ -66,6 +66,14 @@ describe('pruneWorkflowSettings', () => {
     expect(pruneWorkflowSettings({ visibility: 'private' })).toEqual({ visibility: 'private' });
   });
 
+  it('keeps a cleared display name, which reads as absent downstream anyway', () => {
+    // metadata is a general bag, so a blank value is not assumed meaningless
+    // the way a blank text field is. Harmless here: `workflowDisplayName`
+    // guards on `dn.trim().length > 0` and falls back to the formatted id.
+    expect(pruneWorkflowSettings({ metadata: { displayName: '' } }))
+      .toEqual({ metadata: { displayName: '' } });
+  });
+
   it('never invents a key the draft did not carry', () => {
     expect(Object.keys(pruneWorkflowSettings({}))).toEqual([]);
   });
