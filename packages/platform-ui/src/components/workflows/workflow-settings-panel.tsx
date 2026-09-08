@@ -289,6 +289,12 @@ export function WorkflowSettingsPanel({
                   </button>
                 </div>
               ))}
+              {notifications.some((n) => n.roles.length === 0) && (
+                <p className="px-0.5 text-[11px] leading-relaxed text-amber-600 dark:text-amber-500">
+                  A notification with no roles reaches nobody, so it is not saved until
+                  you name at least one.
+                </p>
+              )}
               {workspaceRoles !== undefined && (
                 <datalist id="workflow-settings-roles">
                   {workspaceRoles.map((role) => <option key={role} value={role} />)}

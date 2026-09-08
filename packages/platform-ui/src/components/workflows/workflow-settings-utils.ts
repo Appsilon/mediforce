@@ -63,7 +63,13 @@ export function pruneWorkflowSettings(draft: WorkflowSettingsDraft): Registerabl
     }
 
     if (Array.isArray(value)) {
-      Object.assign(pruned, { [key]: value.length > 0 ? value : undefined });
+      // A notification with no roles notifies nobody, so it is the same class
+      // of half-finished value as a skills repo missing its commit: dropped
+      // rather than registered, and the panel warns.
+      const entries = key === 'notifications'
+        ? (value as { roles?: string[] }[]).filter((n) => (n.roles ?? []).length > 0)
+        : value;
+      Object.assign(pruned, { [key]: entries.length > 0 ? entries : undefined });
       continue;
     }
 
