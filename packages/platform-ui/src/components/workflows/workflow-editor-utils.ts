@@ -140,6 +140,14 @@ export function bridgeTargetForDeletion(
 /** The graph the canvas owns; everything else is applied as a non-graph edit. */
 const GRAPH_KEYS = { steps: true, transitions: true, inputForNextRun: true } as const;
 
+/** Where a pasted definition registers is not the document's call: an existing
+ *  workflow's editor is bound to its route, and the create page has a name
+ *  field. Applying the pasted `name` there registered under the pasted id
+ *  instead — a second workflow from an existing one's editor, and an id in
+ *  place of the person's name for it on the create page. Reported as
+ *  overwritten, the same as `namespace`. */
+const PAGE_OWNED_KEYS = { name: true } as const;
+
 export type SplitPastedDefinition = {
   graph: {
     steps: unknown;
@@ -165,9 +173,10 @@ export type SplitPastedDefinition = {
  * and the server-assigned fields, so pasting it back was always refused.
  *
  * Server-managed and lifecycle fields need no strip list here — the authorable
- * schema excludes them by construction and the parse drops them. Only keys the
- * document actually carried are returned, so a paste cannot silently apply a
- * schema default (`visibility`) the author never wrote.
+ * schema excludes them by construction and the parse drops them. `name` is
+ * omitted on top of that, since the page owns which workflow a paste registers
+ * as. Only keys the document actually carried are returned, so a paste cannot
+ * silently apply a schema default (`visibility`) the author never wrote.
  */
 export function splitPastedDefinition(doc: unknown): SplitPastedDefinition {
   const empty = { steps: undefined, transitions: undefined, inputForNextRun: undefined };
@@ -189,7 +198,10 @@ export function splitPastedDefinition(doc: unknown): SplitPastedDefinition {
 
   // Graph keys are validated separately by the caller against the step and
   // transition schemas, so only the non-graph half is checked here.
-  const parsed = WorkflowAuthorableSchema.omit(GRAPH_KEYS).partial().safeParse(nonGraph);
+  const parsed = WorkflowAuthorableSchema
+    .omit({ ...GRAPH_KEYS, ...PAGE_OWNED_KEYS })
+    .partial()
+    .safeParse(nonGraph);
 
   if (parsed.success === false) {
     const issue = parsed.error.issues[0];

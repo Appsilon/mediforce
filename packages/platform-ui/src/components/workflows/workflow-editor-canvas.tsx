@@ -783,8 +783,8 @@ export function WorkflowEditorCanvas({
       if (split.ignored.length > 0) {
         toast({
           variant: 'warning',
-          title: 'Some fields come from the platform',
-          description: `${split.ignored.join(', ')} ${split.ignored.length === 1 ? 'is' : 'are'} assigned when a version registers, so the pasted value was not used. Everything else was applied.`,
+          title: 'Some fields are not the file\u2019s to set',
+          description: `${split.ignored.join(', ')} ${split.ignored.length === 1 ? 'is' : 'are'} decided here rather than in the pasted definition, so ${split.ignored.length === 1 ? 'that value' : 'those values'} ${split.ignored.length === 1 ? 'was' : 'were'} not used. Everything else was applied.`,
         });
       }
     } catch (err) {

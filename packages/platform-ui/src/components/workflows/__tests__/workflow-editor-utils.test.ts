@@ -348,8 +348,19 @@ describe('splitPastedDefinition', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
     });
     expect(result.error).toBeNull();
-    expect(result.ignored.sort()).toEqual(['createdAt', 'namespace', 'version']);
-    expect(result.nonGraph).toEqual({ name: 'kept' });
+    expect(result.ignored.sort()).toEqual(['createdAt', 'name', 'namespace', 'version']);
+    expect(result.nonGraph).toEqual({});
+  });
+
+  it('overwrites the pasted name, which the page and the route own', () => {
+    // A package's `name` is its id, and where a definition registers is decided
+    // by the route (an existing workflow's editor) or the name field (the create
+    // page). Applying it registered the paste under the *pasted* name, which in
+    // an existing workflow's editor silently forked a second workflow, and on
+    // the create page put an id where a person's name for it belongs.
+    const result = splitPastedDefinition({ ...graph, name: 'landing-zone-CDISCPILOT01' });
+    expect(result.nonGraph.name).toBeUndefined();
+    expect(result.ignored).toEqual(['name']);
   });
 
   it('reports nothing ignored when the document carries only authorable fields', () => {
@@ -369,7 +380,7 @@ describe('splitPastedDefinition', () => {
       deleted: false,
     });
     expect(result.error).toBeNull();
-    expect(result.nonGraph).toEqual({ name: 'kept' });
+    expect(result.nonGraph).toEqual({});
   });
 
   it('separates the graph the canvas owns from everything else', () => {
