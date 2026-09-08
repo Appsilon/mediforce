@@ -50,6 +50,12 @@ for a channel that carries inputs — is argued in the header comment of
 Deliverables written to `/output` are copied into `.mediforce/output/<stepId>/`
 in the worktree before the commit, so the commit captures them.
 
+A dry run builds the image and mocks the step. Execution is swapped for
+`MockAgentPlugin` — no agent runs, no container starts, nothing external is
+called — but whether the image compiles is the one thing a mock cannot answer,
+and it is the part that takes minutes and fails, so the build is real. A build
+failure fails the dry run, which is what the person asked by running it.
+
 A carried `Dockerfile` is also a build source. When a step sets `dockerfile`
 and the workflow carries a file at that path, the image is built from the
 materialized directory with no clone anywhere: the whole set is the build

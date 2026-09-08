@@ -45,6 +45,13 @@ export async function processDockerJob(rawData: unknown): Promise<DockerJobResul
     await ensureImage(data.imageBuild);
   }
 
+  // A build-only job stops here. A dry run uses it to prove the image compiles
+  // without running the step, which is the one part of a container step a
+  // mocked dry run could never tell you about.
+  if (data.jobType === 'build-image') {
+    return { stdout: '', stderr: '', exitCode: 0, signal: null };
+  }
+
   // Remove any stale container holding this name (from a crashed/killed/retried
   // attempt). `docker run --rm` only cleans up on a clean exit, so without this a
   // retry hits `Conflict. The container name "…" is already in use` (exit 125).
