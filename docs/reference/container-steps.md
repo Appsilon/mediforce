@@ -50,6 +50,17 @@ for a channel that carries inputs — is argued in the header comment of
 Deliverables written to `/output` are copied into `.mediforce/output/<stepId>/`
 in the worktree before the commit, so the commit captures them.
 
+A carried `Dockerfile` is also a build source. When a step sets `dockerfile`
+and the workflow carries a file at that path, the image is built from the
+materialized directory with no clone anywhere: the whole set is the build
+context (so `COPY scripts/ /scripts/` from a `container/Dockerfile` works as it
+does in a repository), and the tag is derived from the files' content
+(`mediforce-artifacts:<hash>`) — so an edit builds a new image and a rerun of
+unchanged files finds the one already there. An explicit step-level
+`repo` + `commit` still wins; `externalSkillsRepo` remains the fallback. The
+first build takes as long as a `docker build` does, which is minutes for a
+sizeable image.
+
 A step names a carried file by its container path: `python3
 /artifacts/scripts/poll.py`. Files are written executable, so a command may be
 the file itself. They are text and capped (64 KiB a file, 256 KiB the set) by

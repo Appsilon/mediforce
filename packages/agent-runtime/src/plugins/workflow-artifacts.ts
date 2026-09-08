@@ -34,6 +34,20 @@ export function artifactsDir(artifacts: WorkflowArtifact[]): string {
   return join(ARTIFACTS_CACHE_DIR, hash);
 }
 
+/**
+ * Image tag for a Dockerfile the workflow carries. Derived from the files, so
+ * an edit builds a new image and a rerun of unchanged files finds the one that
+ * is already there — the staleness question a commit label answers for a repo
+ * build has no equivalent here, because the tag *is* the content.
+ */
+export function artifactsBuildTag(artifacts: WorkflowArtifact[], dockerfile: string): string {
+  const hash = createHash('sha256')
+    .update(`${artifactsDir(artifacts)}\0${dockerfile}`)
+    .digest('hex')
+    .slice(0, 12);
+  return `mediforce-artifacts:${hash}`;
+}
+
 /** The same rule `WorkflowArtifactSchema` applies, enforced again at the point
  *  of writing: a definition stored before that check, or reaching here around
  *  it, must not be able to write outside the directory. */

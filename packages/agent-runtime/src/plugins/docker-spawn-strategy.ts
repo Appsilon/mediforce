@@ -13,16 +13,25 @@ import { dirname } from 'node:path';
 import { ensureImage } from './docker-image-builder';
 import { createLineStreamReader } from '@mediforce/platform-core';
 
+/**
+ * How to get the image if it is not there. Either a git repo at a commit, or a
+ * host directory that already holds the build context — the materialized files
+ * a workflow carries, which need no clone. Exactly one of the two is set.
+ */
 export interface ImageBuildMeta {
   image: string;
-  repoUrl: string;
+  repoUrl?: string;
   /** User-supplied repo reference (pre-normalization), used to pick the clone transport.
    *  `repoUrl` stays the SSH-normalized form so it remains the cache-tag identity. */
-  repoRef: string;
-  commit: string;
+  repoRef?: string;
+  commit?: string;
   dockerfile?: string;
   /** Resolved token for authenticated HTTPS clones; SSH refs without a token use the deploy key. */
   repoToken?: string;
+  /** Host path to build from, instead of a clone. Reachable from the worker as
+   *  well as the orchestrator: it lives under the shared temp directory, the
+   *  same assumption the skills cache and the `/artifacts` mount already make. */
+  contextDir?: string;
 }
 
 export interface DockerSpawnRequest {

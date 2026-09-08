@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { formatExitInfo, deriveBuildTag, missingExecutableHint } from '../container-plugin';
+import { formatExitInfo, deriveBuildTag, missingExecutableHint, resolveImageBuild } from '../container-plugin';
+import { artifactsDir } from '../workflow-artifacts';
+import type { WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
 
 describe('formatExitInfo', () => {
   it('[DATA] reports the exit code when the process exited normally', () => {
@@ -94,5 +96,74 @@ describe('missingExecutableHint', () => {
   it('[DATA] returns an empty hint for unrelated failures', () => {
     expect(missingExecutableHint('Traceback (most recent call last): KeyError', 'python:3.12-slim')).toBe('');
     expect(missingExecutableHint('', 'alpine:3.24')).toBe('');
+  });
+});
+
+// Building an image from a Dockerfile the workflow carries, with no repository
+// anywhere in the picture. This is what lets "it needs pandas and R" be
+// answered in the app instead of by a checkout.
+describe('resolveImageBuild — a Dockerfile the workflow carries', () => {
+  const artifacts = [
+    { path: 'Dockerfile', contents: 'FROM python:3.12-slim\nRUN pip install pandas\n' },
+    { path: 'scripts/poll.py', contents: 'print("poll")\n' },
+  ];
+
+  const contextFor = (
+    overrides: { artifacts?: { path: string; contents: string }[]; externalSkillsRepo?: { url: string; commit: string } } = {},
+  ): WorkflowAgentContext => ({
+    workflowDefinition: {
+      artifacts: overrides.artifacts ?? artifacts,
+      ...(overrides.externalSkillsRepo ? { externalSkillsRepo: overrides.externalSkillsRepo } : {}),
+    },
+    step: { id: 's1' },
+  } as unknown as WorkflowAgentContext);
+
+  it('builds from the materialized files, not a clone', () => {
+    const build = resolveImageBuild(undefined, { dockerfile: 'Dockerfile' }, contextFor());
+    expect(build?.contextDir).toBe(artifactsDir(artifacts));
+    expect(build?.repoUrl).toBeUndefined();
+    expect(build?.commit).toBeUndefined();
+    expect(build?.dockerfile).toBe('Dockerfile');
+  });
+
+  it('derives the tag from the files, so an edit builds a new image and a rerun does not', () => {
+    const first = resolveImageBuild(undefined, { dockerfile: 'Dockerfile' }, contextFor());
+    const same = resolveImageBuild(undefined, { dockerfile: 'Dockerfile' }, contextFor());
+    const edited = resolveImageBuild(undefined, { dockerfile: 'Dockerfile' }, contextFor({
+      artifacts: [{ path: 'Dockerfile', contents: 'FROM python:3.13-slim\n' }],
+    }));
+    expect(first?.image).toBe(same?.image);
+    expect(first?.image).not.toBe(edited?.image);
+    expect(first?.image).toMatch(/^mediforce-artifacts:[a-f0-9]{12}$/);
+  });
+
+  it('keeps an image the step named explicitly', () => {
+    const build = resolveImageBuild('my-registry/mine:v2', { dockerfile: 'Dockerfile' }, contextFor());
+    expect(build?.image).toBe('my-registry/mine:v2');
+    expect(build?.contextDir).toBe(artifactsDir(artifacts));
+  });
+
+  it('leaves an explicit repo and commit in charge', () => {
+    // A step that names its own build source said something specific; the
+    // carried files are the fallback, not an override.
+    const build = resolveImageBuild(undefined, {
+      dockerfile: 'Dockerfile',
+      repo: 'https://github.com/org/agent.git',
+      commit: 'a'.repeat(40),
+    }, contextFor());
+    expect(build?.contextDir).toBeUndefined();
+    expect(build?.commit).toBe('a'.repeat(40));
+  });
+
+  it('falls back to the skills repo when the carried files hold no such Dockerfile', () => {
+    const build = resolveImageBuild(undefined, { dockerfile: 'container/Dockerfile' }, contextFor({
+      externalSkillsRepo: { url: 'https://github.com/org/skills.git', commit: 'b'.repeat(40) },
+    }));
+    expect(build?.contextDir).toBeUndefined();
+    expect(build?.commit).toBe('b'.repeat(40));
+  });
+
+  it('has nothing to build when a step names no Dockerfile', () => {
+    expect(resolveImageBuild('some:image', {}, contextFor())).toBeUndefined();
   });
 });

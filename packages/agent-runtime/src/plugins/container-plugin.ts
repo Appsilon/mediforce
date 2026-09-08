@@ -60,7 +60,7 @@ import { tmpdir } from 'node:os';
 import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { normalizeRepoUrls, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
-import { artifactsDir } from './workflow-artifacts';
+import { artifactsBuildTag, artifactsDir } from './workflow-artifacts';
 import { cloneRepoAtCommit } from './git-clone';
 import { writeFile } from 'node:fs/promises';
 import type { GitMetadata } from '@mediforce/platform-core';
@@ -130,6 +130,21 @@ export function resolveImageBuild(
       dockerfile,
       repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
     };
+  }
+
+  // A Dockerfile the workflow carries: the files are already on the host for
+  // the /artifacts mount, so the build context is that directory and no clone
+  // happens. Second to an explicit step-level repo+commit, which said something
+  // specific, and ahead of the externalSkillsRepo fallback.
+  if (dockerfile && isWorkflowAgentContext(context)) {
+    const artifacts = context.workflowDefinition.artifacts;
+    if (artifacts?.some((artifact) => artifact.path === dockerfile) === true) {
+      return {
+        image: image ?? artifactsBuildTag(artifacts, dockerfile),
+        contextDir: artifactsDir(artifacts),
+        dockerfile,
+      };
+    }
   }
 
   if (dockerfile && isWorkflowAgentContext(context)) {
