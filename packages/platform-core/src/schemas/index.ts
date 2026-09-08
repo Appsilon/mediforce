@@ -283,6 +283,12 @@ export {
 } from './workflow-assistant-platform-tools';
 
 export {
+  pruneWorkflowSettings,
+  type WorkflowSettingsDraft,
+  type RegisterableWorkflowSettings,
+} from './workflow-settings';
+
+export {
   applyWorkflowAssistantToolCalls,
   type ToolCallOutcome,
   type ApplyToolCallsResult,

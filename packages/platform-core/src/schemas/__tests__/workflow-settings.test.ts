@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pruneWorkflowSettings } from '../workflow-settings-utils';
+import { pruneWorkflowSettings } from '../workflow-settings';
 
 describe('pruneWorkflowSettings', () => {
   it('unsets a field the author emptied, rather than registering an empty string', () => {

@@ -144,7 +144,6 @@ export const UpdateWorkflowToolSchema = WorkflowAuthorableSchema.omit({
   name: true,
   steps: true,
   transitions: true,
-  inputForNextRun: true,
 }).omit({
   // Visibility has its own control on the workflow page, which PATCHes every
   // version at once. Writing it through a register — which touches only the new
