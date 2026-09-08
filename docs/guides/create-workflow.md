@@ -42,7 +42,8 @@ placing and wiring blocks by hand.
   edge, writes the workflow-level fields — `triggerInput`, `preamble`, `env`,
   `notifications`, `workspace`, `externalSkillsRepo`, `url` — and writes the
   files the workflow carries (a script, a Dockerfile, a SKILL.md), one file per
-  call. Files appear in the **Files** panel, where you can edit them, and a run
+  call. Files appear in the **Files** panel, where you can edit them, upload
+  more from disk (a folder keeps its structure) or drop them in, and a run
   reads them from `/artifacts`. It does not edit secrets or other workspace
   state — set those yourself (triggers are attached after registration; see
   below).

@@ -71,6 +71,60 @@ test.describe('Workflow Files Journey', () => {
     await expect(page.locator('.cm-content')).toContainText('print("poll")');
   });
 
+  test('files are uploaded from disk, and a binary is refused with the reason', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(EDITOR_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: 'Files', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Files', exact: true })).toBeVisible();
+
+    // A script from disk, a nested skill file, and a PNG. The first two are
+    // text and land; the third is not and comes back with a reason, without
+    // costing the author the other two.
+    await page.getByLabel('Files to upload').setInputFiles([
+      { name: 'poll.py', mimeType: 'text/x-python', buffer: Buffer.from('print("uploaded")\n') },
+      { name: 'SKILL.md', mimeType: 'text/markdown', buffer: Buffer.from('# Validator\n') },
+      { name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) },
+    ]);
+
+    await expect(page.getByText(/logo\.png was not added: not a text file/i)).toBeVisible();
+    await expect(page.getByText(/put binaries in an image or a repository/i)).toBeVisible();
+
+    // Both text files are in the list, and the one that was selected shows its
+    // contents rather than an empty editor.
+    // Exact: each row also has a "Remove <path>" button beside it.
+    await expect(page.getByRole('button', { name: 'poll.py', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'SKILL.md', exact: true })).toBeVisible();
+    await expect(page.locator('.cm-content')).toContainText('print("uploaded")');
+
+    // And they register as the workflow's files.
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 10_000 });
+    await page.getByPlaceholder('e.g. Added AI review step').fill('uploaded files');
+    await page.getByRole('button', { name: /save new version/i }).click();
+
+    await expect(async () => {
+      const saved = await page.evaluate(async (workflow) => {
+        const base = `/api/workflow-definitions/${encodeURIComponent(workflow)}`;
+        const list = await fetch(`${base}/versions?namespace=test`);
+        const { versions } = (await list.json()) as { versions: { version: number; title?: string }[] };
+        const match = versions.find((entry) => entry.title === 'uploaded files');
+        if (match === undefined) return null;
+        const response = await fetch(`${base}?namespace=test&version=${String(match.version)}`);
+        const body = (await response.json()) as {
+          definition: { artifacts?: { path: string; contents: string }[] };
+        };
+        return body.definition.artifacts;
+      }, WORKFLOW);
+      expect(saved).toEqual([
+        { path: 'poll.py', contents: 'print("uploaded")\n' },
+        { path: 'SKILL.md', contents: '# Validator\n' },
+      ]);
+    }).toPass({ timeout: 20_000 });
+  });
+
   test('a path that cannot be written is refused before the save', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(EDITOR_URL);

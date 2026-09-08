@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { FileCode, Plus, Trash2 } from 'lucide-react';
+import { FileCode, FolderUp, Plus, Trash2, Upload } from 'lucide-react';
 import { z } from 'zod';
 import {
   WorkflowArtifactSchema,
@@ -11,6 +11,7 @@ import {
 } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { CodeEditor } from './workflow-editor/code-editor';
+import { decodeTextFile, mergeUploadedFiles, uploadPathFor, type RejectedUpload } from '@/lib/workflow-file-uploads';
 
 /** The server's own rule, run on the draft: one implementation decides whether
  *  a set of files is registerable, so the panel cannot say yes to something the
@@ -52,6 +53,32 @@ export function WorkflowFilesPanel({
   const [selected, setSelected] = React.useState(0);
   const [newPath, setNewPath] = React.useState('');
   const [adding, setAdding] = React.useState(false);
+  const [rejected, setRejected] = React.useState<RejectedUpload[]>([]);
+  const [dropping, setDropping] = React.useState(false);
+  const filePickerRef = React.useRef<HTMLInputElement>(null);
+  const folderPickerRef = React.useRef<HTMLInputElement>(null);
+
+  /** Reads what was picked or dropped and folds it in. Text only: anything else
+   *  is refused with a reason rather than stored mangled. */
+  const upload = async (files: File[], droppedFolderName?: string): Promise<void> => {
+    const reads = await Promise.all(files.map(async (file) => {
+      const path = uploadPathFor(file, droppedFolderName);
+      const text = decodeTextFile(new Uint8Array(await file.arrayBuffer()));
+      return { path, text };
+    }));
+
+    const notText = reads.filter((read) => read.text === null);
+    const merged = mergeUploadedFiles(
+      artifacts,
+      reads.flatMap((read) => (read.text === null ? [] : [{ path: read.path, contents: read.text }])),
+    );
+    setRejected([
+      ...notText.map((read) => ({ path: read.path, reason: 'not a text file' })),
+      ...merged.rejected,
+    ]);
+    if (merged.artifacts.length > artifacts.length) setSelected(artifacts.length);
+    onChange(merged.artifacts);
+  };
 
   const issue = firstIssue(artifacts);
   const used = totalBytes(artifacts);
@@ -67,12 +94,28 @@ export function WorkflowFilesPanel({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 gap-4">
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDropping(true);
+      }}
+      onDragLeave={() => setDropping(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDropping(false);
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length > 0) void upload(files);
+      }}
+      className={cn(
+        'flex min-h-0 flex-1 gap-4 rounded-lg',
+        dropping && 'outline-dashed outline-2 outline-offset-4 outline-primary/60',
+      )}
+    >
       <div className="flex w-56 shrink-0 flex-col gap-1">
         {artifacts.length === 0 && (
           <p className="mb-1 text-xs text-muted-foreground">
-            No files yet. Add one and a step can run it: a command reads it from{' '}
-            <code className="font-mono">/artifacts</code>.
+            No files yet. Add, upload or drop one and a step can run it: a
+            command reads it from <code className="font-mono">/artifacts</code>.
           </p>
         )}
         <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
@@ -135,15 +178,67 @@ export function WorkflowFilesPanel({
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="inline-flex items-center gap-1 self-start rounded-md border px-2 py-1 text-xs font-medium transition-colors hover:bg-muted"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add file
-          </button>
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors hover:bg-muted"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add file
+            </button>
+            <button
+              type="button"
+              aria-label="Upload files"
+              title="Upload files"
+              onClick={() => filePickerRef.current?.click()}
+              className="inline-flex items-center rounded-md border p-1 transition-colors hover:bg-muted"
+            >
+              <Upload className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="Upload a folder"
+              title="Upload a folder, keeping its structure"
+              onClick={() => folderPickerRef.current?.click()}
+              className="inline-flex items-center rounded-md border p-1 transition-colors hover:bg-muted"
+            >
+              <FolderUp className="h-3.5 w-3.5" />
+            </button>
+          </div>
         )}
+
+        <input
+          ref={filePickerRef}
+          type="file"
+          multiple
+          aria-label="Files to upload"
+          className="hidden"
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = '';
+            if (files.length > 0) void upload(files);
+          }}
+        />
+        <input
+          ref={folderPickerRef}
+          type="file"
+          multiple
+          aria-label="Folder to upload"
+          className="hidden"
+          // Not in React's JSX types, and the picker is the only way to keep an
+          // uploaded folder's structure.
+          {...{ webkitdirectory: '', directory: '' } as Record<string, string>}
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = '';
+            // The picker prefixes the chosen folder's own name; drop it so the
+            // files land where the author picked them from.
+            const first = files[0] as (File & { webkitRelativePath?: string }) | undefined;
+            const folder = first?.webkitRelativePath?.split('/')[0];
+            if (files.length > 0) void upload(files, folder);
+          }}
+        />
 
         <p className="mt-1 text-[11px] text-muted-foreground">
           {formatBytes(used)} of {formatBytes(WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES)} used
@@ -178,6 +273,16 @@ export function WorkflowFilesPanel({
               Inside a run this file is <code className="font-mono">/artifacts/{current.path}</code>.
             </p>
           </>
+        )}
+        {rejected.length > 0 && (
+          <ul className="space-y-0.5 text-xs text-destructive">
+            {rejected.map((entry) => (
+              <li key={entry.path}>
+                <span className="font-mono">{entry.path}</span> was not added: {entry.reason}.
+                {entry.reason === 'not a text file' && ' A workflow carries text, so put binaries in an image or a repository.'}
+              </li>
+            ))}
+          </ul>
         )}
         {issue !== null && <p className="text-xs text-destructive">{issue}</p>}
       </div>
