@@ -94,3 +94,40 @@ describe('runPlatformTool', () => {
     expect(result).toMatchObject({ error: expect.stringContaining('delete_everything') });
   });
 });
+
+describe('runPlatformTool — the Tool Catalog', () => {
+  it('adds a server an agent can then bind to', async () => {
+    const scope = buildScope({
+      caller: { kind: 'user', userId: 'u1', email: 'admin@example.com', isSystemActor: false, namespaces: ['acme'], namespaceRoles: new Map([['acme', 'admin']]) },
+      toolCatalog: {
+        list: vi.fn().mockResolvedValue([]),
+        // The handler refuses to overwrite an existing id, so it looks first.
+        getById: vi.fn().mockResolvedValue(null),
+        upsert: vi.fn().mockImplementation((_ns: string, entry: Record<string, unknown>) => Promise.resolve(entry)),
+      },
+    });
+
+    const result = await runPlatformTool('create_tool_catalog_entry', {
+      command: 'npx -y @modelcontextprotocol/server-github',
+      description: 'GitHub MCP',
+    }, scope, 'acme');
+
+    expect(result).toMatchObject({ created: { id: expect.any(String) } });
+  });
+
+  it('tells a member an admin is needed, rather than adding it anyway', async () => {
+    // The Tool Catalog is admin-only on the platform. Running as the user is
+    // what makes that gate hold for the assistant too.
+    const scope = buildScope({
+      caller: { kind: 'user', userId: 'u1', email: 'member@example.com', isSystemActor: false, namespaces: ['acme'], namespaceRoles: new Map([['acme', 'member']]) },
+      toolCatalog: { list: vi.fn(), getById: vi.fn(), upsert: vi.fn() },
+    });
+
+    const result = await runPlatformTool('create_tool_catalog_entry', {
+      command: 'npx -y @modelcontextprotocol/server-github',
+    }, scope, 'acme');
+
+    expect(result).toMatchObject({ needsAdmin: true });
+    expect(vi.mocked(scope.toolCatalog.upsert)).not.toHaveBeenCalled();
+  });
+});

@@ -41,11 +41,29 @@ export const CreateAgentToolSchema = z.object({
 });
 export type CreateAgentTool = z.infer<typeof CreateAgentToolSchema>;
 
+/**
+ * Add an MCP server to the workspace's Tool Catalog, so an agent can bind to
+ * it. Admin-only on the platform, which is the point of running as the user:
+ * a member gets the refusal and is told who can do it.
+ */
+export const CreateToolCatalogEntryToolSchema = z.object({
+  /** Stable name bindings reference. Derived from the command when omitted. */
+  id: z.string().min(1).optional(),
+  command: z.string().min(1),
+  args: z.array(z.string()).optional(),
+  /** Environment for the server process. Values may name a workspace secret as
+   *  `{{KEY}}`; never write a secret's value here. */
+  env: z.record(z.string(), z.string()).optional(),
+  description: z.string().optional(),
+});
+export type CreateToolCatalogEntryTool = z.infer<typeof CreateToolCatalogEntryToolSchema>;
+
 export const WORKFLOW_ASSISTANT_PLATFORM_TOOLS = {
   list_secrets: ListSecretsToolSchema,
   list_agents: ListAgentsToolSchema,
   list_tool_catalog: ListToolCatalogToolSchema,
   create_agent: CreateAgentToolSchema,
+  create_tool_catalog_entry: CreateToolCatalogEntryToolSchema,
 } as const;
 
 export type WorkflowAssistantPlatformToolName = keyof typeof WORKFLOW_ASSISTANT_PLATFORM_TOOLS;

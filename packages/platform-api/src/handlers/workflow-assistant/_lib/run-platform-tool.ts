@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { WORKFLOW_ASSISTANT_PLATFORM_TOOLS, isPlatformToolName } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { HandlerError } from '../../../errors';
+import { createAgent } from '../../agents/create-agent';
+import { createToolCatalogEntry } from '../../tool-catalog/create-entry';
 
 /**
  * Runs one platform tool for the assistant, as the person who asked.
@@ -62,7 +64,10 @@ export async function runPlatformTool(
       }
       case 'create_agent': {
         const input = parsed.data as z.infer<typeof WORKFLOW_ASSISTANT_PLATFORM_TOOLS['create_agent']>;
-        const created = await scope.agentDefinitions.create({
+        // Through the handler the Agents page uses, so an agent the assistant
+        // made is validated the same way and lands in the audit trail the same
+        // way — an agent that appeared from nowhere is worse than no agent.
+        const { agent } = await createAgent({
           ...input,
           namespace,
           // The platform's own defaults, not the model's to choose: a container
@@ -71,8 +76,13 @@ export async function runPlatformTool(
           kind: 'plugin',
           visibility: 'private',
           iconName: 'bot',
-        });
-        return { created: { id: created.id, name: created.name } };
+        }, scope);
+        return { created: { id: agent.id, name: agent.name } };
+      }
+      case 'create_tool_catalog_entry': {
+        const input = parsed.data as z.infer<typeof WORKFLOW_ASSISTANT_PLATFORM_TOOLS['create_tool_catalog_entry']>;
+        const { entry } = await createToolCatalogEntry({ ...input, namespace }, scope);
+        return { created: { id: entry.id } };
       }
     }
   } catch (err) {
