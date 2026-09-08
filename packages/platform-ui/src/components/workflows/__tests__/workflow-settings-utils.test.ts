@@ -81,6 +81,11 @@ describe('pruneWorkflowSettings', () => {
     expect(pruneWorkflowSettings({ visibility: 'private' })).toEqual({ visibility: 'private' });
   });
 
+  it('unsets roles once the last one is removed', () => {
+    expect(pruneWorkflowSettings({ roles: [] })).toEqual({ roles: undefined });
+    expect(pruneWorkflowSettings({ roles: ['reviewer'] })).toEqual({ roles: ['reviewer'] });
+  });
+
   it('keeps a cleared display name, which reads as absent downstream anyway', () => {
     // metadata is a general bag, so a blank value is not assumed meaningless
     // the way a blank text field is. Harmless here: `workflowDisplayName`
