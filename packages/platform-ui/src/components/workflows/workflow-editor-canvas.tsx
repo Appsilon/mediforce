@@ -1026,8 +1026,8 @@ export function WorkflowEditorCanvas({
                 <div className="text-sm text-muted-foreground text-center py-6 space-y-3">
                   <p>Describe the workflow you want to build, or ask a question.</p>
                   <p className="text-xs">
-                    Working in a checkout? <span className="font-mono">/design-workflow</span> authors the
-                    whole package — scripts, Dockerfile, tests — not just the canvas.
+                    It writes the steps, the routing, and the files the workflow needs —
+                    a script, a Dockerfile, a skill.
                   </p>
                 </div>
               ) : (

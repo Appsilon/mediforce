@@ -1,4 +1,4 @@
-import { Blocks, Sparkles, GitBranch, Terminal, type LucideIcon } from 'lucide-react';
+import { Blocks, Sparkles, GitBranch, type LucideIcon } from 'lucide-react';
 
 export type AuthoringPath = {
   /** Stable identifier — React key and test hook. */
@@ -13,8 +13,14 @@ export type AuthoringPath = {
   icon: LucideIcon;
 };
 
-/** The four ways to author a workflow, condensed from
- *  docs/guides/create-workflow.md § "Pick an authoring path". */
+/** The three ways to author a workflow, condensed from
+ *  docs/guides/create-workflow.md § "Pick an authoring path".
+ *
+ *  A fourth used to point at the `/design-workflow` agent skill, for the things
+ *  the canvas could not do: scripts, a Dockerfile, skills. It can do them now —
+ *  a workflow carries its own files — so naming a path that requires a git
+ *  checkout, a second tool and a CLI hand-off would send people out of the app
+ *  for a capability that is in it. */
 export const AUTHORING_PATHS: AuthoringPath[] = [
   {
     id: 'canvas',
@@ -28,7 +34,7 @@ export const AUTHORING_PATHS: AuthoringPath[] = [
     id: 'assistant',
     label: 'AI Assistant',
     reason:
-      'Describe the workflow in plain language and it edits the definition for you — steps, routing conditions, and the workflow-level settings. A first draft, or a bulk edit.',
+      'Describe the workflow in plain language and it builds it: steps, routing conditions, the workflow-level settings, and the files it needs — a script, a Dockerfile, a skill. It challenges the shape rather than transcribing it. A first draft, or a bulk edit.',
     how: 'Type into the AI Assistant pane on the right. Needs the OPENROUTER_API_KEY workspace secret.',
     icon: Sparkles,
   },
@@ -39,13 +45,5 @@ export const AUTHORING_PATHS: AuthoringPath[] = [
       'A one-time copy of a workflow package from a public GitHub repo — not a live link. Reach for it when the workflow already exists somewhere.',
     how: 'Open the importer and paste the repository URL.',
     icon: GitBranch,
-  },
-  {
-    id: 'agent',
-    label: '/design-workflow — the agent skill',
-    reason:
-      'Interview-driven authoring against a checkout of the source. It generates the whole package — scripts, Dockerfile, tests — which this canvas cannot: reach for it when the workflow needs code, not just steps.',
-    how: 'git clone https://github.com/Appsilon/mediforce, open the checkout in Claude Code (or another agent that reads skills/), and type /design-workflow. It interviews you, writes the package, and hands you the mediforce workflow register command that publishes it here.',
-    icon: Terminal,
   },
 ];
