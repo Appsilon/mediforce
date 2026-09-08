@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
@@ -76,4 +76,30 @@ export function useImageCatalogEntry(
     loading: query.isPending && enabled,
     error: (query.error as Error | null) ?? null,
   };
+}
+
+/**
+ * Describe a discovered entry — the sentence the platform cannot derive.
+ *
+ * A plain create: a discovered entry is not a row, so writing the sentence is
+ * what registers it, and the id is derived from the source it already carries,
+ * so the entry keeps the identity the listing showed. The response is a probed
+ * view — `createImageCatalogEntry` probes capabilities in the same request —
+ * which is why this is the moment the card stops saying "not probed".
+ *
+ * No optimistic update. The probe is the point: guessing the answer locally
+ * and correcting it a second later is worse than a pending button.
+ */
+export function useDescribeImage(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; intent: string; source: ImageCatalogEntryView['source'] }) =>
+      mediforce.imageCatalog.create({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entry.id),
+      });
+    },
+  });
 }

@@ -36,6 +36,7 @@ interface EntryView {
   name: string;
   intent: string;
   source: { kind: string; repo?: string; dockerfile?: string; reference?: string };
+  origin: 'catalogued' | 'discovered';
   versions: VersionView[];
   availability: 'present' | 'absent' | 'unknown';
   baseEntryId: string | null;
@@ -63,6 +64,41 @@ function deriveImage(tag: string, from: string, command: string): void {
   docker('run', '--name', container, from, ...command.split(' '));
   try {
     docker('commit', container, tag);
+  } finally {
+    docker('rm', '-f', container);
+  }
+}
+
+/**
+ * Tag an image with the provenance labels the platform's builders write.
+ *
+ * `docker commit --change LABEL` rather than a real build: what the catalog
+ * reads is the labels, and a `docker build` would cost a BuildKit run to
+ * produce the same five strings.
+ */
+function labelAsBuilt(
+  tag: string,
+  from: string,
+  labels: { repo: string; dockerfile: string; namespace: string; workflow: string },
+): void {
+  const container = `mediforce-e2e-built-${tag.replace(/[^a-z0-9]/gi, '-')}`;
+  docker('run', '--name', container, from, 'true');
+  try {
+    docker(
+      'commit',
+      '--change',
+      `LABEL mediforce.build.repo=${labels.repo}`,
+      '--change',
+      `LABEL mediforce.build.dockerfile=${labels.dockerfile}`,
+      '--change',
+      `LABEL mediforce.build.namespace=${labels.namespace}`,
+      '--change',
+      `LABEL mediforce.build.workflow=${labels.workflow}`,
+      '--change',
+      'LABEL mediforce.build.commit=bf0353b123bee142100ae5605ec15ad7605ceb4f',
+      container,
+      tag,
+    );
   } finally {
     docker('rm', '-f', container);
   }
@@ -298,6 +334,92 @@ test.describe('image catalog API journey', () => {
       });
     }
     docker('rmi', `${derivedReference}:v1`, `${baseReference}:v1`);
+  });
+
+  test('an image this namespace built is offered undescribed, and describing it keeps its id', async ({
+    request,
+  }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    // Nobody catalogues this source: the point is that the listing offers it
+    // anyway, because the build labelled which namespace it was built for.
+    const stamp = Date.now();
+    const repo = `git@github.com:Appsilon/e2e-discovered-${stamp}.git`;
+    const tag = `mediforce-e2e-discovered-${stamp}:latest`;
+    try {
+      docker('image', 'inspect', PROBE_BASE_IMAGE);
+    } catch {
+      docker('pull', PROBE_BASE_IMAGE);
+    }
+    labelAsBuilt(tag, PROBE_BASE_IMAGE, {
+      repo,
+      dockerfile: 'Dockerfile',
+      namespace: TEST_ORG_HANDLE,
+      workflow: 'e2e-discovery',
+    });
+
+    try {
+      const listRes = await request.get(catalogUrl(), { headers: apiKeyHeaders() });
+      expect(listRes.ok(), await listRes.text()).toBe(true);
+      const { entries } = (await listRes.json()) as { entries: EntryView[] };
+      const discovered = entries.find((entry) => entry.source.repo === repo);
+
+      expect(discovered, 'the image this namespace built is offered').toBeDefined();
+      expect(discovered?.origin).toBe('discovered');
+      // Named from the repo, described by nobody, and already carrying the
+      // version the build produced — every fact but the sentence is derived.
+      expect(discovered?.name).toBe(`e2e-discovered-${stamp}`);
+      expect(discovered?.intent).toBe('');
+      expect(discovered?.availability).toBe('present');
+      expect(discovered?.versions.map((version) => version.imageTag)).toEqual([tag]);
+      expect(discovered?.versions[0].workflow).toBe('e2e-discovery');
+
+      // A discovered id resolves: a reader who clicks the row reaches the entry
+      // the listing showed, rather than a 404 for a row that does not exist.
+      const getRes = await request.get(
+        `/api/image-catalog/${discovered?.id}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(getRes.status(), await getRes.text()).toBe(200);
+      const read = ((await getRes.json()) as { entry: EntryView }).entry;
+      expect(read.origin).toBe('discovered');
+      // Probed on the entry read, into the memo a row would otherwise hold —
+      // a discovered entry derives every fact a catalogued one does.
+      expect(read.versions[0].capabilities).toEqual({
+        status: 'known',
+        agentCapable: false,
+        runtimes: [],
+      });
+
+      // Describing it is an ordinary create on the source it already carried,
+      // and the id is derived from that source — so the row lands where the
+      // discovered entry was, instead of beside it.
+      const createRes = await request.post(catalogUrl(), {
+        headers: apiKeyHeaders(),
+        data: {
+          name: 'E2E discovered image',
+          intent: 'Proves an image the platform built is offered before anyone describes it',
+          source: discovered?.source,
+        },
+      });
+      expect(createRes.status(), await createRes.text()).toBe(201);
+      const created = ((await createRes.json()) as { entry: EntryView }).entry;
+      expect(created.id).toBe(discovered?.id);
+      expect(created.origin).toBe('catalogued');
+      // Describing is what probes it: the listing never does.
+      expect(created.versions[0].capabilities.status).toBe('known');
+
+      const afterRes = await request.get(catalogUrl(), { headers: apiKeyHeaders() });
+      const after = (await afterRes.json()) as { entries: EntryView[] };
+      const rows = after.entries.filter((entry) => entry.source.repo === repo);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].origin).toBe('catalogued');
+
+      await request.delete(`/api/image-catalog/${created.id}?namespace=${TEST_ORG_HANDLE}`, {
+        headers: apiKeyHeaders(),
+      });
+    } finally {
+      docker('rmi', '-f', tag);
+    }
   });
 
   test('intent is rejected when empty, by the contract', async ({ request }) => {

@@ -59,6 +59,7 @@ function entry(id: string, imageIds: string[]): EntryViewWithoutLineage {
     intent: `what ${id} is for`,
     source: { kind: 'referenced', reference: id },
     capabilities: {},
+    origin: 'catalogued',
     availability: 'present',
     versions: imageIds.map((imageId) => version({ imageId })),
   };
