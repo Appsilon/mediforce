@@ -29,6 +29,7 @@ import { ModelPicker } from './workflow-editor/model-picker';
 import { selectBase } from './workflow-editor/step-editor-fields';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
 import { WorkflowSettingsPanel } from './workflow-settings-panel';
+import { pruneWorkflowSettings } from './workflow-settings-utils';
 import type { WorkflowSettingsDraft } from './workflow-settings-utils';
 import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
@@ -522,11 +523,22 @@ export function WorkflowEditorCanvas({
   // Applies the whole batch through the shared reducer in one atomic state
   // update. Returns a success summary and any tool-call errors separately so the
   // UI never presents a failure as a confirmed change.
+  const settingsDraftRef = useRef(settingsDraft);
+  settingsDraftRef.current = settingsDraft;
+
   const applyAssistantToolCalls = useCallback((toolCalls: WorkflowAssistantToolCall[]): { summary: string; error: string | null } => {
-    const result = applyWorkflowAssistantToolCalls(editedStepsRef.current, editedTransitionsRef.current, toolCalls);
+    const result = applyWorkflowAssistantToolCalls(
+      editedStepsRef.current,
+      editedTransitionsRef.current,
+      toolCalls,
+      settingsDraftRef.current,
+    );
     saveSnapshot();
     setEditedSteps(result.steps);
     setEditedTransitions(result.transitions);
+    // The page owns the workflow-level fields, so the reducer's settings go
+    // back the same way the settings panel's edits do.
+    onSettingsChange?.(result.settings);
     const lastAdded = result.addedStepIds[result.addedStepIds.length - 1];
     if (lastAdded) setSelectedStepId(lastAdded);
 
@@ -539,11 +551,18 @@ export function WorkflowEditorCanvas({
     if (counts.add_step) parts.push(`added ${String(counts.add_step)} step${counts.add_step > 1 ? 's' : ''}`);
     if (counts.update_step) parts.push(`updated ${String(counts.update_step)} step${counts.update_step > 1 ? 's' : ''}`);
     if (counts.remove_step) parts.push(`removed ${String(counts.remove_step)} step${counts.remove_step > 1 ? 's' : ''}`);
+    if (counts.update_workflow) {
+      const fields = result.outcomes.filter((o) => o.tool === 'update_workflow').map((o) => o.stepId).join(', ');
+      parts.push(`set ${fields}`);
+    }
+    if (counts.set_transition_condition) {
+      parts.push(`set ${String(counts.set_transition_condition)} routing condition${counts.set_transition_condition > 1 ? 's' : ''}`);
+    }
     return {
       summary: parts.length > 0 ? `Updated the workflow — ${parts.join(', ')}.` : '',
       error: errors.length > 0 ? errors.join(' ') : null,
     };
-  }, [saveSnapshot]);
+  }, [saveSnapshot, onSettingsChange]);
 
   const sendAssistantMessage = useCallback(async () => {
     const content = assistantInput.trim();
@@ -559,7 +578,7 @@ export function WorkflowEditorCanvas({
         {
           messages: nextMessages,
           model: assistantModel,
-          workflowDefinition: { steps: editedSteps, transitions: editedTransitions },
+          workflowDefinition: { steps: editedSteps, transitions: editedTransitions, settings: pruneWorkflowSettings(settingsDraft ?? {}) },
         },
         { namespace },
       );

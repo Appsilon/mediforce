@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WorkflowStepSchema } from './workflow-definition';
+import { WorkflowStepSchema, WorkflowAuthorableSchema } from './workflow-definition';
 import { BLOCK_PRESETS } from '../blocks/block-presets';
 
 const ACTION_KIND_ALIASES: Record<string, 'http' | 'reshape' | 'email' | 'spawn' | 'wait'> = {
@@ -28,16 +28,16 @@ function preprocessJsonStringObject(val: unknown): unknown {
   }
 }
 
-// Omit only machine-managed fields (`id` is canvas-assigned; `metadata` is
-// display/internal; `stepParams` is an opaque legacy bag) and `plugin`, which
-// the reducer derives from the executor. Everything a user can author in the UI
-// — including `ui` (custom task bodies like file-upload), `assignedTo`, and
-// `continueOnError` — is exposed so the assistant has parity with hand-editing.
+// Omit only machine-managed fields (`id` is canvas-assigned, `metadata` is
+// display/internal) and `plugin`, which the reducer derives from the executor.
+// Everything else a user can author is exposed, so the assistant has parity
+// with hand-editing — including `stepParams`, which is not the legacy bag its
+// old comment claimed: `execute-agent-step` merges it into the agent's input
+// context, under `appContext`.
 const StepConfigSchema = WorkflowStepSchema.omit({
   id: true,
   plugin: true,
   metadata: true,
-  stepParams: true,
 }).extend({
   type: WorkflowStepSchema.shape.type.unwrap().exclude(['terminal']),
   agent: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.agent),
@@ -129,10 +129,47 @@ export const RemoveStepToolSchema = z.object({
 });
 export type RemoveStepTool = z.infer<typeof RemoveStepToolSchema>;
 
+/**
+ * The workflow level, which no tool could reach: all three step tools are
+ * step-scoped, so a request like "make the study ID a required input" or "add
+ * these house rules to every agent step" had no way to land however it was
+ * phrased.
+ *
+ * Patch semantics — a call naming one field leaves the others alone, so the
+ * assistant can answer "also set the preamble" without re-sending `env`.
+ * `name` is excluded: renaming a registered workflow is a different operation
+ * from editing a draft version, and the canvas cannot do it either.
+ */
+export const UpdateWorkflowToolSchema = WorkflowAuthorableSchema.omit({
+  name: true,
+  steps: true,
+  transitions: true,
+  inputForNextRun: true,
+}).partial();
+export type UpdateWorkflowTool = z.infer<typeof UpdateWorkflowToolSchema>;
+
+/**
+ * Conditional routing. `when` is evaluated by the transition-resolver's own
+ * expression language — not the `${...}` interpolation steps use — and the
+ * canvas preserves it on rewire and renders it as an edge label, but no control
+ * could write it.
+ *
+ * Omitting `when` clears the condition, which is how an edge goes back to
+ * unconditional.
+ */
+export const SetTransitionConditionToolSchema = z.object({
+  from: z.string().min(1),
+  to: z.string().min(1),
+  when: z.string().min(1).optional(),
+});
+export type SetTransitionConditionTool = z.infer<typeof SetTransitionConditionToolSchema>;
+
 export const WORKFLOW_ASSISTANT_TOOLS = {
   add_step: AddStepToolSchema,
   update_step: UpdateStepToolSchema,
   remove_step: RemoveStepToolSchema,
+  update_workflow: UpdateWorkflowToolSchema,
+  set_transition_condition: SetTransitionConditionToolSchema,
 } as const;
 
 export type WorkflowAssistantToolName = keyof typeof WORKFLOW_ASSISTANT_TOOLS;
@@ -147,6 +184,8 @@ export const WorkflowAssistantToolCallSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('add_step'), arguments: AddStepToolSchema }),
   z.object({ tool: z.literal('update_step'), arguments: UpdateStepToolSchema }),
   z.object({ tool: z.literal('remove_step'), arguments: RemoveStepToolSchema }),
+  z.object({ tool: z.literal('update_workflow'), arguments: UpdateWorkflowToolSchema }),
+  z.object({ tool: z.literal('set_transition_condition'), arguments: SetTransitionConditionToolSchema }),
 ]);
 export type WorkflowAssistantToolCall = z.infer<typeof WorkflowAssistantToolCallSchema>;
 

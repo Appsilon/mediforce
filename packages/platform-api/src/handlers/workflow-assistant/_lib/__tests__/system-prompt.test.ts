@@ -139,7 +139,11 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
 
   it('appends the embedded capability & authoring reference (all three docs) and scopes out package-only authoring', () => {
     expect(prompt).toMatch(/# Capability & authoring reference/);
-    expect(prompt).toMatch(/out of scope for you/);
+    // The package is what stays out of reach; the definition no longer is,
+    // now that update_workflow and set_transition_condition exist.
+    expect(prompt).toMatch(/out of scope is the surrounding \*package\*/);
+    expect(prompt).toMatch(/update_workflow/);
+    expect(prompt).toMatch(/set_transition_condition/);
     expect(prompt).toMatch(/`command`-mode scripts/);
     expect(prompt).toMatch(/Pick an authoring path/); // how-to-create-workflow.md
     expect(prompt).toMatch(/this is where fan-out lives/); // workflow-capabilities.md
