@@ -33,7 +33,8 @@ export function WorkflowNotificationsPanel({
         </datalist>
       )}
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Roles, not people — the workspace resolves them to whoever holds the role.
+        Pick a role, not a person. Everyone who holds that role in this
+        workspace is notified.
       </p>
         <div className="space-y-1">
           {notifications.map((entry, idx) => (
