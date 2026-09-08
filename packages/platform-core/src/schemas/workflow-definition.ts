@@ -477,6 +477,63 @@ function validateSteps(
   });
 }
 
+/**
+ * Artifacts have to survive being written to a directory: two files cannot
+ * share a path, a file cannot sit where another needs a directory, and the set
+ * cannot outgrow the definition that carries it. Each is refused here rather
+ * than failing halfway through materializing a run.
+ */
+function validateArtifacts(
+  wd: { artifacts?: Array<{ path: string; contents: string }> },
+  ctx: z.RefinementCtx,
+): void {
+  if (!wd.artifacts) return;
+
+  const byPath = new Map<string, number>();
+  wd.artifacts.forEach((artifact, i) => {
+    const seenAt = byPath.get(artifact.path);
+    if (seenAt !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['artifacts', i, 'path'],
+        message: `artifacts[${i}].path '${artifact.path}' is already used by artifacts[${String(seenAt)}]`,
+      });
+      return;
+    }
+    byPath.set(artifact.path, i);
+  });
+
+  // A directory prefix of another artifact cannot also be a file. Checked
+  // against every ancestor rather than only the parent, so `a` conflicting with
+  // `a/b/c` is caught too.
+  wd.artifacts.forEach((artifact, i) => {
+    const segments = artifact.path.split('/');
+    for (let depth = 1; depth < segments.length; depth += 1) {
+      const ancestor = segments.slice(0, depth).join('/');
+      if (byPath.has(ancestor)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['artifacts', i, 'path'],
+          message: `artifacts[${i}].path '${artifact.path}' needs '${ancestor}' to be a directory, but artifacts[${String(byPath.get(ancestor))}] is a file at that path`,
+        });
+        return;
+      }
+    }
+  });
+
+  const total = wd.artifacts.reduce(
+    (sum, artifact) => sum + utf8Bytes(artifact.path) + utf8Bytes(artifact.contents),
+    0,
+  );
+  if (total > WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['artifacts'],
+      message: `artifacts total ${String(total)} bytes, over the ${String(WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES)} byte limit — put what is bigger in an image or a repository`,
+    });
+  }
+}
+
 function validateTriggerInput(
   wd: {
     triggerInput?: Array<{ name: string; type?: string }>;
@@ -614,6 +671,55 @@ export const WorkflowSourceSchema = RepoSchema.omit({ auth: true }).extend({
 });
 export type WorkflowSource = z.infer<typeof WorkflowSourceSchema>;
 
+/** Bytes one artifact may hold. Generous for a Dockerfile, a script or a
+ *  SKILL.md, and small enough that a definition stays a definition. */
+export const WORKFLOW_ARTIFACT_MAX_BYTES = 64 * 1024;
+
+/** Bytes every artifact of a workflow may hold together. The set rides in the
+ *  definition row and is read on every fetch of it, so the total is capped as
+ *  well as each file. Anything beyond this is a dependency, not a workflow
+ *  file: it belongs in an image or a repository. */
+export const WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES = 256 * 1024;
+
+/** UTF-8 length, which is what a stored definition actually costs — a
+ *  character count would let four-byte characters through the cap. */
+function utf8Bytes(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
+
+/**
+ * A file a workflow carries with it: a script a step runs, a Dockerfile its
+ * image is built from, a SKILL.md an agent reads. Text only, and part of the
+ * definition, so it versions with the workflow and needs no git checkout to
+ * reach a run.
+ *
+ * `path` is materialized onto the host before a run, so it has to be a plain
+ * relative posix path: anything that escapes the directory (`..`, a leading
+ * `/`) or that a filesystem would refuse (`\`, an empty segment) is rejected
+ * here rather than at write time. `.mediforce/` is the engine's own directory
+ * inside a run workspace and is not an author's to write.
+ */
+export const WorkflowArtifactSchema = z.object({
+  path: z.string()
+    .min(1, 'artifact path is required')
+    .max(512, 'artifact path is too long')
+    .refine((value) => value.startsWith('/') === false, 'artifact path must be relative')
+    .refine((value) => value.includes('\\') === false, 'artifact path must use forward slashes')
+    .refine(
+      (value) => value.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..'),
+      'artifact path must not contain empty, "." or ".." segments',
+    )
+    .refine(
+      (value) => value.split('/')[0] !== '.mediforce',
+      '.mediforce is written by the platform, so it cannot hold an artifact',
+    ),
+  contents: z.string().refine(
+    (value) => utf8Bytes(value) <= WORKFLOW_ARTIFACT_MAX_BYTES,
+    `artifact is larger than ${String(WORKFLOW_ARTIFACT_MAX_BYTES)} bytes`,
+  ),
+});
+export type WorkflowArtifact = z.infer<typeof WorkflowArtifactSchema>;
+
 export const WorkflowDefinitionBaseSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
@@ -656,6 +762,9 @@ export const WorkflowDefinitionBaseSchema = z.object({
   createdAt: z.string().datetime().optional(),
   inputForNextRun: z.array(InputForNextRunEntrySchema).optional(),
   triggerInput: z.array(TriggerInputFieldSchema).optional(),
+  /** Files this workflow carries: scripts its steps run, a Dockerfile its image
+   *  is built from, skills its agents read. See {@link WorkflowArtifactSchema}. */
+  artifacts: z.array(WorkflowArtifactSchema).optional(),
 });
 
 /**
@@ -696,6 +805,7 @@ export const WorkflowAuthorableSchema = WorkflowDefinitionBaseSchema.pick({
   metadata: true,
   inputForNextRun: true,
   triggerInput: true,
+  artifacts: true,
 });
 
 export function getWorkflowAuthorableJsonSchema(): Record<string, unknown> {
@@ -723,6 +833,7 @@ export const WorkflowDefinitionSchema = WorkflowDefinitionBaseSchema.superRefine
     validateSteps(wd, ctx);
     validateVerdicts(wd, ctx);
     validateTriggerInput(wd, ctx);
+    validateArtifacts(wd, ctx);
   },
 );
 
@@ -731,6 +842,7 @@ export {
   validateSteps,
   validateVerdicts,
   validateTriggerInput,
+  validateArtifacts,
   scriptConfigKeyForPlugin,
 };
 
@@ -750,6 +862,7 @@ export function parseWorkflowDefinitionForCreation(input: unknown) {
       validateSteps(wd, ctx);
       validateVerdicts(wd, ctx);
       validateTriggerInput(wd, ctx);
+      validateArtifacts(wd, ctx);
     })
     .safeParse(input);
 }
@@ -771,6 +884,7 @@ export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit(
   validateSteps(wd, ctx);
   validateVerdicts(wd, ctx);
   validateTriggerInput(wd, ctx);
+  validateArtifacts(wd, ctx);
 });
 
 export type WorkflowTemplate = z.infer<typeof WorkflowTemplateSchema>;

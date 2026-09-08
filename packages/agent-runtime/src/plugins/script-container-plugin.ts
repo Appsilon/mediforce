@@ -8,6 +8,7 @@ import { resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
 import { isLocalExecutionAllowed } from './base-container-agent-plugin';
+import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 
 // Last-resort for the legacy process-mode path only; the workflow path resolves
 // the timeout via resolveStepTimeoutMinutes. Aligned with that resolver's
@@ -215,6 +216,13 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         );
       }
 
+      // The workflow's own files, written to a host directory and mounted
+      // read-only at /artifacts: how a script reaches its code with no git
+      // checkout and nothing baked into the image.
+      const artifactsHostDir = isWorkflowAgentContext(this.context)
+        ? await materializeArtifacts(this.context.workflowDefinition.artifacts)
+        : null;
+
       // Write inline script to /output/script.{ext}
       if (this.inlineScript && this.runtime) {
         const runtimeCfg = RUNTIME_CONFIG[this.runtime];
@@ -308,6 +316,9 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           '--cpus', '2',
           '-v', `${outputDir}:/output`,
           '-v', `${this.runWorkspaceHandle!.path}:/workspace`,
+          ...(artifactsHostDir === null
+            ? []
+            : ['-v', `${artifactsHostDir}:${CONTAINER_ARTIFACTS_MOUNT}:ro`]),
           '-w', '/workspace',
           ...envFlags,
           this.image,

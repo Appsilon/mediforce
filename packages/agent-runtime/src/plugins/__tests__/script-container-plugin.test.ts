@@ -543,6 +543,83 @@ describe('ScriptContainerPlugin', () => {
       expect(dockerArgs).toContain('MEDIFORCE_RUN_NAMESPACE=acme');
     });
 
+    it('[DATA] mounts the workflow\'s own files at /artifacts, read-only', async () => {
+      // The files a workflow carries are how a script reaches its code without a
+      // git checkout: the definition holds them, the host writes them, the
+      // container reads them at a fixed path.
+      const context: WorkflowAgentContext = {
+        stepId: 'poll',
+        processInstanceId: 'pi-artifacts',
+        runNamespace: 'acme',
+        definitionVersion: '1',
+        stepInput: {},
+        autonomyLevel: 'L4',
+        workflowDefinition: buildWorkflowDefinition({
+          name: 'landing-zone',
+          version: 1,
+          namespace: 'acme',
+          steps: [],
+          transitions: [],
+          artifacts: [{ path: 'scripts/poll.py', contents: 'print("poll")\n' }],
+        }),
+        step: {
+          id: 'poll',
+          name: 'Poll',
+          type: 'creation',
+          executor: 'script',
+          script: { command: 'python3 /artifacts/scripts/poll.py', image: 'python:3.12-slim' },
+        },
+        llm: { complete: vi.fn() },
+        getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
+      };
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      mockSpawnSuccess(createMockChild());
+      await plugin.run(emit);
+
+      const dockerArgs = spawnMock.mock.calls[0][1] as string[];
+      const mount = dockerArgs.find((arg) => arg.endsWith(':/artifacts:ro'));
+      expect(mount, 'artifacts are mounted read-only').toBeDefined();
+      const hostDir = mount!.slice(0, -':/artifacts:ro'.length);
+      expect(await readFile(join(hostDir, 'scripts/poll.py'), 'utf8')).toBe('print("poll")\n');
+    });
+
+    it('[DATA] adds no mount when the workflow carries no files', async () => {
+      const context: WorkflowAgentContext = {
+        stepId: 'poll',
+        processInstanceId: 'pi-no-artifacts',
+        runNamespace: 'acme',
+        definitionVersion: '1',
+        stepInput: {},
+        autonomyLevel: 'L4',
+        workflowDefinition: buildWorkflowDefinition({
+          name: 'landing-zone',
+          version: 1,
+          namespace: 'acme',
+          steps: [],
+          transitions: [],
+        }),
+        step: {
+          id: 'poll',
+          name: 'Poll',
+          type: 'creation',
+          executor: 'script',
+          script: { runtime: 'bash', inlineScript: '#!/bin/sh\necho ok\n' },
+        },
+        llm: { complete: vi.fn() },
+        getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
+      };
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      mockSpawnSuccess(createMockChild());
+      await plugin.run(emit);
+
+      const dockerArgs = spawnMock.mock.calls[0][1] as string[];
+      expect(dockerArgs.some((arg) => arg.includes(':/artifacts'))).toBe(false);
+    });
+
     it('[ERROR] no-output diagnostic lists MEDIFORCE_RUN_NAMESPACE for workflow runs', async () => {
       const context: WorkflowAgentContext = {
         stepId: 'register',
