@@ -133,21 +133,10 @@ describe('applyWorkflowAssistantToolCalls — the workflow level', () => {
     expect(settings.env).toEqual({ STUDY_ID: 'CDISCPILOT01' });
   });
 
-  it('does not narrow visibility on an unrelated edit', () => {
-    // `visibility` carries a `.default('private')` that `.partial()` does not
-    // strip, so a parsed patch claims a visibility the model never wrote. A
-    // public workflow going private because someone set the preamble is an
-    // access change nobody asked for.
-    const parsed = UpdateWorkflowToolSchema.parse({ preamble: 'house rules' });
-    expect(parsed.visibility).toBeUndefined();
-
-    const { settings } = applyWorkflowAssistantToolCalls(
-      baseCanvas().steps,
-      baseCanvas().transitions,
-      [{ tool: 'update_workflow', arguments: parsed }],
-      { visibility: 'public' },
-    );
-    expect(settings.visibility).toBe('public');
+  it('cannot touch visibility, which has its own control', () => {
+    // Its editor on the workflow page PATCHes every version at once; a register
+    // writes only the new one, so two controls would disagree.
+    expect('visibility' in UpdateWorkflowToolSchema.shape).toBe(false);
   });
 
   it('merges env and metadata rather than replacing them', () => {

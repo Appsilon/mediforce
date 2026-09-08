@@ -20,7 +20,7 @@ const rs = selectBase;
 const rt = textareaBase;
 
 const TIP = {
-  triggerInput: 'The input contract for the whole workflow (ADR-0012). Every trigger and every spawned child validates its payload against this, and steps read the values as ${triggerPayload.<name>}.',
+  triggerInput: 'What this workflow accepts when it starts. Every trigger and every workflow that spawns this one is checked against it, and steps read the values as ${triggerPayload.<name>}.',
   preamble: 'Prepended to every agent prompt in this workflow — house rules, domain context, terminology.',
   env: 'Workflow-wide environment defaults. A step’s own env overrides these key by key. A {{SECRET_NAME}} value resolves from workspace or workflow secrets.',
   notifications: 'Who is told when a task is assigned or an agent escalates. Roles, not people — the workspace resolves them to members.',
@@ -30,8 +30,6 @@ const TIP = {
   skillsRepoCommit: 'Commit to clone. Required — without it the skills fetch silently does nothing.',
   skillsRepoAuth: 'Name of a secret holding a token, for a private skills repo.',
   url: 'Link shown on the run card. Cosmetic.',
-  visibility: 'The cross-workspace shelf: public lets another workspace find and copy this workflow. It does not decide who may run or edit it — that is the Access tab. Saved with this version, so older versions keep what they had.',
-  roles: 'Role names this workflow expects, which seed the workspace role pick-list so an imported package can name roles nobody holds yet. Granting them is the Access tab’s job.',
   displayName: 'The name shown in the app. The workflow’s id — what routes, spawn targets and the CLI use — is fixed at creation; use Copy to get one under a different id.',
 } as const;
 
@@ -377,36 +375,6 @@ export function WorkflowSettingsPanel({
                 externalSkillsRepo: { ...draft.externalSkillsRepo, auth: e.target.value },
               })}
               className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
-            />
-          </FieldRow>
-        </FieldGroup>
-      </Section>
-
-      <Section title="Sharing">
-        <FieldGroup>
-          <FieldRow label="visibility" tooltip={TIP.visibility}>
-            <select
-              value={draft.visibility ?? ''}
-              onChange={(e) => onChange({
-                visibility: (e.target.value || undefined) as 'public' | 'private' | undefined,
-              })}
-              className={rs}
-            >
-              <option value="">Default (private)</option>
-              <option value="private">Private</option>
-              <option value="public">Public — other workspaces may copy it</option>
-            </select>
-          </FieldRow>
-          <FieldRow label="roles" tooltip={TIP.roles}>
-            <input
-              value={draft.roles?.join(', ') ?? ''}
-              placeholder="reviewer, data-manager"
-              list={workspaceRoles === undefined ? undefined : 'workflow-settings-roles'}
-              onChange={(e) => {
-                const roles = e.target.value.split(',').map((r) => r.trim()).filter(Boolean);
-                onChange({ roles: roles.length > 0 ? roles : [] });
-              }}
-              className={cn(ri, 'placeholder:italic placeholder:text-muted-foreground/40')}
             />
           </FieldRow>
         </FieldGroup>
