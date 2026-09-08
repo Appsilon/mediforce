@@ -37,6 +37,7 @@ const TIP = {
   skillsRepoCommit: 'Commit to clone. Required — without it the skills fetch silently does nothing.',
   skillsRepoAuth: 'Name of a secret holding a token, for a private skills repo.',
   url: 'Link shown on the run card. Cosmetic.',
+  displayName: 'The name shown in the app. The workflow’s id — what routes, spawn targets and the CLI use — is fixed at creation; use Copy to get one under a different id.',
 } as const;
 
 const NOTIFICATION_EVENTS = ['task_assigned', 'agent_escalation'] as const;
@@ -375,6 +376,16 @@ export function WorkflowSettingsPanel({
 
       <Section title="Presentation">
         <FieldGroup>
+          <FieldRow label="displayName" tooltip={TIP.displayName}>
+            <input
+              value={(draft.metadata?.displayName as string | undefined) ?? ''}
+              placeholder="Landing Zone — CDISCPILOT01"
+              onChange={(e) => onChange({
+                metadata: { ...draft.metadata, displayName: e.target.value },
+              })}
+              className={cn(ri, 'placeholder:italic placeholder:text-muted-foreground/40')}
+            />
+          </FieldRow>
           <FieldRow label="url" tooltip={TIP.url}>
             <input
               value={draft.url ?? ''}
