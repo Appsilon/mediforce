@@ -9,6 +9,12 @@ vi.mock('next-auth', () => ({
 vi.mock('next-auth/providers/google', () => ({ default: () => ({ id: 'google', type: 'oauth' }) }));
 vi.mock('@auth/drizzle-adapter', () => ({ DrizzleAdapter: () => ({}) }));
 
+// The second term of the ADR-0021 §5 gate: `auth_users.invited_at`, i.e. did an
+// admin deliberately seed this account. Default `false` — which covers both a
+// stranger and a self-registered account, the distinction the column exists to
+// draw — so the allowlist alone decides unless a test says otherwise.
+const mockAuthUserWasInvited = vi.fn(async () => false);
+
 // auth.ts opens a Postgres client at module load; stub the infra layer so the
 // signIn decision path can be exercised without a database.
 vi.mock('@mediforce/platform-infra', () => ({
@@ -22,18 +28,26 @@ vi.mock('@mediforce/platform-infra', () => ({
   // auth.ts registers the Email provider whenever email is configured; null =
   // no email → no Email provider, which is irrelevant to the domain-opt-out test.
   resolveEmailSenderFromEnv: () => null,
-  findPasswordCredentialByEmail: vi.fn(async () => null),
+  authUserWasInvited: (...args: unknown[]) => mockAuthUserWasInvited(...args),
 }));
 
 import { buildAuthConfig } from '../../auth';
 import { validateEnv } from '../../instrumentation-node';
 
 /**
+ * Two things about the `signIn` gate, which ADR-0021 §5 made two-term.
+ *
  * ADR-0002 §4a opt-out: `ALLOWED_EMAIL_DOMAINS='*'` deliberately disables the
  * email-domain restriction so any Google/OIDC account can sign in. This proves
  * the whole decision path (auth.ts signIn callback reading the env) honours the
  * sentinel, and that the boot guard accepts it with a WARN yet still fails an
  * empty allowlist.
+ *
+ * ADR-0021 §5: an address an admin deliberately seeded — an invite, or a
+ * redeemed join link — is admitted whatever its domain. Before this, such an
+ * invite produced an account that every route rejected. The second term is
+ * `auth_users.invited_at` and NOT "a row exists", so the allowlist keeps its
+ * other job: dropping a domain still evicts everyone who self-registered at it.
  */
 
 function callSignIn(email: string): boolean | Promise<boolean> {
@@ -43,6 +57,11 @@ function callSignIn(email: string): boolean | Promise<boolean> {
 }
 
 describe('signIn email-domain gate', () => {
+  beforeEach(() => {
+    mockAuthUserWasInvited.mockClear();
+    mockAuthUserWasInvited.mockResolvedValue(false);
+  });
+
   afterEach(() => {
     delete process.env.ALLOWED_EMAIL_DOMAINS;
   });
@@ -52,9 +71,35 @@ describe('signIn email-domain gate', () => {
     expect(await callSignIn('mallory@evil.com')).toBe(true);
   });
 
-  it('rejects an out-of-domain sign-in when a real domain list is set', async () => {
+  it('rejects an out-of-domain sign-in by an address with no account', async () => {
     process.env.ALLOWED_EMAIL_DOMAINS = 'appsilon.com';
     expect(await callSignIn('mallory@evil.com')).toBe(false);
+  });
+
+  it('admits an out-of-domain address that an admin deliberately seeded (ADR-0021 §5)', async () => {
+    process.env.ALLOWED_EMAIL_DOMAINS = 'appsilon.com';
+    mockAuthUserWasInvited.mockResolvedValue(true);
+    expect(await callSignIn('alice@external.test')).toBe(true);
+  });
+
+  /**
+   * The regression the `invited_at` column exists to prevent. The staging
+   * runbook records `ALLOWED_EMAIL_DOMAINS=appsilon.com` deliberately blocking
+   * two migrated accounts by name, so dropping a domain has to keep evicting
+   * the people at it. A bare "an `auth_users` row exists" second term — which
+   * is what ADR-0021 §5's own text proposed — would re-admit exactly those,
+   * because the Auth.js adapter writes that row for every self-registered user.
+   */
+  it('still rejects an out-of-domain account that merely exists', async () => {
+    process.env.ALLOWED_EMAIL_DOMAINS = 'appsilon.com';
+    mockAuthUserWasInvited.mockResolvedValue(false);
+    expect(await callSignIn('fylyps@gmail.com')).toBe(false);
+  });
+
+  it('does not need the account lookup when the domain is allowlisted', async () => {
+    process.env.ALLOWED_EMAIL_DOMAINS = 'appsilon.com';
+    expect(await callSignIn('bob@appsilon.com')).toBe(true);
+    expect(mockAuthUserWasInvited).not.toHaveBeenCalled();
   });
 });
 

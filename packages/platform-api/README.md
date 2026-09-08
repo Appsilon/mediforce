@@ -77,6 +77,16 @@ its full replace. Nothing in `auth.ts` knows these names, and nothing should: a
 role that held authority the Access tab does not show would make the tab a
 partial answer.
 
+**Two handlers deliberately have no caller.** `previewJoinLink` and
+`redeemJoinLink` ([ADR-0021](../../docs/adr/0021-workspace-join-links.md)) run
+behind public routes: the join-link *token* is the authorization, so they must
+never consult `scope.caller`, and the route builds a system scope for them
+rather than resolving credentials that do not exist. Every other handler in
+`handlers/join-links/` is an ordinary owner/admin surface behind
+`assertCallerIsNamespaceAdmin`. The rule this bends — a handler reaches data
+through `CallerScope` — is intact; the one it suspends is that a caller was
+authenticated, and only these two may do that.
+
 **`getPlatformServices()` is the only composition root.** It wires repositories,
 the workflow engine, the plugin registry and the action registry. It lives here —
 not in `platform-ui`, whose `src/lib/platform-services.ts` is a re-export shim

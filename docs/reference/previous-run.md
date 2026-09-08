@@ -1,7 +1,7 @@
 ---
 status: living
 audience: engineers
-last_reviewed: 2026-08-18
+last_reviewed: 2026-09-04
 ---
 
 # Previous Run Outputs (carry-over across runs)
@@ -90,6 +90,22 @@ API route, cron) sees the failure and can retry.
 
 The `output` key itself is not validated — step outputs are dynamic, and a
 missing key at runtime simply means the key is omitted from `previousRun`.
+
+## Authoring in the workflow editor
+
+The canvas edits `inputForNextRun` along with the graph, because its entries
+name step ids: renaming a step moves the entries that named it, and deleting one
+drops them (with a toast naming what the next run stops receiving). Both are pure
+helpers in [`workflow-editor-utils.ts`](../../packages/platform-ui/src/components/workflows/workflow-editor-utils.ts),
+applied by the canvas beside its transition and verdict-target rewiring, and the
+entries ride in its undo/redo snapshots. Otherwise the entry would keep
+an id the workflow no longer has, the validation above would refuse the save, and
+the canvas change could not be shipped from the page that made it.
+
+The block itself is edited in the **Workflow source code** panel, which applies
+`steps`, `transitions` and `inputForNextRun` — a `stepId` naming no applied step
+is reported there rather than dropped, since in that panel it is what the author
+just typed.
 
 ## Why this shape
 

@@ -26,6 +26,7 @@ import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useWorkflowDefinitionApi } from '@/hooks/use-workflows-api';
 import { WorkflowSecretsEditor } from '@/components/workflows/workflow-secrets-editor';
+import { collectSecretReferences } from '@/lib/preflight-checks';
 import { WorkflowAccessPanel } from '@/components/workflows/workflow-access-panel';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
@@ -238,7 +239,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const tabParam = searchParams.get('tab');
   const initialTab =
     tabParam === 'secrets' || tabParam === 'triggers' || tabParam === 'access' ? tabParam : 'runs';
-  const setupKeys = searchParams.get('setup')?.split(',').filter(Boolean) ?? [];
+  const setupParam = searchParams.get('setup');
   const [activeTab, setActiveTab] = React.useState(initialTab);
   // Lifted out of AllRunsPanel (controlled props) so the header/tab run count
   // below can mirror them — the count must match what the table's own
@@ -256,6 +257,15 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   // per workflow.
   const latestVersionNumber = versions[0]?.version ?? null;
   const { definition: latest } = useWorkflowVersion(decodedName, handle, latestVersionNumber);
+  // The Secrets tab lists every key the definition references, whether or not
+  // the visitor arrived through a warning's `?setup=` deep link — the keys the
+  // workflow needs are the ones worth showing, and hunting them down in the
+  // step env blocks is the friction the warning otherwise leaves behind.
+  const requiredSecretKeys = React.useMemo(() => {
+    const fromLink = setupParam?.split(',').filter(Boolean) ?? [];
+    const fromDefinition = latest ? collectSecretReferences(latest).map((ref) => ref.key) : [];
+    return [...new Set([...fromLink, ...fromDefinition])];
+  }, [setupParam, latest]);
   // The Triggers tab needs the contract a *firing* will be validated against,
   // which is the version a trigger resolves — so the selection runs through the
   // very function the server's `resolveRunnableVersion` delegates to, not a
@@ -696,7 +706,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
               <WorkflowSecretsEditor
                 namespace={handle}
                 workflowName={decodedName}
-                suggestedKeys={setupKeys}
+                requiredKeys={requiredSecretKeys}
               />
             )}
           </div>

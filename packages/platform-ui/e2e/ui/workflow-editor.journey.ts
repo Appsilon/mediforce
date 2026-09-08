@@ -1045,6 +1045,68 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page).not.toHaveURL(/\/definitions\/1$/, { timeout: 10_000 });
   });
 
+  // ── Carry-over to the next run follows the steps it names ─────────────────
+
+  test('renaming a step moves the carry-over entry that named it', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Carry%20Over%20Rename/definitions/1`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    // `inputForNextRun` names step ids and has no field of its own on this page,
+    // so an entry left on the old id is unfixable: the server refuses the save
+    // with "does not match any step id" and the canvas change cannot be shipped.
+    await page.locator('.react-flow__node').filter({ hasText: 'Scan' }).click();
+    const stepEditor = page.locator('[data-testid="step-editor"]');
+    await expect(stepEditor).toBeVisible({ timeout: 5_000 });
+    await stepEditor.getByRole('button', { name: /advanced/i }).click();
+    const stepIdField = stepEditor.getByTestId('step-id-field');
+    await expect(stepIdField).toHaveValue('scan');
+    await stepIdField.fill('poll');
+    await stepIdField.blur();
+
+    // Committing an id re-keys the step editor, which folds its cards back to
+    // the defaults — reopen Advanced to read the committed value back.
+    await stepEditor.getByRole('button', { name: /advanced/i }).click();
+    await expect(stepEditor.getByTestId('step-id-field')).toHaveValue('poll');
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('renamed scan to poll');
+    await page.getByRole('button', { name: /save new version/i }).click();
+
+    // The save is accepted, and the new version reads the output off the step
+    // under its new id.
+    await page.waitForURL(/\/workflows\/Carry%20Over%20Rename\/?$/, { timeout: 20_000 });
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Carry%20Over%20Rename/definitions/2`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
+    await expectJsonEditorContains(page, '"stepId": "poll"');
+  });
+
+  test('deleting a step drops the carry-over entry that named it, and says so', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Carry%20Over%20Delete/definitions/1`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.locator('.react-flow__node').filter({ hasText: 'Review' }).hover();
+    await page.getByRole('button', { name: 'Delete step' }).click();
+    await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 5_000 });
+
+    // Nothing produces `notes` any more, so the entry goes — but the next run
+    // stops receiving it, which the author has to be told about.
+    const toast = page.getByTestId('toast');
+    await expect(toast.getByText('Carry-over to the next run removed')).toBeVisible({ timeout: 5_000 });
+    await expect(toast.getByText(/"notes" came from a step that is no longer/)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('dropped the review step');
+    await page.getByRole('button', { name: /save new version/i }).click();
+
+    // A dangling entry would have been refused by the server's cross-field check.
+    await page.waitForURL(/\/workflows\/Carry%20Over%20Delete\/?$/, { timeout: 20_000 });
+    await expect(page.getByRole('tab', { name: /definitions/i })).toBeVisible({ timeout: 15_000 });
+  });
+
   test('leaving an untouched workflow navigates without a prompt', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);

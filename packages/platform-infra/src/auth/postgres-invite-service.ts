@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Database } from '../postgres/client';
 import { authAccounts } from '../postgres/schema/auth-account';
 import { authSessions } from '../postgres/schema/auth-session';
@@ -18,6 +18,26 @@ export interface SeedInviteInput {
    * administers the workspace, these are what the invitee does in a process.
    */
   readonly roles?: readonly string[];
+  /**
+   * Whether an authenticated admin is naming this specific person, as opposed
+   * to an anonymous join-link holder typing an address into a public form
+   * (ADR-0021 §4). Required, with no default: the two callers want materially
+   * different writes, and a third that forgot to choose would silently get the
+   * privileged one.
+   *
+   * `true` (admin invite) may modify an account that already exists — raise or
+   * lower its membership, stamp `invited_at`, clear an auto-join tombstone.
+   * Each of those is a deliberate act by someone entitled to perform it.
+   *
+   * `false` (join-link redemption) may only ever CREATE. The email is
+   * attacker-supplied and unauthenticated, so touching an existing row would
+   * hand any link holder three escalations the ADR never granted: demoting a
+   * workspace owner to `member` by typing their address at a `member` link,
+   * exempting an allowlist-blocked account from the domain gate by stamping
+   * `invited_at` on it, and undoing a deliberate removal. A link is an
+   * entrance; walking through one twice is a no-op.
+   */
+  readonly vouchedByAdmin: boolean;
 }
 
 export interface SeededInvite {
@@ -38,10 +58,16 @@ export interface SeededInvite {
  * verified-email auto-link (ADR-0002 §4b) onto the pre-seeded row, or by
  * setting a password.
  *
- * Idempotent: re-seeding the same email reuses the existing uid. A re-invite
- * with a different membership updates the existing workspace membership row
- * (role parity with the pre-cutover `addMember` upsert); roles are
- * additive.
+ * Idempotent: re-seeding the same email reuses the existing uid. What a
+ * re-seed is allowed to CHANGE depends on `vouchedByAdmin` — an admin invite
+ * may rewrite an existing membership, stamp `invited_at` and clear an
+ * auto-join tombstone; an anonymous join-link redemption may only create. See
+ * that field for why. Roles are additive either way.
+ *
+ * This is also the ONLY writer of `auth_users.invited_at` (migration 0048) —
+ * the marker the ADR-0021 §5 sign-in gate reads to tell an admin's deliberate
+ * add apart from a self-registration the Auth.js adapter wrote. Both admin
+ * invites and redeemed join links reach it here, and nothing else may set it.
  */
 export class PostgresInviteService {
   constructor(private readonly db: Database) {}
@@ -62,37 +88,79 @@ export class PostgresInviteService {
       const uid = existing[0]?.id ?? randomUUID();
 
       if (!isExisting) {
+        // Stamped whichever caller this is. A brand-new row means nobody held
+        // this address before, so there is no pre-existing standing for a
+        // redemption to subvert — and the link it came through was minted by an
+        // admin, which is the vouching ADR-0021 §5 asks for.
         await tx.insert(authUsers).values({
           id: uid,
           email: normalisedEmail,
           name: input.displayName ?? null,
+          invitedAt: new Date(),
         });
+      } else if (input.vouchedByAdmin) {
+        // Only an admin naming this person may stamp a row that already exists.
+        // This is the repair path for someone invited before migration 0048
+        // shipped, and for a migrated account an admin now genuinely wants in.
+        //
+        // A redemption must NOT reach here: its email is attacker-supplied and
+        // unauthenticated, so stamping would let any link holder exempt an
+        // allowlist-blocked account from the domain gate by typing its address
+        // — the exact control migration 0048 exists to preserve.
+        //
+        // First stamp wins: `invited_at` records when they were first vouched
+        // for, so a later re-invite does not rewrite that history.
+        await tx
+          .update(authUsers)
+          .set({ invitedAt: sql`now()` })
+          .where(and(eq(authUsers.id, uid), isNull(authUsers.invitedAt)));
       }
 
-      await tx
+      const memberInsert = tx
         .insert(workspaceMembers)
         .values({
           workspace: input.workspaceHandle,
           uid,
           role: input.membership,
           ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
-        })
-        .onConflictDoUpdate({
+        });
+      if (input.vouchedByAdmin) {
+        // An admin re-inviting someone at a different level means it: role
+        // parity with the pre-cutover `addMember` upsert.
+        await memberInsert.onConflictDoUpdate({
           target: [workspaceMembers.workspace, workspaceMembers.uid],
           set: { role: input.membership },
         });
+      } else {
+        // A redemption never rewrites an existing seat, in either direction.
+        // Upserting would let an anonymous link holder demote the workspace
+        // OWNER to `member` by typing their address at a `member` link, and
+        // promote themselves by redeeming an `admin` link they were already a
+        // member under. Both are silent: the response is identical either way
+        // (that identity is the anti-enumeration property), so the state change
+        // would be invisible to everyone including the victim.
+        await memberInsert.onConflictDoNothing();
+      }
 
       // An explicit invite outranks a past removal: clear the auto-join
       // tombstone (migration 0043) so re-inviting someone who was removed
       // sticks, and so their next `leave` starts from a clean slate.
-      await tx
-        .delete(workspaceAutojoinBlocks)
-        .where(
-          and(
-            eq(workspaceAutojoinBlocks.workspace, input.workspaceHandle),
-            eq(workspaceAutojoinBlocks.uid, uid),
-          ),
-        );
+      //
+      // A redemption does not: "an admin explicitly wants this person back" is
+      // not something an anonymous holder of a shared link can assert on
+      // somebody else's behalf. The membership insert above still adds them,
+      // which is the accepted blast radius; the tombstone keeps guarding
+      // auto-join, which is all it ever guarded.
+      if (input.vouchedByAdmin) {
+        await tx
+          .delete(workspaceAutojoinBlocks)
+          .where(
+            and(
+              eq(workspaceAutojoinBlocks.workspace, input.workspaceHandle),
+              eq(workspaceAutojoinBlocks.uid, uid),
+            ),
+          );
+      }
 
       for (const role of input.roles ?? []) {
         await tx

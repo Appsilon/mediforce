@@ -189,6 +189,7 @@ export {
   validateInputForNextRun,
   validateSteps,
   validateTriggerInput,
+  scriptConfigKeyForPlugin,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
   getWorkflowAuthorableJsonSchema,

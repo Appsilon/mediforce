@@ -20,3 +20,15 @@ export {
   sendInviteSetupEmail,
   type SendInviteSetupEmailParams,
 } from './invite-emails';
+export {
+  mintJoinToken,
+  hashJoinToken,
+  buildJoinUrl,
+  joinLinkStatus,
+  type JoinLink,
+  type JoinLinkStatus,
+  type JoinLinkService,
+  type JoinLinkLookup,
+  type JoinLinkRejection,
+  type CreateJoinLinkRecord,
+} from './join-link';

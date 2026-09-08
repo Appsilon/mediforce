@@ -188,6 +188,105 @@ describe('StepEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith({ id: 'input-text-2' });
   });
 
+  it('[REGRESSION] keeps the verdict row label steady while the verdict name is edited', () => {
+    function ControlledStepEditor() {
+      const [step, setStep] = React.useState(
+        buildStep({ type: 'decision', executor: 'human', verdicts: { approve: { target: 'done' } } }),
+      );
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step]}
+          onChange={(patch) => setStep((current) => ({ ...current, ...patch }))}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Routing');
+
+    const verdictInput = screen.getByDisplayValue('approve') as HTMLInputElement;
+    fireEvent.change(verdictInput, { target: { value: 'approved' } });
+
+    // The row label names the field, not the value being typed...
+    expect(screen.getAllByText('Verdict').length).toBe(1);
+    expect(screen.queryByText('Approve')).toBeNull();
+    // ...and the input is the same element, so typing never steals its own focus.
+    expect(screen.getByDisplayValue('approved')).toBe(verdictInput);
+  });
+
+  it('[REGRESSION] adds a second verdict without renaming the first', () => {
+    function ControlledStepEditor() {
+      const [step, setStep] = React.useState(buildStep({ type: 'decision', executor: 'human' }));
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step]}
+          onChange={(patch) => setStep((current) => ({ ...current, ...patch }))}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Routing');
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add verdict' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ Add verdict' }));
+
+    expect(screen.getAllByText('Verdict').length).toBe(2);
+    expect(screen.getByDisplayValue('new-verdict')).toBeTruthy();
+    expect(screen.getByDisplayValue('new-verdict-2')).toBeTruthy();
+  });
+
+  it('[REGRESSION] adds a second environment variable without renaming the first', () => {
+    function ControlledStepEditor() {
+      const [step, setStep] = React.useState(buildStep({ executor: 'agent' }));
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step]}
+          onChange={(patch) => setStep((current) => ({ ...current, ...patch }))}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Advanced');
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add variable' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ Add variable' }));
+
+    // Suffixed the way an env var is named, not slugified into `new-var`.
+    expect(screen.getByDisplayValue('NEW_VAR')).toBeTruthy();
+    expect(screen.getByDisplayValue('NEW_VAR_2')).toBeTruthy();
+  });
+
+  it('[REGRESSION] adds a second http header without renaming the first', () => {
+    function ControlledStepEditor() {
+      const [step, setStep] = React.useState(buildStep({
+        executor: 'action',
+        action: { kind: 'http', config: { method: 'GET', url: 'https://example.com' } },
+      }));
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step]}
+          onChange={(patch) => setStep((current) => ({ ...current, ...patch }))}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Action');
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add header' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ Add header' }));
+
+    // Header names keep their casing; `x-header` would not match the convention.
+    expect(screen.getByDisplayValue('X-Header')).toBeTruthy();
+    expect(screen.getByDisplayValue('X-Header-2')).toBeTruthy();
+  });
+
   it('[RENDER] step type badge visible without expanding details', () => {
     render(
       <StepEditor

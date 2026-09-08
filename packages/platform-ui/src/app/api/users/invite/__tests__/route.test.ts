@@ -118,6 +118,9 @@ describe('POST /api/users/invite', () => {
       workspaceHandle: 'alpha',
       membership: 'member',
       roles: [],
+      // An authenticated admin named this person, so the seed may modify an
+      // account that already exists (ADR-0021).
+      vouchedByAdmin: true,
     });
     expect(mockSendWorkspaceEmail).toHaveBeenCalled();
   });

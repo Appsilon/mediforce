@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { defineCommand } from '../define-command';
+import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson, printError, printKv } from '../output';
 
 export const runStartCommand = defineCommand({
@@ -30,19 +30,16 @@ export const runStartCommand = defineCommand({
     },
   },
   async run({ args, output, stdin, mediforce, jsonMode }) {
-    let definitionVersion: number | undefined;
-    if (typeof args.version === 'string') {
-      const parsedVersion = Number.parseInt(args.version, 10);
-      if (!Number.isInteger(parsedVersion) || parsedVersion <= 0) {
-        printError(
-          output,
-          { error: `--version must be a positive integer, got '${args.version}'` },
-          jsonMode,
-        );
-        return 2;
-      }
-      definitionVersion = parsedVersion;
+    const parsedVersion = parsePositiveIntArg(args.version);
+    if (parsedVersion === 'invalid') {
+      printError(
+        output,
+        { error: `--version must be a positive integer, got '${String(args.version)}'` },
+        jsonMode,
+      );
+      return 2;
     }
+    const definitionVersion = parsedVersion;
 
     if (args.input !== undefined && args['input-file'] !== undefined) {
       printError(

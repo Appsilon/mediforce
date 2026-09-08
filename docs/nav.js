@@ -3,13 +3,13 @@
 (function () {
   const scriptEl = document.currentScript;
   const src = scriptEl?.getAttribute('src') || '';
-  const p = src.replace(/nav\.js$/, '');
+  const p = src.replace(/nav\.js(\?.*)?$/, '');
 
   const LINKS = [
     {
       label: 'Case Studies',
+      href: 'case-studies/',
       children: [
-        { href: 'case-studies/', label: 'All case studies' },
         { href: 'case-studies/data-delivery/', label: 'Data Delivery' },
         { href: 'case-studies/collecting-documents/', label: 'Collecting Documents' },
       ],
@@ -34,7 +34,7 @@
     return path.endsWith(href) || path.endsWith(href.replace('.html', ''));
   }
   function groupActive(l) {
-    return l.children.some(c => isActive(c.href));
+    return (l.href !== undefined && isActive(l.href)) || l.children.some(c => isActive(c.href));
   }
 
   const chevronIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="header-dropdown-chevron"><polyline points="6 9 12 15 18 9"/></svg>';
@@ -46,7 +46,7 @@
         `<a href="${p}${c.href}" class="header-dropdown-item${isActive(c.href) ? ' header-dropdown-item--active' : ''}">${c.label}</a>`
       ).join('');
       return `<div class="header-dropdown">
-        <button type="button" class="header-link header-dropdown-trigger${active ? ' header-link--active' : ''}" aria-haspopup="true" aria-expanded="false">${l.label}${chevronIcon}</button>
+        <a href="${p}${l.href}" class="header-link header-dropdown-trigger${active ? ' header-link--active' : ''}" aria-haspopup="true" aria-expanded="false">${l.label}${chevronIcon}</a>
         <div class="header-dropdown-menu">${items}</div>
       </div>`;
     }
@@ -59,7 +59,10 @@
       const items = l.children.map(c =>
         `<a href="${p}${c.href}" class="mobile-nav-sublink"${isActive(c.href) ? ' style="color:var(--accent,hsl(161 94% 30%));font-weight:600"' : ''}>${c.label}</a>`
       ).join('');
-      return `<div class="mobile-nav-group-label">${l.label}</div>${items}`;
+      const label = l.href === undefined
+        ? `<div class="mobile-nav-group-label">${l.label}</div>`
+        : `<a href="${p}${l.href}"${isActive(l.href) ? ' style="color:var(--accent,hsl(161 94% 30%));font-weight:600"' : ''}>${l.label}</a>`;
+      return `${label}${items}`;
     }
     if (l.external === true) return `<a href="${l.href}" target="_blank" rel="noopener noreferrer">${l.label}</a>`;
     return `<a href="${p}${l.href}"${isActive(l.href) ? ' style="color:var(--accent,hsl(161 94% 30%));font-weight:600"' : ''}>${l.label}</a>`;
@@ -123,6 +126,9 @@
     dropdown.addEventListener('mouseenter', function () {
       openDropdown(dropdown);
     });
+    if (trigger.tagName === 'A') {
+      return;
+    }
     trigger.addEventListener('click', function (e) {
       e.stopPropagation();
       if (dropdown.classList.contains('is-open')) {

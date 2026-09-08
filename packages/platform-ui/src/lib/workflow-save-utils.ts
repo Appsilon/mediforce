@@ -1,6 +1,10 @@
 import { z } from 'zod';
-import type { WorkflowStep } from '@mediforce/platform-core';
-import type { RegistrationWarning } from '@mediforce/platform-api/contract';
+import {
+  scriptConfigKeyForPlugin,
+  type WorkflowDefinition,
+  type WorkflowStep,
+} from '@mediforce/platform-core';
+import type { RegisterWorkflowBody, RegistrationWarning } from '@mediforce/platform-api/contract';
 import type { ToastOpts } from '@/components/command-palette/types';
 import { formatStepName } from '@/lib/format';
 
@@ -25,6 +29,38 @@ type ValidationIssue = z.infer<typeof ValidationIssueSchema>;
 const MAX_REPORTED_ISSUES = 4;
 
 export const DISPLAY_NAME_KEY = 'displayName';
+
+/**
+ * Builds the register body for a new version of an existing workflow.
+ *
+ * Carries the edited version forward wholesale and lets `edits` override only
+ * what the canvas changed, instead of hand-listing the fields to copy: the old
+ * allowlist silently dropped everything it did not name — `workspace`,
+ * `preamble`, `inputForNextRun`, `triggerInput`, and a non-default
+ * `visibility` — so saving a model change also deleted the workflow's git
+ * remote and made a public workflow private (AGENTS.md §12).
+ *
+ * The destructured fields are the complement of `WorkflowAuthorableSchema`
+ * within the definition: `version`/`createdAt`/`namespace` are assigned
+ * server-side, and the lifecycle fields belong to the version they were set on
+ * — a new version is neither archived nor a copy nor imported from git.
+ */
+export function buildRegisterBody(
+  definition: WorkflowDefinition,
+  edits: Partial<RegisterWorkflowBody>,
+): RegisterWorkflowBody {
+  const {
+    version: _version,
+    createdAt: _createdAt,
+    namespace: _namespace,
+    copiedFrom: _copiedFrom,
+    source: _source,
+    archived: _archived,
+    deleted: _deleted,
+    ...authorable
+  } = definition;
+  return { ...authorable, ...edits };
+}
 
 /**
  * Counts step parameters by trimmed name, so "amount" and "amount " collide
@@ -134,6 +170,10 @@ function fallbackMessage(err: unknown): string {
 /**
  * Validates steps for known structural errors before saving.
  * Returns an error message string on failure, or null when valid.
+ *
+ * Script config is required by the step's *plugin*, exactly as the server
+ * requires it (`scriptConfigKeyForPlugin`) — a pluginless script step, i.e. a
+ * terminal whose `executor` is filler the schema demands, needs none.
  */
 export function validateSteps(steps: WorkflowStep[]): string | null {
   const missingPlugin = steps.filter(
@@ -147,9 +187,14 @@ export function validateSteps(steps: WorkflowStep[]): string | null {
   if (missingAction.length > 0) {
     return `Action config required: ${missingAction.map((s) => `"${s.name}"`).join(', ')}`;
   }
-  const missingScript = steps.filter((s) => s.executor === 'script' && !s.script && !s.databricks);
-  if (missingScript.length > 0) {
-    return `Script config required: ${missingScript.map((s) => `"${s.name}"`).join(', ')}`;
+  const missingScriptConfig = steps.flatMap((s) => {
+    const configKey = s.executor === 'script' ? scriptConfigKeyForPlugin(s.plugin) : undefined;
+    return configKey !== undefined && s[configKey] === undefined
+      ? [`"${s.name}" needs a ${configKey} block`]
+      : [];
+  });
+  if (missingScriptConfig.length > 0) {
+    return `Missing step config: ${missingScriptConfig.join(', ')}`;
   }
 
   const emptyIds = steps.filter((s) => !s.id);

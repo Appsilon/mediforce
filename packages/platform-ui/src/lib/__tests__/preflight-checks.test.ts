@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { runPreflightChecks, findSkippedChecks } from '../preflight-checks';
+import { runPreflightChecks, findSkippedChecks, collectSecretReferences } from '../preflight-checks';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 
@@ -257,5 +257,61 @@ describe('findSkippedChecks', () => {
       modelValidationFailed: true,
     });
     expect(skipped.sort()).toEqual(['credits', 'images', 'models']);
+  });
+});
+
+describe('collectSecretReferences', () => {
+  it('collects the secret keys a definition references, with their env var', () => {
+    const wd = makeDefinition({ env: { API_KEY: '{{MY_SECRET}}' } });
+    expect(collectSecretReferences(wd)).toEqual([
+      { key: 'MY_SECRET', envVar: 'API_KEY', stepNames: [wd.steps[0].name] },
+    ]);
+  });
+
+  it('groups one key referenced by several steps', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.steps[0].executor = 'script';
+    wd.steps[0].script = { command: 'python run.py', image: 'python:3.11-slim' };
+    wd.steps[0].env = { KEY: '{{SHARED_SECRET}}' };
+    const reviewStep = wd.steps.find((s) => s.type === 'review');
+    if (reviewStep) {
+      reviewStep.executor = 'agent';
+      reviewStep.agent = { image: 'python:3.11-slim' };
+      reviewStep.env = { KEY: '{{SHARED_SECRET}}' };
+    }
+    const references = collectSecretReferences(wd);
+    expect(references).toHaveLength(1);
+    expect(references[0].stepNames.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('includes workflow-level env inherited by container steps', () => {
+    const wd = makeDefinition();
+    wd.env = { SHARED: '{{WORKFLOW_SECRET}}' };
+    expect(collectSecretReferences(wd).map((r) => r.key)).toContain('WORKFLOW_SECRET');
+  });
+
+  it('ignores plain values and human steps', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.steps[0].executor = 'human';
+    wd.steps[0].env = { KEY: '{{HUMAN_SECRET}}' };
+    const reviewStep = wd.steps.find((s) => s.type === 'review');
+    if (reviewStep) {
+      reviewStep.executor = 'script';
+      reviewStep.script = { command: 'echo hi', image: 'python:3.11-slim' };
+      reviewStep.env = { LITERAL: 'not-a-template' };
+    }
+    expect(collectSecretReferences(wd)).toEqual([]);
+  });
+
+  it('ignores OAUTH templates, which no secret row can satisfy', () => {
+    const wd = makeDefinition({ env: { GITHUB_TOKEN: '{{OAUTH:github}}', API_KEY: '{{SECRET:my_key}}' } });
+    expect(collectSecretReferences(wd).map((r) => r.key)).toEqual(['my_key']);
+  });
+
+  it('returns nothing for a definition without steps', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    // @ts-expect-error — a stale bundle can deliver a definition without steps
+    wd.steps = undefined;
+    expect(collectSecretReferences(wd)).toEqual([]);
   });
 });

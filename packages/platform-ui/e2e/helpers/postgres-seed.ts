@@ -158,7 +158,7 @@ export async function seedPostgresNamespace(
       await sql`
         INSERT INTO workflow_definitions (
           workspace, name, version, title, description, visibility,
-          steps, transitions, trigger_input, roles, env,
+          steps, transitions, trigger_input, input_for_next_run, roles, env,
           notifications, git_workspace, metadata, created_at
         ) VALUES (
           ${wd.namespace as string},
@@ -170,6 +170,7 @@ export async function seedPostgresNamespace(
           ${sql.json(wd.steps as unknown)},
           ${sql.json(wd.transitions as unknown)},
           ${wd.triggerInput ? sql.json(wd.triggerInput as unknown) : null},
+          ${wd.inputForNextRun ? sql.json(wd.inputForNextRun as unknown) : null},
           ${wd.roles ? sql.json(wd.roles as unknown) : null},
           ${wd.env ? sql.json(wd.env as unknown) : null},
           ${wd.notifications ? sql.json(wd.notifications as unknown) : null},
@@ -861,6 +862,55 @@ export async function clearPostgresWorkspaceMembership(
   try {
     await sql`DELETE FROM workspace_members WHERE workspace = ${handle} AND uid = ${uid}`;
     await sql`DELETE FROM workspace_autojoin_blocks WHERE workspace = ${handle} AND uid = ${uid}`;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * Drop every join link of one workspace, so a journey that asserts the empty
+ * state starts from it. Minting is the thing under test, and a link minted by
+ * the previous run is indistinguishable at the UI from one this run created.
+ *
+ * Scoped to a single handle — never a table-wide wipe, which would take the
+ * shared fixture's links with it.
+ */
+export async function clearPostgresJoinLinks(handle: string): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to seed Postgres for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await sql`DELETE FROM workspace_join_links WHERE workspace = ${handle}`;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * Remove one address's membership of one workspace, resolving the uid through
+ * `auth_users` so a caller that only knows the email does not have to.
+ *
+ * For fixtures whose member arrives by joining rather than by being seeded —
+ * the uid is minted during the run, so there is nothing to remember afterwards.
+ * Call it BEFORE `deleteAuthUser`, which is what the uid is resolved from.
+ */
+export async function clearPostgresWorkspaceMemberByEmail(
+  handle: string,
+  email: string,
+): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to seed Postgres for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await sql`
+      DELETE FROM workspace_members
+      WHERE workspace = ${handle}
+        AND uid IN (SELECT id FROM auth_users WHERE email = ${email})
+    `;
   } finally {
     await sql.end({ timeout: 5 });
   }

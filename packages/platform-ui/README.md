@@ -12,6 +12,7 @@ that lands here is reachable from the browser and from nowhere else.
 |---|---|
 | `src/app/(app)/[handle]/` | Workspace-scoped pages |
 | `src/app/api/` | HTTP route adapters over `platform-api` handlers |
+| `src/app/join/` | Public `/join/<token>` join-link landing page (no session) |
 | `src/proxy.ts` | NextAuth session / API-key auth and CORS |
 | `src/components/`, `src/hooks/`, `src/contexts/` | UI surface |
 | `src/instrumentation*.ts` | OTel wiring ([ADR-0007](../../docs/adr/0007-llm-evaluation-observability.md)) |
@@ -28,6 +29,15 @@ which call the same handler directly —
 
 **No new Server Actions.** Every mutation is a handler plus a Zod contract plus a
 route adapter ([ADR-0005](../../docs/adr/0005-headless-platform-api-ui-separation.md)).
+
+**A public route brings its own guards.** `proxy.ts` exempts `/api/auth/*` and
+`/api/join/*` because you cannot present a session while obtaining one. What the
+adapter would otherwise supply, those routes supply themselves: a JSON
+content-type check (a cross-site form post can only send the three form
+encodings, so demanding JSON blocks CSRF) and, for anything that sends mail, a
+budget from `@/lib/rate-limit` in the same commit as the route
+([ADR-0021](../../docs/adr/0021-workspace-join-links.md) §6). A public route
+without both is how an endpoint becomes a mail relay.
 
 **`src/lib/platform-services.ts` is a re-export shim, not an API.** The
 composition root is `getPlatformServices()` in `@mediforce/platform-api/services`;

@@ -15,7 +15,7 @@ consumers depend on the interface and receive an instance.
 | `src/postgres/repositories/` | One repository per domain entity, implementing the `platform-core` interface |
 | `src/postgres/schema/` | Drizzle table definitions |
 | `src/postgres/migrations/` | Numbered `NNNN_*.sql` — forward-only, applied in order |
-| `src/auth/` | NextAuth session store, credentials, invites, user directory, sign-in audit |
+| `src/auth/` | NextAuth session store, credentials, invites, join links, user directory, sign-in audit |
 | `src/email/` | Mailgun and SMTP clients, sender resolution |
 | `src/notifications/` | Email and webhook notification services |
 | `src/crypto/` | `secrets-cipher.ts` — workflow/namespace secret encryption |
@@ -35,6 +35,14 @@ would quietly outlive the request that made it.
 `NNNN_description.sql`; never edit a migration that has run anywhere. Deployed
 environments replay the directory in order, so an edited file means two
 databases that disagree about what schema `0037` produced.
+
+**A secret is stored as a hash, never as itself.** `PostgresJoinLinkService`
+([ADR-0021](../../docs/adr/0021-workspace-join-links.md)) writes only the
+SHA-256 of a join token, so `find` and `claim` take a hash and no read can
+reconstruct the plaintext. `claim` is also the one place `uses` is incremented,
+and it takes the row `FOR UPDATE` before checking the cap — without that, two
+attendees redeeming the last seat of a capped link both read `uses = maxUses - 1`
+and both succeed.
 
 **This package does not know about workflows.** It depends on `platform-core`
 and nothing else internal — not `workflow-engine`, not `agent-runtime`. Business

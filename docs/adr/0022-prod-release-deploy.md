@@ -4,7 +4,7 @@ audience: engineers
 last_reviewed: 2026-08-20
 ---
 
-# 0021 — Production deploy via GitHub Releases + pinned image tags
+# 0022 — Production deploy via GitHub Releases + pinned image tags
 
 - **Status:** Proposed (2026-07-29)
 - **Authors:** Marek Rogala (@marekrogala)

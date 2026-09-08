@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { hashSync } from 'bcryptjs';
 
 const mockFindPasswordCredentialByEmail = vi.fn();
+// ADR-0021 §5's second term: `auth_users.invited_at`. Default `false` = a
+// self-registered account, so the allowlist alone decides unless a test says
+// this address was deliberately seeded.
+const mockAuthUserWasInvited = vi.fn(async () => false);
 const mockCreateDatabaseSession = vi.fn();
 const mockRecordSignIn = vi.fn();
 const mockRecordSignInAuditEvent = vi.fn();
@@ -9,6 +13,7 @@ const mockRecordSignInAuditEvent = vi.fn();
 vi.mock('@mediforce/platform-infra', () => ({
   getSharedPostgresClient: () => ({ db: {} }),
   findPasswordCredentialByEmail: (...args: unknown[]) => mockFindPasswordCredentialByEmail(...args),
+  authUserWasInvited: (...args: unknown[]) => mockAuthUserWasInvited(...args),
   createDatabaseSession: (...args: unknown[]) => mockCreateDatabaseSession(...args),
   recordSignIn: (...args: unknown[]) => mockRecordSignIn(...args),
   recordSignInAuditEvent: (...args: unknown[]) => mockRecordSignInAuditEvent(...args),
@@ -33,6 +38,7 @@ describe('/api/auth/password-login', () => {
     vi.clearAllMocks();
     process.env.ENABLE_PASSWORD_AUTH = 'true';
     delete process.env.ALLOWED_EMAIL_DOMAINS;
+    mockAuthUserWasInvited.mockResolvedValue(false);
     mockFindPasswordCredentialByEmail.mockResolvedValue({
       id: 'user-1',
       email: 'alice@example.com',
@@ -155,7 +161,16 @@ describe('/api/auth/password-login', () => {
     expect(mockCreateDatabaseSession).not.toHaveBeenCalled();
   });
 
-  it('enforces ALLOWED_EMAIL_DOMAINS, and hides it behind the generic rejection', async () => {
+  // ADR-0021 §5, amending ADR-0002 §4a. This route cannot self-register — a
+  // password hash exists only for an account an admin seeded (an invite, or a
+  // redeemed join link) — so the allowlist only ever locked a legitimately
+  // invited external colleague out of the password she had just been asked to
+  // set. The allowlist keeps closing the door Google leaves open, in the
+  // `signIn` callback.
+  // ADR-0021 §5, amending ADR-0002 §4a. The allowlist governs SELF-SERVICE
+  // sign-in, so an account nobody invited is still evicted by dropping its
+  // domain — that is a live operator control the staging runbook uses by name.
+  it('enforces ALLOWED_EMAIL_DOMAINS for a self-registered account, behind the generic rejection', async () => {
     process.env.ALLOWED_EMAIL_DOMAINS = 'mediforce.io';
 
     const res = await POST(loginRequest({ email: 'alice@example.com', password: PASSWORD }));
@@ -165,6 +180,16 @@ describe('/api/auth/password-login', () => {
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: 'Incorrect email or password.' });
     expect(mockCreateDatabaseSession).not.toHaveBeenCalled();
+  });
+
+  it('admits an out-of-allowlist account an admin deliberately seeded', async () => {
+    process.env.ALLOWED_EMAIL_DOMAINS = 'mediforce.io';
+    mockAuthUserWasInvited.mockResolvedValue(true);
+
+    const res = await POST(loginRequest({ email: 'alice@example.com', password: PASSWORD }));
+
+    expect(res.status).toBe(200);
+    expect(mockCreateDatabaseSession).toHaveBeenCalledTimes(1);
   });
 
   it('404s when password auth is disabled', async () => {
