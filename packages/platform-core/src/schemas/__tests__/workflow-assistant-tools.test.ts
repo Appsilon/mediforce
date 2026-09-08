@@ -232,15 +232,18 @@ describe('RemoveStepToolSchema', () => {
 });
 
 describe('WORKFLOW_ASSISTANT_TOOLS', () => {
-  it('exposes the step tools and the workflow-level ones', () => {
+  it('exposes the step tools, the workflow-level ones, and the files it carries', () => {
     // The three step tools were the whole surface, which is why no phrasing of
-    // "make the study ID a required input" could land.
+    // "make the study ID a required input" could land — and why "write the
+    // script that polls the SFTP server" had nowhere to go either.
     expect(Object.keys(WORKFLOW_ASSISTANT_TOOLS).sort()).toEqual([
       'add_step',
       'remove_step',
+      'remove_workflow_file',
       'set_transition_condition',
       'update_step',
       'update_workflow',
+      'write_workflow_file',
     ]);
   });
 });

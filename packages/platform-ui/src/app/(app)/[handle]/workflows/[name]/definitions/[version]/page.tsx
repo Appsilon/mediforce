@@ -326,6 +326,7 @@ export default function WorkflowDefinitionVersionPage() {
           workspace: definition.workspace,
           externalSkillsRepo: definition.externalSkillsRepo,
           triggerInput: definition.triggerInput,
+          artifacts: definition.artifacts,
           ...settingsDraft,
         }}
         onSettingsChange={setSettingsDraft}

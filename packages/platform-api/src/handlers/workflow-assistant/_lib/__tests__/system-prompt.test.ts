@@ -137,14 +137,16 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/don't pretend an empty result is impossible/);
   });
 
-  it('appends the embedded capability & authoring reference (all three docs) and scopes out package-only authoring', () => {
+  it('appends the embedded capability & authoring reference (all three docs) and scopes out what is genuinely out of reach', () => {
     expect(prompt).toMatch(/# Capability & authoring reference/);
-    // The package is what stays out of reach; the definition no longer is,
-    // now that update_workflow and set_transition_condition exist.
-    expect(prompt).toMatch(/out of scope is the surrounding \*package\*/);
+    // The definition is in reach (update_workflow, set_transition_condition)
+    // and so are the files it carries (write_workflow_file). What is left is
+    // the platform setup around it.
+    expect(prompt).toMatch(/write_workflow_file/);
+    expect(prompt).toMatch(/\/artifacts\//);
+    expect(prompt).toMatch(/out of scope is the platform setup around it/);
     expect(prompt).toMatch(/update_workflow/);
     expect(prompt).toMatch(/set_transition_condition/);
-    expect(prompt).toMatch(/`command`-mode scripts/);
     expect(prompt).toMatch(/Pick an authoring path/); // how-to-create-workflow.md
     expect(prompt).toMatch(/this is where fan-out lives/); // workflow-capabilities.md
     expect(prompt).toMatch(/Do \*\*not\*\* create new CM1\/L2/); // workflow-authoring-golden-rules.md

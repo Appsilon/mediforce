@@ -113,7 +113,10 @@ Use `repoAuth` for private Docker build contexts.
 
 Workflow-specific skills SHOULD live in the workflow package: pin
 `externalSkillsRepo` at workflow level, and point the step at `agent.skill` plus
-`agent.skillsDir` (the skills folder's path inside that repo). Use a separate
+`agent.skillsDir` (the skills folder's path inside that repo). A workflow can
+also carry its skills itself — `artifacts` with a file at
+`<skillsDir>/<skill>/SKILL.md`, which needs no repository and no checkout, and
+takes precedence over `externalSkillsRepo` for the directory it holds. Use a separate
 skills repo only when the skills are shared products with their own release
 process.
 
