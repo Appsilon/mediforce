@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ContainerPlugin, skillsCacheDir } from '../container-plugin';
+import { artifactsDir } from '../workflow-artifacts';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../../interfaces/step-executor-plugin';
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
 
@@ -26,6 +27,16 @@ function repoContext(url: string, commit: string): WorkflowAgentContext {
   return {
     workflowDefinition: { externalSkillsRepo: { url, commit } },
     step: { id: 's1' },
+  } as unknown as WorkflowAgentContext;
+}
+
+function artifactsContext(
+  artifacts: { path: string; contents: string }[],
+  externalSkillsRepo?: { url: string; commit: string },
+): WorkflowAgentContext {
+  return {
+    workflowDefinition: { artifacts, ...(externalSkillsRepo ? { externalSkillsRepo } : {}) },
+    step: { id: 's3' },
   } as unknown as WorkflowAgentContext;
 }
 
@@ -82,5 +93,53 @@ describe('resolveSkillsDir — no shared mutable state across steps', () => {
     expect(a).not.toBe(b);
     expect(a).toBe(skillsCacheDir('git@github.com:org/a.git', 'aaa', 'skills'));
     expect(b).toBe(skillsCacheDir('git@github.com:org/b.git', 'bbb', 'skills'));
+  });
+});
+
+describe('resolveSkillsDir — skills the workflow carries itself', () => {
+  const skills = [
+    { path: 'skills/data-validator/SKILL.md', contents: '# Data validator\n' },
+  ];
+
+  it('[DATA] resolves into the artifact directory, so no repository is needed', () => {
+    const plugin = new TestPlugin();
+    plugin.setContext(artifactsContext(skills));
+    expect(plugin.exposeResolveSkillsDir('skills', PROJECT))
+      .toBe(join(artifactsDir(skills), 'skills'));
+  });
+
+  it('[DATA] takes the carried skills over a declared repository', () => {
+    // The definition holding the files is the most specific answer available,
+    // and it is the one an author edited in the app.
+    const plugin = new TestPlugin();
+    plugin.setContext(artifactsContext(skills, { url: 'git@github.com:org/a.git', commit: 'aaa' }));
+    expect(plugin.exposeResolveSkillsDir('skills', PROJECT))
+      .toBe(join(artifactsDir(skills), 'skills'));
+  });
+
+  it('[DATA] leaves a repository alone when the artifacts hold no skills', () => {
+    // A workflow may carry a Dockerfile and still take its skills from a repo,
+    // so artifacts only answer for the directory they actually contain.
+    const dockerfileOnly = [{ path: 'Dockerfile', contents: 'FROM python:3.12-slim\n' }];
+    const plugin = new TestPlugin();
+    plugin.setContext(artifactsContext(dockerfileOnly, { url: 'git@github.com:org/a.git', commit: 'aaa' }));
+    expect(plugin.exposeResolveSkillsDir('skills', PROJECT))
+      .toBe(skillsCacheDir('git@github.com:org/a.git', 'aaa', 'skills'));
+  });
+
+  it('[DATA] falls back to disk when neither the artifacts nor a repo hold them', () => {
+    const plugin = new TestPlugin();
+    plugin.setContext(artifactsContext([{ path: 'Dockerfile', contents: 'FROM scratch\n' }]));
+    expect(plugin.exposeResolveSkillsDir('skills', PROJECT)).toBe(PROJECT('skills'));
+  });
+
+  it('[DATA] matches on a directory boundary, not a string prefix', () => {
+    // `skills-archive/...` is not inside `skills`, and resolving it there would
+    // hand the agent an empty directory instead of the repo it asked for.
+    const nearMiss = [{ path: 'skills-archive/old/SKILL.md', contents: '# Old\n' }];
+    const plugin = new TestPlugin();
+    plugin.setContext(artifactsContext(nearMiss, { url: 'git@github.com:org/a.git', commit: 'aaa' }));
+    expect(plugin.exposeResolveSkillsDir('skills', PROJECT))
+      .toBe(skillsCacheDir('git@github.com:org/a.git', 'aaa', 'skills'));
   });
 });
