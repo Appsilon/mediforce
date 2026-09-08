@@ -47,8 +47,14 @@ placing and wiring blocks by hand.
   uploads whole) or drop them in, and a run reads them from `/artifacts`. A
   skill among those files is offered by name on an agent step, which fills in
   the directory it lives in — no repository path to type. It does not edit secrets or other workspace
-  state — set those yourself (triggers are attached after registration; see
-  below).
+  state, except the parts it can now set up for you: it can list the workspace's
+  secret **keys** (never their values), list and create **agents** a step points
+  at, and list the **Tool Catalog** servers an agent binds to. Those calls run
+  as you, with your permissions — when one is refused it says so and names what
+  an admin has to do, rather than working around it. A secret's *value* is never
+  asked for in the chat, because anything typed there reaches the model: it
+  tells you which key to set, and you set it in the Secrets tab (triggers are
+  attached after registration; see below).
 - **Validation & retry.** Every proposed change is validated against the same
   graph, reference, and schema gates as registration before it is applied; if the
   result would be invalid the assistant is told why and retries, so it does not
