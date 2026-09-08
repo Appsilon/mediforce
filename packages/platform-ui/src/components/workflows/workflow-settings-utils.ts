@@ -1,12 +1,6 @@
 import type { WorkflowDefinition, WorkflowSettings } from '@mediforce/platform-core';
 
 /**
- * The workflow-level fields the settings panel edits — everything authorable
- * that is not the graph. Values are held as the author typed them, so a cleared
- * input is `''` here rather than absent, and `pruneWorkflowSettings` is what
- * turns that back into an absence at save time.
- */
-/**
  * What the settings panel edits: the reducer's own type, so the assistant and
  * the form cannot drift about what a workflow-level field is. Values are held
  * as the author typed them, so a cleared input is `''` rather than absent, and
