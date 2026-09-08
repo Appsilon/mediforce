@@ -151,7 +151,11 @@ export function parseMutationToolCall(toolName: string, parsedArguments: unknown
 type Transitions = WorkflowDefinition['transitions'];
 
 export function validateResultingGraph(
-  currentDefinition: { steps: WorkflowStep[]; transitions: Transitions; settings?: WorkflowSettings },
+  currentDefinition: {
+    steps: WorkflowStep[];
+    transitions: Transitions;
+    settings?: WorkflowSettings & { inputForNextRun?: WorkflowDefinition['inputForNextRun'] };
+  },
   toolCalls: WorkflowAssistantToolCall[],
   namespace: string,
 ): { valid: true } | { valid: false; errors: string[] } {
@@ -160,6 +164,7 @@ export function validateResultingGraph(
     currentDefinition.transitions,
     toolCalls,
     currentDefinition.settings ?? {},
+    currentDefinition.settings?.inputForNextRun,
   );
   const mergedTransitions = mergeVerdictTransitions(applied.steps, applied.transitions);
   const orderedSteps = ensureEntryStepFirst(applied.steps, mergedTransitions);
@@ -190,6 +195,9 @@ export function validateResultingGraph(
     ...applied.settings,
     steps: orderedSteps,
     transitions: mergedTransitions,
+    // An entry naming a step that does not exist is refused here, which is the
+    // only check carry-over gets before a save.
+    ...(applied.inputForNextRun === undefined ? {} : { inputForNextRun: applied.inputForNextRun }),
   });
   const schemaErrors = templateParse.success
     ? []

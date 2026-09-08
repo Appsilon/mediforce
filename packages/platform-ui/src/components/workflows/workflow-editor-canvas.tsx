@@ -480,10 +480,14 @@ export function WorkflowEditorCanvas({
       editedTransitionsRef.current,
       toolCalls,
       settingsDraftRef.current,
+      editedInputForNextRunRef.current,
     );
     saveSnapshot();
     setEditedSteps(result.steps);
     setEditedTransitions(result.transitions);
+    // Carry-over names steps, so it lands with them rather than through the
+    // page's settings draft.
+    setEditedInputForNextRun(result.inputForNextRun);
     // The page owns the workflow-level fields, so the reducer's settings go
     // back the same way the settings panel's edits do.
     onSettingsChange?.(result.settings);
@@ -536,7 +540,18 @@ export function WorkflowEditorCanvas({
         {
           messages: nextMessages,
           model: assistantModel,
-          workflowDefinition: { steps: editedSteps, transitions: editedTransitions, settings: pruneWorkflowSettings(settingsDraftRef.current ?? {}) },
+          workflowDefinition: {
+            steps: editedSteps,
+            transitions: editedTransitions,
+            // Carry-over goes with the workflow level so the assistant can read
+            // what is set before patching it, the same as every other field.
+            settings: {
+              ...pruneWorkflowSettings(settingsDraftRef.current ?? {}),
+              ...(editedInputForNextRunRef.current === undefined
+                ? {}
+                : { inputForNextRun: editedInputForNextRunRef.current }),
+            },
+          },
         },
         { namespace },
       );
