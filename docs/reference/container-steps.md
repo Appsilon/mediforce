@@ -61,6 +61,13 @@ unchanged files finds the one already there. An explicit step-level
 first build takes as long as a `docker build` does, which is minutes for a
 sizeable image.
 
+A step that names a file the workflow does not carry is flagged before the run
+(preflight, beside missing secrets and images): a command reading
+`/artifacts/<path>` with no such file, or a `dockerfile` with neither a carried
+file nor a repo to build from. A `skillsDir` is not flagged, because with
+neither carried skills nor an `externalSkillsRepo` it resolves against the
+repository on the host, which the browser cannot see.
+
 A step names a carried file by its container path: `python3
 /artifacts/scripts/poll.py`. Files are written executable, so a command may be
 the file itself. They are text and capped (64 KiB a file, 256 KiB the set) by
