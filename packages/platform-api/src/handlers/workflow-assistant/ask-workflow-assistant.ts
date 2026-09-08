@@ -5,6 +5,8 @@ import {
   RemoveStepToolSchema,
   ListModelsToolSchema,
   WORKFLOW_ASSISTANT_TOOLS,
+  WORKFLOW_ASSISTANT_PLATFORM_TOOLS,
+  isPlatformToolName,
   WORKFLOW_ASSISTANT_DEFAULT_MODEL,
   toProcessDefinition,
   mergeVerdictTransitions,
@@ -28,6 +30,7 @@ import { actorFromCaller } from '../_helpers';
 import { HandlerError, ValidationError } from '../../errors';
 import { callOpenRouter, type OpenRouterChatMessage, type OpenRouterToolDefinition } from '../../services/openrouter-client';
 import { buildWorkflowAssistantSystemPrompt } from './_lib/system-prompt';
+import { runPlatformTool } from './_lib/run-platform-tool';
 
 interface AskScopedInput extends AskWorkflowAssistantInput {
   namespace: string;
@@ -54,8 +57,15 @@ function buildToolDefinitions(): OpenRouterToolDefinition[] {
     type: 'function',
     function: { name, parameters: z.toJSONSchema(schema, { io: 'input' }) },
   }));
+  // Platform tools run here, as the caller, and their results come back into
+  // this same conversation — unlike the canvas tools, which the browser applies.
+  const platformTools = Object.entries(WORKFLOW_ASSISTANT_PLATFORM_TOOLS).map(([name, schema]) => ({
+    type: 'function',
+    function: { name, parameters: z.toJSONSchema(schema as z.ZodType, { io: 'input' }) },
+  }));
   return [
     ...mutationTools,
+    ...platformTools,
     {
       type: 'function',
       function: {
@@ -103,7 +113,11 @@ export function parseMutationToolCall(toolName: string, parsedArguments: unknown
   // resolved call to be a mutation, a rejected one discarded the whole batch.
   const schema: z.ZodType | undefined = WORKFLOW_ASSISTANT_TOOLS[toolName as WorkflowAssistantToolName];
   if (schema === undefined) {
-    const valid = [...Object.keys(WORKFLOW_ASSISTANT_TOOLS), 'list_models'].join(', ');
+    const valid = [
+      ...Object.keys(WORKFLOW_ASSISTANT_TOOLS),
+      ...Object.keys(WORKFLOW_ASSISTANT_PLATFORM_TOOLS),
+      'list_models',
+    ].join(', ');
     return { ok: false, error: `Unknown tool '${toolName}'. Valid tools: ${valid}.` };
   }
   const result = schema.safeParse(parsedArguments);
@@ -272,6 +286,9 @@ export async function askWorkflowAssistant(
       } catch {
         return { call, kind: 'error' as const, error: `Malformed JSON arguments for '${call.function.name}'.` };
       }
+      if (isPlatformToolName(call.function.name)) {
+        return { call, kind: 'platform' as const, toolName: call.function.name, arguments: parsedArguments };
+      }
       const parsed = parseMutationToolCall(call.function.name, parsedArguments);
       return parsed.ok
         ? { call, kind: 'mutation' as const, toolCall: parsed.toolCall }
@@ -346,6 +363,9 @@ export async function askWorkflowAssistant(
     for (const r of resolved) {
       if (r.kind === 'list_models') {
         const result = await runListModelsTool(scope);
+        messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify(result) });
+      } else if (r.kind === 'platform') {
+        const result = await runPlatformTool(r.toolName, r.arguments, scope, input.namespace);
         messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify(result) });
       } else if (r.kind === 'error') {
         messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify({ error: r.error }) });

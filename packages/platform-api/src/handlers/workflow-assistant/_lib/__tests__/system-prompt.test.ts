@@ -144,7 +144,10 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     // the platform setup around it.
     expect(prompt).toMatch(/write_workflow_file/);
     expect(prompt).toMatch(/\/artifacts\//);
-    expect(prompt).toMatch(/out of scope is the platform setup around it/);
+    expect(prompt).toMatch(/list_secrets/);
+    expect(prompt).toMatch(/never values/);
+    expect(prompt).toMatch(/runs as the person you are helping/);
+    expect(prompt).toMatch(/an admin can do it/);
     expect(prompt).toMatch(/update_workflow/);
     expect(prompt).toMatch(/set_transition_condition/);
     expect(prompt).toMatch(/Pick an authoring path/); // how-to-create-workflow.md
