@@ -22,7 +22,7 @@ const rt = textareaBase;
 const TIP = {
   triggerInput: 'What this workflow accepts when it starts. Every trigger and every workflow that spawns this one is checked against it, and steps read the values as ${triggerPayload.<name>}.',
   preamble: 'Prepended to every agent prompt in this workflow — house rules, domain context, terminology.',
-  env: 'Workflow-wide environment defaults. A step’s own env overrides these key by key. A {{SECRET_NAME}} value resolves from workspace or workflow secrets.',
+  env: 'Set for every step in this workflow; a step’s own variables override these one key at a time. Write {{NAME}} to pull the value from a secret — secrets themselves are managed in the workflow’s Secrets tab.',
   notifications: 'Who is told when a task is assigned or an agent escalates. Roles, not people — the workspace resolves them to members.',
   workspaceRemote: 'Git repository the run’s working directory is cloned from and committed to — mounted at /workspace inside every step. Not the Mediforce workspace you are in. Leave empty to keep the run’s files local to the run.',
   workspaceAuth: 'Name of a secret holding the token used to reach that repository.',
@@ -30,7 +30,6 @@ const TIP = {
   skillsRepoCommit: 'Commit to clone. Required — without it the skills fetch silently does nothing.',
   skillsRepoAuth: 'Name of a secret holding a token, for a private skills repo.',
   url: 'Link shown on the run card. Cosmetic.',
-  displayName: 'The name shown in the app. The workflow’s id — what routes, spawn targets and the CLI use — is fixed at creation; use Copy to get one under a different id.',
 } as const;
 
 const NOTIFICATION_EVENTS = ['task_assigned', 'agent_escalation'] as const;
@@ -212,7 +211,7 @@ export function WorkflowSettingsPanel({
           {workspaceRoles.map((role) => <option key={role} value={role} />)}
         </datalist>
       )}
-      <Section title="Input contract">
+      <Section title="Triggers — what this workflow accepts">
         <FieldGroup>
           <FieldRow label="triggerInput" tooltip={TIP.triggerInput} alignStart>
             <TriggerInputEditor
@@ -223,7 +222,7 @@ export function WorkflowSettingsPanel({
         </FieldGroup>
       </Section>
 
-      <Section title="Agent context">
+      <Section title="Agent preamble">
         <FieldGroup>
           <FieldRow label="preamble" tooltip={TIP.preamble} alignStart>
             <textarea
@@ -237,7 +236,7 @@ export function WorkflowSettingsPanel({
         </FieldGroup>
       </Section>
 
-      <Section title="Environment">
+      <Section title="Environment variables">
         <FieldGroup>
           <FieldRow label="env" tooltip={TIP.env} alignStart>
             <KeyValueRows
@@ -315,7 +314,7 @@ export function WorkflowSettingsPanel({
         </FieldGroup>
       </Section>
 
-      <Section title="Repositories">
+      <Section title="Git repositories">
         <FieldGroup>
           <FieldRow label="Run files repository" tooltip={TIP.workspaceRemote}>
             <input
@@ -380,18 +379,8 @@ export function WorkflowSettingsPanel({
         </FieldGroup>
       </Section>
 
-      <Section title="Presentation">
+      <Section title="Link">
         <FieldGroup>
-          <FieldRow label="displayName" tooltip={TIP.displayName}>
-            <input
-              value={(draft.metadata?.displayName as string | undefined) ?? ''}
-              placeholder="Landing Zone — CDISCPILOT01"
-              onChange={(e) => onChange({
-                metadata: { ...draft.metadata, displayName: e.target.value },
-              })}
-              className={cn(ri, 'placeholder:italic placeholder:text-muted-foreground/40')}
-            />
-          </FieldRow>
           <FieldRow label="url" tooltip={TIP.url}>
             <input
               value={draft.url ?? ''}
