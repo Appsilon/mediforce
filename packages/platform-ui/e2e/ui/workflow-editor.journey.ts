@@ -500,10 +500,8 @@ test.describe('Workflow Editor Journey', () => {
     // The apply is accepted: the old refusal rendered an error instead.
     await expect(page.getByText(/applies steps, transitions/i)).toHaveCount(0);
 
-    // The source panel is a modal over the toolbar, so it has to be closed
-    // before the header's Save is reachable. Applying leaves it clean, so this
-    // closes without the discard prompt.
-    await page.getByRole('button', { name: 'Close' }).click();
+    // Applying closes the panel, which is also what makes the header's Save
+    // reachable: the source panel is a modal over the toolbar.
     await expect(page.getByRole('heading', { name: /workflow source code/i })).toBeHidden();
 
     await page.getByRole('button', { name: /^save$/i }).click();
@@ -621,12 +619,17 @@ test.describe('Workflow Editor Journey', () => {
     await page.getByRole('button', { name: /workflow source code/i }).click();
     await expect(page.getByText(/unapplied changes/i)).not.toBeVisible();
 
-    // Clicking Apply after an edit clears the warning without needing a close.
+    // Applying is the end of the edit, so the panel closes on its own: no
+    // warning left to clear, and no second click to get back to the canvas.
     await page.locator('.cm-content').click();
     await page.keyboard.press('End');
     await page.keyboard.type(' ');
     await expect(page.getByText(/unapplied changes/i)).toBeVisible({ timeout: 5_000 });
     await page.getByRole('button', { name: /apply json/i }).click();
+    await expect(page.locator('.cm-editor')).not.toBeVisible();
+
+    // Reopening shows the applied source, with nothing outstanding.
+    await page.getByRole('button', { name: /workflow source code/i }).click();
     await expect(page.getByText(/unapplied changes/i)).not.toBeVisible();
   });
 

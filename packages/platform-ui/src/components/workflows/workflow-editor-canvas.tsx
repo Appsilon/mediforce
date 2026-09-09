@@ -729,6 +729,11 @@ export function WorkflowEditorCanvas({
       onNonGraphFieldsChange?.(split.nonGraph);
       lastSyncedJsonRef.current = jsonDraft;
       setJsonError(null);
+      // Applying is the end of the edit, so the panel gets out of the way: it
+      // is a modal over the toolbar, and leaving it up hides the canvas it just
+      // changed and the Save that keeps the change. A refusal above returns
+      // early and leaves it open, which is where the error belongs.
+      setRightPanelView(null);
       if (split.ignored.length > 0) {
         toast({
           variant: 'warning',
