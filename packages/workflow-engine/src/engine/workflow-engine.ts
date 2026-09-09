@@ -271,6 +271,7 @@ export class WorkflowEngine {
 
           let preAssignedUserId: string | null = null;
           let preAssignedEmail: string | null = null;
+          let unresolvedAssignee: string | null = null;
           if (nextStep.assignedTo) {
             const resolved = interpolate(nextStep.assignedTo, {
               triggerPayload: (updatedInstance.triggerPayload as Record<string, unknown>) ?? {},
@@ -282,14 +283,34 @@ export class WorkflowEngine {
             if (typeof resolved === 'string' && resolved.length > 0) {
               if (this.userDirectoryService?.resolveUser) {
                 const user = await this.userDirectoryService.resolveUser(resolved);
-                preAssignedUserId = user?.uid ?? resolved;
-                preAssignedEmail = user?.email ?? null;
+                // An address that resolves to nobody is not an assignee. Taking
+                // it verbatim produced a task whose only possible claimant did
+                // not exist: the UI showed it claimed, `completeTask` refused
+                // everyone else, and there is no unclaim and no override — so
+                // the run could not be finished by anyone, owner included.
+                // Left unassigned instead, which is a task anybody holding the
+                // step's role can claim.
+                if (user === null || user === undefined) {
+                  unresolvedAssignee = resolved;
+                } else {
+                  preAssignedUserId = user.uid;
+                  preAssignedEmail = user.email ?? null;
+                }
               } else {
                 preAssignedUserId = resolved;
               }
             }
           }
-          const taskAssignedUserId = preAssignedUserId ?? updatedInstance.createdBy ?? null;
+          // The creator fallback puts a run's own tasks in the starter's inbox,
+          // which is the right default for a step that named nobody. It is the
+          // wrong answer when the step named someone specific and they could
+          // not be found: handing the review to whoever started the run is a
+          // different decision than the author wrote, and in a review step it
+          // is the one that removes the second pair of eyes. Left unassigned so
+          // a holder of the step's role claims it.
+          const taskAssignedUserId = unresolvedAssignee !== null
+            ? null
+            : preAssignedUserId ?? updatedInstance.createdBy ?? null;
           const taskStatus: 'pending' | 'claimed' = taskAssignedUserId ? 'claimed' : 'pending';
 
           const task: HumanTask = {
@@ -327,6 +348,27 @@ export class WorkflowEngine {
             processInstanceId: instanceId,
             processDefinitionVersion: String(definition.version),
           });
+
+          if (unresolvedAssignee !== null) {
+            // Said out loud, because the step asked for a specific person and
+            // did not get them: the task is claimable by the role instead, and
+            // whoever wrote `assignedTo` needs to know their value named nobody.
+            await this.auditRepository.append({
+              actorId: 'engine',
+              actorType: 'system',
+              actorRole: 'orchestrator',
+              action: 'task.assignee_unresolved',
+              description: `Step '${nextStep.id}' is assigned to '${unresolvedAssignee}', which matches no user in this workspace — the task was left unassigned so anyone holding the step's role can claim it`,
+              timestamp: now,
+              inputSnapshot: { taskId: task.id, stepId: nextStep.id, assignedTo: unresolvedAssignee },
+              outputSnapshot: { assignedUserId: null, status: task.status },
+              basis: 'advanceStep: assignedTo resolved to no user',
+              entityType: 'humanTask',
+              entityId: task.id,
+              processInstanceId: instanceId,
+              processDefinitionVersion: String(definition.version),
+            });
+          }
 
           await this.instanceRepository.update(instanceId, {
             status: 'paused',
