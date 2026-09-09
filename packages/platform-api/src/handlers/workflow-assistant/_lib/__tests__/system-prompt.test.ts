@@ -191,3 +191,26 @@ describe('buildWorkflowAssistantSystemPrompt — challenging the design', () => 
     expect(prompt).toMatch(/Not a form to fill in/);
   });
 });
+
+// "A data manager reviews the report" produced `assignedTo:
+// "data-manager@company.com"`, which resolves to no user: the task was created
+// assigned to that literal string, the UI showed it claimed by someone who does
+// not exist, and nobody — owner included — could complete the run.
+describe('buildWorkflowAssistantSystemPrompt — who does a human step', () => {
+  const prompt = buildWorkflowAssistantSystemPrompt();
+
+  it('sends a job title to allowedRoles, not assignedTo', () => {
+    expect(prompt).toMatch(/is a role, not a person/);
+    expect(prompt).toMatch(/allowedRoles: \["data-manager"\]/);
+  });
+
+  it('says what assignedTo actually takes, and what happens when it is not that', () => {
+    expect(prompt).toMatch(/pre-assigns to one specific \*user id\*/);
+    expect(prompt).toMatch(/leaves such a task unassigned and records that the value named nobody/);
+  });
+
+  it('keeps assignedTo for an identity the run genuinely knows', () => {
+    expect(prompt).toMatch(/triggerPayload\.userId/);
+    expect(prompt).toMatch(/set the role and say which role you used/);
+  });
+});
