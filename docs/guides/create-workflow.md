@@ -59,8 +59,8 @@ placing and wiring blocks by hand.
   asks only what it genuinely cannot infer — each question carrying the answer
   it would otherwise have used, so agreeing is one click. Nothing to ask means
   it says the plan and starts. While it builds, the pane shows the phases that
-  planning turn named for *this* workflow, with the time elapsed, and **Halt**
-  beside them stops the turn — the request is aborted, and nothing is applied,
+  planning turn named for *this* workflow, with the time elapsed, and a stop
+  button beside them ends the turn — the request is aborted, and nothing is applied,
   since the canvas only changes when a turn returns.
 - **Validation & retry.** Every proposed change is validated against the same
   graph, reference, and schema gates as registration before it is applied; if the
