@@ -531,6 +531,56 @@ test.describe('Workflow Editor Journey', () => {
     }).toPass({ timeout: 15_000 });
   });
 
+  // A pasted definition carries both an id and a title. The page's name field
+  // is the workflow's display name, so it is the title that belongs in it.
+  test('a paste on the create page names the workflow by its title, not its id', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    const stamp = String(Date.now());
+    const pasted = JSON.stringify(
+      {
+        name: `landing-zone-CDISCPILOT01-${stamp}`,
+        title: `Landing Zone — CDISCPILOT01 ${stamp}`,
+        description: 'Pasted from a registered version',
+        steps: [
+          { id: 'poll', name: 'Poll SFTP', type: 'creation', executor: 'human' },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'poll', to: 'done' }],
+      },
+      null,
+      2,
+    );
+
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
+    await page.locator('.cm-content').click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText(pasted);
+    await page.getByRole('button', { name: /apply json/i }).click();
+
+    // The id filled this field before, so the workflow was saved calling itself
+    // `landing-zone-CDISCPILOT01` while its version was named correctly.
+    await expect(page.getByPlaceholder('Add a Workflow Name…')).toHaveValue(
+      `Landing Zone — CDISCPILOT01 ${stamp}`,
+    );
+    await expect(page.getByPlaceholder('Add a workflow description…')).toHaveValue(
+      'Pasted from a registered version',
+    );
+
+    // And it is the name the saved workflow shows, rather than its id.
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
+    await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('v1');
+    await page.getByRole('button', { name: /publish workflow/i }).click();
+
+    await expect(
+      page.getByRole('heading', { name: `Landing Zone — CDISCPILOT01 ${stamp}` }),
+    ).toBeVisible({ timeout: 20_000 });
+  });
+
   // ── Authoring paths are stated where the workflow is created (#1185) ──────
 
   test('ways to author names every path and its import entry opens the importer', async ({ page }) => {

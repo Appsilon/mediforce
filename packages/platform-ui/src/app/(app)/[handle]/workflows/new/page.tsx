@@ -11,6 +11,7 @@ import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { mediforceSilent } from '@/lib/mediforce';
 import { validateSteps, toastRegistrationWarnings, handleSaveFailure, DISPLAY_NAME_KEY } from '@/lib/workflow-save-utils';
+import { pastedWorkflowName } from '@/components/workflows/workflow-editor-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
@@ -146,7 +147,6 @@ export default function NewWorkflowPage() {
         {
           title: versionTitle || undefined,
           description: description.trim() || undefined,
-          metadata: { [DISPLAY_NAME_KEY]: workflowName.trim() },
           steps: orderedSteps,
           transitions: mergedTransitions,
           // Declarable here only through the source-code panel, which applies it
@@ -158,6 +158,15 @@ export default function NewWorkflowPage() {
           // route and the save dialog both key off it.
           ...pastedFields,
           name: workflowId,
+          // After the spread as well: a pasted `metadata` carries its own keys,
+          // and letting it replace this one wholesale drops the display name
+          // and leaves the workflow calling itself by its id.
+          metadata: {
+            ...(typeof pastedFields.metadata === 'object' && pastedFields.metadata !== null
+              ? pastedFields.metadata as Record<string, unknown>
+              : {}),
+            [DISPLAY_NAME_KEY]: workflowName.trim(),
+          },
         },
         { namespace: effectiveNamespace },
       );
@@ -343,7 +352,10 @@ export default function NewWorkflowPage() {
           // has to fill the inputs rather than register values the author
           // cannot see. `title` is the version title, asked for on save.
           if (typeof fields.description === 'string') setDescription(fields.description);
-          if (typeof fields.name === 'string') setWorkflowName(fields.name);
+          // The title, not the id: the field is the workflow's display name,
+          // and the id is derived from it below.
+          const pastedName = pastedWorkflowName(fields);
+          if (pastedName !== null) setWorkflowName(pastedName);
         }}
         onChange={handleCanvasChange}
         onDirtyChange={setCanvasDirty}

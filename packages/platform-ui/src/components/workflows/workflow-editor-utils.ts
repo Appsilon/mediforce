@@ -283,3 +283,19 @@ export function pruneCarryOver(
   const kept = entries.filter((entry) => stepIds.has(entry.stepId));
   return kept.length === entries.length ? entries : kept;
 }
+
+/**
+ * What to call a workflow a paste is creating.
+ *
+ * A definition carries both: `name` is its id, `title` is what a person calls
+ * it. The create page's name field is the display name, so it takes the title
+ * when there is one and the id only as a fallback. Filling it with the id saved
+ * a workflow displayed as `landing-zone-CDISCPILOT01`, case and all, while the
+ * version it cut was named correctly.
+ */
+export function pastedWorkflowName(fields: Record<string, unknown>): string | null {
+  const title = typeof fields.title === 'string' ? fields.title.trim() : '';
+  if (title !== '') return title;
+  const name = typeof fields.name === 'string' ? fields.name.trim() : '';
+  return name === '' ? null : name;
+}

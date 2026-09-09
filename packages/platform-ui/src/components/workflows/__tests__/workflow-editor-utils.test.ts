@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { globSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver, splitPastedDefinition } from '../workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver, splitPastedDefinition, pastedWorkflowName } from '../workflow-editor-utils';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -416,4 +416,30 @@ describe('splitPastedDefinition — round-trips the packages we ship', () => {
       expect(result.error).toBeNull();
     });
   }
+});
+
+describe('pastedWorkflowName', () => {
+  it('takes the title, which is what a person calls the workflow', () => {
+    // The failure this replaces: a definition carrying
+    // `name: 'landing-zone-CDISCPILOT01'` and
+    // `title: 'Landing Zone — CDISCPILOT01'` filled the name field with the id,
+    // so the workflow was saved with the id as its display name while the
+    // version was named correctly.
+    expect(pastedWorkflowName({
+      name: 'landing-zone-CDISCPILOT01',
+      title: 'Landing Zone — CDISCPILOT01',
+    })).toBe('Landing Zone — CDISCPILOT01');
+  });
+
+  it('falls back to the id when the paste carries no title', () => {
+    expect(pastedWorkflowName({ name: 'landing-zone' })).toBe('landing-zone');
+  });
+
+  it('ignores a blank title', () => {
+    expect(pastedWorkflowName({ name: 'landing-zone', title: '   ' })).toBe('landing-zone');
+  });
+
+  it('returns null when the paste names the workflow neither way', () => {
+    expect(pastedWorkflowName({ description: 'no name here' })).toBeNull();
+  });
 });
