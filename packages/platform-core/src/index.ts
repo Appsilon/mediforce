@@ -497,6 +497,7 @@ export type {
   WorkflowVersionSource,
 } from './workflows/resolve-runnable-version';
 export { stepHasBuildSource } from './workflows/build-source';
+export { resolveStepAssignee, type ResolvedStepAssignee } from './workflows/step-assignee';
 
 // MCP resolver (pure; wires AgentDefinition + step restrictions + catalog)
 export {
