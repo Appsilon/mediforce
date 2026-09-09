@@ -335,3 +335,41 @@ describe('applyWorkflowAssistantToolCalls — carry-over between runs', () => {
     expect(inputForNextRun).toEqual([{ stepId: 'draft', output: 'listing', as: 'previousListing' }]);
   });
 });
+
+describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not carry', () => {
+  it('says to write the file, rather than leaving a step that cannot build', () => {
+    // The failure this replaces: the model names `container/Dockerfile`, no
+    // file exists, and the step registers with nothing to build from. The
+    // message names the tool that fixes it, in the model's own vocabulary.
+    const { outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions,
+      [{
+        tool: 'add_step',
+        arguments: {
+          type: 'creation', executor: 'script', name: 'Validate',
+          insertAfterId: 'draft', insertBeforeId: 'done',
+          script: { command: 'python3 /artifacts/scripts/validate.py', dockerfile: 'container/Dockerfile' },
+        },
+      }],
+    );
+    const outcome = outcomes.find((o) => o.tool === 'add_step');
+    expect(outcome?.error).toContain('container/Dockerfile');
+    expect(outcome?.error).toContain('write_workflow_file');
+  });
+
+  it('is silent when the workflow carries it', () => {
+    const { outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions,
+      [{
+        tool: 'add_step',
+        arguments: {
+          type: 'creation', executor: 'script', name: 'Validate',
+          insertAfterId: 'draft', insertBeforeId: 'done',
+          script: { command: 'python3 /artifacts/run.py', dockerfile: 'Dockerfile' },
+        },
+      }],
+      { artifacts: [{ path: 'Dockerfile', contents: 'FROM python:3.12-slim\n' }] },
+    );
+    expect(outcomes.find((o) => o.tool === 'add_step')?.error).toBeUndefined();
+  });
+});

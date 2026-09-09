@@ -42,6 +42,21 @@ export interface ApplyToolCallsResult {
   addedStepIds: string[];
 }
 
+/** A step that names a Dockerfile the workflow does not carry has nothing to
+ *  build from: the repository build fields are not the assistant's to write, so
+ *  the file has to be one it wrote. Reported against the call that named it,
+ *  naming the tool that fixes it. */
+function missingDockerfileError(
+  step: WorkflowStep,
+  artifacts: { path: string }[] | undefined,
+): string | null {
+  const config = step.executor === 'script' ? step.script : step.executor === 'agent' ? step.agent : undefined;
+  const dockerfile = config?.dockerfile;
+  if (typeof dockerfile !== 'string' || dockerfile === '') return null;
+  if (artifacts?.some((artifact) => artifact.path === dockerfile) === true) return null;
+  return `This workflow carries no '${dockerfile}', so the step has nothing to build from — write it with write_workflow_file first, or drop the dockerfile and use an image that already exists.`;
+}
+
 export function applyWorkflowAssistantToolCalls(
   steps: WorkflowStep[],
   transitions: Transitions,
@@ -130,7 +145,10 @@ export function applyWorkflowAssistantToolCalls(
       }
       if (clientId) clientIdToRealId.set(clientId, newId);
       addedStepIds.push(newId);
-      outcomes.push({ tool: 'add_step', stepId: newId });
+      const buildError = missingDockerfileError(newStep, workingSettings.artifacts);
+      outcomes.push(buildError === null
+        ? { tool: 'add_step', stepId: newId }
+        : { tool: 'add_step', stepId: newId, error: buildError });
     } else if (call.tool === 'update_workflow') {
       // Patch, not replace: a call naming one field must leave the others
       // alone, or "also set the preamble" would clear the env set a turn ago.
