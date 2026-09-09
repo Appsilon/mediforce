@@ -1105,19 +1105,22 @@ export function WorkflowEditorCanvas({
               {(assistantPlanning || assistantLoading) && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  <span>
+                  {/* The phrase rotates and the counter grows a digit, so both
+                      are kept off the button: it stays put at the end of the
+                      row instead of sliding about while the turn runs. */}
+                  <span className="min-w-0 flex-1 truncate">
                     {assistantPlanning
                       ? 'Reading what you asked for…'
                       : assistantPhases[assistantPhase] ?? assistantPhases[0]}
                   </span>
                   {assistantLoading && assistantElapsed > 0 && (
-                    <span className="tabular-nums text-xs text-muted-foreground/70">
+                    <span className="shrink-0 tabular-nums text-xs text-muted-foreground/70">
                       {formatDuration(assistantElapsed * 1000)}
                     </span>
                   )}
                   <button
                     onClick={haltAssistant}
-                    className="inline-flex h-5 w-5 items-center justify-center rounded-md border hover:bg-muted hover:text-foreground transition-colors"
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border hover:bg-muted hover:text-foreground transition-colors"
                     title="Stop the assistant"
                     aria-label="Stop the assistant"
                   >
