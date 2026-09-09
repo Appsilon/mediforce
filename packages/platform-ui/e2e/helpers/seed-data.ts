@@ -2380,6 +2380,24 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
+  // Owned by the saving test in workflow-editor.journey.ts. `Supply Chain
+  // Review` cannot stand in for them: its agent steps carry no `plugin`, so
+  // `validateSteps` refuses the save before a request is made. Human steps only,
+  // so a save from the editor is about the fields under test and nothing else.
+  workflowDefinitions['test:Editor Save Test:1'] = {
+    name: 'Editor Save Test',
+    namespace: 'test',
+    version: 1,
+    title: 'Workflow the editor journeys save new versions of',
+    description: 'Test workflow for the version editor save path',
+    steps: [
+      { id: 'assess', name: 'Assess Vendor', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'assess', to: 'done' }],
+    createdAt: twoDaysAgo,
+  };
+
   // Step executions for the new-style workflow run (proc-workflow-run-1)
   // Used by executor identity label tests — vendor-assessment has plugin 'supply-data-collector'
   // in the WorkflowDefinition, so its label should render as 'agent:supply-data-collector'.

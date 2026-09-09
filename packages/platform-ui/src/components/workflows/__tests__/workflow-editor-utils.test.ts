@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, nonGraphFieldsDiffer, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from '../workflow-editor-utils';
+import { globSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver, splitPastedDefinition, pastedWorkflowName } from '../workflow-editor-utils';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -90,31 +92,6 @@ describe('bridgeTargetForDeletion', () => {
   it('returns undefined when there is neither an outgoing transition nor a terminal', () => {
     const steps = [step('a'), step('b')];
     expect(bridgeTargetForDeletion(steps, [], 'b')).toBeUndefined();
-  });
-});
-
-describe('nonGraphFieldsDiffer', () => {
-  it('is false when only steps/transitions changed', () => {
-    const wd = { title: 'T', triggers: [{ type: 'manual', name: 'start' }] };
-    const doc = { ...wd, steps: [{ id: 'a' }], transitions: [] };
-    expect(nonGraphFieldsDiffer(doc, wd)).toBe(false);
-  });
-
-  it('is false when non-graph keys are merely reordered (order-insensitive)', () => {
-    const wd = { title: 'T', triggers: [{ type: 'manual', name: 'start' }] };
-    const doc = { triggers: [{ name: 'start', type: 'manual' }], steps: [], transitions: [], title: 'T' };
-    expect(nonGraphFieldsDiffer(doc, wd)).toBe(false);
-  });
-
-  it('is true when a non-graph field value changed', () => {
-    const wd = { title: 'T', triggers: [] };
-    const doc = { title: 'Different', triggers: [], steps: [], transitions: [] };
-    expect(nonGraphFieldsDiffer(doc, wd)).toBe(true);
-  });
-
-  it('treats missing wdJsonFields as empty', () => {
-    expect(nonGraphFieldsDiffer({ steps: [], transitions: [] }, undefined)).toBe(false);
-    expect(nonGraphFieldsDiffer({ title: 'X', steps: [] }, undefined)).toBe(true);
   });
 });
 
@@ -341,5 +318,128 @@ describe('pruneCarryOver', () => {
 
   it('tolerates a workflow without carry-over', () => {
     expect(pruneCarryOver(undefined, steps)).toBeUndefined();
+  });
+});
+
+describe('splitPastedDefinition', () => {
+  const graph = { steps: [{ id: 'a', name: 'A', type: 'creation', executor: 'human' }], transitions: [{ from: 'a', to: 'done' }] };
+
+  it('applies the non-graph fields instead of refusing them', () => {
+    const result = splitPastedDefinition({
+      ...graph,
+      title: 'Pasted',
+      preamble: 'House rules',
+      triggerInput: [{ name: 'studyId', type: 'string', required: true }],
+    });
+    expect(result.error).toBeNull();
+    expect(result.nonGraph).toMatchObject({
+      title: 'Pasted',
+      preamble: 'House rules',
+      triggerInput: [{ name: 'studyId', type: 'string' }],
+    });
+  });
+
+  it('names the fields it overwrote rather than dropping them in silence', () => {
+    const result = splitPastedDefinition({
+      ...graph,
+      name: 'kept',
+      namespace: 'other-workspace',
+      version: 7,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    expect(result.error).toBeNull();
+    expect(result.ignored.sort()).toEqual(['createdAt', 'namespace', 'version']);
+    expect(result.nonGraph).toEqual({ name: 'kept' });
+  });
+
+  it('reports nothing ignored when the document carries only authorable fields', () => {
+    expect(splitPastedDefinition({ ...graph, title: 'T' }).ignored).toEqual([]);
+  });
+
+  it('drops the server-assigned fields a copied definition carries', () => {
+    const result = splitPastedDefinition({
+      ...graph,
+      name: 'kept',
+      version: 7,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      namespace: 'other-workspace',
+      copiedFrom: { name: 'x', version: 1 },
+      source: 'git',
+      archived: true,
+      deleted: false,
+    });
+    expect(result.error).toBeNull();
+    expect(result.nonGraph).toEqual({ name: 'kept' });
+  });
+
+  it('separates the graph the canvas owns from everything else', () => {
+    const result = splitPastedDefinition({
+      ...graph,
+      inputForNextRun: [{ from: 'a', as: 'carry' }],
+      title: 'T',
+    });
+    expect(result.graph.steps).toHaveLength(1);
+    expect(result.graph.transitions).toEqual([{ from: 'a', to: 'done' }]);
+    expect(result.graph.inputForNextRun).toEqual([{ from: 'a', as: 'carry' }]);
+    expect(result.nonGraph).toEqual({ title: 'T' });
+  });
+
+  it('reports the offending field when a non-graph value is invalid', () => {
+    const result = splitPastedDefinition({ ...graph, visibility: 'sideways' });
+    expect(result.error).toContain('visibility');
+  });
+
+  it('rejects a document that is not an object', () => {
+    expect(splitPastedDefinition([]).error).not.toBeNull();
+  });
+});
+
+// The bug this closes: a definition copied out of a registered version could
+// never be pasted back, because the panel compared every non-graph field
+// against page state and refused on any difference. These are the real
+// packages, so a field a shipped workflow uses cannot regress un-pasteable.
+describe('splitPastedDefinition — round-trips the packages we ship', () => {
+  const files = globSync('apps/**/src/*.wd.json', { cwd: resolve(__dirname, '../../../../../..') })
+    .map((rel) => resolve(__dirname, '../../../../../..', rel));
+
+  it('finds every shipped package, including the nested ones', () => {
+    // Pinned, not `> 0`: the non-recursive glob this replaced matched 16 of 20
+    // and passed. Bump this when a package is added.
+    expect(files.length).toBe(20);
+  });
+
+  for (const file of files) {
+    const name = file.split('/').slice(-1)[0];
+    it(`applies every non-graph field in ${name}`, () => {
+      const doc = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+      const result = splitPastedDefinition(doc);
+      expect(result.error).toBeNull();
+    });
+  }
+});
+
+describe('pastedWorkflowName', () => {
+  it('takes the title, which is what a person calls the workflow', () => {
+    // The failure this replaces: a definition carrying
+    // `name: 'landing-zone-CDISCPILOT01'` and
+    // `title: 'Landing Zone — CDISCPILOT01'` filled the name field with the id,
+    // so the workflow was saved with the id as its display name while the
+    // version was named correctly.
+    expect(pastedWorkflowName({
+      name: 'landing-zone-CDISCPILOT01',
+      title: 'Landing Zone — CDISCPILOT01',
+    })).toBe('Landing Zone — CDISCPILOT01');
+  });
+
+  it('falls back to the id when the paste carries no title', () => {
+    expect(pastedWorkflowName({ name: 'landing-zone' })).toBe('landing-zone');
+  });
+
+  it('ignores a blank title', () => {
+    expect(pastedWorkflowName({ name: 'landing-zone', title: '   ' })).toBe('landing-zone');
+  });
+
+  it('returns null when the paste names the workflow neither way', () => {
+    expect(pastedWorkflowName({ description: 'no name here' })).toBeNull();
   });
 });

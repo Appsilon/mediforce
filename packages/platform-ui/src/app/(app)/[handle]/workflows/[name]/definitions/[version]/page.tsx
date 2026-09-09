@@ -51,6 +51,9 @@ export default function WorkflowDefinitionVersionPage() {
   const [stepErrors, setStepErrors] = useState<Record<string, Record<string, string>>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [canvasDirty, setCanvasDirty] = useState(false);
+  // Fields outside the graph that a pasted definition carried. Empty until the
+  // source panel applies one; merged over the loaded definition on save.
+  const [pastedFields, setPastedFields] = useState<Record<string, unknown>>({});
 
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>([]);
@@ -108,8 +111,11 @@ export default function WorkflowDefinitionVersionPage() {
     try {
       const result = await mediforceSilent.workflows.register(
         buildRegisterBody(definition, {
+          // After the page's own fields, not before: spreading first meant a
+          // pasted title showed in the panel and was overwritten on save.
           title: title || undefined,
           description: editedDescription.trim() || undefined,
+          ...pastedFields,
           steps: orderedSteps,
           transitions: mergedTransitions,
           // Retargeted by the canvas when a step it referenced was renamed, and
@@ -119,6 +125,9 @@ export default function WorkflowDefinitionVersionPage() {
         }),
         { namespace: definition.namespace },
       );
+      // The version that just registered carries them, so they are no longer
+      // pending — without this the page reports unsaved changes forever.
+      setPastedFields({});
       if (setAsDefault) {
         await mediforceSilent.workflows.setDefaultVersion({
           name: definition.name,
@@ -136,7 +145,7 @@ export default function WorkflowDefinitionVersionPage() {
       toast({ title: 'Save failed', description: message, variant: 'error' });
       throw err;
     }
-  }, [definition, editedDescription, toast]);
+  }, [definition, editedDescription, pastedFields, toast]);
 
   const handleSave = useCallback(async (title: string, setAsDefault: boolean) => {
     setDialogOpen(false);
@@ -185,12 +194,14 @@ export default function WorkflowDefinitionVersionPage() {
 
   if (definition === null) return null;
 
-  const hasUnsavedChanges = canvasDirty || editedDescription !== (definition.description ?? '');
+  const hasUnsavedChanges =
+    canvasDirty ||
+    editedDescription !== (definition.description ?? '') ||
+    Object.keys(pastedFields).length > 0;
 
-  // What the canvas shows around the graph in its JSON panel, and compares
-  // against to refuse an apply that edits a field it cannot apply. The graph it
-  // owns — steps, transitions, inputForNextRun — must therefore not be in here,
-  // or every apply is refused; `version`/`createdAt` are server-assigned.
+  // What the canvas shows around the graph in its JSON panel. The graph it owns
+  // — steps, transitions, inputForNextRun — is excluded because the canvas
+  // supplies those; `version`/`createdAt` are server-assigned.
   const {
     steps: _steps,
     transitions: _transitions,
@@ -301,7 +312,13 @@ export default function WorkflowDefinitionVersionPage() {
         workflowName={decodedName}
         namespace={handle}
         workflowExternalSkillsRepo={definition.externalSkillsRepo}
-        wdJsonFields={wdJsonFields as Record<string, unknown>}
+        wdJsonFields={{ ...(wdJsonFields as Record<string, unknown>), ...pastedFields }}
+        onNonGraphFieldsChange={(fields) => {
+          setPastedFields(fields);
+          // The fields with an input on this page have to show what was pasted,
+          // or the header reads one description while the save writes another.
+          if (typeof fields.description === 'string') setEditedDescription(fields.description);
+        }}
         onChange={handleCanvasChange}
         onDirtyChange={setCanvasDirty}
         stepErrors={stepErrors}
@@ -310,6 +327,7 @@ export default function WorkflowDefinitionVersionPage() {
       <UnsavedChangesGuard when={hasUnsavedChanges} />
 
       <SaveVersionDialog
+        suggestedTitle={typeof pastedFields.title === 'string' ? pastedFields.title : undefined}
         open={dialogOpen}
         nextVersion={definition.version + 1}
         confirmLabel="Save new version"

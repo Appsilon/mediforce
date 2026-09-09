@@ -28,7 +28,7 @@ import { StepEditor } from './workflow-editor/step-editor';
 import { ModelPicker } from './workflow-editor/model-picker';
 import { selectBase } from './workflow-editor/step-editor-fields';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
-import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, nonGraphFieldsDiffer, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
@@ -118,6 +118,9 @@ export interface WorkflowEditorCanvasProps {
   initialTransitions: WorkflowDefinition['transitions'];
   initialInputForNextRun?: WorkflowDefinition['inputForNextRun'];
   wdJsonFields?: Record<string, unknown>;
+  /** Applied when a pasted document carries fields outside the graph, so the
+   *  source panel can round-trip a whole definition instead of refusing it. */
+  onNonGraphFieldsChange?: (fields: Record<string, unknown>) => void;
   workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
   workflowName?: string;
   namespace?: string;
@@ -155,6 +158,7 @@ export function WorkflowEditorCanvas({
   initialTransitions,
   initialInputForNextRun,
   wdJsonFields,
+  onNonGraphFieldsChange,
   workflowExternalSkillsRepo,
   workflowName,
   namespace,
@@ -665,30 +669,29 @@ export function WorkflowEditorCanvas({
 
   const applyJson = () => {
     try {
-      const doc = JSON.parse(jsonDraft) as Record<string, unknown>;
-      // This editor applies the graph (steps, transitions, inputForNextRun)
-      // only — the other authorable fields (title, triggers, metadata, …) are
-      // page state, not canvas state. Rather than silently discard edits to
-      // them, refuse and point the user at where those fields live.
-      if (nonGraphFieldsDiffer(doc, wdJsonFields)) {
-        setJsonError(
-          'This editor applies steps, transitions & inputForNextRun only. Edit other fields (title, triggers, metadata, …) in workflow settings, then reapply.',
-        );
+      const doc: unknown = JSON.parse(jsonDraft);
+      // The graph is applied here; the fields around it are handed to the page,
+      // which owns them. Refusing them instead — as this panel used to — meant
+      // a definition copied out of a registered version could never be pasted
+      // back, since a copy carries `title`, `triggerInput` and the rest.
+      const split = splitPastedDefinition(doc);
+      if (split.error !== null) {
+        setJsonError(split.error);
         return;
       }
-      const stepsResult = WorkflowStepSchema.array().safeParse(doc?.steps);
+      const stepsResult = WorkflowStepSchema.array().safeParse(split.graph.steps);
       if (!stepsResult.success) {
         setJsonError(`steps: ${stepsResult.error.issues[0]?.message ?? 'invalid'}`);
         return;
       }
       const transitionsResult = TransitionSchema.array().safeParse(
-        Array.isArray(doc?.transitions) ? doc.transitions : [],
+        Array.isArray(split.graph.transitions) ? split.graph.transitions : [],
       );
       if (!transitionsResult.success) {
         setJsonError(`transitions: ${transitionsResult.error.issues[0]?.message ?? 'invalid'}`);
         return;
       }
-      const carryOverResult = InputForNextRunEntrySchema.array().optional().safeParse(doc?.inputForNextRun);
+      const carryOverResult = InputForNextRunEntrySchema.array().optional().safeParse(split.graph.inputForNextRun);
       if (!carryOverResult.success) {
         setJsonError(`inputForNextRun: ${carryOverResult.error.issues[0]?.message ?? 'invalid'}`);
         return;
@@ -723,8 +726,21 @@ export function WorkflowEditorCanvas({
       setEditedSteps(orderedSteps);
       setEditedTransitions(mergedTransitions);
       setEditedInputForNextRun(carryOverResult.data);
+      onNonGraphFieldsChange?.(split.nonGraph);
       lastSyncedJsonRef.current = jsonDraft;
       setJsonError(null);
+      // Applying is the end of the edit, so the panel gets out of the way: it
+      // is a modal over the toolbar, and leaving it up hides the canvas it just
+      // changed and the Save that keeps the change. A refusal above returns
+      // early and leaves it open, which is where the error belongs.
+      setRightPanelView(null);
+      if (split.ignored.length > 0) {
+        toast({
+          variant: 'warning',
+          title: 'Some fields come from the platform',
+          description: `${split.ignored.join(', ')} ${split.ignored.length === 1 ? 'is' : 'are'} assigned when a version registers, so the pasted value was not used. Everything else was applied.`,
+        });
+      }
     } catch (err) {
       setJsonError(err instanceof Error ? err.message : 'Invalid JSON');
     }

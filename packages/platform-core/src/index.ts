@@ -532,3 +532,28 @@ export type { BlockPreset, BlockPresetPayload, BlockCategory } from './blocks/bl
 // Workflow examples — shared loader for MCP tool, tests, and build scripts.
 // Uses Node.js fs/path so NOT exported from this barrel (breaks browser bundles).
 // Import directly: import { loadWorkflowExamples } from '@mediforce/platform-core/workflow-examples'
+
+export {
+  SelectOptionSchema,
+  AssigneeOptionSchema,
+  ColumnSpecSchema,
+  COLUMN_KINDS,
+  FileUploadUiConfigSchema,
+  TableEditorUiConfigSchema,
+  AssignmentTableUiConfigSchema,
+  STEP_UI_CONFIG_SCHEMAS,
+  STEP_UI_COMPONENTS,
+  isKnownStepUiComponent,
+  type SelectOption,
+  type AssigneeOption,
+  type ColumnSpec,
+  type StaticColumn,
+  type SingleSelectColumn,
+  type MultiSelectColumn,
+  type TextColumn,
+  type AvatarColumn,
+  type FileUploadUiConfig,
+  type TableEditorUiConfig,
+  type AssignmentTableUiConfig,
+  type StepUiComponent,
+} from './schemas/step-ui-config';

@@ -11,6 +11,7 @@ import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { mediforceSilent } from '@/lib/mediforce';
 import { validateSteps, toastRegistrationWarnings, handleSaveFailure, DISPLAY_NAME_KEY } from '@/lib/workflow-save-utils';
+import { pastedWorkflowName } from '@/components/workflows/workflow-editor-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
@@ -109,6 +110,11 @@ export default function NewWorkflowPage() {
   const routeIsWritable = namespacesLoading || namespaces.some((ns) => ns.handle === handle);
   const effectiveNamespace = namespace || (routeIsWritable ? handle : namespaces[0]?.handle ?? handle);
 
+  // Fields outside the graph that a pasted definition carried — the only way
+  // to declare them when creating a workflow, since there is no settings form
+  // yet. Merged under the page's own fields on register.
+  const [pastedFields, setPastedFields] = useState<Record<string, unknown>>({});
+
   const registerCurrentCanvas = useCallback(async (versionTitle: string) => {
     const steps = currentStepsRef.current;
     const transitions = currentTransitionsRef.current;
@@ -139,16 +145,28 @@ export default function NewWorkflowPage() {
     try {
       const result = await mediforceSilent.workflows.register(
         {
-          name: workflowId,
           title: versionTitle || undefined,
           description: description.trim() || undefined,
-          metadata: { [DISPLAY_NAME_KEY]: workflowName.trim() },
           steps: orderedSteps,
           transitions: mergedTransitions,
           // Declarable here only through the source-code panel, which applies it
           // with the rest of the graph — a field that panel accepts has to reach
           // the registration, not be dropped on the way out.
           inputForNextRun: currentInputForNextRunRef.current,
+          // After the page's own fields: a pasted title shown in the panel has
+          // to be the one that registers. `name` stays the page's, since the
+          // route and the save dialog both key off it.
+          ...pastedFields,
+          name: workflowId,
+          // After the spread as well: a pasted `metadata` carries its own keys,
+          // and letting it replace this one wholesale drops the display name
+          // and leaves the workflow calling itself by its id.
+          metadata: {
+            ...(typeof pastedFields.metadata === 'object' && pastedFields.metadata !== null
+              ? pastedFields.metadata as Record<string, unknown>
+              : {}),
+            [DISPLAY_NAME_KEY]: workflowName.trim(),
+          },
         },
         { namespace: effectiveNamespace },
       );
@@ -162,7 +180,7 @@ export default function NewWorkflowPage() {
       toast({ title: 'Save failed', description: message, variant: 'error' });
       throw err;
     }
-  }, [workflowName, effectiveNamespace, description, toast]);
+  }, [workflowName, effectiveNamespace, description, pastedFields, toast]);
 
   const handleSave = useCallback(async (versionTitle: string) => {
     setDialogOpen(false);
@@ -327,7 +345,18 @@ export default function NewWorkflowPage() {
         initialSteps={TEMPLATE_STEPS}
         initialTransitions={TEMPLATE_TRANSITIONS}
         namespace={effectiveNamespace}
-        wdJsonFields={wdJsonFields}
+        wdJsonFields={{ ...wdJsonFields, ...pastedFields }}
+        onNonGraphFieldsChange={(fields) => {
+          setPastedFields(fields);
+          // The create page owns name and description as form state, so a paste
+          // has to fill the inputs rather than register values the author
+          // cannot see. `title` is the version title, asked for on save.
+          if (typeof fields.description === 'string') setDescription(fields.description);
+          // The title, not the id: the field is the workflow's display name,
+          // and the id is derived from it below.
+          const pastedName = pastedWorkflowName(fields);
+          if (pastedName !== null) setWorkflowName(pastedName);
+        }}
         onChange={handleCanvasChange}
         onDirtyChange={setCanvasDirty}
         stepErrors={stepErrors}
@@ -336,6 +365,7 @@ export default function NewWorkflowPage() {
       <UnsavedChangesGuard when={hasUnsavedChanges} />
 
       <SaveVersionDialog
+        suggestedTitle={typeof pastedFields.title === 'string' ? pastedFields.title : undefined}
         open={dialogOpen}
         nextVersion={1}
         confirmLabel="Publish workflow"
