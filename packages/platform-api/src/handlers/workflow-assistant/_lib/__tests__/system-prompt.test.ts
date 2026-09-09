@@ -106,6 +106,14 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/"HARVEST_API_KEY": "\{\{HARVEST_API_KEY\}\}"/);
   });
 
+  it('says how a file crosses from one step to the next, since /output does not survive', () => {
+    // The live failure: a reader step written as `pd.read_csv('/output/samples.csv')`,
+    // which the producing step really did write, dies with FileNotFoundError
+    // because /output is wiped between steps.
+    expect(prompt).toMatch(/\/workspace\/\.mediforce\/output\//);
+    expect(prompt).toMatch(/wiped|deleted|does not survive/i);
+  });
+
   it('states the only route an MCP server has to a step: a saved agent the step names with agentId', () => {
     // `resolveMcpForStep` returns null when `agentId` is unset, so an inline
     // agent step reaches no MCP at all however the request was phrased. The
