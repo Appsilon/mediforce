@@ -45,12 +45,24 @@ export async function runPlatformTool(
       case 'list_agents': {
         const agents = await scope.agentDefinitions.list(namespace);
         return {
-          agents: agents.map((agent) => ({
-            id: agent.id,
-            name: agent.name,
-            description: agent.description,
-            foundationModel: agent.foundationModel,
-          })),
+          agents: agents.map((agent) => {
+            // The MCP servers each agent is bound to, named by what a binding
+            // points at: a catalog id for stdio, the URL for http. This is what
+            // decides whether an existing agent can be reused for "use the X
+            // MCP" — an MCP reaches a step only through the agent the step
+            // names, so without the bindings the only options are guessing and
+            // creating a second agent that does the same thing.
+            const bindings = Object.entries(agent.mcpServers ?? {}).map(
+              ([name, binding]) => [name, binding.type === 'stdio' ? binding.catalogId : binding.url] as const,
+            );
+            return {
+              id: agent.id,
+              name: agent.name,
+              description: agent.description,
+              foundationModel: agent.foundationModel,
+              ...(bindings.length === 0 ? {} : { mcpServers: Object.fromEntries(bindings) }),
+            };
+          }),
         };
       }
       case 'list_tool_catalog': {

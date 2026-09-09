@@ -336,6 +336,74 @@ describe('applyWorkflowAssistantToolCalls — carry-over between runs', () => {
   });
 });
 
+describe('applyWorkflowAssistantToolCalls — a Dockerfile an imported workflow builds from git', () => {
+  it('keeps it on a step that pins repo and commit, which is where that file lives', () => {
+    // A workflow imported from git carries no artifacts: its build context is
+    // the checkout, and `dockerfile` names a path inside it. Stripping the
+    // field because the workflow carries no such artifact silently moved the
+    // build to the repository's root Dockerfile.
+    const canvas = baseCanvas();
+    const withGitBuild: typeof canvas.steps = canvas.steps.map((step) => (step.id === 'draft'
+      ? {
+        ...step,
+        executor: 'script' as const,
+        plugin: 'script-container',
+        script: {
+          command: 'python3 validate.py',
+          dockerfile: 'container/Dockerfile',
+          repo: 'https://github.com/acme/pipelines.git',
+          commit: 'a'.repeat(40),
+        },
+      }
+      : step));
+    const { steps } = applyWorkflowAssistantToolCalls(
+      withGitBuild, canvas.transitions,
+      [{ tool: 'update_step', arguments: { stepId: 'draft', name: 'Validate the extract' } }],
+    );
+    const draft = steps.find((step) => step.id === 'draft');
+    expect(draft?.executor === 'script' ? draft.script?.dockerfile : undefined).toBe('container/Dockerfile');
+  });
+
+  it('keeps it when the workflow takes its files from an external repo', () => {
+    // The third build source: `dockerfile` plus the workflow-level
+    // `externalSkillsRepo`, which is what a legacy workflow pointing at the app
+    // package uses. Also not the assistant's to strip.
+    const canvas = baseCanvas();
+    const withRepoFiles: typeof canvas.steps = canvas.steps.map((step) => (step.id === 'draft'
+      ? { ...step, executor: 'agent' as const, plugin: 'claude-code-agent', agent: { dockerfile: 'container/Dockerfile' } }
+      : step));
+    const { steps } = applyWorkflowAssistantToolCalls(
+      withRepoFiles, canvas.transitions,
+      [{ tool: 'update_step', arguments: { stepId: 'draft', name: 'Interpret' } }],
+      { externalSkillsRepo: { url: 'https://github.com/acme/pipelines.git', commit: 'b'.repeat(40) } },
+    );
+    const draft = steps.find((step) => step.id === 'draft');
+    expect(draft?.executor === 'agent' ? draft.agent?.dockerfile : undefined).toBe('container/Dockerfile');
+  });
+});
+
+describe('applyWorkflowAssistantToolCalls — an agent step bound to an MCP server', () => {
+  it('keeps the agentId and the step restrictions, which is the only route an MCP has to a step', () => {
+    // `resolveMcpForStep` reads `agentId` and returns null without one, so a
+    // step that loses it runs with no MCP however the request was phrased.
+    const { steps } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions,
+      [{
+        tool: 'add_step',
+        arguments: {
+          type: 'creation', executor: 'agent', name: 'File the issue',
+          agentId: 'issue-filer',
+          mcpRestrictions: { github: { denyTools: ['delete_repository'] } },
+          insertAfterId: 'draft', insertBeforeId: 'done',
+        },
+      }],
+    );
+    const added = steps.find((step) => step.name === 'File the issue');
+    expect(added?.agentId).toBe('issue-filer');
+    expect(added?.mcpRestrictions).toEqual({ github: { denyTools: ['delete_repository'] } });
+  });
+});
+
 describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not carry', () => {
   it('keeps it when the file arrives later in the same batch', () => {
     // The loop this closes: every iteration re-applies the whole accumulated

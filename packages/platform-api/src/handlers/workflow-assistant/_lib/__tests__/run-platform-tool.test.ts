@@ -13,6 +13,17 @@ function buildScope(overrides: Record<string, unknown> = {}): CallerScope {
     agentDefinitions: {
       list: vi.fn().mockResolvedValue([
         { id: 'agent-1', name: 'Validator', description: 'Validates', foundationModel: 'anthropic/claude-sonnet-4.6', namespace: 'acme' },
+        {
+          id: 'agent-2',
+          name: 'Issue filer',
+          description: 'Files issues',
+          foundationModel: 'anthropic/claude-sonnet-4.6',
+          namespace: 'acme',
+          mcpServers: {
+            github: { type: 'stdio', catalogId: 'github' },
+            docs: { type: 'http', url: 'https://mcp.example.com/docs' },
+          },
+        },
       ]),
       create: vi.fn().mockImplementation((input: Record<string, unknown>) =>
         Promise.resolve({ id: 'agent-new', ...input })),
@@ -38,10 +49,23 @@ describe('runPlatformTool', () => {
     expect(JSON.stringify(result)).not.toContain('sk-live-abc');
   });
 
-  it('lists the agents a step could point at', async () => {
+  it('lists the agents a step could point at, with the MCP servers each is bound to', async () => {
+    // An MCP reaches a step only through the agent it points at, so the
+    // bindings are what decides whether an existing agent can be reused. Listed
+    // without them, the assistant could only guess, and guessing means a second
+    // agent that does the same thing.
     const result = await runPlatformTool('list_agents', {}, buildScope(), 'acme');
     expect(result).toEqual({
-      agents: [{ id: 'agent-1', name: 'Validator', description: 'Validates', foundationModel: 'anthropic/claude-sonnet-4.6' }],
+      agents: [
+        { id: 'agent-1', name: 'Validator', description: 'Validates', foundationModel: 'anthropic/claude-sonnet-4.6' },
+        {
+          id: 'agent-2',
+          name: 'Issue filer',
+          description: 'Files issues',
+          foundationModel: 'anthropic/claude-sonnet-4.6',
+          mcpServers: { github: 'github', docs: 'https://mcp.example.com/docs' },
+        },
+      ],
     });
   });
 
