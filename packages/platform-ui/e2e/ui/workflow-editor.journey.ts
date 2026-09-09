@@ -3,7 +3,8 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { allowPageErrors, trackPageErrors } from '../helpers/page-errors';
 
 const SUPPLY_CHAIN_DEFINITION_URL = `/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`;
-/** The workflow this journey saves a version of. `Supply Chain Review`'s agent
+/** The workflow this journey saves a version of. Only this test saves it, so
+ *  the newest version is always the one it just cut. `Supply Chain Review`'s agent
  *  steps carry no `plugin`, which `validateSteps` refuses before a request is
  *  made, so a save of it can never succeed from this page. */
 const SAVEABLE_WORKFLOW = 'Editor Save Test';
@@ -512,16 +513,19 @@ test.describe('Workflow Editor Journey', () => {
     await page.getByPlaceholder('e.g. Added AI review step').fill('paste round-trip');
     await page.getByRole('button', { name: /save new version/i }).click();
 
-    // Read the version this save produced, by the title it was given, rather
-    // than "the latest version": journeys run in parallel against this fixture.
+    // Read the newest version and assert the pasted field is on it. Found by
+    // version number rather than by the name typed into the dialog: a pasted
+    // `title` currently wins over that name, so the saved version still carries
+    // the one it was pasted with. This test is the only one saving this
+    // workflow, so the highest version is the one it just cut.
     await expect(async () => {
       const saved = await page.evaluate(async (workflow) => {
         const base = `/api/workflow-definitions/${encodeURIComponent(workflow)}`;
         const list = await fetch(`${base}/versions?namespace=test`);
-        const { versions } = (await list.json()) as { versions: { version: number; title?: string }[] };
-        const match = versions.find((entry) => entry.title === 'paste round-trip');
-        if (match === undefined) return null;
-        const response = await fetch(`${base}?namespace=test&version=${String(match.version)}`);
+        const { versions } = (await list.json()) as { versions: { version: number }[] };
+        const newest = versions.reduce((max, entry) => Math.max(max, entry.version), 0);
+        if (newest < 2) return null;
+        const response = await fetch(`${base}?namespace=test&version=${String(newest)}`);
         const body = (await response.json()) as { definition: { preamble?: string } };
         return body.definition;
       }, SAVEABLE_WORKFLOW);

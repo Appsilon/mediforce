@@ -2380,7 +2380,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
-  // Owned by the two saving tests in workflow-editor.journey.ts. `Supply Chain
+  // Owned by the saving test in workflow-editor.journey.ts. `Supply Chain
   // Review` cannot stand in for them: its agent steps carry no `plugin`, so
   // `validateSteps` refuses the save before a request is made. Human steps only,
   // so a save from the editor is about the fields under test and nothing else.
