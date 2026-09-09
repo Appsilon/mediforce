@@ -637,14 +637,16 @@ export class Mediforce {
   };
 
   readonly assistant: {
+    /** `signal` aborts the request: an assistant turn is the one call long
+     *  enough that a person will want to stop it. */
     ask: (
       input: AskWorkflowAssistantInput,
-      options: { namespace: string },
+      options: { namespace: string; signal?: AbortSignal },
     ) => Promise<AskWorkflowAssistantOutput>;
     /** The turn before the build: intent, questions, and the phases to show. */
     plan: (
       input: PlanWorkflowBuildInput,
-      options: { namespace: string },
+      options: { namespace: string; signal?: AbortSignal },
     ) => Promise<PlanWorkflowBuildOutput>;
   };
 
@@ -1130,6 +1132,7 @@ export class Mediforce {
           { ...validatedInput } as Record<string, unknown>,
           AskWorkflowAssistantOutputSchema,
           'mediforce.assistant.ask',
+          options.signal,
         );
       },
       plan: async (input, options) => {
@@ -1147,6 +1150,7 @@ export class Mediforce {
           { ...validatedInput } as Record<string, unknown>,
           PlanWorkflowBuildOutputSchema,
           'mediforce.assistant.plan',
+          options.signal,
         );
       },
     };
@@ -2306,8 +2310,10 @@ export class Mediforce {
     body: unknown,
     outputSchema: { parse: (b: unknown) => TOut },
     ctx: string,
+    signal?: AbortSignal,
   ): Promise<TOut> {
     const init: RequestInit = { method };
+    if (signal !== undefined) init.signal = signal;
     if (body !== undefined) {
       init.headers = { 'Content-Type': 'application/json' };
       init.body = JSON.stringify(body);
