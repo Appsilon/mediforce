@@ -225,10 +225,28 @@ export function applyWorkflowAssistantToolCalls(
       const to = resolveId(rawTo) ?? rawTo;
       const edge = workingTransitions.find((t) => t.from === from && t.to === to);
       if (edge === undefined) {
+        // "Add the edge" was the wrong advice and an endless loop: the canvas
+        // state the model read says `A → B`, its own add_step in the same batch
+        // spliced a step between them, and adding the edge back splices again.
+        // What it needs is the graph as it stands, so naming the edges around
+        // both ends turns this into one correction.
+        const unknownStep = workingSteps.some((step) => step.id === from) === false
+          ? from
+          : workingSteps.some((step) => step.id === to) === false ? to : null;
+        const outgoing = workingTransitions.filter((t) => t.from === from).map((t) => `${t.from} → ${t.to}`);
+        const incoming = workingTransitions.filter((t) => t.to === to).map((t) => `${t.from} → ${t.to}`);
+        const around = [
+          outgoing.length > 0
+            ? `Leaving "${from}": ${outgoing.join(', ')}.`
+            : `Right now nothing leaves "${from}".`,
+          incoming.length > 0 ? `Reaching "${to}": ${incoming.join(', ')}.` : '',
+        ].filter((part) => part !== '').join(' ');
         outcomes.push({
           tool: 'set_transition_condition',
           stepId: `${from} → ${to}`,
-          error: `There is no transition from "${from}" to "${to}" — add the edge before giving it a condition.`,
+          error: unknownStep !== null
+            ? `"${unknownStep}" is not a step on this canvas, so there is no edge to condition. ${around}`
+            : `There is no edge from "${from}" to "${to}" — inserting a step between two steps replaces the edge that joined them, so condition the edge that exists now. ${around}`,
         });
         continue;
       }

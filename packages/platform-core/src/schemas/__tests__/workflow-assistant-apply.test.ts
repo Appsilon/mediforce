@@ -373,3 +373,50 @@ describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not
     expect(outcomes.find((o) => o.tool === 'add_step')?.error).toBeUndefined();
   });
 });
+
+// The loop this closes: the canvas state the model reads says `poll → done`,
+// its own add_step in the same batch splices a step between them, and the
+// condition it then sets on `poll → done` finds nothing. "Add the edge" sent it
+// adding an edge, which spliced again — for ever.
+describe('applyWorkflowAssistantToolCalls — a condition on an edge the batch replaced', () => {
+  it('names the edges that exist now, instead of telling it to add one', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'add_step', arguments: { clientId: 'validate', type: 'creation', executor: 'script', name: 'Validate', insertAfterId: 'draft', insertBeforeId: 'done' } },
+      { tool: 'set_transition_condition', arguments: { from: 'draft', to: 'done', when: 'output.newFiles > 0' } },
+    ];
+    const { outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions, calls,
+    );
+    const error = outcomes.find((o) => o.tool === 'set_transition_condition')?.error;
+    // What leaves `draft` now, so the next call can be right first time.
+    expect(error).toContain('draft → validate');
+    // And what reaches `done`, in case that was the edge it meant.
+    expect(error).toContain('validate → done');
+    expect(error).not.toContain('add the edge');
+  });
+
+  it('says so plainly when the step has no outgoing edge at all', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'set_transition_condition', arguments: { from: 'done', to: 'draft', when: 'x == 1' } },
+    ];
+    const { outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions, calls,
+    );
+    expect(outcomes.find((o) => o.tool === 'set_transition_condition')?.error)
+      .toContain('nothing leaves "done"');
+  });
+
+  it('still names an unknown step as unknown', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'set_transition_condition', arguments: { from: 'ghost', to: 'done', when: 'x == 1' } },
+    ];
+    expect(outcomesFor(calls)).toContain('"ghost" is not a step');
+  });
+});
+
+function outcomesFor(calls: WorkflowAssistantToolCall[]): string {
+  const { outcomes } = applyWorkflowAssistantToolCalls(
+    baseCanvas().steps, baseCanvas().transitions, calls,
+  );
+  return outcomes.find((o) => o.tool === 'set_transition_condition')?.error ?? '';
+}

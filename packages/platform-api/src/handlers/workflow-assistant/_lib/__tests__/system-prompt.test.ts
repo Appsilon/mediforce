@@ -223,3 +223,19 @@ describe('buildWorkflowAssistantSystemPrompt — who does a human step', () => {
     expect(prompt).toMatch(/set the role and say which role you used/);
   });
 });
+
+// The loop a person watched: the canvas said `poll → done`, the batch spliced a
+// step between them, and the condition on the old edge was refused — so it
+// added the edge back, which spliced again.
+describe('buildWorkflowAssistantSystemPrompt — conditions and splicing', () => {
+  const prompt = buildWorkflowAssistantSystemPrompt();
+
+  it('says inserting a step replaces the edge that joined the two', () => {
+    expect(prompt).toMatch(/replaces the edge that joined them/);
+    expect(prompt).toMatch(/condition the edge that exists now/);
+  });
+
+  it('tells it to read the refusal rather than re-adding the old edge', () => {
+    expect(prompt).toMatch(/which splits the graph again/);
+  });
+});
