@@ -337,11 +337,38 @@ describe('applyWorkflowAssistantToolCalls — carry-over between runs', () => {
 });
 
 describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not carry', () => {
-  it('says to write the file, rather than leaving a step that cannot build', () => {
-    // The failure this replaces: the model names `container/Dockerfile`, no
-    // file exists, and the step registers with nothing to build from. The
-    // message names the tool that fixes it, in the model's own vocabulary.
-    const { outcomes } = applyWorkflowAssistantToolCalls(
+  it('keeps it when the file arrives later in the same batch', () => {
+    // The loop this closes: every iteration re-applies the whole accumulated
+    // batch from the original definition, so an add_step checked against the
+    // artifacts as they stood *at that call* never sees the file the model
+    // wrote a call later. It was told to write the file, it wrote it, and the
+    // gate failed again on the replay — for ever. Checked once, at the end.
+    const { steps, outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions,
+      [
+        {
+          tool: 'add_step',
+          arguments: {
+            type: 'creation', executor: 'script', name: 'Validate',
+            insertAfterId: 'draft', insertBeforeId: 'done',
+            script: { command: 'python3 /artifacts/scripts/validate.py', dockerfile: 'container/Dockerfile' },
+          },
+        },
+        { tool: 'write_workflow_file', arguments: { path: 'container/Dockerfile', contents: 'FROM python:3.12-slim\n' } },
+      ],
+    );
+    expect(outcomes.every((outcome) => outcome.error === undefined)).toBe(true);
+    const added = steps.find((step) => step.name === 'Validate');
+    expect(added?.executor === 'script' ? added.script?.dockerfile : undefined).toBe('container/Dockerfile');
+  });
+
+  it('drops the dockerfile rather than refusing the step nothing carries a file for', () => {
+    // Dropped, not rejected, for the same reason the repository build fields
+    // are: refusing sent the model into a retry loop that burned the iteration
+    // cap and ended the turn with an error. Without a Dockerfile the step runs
+    // on the image every other step runs on, which is the fallback the model
+    // was being offered anyway.
+    const { steps, outcomes } = applyWorkflowAssistantToolCalls(
       baseCanvas().steps, baseCanvas().transitions,
       [{
         tool: 'add_step',
@@ -352,13 +379,15 @@ describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not
         },
       }],
     );
-    const outcome = outcomes.find((o) => o.tool === 'add_step');
-    expect(outcome?.error).toContain('container/Dockerfile');
-    expect(outcome?.error).toContain('write_workflow_file');
+    expect(outcomes.every((outcome) => outcome.error === undefined)).toBe(true);
+    const added = steps.find((step) => step.name === 'Validate');
+    expect(added?.executor === 'script' ? added.script?.dockerfile : undefined).toBeUndefined();
+    expect(added?.executor === 'script' ? added.script?.command : undefined)
+      .toBe('python3 /artifacts/scripts/validate.py');
   });
 
-  it('is silent when the workflow carries it', () => {
-    const { outcomes } = applyWorkflowAssistantToolCalls(
+  it('leaves the step alone when the workflow carries the file', () => {
+    const { steps, outcomes } = applyWorkflowAssistantToolCalls(
       baseCanvas().steps, baseCanvas().transitions,
       [{
         tool: 'add_step',
@@ -370,7 +399,24 @@ describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not
       }],
       { artifacts: [{ path: 'Dockerfile', contents: 'FROM python:3.12-slim\n' }] },
     );
-    expect(outcomes.find((o) => o.tool === 'add_step')?.error).toBeUndefined();
+    expect(outcomes.find((outcome) => outcome.tool === 'add_step')?.error).toBeUndefined();
+    const added = steps.find((step) => step.name === 'Validate');
+    expect(added?.executor === 'script' ? added.script?.dockerfile : undefined).toBe('Dockerfile');
+  });
+
+  it('leaves a step the batch never touched alone', () => {
+    // The reducer's output is what gets saved: stripping a field off a step
+    // this batch did not name would edit the workflow behind the person's back.
+    const canvas = baseCanvas();
+    const withBuild: typeof canvas.steps = canvas.steps.map((step) => (step.id === 'draft'
+      ? { ...step, executor: 'script' as const, plugin: 'script-container', script: { command: 'python3 run.py', dockerfile: 'container/Dockerfile' } }
+      : step));
+    const { steps } = applyWorkflowAssistantToolCalls(
+      withBuild, canvas.transitions,
+      [{ tool: 'update_workflow', arguments: { preamble: 'House rules.' } }],
+    );
+    const draft = steps.find((step) => step.id === 'draft');
+    expect(draft?.executor === 'script' ? draft.script?.dockerfile : undefined).toBe('container/Dockerfile');
   });
 });
 

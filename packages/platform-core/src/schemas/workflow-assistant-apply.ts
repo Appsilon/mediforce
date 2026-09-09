@@ -44,17 +44,24 @@ export interface ApplyToolCallsResult {
 
 /** A step that names a Dockerfile the workflow does not carry has nothing to
  *  build from: the repository build fields are not the assistant's to write, so
- *  the file has to be one it wrote. Reported against the call that named it,
- *  naming the tool that fixes it. */
-function missingDockerfileError(
+ *  the file has to be one it wrote. Dropped rather than refused, for the same
+ *  reason the repository fields are — refusing failed the graph gate, and since
+ *  every retry re-applies the whole accumulated batch from the original
+ *  definition, the file the model then wrote always landed *after* the step
+ *  that named it and the gate failed again. Without a Dockerfile the step runs
+ *  on the image every other step runs on. */
+function withoutUncarriedDockerfile(
   step: WorkflowStep,
   artifacts: { path: string }[] | undefined,
-): string | null {
+): WorkflowStep {
   const config = step.executor === 'script' ? step.script : step.executor === 'agent' ? step.agent : undefined;
   const dockerfile = config?.dockerfile;
-  if (typeof dockerfile !== 'string' || dockerfile === '') return null;
-  if (artifacts?.some((artifact) => artifact.path === dockerfile) === true) return null;
-  return `This workflow carries no '${dockerfile}', so the step has nothing to build from — write it with write_workflow_file first, or drop the dockerfile and use an image that already exists.`;
+  if (config === undefined || typeof dockerfile !== 'string' || dockerfile === '') return step;
+  if (artifacts?.some((artifact) => artifact.path === dockerfile) === true) return step;
+  const { dockerfile: _dropped, ...rest } = config;
+  return step.executor === 'script'
+    ? ({ ...step, script: rest } as WorkflowStep)
+    : ({ ...step, agent: rest } as WorkflowStep);
 }
 
 export function applyWorkflowAssistantToolCalls(
@@ -71,6 +78,10 @@ export function applyWorkflowAssistantToolCalls(
   const clientIdToRealId = new Map<string, string>();
   const outcomes: ToolCallOutcome[] = [];
   const addedStepIds: string[] = [];
+  /** Steps this batch wrote. The build-source pass only touches these: the
+   *  reducer's output is what gets saved, so editing a step the batch never
+   *  named would change the workflow behind the person's back. */
+  const touchedStepIds = new Set<string>();
 
   let stepCounter = steps.reduce((max, s) => {
     const match = /^new-step-(\d+)$/.exec(s.id);
@@ -145,10 +156,8 @@ export function applyWorkflowAssistantToolCalls(
       }
       if (clientId) clientIdToRealId.set(clientId, newId);
       addedStepIds.push(newId);
-      const buildError = missingDockerfileError(newStep, workingSettings.artifacts);
-      outcomes.push(buildError === null
-        ? { tool: 'add_step', stepId: newId }
-        : { tool: 'add_step', stepId: newId, error: buildError });
+      touchedStepIds.add(newId);
+      outcomes.push({ tool: 'add_step', stepId: newId });
     } else if (call.tool === 'update_workflow') {
       // Patch, not replace: a call naming one field must leave the others
       // alone, or "also set the preamble" would clear the env set a turn ago.
@@ -303,6 +312,7 @@ export function applyWorkflowAssistantToolCalls(
           workingTransitions = [...workingTransitions, { from: afterId, to: realId }];
         }
       }
+      touchedStepIds.add(realId);
       outcomes.push({ tool: 'update_step', stepId: realId });
     } else {
       const realId = resolveId(call.arguments.stepId) ?? call.arguments.stepId;
@@ -326,8 +336,14 @@ export function applyWorkflowAssistantToolCalls(
     }
   }
 
+  // Checked once, at the end, against the files the batch finished with — a
+  // step and the Dockerfile it names arrive in the same batch, in either order.
+  const finalSteps = workingSteps.map((step) => (touchedStepIds.has(step.id)
+    ? withoutUncarriedDockerfile(step, workingSettings.artifacts)
+    : step));
+
   return {
-    steps: workingSteps,
+    steps: finalSteps,
     transitions: workingTransitions,
     settings: workingSettings,
     inputForNextRun: workingInputForNextRun,
