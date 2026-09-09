@@ -35,6 +35,8 @@ import { useToast } from '@/components/command-palette';
 import { applyWorkflowAssistantToolCalls, type WorkflowAssistantToolCall } from '@mediforce/platform-core';
 import { CodeEditor } from './workflow-editor/code-editor';
 import { WorkflowFilesPanel } from './workflow-files-panel';
+import { AssistantPlan, answersMessage } from './assistant-plan';
+import type { PlanWorkflowBuildOutput } from '@mediforce/platform-api/contract';
 
 interface AssistantMessage {
   role: 'user' | 'assistant';
@@ -438,7 +440,16 @@ export function WorkflowEditorCanvas({
   const [assistantModel, setAssistantModel] = useState<string | undefined>(undefined);
   const [assistantSettingsOpen, setAssistantSettingsOpen] = useState(false);
   const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantPlanning, setAssistantPlanning] = useState(false);
   const [assistantPhase, setAssistantPhase] = useState(0);
+  /** What this turn said it would do, and what it asked first. Written by the
+   *  planning call, cleared when the build starts. */
+  const [assistantPlan, setAssistantPlan] = useState<PlanWorkflowBuildOutput | null>(null);
+  const [assistantAnswers, setAssistantAnswers] = useState<Record<string, string>>({});
+  /** Phases for the build now running, written for this workflow rather than
+   *  the generic list they replace. Empty falls back to that list. */
+  const [assistantPhases, setAssistantPhases] = useState<readonly string[]>(ASSISTANT_PHASES);
+  const [assistantElapsed, setAssistantElapsed] = useState(0);
   const assistantInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -453,11 +464,14 @@ export function WorkflowEditorCanvas({
   useEffect(() => {
     if (!assistantLoading) return;
     setAssistantPhase(0);
+    setAssistantElapsed(0);
+    const started = Date.now();
     const timer = setInterval(() => {
-      setAssistantPhase((p) => Math.min(p + 1, ASSISTANT_PHASES.length - 1));
+      setAssistantElapsed(Math.round((Date.now() - started) / 1000));
+      setAssistantPhase((p) => Math.min(p + 1, assistantPhases.length - 1));
     }, 2500);
     return () => clearInterval(timer);
-  }, [assistantLoading]);
+  }, [assistantLoading, assistantPhases]);
 
   // Seeds the notifications role pick-list. Fetched here rather than threaded
   // through the pages: the canvas already knows the handle, and that panel is
@@ -470,6 +484,9 @@ export function WorkflowEditorCanvas({
   // Applies the whole batch through the shared reducer in one atomic state
   // update. Returns a success summary and any tool-call errors separately so the
   // UI never presents a failure as a confirmed change.
+
+  const assistantMessagesRef = useRef(assistantMessages);
+  assistantMessagesRef.current = assistantMessages;
 
   const settingsDraftRef = useRef(settingsDraft);
   settingsDraftRef.current = settingsDraft;
@@ -526,32 +543,41 @@ export function WorkflowEditorCanvas({
     };
   }, [saveSnapshot, onSettingsChange]);
 
-  const sendAssistantMessage = useCallback(async () => {
-    const content = assistantInput.trim();
-    if (!content || assistantLoading || !namespace) return;
+  /** The canvas as the assistant sees it, for both calls. */
+  const assistantWorkflowDefinition = useCallback(() => ({
+    steps: editedStepsRef.current,
+    transitions: editedTransitionsRef.current,
+    // Carry-over goes with the workflow level so the assistant can read
+    // what is set before patching it, the same as every other field.
+    settings: {
+      ...pruneWorkflowSettings(settingsDraftRef.current ?? {}),
+      ...(editedInputForNextRunRef.current === undefined
+        ? {}
+        : { inputForNextRun: editedInputForNextRunRef.current }),
+    },
+  }), []);
 
-    const nextMessages: AssistantMessage[] = [...assistantMessages, { role: 'user', content }];
-    setAssistantMessages(nextMessages);
-    setAssistantInput('');
+  /**
+   * The build itself. Split from sending a message so the plan can sit between
+   * them: answers to the plan's questions are appended as one message, which is
+   * how the build hears them without a second round of asking.
+   */
+  const runAssistantBuild = useCallback(async (extra?: string) => {
+    if (assistantLoading || !namespace) return;
+    const answered = extra === undefined || extra === ''
+      ? assistantMessagesRef.current
+      : [...assistantMessagesRef.current, { role: 'user' as const, content: extra }];
+    if (extra !== undefined && extra !== '') setAssistantMessages(answered);
+    setAssistantPlan(null);
+    setAssistantAnswers({});
     setAssistantLoading(true);
 
     try {
       const result = await mediforce.assistant.ask(
         {
-          messages: nextMessages,
+          messages: answered,
           model: assistantModel,
-          workflowDefinition: {
-            steps: editedSteps,
-            transitions: editedTransitions,
-            // Carry-over goes with the workflow level so the assistant can read
-            // what is set before patching it, the same as every other field.
-            settings: {
-              ...pruneWorkflowSettings(settingsDraftRef.current ?? {}),
-              ...(editedInputForNextRunRef.current === undefined
-                ? {}
-                : { inputForNextRun: editedInputForNextRunRef.current }),
-            },
-          },
+          workflowDefinition: assistantWorkflowDefinition(),
         },
         { namespace },
       );
@@ -580,7 +606,48 @@ export function WorkflowEditorCanvas({
     } finally {
       setAssistantLoading(false);
     }
-  }, [assistantInput, assistantLoading, assistantMessages, assistantModel, namespace, editedSteps, editedTransitions, applyAssistantToolCalls, toast]);
+  }, [assistantLoading, assistantModel, namespace, assistantWorkflowDefinition, applyAssistantToolCalls, toast]);
+
+  /**
+   * Sending a message plans first, then builds. The plan is one short call: it
+   * says what it is about to do and asks only what it cannot infer, so a wrong
+   * assumption costs a sentence rather than a minute of building. When it has
+   * nothing to ask, the build starts straight away and the plan is just the
+   * status the pane shows while it runs.
+   */
+  const sendAssistantMessage = useCallback(async () => {
+    const content = assistantInput.trim();
+    if (!content || assistantLoading || assistantPlanning || !namespace) return;
+
+    const nextMessages: AssistantMessage[] = [...assistantMessagesRef.current, { role: 'user', content }];
+    setAssistantMessages(nextMessages);
+    setAssistantInput('');
+    setAssistantPlanning(true);
+
+    let planned: PlanWorkflowBuildOutput | null = null;
+    try {
+      planned = await mediforce.assistant.plan(
+        { messages: nextMessages, model: assistantModel, workflowDefinition: assistantWorkflowDefinition() },
+        { namespace },
+      );
+    } catch {
+      // The plan is an aid, not the work: a planning call that fails must not
+      // cost the user their turn, so the build runs as it always did.
+      planned = null;
+    } finally {
+      setAssistantPlanning(false);
+    }
+
+    setAssistantPhases(planned !== null && planned.phases.length > 0 ? planned.phases : ASSISTANT_PHASES);
+    if (planned !== null && planned.questions.length > 0) {
+      setAssistantPlan(planned);
+      return;
+    }
+    if (planned !== null && planned.plan.length > 0) {
+      setAssistantMessages((prev) => [...prev, { role: 'assistant', content: planned.plan.join('\n') }]);
+    }
+    await runAssistantBuild();
+  }, [assistantInput, assistantLoading, assistantPlanning, assistantModel, namespace, assistantWorkflowDefinition, runAssistantBuild]);
 
   const moveStep = useCallback((stepId: string, direction: 'up' | 'down') => {
     saveSnapshot();
@@ -973,11 +1040,32 @@ export function WorkflowEditorCanvas({
                   </div>
                 ))
               )}
+              {assistantPlanning && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Reading what you asked for…
+                </div>
+              )}
               {assistantLoading && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  {ASSISTANT_PHASES[assistantPhase]}
+                  <span>{assistantPhases[assistantPhase] ?? assistantPhases[0]}</span>
+                  {assistantElapsed > 0 && (
+                    <span className="tabular-nums text-xs text-muted-foreground/70">
+                      {assistantElapsed}s
+                    </span>
+                  )}
                 </div>
+              )}
+
+              {assistantPlan !== null && !assistantLoading && (
+                <AssistantPlan
+                  plan={assistantPlan}
+                  answers={assistantAnswers}
+                  onAnswer={(id: string, value: string) => setAssistantAnswers((prev) => ({ ...prev, [id]: value }))}
+                  onBuild={() => void runAssistantBuild(answersMessage(assistantPlan, assistantAnswers))}
+                  onCancel={() => { setAssistantPlan(null); setAssistantAnswers({}); }}
+                />
               )}
             </div>
             <div className="shrink-0 border-t p-3">
@@ -993,13 +1081,13 @@ export function WorkflowEditorCanvas({
                     }
                   }}
                   rows={1}
-                  disabled={assistantLoading || !namespace}
+                  disabled={assistantLoading || assistantPlanning || !namespace}
                   placeholder={namespace ? 'Ask AI to build your workflow…' : 'Save the workflow first'}
                   className="flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed max-h-48 overflow-y-auto leading-relaxed"
                 />
                 <button
                   onClick={() => void sendAssistantMessage()}
-                  disabled={assistantLoading || !namespace || assistantInput.trim().length === 0}
+                  disabled={assistantLoading || assistantPlanning || !namespace || assistantInput.trim().length === 0}
                   className="shrink-0 pb-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   aria-label="Send message to the assistant"
                 >
