@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { X, HelpCircle, Save, KeyRound, Code2, FileCode, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle } from 'lucide-react';
+import { X, HelpCircle, Save, KeyRound, Code2, FileCode, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle, Square } from 'lucide-react';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import {
@@ -37,12 +37,9 @@ import { CodeEditor } from './workflow-editor/code-editor';
 import { WorkflowFilesPanel } from './workflow-files-panel';
 import { AssistantPlan, answersMessage } from './assistant-plan';
 import type { PlanWorkflowBuildOutput } from '@mediforce/platform-api/contract';
+import { messagesForModel, type AssistantMessage } from '@/lib/assistant-conversation';
+import { formatDuration } from '@/lib/format';
 
-interface AssistantMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  changes?: string;
-}
 
 // Rotating status shown while the assistant works — the request is a single
 // non-streaming call, so these are indicative phases, not live server progress.
@@ -452,6 +449,8 @@ export function WorkflowEditorCanvas({
   const [assistantElapsed, setAssistantElapsed] = useState(0);
   /** Something arrived while the pane was collapsed. Cleared on opening it. */
   const [assistantUnread, setAssistantUnread] = useState(false);
+  /** The turn in flight, so the halt button can stop it. */
+  const assistantAbortRef = useRef<AbortController | null>(null);
   const assistantScrollRef = useRef<HTMLDivElement>(null);
   const assistantInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -573,6 +572,12 @@ export function WorkflowEditorCanvas({
     },
   }), []);
 
+  /** Stop the turn in flight. The request is aborted rather than ignored, so a
+   *  turn nobody is waiting for stops costing tokens. */
+  const haltAssistant = useCallback(() => {
+    assistantAbortRef.current?.abort();
+  }, []);
+
   /**
    * The build itself. Split from sending a message so the plan can sit between
    * them: answers to the plan's questions are appended as one message, which is
@@ -587,15 +592,17 @@ export function WorkflowEditorCanvas({
     setAssistantPlan(null);
     setAssistantAnswers({});
     setAssistantLoading(true);
+    const controller = new AbortController();
+    assistantAbortRef.current = controller;
 
     try {
       const result = await mediforce.assistant.ask(
         {
-          messages: answered,
+          messages: messagesForModel(answered),
           model: assistantModel,
           workflowDefinition: assistantWorkflowDefinition(),
         },
-        { namespace },
+        { namespace, signal: controller.signal },
       );
       const applied = result.toolCalls ? applyAssistantToolCalls(result.toolCalls) : { summary: '', error: null };
       const replyText = result.reply || (applied.summary ? 'Done.' : '');
@@ -614,6 +621,7 @@ export function WorkflowEditorCanvas({
         setAssistantMessages((prev) => [...prev, {
           role: 'assistant',
           content: `Not everything landed: ${applied.error}`,
+          narration: true,
         }]);
       }
       if (result.toolCalls) {
@@ -621,14 +629,25 @@ export function WorkflowEditorCanvas({
         setTimeout(() => {
           const issue = validateSteps(editedStepsRef.current);
           if (issue) {
-            setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `This will not save yet: ${issue}` }]);
+            setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `This will not save yet: ${issue}`, narration: true }]);
           }
         }, 0);
       }
     } catch (err) {
-      const description = err instanceof ApiError || err instanceof Error ? err.message : 'Failed to reach the assistant';
-      toast({ variant: 'error', title: 'Assistant error', description });
+      // Halted on purpose: said in the thread rather than as an error, because
+      // it is the outcome the person asked for. Nothing was applied.
+      if (controller.signal.aborted) {
+        setAssistantMessages((prev) => [...prev, {
+          role: 'assistant',
+          content: 'Stopped. Nothing was changed on the canvas.',
+          narration: true,
+        }]);
+      } else {
+        const description = err instanceof ApiError || err instanceof Error ? err.message : 'Failed to reach the assistant';
+        toast({ variant: 'error', title: 'Assistant error', description });
+      }
     } finally {
+      assistantAbortRef.current = null;
       setAssistantLoading(false);
     }
   }, [assistantLoading, assistantModel, namespace, assistantWorkflowDefinition, applyAssistantToolCalls, toast]);
@@ -648,19 +667,31 @@ export function WorkflowEditorCanvas({
     setAssistantMessages(nextMessages);
     setAssistantInput('');
     setAssistantPlanning(true);
+    const controller = new AbortController();
+    assistantAbortRef.current = controller;
 
     let planned: PlanWorkflowBuildOutput | null = null;
     try {
       planned = await mediforce.assistant.plan(
-        { messages: nextMessages, model: assistantModel, workflowDefinition: assistantWorkflowDefinition() },
-        { namespace },
+        { messages: messagesForModel(nextMessages), model: assistantModel, workflowDefinition: assistantWorkflowDefinition() },
+        { namespace, signal: controller.signal },
       );
     } catch {
       // The plan is an aid, not the work: a planning call that fails must not
       // cost the user their turn, so the build runs as it always did.
       planned = null;
     } finally {
+      assistantAbortRef.current = null;
       setAssistantPlanning(false);
+    }
+
+    if (controller.signal.aborted) {
+      setAssistantMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: 'Stopped. Nothing was changed on the canvas.',
+        narration: true,
+      }]);
+      return;
     }
 
     setAssistantPhases(planned !== null && planned.phases.length > 0 ? planned.phases : ASSISTANT_PHASES);
@@ -669,7 +700,7 @@ export function WorkflowEditorCanvas({
       return;
     }
     if (planned !== null && planned.plan.length > 0) {
-      setAssistantMessages((prev) => [...prev, { role: 'assistant', content: planned.plan.join('\n') }]);
+      setAssistantMessages((prev) => [...prev, { role: 'assistant', content: planned.plan.join('\n'), narration: true }]);
     }
     await runAssistantBuild();
   }, [assistantInput, assistantLoading, assistantPlanning, assistantModel, namespace, assistantWorkflowDefinition, runAssistantBuild]);
@@ -1065,21 +1096,27 @@ export function WorkflowEditorCanvas({
                   </div>
                 ))
               )}
-              {assistantPlanning && (
+              {(assistantPlanning || assistantLoading) && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Reading what you asked for…
-                </div>
-              )}
-              {assistantLoading && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <span>{assistantPhases[assistantPhase] ?? assistantPhases[0]}</span>
-                  {assistantElapsed > 0 && (
+                  <span>
+                    {assistantPlanning
+                      ? 'Reading what you asked for…'
+                      : assistantPhases[assistantPhase] ?? assistantPhases[0]}
+                  </span>
+                  {assistantLoading && assistantElapsed > 0 && (
                     <span className="tabular-nums text-xs text-muted-foreground/70">
-                      {assistantElapsed}s
+                      {formatDuration(assistantElapsed * 1000)}
                     </span>
                   )}
+                  <button
+                    onClick={haltAssistant}
+                    className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:bg-muted transition-colors"
+                    aria-label="Stop the assistant"
+                  >
+                    <Square className="h-2.5 w-2.5 fill-current" />
+                    Halt
+                  </button>
                 </div>
               )}
 
