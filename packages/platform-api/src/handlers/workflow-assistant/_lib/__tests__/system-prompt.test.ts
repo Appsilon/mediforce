@@ -106,6 +106,17 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/"HARVEST_API_KEY": "\{\{HARVEST_API_KEY\}\}"/);
   });
 
+  it('states the only route an MCP server has to a step: a saved agent the step names with agentId', () => {
+    // `resolveMcpForStep` returns null when `agentId` is unset, so an inline
+    // agent step reaches no MCP at all however the request was phrased. The
+    // prompt has to say so, or "use the GitHub MCP" produces a step that
+    // silently has none.
+    expect(prompt).toMatch(/`agentId`/);
+    expect(prompt).toMatch(/no MCP at all|reaches no MCP|gets no MCP/i);
+    expect(prompt).toMatch(/list_tool_catalog/);
+    expect(prompt).toMatch(/mcpRestrictions/);
+  });
+
   it('documents that update_step can connect an already-existing step, and that every response is graph-checked before finishing', () => {
     expect(prompt).toMatch(/`update_step` also accepts `insertAfterId`\/`insertBeforeId`/);
     expect(prompt).toMatch(/checked for structural completeness/i);

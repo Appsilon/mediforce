@@ -42,22 +42,34 @@ export interface ApplyToolCallsResult {
   addedStepIds: string[];
 }
 
-/** A step that names a Dockerfile the workflow does not carry has nothing to
- *  build from: the repository build fields are not the assistant's to write, so
- *  the file has to be one it wrote. Dropped rather than refused, for the same
- *  reason the repository fields are — refusing failed the graph gate, and since
- *  every retry re-applies the whole accumulated batch from the original
- *  definition, the file the model then wrote always landed *after* the step
- *  that named it and the gate failed again. Without a Dockerfile the step runs
- *  on the image every other step runs on. */
+/** A step that names a Dockerfile with nothing to build it from.
+ *
+ *  Three things can build one, in the order the runtime tries them: the step's
+ *  own `repo` + `commit`, a Dockerfile the workflow carries, and the
+ *  workflow-level `externalSkillsRepo`. The first and third belong to imported
+ *  and legacy workflows, whose build context is a checkout rather than carried
+ *  files — stripping the field there moves the build to the repository's root
+ *  Dockerfile, which is a different image.
+ *
+ *  What is left is a step naming a file nobody wrote. The repository fields are
+ *  not the assistant's to write, so the file would have to be one it carried.
+ *  Dropped rather than refused, for the same reason the repository fields are:
+ *  refusing failed the graph gate, and since every retry re-applies the whole
+ *  accumulated batch from the original definition, the file the model then
+ *  wrote always landed *after* the step that named it and the gate failed
+ *  again. Without a Dockerfile the step runs on the image every other step runs
+ *  on. */
 function withoutUncarriedDockerfile(
   step: WorkflowStep,
-  artifacts: { path: string }[] | undefined,
+  settings: WorkflowSettings,
 ): WorkflowStep {
   const config = step.executor === 'script' ? step.script : step.executor === 'agent' ? step.agent : undefined;
   const dockerfile = config?.dockerfile;
   if (config === undefined || typeof dockerfile !== 'string' || dockerfile === '') return step;
-  if (artifacts?.some((artifact) => artifact.path === dockerfile) === true) return step;
+  if (settings.artifacts?.some((artifact) => artifact.path === dockerfile) === true) return step;
+  if (typeof config.repo === 'string' && typeof config.commit === 'string') return step;
+  const repoFiles = settings.externalSkillsRepo;
+  if (typeof repoFiles?.url === 'string' && typeof repoFiles.commit === 'string') return step;
   const { dockerfile: _dropped, ...rest } = config;
   return step.executor === 'script'
     ? ({ ...step, script: rest } as WorkflowStep)
@@ -339,7 +351,7 @@ export function applyWorkflowAssistantToolCalls(
   // Checked once, at the end, against the files the batch finished with — a
   // step and the Dockerfile it names arrive in the same batch, in either order.
   const finalSteps = workingSteps.map((step) => (touchedStepIds.has(step.id)
-    ? withoutUncarriedDockerfile(step, workingSettings.artifacts)
+    ? withoutUncarriedDockerfile(step, workingSettings)
     : step));
 
   return {
