@@ -1111,11 +1111,11 @@ export function WorkflowEditorCanvas({
                   )}
                   <button
                     onClick={haltAssistant}
-                    className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:bg-muted transition-colors"
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-md border hover:bg-muted hover:text-foreground transition-colors"
+                    title="Stop the assistant"
                     aria-label="Stop the assistant"
                   >
-                    <Square className="h-2.5 w-2.5 fill-current" />
-                    Halt
+                    <Square className="h-2 w-2 fill-current" />
                   </button>
                 </div>
               )}
