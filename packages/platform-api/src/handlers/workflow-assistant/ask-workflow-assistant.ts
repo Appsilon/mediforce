@@ -357,6 +357,15 @@ export async function askWorkflowAssistant(
           continue;
         }
       }
+      if (accumulatedToolCalls.length > 0 && response.content === '') {
+        lastErrors = ['The model finished a structurally valid workflow but never wrote a text reply.'];
+        console.error(`[workflow-assistant] model finished with a valid graph but empty content (iteration ${String(iteration + 1)}/${String(MAX_TOOL_LOOP_ITERATIONS)}) — requesting the missing reply`);
+        messages.push({
+          role: 'user',
+          content: `Those changes were applied and the workflow is complete — but you didn't write a reply. Write one now: one or two sentences in plain language summarizing what you built, exactly as if you were saying it to the user for the first time (see "Conversational style").`,
+        });
+        continue;
+      }
       return accumulatedToolCalls.length > 0
         ? { reply: response.content, toolCalls: accumulatedToolCalls }
         : { reply: response.content };
@@ -412,18 +421,20 @@ export async function askWorkflowAssistant(
 
       const graphCheck = validateResultingGraph(input.workflowDefinition, accumulatedToolCalls, input.namespace);
       if (graphCheck.valid) {
-        if (response.content) {
-          return { toolCalls: accumulatedToolCalls, reply: response.content };
-        }
-        lastErrors = ['The model completed a structurally valid workflow but never wrote a text reply.'];
-        console.error(`[workflow-assistant] model finished with a valid graph but empty content (iteration ${String(iteration + 1)}/${String(MAX_TOOL_LOOP_ITERATIONS)}) — requesting the missing reply`);
+        // A batch that leaves the graph valid is not evidence the request is
+        // done: a model that opens with `update_workflow` and a sentence
+        // announcing the build leaves the starter graph exactly as valid as it
+        // found it. Ending the turn there landed the settings, never the steps,
+        // and handed back a confirmation of work that had not happened. The
+        // model ends its own turn, by answering with no tool calls.
+        lastErrors = [];
         messages.push({ role: 'assistant', content: response.content, tool_calls: response.toolCalls });
         for (const r of resolved) {
           messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify({ applied: true }) });
         }
         messages.push({
           role: 'user',
-          content: `Those changes were applied and the workflow is complete — but you didn't write a reply. Write one now: one or two sentences in plain language summarizing what you built, exactly as if you were saying it to the user for the first time (see "Conversational style").`,
+          content: `Those changes were applied.\n\n${describeGraph(graphCheck.steps, graphCheck.transitions)}\n\nIf anything the request asked for is still missing — a step, a file, a condition, a workflow-level field — continue with more tool calls, using the ids above (the clientIds from your previous response no longer resolve) and without repeating what is already applied. If it is all there, reply with no tool calls: one or two sentences in plain language summarizing what you built.`,
         });
         continue;
       }
