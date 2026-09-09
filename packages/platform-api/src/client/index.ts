@@ -6,9 +6,13 @@ import {
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
   AskWorkflowAssistantInputSchema,
+  PlanWorkflowBuildInputSchema,
+  PlanWorkflowBuildOutputSchema,
   AskWorkflowAssistantOutputSchema,
   type AskWorkflowAssistantInput,
   type AskWorkflowAssistantOutput,
+  type PlanWorkflowBuildInput,
+  type PlanWorkflowBuildOutput,
   ValidateWorkflowOutputSchema,
   GetWorkflowSchemaOutputSchema,
   ListWorkflowsInputSchema,
@@ -637,6 +641,11 @@ export class Mediforce {
       input: AskWorkflowAssistantInput,
       options: { namespace: string },
     ) => Promise<AskWorkflowAssistantOutput>;
+    /** The turn before the build: intent, questions, and the phases to show. */
+    plan: (
+      input: PlanWorkflowBuildInput,
+      options: { namespace: string },
+    ) => Promise<PlanWorkflowBuildOutput>;
   };
 
   readonly workflows: {
@@ -1121,6 +1130,23 @@ export class Mediforce {
           { ...validatedInput } as Record<string, unknown>,
           AskWorkflowAssistantOutputSchema,
           'mediforce.assistant.ask',
+        );
+      },
+      plan: async (input, options) => {
+        const validatedInput = PlanWorkflowBuildInputSchema.parse(input);
+        const namespace = options.namespace;
+        if (typeof namespace !== 'string' || namespace.length === 0) {
+          throw new Error(
+            'mediforce.assistant.plan: `namespace` is required (passed as an HTTP query parameter).',
+          );
+        }
+        const qs = toSearchParams({ namespace });
+        return this.sendJson(
+          'POST',
+          `/api/workflow-assistant/plan${qs}`,
+          { ...validatedInput } as Record<string, unknown>,
+          PlanWorkflowBuildOutputSchema,
+          'mediforce.assistant.plan',
         );
       },
     };

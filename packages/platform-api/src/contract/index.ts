@@ -144,6 +144,12 @@ export {
   AskWorkflowAssistantInputSchema,
   AskWorkflowAssistantOutputSchema,
   type AskWorkflowAssistantInput,
+  PlanWorkflowBuildInputSchema,
+  PlanWorkflowBuildOutputSchema,
+  PlanQuestionSchema,
+  type PlanWorkflowBuildInput,
+  type PlanWorkflowBuildOutput,
+  type PlanQuestion,
   type WorkflowAssistantToolCall,
   type AskWorkflowAssistantOutput,
 } from './workflow-assistant';

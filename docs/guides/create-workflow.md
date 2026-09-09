@@ -55,6 +55,12 @@ placing and wiring blocks by hand.
   asked for in the chat, because anything typed there reaches the model: it
   tells you which key to set, and you set it in the Secrets tab (triggers are
   attached after registration; see below).
+- **It plans before it builds.** Sending a message runs a short planning turn
+  first: the assistant says what it is about to do in two or three lines, and
+  asks only what it genuinely cannot infer — each question carrying the answer
+  it would otherwise have used, so agreeing is one click. Nothing to ask means
+  it says the plan and starts. While it builds, the pane shows the phases that
+  planning turn named for *this* workflow, with the seconds elapsed.
 - **Validation & retry.** Every proposed change is validated against the same
   graph, reference, and schema gates as registration before it is applied; if the
   result would be invalid the assistant is told why and retries, so it does not
