@@ -151,6 +151,29 @@ export function parseMutationToolCall(toolName: string, parsedArguments: unknown
 
 type Transitions = WorkflowDefinition['transitions'];
 
+type ValidatedGraph =
+  | { valid: true; steps: WorkflowStep[]; transitions: Transitions }
+  | { valid: false; errors: string[]; steps: WorkflowStep[]; transitions: Transitions };
+
+/**
+ * The canvas as it stands after the calls so far, in the terms the model needs
+ * to fix it: every step's real id, and every edge.
+ *
+ * Without this a retry was unanswerable. The canvas state in the conversation
+ * is the one sent at the start; a step added this turn carries an id the
+ * reducer assigned, which the model has never seen; and the `clientId` it used
+ * is dead by the next response. So "reconnect the disconnected step" named
+ * something it could not name, every guess came back as an unknown step, and
+ * the loop ran to its cap.
+ */
+function describeGraph(steps: WorkflowStep[], transitions: Transitions): string {
+  const stepList = steps.map((step) => `${step.id} (${step.name})`).join(', ');
+  const edgeList = transitions.length > 0
+    ? transitions.map((t) => `${t.from} → ${t.to}`).join(', ')
+    : 'none';
+  return `The canvas now holds these steps, by id: ${stepList}. Transitions: ${edgeList}.`;
+}
+
 export function validateResultingGraph(
   currentDefinition: {
     steps: WorkflowStep[];
@@ -159,7 +182,7 @@ export function validateResultingGraph(
   },
   toolCalls: WorkflowAssistantToolCall[],
   namespace: string,
-): { valid: true } | { valid: false; errors: string[] } {
+): ValidatedGraph {
   const applied = applyWorkflowAssistantToolCalls(
     currentDefinition.steps,
     currentDefinition.transitions,
@@ -203,10 +226,15 @@ export function validateResultingGraph(
   const schemaErrors = templateParse.success
     ? []
     : templateParse.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`);
+  const applied_ = { steps: orderedSteps, transitions: mergedTransitions };
   if (graphErrors.length === 0 && referenceErrors.length === 0 && outcomeErrors.length === 0 && schemaErrors.length === 0) {
-    return { valid: true };
+    return { valid: true, ...applied_ };
   }
-  return { valid: false, errors: [...graphErrors, ...referenceErrors, ...outcomeErrors, ...schemaErrors] };
+  return {
+    valid: false,
+    errors: [...graphErrors, ...referenceErrors, ...outcomeErrors, ...schemaErrors],
+    ...applied_,
+  };
 }
 
 /** What the assistant says when it could not finish: the reply the person
@@ -408,7 +436,7 @@ export async function askWorkflowAssistant(
       }
       messages.push({
         role: 'user',
-        content: `Those changes were applied, but the resulting workflow graph is incomplete: ${graphCheck.errors.join('; ')}. Fix this before finishing — use update_step's insertAfterId/insertBeforeId to connect a disconnected step (referencing it by its real id from canvas state, or by the clientId you assigned it earlier in this response if it's a step you just added) or add_step if a step is genuinely missing. Then write a short reply summarizing what you built, same as any other turn.`,
+        content: `Those changes were applied, but the resulting workflow graph is incomplete: ${graphCheck.errors.join('; ')}.\n\n${describeGraph(graphCheck.steps, graphCheck.transitions)}\n\nFix it with those ids — update_step's insertAfterId/insertBeforeId connects a step that exists, add_step adds one that is genuinely missing. The clientIds from your previous response no longer resolve; use the ids above. Then write a short reply summarizing what you built, same as any other turn.`,
       });
       continue;
     }

@@ -450,6 +450,9 @@ export function WorkflowEditorCanvas({
    *  the generic list they replace. Empty falls back to that list. */
   const [assistantPhases, setAssistantPhases] = useState<readonly string[]>(ASSISTANT_PHASES);
   const [assistantElapsed, setAssistantElapsed] = useState(0);
+  /** Something arrived while the pane was collapsed. Cleared on opening it. */
+  const [assistantUnread, setAssistantUnread] = useState(false);
+  const assistantScrollRef = useRef<HTMLDivElement>(null);
   const assistantInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -472,6 +475,19 @@ export function WorkflowEditorCanvas({
     }, 2500);
     return () => clearInterval(timer);
   }, [assistantLoading, assistantPhases]);
+
+  // A reply is only useful if it is seen. The thread scrolls to the newest
+  // message, and when the pane is collapsed the toggle carries a mark instead —
+  // an answer nobody notices is the same as no answer.
+  useEffect(() => {
+    if (assistantMessages.length === 0 && assistantPlan === null) return;
+    if (!aiPaneOpen) {
+      setAssistantUnread(true);
+      return;
+    }
+    const el = assistantScrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [assistantMessages, assistantPlan, aiPaneOpen]);
 
   // Seeds the notifications role pick-list. Fetched here rather than threaded
   // through the pages: the canvas already knows the handle, and that panel is
@@ -983,7 +999,7 @@ export function WorkflowEditorCanvas({
                   <Settings className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => setAiPaneOpen(false)}
+                  onClick={() => { setAiPaneOpen(false); setAssistantUnread(false); }}
                   className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   title="Collapse AI Assistant"
                   aria-label="Collapse AI Assistant"
@@ -1005,7 +1021,7 @@ export function WorkflowEditorCanvas({
                 />
               </div>
             )}
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            <div ref={assistantScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
               {assistantMessages.length === 0 ? (
                 <div className="text-sm text-muted-foreground text-center py-6 space-y-3">
                   <p>Describe the workflow you want to build, or ask a question.</p>
@@ -1107,16 +1123,30 @@ export function WorkflowEditorCanvas({
           </div>
         ) : (
           <button
-            onClick={() => setAiPaneOpen(true)}
-            className="w-10 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col items-center justify-between py-4 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Expand AI Assistant"
-            aria-label="Expand AI Assistant"
+            onClick={() => { setAiPaneOpen(true); setAssistantUnread(false); }}
+            className={cn(
+              'w-10 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col items-center justify-between py-4 transition-colors',
+              assistantUnread
+                ? 'border-primary/40 text-primary hover:bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+            )}
+            title={assistantUnread ? 'The AI Assistant has something for you' : 'Expand AI Assistant'}
+            aria-label={assistantUnread ? 'Expand AI Assistant — it has something for you' : 'Expand AI Assistant'}
           >
-            <Sparkles className="h-4 w-4 shrink-0" />
+            <span className="relative inline-flex shrink-0">
+              <Sparkles className="h-4 w-4" />
+              {assistantUnread && (
+                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-white dark:ring-background" />
+              )}
+            </span>
             <span className="text-[11px] font-semibold tracking-wide [writing-mode:vertical-rl] rotate-180 select-none">
               AI Assistant
             </span>
-            <ChevronLeft className="h-4 w-4 shrink-0" />
+            {assistantLoading || assistantPlanning ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+            ) : (
+              <ChevronLeft className="h-4 w-4 shrink-0" />
+            )}
           </button>
         )}
 
