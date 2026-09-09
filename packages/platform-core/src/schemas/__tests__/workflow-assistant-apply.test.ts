@@ -379,20 +379,46 @@ describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not
 // condition it then sets on `poll → done` finds nothing. "Add the edge" sent it
 // adding an edge, which spliced again — for ever.
 describe('applyWorkflowAssistantToolCalls — a condition on an edge the batch replaced', () => {
-  it('names the edges that exist now, instead of telling it to add one', () => {
+  it('puts the condition on the edge that replaced it, rather than refusing', () => {
+    // Inserting a step between two steps replaces the edge that joined them, so
+    // a condition naming the old edge has exactly one place it can mean: the
+    // one edge now leaving that step. Refusing made the assistant add the old
+    // edge back, which split the graph again.
     const calls: WorkflowAssistantToolCall[] = [
       { tool: 'add_step', arguments: { clientId: 'validate', type: 'creation', executor: 'script', name: 'Validate', insertAfterId: 'draft', insertBeforeId: 'done' } },
       { tool: 'set_transition_condition', arguments: { from: 'draft', to: 'done', when: 'output.newFiles > 0' } },
     ];
-    const { outcomes } = applyWorkflowAssistantToolCalls(
+    const { transitions, outcomes } = applyWorkflowAssistantToolCalls(
       baseCanvas().steps, baseCanvas().transitions, calls,
     );
+    const outcome = outcomes.find((o) => o.tool === 'set_transition_condition');
+    expect(outcome?.error).toBeUndefined();
+    expect(transitions).toContainEqual({ from: 'draft', to: 'validate', when: 'output.newFiles > 0' });
+    // Reported as what it did, not as what was asked, so the summary is true.
+    expect(outcome?.stepId).toBe('draft → validate');
+  });
+
+  it('refuses when the step branches, because then it would be a guess', () => {
+    const canvas = {
+      steps: [
+        { id: 'draft', name: 'Draft', type: 'creation' as const, executor: 'human' as const },
+        { id: 'left', name: 'Left', type: 'creation' as const, executor: 'human' as const },
+        { id: 'right', name: 'Right', type: 'creation' as const, executor: 'human' as const },
+        { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
+      ],
+      transitions: [
+        { from: 'draft', to: 'left' },
+        { from: 'draft', to: 'right' },
+        { from: 'left', to: 'done' },
+        { from: 'right', to: 'done' },
+      ],
+    };
+    const { outcomes } = applyWorkflowAssistantToolCalls(canvas.steps, canvas.transitions, [
+      { tool: 'set_transition_condition', arguments: { from: 'draft', to: 'done', when: 'x == 1' } },
+    ]);
     const error = outcomes.find((o) => o.tool === 'set_transition_condition')?.error;
-    // What leaves `draft` now, so the next call can be right first time.
-    expect(error).toContain('draft → validate');
-    // And what reaches `done`, in case that was the edge it meant.
-    expect(error).toContain('validate → done');
-    expect(error).not.toContain('add the edge');
+    expect(error).toContain('draft → left');
+    expect(error).toContain('draft → right');
   });
 
   it('says so plainly when the step has no outgoing edge at all', () => {
@@ -410,13 +436,10 @@ describe('applyWorkflowAssistantToolCalls — a condition on an edge the batch r
     const calls: WorkflowAssistantToolCall[] = [
       { tool: 'set_transition_condition', arguments: { from: 'ghost', to: 'done', when: 'x == 1' } },
     ];
-    expect(outcomesFor(calls)).toContain('"ghost" is not a step');
+    const { outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions, calls,
+    );
+    expect(outcomes.find((o) => o.tool === 'set_transition_condition')?.error)
+      .toContain('"ghost" is not a step');
   });
 });
-
-function outcomesFor(calls: WorkflowAssistantToolCall[]): string {
-  const { outcomes } = applyWorkflowAssistantToolCalls(
-    baseCanvas().steps, baseCanvas().transitions, calls,
-  );
-  return outcomes.find((o) => o.tool === 'set_transition_condition')?.error ?? '';
-}
