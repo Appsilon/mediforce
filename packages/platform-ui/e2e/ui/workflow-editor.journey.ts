@@ -675,11 +675,10 @@ test.describe('Workflow Editor Journey', () => {
     const canvas = page.getByTestId('authoring-path-canvas');
     await expect(canvas).toContainText('Exact control over one block');
     await expect(page.getByTestId('authoring-path-assistant')).toContainText('OPENROUTER_API_KEY');
-    // The path a reader without a checkout cannot otherwise discover, with the
-    // clone it needs rather than the skill name alone.
-    await expect(page.getByTestId('authoring-path-agent')).toContainText(
-      'git clone https://github.com/Appsilon/mediforce',
-    );
+    // The `/design-workflow` path is gone: a workflow carries its own files
+    // now, so naming a skill here sent people out to a checkout for something
+    // the app does.
+    await expect(page.getByTestId('authoring-path-agent')).toHaveCount(0);
 
     // Import is a click, not an instruction: the importer lives on the
     // workspace home, so the entry navigates there with the dialog open.
