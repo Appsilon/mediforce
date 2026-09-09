@@ -16,7 +16,12 @@ describe('validateResultingGraph', () => {
     const calls: WorkflowAssistantToolCall[] = [
       { tool: 'add_step', arguments: { type: 'creation', executor: 'human', name: 'Review', insertAfterId: 'start', insertBeforeId: 'done' } },
     ];
-    expect(validateResultingGraph(base, calls, 'team-alpha')).toEqual({ valid: true });
+    // The applied graph comes back with the verdict: the loop needs the real
+    // ids to tell the model what to reconnect.
+    const result = validateResultingGraph(base, calls, 'team-alpha');
+    expect(result.valid).toBe(true);
+    expect(result.steps.map((step) => step.id)).toEqual(['start', 'review', 'done']);
+    expect(result.transitions).toEqual([{ from: 'start', to: 'review' }, { from: 'review', to: 'done' }]);
   });
 
   // #2 — a reducer-rejected call must fail the gate even though the *unchanged*
