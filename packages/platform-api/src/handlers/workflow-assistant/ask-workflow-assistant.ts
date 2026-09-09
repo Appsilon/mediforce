@@ -32,6 +32,7 @@ import { callOpenRouter, type OpenRouterChatMessage, type OpenRouterToolDefiniti
 import { PlanQuestionSchema } from '../../contract/workflow-assistant';
 import { buildWorkflowAssistantSystemPrompt } from './_lib/system-prompt';
 import { runPlatformTool } from './_lib/run-platform-tool';
+import { parseModelJson } from './_lib/parse-model-json';
 
 interface AskScopedInput extends AskWorkflowAssistantInput {
   namespace: string;
@@ -273,14 +274,7 @@ async function askWhatItCouldNotResolve(
         },
       ],
     });
-    const content = response.content;
-    const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(content);
-    const candidate = (fenced?.[1] ?? content).trim();
-    const start = candidate.indexOf('{');
-    const end = candidate.lastIndexOf('}');
-    if (start === -1 || end <= start) return null;
-    const parsed = StuckReplySchema.safeParse(JSON.parse(candidate.slice(start, end + 1)));
-    return parsed.success ? parsed.data : null;
+    return parseModelJson(response.content, StuckReplySchema);
   } catch {
     return null;
   }

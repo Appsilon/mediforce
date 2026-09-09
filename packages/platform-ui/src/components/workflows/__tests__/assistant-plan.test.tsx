@@ -76,4 +76,24 @@ describe('AssistantPlan — asking after a build could not finish', () => {
     render(<AssistantPlan plan={stuck} answers={{}} onAnswer={vi.fn()} onBuild={vi.fn()} onCancel={vi.fn()} />);
     expect(screen.getByRole('button', { name: /try again with this/i })).toBeInTheDocument();
   });
+
+  it('counts what it is asking for, rather than always saying one thing', () => {
+    render(
+      <AssistantPlan
+        plan={{
+          plan: [],
+          questions: [
+            { id: 'secret', question: 'Which key holds the SFTP credentials?', recommended: 'SFTP_CREDENTIALS' },
+            { id: 'reviewer', question: 'Who signs off?', recommended: 'A data manager' },
+          ],
+          phases: [],
+        }}
+        answers={{}}
+        onAnswer={() => {}}
+        onBuild={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(screen.getByText('I need 2 things from you')).toBeTruthy();
+  });
 });

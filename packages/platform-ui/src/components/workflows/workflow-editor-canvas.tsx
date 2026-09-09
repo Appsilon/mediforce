@@ -500,13 +500,10 @@ export function WorkflowEditorCanvas({
   // update. Returns a success summary and any tool-call errors separately so the
   // UI never presents a failure as a confirmed change.
 
-  const assistantMessagesRef = useRef(assistantMessages);
-  assistantMessagesRef.current = assistantMessages;
-
   const settingsDraftRef = useRef(settingsDraft);
   settingsDraftRef.current = settingsDraft;
 
-  const applyAssistantToolCalls = useCallback((toolCalls: WorkflowAssistantToolCall[]): { summary: string; error: string | null } => {
+  const applyAssistantToolCalls = useCallback((toolCalls: WorkflowAssistantToolCall[]): { summary: string; error: string | null; steps: WorkflowStep[] } => {
     const result = applyWorkflowAssistantToolCalls(
       editedStepsRef.current,
       editedTransitionsRef.current,
@@ -553,6 +550,10 @@ export function WorkflowEditorCanvas({
       parts.push(`removed ${paths}`);
     }
     return {
+      // The graph the reducer produced, so a caller checking whether it can be
+      // saved reads what just landed rather than waiting for the state to
+      // commit and the mirror refs to catch up a macrotask later.
+      steps: result.steps,
       summary: parts.length > 0 ? `Updated the workflow: ${parts.join(', ')}.` : '',
       error: errors.length > 0 ? errors.join(' ') : null,
     };
@@ -583,11 +584,17 @@ export function WorkflowEditorCanvas({
    * them: answers to the plan's questions are appended as one message, which is
    * how the build hears them without a second round of asking.
    */
-  const runAssistantBuild = useCallback(async (extra?: string) => {
+  const runAssistantBuild = useCallback(async (extra?: string, base?: AssistantMessage[]) => {
     if (assistantLoading || !namespace) return;
+    // `base` is the thread as the caller knows it. Sending a message plans
+    // first and then builds within the same call, so the message it just added
+    // has not been committed yet — reading it back from state (or from a ref
+    // mirroring state) is a race, and it is the race that made the plan reach
+    // the model only sometimes.
+    const thread = base ?? assistantMessages;
     const answered = extra === undefined || extra === ''
-      ? assistantMessagesRef.current
-      : [...assistantMessagesRef.current, { role: 'user' as const, content: extra }];
+      ? thread
+      : [...thread, { role: 'user' as const, content: extra }];
     if (extra !== undefined && extra !== '') setAssistantMessages(answered);
     setAssistantPlan(null);
     setAssistantAnswers({});
@@ -604,7 +611,9 @@ export function WorkflowEditorCanvas({
         },
         { namespace, signal: controller.signal },
       );
-      const applied = result.toolCalls ? applyAssistantToolCalls(result.toolCalls) : { summary: '', error: null };
+      const applied = result.toolCalls
+        ? applyAssistantToolCalls(result.toolCalls)
+        : { summary: '', error: null, steps: null };
       const replyText = result.reply || (applied.summary ? 'Done.' : '');
       setAssistantMessages((prev) => [...prev, {
         role: 'assistant',
@@ -624,14 +633,11 @@ export function WorkflowEditorCanvas({
           narration: true,
         }]);
       }
-      if (result.toolCalls) {
-        // editedStepsRef only settles one macrotask after the state update commits.
-        setTimeout(() => {
-          const issue = validateSteps(editedStepsRef.current);
-          if (issue) {
-            setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `This will not save yet: ${issue}`, narration: true }]);
-          }
-        }, 0);
+      if (applied.steps !== null) {
+        const issue = validateSteps(applied.steps);
+        if (issue) {
+          setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `This will not save yet: ${issue}`, narration: true }]);
+        }
       }
     } catch (err) {
       // Halted on purpose: said in the thread rather than as an error, because
@@ -650,7 +656,7 @@ export function WorkflowEditorCanvas({
       assistantAbortRef.current = null;
       setAssistantLoading(false);
     }
-  }, [assistantLoading, assistantModel, namespace, assistantWorkflowDefinition, applyAssistantToolCalls, toast]);
+  }, [assistantMessages, assistantLoading, assistantModel, namespace, assistantWorkflowDefinition, applyAssistantToolCalls, toast]);
 
   /**
    * Sending a message plans first, then builds. The plan is one short call: it
@@ -663,7 +669,7 @@ export function WorkflowEditorCanvas({
     const content = assistantInput.trim();
     if (!content || assistantLoading || assistantPlanning || !namespace) return;
 
-    const nextMessages: AssistantMessage[] = [...assistantMessagesRef.current, { role: 'user', content }];
+    const nextMessages: AssistantMessage[] = [...assistantMessages, { role: 'user', content }];
     setAssistantMessages(nextMessages);
     setAssistantInput('');
     setAssistantPlanning(true);
@@ -702,8 +708,8 @@ export function WorkflowEditorCanvas({
     if (planned !== null && planned.plan.length > 0) {
       setAssistantMessages((prev) => [...prev, { role: 'assistant', content: planned.plan.join('\n'), narration: true }]);
     }
-    await runAssistantBuild();
-  }, [assistantInput, assistantLoading, assistantPlanning, assistantModel, namespace, assistantWorkflowDefinition, runAssistantBuild]);
+    await runAssistantBuild(undefined, nextMessages);
+  }, [assistantMessages, assistantInput, assistantLoading, assistantPlanning, assistantModel, namespace, assistantWorkflowDefinition, runAssistantBuild]);
 
   const moveStep = useCallback((stepId: string, direction: 'up' | 'down') => {
     saveSnapshot();

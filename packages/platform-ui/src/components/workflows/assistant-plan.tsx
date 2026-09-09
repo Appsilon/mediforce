@@ -28,10 +28,16 @@ export function AssistantPlan({
   onBuild: () => void;
   onCancel: () => void;
 }) {
+  const hasPlan = plan.plan.length > 0;
+  const questionCount = plan.questions.length;
+  const buildLabel = questionCount === 0
+    ? 'Build it'
+    : hasPlan ? 'Build with these answers' : 'Try again with this';
+
   return (
     <div className="rounded-lg border bg-muted/30 p-3 space-y-3 text-sm">
       <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-        {plan.plan.length > 0 ? (
+        {hasPlan ? (
           <>
             <ListChecks className="h-3.5 w-3.5" />
             Here is what I would build
@@ -39,12 +45,12 @@ export function AssistantPlan({
         ) : (
           <>
             <HelpCircle className="h-3.5 w-3.5" />
-            I need one thing from you
+            {questionCount === 1 ? 'I need one thing from you' : `I need ${String(questionCount)} things from you`}
           </>
         )}
       </div>
 
-      {plan.plan.length > 0 && (
+      {hasPlan && (
         <ul className="space-y-1">
           {plan.plan.map((line, index) => (
             <li key={index} className="flex gap-2">
@@ -55,7 +61,7 @@ export function AssistantPlan({
         </ul>
       )}
 
-      {plan.questions.length > 0 && (
+      {questionCount > 0 && (
         <div className="space-y-2 border-t pt-3">
           {plan.questions.map((question) => (
             <div key={question.id} className="space-y-1">
@@ -87,7 +93,7 @@ export function AssistantPlan({
           onClick={onBuild}
           className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
         >
-          {plan.questions.length > 0 ? (plan.plan.length > 0 ? 'Build with these answers' : 'Try again with this') : 'Build it'}
+          {buildLabel}
         </button>
       </div>
     </div>

@@ -11,6 +11,8 @@ const assistantState = vi.hoisted(() => ({
   plan: { plan: ['Poll SFTP, validate, then report.'], questions: [] as unknown[], phases: [] as string[] },
   /** Resolves the ask call, so a test can halt a turn that is still in flight. */
   askResolver: null as null | ((value: unknown) => void),
+  /** Set to answer the build immediately instead of leaving it in flight. */
+  askResult: null as null | { reply?: string; toolCalls?: unknown[] },
 }));
 
 vi.mock('@/lib/mediforce', () => ({
@@ -23,6 +25,7 @@ vi.mock('@/lib/mediforce', () => ({
       },
       ask: (input: { messages: { role: string; content: string }[] }, options: { signal?: AbortSignal }) => {
         assistantState.askCalls.push({ messages: input.messages, signal: options.signal });
+        if (assistantState.askResult !== null) return Promise.resolve(assistantState.askResult);
         return new Promise((resolve, reject) => {
           assistantState.askResolver = resolve;
           options.signal?.addEventListener('abort', () => {
@@ -45,6 +48,12 @@ vi.mock('@/hooks/use-workspace-roles', () => ({
 vi.mock('@/hooks/use-docker-images', () => ({
   useDockerImages: () => ({ images: [] }),
   isImageAvailable: () => true,
+}));
+
+// Renders the selected step; adding a step selects it, and the real editor
+// wants the auth context this test has no use for.
+vi.mock('../workflow-editor/step-editor', () => ({
+  StepEditor: () => <div data-testid="step-editor" />,
 }));
 
 vi.mock('@/components/workflows/workflow-diagram', () => ({
@@ -84,6 +93,7 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
     assistantState.planCalls = [];
     assistantState.askCalls = [];
     assistantState.askResolver = null;
+    assistantState.askResult = null;
     assistantState.plan = { plan: ['Poll SFTP, validate, then report.'], questions: [], phases: [] };
   });
 
@@ -97,6 +107,25 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
     expect(assistantState.askCalls[0]?.messages).toEqual([
       { role: 'user', content: 'Build a CDISC validation workflow.' },
     ]);
+  });
+
+  it('says a build cannot be saved yet, without waiting for the canvas state to commit', async () => {
+    // Read from the graph the reducer just returned. It used to be read back
+    // from a ref mirroring state one macrotask later, which needed a
+    // setTimeout to be true at all.
+    assistantState.askResult = {
+      reply: 'Added a validation step.',
+      toolCalls: [{
+        tool: 'add_step',
+        arguments: { type: 'creation', executor: 'script', name: 'Validate', insertAfterId: 'draft', insertBeforeId: 'done' },
+      }],
+    };
+    openAssistant();
+    await ask('Add a validation script step.');
+
+    await waitFor(() => {
+      expect(screen.getByText(/This will not save yet: .*script block/)).toBeTruthy();
+    });
   });
 
   it('halts the turn in flight and says so, rather than leaving it running', async () => {

@@ -297,7 +297,11 @@ export class WorkflowEngine {
                   preAssignedEmail = user.email ?? null;
                 }
               } else {
-                preAssignedUserId = resolved;
+                // No directory to ask, so nothing can confirm the value names a
+                // real user. Taking it verbatim here would rebuild exactly the
+                // unclaimable task described above, in the one configuration
+                // that cannot check.
+                unresolvedAssignee = resolved;
               }
             }
           }

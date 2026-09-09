@@ -8,6 +8,7 @@ import type { CallerScope } from '../../repositories/index';
 import { HandlerError } from '../../errors';
 import { callOpenRouter } from '../../services/openrouter-client';
 import { buildPlanPrompt } from './_lib/plan-prompt';
+import { parseModelJson } from './_lib/parse-model-json';
 
 interface PlanScopedInput extends PlanWorkflowBuildInput {
   namespace: string;
@@ -16,23 +17,6 @@ interface PlanScopedInput extends PlanWorkflowBuildInput {
 /** A plan is short by definition; this is generous for four lines and a couple
  *  of questions, and small enough to feel instant next to a build. */
 const PLAN_MAX_OUTPUT_TOKENS = 700;
-
-/** Reads the plan out of a reply, whatever wrapping the model put around it.
- *  Fenced JSON is the common one; prose is the give-up case. */
-function readPlan(content: string): PlanWorkflowBuildOutput | null {
-  const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(content);
-  const candidate = (fenced?.[1] ?? content).trim();
-  const start = candidate.indexOf('{');
-  const end = candidate.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
-  try {
-    const parsed: unknown = JSON.parse(candidate.slice(start, end + 1));
-    const result = PlanWorkflowBuildOutputSchema.safeParse(parsed);
-    return result.success ? result.data : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * The turn before the build: what the assistant intends to do, what it has to
@@ -68,7 +52,8 @@ export async function planWorkflowBuild(
     ],
   });
 
-  const plan = readPlan(response.content);
-  if (plan === null) return { plan: [], questions: [], phases: [] };
-  return { ...plan, questions: plan.questions.slice(0, 5) };
+  // The schema caps the questions, so an over-long list fails the parse and
+  // lands on the empty plan below rather than being trimmed here.
+  return parseModelJson(response.content, PlanWorkflowBuildOutputSchema)
+    ?? { plan: [], questions: [], phases: [] };
 }
