@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ForbiddenError } from '../../../errors';
-import { runPlatformTool } from '../_lib/run-platform-tool';
-import type { CallerScope } from '../../../repositories/index';
+import { ForbiddenError } from '../../../../errors';
+import { runPlatformTool } from '../run-platform-tool';
+import type { CallerScope } from '../../../../repositories/index';
 
 /** Only the surfaces these tools touch; everything else stays absent so a tool
  *  reaching for more fails the test rather than silently working. */
