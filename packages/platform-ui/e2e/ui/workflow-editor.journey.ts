@@ -880,7 +880,7 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByText(/name, namespace are decided here/i).first())
       .toBeVisible({ timeout: 10_000 });
 
-    await page.getByRole('button', { name: 'Close' }).click();
+    // Applying closes the panel on its own.
     await expect(page.getByRole('heading', { name: /workflow source code/i })).toBeHidden();
 
     // The name field holds the person-facing title, and the description came
