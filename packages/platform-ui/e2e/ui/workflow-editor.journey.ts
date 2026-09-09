@@ -3,6 +3,11 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { allowPageErrors, trackPageErrors } from '../helpers/page-errors';
 
 const SUPPLY_CHAIN_DEFINITION_URL = `/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`;
+/** The workflow this journey saves a version of. `Supply Chain Review`'s agent
+ *  steps carry no `plugin`, which `validateSteps` refuses before a request is
+ *  made, so a save of it can never succeed from this page. */
+const SAVEABLE_WORKFLOW = 'Editor Save Test';
+const SAVEABLE_DEFINITION_URL = `/${TEST_ORG_HANDLE}/workflows/${encodeURIComponent(SAVEABLE_WORKFLOW)}/definitions/1`;
 
 /**
  * Serialized Zod issues as they arrive in the ADR-0005 error envelope's
@@ -465,49 +470,62 @@ test.describe('Workflow Editor Journey', () => {
   // registered version, which is where the merge order got it wrong.
   test('a pasted definition applies its non-graph fields and they reach the saved version', async ({ page }) => {
     trackPageErrors(page);
-    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+    await page.goto(SAVEABLE_DEFINITION_URL);
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole('button', { name: /workflow source code/i }).click();
     await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
 
     // Take the definition the panel is showing and paste it back with a
-    // `preamble` added — a field the canvas does not own and the form has no
+    // `preamble` added: a field the canvas does not own and the form has no
     // input for, so only the paste can have supplied it.
-    const pasted = await page.evaluate(async () => {
+    const pasted = await page.evaluate(async (workflow) => {
       const response = await fetch(
-        `/api/workflow-definitions/Supply%20Chain%20Review?namespace=${'test'}&version=1`,
+        `/api/workflow-definitions/${encodeURIComponent(workflow)}?namespace=test&version=1`,
       );
-      const body = (await response.json()) as Record<string, unknown>;
-      return JSON.stringify({ ...body, preamble: 'Pasted house rules.' }, null, 2);
-    });
+      const body = (await response.json()) as { definition: Record<string, unknown> };
+      return JSON.stringify({ ...body.definition, preamble: 'Pasted house rules.' }, null, 2);
+    }, SAVEABLE_WORKFLOW);
 
-    // Typing 4KB of JSON through the keyboard is too slow to be worth it, so
-    // the document is replaced through CodeMirror's own dispatch.
-    await page.evaluate((text) => {
-      const view = (document.querySelector('.cm-editor') as unknown as { cmView?: { view?: { dispatch: (t: unknown) => void; state: { doc: { length: number } } } } })?.cmView?.view;
-      if (view === undefined) throw new Error('CodeMirror view not reachable');
-      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
-    }, pasted);
+    // Select the whole document and replace it in one input event: typing 4KB
+    // of JSON key by key is too slow to be worth it, and CodeMirror's view is
+    // not reachable from the DOM node to dispatch against.
+    await page.locator('.cm-content').click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText(pasted);
 
     await page.getByRole('button', { name: /apply json/i }).click();
 
-    // The apply is accepted — the old refusal rendered an error instead.
+    // The apply is accepted: the old refusal rendered an error instead.
     await expect(page.getByText(/applies steps, transitions/i)).toHaveCount(0);
 
-    await page.getByRole('button', { name: /^save$/i }).click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByRole('textbox').first().fill('paste round-trip');
-    await dialog.getByRole('button', { name: /save/i }).click();
+    // The source panel is a modal over the toolbar, so it has to be closed
+    // before the header's Save is reachable. Applying leaves it clean, so this
+    // closes without the discard prompt.
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(page.getByRole('heading', { name: /workflow source code/i })).toBeHidden();
 
-    // Read the version the save produced and assert the pasted field is on it.
+    await page.getByRole('button', { name: /^save$/i }).click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByPlaceholder('e.g. Added AI review step').fill('paste round-trip');
+    await page.getByRole('button', { name: /save new version/i }).click();
+
+    // Read the version this save produced, by the title it was given, rather
+    // than "the latest version": journeys run in parallel against this fixture.
     await expect(async () => {
-      const preamble = await page.evaluate(async () => {
-        const response = await fetch('/api/workflow-definitions/Supply%20Chain%20Review?namespace=test');
-        const body = (await response.json()) as { preamble?: string };
-        return body.preamble;
-      });
-      expect(preamble).toBe('Pasted house rules.');
+      const saved = await page.evaluate(async (workflow) => {
+        const base = `/api/workflow-definitions/${encodeURIComponent(workflow)}`;
+        const list = await fetch(`${base}/versions?namespace=test`);
+        const { versions } = (await list.json()) as { versions: { version: number; title?: string }[] };
+        const match = versions.find((entry) => entry.title === 'paste round-trip');
+        if (match === undefined) return null;
+        const response = await fetch(`${base}?namespace=test&version=${String(match.version)}`);
+        const body = (await response.json()) as { definition: { preamble?: string } };
+        return body.definition;
+      }, SAVEABLE_WORKFLOW);
+      expect(saved?.preamble).toBe('Pasted house rules.');
     }).toPass({ timeout: 15_000 });
   });
 
