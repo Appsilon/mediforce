@@ -186,6 +186,15 @@ describe('buildWorkflowAssistantSystemPrompt — challenging the design', () => 
     expect(prompt).toMatch(/list_secrets.*list_agents.*list_tool_catalog.* are there to be called/);
   });
 
+  it('forbids inventing a repository or a commit, which the older references still describe', () => {
+    // The reference docs below the prompt taught the pinned-repo shape as the
+    // only way to run a script file. A model following them writes a
+    // github.com/user/... URL and forty zeros, and the workflow can never run.
+    expect(prompt).toMatch(/Never invent a repository or a commit/);
+    expect(prompt).toMatch(/placeholder SHA \(forty zeros\)/);
+    expect(prompt).toMatch(/When a step needs a file, write the file/);
+  });
+
   it('asks for a plan first on a large build, rather than a form', () => {
     expect(prompt).toMatch(/more than about five steps/);
     expect(prompt).toMatch(/Not a form to fill in/);

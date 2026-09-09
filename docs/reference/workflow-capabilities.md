@@ -139,7 +139,7 @@ Runtimes and how each is launched are the `RUNTIME_CONFIG` map in
 | Mode | Set | Image | Runs |
 |------|-----|-------|------|
 | Inline | `inlineScript` + `runtime` | auto per runtime (override with `image`) | `javascript` (`node`), `python` (`python3`), `r` (`Rscript`), `bash` (`sh`) |
-| Command | `command` + `image` (or `dockerfile`+`repo`+`commit`) | the named/built image | any shell command in that image |
+| Command | `command` + a file the workflow carries, `image`, or `dockerfile` (carried, or `repo`+`commit`) | the named/built image | any shell command in that image |
 
 Every script reads `/output/input.json` and writes `/output/result.json`. The
 working directory is `/workspace` (the per-run git worktree). A third mode is
@@ -147,12 +147,21 @@ working directory is `/workspace` (the per-run git worktree). A third mode is
 (`DatabricksJobConfigSchema`) instead of `script`.
 
 **Runtime auto-selection is inline-only.** A `command` can only execute code
-already reachable in the container: baked into the image, present at
-`/workspace` (via `workspace.remote`), or self-contained (`python3 -c "..."`).
-To run a script *file from your package*, copy it into a custom image
-(Dockerfile + `repo` + `commit`, which triggers the golden-rules §2 pinning
-rules) or mount it through `workspace.remote`. Inline scripts need none of that,
-which is why they are the default for small glue.
+already reachable in the container: **carried by the workflow** and mounted at
+`/artifacts`, baked into the image, present at `/workspace` (via
+`workspace.remote`), or self-contained (`python3 -c "..."`).
+
+To run a script *file*, the first option is to carry it: `artifacts` on the
+definition holds text files, they are mounted read-only at `/artifacts`, and a
+step runs one as `python3 /artifacts/scripts/poll.py` — no repository, no
+commit, no checkout, and it versions with the workflow
+([container-steps.md](container-steps.md)). A carried `Dockerfile` builds the
+same way, from the carried files as its build context. The `repo` + `commit`
+form is for a build context that genuinely lives in a repository — a real one
+the author names — and it triggers the golden-rules §2 pinning rules; never
+invent a URL or a SHA to satisfy the shape. `workspace.remote` remains for a
+per-run worktree. Inline scripts need none of this, which is why they are the
+default for small glue.
 
 ## Models
 

@@ -59,10 +59,16 @@ See [create-workflow.md](../guides/create-workflow.md#import-from-git) and
 
 ## 2. Pin Runtime Sources
 
-MUST (once you build a custom image or pin sources):
+MUST (once you build a custom image or pin sources **from a repository**):
 
 - Pin `externalSkillsRepo.commit`.
 - Pin step Docker build `repo` + `commit` + `dockerfile`.
+
+A workflow that carries its own files pins nothing: the Dockerfile, the scripts
+and the skills live on the definition, version with it, and the image tag is
+derived from their content. `repo` + `commit` describe a repository that
+actually exists — a placeholder SHA (all zeros) or an invented URL is refused at
+registration, because it names a build that can never run.
 - Avoid `latest` image tags outside local development.
 - Register/import a new workflow version for every released change.
 
