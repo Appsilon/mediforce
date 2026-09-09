@@ -64,7 +64,9 @@ placing and wiring blocks by hand.
 - **Validation & retry.** Every proposed change is validated against the same
   graph, reference, and schema gates as registration before it is applied; if the
   result would be invalid the assistant is told why and retries, so it does not
-  hand you a workflow that cannot be saved.
+  hand you a workflow that cannot be saved. When it runs out of retries it asks
+  you rather than failing — one or two questions with the answer it would take —
+  and answering runs the build again from where it stopped.
 - **You still save.** The assistant edits the *unsaved* canvas. Nothing is
   persisted until you **Save** (or **Save & Start Run** / **Save & Dry Run**) —
   review the diagram, then save a version like any other edit.
