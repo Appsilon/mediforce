@@ -232,10 +232,16 @@ describe('buildWorkflowAssistantSystemPrompt — conditions and splicing', () =>
 
   it('says inserting a step replaces the edge that joined the two', () => {
     expect(prompt).toMatch(/replaces the edge that joined them/);
-    expect(prompt).toMatch(/condition the edge that exists now/);
   });
 
-  it('tells it to read the refusal rather than re-adding the old edge', () => {
-    expect(prompt).toMatch(/which splits the graph again/);
+  it('says naming the old edge is fine when the step has one way out', () => {
+    // The platform resolves that case rather than refusing it, and the prompt
+    // has to agree or the model will second-guess a call that works.
+    expect(prompt).toMatch(/fine when the step you condition has one way out/);
+    expect(prompt).toMatch(/refused only when the step branches/);
+  });
+
+  it('tells it never to re-add an edge it just split', () => {
+    expect(prompt).toMatch(/that splits the graph again/);
   });
 });

@@ -222,8 +222,23 @@ export function applyWorkflowAssistantToolCalls(
       // escalate when severity is high" is one request, and the step it names
       // has no real id until this batch is applied.
       const from = resolveId(rawFrom) ?? rawFrom;
-      const to = resolveId(rawTo) ?? rawTo;
-      const edge = workingTransitions.find((t) => t.from === from && t.to === to);
+      let to = resolveId(rawTo) ?? rawTo;
+      let edge = workingTransitions.find((t) => t.from === from && t.to === to);
+      // Inserting a step between two steps replaces the edge that joined them,
+      // so a condition naming the old edge has exactly one place it can mean:
+      // the single edge now leaving that step. Applied there rather than
+      // refused — refusing made the assistant add the old edge back, which
+      // split the graph again. A step that branches is a genuine ambiguity and
+      // still refuses, because then it would be a guess.
+      if (edge === undefined && workingSteps.some((step) => step.id === to)) {
+        // Both ends have to be real steps: a `to` naming nothing is a mistake
+        // to report, not a stale edge to repair.
+        const outgoingEdges = workingTransitions.filter((t) => t.from === from);
+        if (outgoingEdges.length === 1) {
+          edge = outgoingEdges[0];
+          to = edge.to;
+        }
+      }
       if (edge === undefined) {
         // "Add the edge" was the wrong advice and an endless loop: the canvas
         // state the model read says `A → B`, its own add_step in the same batch
