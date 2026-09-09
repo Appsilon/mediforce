@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ListChecks } from 'lucide-react';
+import { HelpCircle, ListChecks } from 'lucide-react';
 import type { PlanWorkflowBuildOutput } from '@mediforce/platform-api/contract';
 import { cn } from '@/lib/utils';
 
@@ -31,8 +31,17 @@ export function AssistantPlan({
   return (
     <div className="rounded-lg border bg-muted/30 p-3 space-y-3 text-sm">
       <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-        <ListChecks className="h-3.5 w-3.5" />
-        Here is what I would build
+        {plan.plan.length > 0 ? (
+          <>
+            <ListChecks className="h-3.5 w-3.5" />
+            Here is what I would build
+          </>
+        ) : (
+          <>
+            <HelpCircle className="h-3.5 w-3.5" />
+            I need one thing from you
+          </>
+        )}
       </div>
 
       {plan.plan.length > 0 && (
@@ -78,7 +87,7 @@ export function AssistantPlan({
           onClick={onBuild}
           className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
         >
-          {plan.questions.length > 0 ? 'Build with these answers' : 'Build it'}
+          {plan.questions.length > 0 ? (plan.plan.length > 0 ? 'Build with these answers' : 'Try again with this') : 'Build it'}
         </button>
       </div>
     </div>

@@ -38,11 +38,6 @@ export type AskWorkflowAssistantInput = z.infer<typeof AskWorkflowAssistantInput
 /** Re-exported from platform-core so `@mediforce/platform-api/contract` consumers keep a single import site. */
 export type WorkflowAssistantToolCall = z.infer<typeof WorkflowAssistantToolCallSchema>;
 
-export const AskWorkflowAssistantOutputSchema = z.object({
-  reply: z.string().optional(),
-  toolCalls: z.array(WorkflowAssistantToolCallSchema).min(1).optional(),
-});
-export type AskWorkflowAssistantOutput = z.infer<typeof AskWorkflowAssistantOutputSchema>;
 
 /**
  * The turn before the build: what the assistant intends to do, what it must ask
@@ -89,3 +84,14 @@ export const PlanWorkflowBuildOutputSchema = z.object({
 export type PlanWorkflowBuildInput = z.infer<typeof PlanWorkflowBuildInputSchema>;
 export type PlanWorkflowBuildOutput = z.infer<typeof PlanWorkflowBuildOutputSchema>;
 export type PlanQuestion = z.infer<typeof PlanQuestionSchema>;
+
+export const AskWorkflowAssistantOutputSchema = z.object({
+  reply: z.string().optional(),
+  toolCalls: z.array(WorkflowAssistantToolCallSchema).min(1).optional(),
+  /** Set when the build could not finish on its own. The assistant asks rather
+   *  than failing: an error toast tells someone their turn is gone, a question
+   *  with a recommended answer lets them finish it. Same shape as the planning
+   *  turn's, so the pane renders one card for both. */
+  questions: z.array(PlanQuestionSchema).max(3).optional(),
+});
+export type AskWorkflowAssistantOutput = z.infer<typeof AskWorkflowAssistantOutputSchema>;

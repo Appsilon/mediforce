@@ -29,6 +29,7 @@ import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller } from '../_helpers';
 import { HandlerError, ValidationError } from '../../errors';
 import { callOpenRouter, type OpenRouterChatMessage, type OpenRouterToolDefinition } from '../../services/openrouter-client';
+import { PlanQuestionSchema } from '../../contract/workflow-assistant';
 import { buildWorkflowAssistantSystemPrompt } from './_lib/system-prompt';
 import { runPlatformTool } from './_lib/run-platform-tool';
 
@@ -208,6 +209,55 @@ export function validateResultingGraph(
   return { valid: false, errors: [...graphErrors, ...referenceErrors, ...outcomeErrors, ...schemaErrors] };
 }
 
+/** What the assistant says when it could not finish: the reply the person
+ *  reads, and at most a few questions with the answer it would take. */
+const StuckReplySchema = z.object({
+  reply: z.string().min(1).max(1000),
+  questions: z.array(PlanQuestionSchema).max(3),
+});
+
+/**
+ * The turn after a build that could not finish.
+ *
+ * Throwing here is what the pane turned into an error toast: the person's turn
+ * was gone and there was nothing to act on, while the model knew exactly what
+ * it had been unable to resolve. One more short call turns that into a question
+ * with a recommended answer, which is the same shape the planning turn returns
+ * and the same card renders. Returns null when even this fails — then an error
+ * is the honest answer.
+ */
+async function askWhatItCouldNotResolve(
+  model: string,
+  apiKey: string,
+  messages: OpenRouterChatMessage[],
+  errors: string[],
+): Promise<z.infer<typeof StuckReplySchema> | null> {
+  try {
+    const response = await callOpenRouter({
+      model,
+      apiKey,
+      maxTokens: 500,
+      messages: [
+        ...messages,
+        {
+          role: 'user',
+          content: `You could not finish this build. What stopped you: ${errors.join('; ')}.\n\nDo not try again. Answer with a single JSON object and nothing else: {"reply": "one or two sentences saying plainly what you could not do", "questions": [{"id": "...", "question": "...", "recommended": "..."}]}. Ask at most two questions, only ones whose answer would let you finish, each with the answer you would take if the person simply agreed. If nothing they could tell you would help, return an empty questions array and say what is wrong instead.`,
+        },
+      ],
+    });
+    const content = response.content;
+    const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(content);
+    const candidate = (fenced?.[1] ?? content).trim();
+    const start = candidate.indexOf('{');
+    const end = candidate.lastIndexOf('}');
+    if (start === -1 || end <= start) return null;
+    const parsed = StuckReplySchema.safeParse(JSON.parse(candidate.slice(start, end + 1)));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function askWorkflowAssistant(
   input: AskScopedInput,
   scope: CallerScope,
@@ -385,6 +435,13 @@ export async function askWorkflowAssistant(
         });
       }
     }
+  }
+
+  const stuck = await askWhatItCouldNotResolve(model, apiKey, messages, lastErrors);
+  if (stuck !== null) {
+    return stuck.questions.length > 0
+      ? { reply: stuck.reply, questions: stuck.questions }
+      : { reply: stuck.reply };
   }
 
   throw new HandlerError(

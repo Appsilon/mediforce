@@ -588,8 +588,17 @@ export function WorkflowEditorCanvas({
         content: replyText,
         ...(applied.summary ? { changes: applied.summary } : {}),
       }]);
+      // A build that could not finish comes back asking. Rendered as the same
+      // card the plan uses, because answering is the way out of it — a toast
+      // would say the turn is over and leave nothing to act on.
+      if (result.questions !== undefined && result.questions.length > 0) {
+        setAssistantPlan({ plan: [], questions: result.questions, phases: [] });
+      }
       if (applied.error) {
-        toast({ variant: 'error', title: "Couldn't apply every change", description: applied.error });
+        setAssistantMessages((prev) => [...prev, {
+          role: 'assistant',
+          content: `Not everything landed: ${applied.error}`,
+        }]);
       }
       if (result.toolCalls) {
         // editedStepsRef only settles one macrotask after the state update commits.

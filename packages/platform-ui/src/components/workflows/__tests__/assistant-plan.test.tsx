@@ -55,3 +55,25 @@ describe('answersMessage', () => {
     expect(answersMessage(plan, { reviewer: 'the qa role' })).toContain('Who reviews the report? the qa role');
   });
 });
+
+// The same card carries a build that could not finish: no plan, just what it
+// needs to know. A toast there would say the turn is over and leave the person
+// nothing to act on.
+describe('AssistantPlan — asking after a build could not finish', () => {
+  const stuck = {
+    plan: [],
+    questions: [{ id: 'which-step', question: 'Which step did you mean?', recommended: 'the review step' }],
+    phases: [],
+  };
+
+  it('asks rather than announcing a plan it does not have', () => {
+    render(<AssistantPlan plan={stuck} answers={{}} onAnswer={vi.fn()} onBuild={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByText(/I need one thing from you/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Here is what I would build/i)).toBeNull();
+  });
+
+  it('offers to try again rather than to build', () => {
+    render(<AssistantPlan plan={stuck} answers={{}} onAnswer={vi.fn()} onBuild={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /try again with this/i })).toBeInTheDocument();
+  });
+});

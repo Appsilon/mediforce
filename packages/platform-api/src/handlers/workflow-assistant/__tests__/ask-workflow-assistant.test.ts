@@ -610,7 +610,11 @@ describe('askWorkflowAssistant handler', () => {
 
     await expect(askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope))
       .rejects.toThrow(HandlerError);
-    expect(fetchSpy).toHaveBeenCalledTimes(12);
+    // Twelve build turns, then one more that tries to turn the failure into a
+    // question. This model answers that with another tool call rather than the
+    // question it was asked for, so there is nothing to hand back and the error
+    // stands.
+    expect(fetchSpy).toHaveBeenCalledTimes(13);
   });
 
   it('throws HandlerError when OPENROUTER_API_KEY is missing', async () => {
@@ -805,5 +809,86 @@ describe('askWorkflowAssistant — platform tools', () => {
       error: 'Only admins may create agents',
       needsAdmin: true,
     });
+  });
+});
+
+// A build that cannot finish used to throw, which the pane showed as an error
+// toast: the turn was gone and the person had nothing to act on. It asks now.
+describe('askWorkflowAssistant — when it cannot finish', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  afterEach(() => { fetchSpy?.mockRestore(); });
+
+  /** A model that keeps making the same rejected call, then answers the
+   *  "ask the user" turn with a question. */
+  function mockStuckThenQuestion(question: unknown) {
+    let call = 0;
+    return vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init) => {
+      call += 1;
+      const body = JSON.parse((init as { body?: string } | undefined)?.body ?? '{}') as {
+        messages?: { role: string; content?: string }[];
+      };
+      const asksForQuestion = body.messages?.some(
+        (m) => typeof m.content === 'string' && m.content.includes('could not finish'),
+      ) === true;
+      const payload = asksForQuestion
+        ? { choices: [{ message: { content: JSON.stringify(question), tool_calls: [] } }] }
+        : {
+            choices: [{
+              message: {
+                content: '',
+                tool_calls: [{
+                  id: `call-${String(call)}`,
+                  type: 'function',
+                  function: { name: 'remove_step', arguments: JSON.stringify({ stepId: 'ghost' }) },
+                }],
+              },
+            }],
+          };
+      return Promise.resolve(new Response(JSON.stringify(payload), { status: 200 }));
+    });
+  }
+
+  it('comes back with a question instead of throwing', async () => {
+    fetchSpy = mockStuckThenQuestion({
+      reply: 'I could not remove that step — it is not on the canvas any more.',
+      questions: [{ id: 'which-step', question: 'Which step did you mean?', recommended: 'the review step' }],
+    });
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    const result = await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    expect(result.reply).toContain('could not remove that step');
+    expect(result.questions?.[0]).toMatchObject({ id: 'which-step', recommended: 'the review step' });
+  });
+
+  it('still fails loudly when even the question cannot be written', async () => {
+    // Nothing to act on and nothing to say: an error is the honest answer, and
+    // the pane still has its toast for it.
+    let call = 0;
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      call += 1;
+      return Promise.resolve(new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: 'not json',
+            tool_calls: call > 12 ? [] : [{
+              id: `c${String(call)}`,
+              type: 'function',
+              function: { name: 'remove_step', arguments: JSON.stringify({ stepId: 'ghost' }) },
+            }],
+          },
+        }],
+      }), { status: 200 }));
+    });
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    await expect(askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope))
+      .rejects.toThrow(HandlerError);
   });
 });
