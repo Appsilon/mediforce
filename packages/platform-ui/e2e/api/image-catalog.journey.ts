@@ -9,7 +9,10 @@ import {
   setupMultiNamespaceCallers,
   TEST_ORG_HANDLE,
   type MultiNamespaceFixture,
+  type UserCaller,
 } from '../helpers/multi-namespace';
+import { createTestUser, signInAndGetSessionCookie } from '../helpers/emulator';
+import { seedPostgresWorkspaceMember } from '../helpers/postgres-seed';
 
 /**
  * L3 API journey for the Image Catalog (ADR-0022, issue #1294). Runs against
@@ -175,9 +178,31 @@ test.describe.configure({ mode: 'default' });
 
 test.describe('image catalog API journey', () => {
   let callers: MultiNamespaceFixture;
+  /**
+   * A caller with `member` role in the test workspace.
+   *
+   * `callers.member` will not do for a role gate: the shared fixture seeds that
+   * user as the workspace **owner**, so it passes every admin assert. Seeded
+   * here rather than added to the shared fixture, whose outsider is load-bearing
+   * for other journeys' 404 anti-enumeration probes.
+   */
+  let plainMember: UserCaller;
 
   test.beforeAll(async () => {
     callers = await setupMultiNamespaceCallers();
+    const uid = await createTestUser(
+      'image-catalog-member@mediforce.dev',
+      'imagecatalog123456',
+      'Image Catalog Member',
+    );
+    await seedPostgresWorkspaceMember(TEST_ORG_HANDLE, uid, 'member', 'Image Catalog Member');
+    plainMember = {
+      uid,
+      sessionCookie: await signInAndGetSessionCookie(
+        'image-catalog-member@mediforce.dev',
+        'imagecatalog123456',
+      ),
+    };
   });
 
   test.beforeEach(() => {
@@ -544,6 +569,110 @@ test.describe('image catalog API journey', () => {
       await request.delete(`/api/image-catalog/${liveId}?namespace=${TEST_ORG_HANDLE}`, {
         headers: apiKeyHeaders(),
       });
+    }
+  });
+
+  test('a plain member may delete the entry but not the images behind it', async ({
+    request,
+  }) => {
+    const payload = entryPayload(`rmi-gate-${Date.now()}`);
+    const createRes = await request.post(catalogUrl(), {
+      headers: apiKeyHeaders(),
+      data: payload,
+    });
+    const { entry } = (await createRes.json()) as { entry: EntryView };
+
+    try {
+      // The daemon is deployment-wide, so destroying an image is
+      // Infrastructure's admin gate — not the member gate the entry carries.
+      const refused = await request.delete(
+        `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        { headers: sessionCookieHeaders(plainMember) },
+      );
+      expect(refused.status(), await refused.text()).toBe(403);
+
+      // Still there: a caller refused the image half gets no delete at all,
+      // rather than a half-done one.
+      const stillThere = await request.get(
+        `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(stillThere.ok(), await stillThere.text()).toBe(true);
+
+      // The offer is theirs to withdraw, though: no Workflow Definition
+      // references an entry, so this destroys nothing (decision 3).
+      const allowed = await request.delete(
+        `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: sessionCookieHeaders(plainMember) },
+      );
+      expect(allowed.ok(), await allowed.text()).toBe(true);
+      expect(((await allowed.json()) as { deletedImages: string[] }).deletedImages).toEqual([]);
+    } finally {
+      await request.delete(`/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`, {
+        headers: apiKeyHeaders(),
+      });
+    }
+  });
+
+  test('deleting with the images removes them from the daemon', async ({ request }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    // A `docker commit` of its own, never a shared tag: this test destroys the
+    // image it names, and a neighbour reading the same tag would lose it.
+    const stamp = Date.now();
+    const reference = `mediforce-e2e-rmi-${stamp}`;
+    const tag = `${reference}:v1`;
+    let entryId = '';
+
+    try {
+      docker('image', 'inspect', PROBE_BASE_IMAGE);
+    } catch {
+      docker('pull', PROBE_BASE_IMAGE);
+    }
+    deriveImage(tag, PROBE_BASE_IMAGE, 'mkdir /e2e-rmi-marker');
+
+    try {
+      const createRes = await request.post(catalogUrl(), {
+        headers: apiKeyHeaders(),
+        data: {
+          name: `E2E rmi ${stamp}`,
+          intent: 'Proves the composite delete reaches the daemon.',
+          source: { kind: 'referenced', reference },
+        },
+      });
+      expect(createRes.status(), await createRes.text()).toBe(201);
+      entryId = ((await createRes.json()) as { entry: EntryView }).entry.id;
+
+      const res = await request.delete(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(res.ok(), await res.text()).toBe(true);
+      // By tag, which is what the entry offered — not by image id, which a
+      // second tag could still be pointing at.
+      expect(((await res.json()) as { deletedImages: string[] }).deletedImages).toEqual([tag]);
+      entryId = '';
+
+      // The daemon is the assertion, not the response: `docker rmi` either ran
+      // or it did not.
+      expect(() => docker('image', 'inspect', tag)).toThrow();
+
+      const listRes = await request.get(catalogUrl(), { headers: apiKeyHeaders() });
+      const ids = ((await listRes.json()) as { entries: EntryView[] }).entries.map(
+        (candidate) => candidate.id,
+      );
+      expect(ids).not.toContain(entryId);
+    } finally {
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+      // Already gone when the test passed; this is for the paths where it is not.
+      try {
+        docker('rmi', '-f', tag);
+      } catch {
+        /* the delete under test removed it */
+      }
     }
   });
 

@@ -8,6 +8,7 @@ const listMock = vi.fn();
 const getMock = vi.fn();
 const createMock = vi.fn();
 const updateMock = vi.fn();
+const deleteMock = vi.fn();
 const buildMock = vi.fn();
 const apiFetchMock = vi.fn();
 const searchParams = new URLSearchParams();
@@ -22,6 +23,7 @@ vi.mock('@/lib/mediforce', () => ({
       get: (...args: unknown[]) => getMock(...args),
       create: (...args: unknown[]) => createMock(...args),
       update: (...args: unknown[]) => updateMock(...args),
+      delete: (...args: unknown[]) => deleteMock(...args),
       build: (...args: unknown[]) => buildMock(...args),
     },
   },
@@ -31,8 +33,11 @@ vi.mock('@/lib/api-fetch', () => ({
   apiFetch: (...args: unknown[]) => apiFetchMock(...args),
 }));
 
+// Switchable, because the delete dialog offers the image half only to an
+// admin — the gate is behaviour under test, not scenery.
+const role = { value: { role: 'member', canAdmin: false, loading: false } };
 vi.mock('@/hooks/use-namespace-role', () => ({
-  useNamespaceRole: () => ({ role: 'member', canAdmin: false, loading: false }),
+  useNamespaceRole: () => role.value,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -144,6 +149,8 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  role.value = { role: 'member', canAdmin: false, loading: false };
+  deleteMock.mockResolvedValue({ success: true, deletedImages: [] });
   listMock.mockResolvedValue({ entries: [GOLDEN, TEALFLOW] });
   getMock.mockResolvedValue({
     entry: {
@@ -646,5 +653,114 @@ describe('ImagesPage', () => {
       within(dialog).getByText('git@github.com:vedhav/cdisc-case-1.git \u00b7 Dockerfile'),
     ).toBeInTheDocument();
     expect(within(dialog).queryByLabelText('Repository')).not.toBeInTheDocument();
+  });
+
+  it('deletes the entry alone for a member, who cannot touch the daemon', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+
+    const dialog = await screen.findByRole('dialog');
+    // Removing an entry removes an offer, so it needs no admin — but the
+    // images are deployment-wide, and a member is told where that lives.
+    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/stay on the daemon/)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Delete entry' }));
+
+    expect(deleteMock).toHaveBeenCalledWith({ namespace: 'acme', id: 'tealflow' });
+  });
+
+  it('offers an admin the images too, naming every tag it would destroy', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('mediforce-built:aaaa1111')).toBeInTheDocument();
+    expect(within(dialog).getByText('mediforce-built:bbbb2222')).toBeInTheDocument();
+
+    // Off by default: the destructive half is asked for, never assumed.
+    const checkbox = within(dialog).getByRole('checkbox');
+    expect(checkbox).not.toBeChecked();
+    expect(within(dialog).getByRole('button', { name: 'Delete entry' })).toBeInTheDocument();
+
+    await user.click(checkbox);
+
+    // The count is on the button, so the last thing read before clicking says
+    // how much is about to be destroyed.
+    await user.click(within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }));
+
+    expect(deleteMock).toHaveBeenCalledWith({
+      namespace: 'acme',
+      id: 'tealflow',
+      withImages: true,
+    });
+  });
+
+  it('names the workflow that pins an image before it is destroyed', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('checkbox'));
+
+    // The scan is deployment-wide on purpose: a step that breaks is a step
+    // that breaks, whichever workspace it lives in.
+    expect(await within(dialog).findByText(/will fail at container start/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/acme\/sdtm-qc/)).toBeInTheDocument();
+  });
+
+  it('has only images to delete for an entry nobody described', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    listMock.mockResolvedValue({ entries: [GOLDEN, DISCOVERED] });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-cdisc-case-1-1a2b3c4d');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+
+    const dialog = await screen.findByRole('dialog');
+    // Derived on read, not stored: there is no record to remove, so the image
+    // half is the whole act and cannot be turned off.
+    expect(within(dialog).getByText(/no record to remove/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('checkbox')).toBeDisabled();
+    expect(within(dialog).getByRole('checkbox')).toBeChecked();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Delete 1 image' }));
+
+    expect(deleteMock).toHaveBeenCalledWith({
+      namespace: 'acme',
+      id: 'cdisc-case-1-1a2b3c4d',
+      withImages: true,
+    });
+  });
+
+  it('keeps the dialog open and explains a refusal from the daemon', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    deleteMock.mockRejectedValue(
+      new Error('conflict: unable to delete (must be forced) - image is being used'),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('checkbox'));
+    await user.click(within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }));
+
+    expect(await within(dialog).findByText(/image is being used/)).toBeInTheDocument();
+    // The entry survives a failed image delete, and the dialog says so rather
+    // than leaving the reader to guess what state they are in.
+    expect(within(dialog).getByText(/The entry was kept/)).toBeInTheDocument();
   });
 });

@@ -293,7 +293,28 @@ test.describe('Image Catalog UI journey', () => {
       expect(entryId).not.toBe(rekeyedFrom);
       // One entry, corrected — not the mistake sitting beside its fix.
       expect(afterEntries.map((candidate) => candidate.id)).not.toContain(rekeyedFrom);
-      await expect(page.getByTestId(`image-entry-${entryId}`)).toBeVisible({ timeout: 60_000 });
+      const movedCard = page.getByTestId(`image-entry-${entryId}`);
+      await expect(movedCard).toBeVisible({ timeout: 60_000 });
+
+      // And withdrawing the offer entirely. Nothing was ever built from this
+      // repo, so there is no image to destroy and the entry half is the whole
+      // act — which is the half every member may perform.
+      await movedCard.getByRole('button', { name: 'Delete' }).click();
+      const deleteDialog = page.getByRole('dialog');
+      await expect(deleteDialog.getByText(/never a capability/)).toBeVisible();
+      await deleteDialog.getByRole('button', { name: 'Delete entry' }).click();
+      await expect(deleteDialog).toBeHidden({ timeout: 60_000 });
+
+      // Gone from the view it was listed in, and gone from the read behind it.
+      await expect(page.getByTestId(`image-entry-${entryId}`)).toHaveCount(0, {
+        timeout: 60_000,
+      });
+      const afterDelete = await request.get(`/api/image-catalog?namespace=${TEST_ORG_HANDLE}`, {
+        headers: AUTH,
+      });
+      const { entries: remaining } = (await afterDelete.json()) as { entries: { id: string }[] };
+      expect(remaining.map((candidate) => candidate.id)).not.toContain(entryId);
+      entryId = '';
     } finally {
       if (entryId !== '') {
         await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {

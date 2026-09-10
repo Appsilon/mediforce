@@ -49,6 +49,23 @@ than upserted, since that would overwrite the occupant's sentence and delete the
 row being edited. A re-key audits against both ids — it is the one update that
 leaves an id with no row.
 
+**Deleting an entry may now take its images with it**, which splits decision
+3's write gate rather than widening it. The entry half stays a member's right
+for the reason stated there — it removes an offer, and no Workflow Definition
+references an entry. The image half is a different act on a deployment-wide
+daemon, so it requires **admin of the workspace whose catalog it is** and keeps
+the `_system` audit **Admin → Infrastructure** already used, and it is opt-in:
+absent means no. It does *not* simply inherit
+`assertCallerCanAdminDockerImages`, whose own comment calls it a loose
+approximation until #376 — owner or admin of *any* namespace, which nearly
+every user satisfies through a personal workspace. That gate still applies
+underneath, so Infrastructure is unchanged; this one is additional and is what
+the dialog's checkbox actually reflects.
+Images are deleted by tag rather than by image id, so an artifact a second tag
+still references survives instead of needing a force that would destroy a
+version another entry offers; and they go before the row, all or nothing, since
+the entry is the only handle anyone has on a version left behind.
+
 Decision 7 is dated 2026-09-08 and revises one line of the original
 consequences — *"a new row appears only when someone catalogues a source nobody
 has catalogued before"*. That stays true of **rows**; it is no longer true of
@@ -471,8 +488,10 @@ User-visible changes, each a §12 gate in the issue that made it:
 - **Layer-level diffing between two arbitrary images.** The delta of an entry
   against its own base is in scope (#1296); a general diff tool is not.
 - **Garbage collection of superseded versions.** Marking a version superseded
-  and unused is in scope; deleting an image stays Infrastructure's admin-gated
-  job.
+  and unused is in scope; picking one version off an entry and deleting it is
+  not. Deleting an entry's images *together with the entry* is in scope and
+  keeps Infrastructure's admin gate — the catalog offers the composite act,
+  never a second, looser way to destroy an image.
 - **Any write path to git.** The catalog reads Dockerfiles; it never proposes
   changes to them.
 - **Run-time enforcement of catalog membership** (decision 5).

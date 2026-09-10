@@ -25,6 +25,7 @@ import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useImageCatalogEntries, useImageCatalogEntry } from '@/hooks/use-image-catalog';
 import { AddImageDialog } from '@/components/images/add-image-dialog';
 import { BuildImageDialog } from '@/components/images/build-image-dialog';
+import { DeleteImageEntryDialog } from '@/components/images/delete-image-entry-dialog';
 import { ImageDescriptionDialog } from '@/components/images/image-description-dialog';
 import { useWorkflowsByImage, type WorkflowImageMatch } from '@/hooks/use-workflows-by-image';
 import {
@@ -314,6 +315,7 @@ function EntryCard({
   depth,
   baseName,
   handle,
+  canAdmin,
   expanded,
   onToggle,
 }: {
@@ -321,6 +323,7 @@ function EntryCard({
   depth: number;
   baseName: string | null;
   handle: string;
+  canAdmin: boolean;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -330,6 +333,7 @@ function EntryCard({
   const shown = detail.entry ?? entry;
   const [writingDescription, setWritingDescription] = useState(false);
   const [building, setBuilding] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const discovered = shown.origin === 'discovered';
   // Only a built source carries the recipe a build needs. A `referenced` entry
   // names an image the platform holds no inputs for, so it has nothing to build.
@@ -420,6 +424,17 @@ function EntryCard({
             >
               {discovered ? 'Describe' : 'Edit'}
             </button>
+            {/* Any member, for the same reason: removing an entry removes an
+                offer, not a capability. The dialog is where the destructive
+                half — the images themselves — is asked for, and it is the
+                admin gate that decides whether it is offered at all. */}
+            <button
+              type="button"
+              onClick={() => setDeleting(true)}
+              className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              Delete
+            </button>
           </div>
         </div>
         {writingDescription && (
@@ -436,6 +451,15 @@ function EntryCard({
             handle={handle}
             open={building}
             onOpenChange={setBuilding}
+          />
+        )}
+        {deleting && (
+          <DeleteImageEntryDialog
+            entry={shown}
+            handle={handle}
+            canAdmin={canAdmin}
+            open={deleting}
+            onOpenChange={setDeleting}
           />
         )}
 
@@ -619,6 +643,7 @@ export default function ImagesPage() {
               depth={depth}
               baseName={baseName}
               handle={handle}
+              canAdmin={canAdmin}
               expanded={expandedId === entry.id}
               onToggle={() => setExpandedId((current) => (current === entry.id ? null : entry.id))}
             />

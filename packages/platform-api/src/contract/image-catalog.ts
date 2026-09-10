@@ -171,11 +171,28 @@ export const BuildImageCatalogVersionOutputSchema = z.object({
   entryId: z.string(),
 });
 
+/**
+ * DELETE input: id from URL.
+ *
+ * `withImages` extends the act from "remove an offer" to "remove the artifacts
+ * too", and the two are gated differently on purpose. Removing an entry is a
+ * member's right, because it destroys nothing — no Workflow Definition
+ * references an entry (decision 3). Removing an image acts on the
+ * **deployment-wide** daemon, where a tag can back steps in namespaces the
+ * caller cannot see, so it carries Infrastructure's admin gate and audits
+ * under `_system`. Optional, and absent means no: the destructive half is
+ * always asked for, never assumed, and a caller that does not care about it
+ * need not mention it.
+ */
 export const DeleteImageCatalogEntryInputSchema = NamespaceQuery.extend({
   id: z.string().min(1),
+  withImages: z.boolean().optional(),
 });
 export const DeleteImageCatalogEntryOutputSchema = z.object({
   success: z.literal(true),
+  /** Tags removed from the daemon — empty unless `withImages` was set, and
+   *  empty when the entry had no version on the daemon to remove. */
+  deletedImages: z.array(z.string()),
 });
 
 export type ImageCatalogVersionBase = z.infer<typeof ImageCatalogVersionBaseSchema>;

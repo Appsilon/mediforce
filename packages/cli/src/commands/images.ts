@@ -271,7 +271,7 @@ export const imagesUpdateCommand = defineCommand({
 export const imagesDeleteCommand = defineCommand({
   name: 'mediforce images delete',
   description:
-    'Remove an entry. Removes an offer, never a capability — no workflow points at an entry.',
+    'Remove an entry. Removes an offer, never a capability — no workflow points at an entry. --with-images also destroys its images on the daemon (admin only).',
   args: {
     entryId: {
       type: 'positional',
@@ -279,17 +279,32 @@ export const imagesDeleteCommand = defineCommand({
       description: 'Entry id (from `images list`)',
     },
     namespace: { type: 'string', required: true, description: 'Namespace handle' },
+    'with-images': {
+      type: 'boolean',
+      description:
+        "Also remove the entry's versions from the deployment's Docker daemon. Destructive and admin-gated: a tag can back steps in namespaces you cannot see",
+    },
   },
   async run({ args, output, mediforce, jsonMode }) {
+    const withImages = args['with-images'] === true;
     const result = await mediforce.imageCatalog.delete({
       namespace: args.namespace,
       id: args.entryId,
+      ...(withImages ? { withImages: true } : {}),
     });
     if (jsonMode) {
       printJson(output, result);
       return 0;
     }
     output.stdout(`Deleted ${args.entryId} from "${args.namespace}".`);
+    // Named, not counted: these are gone from the daemon deployment-wide, and
+    // the tags are what a reader needs to know went.
+    for (const tag of result.deletedImages) {
+      output.stdout(`  Removed ${tag} from the daemon.`);
+    }
+    if (withImages && result.deletedImages.length === 0) {
+      output.stdout('  No image for this entry was on the daemon.');
+    }
     return 0;
   },
 });

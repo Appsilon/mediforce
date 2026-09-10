@@ -2064,7 +2064,12 @@ export class Mediforce {
       },
       delete: async (input) => {
         const validated = DeleteImageCatalogEntryInputSchema.parse(input);
-        const qs = toSearchParams({ namespace: validated.namespace });
+        // Sent only when asked for, so an ordinary delete carries no hint that
+        // the destructive half exists.
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          ...(validated.withImages === true ? { withImages: 'true' } : {}),
+        });
         const res = await this.request(
           `/api/image-catalog/${encodeURIComponent(validated.id)}${qs}`,
           { method: 'DELETE' },
