@@ -60,9 +60,16 @@ export const DELETE = createRouteAdapter<
   RouteContext
 >(
   DeleteImageCatalogEntryInputSchema,
-  async (req, ctx) => ({
-    namespace: new URL(req.url).searchParams.get('namespace') ?? '',
-    id: (await ctx.params).id,
-  }),
+  async (req, ctx) => {
+    const params = new URL(req.url).searchParams;
+    return {
+      namespace: params.get('namespace') ?? '',
+      id: (await ctx.params).id,
+      // Only the literal string opts in. Anything else — absent, empty,
+      // "false", a typo — leaves the daemon alone, which is the safe reading of
+      // a destructive flag arriving as text.
+      withImages: params.get('withImages') === 'true',
+    };
+  },
   deleteImageCatalogEntry,
 );

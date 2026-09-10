@@ -50,6 +50,10 @@ has written a sentence for; `images create` on its source registers it
 changes an entry's name, intent or **source** — and since the id derives from
 the source (decision 1), `--repo` / `--reference` re-key the entry, so the
 command prints the id it moved to rather than the one you passed.
+`images delete` withdraws an entry — an offer, never a capability — and
+`--with-images` also runs `docker rmi` on every tag it offered, which needs
+admin of that workspace and audits under `_system` because the daemon is
+deployment-wide (`system rmi` still removes one image by id or tag).
 `images build --repo --commit [--dockerfile]` builds one version of a built
 source there and then, instead of waiting for a workflow run to build it
 lazily: it mints the same tag a build-mode step pinning that commit resolves
