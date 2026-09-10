@@ -680,8 +680,16 @@ test.describe('Workflow Editor Journey', () => {
     // the app does.
     await expect(page.getByTestId('authoring-path-agent')).toHaveCount(0);
 
+    // Clicking away closes it. The canvas pane swallows the pointer events
+    // Radix listens for, so this stayed open over the workflow it describes.
+    // `page.mouse`, not a locator click: the dismiss layer covers the canvas by
+    // design, and taking that click is exactly what closes the popover.
+    await page.mouse.click(60, 400);
+    await expect(page.getByTestId('authoring-path-canvas')).toBeHidden();
+
     // Import is a click, not an instruction: the importer lives on the
     // workspace home, so the entry navigates there with the dialog open.
+    await page.getByRole('button', { name: /ways to author/i }).click();
     await page.getByTestId('authoring-path-import').getByRole('link').click();
     await page.waitForURL(new RegExp(`/${TEST_ORG_HANDLE}\\?import=source`), { timeout: 15_000 });
     await expect(page.getByRole('dialog').getByLabel('Repository URL')).toBeVisible({ timeout: 15_000 });
