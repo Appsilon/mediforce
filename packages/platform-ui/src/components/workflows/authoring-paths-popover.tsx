@@ -45,8 +45,12 @@ function PathEntry({ path, handle }: { path: AuthoringPath; handle: string }) {
 export function AuthoringPathsPopover() {
   const { handle } = useParams<{ handle: string }>();
 
+  // `modal`: the canvas pane swallows the pointer events Radix's dismiss layer
+  // listens for, so the default outside-click close never fired and this stayed
+  // open over the workflow it is describing. A modal layer takes the click
+  // itself, which is also what every other panel on this canvas does.
   return (
-    <Popover.Root>
+    <Popover.Root modal>
       <Popover.Trigger
         className={cn(
           'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm whitespace-nowrap shrink-0',
