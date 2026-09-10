@@ -231,6 +231,25 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
     });
   });
 
+  it('renders a multi-line plan as a list, not one run-on paragraph', async () => {
+    // Markdown folds single newlines into spaces, so a plan joined with them
+    // arrived as "Fix the regex error Replace the patterns Test the script".
+    assistantState.plan = {
+      plan: ['Fix the regex escape error', 'Replace the patterns with R syntax', 'Test the script'],
+      questions: [],
+      phases: [],
+    };
+    openAssistant();
+    await ask('Fix the script.');
+
+    await waitFor(() => {
+      const plan = [...document.querySelectorAll('.cm-assistant-reply')]
+        .find((node) => node.textContent?.includes('Fix the regex escape error') === true);
+      expect(plan?.querySelectorAll('li')).toHaveLength(3);
+    });
+    expect(screen.queryByText(/error Replace/)).toBeNull();
+  });
+
   it('renders the reply as markdown, not as the characters it is written in', async () => {
     // The pane printed the raw string, so a reply with a list or **bold** read
     // as asterisks to the person it was written for.
@@ -241,7 +260,8 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
     await waitFor(() => {
       expect(document.querySelector('.cm-assistant-reply strong')?.textContent).toBe('Poll');
     });
-    expect(document.querySelectorAll('.cm-assistant-reply li')).toHaveLength(2);
+    const reply = document.querySelector('.cm-assistant-reply strong')?.closest('.cm-assistant-reply');
+    expect(reply?.querySelectorAll('li')).toHaveLength(2);
     expect(screen.queryByText(/\*\*Poll\*\*/)).toBeNull();
   });
 

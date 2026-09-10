@@ -756,7 +756,11 @@ export function WorkflowEditorCanvas({
       return;
     }
     if (planned !== null && planned.plan.length > 0) {
-      setAssistantMessages((prev) => [...prev, { role: 'assistant', content: planned.plan.join('\n'), narration: true }]);
+      setAssistantMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: planned.plan.map((line) => `- ${line}`).join('\n'),
+        narration: true,
+      }]);
     }
     await runAssistantBuild(undefined, nextMessages);
   }, [assistantMessages, assistantInput, assistantLoading, assistantPlanning, assistantModel, namespace, assistantWorkflowDefinition, runAssistantBuild, toast]);
