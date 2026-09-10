@@ -311,3 +311,25 @@ export function pastedWorkflowName(fields: Record<string, unknown>): string | nu
   const name = typeof fields.name === 'string' ? fields.name.trim() : '';
   return name === '' ? null : name;
 }
+
+/**
+ * Roles the given steps allow that nobody in the workspace holds.
+ *
+ * `null` held-roles means the roster has not answered — in flight or failed —
+ * and must stay silent, or every role is reported as unheld for as long as the
+ * roster is slow. Deduplicated and ordered as first seen, since this is read
+ * aloud in a sentence.
+ */
+export function unheldStepRoles(
+  steps: { allowedRoles?: string[] }[],
+  heldRoles: string[] | null,
+): string[] {
+  if (heldRoles === null) return [];
+  const unheld: string[] = [];
+  for (const step of steps) {
+    for (const role of step.allowedRoles ?? []) {
+      if (heldRoles.includes(role) === false && unheld.includes(role) === false) unheld.push(role);
+    }
+  }
+  return unheld;
+}

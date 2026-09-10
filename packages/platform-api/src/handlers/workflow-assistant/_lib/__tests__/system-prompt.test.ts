@@ -125,6 +125,13 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/mcpRestrictions/);
   });
 
+  it('checks a role exists before leaning on it, and points at Settings for granting one', () => {
+    expect(prompt).toMatch(/list_roles/);
+    expect(prompt).toMatch(/Settings → Members/);
+    expect(prompt).toMatch(/nobody holds it yet/i);
+    expect(prompt).toMatch(/Access\*\* tab/);
+  });
+
   it('documents that update_step can connect an already-existing step, and that every response is graph-checked before finishing', () => {
     expect(prompt).toMatch(/`update_step` also accepts `insertAfterId`\/`insertBeforeId`/);
     expect(prompt).toMatch(/checked for structural completeness/i);
