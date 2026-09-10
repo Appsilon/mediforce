@@ -66,8 +66,8 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/continueOnError/);
   });
 
-  it('keeps webhook triggers on the Triggers tab, and reads trigger inputs in steps', () => {
-    expect(prompt).toMatch(/name the workflow's \*\*Triggers\*\* tab as where they add one/);
+  it('declines webhooks the same way, and still reads trigger inputs in steps', () => {
+    expect(prompt).toMatch(/covers webhooks, which you cannot create at any time/);
     expect(prompt).toMatch(/\$\{triggerPayload\.<field>\}/);
   });
 
@@ -138,12 +138,13 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/wiped|deleted|does not survive/i);
   });
 
-  it('can schedule a saved workflow, and says out loud that an unsaved one cannot be', () => {
+  it('declines an unschedulable request in one sentence rather than explaining the workaround', () => {
+    // Offered the tool and refused by it, the model talked its way to the
+    // Triggers tab and then to a CLI command. There is nothing to explain.
     expect(prompt).toMatch(/create_cron_trigger/);
-    expect(prompt).toMatch(/never been saved/i);
-    expect(prompt).toMatch(/saved at least once/i);
-    expect(prompt).toMatch(/Webhooks you cannot create at all/);
-    expect(prompt).not.toMatch(/you have no way to create triggers/i);
+    expect(prompt).toMatch(/the whole answer is one sentence/i);
+    expect(prompt).toMatch(/Do not describe the Triggers tab/);
+    expect(prompt).toMatch(/never a command/);
   });
 
   it('checks a role exists before leaning on it, and points at Settings for granting one', () => {

@@ -8,6 +8,10 @@ export interface AssistantMessage {
   /** Written by the pane rather than by the model: the plan it is about to
    *  build, a note that something did not land, a halted turn. */
   narration?: boolean;
+  /** Narration the person has to act on — a role nobody holds, a graph that
+   *  will not save. Rendered as a warning rather than as another reply, since
+   *  it reads past otherwise. */
+  tone?: 'warning';
 }
 
 /**

@@ -657,12 +657,13 @@ export function WorkflowEditorCanvas({
           role: 'assistant',
           content: `Not everything landed: ${applied.error}`,
           narration: true,
+          tone: 'warning',
         }]);
       }
       if (applied.steps !== null) {
         const issue = validateSteps(applied.steps);
         if (issue) {
-          setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `This will not save yet: ${issue}`, narration: true }]);
+          setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `This will not save yet: ${issue}`, narration: true, tone: 'warning' }]);
         }
         // A role nobody holds is a task nobody can claim. Said here rather than
         // left to the prompt: the model may not check, and the step panel that
@@ -673,6 +674,7 @@ export function WorkflowEditorCanvas({
             role: 'assistant',
             content: `Heads up: nobody holds ${unheld.map((role) => `"${role}"`).join(', ')} in this workspace, so ${unheld.length === 1 ? 'that step' : 'those steps'} will wait until someone is granted ${unheld.length === 1 ? 'it' : 'them'} in Settings → Members.`,
             narration: true,
+            tone: 'warning',
           }]);
         }
       }
@@ -1146,11 +1148,16 @@ export function WorkflowEditorCanvas({
                     <div className="flex flex-col gap-1 max-w-[85%] min-w-0">
                       {message.content && (
                         <div
+                          data-tone={message.tone}
                           className={cn(
                             'rounded-lg px-3 py-2 break-words',
                             message.role === 'user'
                               ? 'bg-primary/10 whitespace-pre-wrap'
                               : 'cm-assistant-reply bg-muted',
+                            // A warning is not another reply: same thread, its
+                            // own colour, so it is not read past.
+                            message.tone === 'warning'
+                              && 'bg-amber-50 dark:bg-amber-950/40 border border-amber-500/40 text-amber-900 dark:text-amber-200',
                           )}
                         >
                           {/* The model writes markdown, so the pane renders it:

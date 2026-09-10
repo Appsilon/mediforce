@@ -744,6 +744,49 @@ describe('askWorkflowAssistant handler', () => {
 // Platform tools run inside the turn, unlike the canvas tools the browser
 // applies. This covers the whole loop: the model asks, the platform answers as
 // the caller, and the answer goes back into the conversation.
+describe('askWorkflowAssistant — scheduling an unsaved workflow', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  afterEach(() => {
+    fetchSpy?.mockRestore();
+  });
+
+  it('does not offer the schedule tool at all when the workflow has never been saved', async () => {
+    // Offered but refused, the model filled the gap with instructions — the
+    // Triggers tab, then a CLI command out of the embedded reference. A tool
+    // it cannot see is a request it declines in one sentence.
+    fetchSpy = mockOpenRouterTurn({
+      choices: [{ message: { content: 'That needs the workflow saved first.', tool_calls: [] } }],
+    });
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    const body = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body)) as { tools: { function: { name: string } }[] };
+    const offered = body.tools.map((tool) => tool.function.name);
+    expect(offered).not.toContain('create_cron_trigger');
+    expect(offered).toContain('list_roles');
+  });
+
+  it('offers it once the canvas names a saved workflow', async () => {
+    fetchSpy = mockOpenRouterTurn({
+      choices: [{ message: { content: 'Scheduled.', tool_calls: [] } }],
+    });
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha', workflowName: 'sample-qc-check' }, scope);
+
+    const body = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body)) as { tools: { function: { name: string } }[] };
+    expect(body.tools.map((tool) => tool.function.name)).toContain('create_cron_trigger');
+  });
+});
+
 describe('askWorkflowAssistant — a batch that leaves the graph valid', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 

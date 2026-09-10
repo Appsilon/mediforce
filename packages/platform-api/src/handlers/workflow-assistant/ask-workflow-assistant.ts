@@ -52,7 +52,7 @@ const MAX_TOOL_LOOP_ITERATIONS = 12;
 // recoverable, so this is a throughput knob, not a correctness one.
 const ASSISTANT_MAX_OUTPUT_TOKENS = 8000;
 
-function buildToolDefinitions(): OpenRouterToolDefinition[] {
+function buildToolDefinitions(options: { canSchedule: boolean }): OpenRouterToolDefinition[] {
   const mutationTools = (
     Object.entries(WORKFLOW_ASSISTANT_TOOLS) as [WorkflowAssistantToolName, z.ZodType][]
   ).map(([name, schema]) => ({
@@ -61,7 +61,14 @@ function buildToolDefinitions(): OpenRouterToolDefinition[] {
   }));
   // Platform tools run here, as the caller, and their results come back into
   // this same conversation — unlike the canvas tools, which the browser applies.
-  const platformTools = Object.entries(WORKFLOW_ASSISTANT_PLATFORM_TOOLS).map(([name, schema]) => ({
+  const platformTools = Object.entries(WORKFLOW_ASSISTANT_PLATFORM_TOOLS)
+    // A schedule attaches to a saved workflow, so on a canvas that has never
+    // been saved the tool is not offered at all. Offered and then refusing, the
+    // model filled the gap with instructions of its own — the Triggers tab,
+    // then a CLI command copied out of the embedded reference. A tool it cannot
+    // see is a request it simply declines.
+    .filter(([name]) => name !== 'create_cron_trigger' || options.canSchedule)
+    .map(([name, schema]) => ({
     type: 'function',
     function: { name, parameters: z.toJSONSchema(schema as z.ZodType, { io: 'input' }) },
   }));
@@ -314,7 +321,7 @@ export async function askWorkflowAssistant(
     console.error('[workflow-assistant] failed to write prompt audit entry (non-fatal):', err);
   }
 
-  const tools = buildToolDefinitions();
+  const tools = buildToolDefinitions({ canSchedule: input.workflowName !== undefined });
   const messages: OpenRouterChatMessage[] = [
     { role: 'system', content: buildWorkflowAssistantSystemPrompt() },
     {
