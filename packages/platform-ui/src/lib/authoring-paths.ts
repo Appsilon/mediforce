@@ -13,14 +13,7 @@ export type AuthoringPath = {
   icon: LucideIcon;
 };
 
-/** The three ways to author a workflow, condensed from
- *  docs/guides/create-workflow.md § "Pick an authoring path".
- *
- *  A fourth used to point at the `/design-workflow` agent skill, for the things
- *  the canvas could not do: scripts, a Dockerfile, skills. It can do them now —
- *  a workflow carries its own files — so naming a path that requires a git
- *  checkout, a second tool and a CLI hand-off would send people out of the app
- *  for a capability that is in it. */
+// The three ways to author a workflow, condensed from docs/guides/create-workflow.md § "Pick an authoring path".
 export const AUTHORING_PATHS: AuthoringPath[] = [
   {
     id: 'canvas',

@@ -200,10 +200,7 @@ export function runPreflightChecks(
     });
   }
 
-  // `triggerInput` is the workflow's total contract and is checked before a run
-  // starts, so a required field there cannot be gathered by a step later: the
-  // run is refused with "Invalid payload" before anyone reaches that step. The
-  // shape reads plausibly, which is why it keeps being authored.
+  // `triggerInput` is the workflow's total contract and is checked before a run starts, so a required field there cannot be gathered by a step later: the run is refused with "Invalid payload" before anyone reaches that step.
   const entryStep = steps[0];
   const collectedTwice = (definition.triggerInput ?? [])
     .filter((field) => field.required === true)

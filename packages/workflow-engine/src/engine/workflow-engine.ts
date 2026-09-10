@@ -281,13 +281,7 @@ export class WorkflowEngine {
               secrets: {},
             });
             if (typeof resolved === 'string' && resolved.length > 0) {
-              // An address that resolves to nobody is not an assignee. Taking
-              // it verbatim produced a task whose only possible claimant did
-              // not exist: the UI showed it claimed, `completeTask` refused
-              // everyone else, and there is no unclaim and no override — so
-              // the run could not be finished by anyone, owner included.
-              // Left unassigned instead, which is a task anybody holding the
-              // step's role can claim.
+              // An address that resolves to nobody is not an assignee.
               const assignee = await resolveStepAssignee(resolved, this.userDirectoryService);
               preAssignedUserId = assignee.userId;
               preAssignedEmail = assignee.email;

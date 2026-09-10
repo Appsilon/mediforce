@@ -1,4 +1,3 @@
-/** An agent step's input, seeded as `/output/input.json` the way the channel is documented. */
 import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';
 import { readFile } from 'node:fs/promises';

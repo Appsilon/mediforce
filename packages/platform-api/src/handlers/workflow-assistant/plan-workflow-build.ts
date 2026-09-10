@@ -52,8 +52,7 @@ export async function planWorkflowBuild(
     ],
   });
 
-  // The schema caps the questions, so an over-long list fails the parse and
-  // lands on the empty plan below rather than being trimmed here.
+  // The schema caps the questions, so an over-long list fails the parse and lands on the empty plan below rather than being trimmed here.
   return parseModelJson(response.content, PlanWorkflowBuildOutputSchema)
     ?? { plan: [], questions: [], phases: [] };
 }

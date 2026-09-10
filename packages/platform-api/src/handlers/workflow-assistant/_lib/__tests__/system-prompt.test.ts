@@ -105,25 +105,15 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
   });
 
   it('never sends the reader to a terminal: no CLI, no git, no repo paths', () => {
-    // The reader is in a browser and has no checkout. The prompt itself used to
-    // name `mediforce workflow trigger-add`, so the assistant handed a person
-    // in the app a command they cannot run.
     expect(prompt).toMatch(/never name a command for them to run/i);
-    // The embedded references are written for a repo reader and are full of
-    // commands, which is where the CLI answer came from. The rule has to name
-    // them, since they cannot be scrubbed without breaking their other reader.
     expect(prompt).toMatch(/never quote their instructions back/i);
   });
 
   it('sends any third-party package to a carried file plus a Dockerfile, in every language', () => {
-    // The old advice was pip-install-at-the-top-of-the-script, from before a
-    // workflow could carry its own Dockerfile.
     expect(prompt).toMatch(/standard library/i);
     expect(prompt).toMatch(/write_workflow_file/);
     expect(prompt).toMatch(/pandas/);
     expect(prompt).not.toMatch(/pip", "install"/);
-    // …and from the language's own base image, since a system Python refuses
-    // `pip install` outright.
     expect(prompt).toMatch(/python:3\.12-slim/);
     expect(prompt).toMatch(/rocker\/r-ver/);
     expect(prompt).toMatch(/externally managed/i);
@@ -131,9 +121,6 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
   });
 
   it('says how a file crosses from one step to the next, since /output does not survive', () => {
-    // The live failure: a reader step written as `pd.read_csv('/output/samples.csv')`,
-    // which the producing step really did write, dies with FileNotFoundError
-    // because /output is wiped between steps.
     expect(prompt).toMatch(/\/workspace\/\.mediforce\/output\//);
     expect(prompt).toMatch(/wiped|deleted|does not survive/i);
   });
@@ -144,17 +131,11 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
   });
 
   it('never asks for the same field twice, as a trigger input and as an entry-step param', () => {
-    // The shape the assistant kept building: `triggerInput` declares the
-    // fields and the first human step collects them again. The contract is
-    // checked before the run starts, so the run is refused with "Invalid
-    // payload" before anyone reaches the step meant to fill it in.
     expect(prompt).toMatch(/never both/i);
     expect(prompt).toMatch(/Invalid payload/);
   });
 
   it('declines an unschedulable request in one sentence rather than explaining the workaround', () => {
-    // Offered the tool and refused by it, the model talked its way to the
-    // Triggers tab and then to a CLI command. There is nothing to explain.
     expect(prompt).toMatch(/create_cron_trigger/);
     expect(prompt).toMatch(/the whole answer is one sentence/i);
     expect(prompt).toMatch(/Do not describe the Triggers tab/);
@@ -169,10 +150,6 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
   });
 
   it('states the only route an MCP server has to a step: a saved agent the step names with agentId', () => {
-    // `resolveMcpForStep` returns null when `agentId` is unset, so an inline
-    // agent step reaches no MCP at all however the request was phrased. The
-    // prompt has to say so, or "use the GitHub MCP" produces a step that
-    // silently has none.
     expect(prompt).toMatch(/`agentId`/);
     expect(prompt).toMatch(/no MCP at all|reaches no MCP|gets no MCP/i);
     expect(prompt).toMatch(/list_tool_catalog/);
@@ -297,9 +274,6 @@ describe('buildWorkflowAssistantSystemPrompt — who does a human step', () => {
   });
 });
 
-// The loop a person watched: the canvas said `poll → done`, the batch spliced a
-// step between them, and the condition on the old edge was refused — so it
-// added the edge back, which spliced again.
 describe('buildWorkflowAssistantSystemPrompt — conditions and splicing', () => {
   const prompt = buildWorkflowAssistantSystemPrompt();
 
@@ -308,8 +282,6 @@ describe('buildWorkflowAssistantSystemPrompt — conditions and splicing', () =>
   });
 
   it('says naming the old edge is fine when the step has one way out', () => {
-    // The platform resolves that case rather than refusing it, and the prompt
-    // has to agree or the model will second-guess a call that works.
     expect(prompt).toMatch(/fine when the step you condition has one way out/);
     expect(prompt).toMatch(/refused only when the step branches/);
   });

@@ -452,11 +452,9 @@ export function WorkflowEditorCanvas({
   const [assistantElapsed, setAssistantElapsed] = useState(0);
   /** Something arrived while the pane was collapsed. Cleared on opening it. */
   const [assistantUnread, setAssistantUnread] = useState(false);
-  /** Whether this workspace holds the key every assistant turn needs. Probed
-   *  once when the pane opens: without it the server refuses every turn, and
-   *  saying so before the first message beats an error after it. */
+  // Whether this workspace holds the key every assistant turn needs.
   const [assistantKeyMissing, setAssistantKeyMissing] = useState(false);
-  /** The turn in flight, so the halt button can stop it. */
+  // The turn in flight, so the halt button can stop it.
   const assistantAbortRef = useRef<AbortController | null>(null);
   const heldRolesRef = useRef<string[] | null>(null);
   const assistantScrollRef = useRef<HTMLDivElement>(null);
@@ -465,8 +463,7 @@ export function WorkflowEditorCanvas({
   useEffect(() => {
     if (!aiPaneOpen || !namespace) return;
     let cancelled = false;
-    // `mediforceSilent`: a probe that fails is not the person's problem, and a
-    // toast about it would be the third one this pane has learned not to raise.
+    // `mediforceSilent`: a probe that fails is not the person's problem, and a toast about it would be the third one this pane has learned not to raise.
     void mediforceSilent.secrets.list({ namespace })
       .then(({ keys }) => { if (!cancelled) setAssistantKeyMissing(keys.includes('OPENROUTER_API_KEY') === false); })
       .catch(() => { if (!cancelled) setAssistantKeyMissing(false); });
@@ -511,9 +508,7 @@ export function WorkflowEditorCanvas({
   // through the pages: the canvas already knows the handle, and that panel is
   // the only consumer.
   const { roles: workspaceRoles, heldRoles } = useWorkspaceRoles(namespace ?? '', {
-    // Also while the assistant pane is open: a step it writes can name a role
-    // nobody holds, and the person reading the reply never opens the panel
-    // where that warning already lives.
+    // Also while the assistant pane is open: a step it writes can name a role nobody holds, and the person reading the reply never opens the panel where that warning already lives.
     enabled: rightPanelView === 'notifications' || aiPaneOpen,
     workflowName,
   });
@@ -573,9 +568,7 @@ export function WorkflowEditorCanvas({
       parts.push(`removed ${paths}`);
     }
     return {
-      // The graph the reducer produced, so a caller checking whether it can be
-      // saved reads what just landed rather than waiting for the state to
-      // commit and the mirror refs to catch up a macrotask later.
+      // The graph the reducer produced, so a caller checking whether it can be saved reads what just landed rather than waiting for the state to commit and the mirror refs to catch up a macrotask later.
       steps: result.steps,
       summary: parts.length > 0 ? `Updated the workflow: ${parts.join(', ')}.` : '',
       error: errors.length > 0 ? errors.join(' ') : null,
@@ -596,8 +589,7 @@ export function WorkflowEditorCanvas({
     },
   }), []);
 
-  /** Stop the turn in flight. The request is aborted rather than ignored, so a
-   *  turn nobody is waiting for stops costing tokens. */
+  // Stop the turn in flight.
   const haltAssistant = useCallback(() => {
     assistantAbortRef.current?.abort();
   }, []);
@@ -609,11 +601,7 @@ export function WorkflowEditorCanvas({
    */
   const runAssistantBuild = useCallback(async (extra?: string, base?: AssistantMessage[]) => {
     if (assistantLoading || !namespace) return;
-    // `base` is the thread as the caller knows it. Sending a message plans
-    // first and then builds within the same call, so the message it just added
-    // has not been committed yet — reading it back from state (or from a ref
-    // mirroring state) is a race, and it is the race that made the plan reach
-    // the model only sometimes.
+    // `base` is the thread as the caller knows it.
     const thread = base ?? assistantMessages;
     const answered = extra === undefined || extra === ''
       ? thread
@@ -631,8 +619,7 @@ export function WorkflowEditorCanvas({
           messages: messagesForModel(answered),
           model: assistantModel,
           workflowDefinition: assistantWorkflowDefinition(),
-          // A trigger attaches to a saved workflow, so the assistant needs to
-          // know whether this canvas is a version of one.
+          // A trigger attaches to a saved workflow, so the assistant needs to know whether this canvas is a version of one.
           ...(workflowName === undefined ? {} : { workflowName }),
         },
         { namespace, signal: controller.signal },
@@ -665,9 +652,7 @@ export function WorkflowEditorCanvas({
         if (issue) {
           setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `This will not save yet: ${issue}`, narration: true, tone: 'warning' }]);
         }
-        // A role nobody holds is a task nobody can claim. Said here rather than
-        // left to the prompt: the model may not check, and the step panel that
-        // already warns about it is not where this person is looking.
+        // A role nobody holds is a task nobody can claim.
         const unheld = unheldStepRoles(applied.steps, heldRolesRef.current);
         if (unheld.length > 0) {
           setAssistantMessages((prev) => [...prev, {
@@ -679,8 +664,7 @@ export function WorkflowEditorCanvas({
         }
       }
     } catch (err) {
-      // Halted on purpose: said in the thread rather than as an error, because
-      // it is the outcome the person asked for. Nothing was applied.
+      // Halted on purpose: said in the thread rather than as an error, because it is the outcome the person asked for.
       if (controller.signal.aborted) {
         setAssistantMessages((prev) => [...prev, {
           role: 'assistant',
@@ -723,10 +707,7 @@ export function WorkflowEditorCanvas({
         { namespace, signal: controller.signal },
       );
     } catch (err) {
-      // The plan is an aid, not the work, so a plan this pane merely could not
-      // read costs nobody their turn. A request the *server* refused is
-      // different: the build is the same request with a longer prompt and
-      // fails identically, so it is reported once here instead of twice.
+      // The plan is an aid, not the work, so a plan this pane merely could not read costs nobody their turn.
       if (err instanceof ApiError) refusal = err;
       planned = null;
     } finally {
@@ -734,8 +715,7 @@ export function WorkflowEditorCanvas({
       setAssistantPlanning(false);
     }
 
-    // The server refused the request, and the build is the same request with a
-    // longer prompt. Reported once here instead of failing twice.
+    // The server refused the request, and the build is the same request with a longer prompt.
     if (refusal !== null) {
       toast({ variant: 'error', title: 'Assistant error', description: refusal.message });
       return;
@@ -1079,9 +1059,7 @@ export function WorkflowEditorCanvas({
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {assistantKeyMissing && (
-                  // Pulsing, because it is the difference between the pane
-                  // working and every message failing, and it sits next to
-                  // controls a person is about to reach for anyway.
+                  // Pulsing, because it is the difference between the pane working and every message failing, and it sits next to controls a person is about to reach for anyway.
                   <InstantTooltip label="OPENROUTER_API_KEY is missing from this workspace">
                     <span
                       tabIndex={0}
@@ -1158,8 +1136,7 @@ export function WorkflowEditorCanvas({
                             message.role === 'user'
                               ? 'bg-primary/10 whitespace-pre-wrap'
                               : 'cm-assistant-reply bg-muted',
-                            // A warning is not another reply: same thread, its
-                            // own colour, so it is not read past.
+                            // A warning is not another reply: same thread, its own colour, so it is not read past.
                             message.tone === 'warning'
                               && 'bg-amber-50 dark:bg-amber-950/40 border border-amber-500/40 text-amber-900 dark:text-amber-200',
                           )}

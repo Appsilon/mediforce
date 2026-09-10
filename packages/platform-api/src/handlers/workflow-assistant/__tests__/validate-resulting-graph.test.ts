@@ -95,8 +95,6 @@ describe('validateResultingGraph', () => {
 });
 
 describe('validateResultingGraph — a defect the canvas already had', () => {
-  // A decision step routing by verdict that also carries a hand-written edge:
-  // invalid, and not something this turn did.
   const brokenSteps: WorkflowStep[] = [
     { id: 'start', name: 'Start', type: 'creation', executor: 'human' },
     {
@@ -115,9 +113,6 @@ describe('validateResultingGraph — a defect the canvas already had', () => {
   const broken = { steps: brokenSteps, transitions: brokenTransitions };
 
   it('lets an unrelated edit through, rather than refusing to touch the workflow', () => {
-    // The gate used to fail on any invalid result, so a workflow with an old
-    // defect could not be edited at all: the assistant was told to fix
-    // something it had not caused and had no tool for, and burned its turn.
     const calls: WorkflowAssistantToolCall[] = [
       { tool: 'update_workflow', arguments: { preamble: 'House rules.' } },
     ];

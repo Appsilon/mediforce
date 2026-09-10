@@ -42,23 +42,7 @@ export interface ApplyToolCallsResult {
   addedStepIds: string[];
 }
 
-/** A step that names a Dockerfile with nothing to build it from.
- *
- *  Three things can build one, in the order the runtime tries them: the step's
- *  own `repo` + `commit`, a Dockerfile the workflow carries, and the
- *  workflow-level `externalSkillsRepo`. The first and third belong to imported
- *  and legacy workflows, whose build context is a checkout rather than carried
- *  files — stripping the field there moves the build to the repository's root
- *  Dockerfile, which is a different image.
- *
- *  What is left is a step naming a file nobody wrote. The repository fields are
- *  not the assistant's to write, so the file would have to be one it carried.
- *  Dropped rather than refused, for the same reason the repository fields are:
- *  refusing failed the graph gate, and since every retry re-applies the whole
- *  accumulated batch from the original definition, the file the model then
- *  wrote always landed *after* the step that named it and the gate failed
- *  again. Without a Dockerfile the step runs on the image every other step runs
- *  on. */
+// A step that names a Dockerfile with nothing to build it from.
 function withoutUncarriedDockerfile(
   step: WorkflowStep,
   settings: WorkflowSettings,
@@ -90,9 +74,7 @@ export function applyWorkflowAssistantToolCalls(
   const clientIdToRealId = new Map<string, string>();
   const outcomes: ToolCallOutcome[] = [];
   const addedStepIds: string[] = [];
-  /** Steps this batch wrote. The build-source pass only touches these: the
-   *  reducer's output is what gets saved, so editing a step the batch never
-   *  named would change the workflow behind the person's back. */
+  // Steps this batch wrote.
   const touchedStepIds = new Set<string>();
 
   let stepCounter = steps.reduce((max, s) => {
@@ -245,15 +227,9 @@ export function applyWorkflowAssistantToolCalls(
       const from = resolveId(rawFrom) ?? rawFrom;
       let to = resolveId(rawTo) ?? rawTo;
       let edge = workingTransitions.find((t) => t.from === from && t.to === to);
-      // Inserting a step between two steps replaces the edge that joined them,
-      // so a condition naming the old edge has exactly one place it can mean:
-      // the single edge now leaving that step. Applied there rather than
-      // refused — refusing made the assistant add the old edge back, which
-      // split the graph again. A step that branches is a genuine ambiguity and
-      // still refuses, because then it would be a guess.
+      // Inserting a step between two steps replaces the edge that joined them, so a condition naming the old edge has exactly one place it can mean: the single edge now leaving that step.
       if (edge === undefined && workingSteps.some((step) => step.id === to)) {
-        // Both ends have to be real steps: a `to` naming nothing is a mistake
-        // to report, not a stale edge to repair.
+        // Both ends have to be real steps: a `to` naming nothing is a mistake to report, not a stale edge to repair.
         const outgoingEdges = workingTransitions.filter((t) => t.from === from);
         if (outgoingEdges.length === 1) {
           edge = outgoingEdges[0];
@@ -261,11 +237,7 @@ export function applyWorkflowAssistantToolCalls(
         }
       }
       if (edge === undefined) {
-        // "Add the edge" was the wrong advice and an endless loop: the canvas
-        // state the model read says `A → B`, its own add_step in the same batch
-        // spliced a step between them, and adding the edge back splices again.
-        // What it needs is the graph as it stands, so naming the edges around
-        // both ends turns this into one correction.
+        // "Add the edge" was the wrong advice and an endless loop: the canvas state the model read says `A → B`, its own add_step in the same batch spliced a step between them, and adding the edge back splices again.
         const unknownStep = workingSteps.some((step) => step.id === from) === false
           ? from
           : workingSteps.some((step) => step.id === to) === false ? to : null;
@@ -308,9 +280,7 @@ export function applyWorkflowAssistantToolCalls(
         });
         continue;
       }
-      // Every edge between the two when no condition is named: a pair that
-      // differs only in `when` is the shape this tool exists to clean up, and
-      // naming the condition is how one of the pair is kept.
+      // Every edge between the two when no condition is named: a pair that differs only in `when` is the shape this tool exists to clean up, and naming the condition is how one of the pair is kept.
       workingTransitions = workingTransitions.filter((edge) => matches(edge) === false);
       outcomes.push({ tool: 'remove_transition', stepId: `${from} → ${to}` });
     } else if (call.tool === 'update_step') {
@@ -367,8 +337,7 @@ export function applyWorkflowAssistantToolCalls(
     }
   }
 
-  // Checked once, at the end, against the files the batch finished with — a
-  // step and the Dockerfile it names arrive in the same batch, in either order.
+  // Checked once, at the end, against the files the batch finished with — a step and the Dockerfile it names arrive in the same batch, in either order.
   const finalSteps = workingSteps.map((step) => (touchedStepIds.has(step.id)
     ? withoutUncarriedDockerfile(step, workingSettings)
     : step));

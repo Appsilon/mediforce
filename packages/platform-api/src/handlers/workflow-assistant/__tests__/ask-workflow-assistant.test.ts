@@ -93,21 +93,12 @@ interface MockOpenRouterBody {
   }[];
 }
 
-/** The same response to every call — for the tests that assert what a batch is
- *  told when the model cannot fix it, which needs the model to keep repeating
- *  itself until the loop gives up. */
 function mockOpenRouterResponse(body: MockOpenRouterBody) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
     Promise.resolve(new Response(JSON.stringify(body), { status: 200 })),
   );
 }
 
-/**
- * One mocked model turn, then the turn that closes it. The model ends its own
- * turn by answering with no tool calls, so a mocked batch on its own leaves the
- * loop asking for more; the closing turn repeats the same content, which is
- * what these assertions read.
- */
 function mockOpenRouterTurn(body: MockOpenRouterBody) {
   const closing: MockOpenRouterBody = {
     choices: [{ message: { content: body.choices[0]?.message.content ?? '', tool_calls: [] } }],
@@ -752,9 +743,6 @@ describe('askWorkflowAssistant — scheduling an unsaved workflow', () => {
   });
 
   it('does not offer the schedule tool at all when the workflow has never been saved', async () => {
-    // Offered but refused, the model filled the gap with instructions — the
-    // Triggers tab, then a CLI command out of the embedded reference. A tool
-    // it cannot see is a request it declines in one sentence.
     fetchSpy = mockOpenRouterTurn({
       choices: [{ message: { content: 'That needs the workflow saved first.', tool_calls: [] } }],
     });
@@ -795,12 +783,6 @@ describe('askWorkflowAssistant — a batch that leaves the graph valid', () => {
   });
 
   it('keeps the turn going until the model stops calling tools', async () => {
-    // The failure this replaces: the model opened with `update_workflow` and a
-    // sentence announcing the build ("I'll build the workflow you described").
-    // The starter graph was already valid, so the turn was declared finished on
-    // that first batch — the settings landed, the steps never did, and the
-    // person read a confirmation of work that had not happened. The model ends
-    // its own turn now, by answering with no tool calls.
     fetchSpy = vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify({
         choices: [{

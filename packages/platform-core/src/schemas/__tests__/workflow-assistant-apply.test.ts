@@ -338,10 +338,6 @@ describe('applyWorkflowAssistantToolCalls — carry-over between runs', () => {
 
 describe('applyWorkflowAssistantToolCalls — a Dockerfile an imported workflow builds from git', () => {
   it('keeps it on a step that pins repo and commit, which is where that file lives', () => {
-    // A workflow imported from git carries no artifacts: its build context is
-    // the checkout, and `dockerfile` names a path inside it. Stripping the
-    // field because the workflow carries no such artifact silently moved the
-    // build to the repository's root Dockerfile.
     const canvas = baseCanvas();
     const withGitBuild: typeof canvas.steps = canvas.steps.map((step) => (step.id === 'draft'
       ? {
@@ -365,9 +361,6 @@ describe('applyWorkflowAssistantToolCalls — a Dockerfile an imported workflow 
   });
 
   it('keeps it when the workflow takes its files from an external repo', () => {
-    // The third build source: `dockerfile` plus the workflow-level
-    // `externalSkillsRepo`, which is what a legacy workflow pointing at the app
-    // package uses. Also not the assistant's to strip.
     const canvas = baseCanvas();
     const withRepoFiles: typeof canvas.steps = canvas.steps.map((step) => (step.id === 'draft'
       ? { ...step, executor: 'agent' as const, plugin: 'claude-code-agent', agent: { dockerfile: 'container/Dockerfile' } }
@@ -384,10 +377,6 @@ describe('applyWorkflowAssistantToolCalls — a Dockerfile an imported workflow 
 
 describe('applyWorkflowAssistantToolCalls — removing a transition', () => {
   it('drops the edge it names', () => {
-    // The verb the assistant did not have. A workflow whose verdict step also
-    // carries a hand-written edge is refused by the graph gate, and until now
-    // the only tools that touched transitions were the ones that add, remove
-    // or re-insert a step.
     const canvas = baseCanvas();
     const { transitions, outcomes } = applyWorkflowAssistantToolCalls(
       canvas.steps,
@@ -421,8 +410,6 @@ describe('applyWorkflowAssistantToolCalls — removing a transition', () => {
 
 describe('applyWorkflowAssistantToolCalls — an agent step bound to an MCP server', () => {
   it('keeps the agentId and the step restrictions, which is the only route an MCP has to a step', () => {
-    // `resolveMcpForStep` reads `agentId` and returns null without one, so a
-    // step that loses it runs with no MCP however the request was phrased.
     const { steps } = applyWorkflowAssistantToolCalls(
       baseCanvas().steps, baseCanvas().transitions,
       [{
@@ -443,11 +430,6 @@ describe('applyWorkflowAssistantToolCalls — an agent step bound to an MCP serv
 
 describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not carry', () => {
   it('keeps it when the file arrives later in the same batch', () => {
-    // The loop this closes: every iteration re-applies the whole accumulated
-    // batch from the original definition, so an add_step checked against the
-    // artifacts as they stood *at that call* never sees the file the model
-    // wrote a call later. It was told to write the file, it wrote it, and the
-    // gate failed again on the replay — for ever. Checked once, at the end.
     const { steps, outcomes } = applyWorkflowAssistantToolCalls(
       baseCanvas().steps, baseCanvas().transitions,
       [
@@ -468,11 +450,6 @@ describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not
   });
 
   it('drops the dockerfile rather than refusing the step nothing carries a file for', () => {
-    // Dropped, not rejected, for the same reason the repository build fields
-    // are: refusing sent the model into a retry loop that burned the iteration
-    // cap and ended the turn with an error. Without a Dockerfile the step runs
-    // on the image every other step runs on, which is the fallback the model
-    // was being offered anyway.
     const { steps, outcomes } = applyWorkflowAssistantToolCalls(
       baseCanvas().steps, baseCanvas().transitions,
       [{
@@ -510,8 +487,6 @@ describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not
   });
 
   it('leaves a step the batch never touched alone', () => {
-    // The reducer's output is what gets saved: stripping a field off a step
-    // this batch did not name would edit the workflow behind the person's back.
     const canvas = baseCanvas();
     const withBuild: typeof canvas.steps = canvas.steps.map((step) => (step.id === 'draft'
       ? { ...step, executor: 'script' as const, plugin: 'script-container', script: { command: 'python3 run.py', dockerfile: 'container/Dockerfile' } }
@@ -525,16 +500,8 @@ describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not
   });
 });
 
-// The loop this closes: the canvas state the model reads says `poll → done`,
-// its own add_step in the same batch splices a step between them, and the
-// condition it then sets on `poll → done` finds nothing. "Add the edge" sent it
-// adding an edge, which spliced again — for ever.
 describe('applyWorkflowAssistantToolCalls — a condition on an edge the batch replaced', () => {
   it('puts the condition on the edge that replaced it, rather than refusing', () => {
-    // Inserting a step between two steps replaces the edge that joined them, so
-    // a condition naming the old edge has exactly one place it can mean: the
-    // one edge now leaving that step. Refusing made the assistant add the old
-    // edge back, which split the graph again.
     const calls: WorkflowAssistantToolCall[] = [
       { tool: 'add_step', arguments: { clientId: 'validate', type: 'creation', executor: 'script', name: 'Validate', insertAfterId: 'draft', insertBeforeId: 'done' } },
       { tool: 'set_transition_condition', arguments: { from: 'draft', to: 'done', when: 'output.newFiles > 0' } },
@@ -545,7 +512,6 @@ describe('applyWorkflowAssistantToolCalls — a condition on an edge the batch r
     const outcome = outcomes.find((o) => o.tool === 'set_transition_condition');
     expect(outcome?.error).toBeUndefined();
     expect(transitions).toContainEqual({ from: 'draft', to: 'validate', when: 'output.newFiles > 0' });
-    // Reported as what it did, not as what was asked, so the summary is true.
     expect(outcome?.stepId).toBe('draft → validate');
   });
 

@@ -388,9 +388,6 @@ describe('WorkflowEngine — task_assigned notification dispatch', () => {
   });
 
   it('leaves it unassigned when there is no directory to resolve against either', async () => {
-    // Half the fence: with no directory service nothing can confirm the value
-    // names a real user, so taking it verbatim rebuilds the same unclaimable
-    // task this whole branch exists to prevent.
     await processRepo.saveWorkflowDefinition(unresolvableDef);
     const engine = new WorkflowEngine(
       processRepo,

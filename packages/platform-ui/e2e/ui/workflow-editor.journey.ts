@@ -675,15 +675,8 @@ test.describe('Workflow Editor Journey', () => {
     const canvas = page.getByTestId('authoring-path-canvas');
     await expect(canvas).toContainText('Exact control over one block');
     await expect(page.getByTestId('authoring-path-assistant')).toContainText('OPENROUTER_API_KEY');
-    // The `/design-workflow` path is gone: a workflow carries its own files
-    // now, so naming a skill here sent people out to a checkout for something
-    // the app does.
     await expect(page.getByTestId('authoring-path-agent')).toHaveCount(0);
 
-    // Clicking away closes it. The canvas pane swallows the pointer events
-    // Radix listens for, so this stayed open over the workflow it describes.
-    // `page.mouse`, not a locator click: the dismiss layer covers the canvas by
-    // design, and taking that click is exactly what closes the popover.
     await page.mouse.click(60, 400);
     await expect(page.getByTestId('authoring-path-canvas')).toBeHidden();
 
