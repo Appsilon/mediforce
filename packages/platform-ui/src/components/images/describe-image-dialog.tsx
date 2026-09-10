@@ -4,7 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Loader2, X } from 'lucide-react';
 import { useState } from 'react';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
-import { useDescribeImage } from '@/hooks/use-image-catalog';
+import { useCatalogueImage } from '@/hooks/use-image-catalog';
 
 /**
  * The one thing a human adds to a discovered entry.
@@ -28,17 +28,22 @@ export function DescribeImageDialog({
 }) {
   const [name, setName] = useState(entry.name);
   const [intent, setIntent] = useState('');
-  const describe = useDescribeImage(handle);
+  const describe = useCatalogueImage(handle);
 
   const sourceLine =
     entry.source.kind === 'built'
       ? `${entry.source.repo}${entry.source.dockerfile === '' ? '' : ` · ${entry.source.dockerfile}`}`
       : entry.source.reference;
 
-  async function handleSubmit(event: React.FormEvent) {
+  // `mutate`, not `mutateAsync`: an async submit handler whose promise rejects
+  // has nothing to catch it, so a rejected write both renders below and escapes
+  // as an unhandled rejection. The error still lands in `describe.error`.
+  function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    await describe.mutateAsync({ name: name.trim(), intent: intent.trim(), source: entry.source });
-    onOpenChange(false);
+    describe.mutate(
+      { name: name.trim(), intent: intent.trim(), source: entry.source },
+      { onSuccess: () => onOpenChange(false) },
+    );
   }
 
   return (

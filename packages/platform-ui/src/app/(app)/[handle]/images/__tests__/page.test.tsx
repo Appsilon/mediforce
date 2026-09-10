@@ -6,6 +6,8 @@ import { createQueryWrapper } from '@/test/react-query';
 
 const listMock = vi.fn();
 const getMock = vi.fn();
+const createMock = vi.fn();
+const buildMock = vi.fn();
 const apiFetchMock = vi.fn();
 const searchParams = new URLSearchParams();
 
@@ -17,6 +19,8 @@ vi.mock('@/lib/mediforce', () => ({
     imageCatalog: {
       list: (...args: unknown[]) => listMock(...args),
       get: (...args: unknown[]) => getMock(...args),
+      create: (...args: unknown[]) => createMock(...args),
+      build: (...args: unknown[]) => buildMock(...args),
     },
   },
 }));
@@ -249,7 +253,7 @@ describe('ImagesPage', () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
 
     const link = await screen.findByRole('link', {
@@ -265,7 +269,7 @@ describe('ImagesPage', () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
 
     expect(
@@ -281,7 +285,7 @@ describe('ImagesPage', () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
 
     const derived = screen.getByTestId('image-entry-tealflow');
@@ -294,7 +298,7 @@ describe('ImagesPage', () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
 
     expect(await screen.findByRole('link', { name: 'SDTM QC' })).toHaveAttribute(
@@ -308,7 +312,7 @@ describe('ImagesPage', () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
     await screen.findByText(/2 layer commands added over/);
 
@@ -346,7 +350,7 @@ describe('ImagesPage', () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
 
     expect(await screen.findByText('Shared QC')).toBeInTheDocument();
@@ -379,10 +383,101 @@ describe('ImagesPage', () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
 
     expect(await screen.findByText(/is not a GitHub repository/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /^Open / })).not.toBeInTheDocument();
+  });
+
+  it('catalogues a source nobody has built here, from the repository and Dockerfile', async () => {
+    createMock.mockResolvedValue({ entry: { ...TEALFLOW, id: 'added' } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+
+    await userEvent.type(screen.getByLabelText('Repository'), 'Appsilon/tealflow');
+    await userEvent.type(screen.getByLabelText(/Dockerfile/), 'container/Dockerfile');
+    await userEvent.type(screen.getByLabelText('Intent'), 'R-based exploration of ADaM datasets');
+
+    // The name is suggested from the repository rather than left blank, the
+    // same way a discovered entry arrives named.
+    expect(screen.getByLabelText('Name')).toHaveValue('tealflow');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add to the catalog' }));
+
+    expect(createMock).toHaveBeenCalledWith({
+      namespace: 'acme',
+      name: 'tealflow',
+      intent: 'R-based exploration of ADaM datasets',
+      source: { kind: 'built', repo: 'Appsilon/tealflow', dockerfile: 'container/Dockerfile' },
+    });
+  });
+
+  it('sends the empty Dockerfile as the value it is, not as an absence', async () => {
+    createMock.mockResolvedValue({ entry: { ...TEALFLOW, id: 'added' } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+    await userEvent.type(screen.getByLabelText('Repository'), 'Appsilon/tealflow');
+    await userEvent.type(screen.getByLabelText('Intent'), 'Whatever the default Dockerfile builds');
+    await userEvent.click(screen.getByRole('button', { name: 'Add to the catalog' }));
+
+    // `deriveBuildTag` folds in `dockerfile ?? ''`, so the entry keyed on the
+    // empty string is the one an image built without a Dockerfile matches.
+    expect(createMock.mock.calls[0][0].source).toEqual({
+      kind: 'built',
+      repo: 'Appsilon/tealflow',
+      dockerfile: '',
+    });
+  });
+
+  it('keeps a name the author typed instead of overwriting it from the repository', async () => {
+    createMock.mockResolvedValue({ entry: { ...TEALFLOW, id: 'added' } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+    await userEvent.type(screen.getByLabelText('Name'), 'TealFlow agent');
+    await userEvent.type(screen.getByLabelText('Repository'), 'Appsilon/tealflow');
+
+    expect(screen.getByLabelText('Name')).toHaveValue('TealFlow agent');
+  });
+
+  it('leads a failed build with the cause and keeps the output behind a disclosure', async () => {
+    buildMock.mockRejectedValue(
+      new Error(
+        'Building "mediforce-built:d999" failed: Command failed: docker build …\n' +
+          '#7 [5/6] COPY mcp/ /opt/golden-standard/mcp/\n' +
+          'ERROR: failed to build: failed to solve: failed to compute cache key: ' +
+          'failed to calculate checksum of ref abc::def: "/mcp": not found',
+      ),
+    );
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await userEvent.click(within(card).getByRole('button', { name: 'Build' }));
+    await userEvent.type(screen.getByLabelText('Commit'), 'e56cba94021b4385');
+    await userEvent.click(screen.getByRole('button', { name: 'Build' }));
+
+    // The rule, not the raw output: the copied path exists in the repository,
+    // so the unexplained failure reads as a platform bug.
+    expect(await screen.findByText(/build context is the directory holding the Dockerfile/i))
+      .toBeInTheDocument();
+    expect(screen.queryByText(/failed to compute cache key/)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Show full error/ }));
+
+    expect(screen.getByText(/failed to compute cache key/)).toBeInTheDocument();
+  });
+
+  it('states the build-context rule before a build is attempted', async () => {
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await userEvent.click(within(card).getByRole('button', { name: 'Build' }));
+
+    expect(
+      screen.getByText(/Everything the Dockerfile/),
+    ).toBeInTheDocument();
   });
 });

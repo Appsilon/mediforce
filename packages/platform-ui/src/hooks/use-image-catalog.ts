@@ -79,18 +79,21 @@ export function useImageCatalogEntry(
 }
 
 /**
- * Describe a discovered entry — the sentence the platform cannot derive.
+ * Register an entry against a source — the one write the catalog has.
  *
- * A plain create: a discovered entry is not a row, so writing the sentence is
- * what registers it, and the id is derived from the source it already carries,
- * so the entry keeps the identity the listing showed. The response is a probed
- * view — `createImageCatalogEntry` probes capabilities in the same request —
- * which is why this is the moment the card stops saying "not probed".
+ * Both callers are the same `POST`, because both are the same act. Describing
+ * a discovered entry writes the sentence for a source the platform already
+ * built from, and the id derives from that source, so the row lands at the
+ * identity the listing was already showing rather than beside it. Adding an
+ * entry by hand names a source nobody has built here yet, and gets a row with
+ * no versions until something builds one.
  *
- * No optimistic update. The probe is the point: guessing the answer locally
- * and correcting it a second later is worse than a pending button.
+ * The response is a probed view — `createImageCatalogEntry` probes capabilities
+ * in the same request — which is why this is the moment a card stops saying
+ * "not probed". No optimistic update: the probe is the point, and guessing the
+ * answer locally to correct it a second later is worse than a pending button.
  */
-export function useDescribeImage(namespace: string) {
+export function useCatalogueImage(namespace: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { name: string; intent: string; source: ImageCatalogEntryView['source'] }) =>
@@ -99,6 +102,29 @@ export function useDescribeImage(namespace: string) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.imageCatalogEntry(namespace, data.entry.id),
+      });
+    },
+  });
+}
+
+/**
+ * Build one version of a built entry, without running a workflow.
+ *
+ * The request stays open for the whole build — minutes, not the sub-second the
+ * other mutations take — so the caller must keep its pending state visible
+ * rather than treating this as a click that settles. On success both reads are
+ * invalidated: the new version is on the daemon, and every version fact is
+ * recomputed per read, so an invalidate is the whole update (#1344).
+ */
+export function useBuildImageVersion(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { repo: string; commit: string; dockerfile: string }) =>
+      mediforce.imageCatalog.build({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entryId),
       });
     },
   });

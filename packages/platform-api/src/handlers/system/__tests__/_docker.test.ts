@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { BuildImageRequestSchema } from '@mediforce/platform-core';
 import {
+  buildImageViaContainerWorker,
   fetchContainerWorkerImageHistory,
   fetchFromContainerWorker,
   fetchFromLocalDocker,
@@ -404,5 +406,39 @@ describe('image history reads', () => {
     });
 
     expect(signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+describe('image builds', () => {
+  const request = {
+    image: 'mediforce-built:abc123abc123',
+    repoUrl: 'git@github.com:org/repo.git',
+    commit: 'bf0353b123bee142100ae5605ec15ad7605ceb4f',
+    dockerfile: 'container/Dockerfile',
+    namespace: 'acme',
+  } as const;
+
+  it('surfaces a worker build failure instead of reporting success', async () => {
+    // Unlike the probe and the history read, a build cannot degrade to
+    // `unknown`: the caller asked for an image to exist.
+    await expect(
+      buildImageViaContainerWorker(request, {
+        baseUrl: 'http://worker.test',
+        fetch: async () => new Response(JSON.stringify({ error: 'no such Dockerfile' }), { status: 500 }),
+      }),
+    ).rejects.toThrow('no such Dockerfile');
+  });
+
+  it('sends the build to the worker as the shared request shape', async () => {
+    let sent: unknown;
+    await buildImageViaContainerWorker(request, {
+      baseUrl: 'http://worker.test',
+      fetch: async (_url, init) => {
+        sent = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ image: request.image }));
+      },
+    });
+
+    expect(BuildImageRequestSchema.parse(sent)).toEqual(request);
   });
 });

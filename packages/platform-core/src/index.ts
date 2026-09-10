@@ -578,6 +578,7 @@ export {
   BUILD_LABELS,
   OCI_LABELS,
   IMAGE_INSPECT_FORMAT,
+  BuildImageRequestSchema,
   buildProvenanceLabelArgs,
   imageInspectArgs,
   parseImageInspect,
@@ -585,6 +586,7 @@ export {
   shortImageId,
 } from './utils/image-provenance';
 export type {
+  BuildImageRequest,
   ImageProvenance,
   InspectedImage,
   ReadImageProvenance,

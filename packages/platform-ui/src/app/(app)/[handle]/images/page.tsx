@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ExternalLink,
   Layers,
+  Plus,
   Search,
   Server,
 } from 'lucide-react';
@@ -22,6 +23,8 @@ import { routes } from '@/lib/routes';
 import { ConceptPopover } from '@/components/ui/concept-intro';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useImageCatalogEntries, useImageCatalogEntry } from '@/hooks/use-image-catalog';
+import { AddImageDialog } from '@/components/images/add-image-dialog';
+import { BuildImageDialog } from '@/components/images/build-image-dialog';
 import { DescribeImageDialog } from '@/components/images/describe-image-dialog';
 import { useWorkflowsByImage, type WorkflowImageMatch } from '@/hooks/use-workflows-by-image';
 import {
@@ -326,7 +329,11 @@ function EntryCard({
   const detail = useImageCatalogEntry(handle, entry.id, expanded);
   const shown = detail.entry ?? entry;
   const [describing, setDescribing] = useState(false);
+  const [building, setBuilding] = useState(false);
   const discovered = shown.origin === 'discovered';
+  // Only a built source carries the recipe a build needs. A `referenced` entry
+  // names an image the platform holds no inputs for, so it has nothing to build.
+  const buildable = shown.source.kind === 'built';
   const versions = shown.versions;
   const newest = versions[0];
 
@@ -392,15 +399,26 @@ function EntryCard({
               {versions.length} version{versions.length === 1 ? '' : 's'}
             </span>
           </button>
-          {discovered && (
-            <div className="shrink-0 py-3 pr-4">
-              <button
-                type="button"
-                onClick={() => setDescribing(true)}
-                className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
-              >
-                Describe
-              </button>
+          {(discovered || buildable) && (
+            <div className="flex shrink-0 gap-2 py-3 pr-4">
+              {buildable && (
+                <button
+                  type="button"
+                  onClick={() => setBuilding(true)}
+                  className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
+                >
+                  Build
+                </button>
+              )}
+              {discovered && (
+                <button
+                  type="button"
+                  onClick={() => setDescribing(true)}
+                  className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
+                >
+                  Describe
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -410,6 +428,14 @@ function EntryCard({
             handle={handle}
             open={describing}
             onOpenChange={setDescribing}
+          />
+        )}
+        {building && (
+          <BuildImageDialog
+            entry={shown}
+            handle={handle}
+            open={building}
+            onOpenChange={setBuilding}
           />
         )}
 
@@ -474,6 +500,7 @@ export default function ImagesPage() {
   const [query, setQuery] = useState('');
   // `?entry=` is how Infrastructure crosses over to a specific entry.
   const [expandedId, setExpandedId] = useState<string | null>(search.get('entry'));
+  const [adding, setAdding] = useState(false);
 
   const grouped = useMemo(
     () => groupByBase(entries.filter((entry) => matchesImageQuery(entry, query))),
@@ -514,16 +541,31 @@ export default function ImagesPage() {
             Images @{handle} offers for workflow steps, grouped by what each was built on.
           </p>
         </div>
-        {canAdmin && (
-          <Link
-            href={routes.adminInfrastructure(handle)}
-            className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+        <div className="flex items-center gap-2">
+          {canAdmin && (
+            <Link
+              href={routes.adminInfrastructure(handle)}
+              className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              <Server className="h-3.5 w-3.5" />
+              Raw daemon inventory
+            </Link>
+          )}
+          {/* Any member, matching the write gate on the entry itself — an entry
+              executes nothing and names an image string a step author can
+              already type (ADR-0022 decision 3). */}
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            <Server className="h-3.5 w-3.5" />
-            Raw daemon inventory
-          </Link>
-        )}
+            <Plus className="h-3.5 w-3.5" />
+            Add image
+          </button>
+        </div>
       </div>
+
+      {adding && <AddImageDialog handle={handle} open={adding} onOpenChange={setAdding} />}
 
       <div className="relative mb-6">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -564,7 +606,7 @@ export default function ImagesPage() {
           </div>
           <p className="text-sm text-muted-foreground">
             {query.trim() === ''
-              ? 'No images catalogued yet, and no workflow here has built one. Register one with `mediforce images create`.'
+              ? 'No images catalogued yet, and no workflow here has built one. Add image registers the repository and Dockerfile yours are built from.'
               : 'No images match your search.'}
           </p>
         </div>
