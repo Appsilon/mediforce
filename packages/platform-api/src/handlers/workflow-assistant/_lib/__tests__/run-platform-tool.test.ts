@@ -34,7 +34,6 @@ function buildScope(overrides: Record<string, unknown> = {}): CallerScope {
         { uid: 'u2', role: 'member', joinedAt: '2026-01-02' },
       ]),
     },
-    // The scoped repo the trigger handler resolves the target workflow through.
     workflowDefinitions: {
       isNameDeleted: vi.fn().mockResolvedValue(false),
       getDefaultVersion: vi.fn().mockResolvedValue(1),
@@ -84,10 +83,6 @@ describe('runPlatformTool', () => {
   });
 
   it('lists the agents a step could point at, with the MCP servers each is bound to', async () => {
-    // An MCP reaches a step only through the agent it points at, so the
-    // bindings are what decides whether an existing agent can be reused. Listed
-    // without them, the assistant could only guess, and guessing means a second
-    // agent that does the same thing.
     const result = await runPlatformTool('list_agents', {}, buildScope(), 'acme');
     expect(result).toEqual({
       agents: [
@@ -109,9 +104,6 @@ describe('runPlatformTool', () => {
   });
 
   it('lists the roles this workspace grants, with how many people hold each', async () => {
-    // A step's `allowedRoles` naming a role nobody holds is a task nobody can
-    // claim. The assistant could not check, so it wrote whatever word the
-    // person used.
     const result = await runPlatformTool('list_roles', {}, buildScope(), 'acme');
     expect(result).toEqual({
       roles: [
@@ -134,8 +126,6 @@ describe('runPlatformTool', () => {
   });
 
   it('says a schedule needs a saved workflow, rather than failing the turn', async () => {
-    // A trigger attaches to a registered workflow, and a canvas that has never
-    // been saved has none. The turn carries on and the reply says so.
     const result = await runPlatformTool('create_cron_trigger', { schedule: '0 9 * * 1' }, buildScope(), 'acme');
     expect(result).toMatchObject({ needsSave: true });
   });

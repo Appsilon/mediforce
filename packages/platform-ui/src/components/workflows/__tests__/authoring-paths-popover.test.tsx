@@ -25,15 +25,10 @@ describe('AuthoringPathsPopover (#1185)', () => {
   it('covers the path that lives outside the browser', () => {
     openPopover();
 
-    // Import is the one a user cannot discover by clicking around the canvas.
     expect(screen.getByTestId('authoring-path-import')).toHaveTextContent(/git/i);
   });
 
   it('sends nobody to a checkout for what the app can do', () => {
-    // The `/design-workflow` skill was listed while the canvas could not author
-    // scripts, a Dockerfile or skills. A workflow carries its own files now, so
-    // naming it here would send people out of the app for a capability that is
-    // in it — and the assistant entry has to say it writes those files.
     openPopover();
 
     expect(screen.queryByTestId('authoring-path-agent')).toBeNull();

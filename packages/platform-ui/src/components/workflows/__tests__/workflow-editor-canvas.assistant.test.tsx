@@ -3,19 +3,14 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
-// ---- Mocks (must be before component import) ----
-
 const secretState = vi.hoisted(() => ({ keys: ['OPENROUTER_API_KEY'] as string[] }));
 
 const assistantState = vi.hoisted(() => ({
   planCalls: [] as { messages: { role: string; content: string }[]; signal?: AbortSignal }[],
   askCalls: [] as { messages: { role: string; content: string }[]; signal?: AbortSignal }[],
   plan: { plan: ['Poll SFTP, validate, then report.'], questions: [] as unknown[], phases: [] as string[] },
-  /** Resolves the ask call, so a test can halt a turn that is still in flight. */
   askResolver: null as null | ((value: unknown) => void),
-  /** Set to answer the build immediately instead of leaving it in flight. */
   askResult: null as null | { reply?: string; toolCalls?: unknown[] },
-  /** Set to make the planning call fail the way a refused request does. */
   planError: null as null | Error,
 }));
 
@@ -62,8 +57,6 @@ vi.mock('@/hooks/use-docker-images', () => ({
   isImageAvailable: () => true,
 }));
 
-// Renders the selected step; adding a step selects it, and the real editor
-// wants the auth context this test has no use for.
 vi.mock('../workflow-editor/step-editor', () => ({
   StepEditor: () => <div data-testid="step-editor" />,
 }));
@@ -73,13 +66,9 @@ vi.mock('@/components/workflows/workflow-diagram', () => ({
 }));
 
 import { WorkflowEditorCanvas } from '../workflow-editor-canvas';
-// The mocked client's own error class: the pane tells a refused request apart
-// from a plan it merely could not read.
 import { ApiError } from '@/lib/mediforce';
 
-// jsdom has no scrolling; the pane scrolls its thread to the newest message.
 Element.prototype.scrollTo = vi.fn();
-// …and no ResizeObserver, which the tooltip's arrow measures itself with.
 globalThis.ResizeObserver ??= class {
   observe() {}
   unobserve() {}
@@ -123,8 +112,6 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
   });
 
   it('does not send the plan it showed back to the model', async () => {
-    // The failure this replaces: the plan reads as the assistant's own last
-    // turn, so the model answers "shall I go ahead?" instead of building.
     openAssistant();
     await ask('Build a CDISC validation workflow.');
 
@@ -135,9 +122,6 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
   });
 
   it('says a build cannot be saved yet, without waiting for the canvas state to commit', async () => {
-    // Read from the graph the reducer just returned. It used to be read back
-    // from a ref mirroring state one macrotask later, which needed a
-    // setTimeout to be true at all.
     assistantState.askResult = {
       reply: 'Added a validation step.',
       toolCalls: [{
@@ -154,13 +138,10 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
   });
 
   it('warns, before you type, when the workspace has no OpenRouter key', async () => {
-    // Without it every turn fails at the server. Saying so up front beats
-    // three error toasts after the fact.
     secretState.keys = ['STUDY_ID'];
     openAssistant();
 
     const warning = await screen.findByLabelText(/assistant needs a key|OPENROUTER_API_KEY/i);
-    // Pulsing and hoverable: it decides whether the pane works at all.
     expect(warning.className).toContain('animate-pulse');
     fireEvent.focus(warning);
     await waitFor(() => {
@@ -175,22 +156,16 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
   });
 
   it('reports a refused turn once, not once per call', async () => {
-    // One missing key produced three popups: the global 4xx listener fired for
-    // the planning call and again for the build, and the pane added its own.
     assistantState.planError = new ApiError('OPENROUTER_API_KEY not configured in workspace secrets');
     openAssistant();
     fireEvent.change(screen.getByPlaceholderText(/ask ai to build/i), { target: { value: 'Build it.' } });
     fireEvent.click(screen.getByLabelText('Send message to the assistant'));
 
     await waitFor(() => { expect(toastState.calls.length).toBe(1); });
-    // and it never reached the build, which would have failed the same way
     expect(assistantState.askCalls).toHaveLength(0);
   });
 
   it('says when a step it just wrote names a role nobody holds', () => {
-    // The editor already warns about this in the step's own panel, but the
-    // person asking the assistant never opens it: they read the reply, which
-    // said the approval step was added and nothing else.
     assistantState.askResult = {
       reply: 'Added a senior lab approval step.',
       toolCalls: [{
@@ -206,7 +181,6 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
     return ask('A senior lab member should approve it.').then(() => waitFor(() => {
       const warning = screen.getByText(/nobody holds "senior-lab-member"/i);
       expect(warning.textContent).toMatch(/Settings → Members/);
-      // Warnings read as warnings: their own message, in the warning colour.
       expect(warning.closest('[data-tone="warning"]')).not.toBeNull();
     }));
   });
@@ -232,8 +206,6 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
   });
 
   it('renders a multi-line plan as a list, not one run-on paragraph', async () => {
-    // Markdown folds single newlines into spaces, so a plan joined with them
-    // arrived as "Fix the regex error Replace the patterns Test the script".
     assistantState.plan = {
       plan: ['Fix the regex escape error', 'Replace the patterns with R syntax', 'Test the script'],
       questions: [],
@@ -251,8 +223,6 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
   });
 
   it('renders the reply as markdown, not as the characters it is written in', async () => {
-    // The pane printed the raw string, so a reply with a list or **bold** read
-    // as asterisks to the person it was written for.
     assistantState.askResult = { reply: 'Added two steps:\n\n- **Poll** the drop\n- Validate the file' };
     openAssistant();
     await ask('Build it.');

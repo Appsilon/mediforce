@@ -62,11 +62,7 @@ function buildToolDefinitions(options: { canSchedule: boolean }): OpenRouterTool
   // Platform tools run here, as the caller, and their results come back into
   // this same conversation — unlike the canvas tools, which the browser applies.
   const platformTools = Object.entries(WORKFLOW_ASSISTANT_PLATFORM_TOOLS)
-    // A schedule attaches to a saved workflow, so on a canvas that has never
-    // been saved the tool is not offered at all. Offered and then refusing, the
-    // model filled the gap with instructions of its own — the Triggers tab,
-    // then a CLI command copied out of the embedded reference. A tool it cannot
-    // see is a request it simply declines.
+    // A schedule attaches to a saved workflow, so on a canvas that has never been saved the tool is not offered at all.
     .filter(([name]) => name !== 'create_cron_trigger' || options.canSchedule)
     .map(([name, schema]) => ({
     type: 'function',
@@ -182,8 +178,7 @@ function describeGraph(steps: WorkflowStep[], transitions: Transitions): string 
   return `The canvas now holds these steps, by id: ${stepList}. Transitions: ${edgeList}.`;
 }
 
-/** The graph and reference errors a definition already carries, so the gate can
- *  tell a defect this turn introduced from one it inherited. */
+// The graph and reference errors a definition already carries, so the gate can tell a defect this turn introduced from one it inherited.
 function collectGraphErrors(
   steps: WorkflowStep[],
   transitions: Transitions,
@@ -205,9 +200,7 @@ function collectGraphErrors(
   ];
 }
 
-/** What to tell the model about defects the canvas arrived with. Reported, not
- *  enforced: it did not cause them, and the person may not want them touched —
- *  but a workflow that cannot run is worth a sentence. */
+// What to tell the model about defects the canvas arrived with.
 function inheritedNote(inheritedErrors: string[]): string {
   if (inheritedErrors.length === 0) return '';
   return `\n\nSeparately, this workflow already had ${inheritedErrors.length === 1 ? 'a problem' : 'problems'} before you touched it: ${inheritedErrors.join('; ')}. Do not silently fix ${inheritedErrors.length === 1 ? 'it' : 'them'} unless that is what was asked — mention ${inheritedErrors.length === 1 ? 'it' : 'them'} in your reply and offer to.`;
@@ -267,12 +260,7 @@ export function validateResultingGraph(
     : templateParse.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`);
   const applied_ = { steps: orderedSteps, transitions: mergedTransitions };
 
-  // What the canvas was already wrong about before this turn touched it. A
-  // workflow can arrive here invalid — pasted, imported, or authored before a
-  // rule existed — and failing the gate on that made it uneditable: the model
-  // was told to fix something it had not caused, often had no tool for, and
-  // spent its whole turn on. Inherited errors are reported, not enforced; only
-  // what this turn introduced fails the gate.
+  // What the canvas was already wrong about before this turn touched it.
   const inheritedErrors = collectGraphErrors(
     currentDefinition.steps,
     currentDefinition.transitions,
@@ -463,12 +451,7 @@ export async function askWorkflowAssistant(
 
       const graphCheck = validateResultingGraph(input.workflowDefinition, accumulatedToolCalls, input.namespace);
       if (graphCheck.valid) {
-        // A batch that leaves the graph valid is not evidence the request is
-        // done: a model that opens with `update_workflow` and a sentence
-        // announcing the build leaves the starter graph exactly as valid as it
-        // found it. Ending the turn there landed the settings, never the steps,
-        // and handed back a confirmation of work that had not happened. The
-        // model ends its own turn, by answering with no tool calls.
+        // A batch that leaves the graph valid is not evidence the request is done: a model that opens with `update_workflow` and a sentence announcing the build leaves the starter graph exactly as valid as it found it.
         lastErrors = [];
         messages.push({ role: 'assistant', content: response.content, tool_calls: response.toolCalls });
         for (const r of resolved) {

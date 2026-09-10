@@ -637,8 +637,7 @@ export class Mediforce {
   };
 
   readonly assistant: {
-    /** `signal` aborts the request: an assistant turn is the one call long
-     *  enough that a person will want to stop it. */
+    // `signal` aborts the request: an assistant turn is the one call long enough that a person will want to stop it.
     ask: (
       input: AskWorkflowAssistantInput,
       options: { namespace: string; signal?: AbortSignal },

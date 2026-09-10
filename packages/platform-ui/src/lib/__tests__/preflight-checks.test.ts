@@ -411,10 +411,6 @@ describe('runPreflightChecks — an input contract the first step asks for again
   const ctx = { dockerAvailable: false, handle: 'acme', workflowName: 'test-wf' };
 
   it('warns when a required trigger input is also a param on the entry step', () => {
-    // What the assistant kept building: `triggerInput` declares the fields and
-    // the first human step collects them too. `triggerInput` is the workflow's
-    // total contract and is checked unconditionally, so the run is refused with
-    // "Invalid payload" before anyone reaches the step meant to fill it in.
     const wd = buildWorkflowDefinition({ name: 'test-wf' });
     wd.triggerInput = [
       { name: 'app_name', type: 'string', required: true },

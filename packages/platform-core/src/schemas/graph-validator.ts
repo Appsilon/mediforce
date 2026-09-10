@@ -104,12 +104,7 @@ export function validateStepGraph(definition: ProcessDefinition): ValidationResu
           );
         }
       } else if (missingWhen.length > 0 && missingWhen.length < transitions.length) {
-        // A verdict step's transitions are normally all unconditioned — they
-        // mirror the verdict targets and the engine routes by verdict. But the
-        // engine falls back to them whenever a step's output names no verdict,
-        // and a mixed set is exactly what it refuses. Caught here rather than
-        // five minutes into a run: an agent that answers `PASS` instead of a
-        // verdict name is ordinary, and this shape turns that into a crash.
+        // A verdict step's transitions are normally all unconditioned — they mirror the verdict targets and the engine routes by verdict.
         errors.push(
           `Step "${stepId}" routes by verdict, but some of its transitions carry a condition and some do not ` +
             `(no condition on: ${missingWhen.map((t) => t.to).join(', ')}). ` +

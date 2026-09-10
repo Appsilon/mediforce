@@ -23,9 +23,6 @@ describe('resolveStepAssignee', () => {
   });
 
   it('reports a job title as unresolved rather than making it the assignee', async () => {
-    // The live failure: "a data manager reviews the report" became a task
-    // claimed by the literal id `data-manager`, which nobody holds — and with
-    // no unclaim, no reassign and no owner override, the run was unfinishable.
     const directory = directoryWith({ uid: 'uid-dm', email: 'data-manager@company.com' });
 
     expect(await resolveStepAssignee('data-manager', directory))
@@ -38,9 +35,6 @@ describe('resolveStepAssignee', () => {
   });
 
   it('resolves nothing when there is no directory to ask', async () => {
-    // Nothing can confirm the value names a real user, so taking it verbatim
-    // would rebuild the same unclaimable task in the one configuration that
-    // cannot check.
     expect(await resolveStepAssignee('filip', undefined))
       .toEqual({ userId: null, email: null, unresolved: 'filip' });
   });

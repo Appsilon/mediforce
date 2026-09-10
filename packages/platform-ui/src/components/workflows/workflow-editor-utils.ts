@@ -5,19 +5,7 @@ import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core'
 type Transitions = WorkflowDefinition['transitions'];
 type CarryOverEntries = NonNullable<WorkflowDefinition['inputForNextRun']>;
 
-/**
- * Returns two sets of step IDs: those that can move up and those that can move
- * down in a linear segment of the workflow graph.
- *
- * A step can move up iff:
- *   - it has exactly one incoming transition, AND
- *   - its predecessor has exactly one outgoing transition (i.e. the swap is
- *     unambiguous — no branching around the swap point).
- *
- * A step can move down iff:
- *   - it has exactly one outgoing transition, AND
- *   - its successor has exactly one incoming transition.
- */
+// Returns two sets of step IDs: those that can move up and those that can move down in a linear segment of the workflow graph.
 export function computeMoveEligibility(
   steps: WorkflowStep[],
   transitions: Transitions,
@@ -46,22 +34,7 @@ export function computeMoveEligibility(
   return { canMoveUp, canMoveDown };
 }
 
-/**
- * Rewire `verdicts[*].target` when a step is inserted onto an edge or removed.
- *
- * Review/decision steps route by their verdict targets, independently of plain
- * transitions. A canvas edit that rewires only transitions leaves verdicts
- * pointing at the old target, so the engine routes straight there at runtime —
- * skipping an inserted step, or dangling on a deleted one. This applies the same
- * target remap to verdicts that the transition rewiring applies to edges.
- *
- * `scope` is a step id (only that step's verdicts) or `null` (every step).
- * `match` is the target id to repoint, or `null` to repoint every verdict of the
- * scoped step(s). `null` is used (rather than a string sentinel) so a real step
- * id or verdict target — both slugs, which could legitimately be "any"/"all" —
- * can never collide with the "match everything" case. Returns a new array only
- * when something changed; otherwise the original reference.
- */
+// Rewire `verdicts[*].target` when a step is inserted onto an edge or removed.
 export function retargetVerdictTargets(
   steps: WorkflowStep[],
   scope: string | null,
@@ -89,15 +62,7 @@ export function retargetVerdictTargets(
   return changed ? next : steps;
 }
 
-/**
- * Transitions after splicing `newId` in below `afterId`.
- *
- * `beforeId` names the single outgoing branch to split; that branch's `when`
- * moves onto the edge into the new step, so a conditional path stays
- * conditional and a multi-branch step keeps a condition on every outgoing edge.
- * Without `beforeId` the new step takes over the whole outgoing fan, and each
- * rewired edge carries its own condition with it.
- */
+// Transitions after splicing `newId` in below `afterId`.
 export function spliceStepIntoTransitions(
   transitions: Transitions,
   afterId: string,
@@ -120,11 +85,7 @@ export function spliceStepIntoTransitions(
   ];
 }
 
-/**
- * The step a deleted node's dangling verdicts should bridge to: the node's first
- * outgoing transition target, falling back to the terminal step. `undefined`
- * only when neither exists (nothing sensible to bridge to).
- */
+// The step a deleted node's dangling verdicts should bridge to: the node's first outgoing transition target, falling back to the terminal step.
 export function bridgeTargetForDeletion(
   steps: WorkflowStep[],
   transitions: Transitions,
@@ -163,22 +124,7 @@ export type SplitPastedDefinition = {
   error: string | null;
 };
 
-/**
- * Splits a pasted workflow document into the graph the canvas applies and the
- * non-graph fields the page applies, validating the latter against
- * `WorkflowAuthorableSchema`.
- *
- * The canvas used to refuse any document whose non-graph fields differed from
- * the loaded ones, which made the product unable to round-trip its own output:
- * a definition copied from a registered version carries `title`, `triggerInput`
- * and the server-assigned fields, so pasting it back was always refused.
- *
- * Server-managed and lifecycle fields need no strip list here — the authorable
- * schema excludes them by construction and the parse drops them. `name` is
- * omitted on top of that, since the page owns which workflow a paste registers
- * as. Only keys the document actually carried are returned, so a paste cannot
- * silently apply a schema default (`visibility`) the author never wrote.
- */
+// Splits a pasted workflow document into the graph the canvas applies and the non-graph fields the page applies, validating the latter against `WorkflowAuthorableSchema`.
 export function splitPastedDefinition(doc: unknown): SplitPastedDefinition {
   const empty = { steps: undefined, transitions: undefined, inputForNextRun: undefined };
   if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) {
@@ -223,13 +169,7 @@ export function splitPastedDefinition(doc: unknown): SplitPastedDefinition {
   return { graph, nonGraph: applied, ignored, error: null };
 }
 
-/**
- * Ensures every non-terminal step has at least one outgoing transition that
- * points to the terminal step.  If no terminal step exists, one is appended.
- *
- * Returns new arrays only when changes were necessary; otherwise returns the
- * original references so callers can use reference equality to skip updates.
- */
+// Ensures every non-terminal step has at least one outgoing transition that points to the terminal step.
 export function ensureTerminalConnected(
   steps: WorkflowStep[],
   transitions: Transitions,
@@ -261,15 +201,7 @@ export function ensureTerminalConnected(
   return { steps: resultSteps, transitions: resultTransitions };
 }
 
-/**
- * Points carry-over entries (`inputForNextRun`) at a step that was renamed,
- * the same way a rename rewires transitions and verdict targets. Without this
- * the entry keeps the old id, the server's cross-field check rejects the save
- * (`stepId '…' does not match any step id`), and the only way to correct it is
- * to retype the block in the source-code panel.
- *
- * Returns the original reference when no entry named the renamed step.
- */
+// Points carry-over entries (`inputForNextRun`) at a step that was renamed, the same way a rename rewires transitions and verdict targets.
 export function retargetCarryOver(
   entries: CarryOverEntries | undefined,
   oldId: string,
@@ -279,14 +211,7 @@ export function retargetCarryOver(
   return entries.map((entry) => (entry.stepId === oldId ? { ...entry, stepId: newId } : entry));
 }
 
-/**
- * Drops carry-over entries whose step is gone — deleted from the diagram,
- * removed by the assistant, or absent from an applied JSON document. There is
- * nothing left to read the output from, and keeping the entry would make the
- * version unsavable.
- *
- * Returns the original reference when every entry still resolves.
- */
+// Drops carry-over entries whose step is gone — deleted from the diagram, removed by the assistant, or absent from an applied JSON document.
 export function pruneCarryOver(
   entries: CarryOverEntries | undefined,
   steps: WorkflowStep[],
@@ -297,8 +222,7 @@ export function pruneCarryOver(
   return kept.length === entries.length ? entries : kept;
 }
 
-/** What to call a workflow a paste is creating: its display name, else the
- *  version's title, else its id title-cased. */
+// What to call a workflow a paste is creating: its display name, else the version's title, else its id title-cased.
 export function pastedWorkflowName(fields: Record<string, unknown>): string | null {
   const metadata = typeof fields.metadata === 'object' && fields.metadata !== null
     ? fields.metadata as Record<string, unknown>
@@ -311,14 +235,7 @@ export function pastedWorkflowName(fields: Record<string, unknown>): string | nu
   return name === '' ? null : formatStepName(name);
 }
 
-/**
- * Roles the given steps allow that nobody in the workspace holds.
- *
- * `null` held-roles means the roster has not answered — in flight or failed —
- * and must stay silent, or every role is reported as unheld for as long as the
- * roster is slow. Deduplicated and ordered as first seen, since this is read
- * aloud in a sentence.
- */
+// Roles the given steps allow that nobody in the workspace holds.
 export function unheldStepRoles(
   steps: { allowedRoles?: string[] }[],
   heldRoles: string[] | null,

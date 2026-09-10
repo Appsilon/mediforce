@@ -117,9 +117,6 @@ describe('validateStepGraph verdict routing', () => {
 
 describe('validateStepGraph — a fork the engine cannot resolve', () => {
   it('rejects two outgoing transitions when one carries no condition', () => {
-    // What the engine raises mid-run: "Multiple transitions require all to
-    // have 'when' conditions". It crashed five minutes into a run that had
-    // already passed validation, registration and four steps.
     const def = definition(
       [step('check'), step('fix'), step('done', { type: 'terminal' })],
       [
@@ -174,10 +171,6 @@ describe('validateStepGraph — a fork the engine cannot resolve', () => {
   });
 
   it('rejects a decision step whose transitions mix conditioned and unconditioned', () => {
-    // The shape that crashed a run five minutes in: `test-application` routes
-    // by verdict and also carries hand-written transitions, one with a `when`
-    // and one without. When the agent's output names no verdict the engine
-    // falls back to those transitions and refuses the mixed set.
     const def = definition(
       [
         step('test', {

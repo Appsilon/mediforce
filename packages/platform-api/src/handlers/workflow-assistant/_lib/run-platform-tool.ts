@@ -21,9 +21,7 @@ export async function runPlatformTool(
   rawArguments: unknown,
   scope: CallerScope,
   namespace: string,
-  /** The saved workflow the canvas is a version of. Absent on a workflow that
-   *  has never been saved, which is the one case a trigger cannot be attached
-   *  to yet. */
+  // The saved workflow the canvas is a version of.
   workflowName?: string,
 ): Promise<unknown> {
   if (!isPlatformToolName(toolName)) {
@@ -52,12 +50,7 @@ export async function runPlatformTool(
         const agents = await scope.agentDefinitions.list(namespace);
         return {
           agents: agents.map((agent) => {
-            // The MCP servers each agent is bound to, named by what a binding
-            // points at: a catalog id for stdio, the URL for http. This is what
-            // decides whether an existing agent can be reused for "use the X
-            // MCP" — an MCP reaches a step only through the agent the step
-            // names, so without the bindings the only options are guessing and
-            // creating a second agent that does the same thing.
+            // The MCP servers each agent is bound to, named by what a binding points at: a catalog id for stdio, the URL for http.
             const bindings = Object.entries(agent.mcpServers ?? {}).map(
               ([name, binding]) => [name, binding.type === 'stdio' ? binding.catalogId : binding.url] as const,
             );
@@ -98,8 +91,7 @@ export async function runPlatformTool(
         return { created: { id: agent.id, name: agent.name } };
       }
       case 'list_roles': {
-        // Read from the roster rather than a role table: a role exists in this
-        // workspace exactly when somebody has been granted it.
+        // Read from the roster rather than a role table: a role exists in this workspace exactly when somebody has been granted it.
         const { members } = await listNamespaceMembers({ namespace }, scope);
         const holders = new Map<string, number>();
         for (const member of members) {
@@ -116,9 +108,7 @@ export async function runPlatformTool(
       case 'create_cron_trigger': {
         const input = parsed.data as z.infer<typeof WORKFLOW_ASSISTANT_PLATFORM_TOOLS['create_cron_trigger']>;
         if (workflowName === undefined) {
-          // A trigger attaches to a registered workflow, and this canvas has
-          // never been saved. Reported rather than thrown: the build carries
-          // on, and the reply says the schedule comes after the first save.
+          // A trigger attaches to a registered workflow, and this canvas has never been saved.
           return {
             error: 'A schedule attaches to a saved workflow, and this one has never been saved. Tell them plainly: the schedule cannot be attached yet and will not take effect until the workflow is saved at least once, and you will add it as soon as they save.',
             needsSave: true,

@@ -1,16 +1,7 @@
 import { z } from 'zod';
 import { AgentMcpBindingMapSchema } from './agent-mcp-binding';
 
-/**
- * Tools the assistant runs against the platform itself rather than the canvas.
- *
- * Two things separate them from the canvas tools. They execute server-side
- * during the turn, so their results come back to the model in the same
- * conversation; and they run as the person who asked — no service account, no
- * elevated path — so a member who may not create an agent gets the same refusal
- * the UI would give them, and the assistant says an admin is needed rather than
- * doing it anyway.
- */
+// Tools the assistant runs against the platform itself rather than the canvas.
 
 /** Which secret keys this workspace has. Names only: a value never enters the
  *  conversation, which is the whole point of a secret. */
@@ -25,10 +16,7 @@ export type ListAgentsTool = z.infer<typeof ListAgentsToolSchema>;
 export const ListToolCatalogToolSchema = z.object({});
 export type ListToolCatalogTool = z.infer<typeof ListToolCatalogToolSchema>;
 
-/**
- * Create an agent a step can then use. The fields are the ones a person fills
- * in the Agents form; everything else the platform decides.
- */
+// Create an agent a step can then use.
 export const CreateAgentToolSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
@@ -41,11 +29,7 @@ export const CreateAgentToolSchema = z.object({
 });
 export type CreateAgentTool = z.infer<typeof CreateAgentToolSchema>;
 
-/**
- * Add an MCP server to the workspace's Tool Catalog, so an agent can bind to
- * it. Admin-only on the platform, which is the point of running as the user:
- * a member gets the refusal and is told who can do it.
- */
+// Add an MCP server to the workspace's Tool Catalog, so an agent can bind to it.
 export const CreateToolCatalogEntryToolSchema = z.object({
   /** Stable name bindings reference. Derived from the command when omitted. */
   id: z.string().min(1).optional(),
@@ -58,27 +42,18 @@ export const CreateToolCatalogEntryToolSchema = z.object({
 });
 export type CreateToolCatalogEntryTool = z.infer<typeof CreateToolCatalogEntryToolSchema>;
 
-/**
- * Put this workflow on a schedule. A trigger is a resource attached to a
- * *registered* workflow rather than a field of the definition, which is why it
- * is a platform call and not a canvas edit — and why it needs the workflow to
- * have been saved at least once.
- */
+// Put this workflow on a schedule.
 export const CreateCronTriggerToolSchema = z.object({
-  /** Standard five-field cron, e.g. `0 9 * * 1` for Mondays at 09:00. */
+  // Standard five-field cron, e.g.
   schedule: z.string().min(1),
-  /** Names the row, so a workflow can carry more than one schedule. */
+  // Names the row, so a workflow can carry more than one schedule.
   name: z.string().min(1).max(100).optional(),
-  /** The static input every tick hands the run. Validated against the
-   *  workflow's `triggerInput`, so it has to satisfy that contract. */
+  // The static input every tick hands the run.
   payload: z.record(z.string(), z.unknown()).optional(),
 });
 export type CreateCronTriggerTool = z.infer<typeof CreateCronTriggerToolSchema>;
 
-/** Which roles this workspace actually grants, and how many people hold each.
- *  A step's `allowedRoles` naming a role nobody holds is a task nobody can
- *  claim, so this is what turns "a data manager reviews it" into either a real
- *  role or a plain sentence asking for one to be created. */
+// Which roles this workspace actually grants, and how many people hold each.
 export const ListRolesToolSchema = z.object({});
 export type ListRolesTool = z.infer<typeof ListRolesToolSchema>;
 
