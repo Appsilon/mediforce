@@ -30,7 +30,7 @@ import type { WorkflowSettingsDraft } from './workflow-settings-utils';
 import { unheldStepRoles } from './workflow-editor-utils';
 import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
-import { mediforce, ApiError } from '@/lib/mediforce';
+import { mediforce, mediforceSilent, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { applyWorkflowAssistantToolCalls, type WorkflowAssistantToolCall } from '@mediforce/platform-core';
@@ -452,12 +452,27 @@ export function WorkflowEditorCanvas({
   const [assistantElapsed, setAssistantElapsed] = useState(0);
   /** Something arrived while the pane was collapsed. Cleared on opening it. */
   const [assistantUnread, setAssistantUnread] = useState(false);
+  /** Whether this workspace holds the key every assistant turn needs. Probed
+   *  once when the pane opens: without it the server refuses every turn, and
+   *  saying so before the first message beats an error after it. */
+  const [assistantKeyMissing, setAssistantKeyMissing] = useState(false);
   /** The turn in flight, so the halt button can stop it. */
   const assistantAbortRef = useRef<AbortController | null>(null);
   const assistantScrollRef = useRef<HTMLDivElement>(null);
   const assistantInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+  useEffect(() => {
+    if (!aiPaneOpen || !namespace) return;
+    let cancelled = false;
+    // `mediforceSilent`: a probe that fails is not the person's problem, and a
+    // toast about it would be the third one this pane has learned not to raise.
+    void mediforceSilent.secrets.list({ namespace })
+      .then(({ keys }) => { if (!cancelled) setAssistantKeyMissing(keys.includes('OPENROUTER_API_KEY') === false); })
+      .catch(() => { if (!cancelled) setAssistantKeyMissing(false); });
+    return () => { cancelled = true; };
+  }, [aiPaneOpen, namespace]);
+
     const el = assistantInputRef.current;
     if (!el) return;
   const heldRolesRef = useRef<string[] | null>(null);
@@ -509,6 +524,7 @@ export function WorkflowEditorCanvas({
 
   const settingsDraftRef = useRef(settingsDraft);
   settingsDraftRef.current = settingsDraft;
+  heldRolesRef.current = heldRoles;
 
   const applyAssistantToolCalls = useCallback((toolCalls: WorkflowAssistantToolCall[]): { summary: string; error: string | null; steps: WorkflowStep[] } => {
     const result = applyWorkflowAssistantToolCalls(
@@ -526,7 +542,6 @@ export function WorkflowEditorCanvas({
     setEditedInputForNextRun(result.inputForNextRun);
     // The page owns the workflow-level fields, so the reducer's settings go
     // back the same way the settings panel's edits do.
-  heldRolesRef.current = heldRoles;
     onSettingsChange?.(result.settings);
     const lastAdded = result.addedStepIds[result.addedStepIds.length - 1];
     if (lastAdded) setSelectedStepId(lastAdded);
@@ -611,7 +626,7 @@ export function WorkflowEditorCanvas({
     assistantAbortRef.current = controller;
 
     try {
-      const result = await mediforce.assistant.ask(
+      const result = await mediforceSilent.assistant.ask(
         {
           messages: messagesForModel(answered),
           model: assistantModel,
@@ -699,18 +714,29 @@ export function WorkflowEditorCanvas({
     assistantAbortRef.current = controller;
 
     let planned: PlanWorkflowBuildOutput | null = null;
+    let refusal: ApiError | null = null;
     try {
-      planned = await mediforce.assistant.plan(
+      planned = await mediforceSilent.assistant.plan(
         { messages: messagesForModel(nextMessages), model: assistantModel, workflowDefinition: assistantWorkflowDefinition() },
         { namespace, signal: controller.signal },
       );
-    } catch {
-      // The plan is an aid, not the work: a planning call that fails must not
-      // cost the user their turn, so the build runs as it always did.
+    } catch (err) {
+      // The plan is an aid, not the work, so a plan this pane merely could not
+      // read costs nobody their turn. A request the *server* refused is
+      // different: the build is the same request with a longer prompt and
+      // fails identically, so it is reported once here instead of twice.
+      if (err instanceof ApiError) refusal = err;
       planned = null;
     } finally {
       assistantAbortRef.current = null;
       setAssistantPlanning(false);
+    }
+
+    // The server refused the request, and the build is the same request with a
+    // longer prompt. Reported once here instead of failing twice.
+    if (refusal !== null) {
+      toast({ variant: 'error', title: 'Assistant error', description: refusal.message });
+      return;
     }
 
     if (controller.signal.aborted) {
@@ -1046,6 +1072,20 @@ export function WorkflowEditorCanvas({
                 <span className="text-sm font-semibold shrink-0">AI Assistant</span>
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                {assistantKeyMissing && (
+                  // Pulsing, because it is the difference between the pane
+                  // working and every message failing, and it sits next to
+                  // controls a person is about to reach for anyway.
+                  <InstantTooltip label="OPENROUTER_API_KEY is missing from this workspace">
+                    <span
+                      tabIndex={0}
+                      className="rounded-md p-1 text-amber-600 dark:text-amber-500 animate-pulse cursor-help"
+                      aria-label="The assistant needs a key: OPENROUTER_API_KEY is not set in this workspace"
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                    </span>
+                  </InstantTooltip>
+                )}
                 <button
                   onClick={() => setAssistantSettingsOpen((prev) => !prev)}
                   className={cn(
