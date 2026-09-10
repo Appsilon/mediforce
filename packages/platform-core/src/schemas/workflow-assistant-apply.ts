@@ -148,6 +148,38 @@ export function applyWorkflowAssistantToolCalls(
           : { externalSkillsRepo: { ...workingSettings.externalSkillsRepo, ...patch.externalSkillsRepo } }),
       };
       outcomes.push({ tool: 'update_workflow', stepId: supplied.map(([key]) => key).join(', ') });
+    } else if (call.tool === 'write_workflow_file') {
+      const { path, contents } = call.arguments;
+      const existing = workingSettings.artifacts ?? [];
+      const at = existing.findIndex((artifact) => artifact.path === path);
+      // Replaced in place rather than appended, so the order a person sees in
+      // the files panel does not shuffle every time a file is rewritten.
+      workingSettings = {
+        ...workingSettings,
+        artifacts: at === -1
+          ? [...existing, { path, contents }]
+          : existing.map((artifact, i) => (i === at ? { path, contents } : artifact)),
+      };
+      outcomes.push({ tool: 'write_workflow_file', stepId: path });
+    } else if (call.tool === 'remove_workflow_file') {
+      const { path } = call.arguments;
+      const existing = workingSettings.artifacts ?? [];
+      if (existing.some((artifact) => artifact.path === path) === false) {
+        outcomes.push({
+          tool: 'remove_workflow_file',
+          stepId: path,
+          error: `This workflow carries no file at "${path}", so there was nothing to remove.`,
+        });
+        continue;
+      }
+      const kept = existing.filter((artifact) => artifact.path !== path);
+      // An empty list is not the same as carrying no files: it would register
+      // as `artifacts: []` and read as a deliberate empty set.
+      workingSettings = {
+        ...workingSettings,
+        artifacts: kept.length > 0 ? kept : undefined,
+      };
+      outcomes.push({ tool: 'remove_workflow_file', stepId: path });
     } else if (call.tool === 'set_transition_condition') {
       const { from, to, when } = call.arguments;
       const edge = workingTransitions.find((t) => t.from === from && t.to === to);

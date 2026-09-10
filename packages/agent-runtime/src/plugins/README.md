@@ -50,7 +50,17 @@ jobs only.
 
 `base-container-agent-plugin.ts` (spawn, mounts, git, MCP, output),
 `docker-spawn-strategy.ts` (local vs queued), `docker-image-builder.ts`,
-`git-clone.ts`, `resolve-env.ts`, `container-plugin.ts`.
+`git-clone.ts`, `resolve-env.ts`, `container-plugin.ts`,
+`workflow-artifacts.ts`.
+
+`workflow-artifacts.ts` writes the files a workflow carries (`artifacts` on the
+definition) to a content-addressed host directory and both container plugins
+mount it read-only at `/artifacts`. It is also where a carried `Dockerfile`
+gets its build context, and where `resolveSkillsDir` looks first — which is
+what lets a workflow authored in the app run without a git checkout. Do not
+resolve an artifact path by hand: `materializeArtifacts` refuses a path that
+would escape the directory, and the tag/dir are keyed on file content so a
+changed file never overwrites what a running step is reading.
 
 Execution model in depth:
 [`docs/reference/container-steps.md`](../../../../docs/reference/container-steps.md).

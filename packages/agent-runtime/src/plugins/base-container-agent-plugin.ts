@@ -8,6 +8,7 @@ import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, Mc
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
+import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
 import { createLineStreamReader, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
@@ -811,6 +812,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       await this.resolveRunWorkspace();
       const workingDirForPrompt = isLocalMode ? this.runWorkspaceHandle!.path : '/workspace';
 
+      // Files the workflow carries are written before the prompt is built: the
+      // SKILL.md read below happens on the host, in local mode as well as
+      // Docker, so the mount alone would be too late.
+      if (isWorkflowAgentContext(this.context)) {
+        await materializeArtifacts(this.context.workflowDefinition.artifacts);
+      }
+
       // Fetch skills from the workflow's external skills repo if configured.
       if (this.agentConfig.skillsDir && isWorkflowAgentContext(this.context)) {
         const wfRepo = this.context.workflowDefinition.externalSkillsRepo;
@@ -1546,6 +1554,16 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       '-v', `${this.runWorkspaceHandle.path}:/workspace`,
       '-w', '/workspace',
     );
+
+    // The workflow's own files, read-only at /artifacts: the same delivery the
+    // script plugin uses, so a definition that carries its scripts and skills
+    // runs on an instance that has never seen the repository.
+    const artifactsHostDir = isWorkflowAgentContext(this.context)
+      ? await materializeArtifacts(this.context.workflowDefinition.artifacts)
+      : null;
+    if (artifactsHostDir !== null) {
+      dockerArgs.push('-v', `${artifactsHostDir}:${CONTAINER_ARTIFACTS_MOUNT}:ro`);
+    }
 
     // Bind-mount the Claude Code plugin root (read-only) when skillsDir is configured.
     // The host `options.pluginDir` becomes `${CONTAINER_PLUGIN_MOUNT}` inside the container;

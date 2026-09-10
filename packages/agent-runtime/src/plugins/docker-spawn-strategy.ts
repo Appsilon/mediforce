@@ -13,17 +13,30 @@ import { dirname } from 'node:path';
 import { ensureImage } from './docker-image-builder';
 import { createLineStreamReader } from '@mediforce/platform-core';
 
+/**
+ * How to get the image if it is not there. Either a git repo at a commit, or a
+ * host directory that already holds the build context — the materialized files
+ * a workflow carries, which need no clone. Exactly one of the two is set.
+ */
 export interface ImageBuildMeta {
   image: string;
-  repoUrl: string;
+  repoUrl?: string;
   /** User-supplied repo reference (pre-normalization), used to pick the clone transport.
    *  `repoUrl` stays the SSH-normalized form so it remains the cache-tag identity. */
-  repoRef: string;
-  commit: string;
+  repoRef?: string;
+  commit?: string;
   dockerfile?: string;
   /** Resolved token for authenticated HTTPS clones; SSH refs without a token use the deploy key. */
   repoToken?: string;
+  /** Host path to build from, instead of a clone. Reachable from the worker as
+   *  well as the orchestrator: it lives under the shared temp directory, the
+   *  same assumption the skills cache and the `/artifacts` mount already make. */
+  contextDir?: string;
 }
+
+/** A first image build is minutes of `docker build`, not seconds of container
+ *  start, so it gets its own budget rather than a step's timeout. */
+const IMAGE_BUILD_TIMEOUT_MS = 30 * 60 * 1000;
 
 export interface DockerSpawnRequest {
   dockerArgs: string[];
@@ -65,6 +78,12 @@ export interface DockerSpawnResult {
 export interface DockerSpawnStrategy {
   spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult>;
   /**
+   * Build the image without running anything. A dry run uses this: execution is
+   * mocked, but whether the image compiles is the one thing a mock can never
+   * answer, and it is the part that takes minutes and fails.
+   */
+  ensureImage(build: ImageBuildMeta): Promise<void>;
+  /**
    * `true` when `onStdoutLine`/`onStderrLine` are invoked live during execution.
    * `false` when they are invoked after exit (queued strategy replays buffered output).
    * Plugins don't need to branch on this for correctness — events are identical either
@@ -83,6 +102,10 @@ const CONTAINER_ID_LINE = /^[0-9a-f]{12,64}$/;
  */
 export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
   readonly supportsLiveStreaming = true;
+
+  async ensureImage(build: ImageBuildMeta): Promise<void> {
+    await ensureImage(build);
+  }
 
   async spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
     if (request.imageBuild) {
@@ -232,6 +255,24 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
  */
 export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
   readonly supportsLiveStreaming = false;
+
+  async ensureImage(build: ImageBuildMeta): Promise<void> {
+    // Through the queue, because the worker is where Docker is: a build-image
+    // job ensures the image and returns without running a container.
+    const { enqueueDockerJob } = await import('@mediforce/container-worker');
+    await enqueueDockerJob({
+      jobType: 'build-image',
+      dockerArgs: [],
+      stdinPayload: null,
+      timeoutMs: IMAGE_BUILD_TIMEOUT_MS,
+      containerName: `mediforce-build-${build.image.replace(/[^a-zA-Z0-9_.-]/g, '-')}`.slice(0, 63),
+      processInstanceId: 'build-image',
+      stepId: 'build-image',
+      outputDir: '',
+      logFile: null,
+      imageBuild: build,
+    });
+  }
 
   async spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
     const { enqueueDockerJob, encodeFilePayload, decodeFilePayload } = await import('@mediforce/container-worker');

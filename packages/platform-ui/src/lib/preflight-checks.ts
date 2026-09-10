@@ -1,5 +1,5 @@
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
-import { type WorkflowDefinition, normaliseModelId, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
+import { type WorkflowDefinition, normaliseModelId, stepHasBuildSource, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
 
 export interface PreflightAction {
   label: string;
@@ -7,7 +7,7 @@ export interface PreflightAction {
 }
 
 export interface PreflightWarning {
-  category: 'missing-image' | 'missing-secret' | 'low-credits' | 'unknown-model';
+  category: 'missing-image' | 'missing-secret' | 'missing-file' | 'low-credits' | 'unknown-model';
   resource: string;
   stepNames: string[];
   message: string;
@@ -67,6 +67,57 @@ export interface OpenRouterCreditsInfo {
 const LOW_CREDITS_THRESHOLD = 0.5;
 const OPENROUTER_CREDITS_URL = 'https://openrouter.ai/settings/credits';
 
+/** Where a workflow's own files appear inside a container. A command naming a
+ *  path under it is naming a file the definition is supposed to carry. */
+const ARTIFACTS_MOUNT_PREFIX = '/artifacts/';
+
+/**
+ * Files a step names that the workflow does not carry.
+ *
+ * Two sources, both exact: a command argument under `/artifacts/`, which by
+ * definition is a carried file, and a `dockerfile` with no carried file and no
+ * repo to build from. `skillsDir` is deliberately not checked — with neither
+ * carried skills nor an `externalSkillsRepo` it resolves against the repository
+ * mounted on the host, which the browser cannot see, so a warning would fire on
+ * every workflow that ships in the repo.
+ */
+function collectMissingFiles(
+  definition: WorkflowDefinition,
+  steps: WorkflowDefinition['steps'],
+): Map<string, string[]> {
+  const carried = new Set((definition.artifacts ?? []).map((artifact) => artifact.path));
+  const missing = new Map<string, string[]>();
+
+  const note = (path: string, stepName: string): void => {
+    if (carried.has(path)) return;
+    const seen = missing.get(path);
+    if (seen) { if (!seen.includes(stepName)) seen.push(stepName); }
+    else { missing.set(path, [stepName]); }
+  };
+
+  for (const step of steps) {
+    if (step.executor !== 'agent' && step.executor !== 'script') continue;
+    const config = step.executor === 'script' ? step.script : step.agent;
+
+    const command = step.executor === 'script' ? step.script?.command : undefined;
+    if (typeof command === 'string') {
+      for (const token of command.split(/\s+/)) {
+        if (token.startsWith(ARTIFACTS_MOUNT_PREFIX)) {
+          note(token.slice(ARTIFACTS_MOUNT_PREFIX.length), step.name);
+        }
+      }
+    }
+
+    const dockerfile = config?.dockerfile;
+    if (typeof dockerfile === 'string' && dockerfile.length > 0
+      && stepHasBuildSource(config, definition.artifacts) === false) {
+      note(dockerfile, step.name);
+    }
+  }
+
+  return missing;
+}
+
 export function runPreflightChecks(
   definition: WorkflowDefinition,
   options: {
@@ -97,9 +148,13 @@ export function runPreflightChecks(
 
     if (options.dockerAvailable && options.dockerImages) {
       const image = containerConfig?.image;
-      const hasBuildSource = typeof containerConfig?.repo === 'string' && containerConfig.repo.length > 0
-        && typeof containerConfig?.commit === 'string' && containerConfig.commit.length > 0;
-      if (typeof image === 'string' && image.length > 0 && !hasBuildSource) {
+      // A step that builds its own image is not missing one — including from a
+      // Dockerfile the workflow carries, which the build resolves before the
+      // step's `image` is ever looked up.
+      if (
+        typeof image === 'string' && image.length > 0 &&
+        stepHasBuildSource(containerConfig, definition.artifacts) === false
+      ) {
         const [repo, tag = 'latest'] = image.split(':');
         const found = options.dockerImages.some((img) => img.repository === repo && img.tag === tag);
         if (!found) {
@@ -136,6 +191,25 @@ export function runPreflightChecks(
       stepNames,
       message: `Image '${image}' not found on platform`,
       actions,
+    });
+  }
+
+  for (const [path, stepNames] of collectMissingFiles(definition, steps)) {
+    const editorHref = options.version !== undefined
+      ? `/${options.handle}/workflows/${encodedName}/definitions/${String(options.version)}`
+      : `/${options.handle}/workflows/${encodedName}`;
+    const isDockerfile = steps.some((step) => {
+      const config = step.executor === 'script' ? step.script : step.agent;
+      return config?.dockerfile === path;
+    });
+    warnings.push({
+      category: 'missing-file',
+      resource: path,
+      stepNames,
+      message: isDockerfile
+        ? `Image cannot be built: this workflow does not carry '${path}', and no repository is configured to build from`
+        : `This workflow does not carry '${path}', so the step cannot read it at /artifacts/${path}`,
+      actions: [{ label: 'Add the file', href: editorHref }],
     });
   }
 
@@ -253,9 +327,10 @@ export function findSkippedChecks(
     const containerConfig = step.executor === 'script' ? step.script : step.agent;
 
     const image = containerConfig?.image;
-    const hasBuildSource = typeof containerConfig?.repo === 'string' && containerConfig.repo.length > 0
-      && typeof containerConfig?.commit === 'string' && containerConfig.commit.length > 0;
-    if (typeof image === 'string' && image.length > 0 && !hasBuildSource) {
+    if (
+      typeof image === 'string' && image.length > 0 &&
+      stepHasBuildSource(containerConfig, definition.artifacts) === false
+    ) {
       needsImageLookup = true;
     }
 

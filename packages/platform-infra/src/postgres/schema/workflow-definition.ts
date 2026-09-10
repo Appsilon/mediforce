@@ -67,6 +67,9 @@ export const workflowDefinitions = pgTable(
     copiedFrom: jsonb('copied_from'),
     source: jsonb('source'),
     inputForNextRun: jsonb('input_for_next_run'),
+    /** Files this version carries: scripts, a Dockerfile, skills. Capped by
+     *  `WorkflowArtifactSchema` so a definition row stays a definition row. */
+    artifacts: jsonb('artifacts'),
 
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),

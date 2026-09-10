@@ -198,3 +198,77 @@ describe('applyWorkflowAssistantToolCalls — transition conditions', () => {
     expect(outcomes.find((o) => o.tool === 'set_transition_condition')?.error).toContain('nowhere');
   });
 });
+
+// Files a workflow carries. One tool per file rather than the whole set through
+// `update_workflow`: a model that has to resend every file to change one will
+// eventually drop one, and these are the files a run executes.
+describe('applyWorkflowAssistantToolCalls — workflow files', () => {
+  const apply = (calls: WorkflowAssistantToolCall[], settings = {}) =>
+    applyWorkflowAssistantToolCalls(baseCanvas().steps, baseCanvas().transitions, calls, settings);
+
+  it('writes a file the workflow did not have', () => {
+    const { settings } = apply([
+      { tool: 'write_workflow_file', arguments: { path: 'scripts/poll.py', contents: 'print("poll")\n' } },
+    ]);
+    expect(settings.artifacts).toEqual([{ path: 'scripts/poll.py', contents: 'print("poll")\n' }]);
+  });
+
+  it('replaces a file at a path it already holds, in place', () => {
+    const { settings } = apply(
+      [{ tool: 'write_workflow_file', arguments: { path: 'a.py', contents: 'new' } }],
+      { artifacts: [{ path: 'z.py', contents: 'z' }, { path: 'a.py', contents: 'old' }] },
+    );
+    expect(settings.artifacts).toEqual([
+      { path: 'z.py', contents: 'z' },
+      { path: 'a.py', contents: 'new' },
+    ]);
+  });
+
+  it('leaves the files it was not asked about alone', () => {
+    const { settings } = apply(
+      [{ tool: 'write_workflow_file', arguments: { path: 'b.py', contents: 'b' } }],
+      { artifacts: [{ path: 'a.py', contents: 'a' }] },
+    );
+    expect(settings.artifacts).toEqual([
+      { path: 'a.py', contents: 'a' },
+      { path: 'b.py', contents: 'b' },
+    ]);
+  });
+
+  it('removes a file', () => {
+    const { settings } = apply(
+      [{ tool: 'remove_workflow_file', arguments: { path: 'a.py' } }],
+      { artifacts: [{ path: 'a.py', contents: 'a' }, { path: 'b.py', contents: 'b' }] },
+    );
+    expect(settings.artifacts).toEqual([{ path: 'b.py', contents: 'b' }]);
+  });
+
+  it('says so rather than reporting a removal that removed nothing', () => {
+    const { settings, outcomes } = apply(
+      [{ tool: 'remove_workflow_file', arguments: { path: 'nope.py' } }],
+      { artifacts: [{ path: 'a.py', contents: 'a' }] },
+    );
+    expect(settings.artifacts).toEqual([{ path: 'a.py', contents: 'a' }]);
+    expect(outcomes.find((o) => o.tool === 'remove_workflow_file')?.error).toContain('nope.py');
+  });
+
+  it('drops the list once its last file is removed, rather than leaving it empty', () => {
+    const { settings } = apply(
+      [{ tool: 'remove_workflow_file', arguments: { path: 'a.py' } }],
+      { artifacts: [{ path: 'a.py', contents: 'a' }] },
+    );
+    expect(settings.artifacts).toBeUndefined();
+  });
+
+  it('applies a batch of files in order, which is how a whole package arrives', () => {
+    const { settings } = apply([
+      { tool: 'write_workflow_file', arguments: { path: 'Dockerfile', contents: 'FROM python:3.12-slim\n' } },
+      { tool: 'write_workflow_file', arguments: { path: 'scripts/poll.py', contents: 'print(1)\n' } },
+      { tool: 'write_workflow_file', arguments: { path: 'scripts/poll.py', contents: 'print(2)\n' } },
+    ]);
+    expect(settings.artifacts).toEqual([
+      { path: 'Dockerfile', contents: 'FROM python:3.12-slim\n' },
+      { path: 'scripts/poll.py', contents: 'print(2)\n' },
+    ]);
+  });
+});

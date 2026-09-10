@@ -315,3 +315,94 @@ describe('collectSecretReferences', () => {
     expect(collectSecretReferences(wd)).toEqual([]);
   });
 });
+
+// A definition can name a file it does not carry — pasted from a package whose
+// files live in a repo, or written with a command typed before the file was
+// uploaded. The run fails at the container otherwise, with no clue why.
+describe('runPreflightChecks — files the workflow references but does not carry', () => {
+  const ctx = { ...BASE_CTX, dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] };
+
+  function withScript(command: string, artifacts?: { path: string; contents: string }[]) {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.steps[0].name = 'Poll';
+    wd.steps[0].executor = 'script';
+    wd.steps[0].script = { command, image: 'python:3.11-slim' };
+    if (artifacts) wd.artifacts = artifacts;
+    return wd;
+  }
+
+  it('warns about a command that names a file the workflow does not carry', () => {
+    const result = runPreflightChecks(withScript('python3 /artifacts/scripts/poll.py'), ctx);
+    const warning = result.find((w) => w.category === 'missing-file');
+    expect(warning?.resource).toBe('scripts/poll.py');
+    expect(warning?.stepNames).toEqual(['Poll']);
+    expect(warning?.message).toMatch(/does not carry/i);
+    expect(warning?.actions.map((a) => a.label)).toContain('Add the file');
+  });
+
+  it('says nothing when the file is there', () => {
+    const result = runPreflightChecks(
+      withScript('python3 /artifacts/scripts/poll.py', [{ path: 'scripts/poll.py', contents: 'print(1)\n' }]),
+      ctx,
+    );
+    expect(result.filter((w) => w.category === 'missing-file')).toEqual([]);
+  });
+
+  it('reports one file once, listing every step that needs it', () => {
+    const wd = withScript('python3 /artifacts/shared.py');
+    wd.steps.push({
+      id: 'second', name: 'Second', type: 'creation', executor: 'script',
+      script: { command: 'python3 /artifacts/shared.py', image: 'python:3.11-slim' },
+    });
+    const result = runPreflightChecks(wd, ctx);
+    const warnings = result.filter((w) => w.category === 'missing-file');
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].stepNames).toEqual(['Poll', 'Second']);
+  });
+
+  it('ignores a path that has nothing to do with the workflow files', () => {
+    // `/output` and `/workspace` are the engine's own mounts, and a bare
+    // argument is not a path at all.
+    const result = runPreflightChecks(withScript('python3 /output/script.py --input /workspace/data'), ctx);
+    expect(result.filter((w) => w.category === 'missing-file')).toEqual([]);
+  });
+
+  it('warns about a Dockerfile the step names and nothing provides', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.steps[0].name = 'Interpret';
+    wd.steps[0].executor = 'agent';
+    wd.steps[0].agent = { dockerfile: 'Dockerfile' };
+    const result = runPreflightChecks(wd, ctx);
+    const warning = result.find((w) => w.category === 'missing-file');
+    expect(warning?.resource).toBe('Dockerfile');
+    expect(warning?.message).toMatch(/cannot be built/i);
+  });
+
+  it('says nothing about a Dockerfile that is carried, or one built from a repo', () => {
+    const carried = buildWorkflowDefinition({ name: 'test-wf' });
+    carried.steps[0].executor = 'agent';
+    carried.steps[0].agent = { dockerfile: 'Dockerfile' };
+    carried.artifacts = [{ path: 'Dockerfile', contents: 'FROM python:3.12-slim\n' }];
+    expect(runPreflightChecks(carried, ctx).filter((w) => w.category === 'missing-file')).toEqual([]);
+
+    const fromRepo = buildWorkflowDefinition({ name: 'test-wf' });
+    fromRepo.steps[0].executor = 'agent';
+    fromRepo.steps[0].agent = {
+      dockerfile: 'Dockerfile',
+      repo: 'https://github.com/org/agent.git',
+      commit: 'a'.repeat(40),
+    };
+    expect(runPreflightChecks(fromRepo, ctx).filter((w) => w.category === 'missing-file')).toEqual([]);
+  });
+
+  it('says nothing about a skills directory, which may live in the checkout', () => {
+    // `skillsDir` resolves against the repository mounted on the host when the
+    // workflow neither carries the skills nor names an `externalSkillsRepo`,
+    // and the browser cannot see that filesystem. Warning here would fire on
+    // every workflow that ships in the repo.
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.steps[0].executor = 'agent';
+    wd.steps[0].agent = { skill: 'validator', skillsDir: 'apps/landing-zone/plugins/landing-zone/skills' };
+    expect(runPreflightChecks(wd, ctx).filter((w) => w.category === 'missing-file')).toEqual([]);
+  });
+});

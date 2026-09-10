@@ -60,6 +60,7 @@ import { tmpdir } from 'node:os';
 import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { normalizeRepoUrls, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
+import { artifactsBuildTag, artifactsDir } from './workflow-artifacts';
 import { cloneRepoAtCommit } from './git-clone';
 import { writeFile } from 'node:fs/promises';
 import type { GitMetadata } from '@mediforce/platform-core';
@@ -129,6 +130,21 @@ export function resolveImageBuild(
       dockerfile,
       repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
     };
+  }
+
+  // A Dockerfile the workflow carries: the files are already on the host for
+  // the /artifacts mount, so the build context is that directory and no clone
+  // happens. Second to an explicit step-level repo+commit, which said something
+  // specific, and ahead of the externalSkillsRepo fallback.
+  if (dockerfile && isWorkflowAgentContext(context)) {
+    const artifacts = context.workflowDefinition.artifacts;
+    if (artifacts?.some((artifact) => artifact.path === dockerfile) === true) {
+      return {
+        image: image ?? artifactsBuildTag(artifacts, dockerfile),
+        contextDir: artifactsDir(artifacts),
+        dockerfile,
+      };
+    }
   }
 
   if (dockerfile && isWorkflowAgentContext(context)) {
@@ -424,17 +440,33 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
   }
 
   /**
-   * Resolve the host skills directory for the current step. When the workflow
-   * declares an `externalSkillsRepo`, the path is the content-addressed cache
-   * dir (populated by {@link fetchSkillsFromRepo}); otherwise it's resolved
-   * from disk. Derived fresh from `this.context` per call — no shared field —
-   * so a repo-mode step can't leak its cache dir into a later disk-mode step,
-   * and concurrent steps can't clobber each other.
+   * Resolve the host skills directory for the current step. Three sources, most
+   * specific first: skills the workflow *carries* as artifacts (materialized by
+   * {@link materializeArtifacts}, no checkout involved), then the
+   * `externalSkillsRepo` content-addressed cache dir (populated by
+   * {@link fetchSkillsFromRepo}), then disk. Derived fresh from `this.context`
+   * per call — no shared field — so a repo-mode step can't leak its cache dir
+   * into a later disk-mode step, and concurrent steps can't clobber each other.
+   *
+   * Carried skills win over a declared repository because the definition
+   * holding the files is the answer an author edited in the app. They only
+   * answer for a directory the artifacts actually contain, so a workflow can
+   * carry a Dockerfile and still take its skills from a repo.
    */
   protected resolveSkillsDir(skillsDir: string, resolveProjectPath: (p: string) => string): string {
-    const wfRepo = isWorkflowAgentContext(this.context)
-      ? this.context.workflowDefinition.externalSkillsRepo
+    const definition = isWorkflowAgentContext(this.context)
+      ? this.context.workflowDefinition
       : undefined;
+
+    const artifacts = definition?.artifacts;
+    if (artifacts !== undefined && artifacts.length > 0) {
+      const prefix = `${skillsDir.replace(/\/+$/, '')}/`;
+      if (artifacts.some((artifact) => artifact.path.startsWith(prefix))) {
+        return join(artifactsDir(artifacts), skillsDir);
+      }
+    }
+
+    const wfRepo = definition?.externalSkillsRepo;
     if (wfRepo?.url && wfRepo?.commit) {
       // Key on the raw url — must match the `repoRef` `fetchSkillsFromRepo`
       // populates with (see the call site in base-container-agent-plugin).

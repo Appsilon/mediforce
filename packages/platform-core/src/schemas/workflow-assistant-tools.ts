@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WorkflowStepSchema, WorkflowAuthorableSchema } from './workflow-definition';
+import { WorkflowStepSchema, WorkflowAuthorableSchema, WorkflowArtifactSchema } from './workflow-definition';
 import { BLOCK_PRESETS } from '../blocks/block-presets';
 
 const ACTION_KIND_ALIASES: Record<string, 'http' | 'reshape' | 'email' | 'spawn' | 'wait'> = {
@@ -169,12 +169,34 @@ export const SetTransitionConditionToolSchema = z.object({
 });
 export type SetTransitionConditionTool = z.infer<typeof SetTransitionConditionToolSchema>;
 
+/**
+ * Write one file the workflow carries: a script a step runs, a Dockerfile its
+ * image is built from, a SKILL.md an agent reads. Upserts by path, so changing
+ * one file does not mean resending the rest — a model that has to resend
+ * everything eventually drops something, and these files are what a run
+ * executes.
+ *
+ * The path is validated the same way the definition validates it, so a file
+ * that could not be written is refused when the assistant proposes it.
+ */
+export const WriteWorkflowFileToolSchema = WorkflowArtifactSchema;
+export type WriteWorkflowFileTool = z.infer<typeof WriteWorkflowFileToolSchema>;
+
+/** Remove one file the workflow carries. Refuses a path it does not hold,
+ *  rather than reporting a removal that removed nothing. */
+export const RemoveWorkflowFileToolSchema = z.object({
+  path: z.string().min(1),
+});
+export type RemoveWorkflowFileTool = z.infer<typeof RemoveWorkflowFileToolSchema>;
+
 export const WORKFLOW_ASSISTANT_TOOLS = {
   add_step: AddStepToolSchema,
   update_step: UpdateStepToolSchema,
   remove_step: RemoveStepToolSchema,
   update_workflow: UpdateWorkflowToolSchema,
   set_transition_condition: SetTransitionConditionToolSchema,
+  write_workflow_file: WriteWorkflowFileToolSchema,
+  remove_workflow_file: RemoveWorkflowFileToolSchema,
 } as const;
 
 export type WorkflowAssistantToolName = keyof typeof WORKFLOW_ASSISTANT_TOOLS;
@@ -191,6 +213,8 @@ export const WorkflowAssistantToolCallSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('remove_step'), arguments: RemoveStepToolSchema }),
   z.object({ tool: z.literal('update_workflow'), arguments: UpdateWorkflowToolSchema }),
   z.object({ tool: z.literal('set_transition_condition'), arguments: SetTransitionConditionToolSchema }),
+  z.object({ tool: z.literal('write_workflow_file'), arguments: WriteWorkflowFileToolSchema }),
+  z.object({ tool: z.literal('remove_workflow_file'), arguments: RemoveWorkflowFileToolSchema }),
 ]);
 export type WorkflowAssistantToolCall = z.infer<typeof WorkflowAssistantToolCallSchema>;
 

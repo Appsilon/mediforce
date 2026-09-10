@@ -85,6 +85,9 @@ export {
   WorkflowTemplateSchema,
   InputForNextRunEntrySchema,
   TriggerInputFieldSchema,
+  WorkflowArtifactSchema,
+  WORKFLOW_ARTIFACT_MAX_BYTES,
+  WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES,
   HttpMethodSchema,
   WebhookTriggerConfigSchema,
   HttpActionConfigSchema,
@@ -97,6 +100,7 @@ export {
   validateInputForNextRun,
   validateSteps,
   validateTriggerInput,
+  validateArtifacts,
   scriptConfigKeyForPlugin,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
@@ -224,6 +228,7 @@ export type {
   WorkflowDefinition,
   WorkflowTemplate,
   TriggerInputField,
+  WorkflowArtifact,
   HttpMethod,
   WebhookTriggerConfig,
   HttpActionConfig,
@@ -484,6 +489,7 @@ export type {
   VersionCandidate,
   WorkflowVersionSource,
 } from './workflows/resolve-runnable-version';
+export { stepHasBuildSource } from './workflows/build-source';
 
 // MCP resolver (pure; wires AgentDefinition + step restrictions + catalog)
 export {

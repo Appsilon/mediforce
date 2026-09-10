@@ -41,12 +41,44 @@ path and branch conventions live in `workspace-paths.ts` so the read-only
 | `/workspace` | rw | the run | The git worktree. Deliverables go here; it is the working directory. |
 | `/output` | rw | the step | Engine ↔ step channel. Host seeds `input.json`, `prompt.txt`, `previous_run.json`, `mcp-config.json`, `script.<ext>`; the step writes `result.json` and optional `presentation.md`. |
 | `/data` | ro | the step | Uploaded attachments the host downloaded for this step. |
+| `/artifacts` | ro | the definition | The files the workflow carries (`artifacts` on the definition): scripts, a Dockerfile, skills. Materialized to a content-addressed host directory per file set, so every step of every run of an unchanged workflow shares one write. Absent when the workflow carries none. |
+| `/plugin` | ro | the step | The Claude Code plugin root, when an agent step sets `skillsDir`. Its parent is the resolved skills directory: carried skills, then the `externalSkillsRepo` cache, then the repo checkout on the host. |
 
 Why `/workspace` and `/output` stay separate — and why `/output` is a bad name
 for a channel that carries inputs — is argued in the header comment of
 [`container-plugin.ts`](../../packages/agent-runtime/src/plugins/container-plugin.ts).
 Deliverables written to `/output` are copied into `.mediforce/output/<stepId>/`
 in the worktree before the commit, so the commit captures them.
+
+A dry run builds the image and mocks the step. Execution is swapped for
+`MockAgentPlugin` — no agent runs, no container starts, nothing external is
+called — but whether the image compiles is the one thing a mock cannot answer,
+and it is the part that takes minutes and fails, so the build is real. A build
+failure fails the dry run, which is what the person asked by running it.
+
+A carried `Dockerfile` is also a build source. When a step sets `dockerfile`
+and the workflow carries a file at that path, the image is built from the
+materialized directory with no clone anywhere: the whole set is the build
+context (so `COPY scripts/ /scripts/` from a `container/Dockerfile` works as it
+does in a repository), and the tag is derived from the files' content
+(`mediforce-artifacts:<hash>`) — so an edit builds a new image and a rerun of
+unchanged files finds the one already there. An explicit step-level
+`repo` + `commit` still wins; `externalSkillsRepo` remains the fallback. The
+first build takes as long as a `docker build` does, which is minutes for a
+sizeable image.
+
+A step that names a file the workflow does not carry is flagged before the run
+(preflight, beside missing secrets and images): a command reading
+`/artifacts/<path>` with no such file, or a `dockerfile` with neither a carried
+file nor a repo to build from. A `skillsDir` is not flagged, because with
+neither carried skills nor an `externalSkillsRepo` it resolves against the
+repository on the host, which the browser cannot see.
+
+A step names a carried file by its container path: `python3
+/artifacts/scripts/poll.py`. Files are written executable, so a command may be
+the file itself. They are text and capped (64 KiB a file, 256 KiB the set) by
+[`WorkflowArtifactSchema`](../../packages/platform-core/src/schemas/workflow-definition.ts);
+data and installed dependencies belong in an image.
 
 Containers run `--rm -i`, capped at 8 GB / 2 CPUs, named
 `mediforce-<runId>-<stepId>`. Network is unrestricted.

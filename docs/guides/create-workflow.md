@@ -39,10 +39,16 @@ placing and wiring blocks by hand.
   large-context models are offered).
 - **What it can change.** The whole definition: it adds, updates and removes
   steps (with their transitions and verdicts), sets conditional routing on an
-  edge, and writes the workflow-level fields — `triggerInput`, `preamble`,
-  `env`, `notifications`, `workspace`, `externalSkillsRepo`, `url`. It does not
-  edit secrets or other workspace state — set those yourself (triggers are
-  attached after registration; see below).
+  edge, writes the workflow-level fields — `triggerInput`, `preamble`, `env`,
+  `notifications`, `workspace`, `externalSkillsRepo`, `url` — and writes the
+  files the workflow carries (a script, a Dockerfile, a SKILL.md), one file per
+  call. Files appear in the **Files** panel, where you can edit them, upload
+  more from disk (a folder keeps its structure, so a `skills/` directory
+  uploads whole) or drop them in, and a run reads them from `/artifacts`. A
+  skill among those files is offered by name on an agent step, which fills in
+  the directory it lives in — no repository path to type. It does not edit secrets or other workspace
+  state — set those yourself (triggers are attached after registration; see
+  below).
 - **Validation & retry.** Every proposed change is validated against the same
   graph, reference, and schema gates as registration before it is applied; if the
   result would be invalid the assistant is told why and retries, so it does not

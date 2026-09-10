@@ -2361,6 +2361,28 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
+  // Owned by workflow-files.journey.ts, which writes files on it and so
+  // registers new versions. Human steps only, so the save is about the files.
+  workflowDefinitions['test:Files Editor Test:1'] = {
+    name: 'Files Editor Test',
+    namespace: 'test',
+    version: 1,
+    title: 'Workflow whose files are written in the editor',
+    description: 'Test workflow for the files panel',
+    steps: [
+      { id: 'review', name: 'Review', type: 'creation', executor: 'human' },
+      // An agent step, so the journey can check that a skill uploaded into the
+      // files is offered where a step picks one.
+      { id: 'interpret', name: 'Interpret', type: 'creation', executor: 'agent', plugin: 'claude-code-agent', agent: { image: 'mediforce-golden-image' } },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [
+      { from: 'review', to: 'interpret' },
+      { from: 'interpret', to: 'done' },
+    ],
+    createdAt: twoDaysAgo,
+  };
+
   // Owned by trigger-input-editor.journey.ts, which edits this workflow's input
   // contract from the Triggers tab and so registers new versions of it. Kept
   // apart from `Trigger Input Test`, whose contract other journeys read, and

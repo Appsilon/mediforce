@@ -22,7 +22,7 @@ import { useModelValidation } from '@/hooks/use-model-validation';
 import { runPreflightChecks, findSkippedChecks, type PreflightWarning } from '@/lib/preflight-checks';
 import { ParamField } from '@/components/ui/param-field';
 import { buildTriggerPayload, hasInvalidObjectInput } from '@/lib/trigger-input-payload';
-import { VERIFY_WORKFLOW_URL, type TriggerInputField } from '@mediforce/platform-core';
+import { VERIFY_WORKFLOW_URL, stepHasBuildSource, type TriggerInputField } from '@mediforce/platform-core';
 
 interface StartRunButtonProps {
   workflowName: string;
@@ -119,6 +119,14 @@ export function StartRunButton({
     preflightVersion,
   );
   const modelValidation = useModelValidation(effectiveDefinition);
+  // Said only when there is something to build: a dry run of a workflow that
+  // names ready-made images starts immediately, and a warning about minutes
+  // would be false.
+  const buildsItsOwnImage = (effectiveDefinition?.steps ?? []).some((step) => {
+    if (step.executor !== 'agent' && step.executor !== 'script') return false;
+    const config = step.executor === 'script' ? step.script : step.agent;
+    return stepHasBuildSource(config, effectiveDefinition?.artifacts);
+  });
 
   const hasContext = secretKeysCtx !== null;
   const uid = user?.id;
@@ -403,6 +411,10 @@ export function StartRunButton({
                     warnings={warnings.filter((w) => w.category === 'missing-secret')}
                   />
                   <WarningGroup
+                    title="Missing files"
+                    warnings={warnings.filter((w) => w.category === 'missing-file')}
+                  />
+                  <WarningGroup
                     title="LLM credits"
                     warnings={warnings.filter((w) => w.category === 'low-credits')}
                   />
@@ -428,6 +440,14 @@ export function StartRunButton({
                 />
               ))}
             </div>
+          )}
+
+          {mode !== 'production' && buildsItsOwnImage && (
+            <p className="mt-4 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-800 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-200">
+              This workflow builds its own image. A dry run mocks the steps but
+              builds the image for real, so the first one can take a few minutes.
+              Later runs reuse it until a file it is built from changes.
+            </p>
           )}
 
           <div className="flex items-center gap-2 mt-5">

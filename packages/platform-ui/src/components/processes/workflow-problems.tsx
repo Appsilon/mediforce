@@ -145,6 +145,14 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
                   View images
                 </Link>
               )}
+              {warning.category === 'missing-file' && warning.actions[0] && (
+                <Link
+                  href={warning.actions[0].href}
+                  className="ml-1.5 text-xs text-amber-700 underline hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200"
+                >
+                  {warning.actions[0].label}
+                </Link>
+              )}
               {secretHref !== null && (
                 <Link
                   href={secretHref}
