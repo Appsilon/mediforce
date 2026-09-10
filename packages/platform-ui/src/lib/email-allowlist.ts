@@ -34,3 +34,30 @@ export function isEmailDomainAllowed(
   const domain = (email ?? '').split('@')[1]?.toLowerCase() ?? '';
   return domain !== '' && allowed.includes(domain);
 }
+
+/**
+ * The sign-in authorization rule (ADR-0021 §5, amending ADR-0002 §4a).
+ *
+ * Two terms, and a reader should be able to find them in one place rather than
+ * reconstruct them from three call sites:
+ *
+ *   - `domainAllowed` — `ALLOWED_EMAIL_DOMAINS` governs **self-service**
+ *     sign-in. It is what stops any Google account on earth registering itself
+ *     on a deployment, and removing a domain from it still evicts everyone who
+ *     signed themselves in at that domain.
+ *   - `invited` — `auth_users.invited_at`, stamped only by `seedInvite`. An
+ *     admin's deliberate add (an invite, or a redeemed join link) is an
+ *     authorization in its own right, and it was never the allowlist's job to
+ *     overrule one. Before this, an admin could invite `alice@external.com` and
+ *     every route she could reach rejected her.
+ *
+ * Note what this does NOT admit: an address whose `auth_users` row exists
+ * merely because it once signed in. That is the whole reason the second term is
+ * a column and not a row-existence check.
+ */
+export function isSignInAuthorized(params: {
+  domainAllowed: boolean;
+  invited: boolean;
+}): boolean {
+  return params.domainAllowed === true || params.invited === true;
+}

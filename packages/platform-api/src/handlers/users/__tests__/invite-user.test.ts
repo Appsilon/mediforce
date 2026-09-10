@@ -85,6 +85,7 @@ describe('inviteUser handler', () => {
       workspaceHandle: 'alpha',
       membership: 'member',
       roles: [],
+      vouchedByAdmin: true,
     });
     expect((await userProfileRepo.getProfile('uid-new'))?.mustChangePassword).toBe(true);
     expect(notifier.sendActivationCalls).toEqual([
@@ -93,12 +94,13 @@ describe('inviteUser handler', () => {
         inviterName: 'alpha',
         workspaceName: 'alpha',
         workspaceHandle: 'alpha',
+        passwordSetupEnabled: true,
       },
     ]);
     expect(notifier.sendWorkspaceCalls).toHaveLength(0);
   });
 
-  it('does not force password-setup for a pending invitee when password auth is disabled (Google-only deployment)', async () => {
+  it('still mails a pending invitee a sign-in link when password auth is disabled (Google-only deployment), forcing no password', async () => {
     const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const notifier = recordingNotifier();
     const userProfileRepo = new InMemoryUserProfileRepository();
@@ -120,15 +122,21 @@ describe('inviteUser handler', () => {
       isExisting: false,
     });
     expect(await userProfileRepo.getProfile('uid-new')).toBeNull();
-    expect(notifier.sendActivationCalls).toHaveLength(0);
-    expect(notifier.sendWorkspaceCalls).toEqual([
+    // A pending invitee has no way in yet, so the mail must carry one whatever
+    // the deployment's first-credential method is. `passwordSetupEnabled: false`
+    // is what turns the same link from "sign in and set a password" into "sign
+    // in"; sending the plain workspace notification here would land them on a
+    // login screen they cannot pass.
+    expect(notifier.sendActivationCalls).toEqual([
       {
         toEmail: 'newbie@example.test',
         inviterName: 'alpha',
         workspaceName: 'alpha',
         workspaceHandle: 'alpha',
+        passwordSetupEnabled: false,
       },
     ]);
+    expect(notifier.sendWorkspaceCalls).toHaveLength(0);
   });
 
   it('sends the plain workspace-notification email and sets no flag for an already-active re-added user', async () => {
@@ -188,7 +196,22 @@ describe('inviteUser handler', () => {
       workspaceHandle: 'alpha',
       membership: 'member',
       roles: [],
+      vouchedByAdmin: true,
     });
+  });
+
+  // An authenticated owner/admin naming a person is the privileged half of the
+  // seed: only it may rewrite an existing membership or stamp `invited_at` on
+  // an account that already exists (ADR-0021). `redeemJoinLink` passes `false`.
+  it('vouches for the invitee, so the seed may touch an existing account', async () => {
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
+    const scope = createTestScope({ namespaceRepo, auditRepo, inviteService });
+
+    await inviteUser(baseInput, scope);
+
+    expect(inviteService.seedInvite).toHaveBeenCalledWith(
+      expect.objectContaining({ vouchedByAdmin: true }),
+    );
   });
 
   it('forwards an admin membership to seedInvite', async () => {
@@ -350,6 +373,7 @@ describe('inviteUser handler', () => {
         workspaceName: 'alpha',
         workspaceHandle: 'alpha',
         baseUrl: 'https://phuse.mediforce.ai',
+        passwordSetupEnabled: true,
       },
     ]);
   });

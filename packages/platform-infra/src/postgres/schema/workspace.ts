@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, primaryKey, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, timestamp, primaryKey, index, check } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 /**
  * Tenant root. Original Firestore path: namespaces/{handle}.
@@ -64,5 +65,44 @@ export const workspaceAutojoinBlocks = pgTable(
   },
   (table) => ({
     pk: primaryKey({ columns: [table.workspace, table.uid] }),
+  }),
+);
+
+/**
+ * Join links (ADR-0021): a secret an admin mints once and hands to a room, a
+ * slide, or a QR code. Redeeming one grants Membership in `workspace` — it
+ * never opens a session, so only the `token_hash` is stored and the plaintext
+ * is unrecoverable after creation.
+ *
+ * Deliberately not `authVerificationTokens`: those are single-use and bound to
+ * one identifier, which is the opposite of what a link handed to a cohort is.
+ *
+ * No `membership` column: a link always grants `member` (ADR-0021 §3), so the
+ * seat is not a dimension of the link and is not stored as one.
+ */
+export const workspaceJoinLinks = pgTable(
+  'workspace_join_links',
+  {
+    id: text('id').primaryKey(),
+    workspace: text('workspace')
+      .notNull()
+      .references(() => workspaces.handle, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    /** `null` = uncapped; the expiry is then the only limit. */
+    maxUses: integer('max_uses'),
+    uses: integer('uses').notNull().default(0),
+    createdBy: text('created_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (table) => ({
+    workspaceIdx: index('workspace_join_links_workspace_idx').on(table.workspace),
+    // Declared here as well as in migration 0047 so `drizzle-kit generate` does
+    // not read it as drift and re-emit the DDL.
+    maxUsesCheck: check(
+      'workspace_join_links_max_uses_check',
+      sql`${table.maxUses} IS NULL OR ${table.maxUses} > 0`,
+    ),
   }),
 );

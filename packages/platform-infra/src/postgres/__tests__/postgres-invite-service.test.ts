@@ -65,6 +65,7 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
       workspaceHandle: 'acme',
       membership: 'admin',
       roles: ['reviewer', 'approver'],
+      vouchedByAdmin: true,
     });
 
     expect(isExisting).toBe(false);
@@ -83,11 +84,158 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
     expect(roles).toEqual(['approver', 'reviewer']);
   });
 
+  /**
+   * `invited_at` (migration 0048) is the second term of the ADR-0021 §5 sign-in
+   * gate, and `seedInvite` is its only writer. These three cases are the whole
+   * contract: an admin's add stamps it, a re-add repairs a row that predates the
+   * column without rewriting history, and nothing else can set it — which is
+   * what leaves `ALLOWED_EMAIL_DOMAINS` able to evict a self-registered account.
+   */
+  it('stamps invited_at on a freshly seeded account', async () => {
+    const before = new Date();
+    const { uid } = await service.seedInvite({
+      email: 'stamped@acme.com',
+      workspaceHandle: 'acme',
+      membership: 'member',
+      vouchedByAdmin: true,
+    });
+
+    const [user] = await db.select().from(authUsers).where(eq(authUsers.id, uid));
+    expect(user?.invitedAt).not.toBeNull();
+    expect(user!.invitedAt!.getTime()).toBeGreaterThanOrEqual(before.getTime() - 1000);
+  });
+
+  it('stamps invited_at on an account that already existed but was never invited', async () => {
+    // The shape the Auth.js adapter leaves behind for a self-registered user,
+    // and the shape every row had the moment migration 0048 ran.
+    await db.insert(authUsers).values({ id: 'self-registered', email: 'self@acme.com' });
+
+    await service.seedInvite({
+      email: 'self@acme.com',
+      workspaceHandle: 'acme',
+      membership: 'member',
+      vouchedByAdmin: true,
+    });
+
+    const [user] = await db.select().from(authUsers).where(eq(authUsers.id, 'self-registered'));
+    expect(user?.invitedAt).not.toBeNull();
+  });
+
+  it('keeps the first invited_at across a re-invite', async () => {
+    const { uid } = await service.seedInvite({
+      email: 'reinvited@acme.com',
+      workspaceHandle: 'acme',
+      membership: 'member',
+      vouchedByAdmin: true,
+    });
+    const [first] = await db.select().from(authUsers).where(eq(authUsers.id, uid));
+
+    await service.seedInvite({
+      email: 'reinvited@acme.com',
+      workspaceHandle: 'acme',
+      membership: 'admin',
+      vouchedByAdmin: true,
+    });
+
+    const [second] = await db.select().from(authUsers).where(eq(authUsers.id, uid));
+    // It records when they were first vouched for; a later re-invite must not
+    // rewrite that.
+    expect(second?.invitedAt?.getTime()).toBe(first?.invitedAt?.getTime());
+  });
+
+  /**
+   * `vouchedByAdmin: false` is the join-link redemption path (ADR-0021 §4),
+   * where the email is typed into a public form by whoever holds a shared
+   * secret. These four cases are what stops that from being an escalation: a
+   * redemption may CREATE, and may not touch anything that already exists.
+   *
+   * Each was a live defect before the flag existed, reproduced here so it
+   * cannot come back.
+   */
+  describe('an unauthenticated redemption may only create', () => {
+    it('does not demote an existing owner to the link\u2019s membership', async () => {
+      const { uid } = await service.seedInvite({
+        email: 'owner@acme.com',
+        workspaceHandle: 'acme',
+        membership: 'owner',
+        vouchedByAdmin: true,
+      });
+
+      // A `member` join link, redeemed against the owner's address.
+      await service.seedInvite({
+        email: 'owner@acme.com',
+        workspaceHandle: 'acme',
+        membership: 'member',
+        vouchedByAdmin: false,
+      });
+
+      const [member] = await db
+        .select()
+        .from(workspaceMembers)
+        .where(eq(workspaceMembers.uid, uid));
+      expect(member?.role).toBe('owner');
+    });
+
+    it('does not promote an existing member to the link\u2019s membership', async () => {
+      const { uid } = await service.seedInvite({
+        email: 'plain@acme.com',
+        workspaceHandle: 'acme',
+        membership: 'member',
+        vouchedByAdmin: true,
+      });
+
+      await service.seedInvite({
+        email: 'plain@acme.com',
+        workspaceHandle: 'acme',
+        membership: 'admin',
+        vouchedByAdmin: false,
+      });
+
+      const [member] = await db
+        .select()
+        .from(workspaceMembers)
+        .where(eq(workspaceMembers.uid, uid));
+      expect(member?.role).toBe('member');
+    });
+
+    it('does not stamp invited_at on an account the allowlist blocks', async () => {
+      // The shape the Auth.js adapter leaves for a self-registered user, and
+      // the one migration 0048's comment names by address: stamping it would
+      // exempt the account from `ALLOWED_EMAIL_DOMAINS` permanently.
+      await db.insert(authUsers).values({ id: 'blocked-user', email: 'fylyps@gmail.com' });
+
+      await service.seedInvite({
+        email: 'fylyps@gmail.com',
+        workspaceHandle: 'acme',
+        membership: 'member',
+        vouchedByAdmin: false,
+      });
+
+      const [user] = await db.select().from(authUsers).where(eq(authUsers.id, 'blocked-user'));
+      expect(user?.invitedAt).toBeNull();
+    });
+
+    it('still stamps invited_at for a brand-new address', async () => {
+      // Nobody held this address, so there is no standing to subvert — and the
+      // link was minted by an admin, which is the vouching §5 asks for.
+      const { uid } = await service.seedInvite({
+        email: 'walkin@acme.com',
+        workspaceHandle: 'acme',
+        membership: 'member',
+        vouchedByAdmin: false,
+      });
+
+      const [user] = await db.select().from(authUsers).where(eq(authUsers.id, uid));
+      expect(user?.invitedAt).not.toBeNull();
+    });
+  });
+
   it('seeds no roles when none are given', async () => {
     const { uid } = await service.seedInvite({
       email: 'norole@acme.com',
       workspaceHandle: 'acme',
       membership: 'member',
+      vouchedByAdmin: true,
     });
     expect(await db.select().from(userRoles).where(eq(userRoles.uid, uid))).toEqual([]);
   });
@@ -98,12 +246,14 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
       workspaceHandle: 'acme',
       membership: 'member',
       roles: ['reviewer'],
+      vouchedByAdmin: true,
     });
     const second = await service.seedInvite({
       email: 'dup@acme.com',
       workspaceHandle: 'acme',
       membership: 'member',
       roles: ['reviewer'],
+      vouchedByAdmin: true,
     });
 
     expect(second.isExisting).toBe(true);
@@ -120,11 +270,13 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
       email: 'Mixed.Case@acme.com',
       workspaceHandle: 'acme',
       membership: 'member',
+      vouchedByAdmin: true,
     });
     const second = await service.seedInvite({
       email: 'mixed.case@acme.com',
       workspaceHandle: 'acme',
       membership: 'member',
+      vouchedByAdmin: true,
     });
 
     expect(second.uid).toBe(first.uid);
@@ -138,12 +290,14 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
       email: 'promoted@acme.com',
       workspaceHandle: 'acme',
       membership: 'member',
+      vouchedByAdmin: true,
     });
 
     const second = await service.seedInvite({
       email: 'promoted@acme.com',
       workspaceHandle: 'acme',
       membership: 'admin',
+      vouchedByAdmin: true,
     });
 
     expect(second.uid).toBe(first.uid);
@@ -162,6 +316,7 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
       email: 'lookup@acme.com',
       workspaceHandle: 'acme',
       membership: 'member',
+      vouchedByAdmin: true,
     });
     expect(await service.getUserEmail(uid)).toBe('lookup@acme.com');
     expect(await service.getUserEmail('nope')).toBeNull();
@@ -173,6 +328,7 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
         email: 'fresh@acme.com',
         workspaceHandle: 'acme',
         membership: 'member',
+        vouchedByAdmin: true,
       });
       expect(await service.isInvitePending(uid)).toBe(true);
     });
@@ -182,6 +338,7 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
         email: 'google@acme.com',
         workspaceHandle: 'acme',
         membership: 'member',
+        vouchedByAdmin: true,
       });
       await db.insert(authAccounts).values({
         userId: uid,
@@ -197,6 +354,7 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
         email: 'session@acme.com',
         workspaceHandle: 'acme',
         membership: 'member',
+        vouchedByAdmin: true,
       });
       await db.insert(authSessions).values({
         sessionToken: 'tok-abc',
@@ -211,6 +369,7 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
         email: 'pwd@acme.com',
         workspaceHandle: 'acme',
         membership: 'member',
+        vouchedByAdmin: true,
       });
       await db
         .update(authUsers)
@@ -224,6 +383,7 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
         email: 'both@acme.com',
         workspaceHandle: 'acme',
         membership: 'member',
+        vouchedByAdmin: true,
       });
       await db.insert(authAccounts).values({
         userId: uid,

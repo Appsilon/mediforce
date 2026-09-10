@@ -8,3 +8,4 @@ export {
 export type { TestScopeOverrides } from '../repositories/__tests__/create-test-scope';
 export { InMemoryNamespaceRepo } from './in-memory-namespace-repo';
 export { stubUserDirectory } from './stub-user-directory';
+export { InMemoryJoinLinkService } from './in-memory-join-link-service';

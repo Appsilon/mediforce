@@ -35,6 +35,16 @@ export const authUsers = pgTable('auth_users', {
   // the member list can show when someone was last here. Sessions cannot carry
   // this: signing out deletes the row.
   lastSignInAt: timestamp('last_sign_in_at', { withTimezone: true, mode: 'date' }),
+  // When an admin deliberately seeded this account — an invite, or a redeemed
+  // join link (migration 0048). NULL means self-registered or carried over by
+  // the Firebase migration.
+  //
+  // This is the second term of the ADR-0021 §5 sign-in gate, and it is a column
+  // rather than "an `auth_users` row exists" because the adapter writes such a
+  // row for every self-registered OAuth user too. Only `seedInvite` sets it, so
+  // removing a domain from `ALLOWED_EMAIL_DOMAINS` still evicts the people who
+  // signed themselves in at it.
+  invitedAt: timestamp('invited_at', { withTimezone: true, mode: 'date' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

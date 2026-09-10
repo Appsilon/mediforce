@@ -24,6 +24,7 @@ import {
   PostgresPlatformSettingsRepository,
   getSharedPostgresClient,
   PostgresInviteService,
+  PostgresJoinLinkService,
   validateSecretsKey,
   resolveEmailSenderFromEnv,
   EmailNotificationService,
@@ -68,6 +69,7 @@ import { isPasswordAuthEnabled, parseAutoJoinWorkspaces } from '@mediforce/platf
 import type { AutoJoinRule } from '@mediforce/platform-core';
 import { sendWorkspaceNotificationEmail, sendInviteSetupEmail } from './invite-emails';
 import { normalizeBaseUrl, resolveInviteAppUrl } from '../contract/config';
+import type { JoinLinkService } from './join-link';
 import type {
   InviteNotificationService,
   InviteService,
@@ -143,6 +145,7 @@ export interface PlatformServices {
   secretsRepo: WorkflowSecretsRepository;
   namespaceSecretsRepo: NamespaceSecretsRepository;
   inviteService: InviteService;
+  joinLinkService: JoinLinkService;
   /** `null` when email env vars are unset (email disabled). */
   inviteNotificationService: InviteNotificationService | null;
   emailProviderInfo: EmailProviderInfo | null;
@@ -374,6 +377,11 @@ export function getPlatformServices(): PlatformServices {
   // or by setting a password. `PostgresInviteService` structurally implements
   // the framework-free `InviteService` port handlers consume.
   const inviteService: InviteService = new PostgresInviteService(pg);
+  // Join links (ADR-0021). Separate store from `inviteService` because the two
+  // answer different questions — that seeds ONE known address, this hands a
+  // room one secret — and they meet only at the moment a redemption calls
+  // `seedInvite`.
+  const joinLinkService: JoinLinkService = new PostgresJoinLinkService(pg);
   // Construction-time fallback app URL for invite/activation emails — used when
   // a send supplies no per-deployment `platform.baseUrl`. Resolves from the
   // canonical `APP_BASE_URL`/`NEXT_PUBLIC_APP_URL` vars (normalized), only
@@ -431,6 +439,7 @@ export function getPlatformServices(): PlatformServices {
     secretsRepo,
     namespaceSecretsRepo,
     inviteService,
+    joinLinkService,
     inviteNotificationService,
     emailProviderInfo,
     dockerImages,

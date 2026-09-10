@@ -11,8 +11,8 @@ import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
-import { DEFAULT_AGENT_IMAGE, uniqueName, uniqueSlug } from '@mediforce/platform-core';
-import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
+import { DEFAULT_AGENT_IMAGE, defaultVerdictLabel, uniqueName, uniqueSlug } from '@mediforce/platform-core';
+import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
@@ -21,6 +21,7 @@ import {
   RUNTIME_OPTIONS,
 } from './constants';
 import { CoworkSection } from './cowork-section';
+import { StepUiConfigSection } from './step-ui-config-section';
 import { StepDataFlow } from './step-data-flow';
 import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
@@ -162,10 +163,6 @@ const TIP = {
   allowedRoles:            'Roles that can claim and complete this task. Enforced: a member holding none of them is refused, and a role nobody holds on this workflow makes the step unclaimable. Pick from the roles this workspace already knows, or type a new one. Leave empty to allow any workspace member.',
   assignedTo:              'Pre-assign this human task to a specific user. Pick a workspace member, or type an interpolated value like ${triggerPayload.userId} to assign per run. Human steps only.',
   continueOnError:         'When on, a failure of this step is logged as a warning and the workflow advances anyway instead of failing the whole run. Use for non-critical side-effects (e.g. a notification), never for a step later steps depend on.',
-  uiComponent:             'Custom task body. "File upload" collects files; "Assignment table" and "Table editor" render their own views (configure their columns in the source editor). Default is the params form.',
-  uiAcceptedTypes:         'Accepted file types, comma-separated — MIME types and/or extensions (e.g. text/csv, .csv, application/pdf). If empty, only PDFs are accepted.',
-  uiMinFiles:              'Minimum number of files the user must upload to complete the task.',
-  uiMaxFiles:              'Maximum number of files the user can upload.',
 
   reviewType:              'Who performs the review: human (creates a task), agent (auto-evaluates), or none (skips review).',
   reviewPlugin:            'Plugin used when review.type is agent.',
@@ -174,7 +171,21 @@ const TIP = {
   selectionMin:            'Minimum number of reviewers required to reach a binding verdict.',
   selectionMax:            'Maximum number of reviewers who may participate in this review step.',
 
-  actionKind:              'Action type: http (outbound API call), reshape (update workflow variables), or email. Fixed at creation.',
+  actionKind:              'Action type: http (outbound API call), reshape (update workflow variables), email, spawn (run another workflow) or wait (pause). Fixed at creation.',
+  actionTargets:           'The workflow(s) this step starts. Each target names a registered workflow; leave the version unset to use its default.',
+  actionForEach:           'Interpolation path to an array — the step spawns one child per element, with ${item} bound to it. Leave empty to spawn each target once.',
+  // Written explicitly rather than as absence, unlike the optional `allowSkip`
+  // and `noteField`: `SpawnActionConfigSchema` gives this a `.default(true)`, so
+  // its parsed type is a required boolean.
+  actionContinueOnSpawnError: 'On by default: one child failing to start does not fail this step. Turn off to fail the step on the first error.',
+  actionWaitDuration:      'How long to pause. Fields combine, so 1 hour 30 minutes is hours 1 + minutes 30.',
+  actionWaitDeadline:      'Absolute time to wait until — an ISO timestamp, or an interpolation like ${steps.x.dueAt}. Takes precedence over a duration.',
+  actionWaitCondition:     'Transition-language expression checked while waiting; the step proceeds as soon as it is true.',
+  scriptTimeoutMinutes:    'Maximum run time in minutes. Without it a long script is killed at the 30-minute default.',
+  verdictLabel:            'Button text shown to the reviewer. Defaults to a title-cased form of the verdict key.',
+  verdictIntent:           'Button styling: success, danger, warning or neutral. Defaults from the key for the common names.',
+  verdictRequiresComment:  'Enforced server-side — the task cannot be completed on this verdict without a comment.',
+  paramRequiredForVerdicts: 'Verdict keys that make this parameter mandatory. Leave empty to use the plain required flag.',
   actionMethod:            'HTTP method for the outbound request.',
   actionUrl:               'Target URL. Supports ${steps.<id>.<field>} and ${triggerPayload.<field>} interpolation — never put ${secrets.NAME} here, the resolved URL is persisted as this step\'s output.',
   actionBody:              'JSON body sent with the request. Supports ${steps.<id>.<field>} interpolation. Only the response is stored, so ${secrets.NAME} is safe here.',
@@ -218,6 +229,7 @@ function StepIdField({ currentId, onChange, error }: { currentId: string; onChan
 
   return (
     <input
+      data-testid="step-id-field"
       value={draft}
       onChange={(e) => { setDraft(e.target.value); setDirty(true); }}
       onBlur={commit}
@@ -337,6 +349,25 @@ export function StepEditor({
   const httpAction    = step.action?.kind === 'http'    ? step.action : undefined;
   const reshapeAction = step.action?.kind === 'reshape' ? step.action : undefined;
   const emailAction   = step.action?.kind === 'email'   ? step.action : undefined;
+  const spawnAction   = step.action?.kind === 'spawn'   ? step.action : undefined;
+  const waitAction    = step.action?.kind === 'wait'    ? step.action : undefined;
+
+  // `targets` is one target or a list; the editor always works on a list and
+  // writes back a bare object when there is exactly one, so a hand-authored
+  // single-target definition round-trips unchanged.
+  const spawnTargets = spawnAction === undefined
+    ? []
+    : Array.isArray(spawnAction.config.targets) ? spawnAction.config.targets : [spawnAction.config.targets];
+
+  const writeSpawnTargets = (targets: SpawnTargetConfig[]): void => {
+    if (spawnAction === undefined) return;
+    onChange({
+      action: {
+        ...spawnAction,
+        config: { ...spawnAction.config, targets: targets.length === 1 ? targets[0] : targets },
+      },
+    });
+  };
 
   const selMin = typeof step.selection === 'number' ? step.selection : step.selection?.min;
   const selMax = typeof step.selection === 'number' ? step.selection : step.selection?.max;
@@ -376,16 +407,7 @@ export function StepEditor({
   function updateReview(patch: Partial<NonNullable<WorkflowStep['review']>>) {
     onChange({ review: { ...step.review, ...patch } });
   }
-  function setUiComponent(component: string) {
-    if (!component) { onChange({ ui: undefined }); return; }
-    onChange({ ui: { ...step.ui, component } });
-  }
-  function updateUiConfig(key: string, value: unknown) {
-    const component = step.ui?.component ?? 'file-upload';
-    const config = { ...step.ui?.config, [key]: value };
-    if (value === undefined) delete config[key];
-    onChange({ ui: { component, config: Object.keys(config).length > 0 ? config : undefined } });
-  }
+
   function updateSelection(newMin: number | undefined, newMax: number | undefined) {
     if (newMin === undefined && newMax === undefined) { onChange({ selection: undefined }); return; }
     onChange({ selection: { min: newMin ?? 1, max: newMax ?? 1 } });
@@ -510,6 +532,32 @@ export function StepEditor({
                     }}
                     className="w-3.5 h-3.5 accent-primary cursor-pointer"
                   />
+                </FieldRow>
+                <FieldRow label="requiredForVerdicts" tooltip={TIP.paramRequiredForVerdicts}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {Object.keys(step.verdicts ?? {}).map((verdictKey) => (
+                      <label key={verdictKey} className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={param.requiredForVerdicts?.includes(verdictKey) === true}
+                          onChange={(e) => {
+                            const current = param.requiredForVerdicts ?? [];
+                            const keys = e.target.checked
+                              ? [...current, verdictKey]
+                              : current.filter((k) => k !== verdictKey);
+                            const next = [...(step.params ?? [])];
+                            next[idx] = { ...next[idx], requiredForVerdicts: keys.length > 0 ? keys : undefined };
+                            onChange({ params: next });
+                          }}
+                          className="h-3.5 w-3.5 accent-primary cursor-pointer"
+                        />
+                        {verdictKey}
+                      </label>
+                    ))}
+                    {Object.keys(step.verdicts ?? {}).length === 0 && (
+                      <span className="text-[11px] italic text-muted-foreground/40">Define verdicts to make this conditional</span>
+                    )}
+                  </div>
                 </FieldRow>
                 <FieldRow label="description" tooltip={TIP.paramDescription}>
                   <input
@@ -900,6 +948,16 @@ export function StepEditor({
               className={cn(rt, 'font-mono text-[11px] placeholder:italic placeholder:text-muted-foreground/40')}
             />
           </FieldRow>
+
+          <FieldRow label="script.timeoutMinutes" tooltip={TIP.scriptTimeoutMinutes}>
+            <input
+              type="number"
+              min={1}
+              value={step.script?.timeoutMinutes ?? ''}
+              onChange={(e) => updateScript({ timeoutMinutes: e.target.value ? Number(e.target.value) : undefined })}
+              className={ri}
+            />
+          </FieldRow>
           </>)}
 
           {step.plugin === 'databricks-job' && (<>
@@ -1045,58 +1103,7 @@ export function StepEditor({
       </>)}
 
       {/* ── Task UI (custom body) ────────────────────────────────── */}
-      {isHuman && (
-        <Section title="Task UI">
-          <FieldGroup>
-            <FieldRow label="component" tooltip={TIP.uiComponent}>
-              <select
-                value={step.ui?.component ?? ''}
-                onChange={(e) => setUiComponent(e.target.value)}
-                className={rs}
-              >
-                <option value="">Params form (default)</option>
-                <option value="file-upload">File upload</option>
-                <option value="assignment-table">Assignment table</option>
-                <option value="table-editor">Table editor</option>
-              </select>
-            </FieldRow>
-            {step.ui?.component === 'file-upload' && (<>
-              <FieldRow label="acceptedTypes" tooltip={TIP.uiAcceptedTypes}>
-                <input
-                  value={(step.ui.config?.acceptedTypes as string[] | undefined)?.join(', ') ?? ''}
-                  onChange={(e) => {
-                    const list = e.target.value.split(',').map((t) => t.trim()).filter(Boolean);
-                    updateUiConfig('acceptedTypes', list.length > 0 ? list : undefined);
-                  }}
-                  placeholder="text/csv, .csv, application/pdf"
-                  className={riMono}
-                />
-              </FieldRow>
-              <FieldRow label="minFiles" tooltip={TIP.uiMinFiles}>
-                <input
-                  type="number"
-                  min={0}
-                  value={(step.ui.config?.minFiles as number | undefined) ?? ''}
-                  onChange={(e) => updateUiConfig('minFiles', e.target.value === '' ? undefined : Number(e.target.value))}
-                  className={ri}
-                />
-              </FieldRow>
-              <FieldRow label="maxFiles" tooltip={TIP.uiMaxFiles}>
-                <input
-                  type="number"
-                  min={1}
-                  value={(step.ui.config?.maxFiles as number | undefined) ?? ''}
-                  onChange={(e) => updateUiConfig('maxFiles', e.target.value === '' ? undefined : Number(e.target.value))}
-                  className={ri}
-                />
-              </FieldRow>
-            </>)}
-            {(step.ui?.component === 'assignment-table' || step.ui?.component === 'table-editor') && (
-              <p className="text-xs text-muted-foreground px-0.5">Configure this component&apos;s columns in the source editor.</p>
-            )}
-          </FieldGroup>
-        </Section>
-      )}
+      {isHuman && <StepUiConfigSection step={step} onChange={onChange} />}
 
       {/* ── Review config ────────────────────────────────────────── */}
       {isReview && (
@@ -1352,6 +1359,117 @@ export function StepEditor({
               </FieldRow>
             </>
           )}
+
+          {spawnAction && (
+            <>
+              <FieldRow label="action.targets" tooltip={TIP.actionTargets} alignStart>
+                <div className="space-y-1.5">
+                  {spawnTargets.map((target, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5">
+                      <input
+                        value={target.definitionName}
+                        placeholder="workflow-name"
+                        onChange={(e) => writeSpawnTargets(
+                          spawnTargets.map((t, i) => (i === idx ? { ...t, definitionName: e.target.value } : t)),
+                        )}
+                        className={cn(riMono, 'flex-1 placeholder:italic placeholder:text-muted-foreground/40')}
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        value={target.definitionVersion ?? ''}
+                        placeholder="default"
+                        onChange={(e) => writeSpawnTargets(
+                          spawnTargets.map((t, i) => (
+                            i === idx
+                              ? { ...t, definitionVersion: e.target.value ? Number(e.target.value) : undefined }
+                              : t
+                          )),
+                        )}
+                        className={cn(ri, 'w-20 placeholder:italic placeholder:text-muted-foreground/40')}
+                      />
+                      <button
+                        type="button"
+                        aria-label={`Remove target ${idx + 1}`}
+                        onClick={() => writeSpawnTargets(spawnTargets.filter((_, i) => i !== idx))}
+                        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => writeSpawnTargets([...spawnTargets, { definitionName: '' }])}
+                    className="text-[11px] font-medium text-primary hover:underline"
+                  >
+                    + Add workflow
+                  </button>
+                </div>
+              </FieldRow>
+
+              <FieldRow label="action.forEach" tooltip={TIP.actionForEach}>
+                <input
+                  value={spawnAction.config.forEach ?? ''}
+                  placeholder="${steps.split.items}"
+                  onChange={(e) => onChange({ action: { ...spawnAction, config: { ...spawnAction.config, forEach: e.target.value || undefined } } })}
+                  className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
+                />
+              </FieldRow>
+
+              <FieldRow label="action.continueOnSpawnError" tooltip={TIP.actionContinueOnSpawnError}>
+                <input
+                  type="checkbox"
+                  checked={spawnAction.config.continueOnSpawnError !== false}
+                  onChange={(e) => onChange({ action: { ...spawnAction, config: { ...spawnAction.config, continueOnSpawnError: e.target.checked } } })}
+                  className="h-3.5 w-3.5 accent-primary"
+                />
+              </FieldRow>
+            </>
+          )}
+
+          {waitAction && (
+            <>
+              <FieldRow label="action.duration" tooltip={TIP.actionWaitDuration}>
+                <div className="flex items-center gap-1.5">
+                  {(['hours', 'minutes', 'seconds'] as const).map((unit) => (
+                    <label key={unit} className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <input
+                        type="number"
+                        min={0}
+                        value={waitAction.config.duration?.[unit] ?? ''}
+                        onChange={(e) => {
+                          const next = { ...waitAction.config.duration, [unit]: e.target.value ? Number(e.target.value) : undefined };
+                          const empty = Object.values(next).every((v) => v === undefined);
+                          onChange({ action: { ...waitAction, config: { ...waitAction.config, duration: empty ? undefined : next } } });
+                        }}
+                        className={cn(ri, 'w-16')}
+                      />
+                      {unit}
+                    </label>
+                  ))}
+                </div>
+              </FieldRow>
+
+              <FieldRow label="action.deadline" tooltip={TIP.actionWaitDeadline}>
+                <input
+                  value={waitAction.config.deadline ?? ''}
+                  placeholder="2026-01-01T00:00:00Z"
+                  onChange={(e) => onChange({ action: { ...waitAction, config: { ...waitAction.config, deadline: e.target.value || undefined } } })}
+                  className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
+                />
+              </FieldRow>
+
+              <FieldRow label="action.condition" tooltip={TIP.actionWaitCondition}>
+                <input
+                  value={waitAction.config.condition ?? ''}
+                  placeholder="steps.poll.ready == true"
+                  onChange={(e) => onChange({ action: { ...waitAction, config: { ...waitAction.config, condition: e.target.value || undefined } } })}
+                  className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
+                />
+              </FieldRow>
+            </>
+          )}
         </FieldGroup>
       )}
 
@@ -1404,6 +1522,36 @@ export function StepEditor({
                     }}
                     className="text-[10px] text-muted-foreground/30 hover:text-red-500 transition-colors shrink-0"
                   >×</button>
+                </div>
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <input
+                    value={verdict.label ?? ''}
+                    placeholder={defaultVerdictLabel(verdictName)}
+                    title={TIP.verdictLabel}
+                    onChange={(e) => onChange({ verdicts: { ...step.verdicts, [verdictName]: { ...verdict, label: e.target.value || undefined } } })}
+                    className={cn(ri, 'flex-1 placeholder:italic placeholder:text-muted-foreground/40')}
+                  />
+                  <select
+                    value={verdict.intent ?? ''}
+                    title={TIP.verdictIntent}
+                    onChange={(e) => onChange({ verdicts: { ...step.verdicts, [verdictName]: { ...verdict, intent: (e.target.value || undefined) as typeof verdict.intent } } })}
+                    className={cn(rs, 'w-24 shrink-0')}
+                  >
+                    <option value="">Default</option>
+                    <option value="success">Success</option>
+                    <option value="danger">Danger</option>
+                    <option value="warning">Warning</option>
+                    <option value="neutral">Neutral</option>
+                  </select>
+                  <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground" title={TIP.verdictRequiresComment}>
+                    <input
+                      type="checkbox"
+                      checked={verdict.requiresComment === true}
+                      onChange={(e) => onChange({ verdicts: { ...step.verdicts, [verdictName]: { ...verdict, requiresComment: e.target.checked ? true : undefined } } })}
+                      className="h-3.5 w-3.5 accent-primary"
+                    />
+                    comment
+                  </label>
                 </div>
               </FieldRow>
             ))}

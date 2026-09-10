@@ -1,6 +1,8 @@
+import { WorkflowAuthorableSchema } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
 type Transitions = WorkflowDefinition['transitions'];
+type CarryOverEntries = NonNullable<WorkflowDefinition['inputForNextRun']>;
 
 /**
  * Returns two sets of step IDs: those that can move up and those that can move
@@ -134,30 +136,78 @@ export function bridgeTargetForDeletion(
 }
 
 /** Order-insensitive canonical serialization (object keys sorted recursively). */
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([key, val]) => `${JSON.stringify(key)}:${stableStringify(val)}`);
-    return `{${entries.join(',')}}`;
-  }
-  return JSON.stringify(value) ?? 'null';
-}
+
+/** The graph the canvas owns; everything else is applied as a non-graph edit. */
+const GRAPH_KEYS = { steps: true, transitions: true, inputForNextRun: true } as const;
+
+export type SplitPastedDefinition = {
+  graph: {
+    steps: unknown;
+    transitions: unknown;
+    inputForNextRun: unknown;
+  };
+  nonGraph: Record<string, unknown>;
+  /** Keys the document carried that the platform assigns itself, so the apply
+   *  overwrote them rather than honouring them. Reported so a pasted
+   *  `namespace` does not look like it was accepted. */
+  ignored: string[];
+  error: string | null;
+};
 
 /**
- * Whether a pasted workflow document changed any field other than
- * `steps`/`transitions`, relative to the canvas's current non-graph fields. The
- * canvas JSON editor applies the graph only, so this gates whether to refuse the
- * apply. Order-insensitive, so merely reordering keys in the JSON is not treated
- * as a change.
+ * Splits a pasted workflow document into the graph the canvas applies and the
+ * non-graph fields the page applies, validating the latter against
+ * `WorkflowAuthorableSchema`.
+ *
+ * The canvas used to refuse any document whose non-graph fields differed from
+ * the loaded ones, which made the product unable to round-trip its own output:
+ * a definition copied from a registered version carries `title`, `triggerInput`
+ * and the server-assigned fields, so pasting it back was always refused.
+ *
+ * Server-managed and lifecycle fields need no strip list here — the authorable
+ * schema excludes them by construction and the parse drops them. Only keys the
+ * document actually carried are returned, so a paste cannot silently apply a
+ * schema default (`visibility`) the author never wrote.
  */
-export function nonGraphFieldsDiffer(
-  doc: Record<string, unknown>,
-  wdJsonFields: Record<string, unknown> | undefined,
-): boolean {
-  const { steps: _steps, transitions: _transitions, ...rest } = doc;
-  return stableStringify(rest) !== stableStringify(wdJsonFields ?? {});
+export function splitPastedDefinition(doc: unknown): SplitPastedDefinition {
+  const empty = { steps: undefined, transitions: undefined, inputForNextRun: undefined };
+  if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) {
+    return { graph: empty, nonGraph: {}, ignored: [], error: 'Expected a workflow definition object.' };
+  }
+
+  const source = doc as Record<string, unknown>;
+  const graph = {
+    steps: source.steps,
+    transitions: source.transitions,
+    inputForNextRun: source.inputForNextRun,
+  };
+
+  const nonGraph: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (key in GRAPH_KEYS === false) nonGraph[key] = value;
+  }
+
+  // Graph keys are validated separately by the caller against the step and
+  // transition schemas, so only the non-graph half is checked here.
+  const parsed = WorkflowAuthorableSchema.omit(GRAPH_KEYS).partial().safeParse(nonGraph);
+
+  if (parsed.success === false) {
+    const issue = parsed.error.issues[0];
+    const field = issue?.path.join('.') ?? 'definition';
+    return { graph, nonGraph, ignored: [], error: `${field}: ${issue?.message ?? 'invalid'}` };
+  }
+
+  const applied: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(parsed.data as Record<string, unknown>)) {
+    if (key in nonGraph) applied[key] = value;
+  }
+
+  // Whatever the parse dropped was either server-assigned or a lifecycle field:
+  // the platform decides those, so the apply overwrites rather than honours
+  // them, and the visitor is told which.
+  const ignored = Object.keys(nonGraph).filter((key) => key in applied === false);
+
+  return { graph, nonGraph: applied, ignored, error: null };
 }
 
 /**
@@ -196,4 +246,56 @@ export function ensureTerminalConnected(
   }
 
   return { steps: resultSteps, transitions: resultTransitions };
+}
+
+/**
+ * Points carry-over entries (`inputForNextRun`) at a step that was renamed,
+ * the same way a rename rewires transitions and verdict targets. Without this
+ * the entry keeps the old id, the server's cross-field check rejects the save
+ * (`stepId '…' does not match any step id`), and the only way to correct it is
+ * to retype the block in the source-code panel.
+ *
+ * Returns the original reference when no entry named the renamed step.
+ */
+export function retargetCarryOver(
+  entries: CarryOverEntries | undefined,
+  oldId: string,
+  newId: string,
+): CarryOverEntries | undefined {
+  if (!entries?.some((entry) => entry.stepId === oldId)) return entries;
+  return entries.map((entry) => (entry.stepId === oldId ? { ...entry, stepId: newId } : entry));
+}
+
+/**
+ * Drops carry-over entries whose step is gone — deleted from the diagram,
+ * removed by the assistant, or absent from an applied JSON document. There is
+ * nothing left to read the output from, and keeping the entry would make the
+ * version unsavable.
+ *
+ * Returns the original reference when every entry still resolves.
+ */
+export function pruneCarryOver(
+  entries: CarryOverEntries | undefined,
+  steps: WorkflowStep[],
+): CarryOverEntries | undefined {
+  if (entries === undefined) return entries;
+  const stepIds = new Set(steps.map((s) => s.id));
+  const kept = entries.filter((entry) => stepIds.has(entry.stepId));
+  return kept.length === entries.length ? entries : kept;
+}
+
+/**
+ * What to call a workflow a paste is creating.
+ *
+ * A definition carries both: `name` is its id, `title` is what a person calls
+ * it. The create page's name field is the display name, so it takes the title
+ * when there is one and the id only as a fallback. Filling it with the id saved
+ * a workflow displayed as `landing-zone-CDISCPILOT01`, case and all, while the
+ * version it cut was named correctly.
+ */
+export function pastedWorkflowName(fields: Record<string, unknown>): string | null {
+  const title = typeof fields.title === 'string' ? fields.title.trim() : '';
+  if (title !== '') return title;
+  const name = typeof fields.name === 'string' ? fields.name.trim() : '';
+  return name === '' ? null : name;
 }

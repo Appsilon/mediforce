@@ -13,7 +13,7 @@ import { StartRunButton } from '@/components/processes/start-run-button';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
 import { mediforceSilent } from '@/lib/mediforce';
-import { validateSteps, toastRegistrationWarnings, handleSaveFailure, workflowDisplayName } from '@/lib/workflow-save-utils';
+import { buildRegisterBody, validateSteps, toastRegistrationWarnings, handleSaveFailure, workflowDisplayName } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
@@ -51,10 +51,14 @@ export default function WorkflowDefinitionVersionPage() {
   const [stepErrors, setStepErrors] = useState<Record<string, Record<string, string>>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [canvasDirty, setCanvasDirty] = useState(false);
+  // Fields outside the graph that a pasted definition carried. Empty until the
+  // source panel applies one; merged over the loaded definition on save.
+  const [pastedFields, setPastedFields] = useState<Record<string, unknown>>({});
 
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>([]);
   const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>([]);
+  const currentInputForNextRunRef = useRef<WorkflowDefinition['inputForNextRun']>(undefined);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startAfterSaveResolverRef = useRef<((saved: { version: number; namespace: string } | undefined) => void) | null>(null);
 
@@ -70,13 +74,19 @@ export default function WorkflowDefinitionVersionPage() {
     setEditedDescription(definition.description ?? '');
     currentStepsRef.current = definition.steps;
     currentTransitionsRef.current = definition.transitions;
+    currentInputForNextRunRef.current = definition.inputForNextRun;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [definition?.version]);
 
   const handleCanvasChange = useCallback(
-    (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => {
+    (
+      steps: WorkflowStep[],
+      transitions: WorkflowDefinition['transitions'],
+      inputForNextRun: WorkflowDefinition['inputForNextRun'],
+    ) => {
       currentStepsRef.current = steps;
       currentTransitionsRef.current = transitions;
+      currentInputForNextRunRef.current = inputForNextRun;
     },
     [],
   );
@@ -100,21 +110,24 @@ export default function WorkflowDefinitionVersionPage() {
 
     try {
       const result = await mediforceSilent.workflows.register(
-        {
-          name: definition.name,
+        buildRegisterBody(definition, {
+          // After the page's own fields, not before: spreading first meant a
+          // pasted title showed in the panel and was overwritten on save.
           title: title || undefined,
           description: editedDescription.trim() || undefined,
+          ...pastedFields,
           steps: orderedSteps,
           transitions: mergedTransitions,
-          roles: definition.roles,
-          env: definition.env,
-          notifications: definition.notifications,
-          metadata: definition.metadata,
-          externalSkillsRepo: definition.externalSkillsRepo,
-          url: definition.url,
-        },
+          // Retargeted by the canvas when a step it referenced was renamed, and
+          // dropped when that step was deleted — a stale entry here is refused
+          // by the server and unfixable from this page.
+          inputForNextRun: currentInputForNextRunRef.current,
+        }),
         { namespace: definition.namespace },
       );
+      // The version that just registered carries them, so they are no longer
+      // pending — without this the page reports unsaved changes forever.
+      setPastedFields({});
       if (setAsDefault) {
         await mediforceSilent.workflows.setDefaultVersion({
           name: definition.name,
@@ -132,7 +145,7 @@ export default function WorkflowDefinitionVersionPage() {
       toast({ title: 'Save failed', description: message, variant: 'error' });
       throw err;
     }
-  }, [definition, editedDescription, toast]);
+  }, [definition, editedDescription, pastedFields, toast]);
 
   const handleSave = useCallback(async (title: string, setAsDefault: boolean) => {
     setDialogOpen(false);
@@ -181,7 +194,22 @@ export default function WorkflowDefinitionVersionPage() {
 
   if (definition === null) return null;
 
-  const hasUnsavedChanges = canvasDirty || editedDescription !== (definition.description ?? '');
+  const hasUnsavedChanges =
+    canvasDirty ||
+    editedDescription !== (definition.description ?? '') ||
+    Object.keys(pastedFields).length > 0;
+
+  // What the canvas shows around the graph in its JSON panel. The graph it owns
+  // — steps, transitions, inputForNextRun — is excluded because the canvas
+  // supplies those; `version`/`createdAt` are server-assigned.
+  const {
+    steps: _steps,
+    transitions: _transitions,
+    inputForNextRun: _inputForNextRun,
+    version: _version,
+    createdAt: _createdAt,
+    ...wdJsonFields
+  } = definition;
 
   return (
     <div className="flex h-full flex-col relative bg-white dark:bg-background">
@@ -280,10 +308,17 @@ export default function WorkflowDefinitionVersionPage() {
         key={definition.version}
         initialSteps={definition.steps}
         initialTransitions={definition.transitions}
+        initialInputForNextRun={definition.inputForNextRun}
         workflowName={decodedName}
         namespace={handle}
         workflowExternalSkillsRepo={definition.externalSkillsRepo}
-        wdJsonFields={{ ...definition, version: undefined, createdAt: undefined } as Record<string, unknown>}
+        wdJsonFields={{ ...(wdJsonFields as Record<string, unknown>), ...pastedFields }}
+        onNonGraphFieldsChange={(fields) => {
+          setPastedFields(fields);
+          // The fields with an input on this page have to show what was pasted,
+          // or the header reads one description while the save writes another.
+          if (typeof fields.description === 'string') setEditedDescription(fields.description);
+        }}
         onChange={handleCanvasChange}
         onDirtyChange={setCanvasDirty}
         stepErrors={stepErrors}
@@ -292,6 +327,7 @@ export default function WorkflowDefinitionVersionPage() {
       <UnsavedChangesGuard when={hasUnsavedChanges} />
 
       <SaveVersionDialog
+        suggestedTitle={typeof pastedFields.title === 'string' ? pastedFields.title : undefined}
         open={dialogOpen}
         nextVersion={definition.version + 1}
         confirmLabel="Save new version"

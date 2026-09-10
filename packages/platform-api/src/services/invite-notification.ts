@@ -18,6 +18,19 @@ export interface SeedInviteInput {
   readonly workspaceHandle: string;
   readonly membership: 'owner' | 'admin' | 'member';
   readonly roles?: readonly string[];
+  /**
+   * Whether an authenticated admin is naming this specific person, as opposed
+   * to an anonymous join-link holder typing an address into a public form
+   * (ADR-0021 §4). Required, with no default — the two callers want materially
+   * different writes and a third that forgot to choose would silently get the
+   * privileged one.
+   *
+   * `false` restricts the seed to creating only: it may not rewrite an existing
+   * membership, stamp `invited_at` on an existing account, or clear an
+   * auto-join tombstone. See `PostgresInviteService.seedInvite` for what each
+   * of those would hand a link holder.
+   */
+  readonly vouchedByAdmin: boolean;
 }
 
 export interface InviteService {

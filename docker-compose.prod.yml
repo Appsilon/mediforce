@@ -128,6 +128,12 @@ services:
       - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
       - OIDC_DISPLAY_NAME=${OIDC_DISPLAY_NAME:-}
       - PLATFORM_API_KEY=${PLATFORM_API_KEY}
+      # --- Ticketing (header "Ticket" button -> GitHub issue) ---
+      # Server-side token only: end users file tickets with their Mediforce
+      # session, never a GitHub account. Unset = the ticket form reports
+      # "not configured" instead of failing the deploy.
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_REPO=${GITHUB_REPO:-appsilon/mediforce}
       - SECRETS_ENCRYPTION_KEY=${SECRETS_ENCRYPTION_KEY}
       - DOCKER_DEEPSEEK_API_KEY=${DOCKER_DEEPSEEK_API_KEY}
       - DOCKER_OPENROUTER_API_KEY=${DOCKER_OPENROUTER_API_KEY}

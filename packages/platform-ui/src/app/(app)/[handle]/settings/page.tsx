@@ -10,6 +10,7 @@ import { useNamespaceMembers } from '@/hooks/use-namespace-members';
 import { DefaultWorkspaceSection } from '@/components/namespace/settings/default-workspace-section';
 import { WorkspaceAdministrationSection } from '@/components/namespace/settings/workspace-administration-section';
 import { WorkspaceDangerZone } from '@/components/namespace/settings/workspace-danger-zone';
+import { JoinLinksPanel } from '@/components/namespace/settings/join-links-panel';
 import { WorkspaceMembersSection } from '@/components/namespace/settings/workspace-members-section';
 import { WorkspaceProfileSection } from '@/components/namespace/settings/workspace-profile-section';
 import { WorkspaceRolesSection } from '@/components/namespace/settings/workspace-roles-section';
@@ -106,6 +107,14 @@ export default function WorkspaceConfigPage() {
           inviterName={user?.name ?? user?.email ?? undefined}
           onError={setDangerError}
         />
+
+        {/* Join links are the other half of "add people", so they sit directly
+            under Members. Organizations only (ADR-0021 §2): a personal
+            workspace is one person's own space, and strangers joining it is not
+            a shape we want to have to reason about. */}
+        {!isPersonal && (
+          <JoinLinksPanel handle={handle} canManageMembers={canManageMembers} />
+        )}
 
         {/* Roles sit under Members and read the same roster: a role is held by
             a member, so the list it is granted from has to be above it. */}

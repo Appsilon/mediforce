@@ -132,6 +132,12 @@ export {
 } from './namespaces/namespace-mutations';
 export { setNamespaceMemberRoles } from './namespaces/set-member-roles';
 
+export { createJoinLink } from './join-links/create-join-link';
+export { listJoinLinks } from './join-links/list-join-links';
+export { revokeJoinLink } from './join-links/revoke-join-link';
+export { previewJoinLink } from './join-links/preview-join-link';
+export { redeemJoinLink } from './join-links/redeem-join-link';
+
 export { listToolCatalogEntries } from './tool-catalog/list-entries';
 export { getToolCatalogEntry } from './tool-catalog/get-entry';
 export { createToolCatalogEntry } from './tool-catalog/create-entry';
