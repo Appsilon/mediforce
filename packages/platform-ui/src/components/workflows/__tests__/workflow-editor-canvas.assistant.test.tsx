@@ -204,8 +204,10 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
     };
     openAssistant();
     return ask('A senior lab member should approve it.').then(() => waitFor(() => {
-      expect(screen.getByText(/nobody holds "senior-lab-member"/i)).toBeTruthy();
-      expect(screen.getByText(/Settings → Members/)).toBeTruthy();
+      const warning = screen.getByText(/nobody holds "senior-lab-member"/i);
+      expect(warning.textContent).toMatch(/Settings → Members/);
+      // Warnings read as warnings: their own message, in the warning colour.
+      expect(warning.closest('[data-tone="warning"]')).not.toBeNull();
     }));
   });
 
