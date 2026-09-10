@@ -50,8 +50,25 @@ function buildScope(overrides: Record<string, unknown> = {}): CallerScope {
         { id: 'github', command: 'npx', args: ['-y', 'mcp-github'], description: 'GitHub MCP' },
       ]),
     },
-    system: { audit: { append: vi.fn().mockResolvedValue(undefined) } },
-    caller: { kind: 'user', userId: 'u1', email: 'someone@example.com' },
+    system: {
+      audit: { append: vi.fn().mockResolvedValue(undefined) },
+      userDirectory: {
+        getUserMetadata: vi.fn().mockResolvedValue({ email: 'a@b.com', displayName: 'A', lastSignInTime: null }),
+        getGrantsForUser: vi.fn().mockImplementation((uid: string) => Promise.resolve(
+          uid === 'u1'
+            ? [{ role: 'data-manager', workflowName: null }, { role: 'reviewer', workflowName: null }]
+            : [{ role: 'reviewer', workflowName: null }],
+        )),
+      },
+    },
+    caller: {
+      kind: 'user',
+      userId: 'u1',
+      email: 'someone@example.com',
+      namespaces: new Set(['acme']),
+      namespaceRoles: new Map([['acme', 'owner']]),
+      isSystemActor: false,
+    },
     ...overrides,
   } as unknown as CallerScope;
 }

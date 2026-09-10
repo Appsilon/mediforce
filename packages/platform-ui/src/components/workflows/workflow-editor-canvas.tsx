@@ -27,6 +27,7 @@ import { WorkflowSettingsPanel } from './workflow-settings-panel';
 import { WorkflowNotificationsPanel } from './workflow-notifications-panel';
 import { pruneWorkflowSettings } from './workflow-settings-utils';
 import type { WorkflowSettingsDraft } from './workflow-settings-utils';
+import { unheldStepRoles } from './workflow-editor-utils';
 import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 import { mediforce, ApiError } from '@/lib/mediforce';
@@ -457,6 +458,7 @@ export function WorkflowEditorCanvas({
   useEffect(() => {
     const el = assistantInputRef.current;
     if (!el) return;
+  const heldRolesRef = useRef<string[] | null>(null);
     el.style.height = 'auto';
     el.style.height = `${String(el.scrollHeight)}px`;
   }, [assistantInput]);
@@ -491,8 +493,11 @@ export function WorkflowEditorCanvas({
   // Seeds the notifications role pick-list. Fetched here rather than threaded
   // through the pages: the canvas already knows the handle, and that panel is
   // the only consumer.
-  const { roles: workspaceRoles } = useWorkspaceRoles(namespace ?? '', {
-    enabled: rightPanelView === 'notifications',
+  const { roles: workspaceRoles, heldRoles } = useWorkspaceRoles(namespace ?? '', {
+    // Also while the assistant pane is open: a step it writes can name a role
+    // nobody holds, and the person reading the reply never opens the panel
+    // where that warning already lives.
+    enabled: rightPanelView === 'notifications' || aiPaneOpen,
     workflowName,
   });
 
@@ -519,6 +524,7 @@ export function WorkflowEditorCanvas({
     setEditedInputForNextRun(result.inputForNextRun);
     // The page owns the workflow-level fields, so the reducer's settings go
     // back the same way the settings panel's edits do.
+  heldRolesRef.current = heldRoles;
     onSettingsChange?.(result.settings);
     const lastAdded = result.addedStepIds[result.addedStepIds.length - 1];
     if (lastAdded) setSelectedStepId(lastAdded);
@@ -658,6 +664,17 @@ export function WorkflowEditorCanvas({
     } finally {
       assistantAbortRef.current = null;
       setAssistantLoading(false);
+        // A role nobody holds is a task nobody can claim. Said here rather than
+        // left to the prompt: the model may not check, and the step panel that
+        // already warns about it is not where this person is looking.
+        const unheld = unheldStepRoles(applied.steps, heldRolesRef.current);
+        if (unheld.length > 0) {
+          setAssistantMessages((prev) => [...prev, {
+            role: 'assistant',
+            content: `Heads up: nobody holds ${unheld.map((role) => `"${role}"`).join(', ')} in this workspace, so ${unheld.length === 1 ? 'that step' : 'those steps'} will wait until someone is granted ${unheld.length === 1 ? 'it' : 'them'} in Settings → Members.`,
+            narration: true,
+          }]);
+        }
     }
   }, [assistantMessages, assistantLoading, assistantModel, namespace, assistantWorkflowDefinition, applyAssistantToolCalls, toast]);
 

@@ -5,6 +5,7 @@ import { HandlerError } from '../../../errors';
 import { createAgent } from '../../agents/create-agent';
 import { createToolCatalogEntry } from '../../tool-catalog/create-entry';
 import { createTrigger } from '../../triggers/manage-triggers';
+import { listNamespaceMembers } from '../../users/list-members';
 
 /**
  * Runs one platform tool for the assistant, as the person who asked.
@@ -95,6 +96,22 @@ export async function runPlatformTool(
           iconName: 'bot',
         }, scope);
         return { created: { id: agent.id, name: agent.name } };
+      }
+      case 'list_roles': {
+        // Read from the roster rather than a role table: a role exists in this
+        // workspace exactly when somebody has been granted it.
+        const { members } = await listNamespaceMembers({ namespace }, scope);
+        const holders = new Map<string, number>();
+        for (const member of members) {
+          for (const grant of member.grants) {
+            holders.set(grant.role, (holders.get(grant.role) ?? 0) + 1);
+          }
+        }
+        return {
+          roles: [...holders.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([role, heldBy]) => ({ role, heldBy })),
+        };
       }
       case 'create_cron_trigger': {
         const input = parsed.data as z.infer<typeof WORKFLOW_ASSISTANT_PLATFORM_TOOLS['create_cron_trigger']>;

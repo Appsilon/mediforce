@@ -75,8 +75,16 @@ export const CreateCronTriggerToolSchema = z.object({
 });
 export type CreateCronTriggerTool = z.infer<typeof CreateCronTriggerToolSchema>;
 
+/** Which roles this workspace actually grants, and how many people hold each.
+ *  A step's `allowedRoles` naming a role nobody holds is a task nobody can
+ *  claim, so this is what turns "a data manager reviews it" into either a real
+ *  role or a plain sentence asking for one to be created. */
+export const ListRolesToolSchema = z.object({});
+export type ListRolesTool = z.infer<typeof ListRolesToolSchema>;
+
 export const WORKFLOW_ASSISTANT_PLATFORM_TOOLS = {
   create_cron_trigger: CreateCronTriggerToolSchema,
+  list_roles: ListRolesToolSchema,
   list_secrets: ListSecretsToolSchema,
   list_agents: ListAgentsToolSchema,
   list_tool_catalog: ListToolCatalogToolSchema,
