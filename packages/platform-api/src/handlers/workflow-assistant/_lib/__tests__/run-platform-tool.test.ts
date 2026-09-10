@@ -28,6 +28,23 @@ function buildScope(overrides: Record<string, unknown> = {}): CallerScope {
       create: vi.fn().mockImplementation((input: Record<string, unknown>) =>
         Promise.resolve({ id: 'agent-new', ...input })),
     },
+    workspaces: {
+      getMembers: vi.fn().mockResolvedValue([
+        { uid: 'u1', role: 'owner', joinedAt: '2026-01-01' },
+        { uid: 'u2', role: 'member', joinedAt: '2026-01-02' },
+      ]),
+    },
+    // The scoped repo the trigger handler resolves the target workflow through.
+    workflowDefinitions: {
+      isNameDeleted: vi.fn().mockResolvedValue(false),
+      getDefaultVersion: vi.fn().mockResolvedValue(1),
+      listVersions: vi.fn().mockResolvedValue([{ name: 'sample-qc-check', version: 1, archived: false }]),
+      get: vi.fn().mockResolvedValue({ name: 'sample-qc-check', version: 1, namespace: 'acme', steps: [], transitions: [] }),
+    },
+    triggers: {
+      listByWorkflow: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockImplementation((row: Record<string, unknown>) => Promise.resolve(row)),
+    },
     toolCatalog: {
       list: vi.fn().mockResolvedValue([
         { id: 'github', command: 'npx', args: ['-y', 'mcp-github'], description: 'GitHub MCP' },
@@ -91,6 +108,38 @@ describe('runPlatformTool', () => {
   });
 
   it('reports a refusal as a result, not an exception', async () => {
+  it('lists the roles this workspace grants, with how many people hold each', async () => {
+    // A step's `allowedRoles` naming a role nobody holds is a task nobody can
+    // claim. The assistant could not check, so it wrote whatever word the
+    // person used.
+    const result = await runPlatformTool('list_roles', {}, buildScope(), 'acme');
+    expect(result).toEqual({
+      roles: [
+        { role: 'data-manager', heldBy: 1 },
+        { role: 'reviewer', heldBy: 2 },
+      ],
+    });
+  });
+
+  it('puts a saved workflow on a schedule', async () => {
+    const scope = buildScope();
+    const result = await runPlatformTool(
+      'create_cron_trigger',
+      { schedule: '0 9 * * 1' },
+      scope,
+      'acme',
+      'sample-qc-check',
+    );
+    expect(result).toEqual({ created: { name: 'schedule', schedule: '0 9 * * 1' } });
+  });
+
+  it('says a schedule needs a saved workflow, rather than failing the turn', async () => {
+    // A trigger attaches to a registered workflow, and a canvas that has never
+    // been saved has none. The turn carries on and the reply says so.
+    const result = await runPlatformTool('create_cron_trigger', { schedule: '0 9 * * 1' }, buildScope(), 'acme');
+    expect(result).toMatchObject({ needsSave: true });
+  });
+
     // The assistant acts as the person who asked. When they may not do a thing,
     // the turn continues and the model tells them an admin is needed — it does
     // not crash the conversation, and it does not find another way through.

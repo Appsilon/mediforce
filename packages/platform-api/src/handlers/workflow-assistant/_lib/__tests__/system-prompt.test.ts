@@ -138,6 +138,21 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
 
   it('requires a params field on human input steps and explains how collected input flows downstream', () => {
     expect(prompt).toMatch(/needs a `params` array/);
+  it('can schedule a saved workflow, and says out loud that an unsaved one cannot be', () => {
+    expect(prompt).toMatch(/create_cron_trigger/);
+    expect(prompt).toMatch(/never been saved/i);
+    expect(prompt).toMatch(/saved at least once/i);
+    expect(prompt).toMatch(/Webhooks you cannot create at all/);
+    expect(prompt).not.toMatch(/you have no way to create triggers/i);
+  });
+
+  it('checks a role exists before leaning on it, and points at Settings for granting one', () => {
+    expect(prompt).toMatch(/list_roles/);
+    expect(prompt).toMatch(/Settings → Members/);
+    expect(prompt).toMatch(/nobody holds it yet/i);
+    expect(prompt).toMatch(/Access\*\* tab/);
+  });
+
     expect(prompt).toMatch(/automatically receives the \*immediately preceding\* step's output/);
     expect(prompt).toMatch(/\$\{steps\.share-two-words\.words\}/);
   });

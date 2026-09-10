@@ -23,6 +23,10 @@ export const WorkflowAssistantMessageSchema = z.object({
 export const AskWorkflowAssistantInputSchema = z.object({
   messages: z.array(WorkflowAssistantMessageSchema).min(1).max(MAX_MESSAGES),
   model: z.string().max(200).optional(),
+  /** The saved workflow this canvas is a version of, when there is one. A
+   *  trigger attaches to a registered workflow, so without this the assistant
+   *  can only say what it would attach once the workflow is saved. */
+  workflowName: z.string().min(1).max(200).optional(),
   workflowDefinition: z.object({
     steps: z.array(WorkflowStepSchema).max(MAX_STEPS),
     transitions: z.array(TransitionSchema).max(MAX_TRANSITIONS),
