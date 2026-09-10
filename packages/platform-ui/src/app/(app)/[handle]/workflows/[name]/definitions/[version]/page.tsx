@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Save } from 'lucide-react';
-import { useWorkflowVersion } from '@/hooks/use-workflow-versions';
+import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
 import { useWorkflowTriggers } from '@/hooks/use-workflow-triggers';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
@@ -36,6 +36,7 @@ export default function WorkflowDefinitionVersionPage() {
   const versionNumber = parseInt(version, 10);
 
   const { definition, loading } = useWorkflowVersion(decodedName, handle, versionNumber);
+  const { latestVersion } = useWorkflowVersions(decodedName, handle);
   // Hand-startable gate reads the unified triggers table (ADR-0011 / Issue #930),
   // the same source of truth as the server guard. Stay optimistic while rows load.
   const { triggers, loading: triggersLoading } = useWorkflowTriggers(decodedName, handle);
@@ -346,7 +347,8 @@ export default function WorkflowDefinitionVersionPage() {
       <SaveVersionDialog
         suggestedTitle={typeof settingsDraft.title === 'string' ? settingsDraft.title : undefined}
         open={dialogOpen}
-        nextVersion={definition.version + 1}
+        nextVersion={(latestVersion ?? definition.version) + 1}
+        editingVersion={definition.version}
         confirmLabel="Save new version"
         onClose={handleDialogClose}
         onConfirm={handleSave}
