@@ -382,6 +382,43 @@ describe('applyWorkflowAssistantToolCalls — a Dockerfile an imported workflow 
   });
 });
 
+describe('applyWorkflowAssistantToolCalls — removing a transition', () => {
+  it('drops the edge it names', () => {
+    // The verb the assistant did not have. A workflow whose verdict step also
+    // carries a hand-written edge is refused by the graph gate, and until now
+    // the only tools that touched transitions were the ones that add, remove
+    // or re-insert a step.
+    const canvas = baseCanvas();
+    const { transitions, outcomes } = applyWorkflowAssistantToolCalls(
+      canvas.steps,
+      [...canvas.transitions, { from: 'draft', to: 'done', when: 'output.ok == true' }],
+      [{ tool: 'remove_transition', arguments: { from: 'draft', to: 'done', when: 'output.ok == true' } }],
+    );
+    expect(transitions).toEqual(canvas.transitions);
+    expect(outcomes.find((outcome) => outcome.tool === 'remove_transition')?.stepId).toBe('draft → done');
+  });
+
+  it('removes every edge between the two steps when no condition is named', () => {
+    const canvas = baseCanvas();
+    const { transitions } = applyWorkflowAssistantToolCalls(
+      canvas.steps,
+      [{ from: 'draft', to: 'done' }, { from: 'draft', to: 'done', when: 'else' }],
+      [{ tool: 'remove_transition', arguments: { from: 'draft', to: 'done' } }],
+    );
+    expect(transitions.filter((t) => t.from === 'draft' && t.to === 'done')).toEqual([]);
+  });
+
+  it('reports an edge that is not there rather than pretending', () => {
+    const canvas = baseCanvas();
+    const { outcomes } = applyWorkflowAssistantToolCalls(
+      canvas.steps, canvas.transitions,
+      [{ tool: 'remove_transition', arguments: { from: 'done', to: 'draft' } }],
+    );
+    expect(outcomes.find((outcome) => outcome.tool === 'remove_transition')?.error)
+      .toMatch(/no transition/i);
+  });
+});
+
 describe('applyWorkflowAssistantToolCalls — an agent step bound to an MCP server', () => {
   it('keeps the agentId and the step restrictions, which is the only route an MCP has to a step', () => {
     // `resolveMcpForStep` reads `agentId` and returns null without one, so a

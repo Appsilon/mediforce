@@ -138,6 +138,11 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/wiped|deleted|does not survive/i);
   });
 
+  it('names the tool that removes an edge, and says a stale defect is not yours to hide', () => {
+    expect(prompt).toMatch(/remove_transition/);
+    expect(prompt).toMatch(/already had|arrived with/i);
+  });
+
   it('never asks for the same field twice, as a trigger input and as an entry-step param', () => {
     // The shape the assistant kept building: `triggerInput` declares the
     // fields and the first human step collects them again. The contract is
