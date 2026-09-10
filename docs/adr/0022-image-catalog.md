@@ -1,7 +1,7 @@
 ---
 status: finalized
 audience: engineers
-last_reviewed: 2026-09-08
+last_reviewed: 2026-09-10
 ---
 
 # ADR-0022: The Image Catalog is an image the platform offers, keyed on its source
@@ -35,6 +35,19 @@ same build on the same host by running a build-mode step — so the gate would
 have removed the convenient path and not the capability. Whether host-side
 builds should be privileged at all is a question about build-mode steps, and
 this ADR does not answer it.
+
+An entry's **source became editable** after the Images view shipped without any
+way to change one: an entry added through **Add image** was final, so a mistyped
+repository was permanent. This does not weaken decision 1 — it follows from
+it. The id still derives from the source, so `PATCH`ing a source **re-keys** the
+entry: the row is written under the id the new source derives and the old row is
+removed, and a source that only spells the same key differently canonicalises to
+the same id and stays put. What makes this safe is the same property that makes
+deleting safe, stated under decision 3: no Workflow Definition references an
+entry. Re-keying onto a source another entry already describes is refused rather
+than upserted, since that would overwrite the occupant's sentence and delete the
+row being edited. A re-key audits against both ids — it is the one update that
+leaves an id with no row.
 
 Decision 7 is dated 2026-09-08 and revises one line of the original
 consequences — *"a new row appears only when someone catalogues a source nobody

@@ -7,6 +7,7 @@ import { createQueryWrapper } from '@/test/react-query';
 const listMock = vi.fn();
 const getMock = vi.fn();
 const createMock = vi.fn();
+const updateMock = vi.fn();
 const buildMock = vi.fn();
 const apiFetchMock = vi.fn();
 const searchParams = new URLSearchParams();
@@ -20,6 +21,7 @@ vi.mock('@/lib/mediforce', () => ({
       list: (...args: unknown[]) => listMock(...args),
       get: (...args: unknown[]) => getMock(...args),
       create: (...args: unknown[]) => createMock(...args),
+      update: (...args: unknown[]) => updateMock(...args),
       build: (...args: unknown[]) => buildMock(...args),
     },
   },
@@ -479,5 +481,170 @@ describe('ImagesPage', () => {
     expect(
       screen.getByText(/Everything the Dockerfile/),
     ).toBeInTheDocument();
+  });
+
+  it('offers Edit on a catalogued entry, prefilled with what the entry says today', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog');
+    // Every field a human wrote, seeded from the entry — including the source,
+    // which is what makes a mistyped repository fixable rather than permanent.
+    expect(within(dialog).getByLabelText('Repository')).toHaveValue('Appsilon/tealflow');
+    expect(within(dialog).getByLabelText(/Dockerfile/)).toHaveValue('container/Dockerfile');
+    expect(within(dialog).getByLabelText('Name')).toHaveValue('TealFlow agent');
+    expect(within(dialog).getByLabelText('Intent')).toHaveValue(
+      'R-based interactive exploration of ADaM datasets',
+    );
+  });
+
+  it('patches the entry it was opened on, leaving the source out of the write', async () => {
+    updateMock.mockResolvedValue({ entry: { ...TEALFLOW, name: 'TealFlow explorer' } });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.clear(within(dialog).getByLabelText('Name'));
+    await user.type(within(dialog).getByLabelText('Name'), 'TealFlow explorer');
+    await user.clear(within(dialog).getByLabelText('Intent'));
+    await user.type(within(dialog).getByLabelText('Intent'), 'Exploring ADaM in a sandbox');
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    expect(updateMock).toHaveBeenCalledWith({
+      namespace: 'acme',
+      id: 'tealflow',
+      name: 'TealFlow explorer',
+      intent: 'Exploring ADaM in a sandbox',
+    });
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('describes an undescribed entry instead of patching it — there is no row yet', async () => {
+    listMock.mockResolvedValue({ entries: [GOLDEN, DISCOVERED] });
+    createMock.mockResolvedValue({ entry: { ...DISCOVERED, origin: 'catalogued' } });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-cdisc-case-1-1a2b3c4d');
+    expect(within(card).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    await user.click(within(card).getByRole('button', { name: 'Describe' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Intent'), 'Synthetic SDTM generation');
+    await user.click(within(dialog).getByRole('button', { name: 'Add to the catalog' }));
+
+    // A discovered entry is derived on read, not stored, so there is nothing to
+    // PATCH. The id derives from the source, so the create lands at the
+    // identity the listing was already showing (ADR-0022 decision 7).
+    expect(createMock).toHaveBeenCalledWith({
+      namespace: 'acme',
+      name: 'cdisc-case-1',
+      intent: 'Synthetic SDTM generation',
+      source: DISCOVERED.source,
+    });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('re-points a mistyped repository, sending the corrected source', async () => {
+    updateMock.mockResolvedValue({ entry: { ...TEALFLOW, id: 'tealflow-corrected' } });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.clear(within(dialog).getByLabelText('Repository'));
+    await user.type(within(dialog).getByLabelText('Repository'), 'Appsilon/tealflow-gpu');
+
+    // The entry is keyed on its source, so the save moves it — said before the
+    // click, not discovered afterwards.
+    expect(within(dialog).getByText(/keyed on its source, so this moves it/)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    expect(updateMock).toHaveBeenCalledWith({
+      namespace: 'acme',
+      id: 'tealflow',
+      name: 'TealFlow agent',
+      intent: 'R-based interactive exploration of ADaM datasets',
+      source: { kind: 'built', repo: 'Appsilon/tealflow-gpu', dockerfile: 'container/Dockerfile' },
+    });
+  });
+
+  it('edits the Dockerfile path on its own, keeping the repository', async () => {
+    updateMock.mockResolvedValue({ entry: TEALFLOW });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.clear(within(dialog).getByLabelText(/Dockerfile/));
+    await user.type(within(dialog).getByLabelText(/Dockerfile/), 'container/Dockerfile.gpu');
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    expect(updateMock.mock.calls[0][0].source).toEqual({
+      kind: 'built',
+      repo: 'Appsilon/tealflow',
+      dockerfile: 'container/Dockerfile.gpu',
+    });
+  });
+
+  it('leaves the source out of a patch that only touches the sentence', async () => {
+    updateMock.mockResolvedValue({ entry: TEALFLOW });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.clear(within(dialog).getByLabelText('Intent'));
+    await user.type(within(dialog).getByLabelText('Intent'), 'Exploring ADaM in a sandbox');
+    // No re-key, so no warning and no `source` on the wire: an edit to the
+    // sentence stays an edit to the sentence.
+    expect(within(dialog).queryByText(/keyed on its source/)).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    expect(updateMock.mock.calls[0][0]).not.toHaveProperty('source');
+  });
+
+  it('offers the reference, not a repository, for an entry the platform never built', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-golden');
+    await user.click(within(card).getByRole('button', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Image reference')).toHaveValue('mediforce-golden-image');
+    // There are no build inputs for a referenced source, so there is no
+    // repository to name and offering one would invent a field.
+    expect(within(dialog).queryByLabelText('Repository')).not.toBeInTheDocument();
+  });
+
+  it('shows a discovered entry its recorded source without offering to re-point it', async () => {
+    listMock.mockResolvedValue({ entries: [GOLDEN, DISCOVERED] });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-cdisc-case-1-1a2b3c4d');
+    await user.click(within(card).getByRole('button', { name: 'Describe' }));
+
+    const dialog = await screen.findByRole('dialog');
+    // A build recorded this source. Re-pointing it here would describe some
+    // other source and leave this one still undescribed.
+    expect(
+      within(dialog).getByText('git@github.com:vedhav/cdisc-case-1.git \u00b7 Dockerfile'),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText('Repository')).not.toBeInTheDocument();
   });
 });

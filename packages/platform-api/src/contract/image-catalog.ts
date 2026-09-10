@@ -123,8 +123,17 @@ export const CreateImageCatalogEntryOutputSchema = z.object({
   entry: ImageCatalogEntryViewSchema,
 });
 
-/** PATCH input: id from URL. `source` is absent by design — it is the key, so
- *  changing it is creating a different entry, not editing this one. */
+/**
+ * PATCH input: id from URL, every writable field optional.
+ *
+ * `source` **re-keys** the entry rather than editing a column. The id derives
+ * from the source (decision 1), so a corrected repo or Dockerfile is a
+ * different id: the handler writes the row at the new key and removes the old
+ * one, which is safe by the property that makes deleting safe — no Workflow
+ * Definition references an entry. A source that only *spells* the same key
+ * differently (`Appsilon/x` for `git@github.com:Appsilon/x.git`) canonicalises
+ * to the same id and stays in place.
+ */
 export const UpdateImageCatalogEntryInputApiSchema = NamespaceQuery.extend({
   id: z.string().min(1),
   name: z.string().min(1).optional(),
@@ -132,6 +141,7 @@ export const UpdateImageCatalogEntryInputApiSchema = NamespaceQuery.extend({
     .string()
     .min(1, 'intent is required: one sentence saying what this image is for')
     .optional(),
+  source: ImageCatalogSourceSchema.optional(),
   declaredSource: ImageCatalogDeclaredSourceSchema.optional(),
 }).strict();
 

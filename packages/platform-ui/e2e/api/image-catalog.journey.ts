@@ -488,26 +488,105 @@ test.describe('image catalog API journey', () => {
     });
   });
 
-  test('the source is the key and cannot be re-pointed by a PATCH', async ({ request }) => {
+  test('the source is the key, so a PATCH that changes it re-keys the entry', async ({
+    request,
+  }) => {
     const payload = entryPayload(`rekey-${Date.now()}`);
     const createRes = await request.post(catalogUrl(), {
       headers: apiKeyHeaders(),
       data: payload,
     });
     const { entry } = (await createRes.json()) as { entry: EntryView };
+    let liveId = entry.id;
 
-    const res = await request.patch(
-      `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
-      {
+    try {
+      // A second Dockerfile in the same repository is a different image, so it
+      // is a different key — this is the mistyped-source correction path.
+      const res = await request.patch(
+        `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
+        {
+          headers: apiKeyHeaders(),
+          data: {
+            source: {
+              kind: 'built',
+              repo: payload.source.repo,
+              dockerfile: 'container/Dockerfile.gpu',
+            },
+          },
+        },
+      );
+      expect(res.ok(), await res.text()).toBe(true);
+      const moved = ((await res.json()) as { entry: EntryView }).entry;
+      liveId = moved.id;
+
+      expect(moved.id).not.toBe(entry.id);
+      expect(moved.source.dockerfile).toBe('container/Dockerfile.gpu');
+      // Carried across, so this is one entry moved rather than a fresh row the
+      // caller has to describe again.
+      expect(moved.name).toBe(payload.name);
+      expect(moved.intent).toBe(payload.intent);
+
+      // The old key is gone: the catalog cannot show the corrected entry beside
+      // the mistake it replaced.
+      const oldRead = await request.get(
+        `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(oldRead.status()).toBe(404);
+
+      const listRes = await request.get(catalogUrl(), { headers: apiKeyHeaders() });
+      const ids = ((await listRes.json()) as { entries: EntryView[] }).entries.map(
+        (candidate) => candidate.id,
+      );
+      expect(ids).toContain(moved.id);
+      expect(ids).not.toContain(entry.id);
+    } finally {
+      await request.delete(`/api/image-catalog/${liveId}?namespace=${TEST_ORG_HANDLE}`, {
         headers: apiKeyHeaders(),
-        data: { source: { kind: 'referenced', reference: 'postgres' } },
-      },
-    );
-    expect(res.status(), await res.text()).toBe(400);
+      });
+    }
+  });
 
-    await request.delete(`/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`, {
-      headers: apiKeyHeaders(),
-    });
+  test('a re-key onto a source another entry already describes is refused', async ({
+    request,
+  }) => {
+    const stamp = Date.now();
+    const mine = entryPayload(`rekey-mine-${stamp}`);
+    const theirs = entryPayload(`rekey-theirs-${stamp}`);
+    const created = await Promise.all(
+      [mine, theirs].map(async (data) => {
+        const res = await request.post(catalogUrl(), { headers: apiKeyHeaders(), data });
+        expect(res.status(), await res.text()).toBe(201);
+        return ((await res.json()) as { entry: EntryView }).entry;
+      }),
+    );
+
+    try {
+      const res = await request.patch(
+        `/api/image-catalog/${created[0].id}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders(), data: { source: theirs.source } },
+      );
+      // 409, not a silent upsert: that would overwrite the occupant's own
+      // sentence and delete the row being edited — two entries lost to one
+      // edit.
+      expect(res.status(), await res.text()).toBe(409);
+
+      // Both rows survive, each still describing its own source.
+      for (const existing of created) {
+        const read = await request.get(
+          `/api/image-catalog/${existing.id}?namespace=${TEST_ORG_HANDLE}`,
+          { headers: apiKeyHeaders() },
+        );
+        expect(read.ok(), await read.text()).toBe(true);
+        expect(((await read.json()) as { entry: EntryView }).entry.name).toBe(existing.name);
+      }
+    } finally {
+      for (const existing of created) {
+        await request.delete(`/api/image-catalog/${existing.id}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+    }
   });
 
   test('a member builds a version on demand and it lands under the entry', async ({ request }) => {

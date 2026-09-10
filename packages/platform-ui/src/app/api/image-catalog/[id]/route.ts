@@ -40,9 +40,9 @@ export const PATCH = createRouteAdapter<
   UpdateImageCatalogEntryInputApiSchema,
   async (req, ctx) => {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    // The path id wins over any `id` in the body. `source` is deliberately
-    // NOT stripped: the patch schema is strict, so a body that tries to
-    // re-key the entry gets a validation error rather than a silent no-op.
+    // The path id wins over any `id` in the body. A `source` in the body is
+    // passed through: it re-keys the entry, so the handler — which is the only
+    // thing that can derive the new id — decides what happens to it.
     const { id: _bodyId, ...rest } = body;
     return {
       ...rest,

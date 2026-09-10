@@ -203,7 +203,7 @@ export const imagesCreateCommand = defineCommand({
 export const imagesUpdateCommand = defineCommand({
   name: 'mediforce images update',
   description:
-    "Change an entry's name or intent. The source is the entry's key and cannot be edited.",
+    "Change an entry's name, intent or source. Changing the source re-keys the entry: the id derives from it, so the entry moves and prints its new id.",
   args: {
     entryId: {
       type: 'positional',
@@ -213,10 +213,37 @@ export const imagesUpdateCommand = defineCommand({
     namespace: { type: 'string', required: true, description: 'Namespace handle' },
     name: { type: 'string', description: 'New human handle' },
     intent: { type: 'string', description: 'New one-sentence intent' },
+    repo: {
+      type: 'string',
+      description: 'New git repo (built source). Re-keys the entry; pass --dockerfile with it',
+    },
+    dockerfile: {
+      type: 'string',
+      description: 'New Dockerfile path inside --repo. Empty means the default',
+    },
+    reference: { type: 'string', description: 'New untagged image reference (referenced source)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
-    if (args.name === undefined && args.intent === undefined) {
-      output.stderr('Nothing to update: supply --name and/or --intent.');
+    if (args.repo !== undefined && args.reference !== undefined) {
+      output.stderr('Supply at most one of --repo (built) or --reference (referenced).');
+      return 2;
+    }
+    // The source is a pair, and the entry is keyed on both halves, so a
+    // Dockerfile with no repo cannot be resolved into a key without reading
+    // the entry back first — which is a race the CLI has no reason to run.
+    if (args.dockerfile !== undefined && args.repo === undefined) {
+      output.stderr('--dockerfile changes the source, so pass --repo with it.');
+      return 2;
+    }
+    const source =
+      args.repo !== undefined
+        ? ({ kind: 'built', repo: args.repo, dockerfile: args.dockerfile ?? '' } as const)
+        : args.reference !== undefined
+          ? ({ kind: 'referenced', reference: args.reference } as const)
+          : undefined;
+
+    if (args.name === undefined && args.intent === undefined && source === undefined) {
+      output.stderr('Nothing to update: supply --name, --intent, --repo and/or --reference.');
       return 2;
     }
     const result = await mediforce.imageCatalog.update({
@@ -224,12 +251,19 @@ export const imagesUpdateCommand = defineCommand({
       id: args.entryId,
       ...(args.name !== undefined ? { name: args.name } : {}),
       ...(args.intent !== undefined ? { intent: args.intent } : {}),
+      ...(source !== undefined ? { source } : {}),
     });
     if (jsonMode) {
       printJson(output, result);
       return 0;
     }
-    output.stdout(`Updated ${result.entry.id}.`);
+    // The id is the one thing a re-key changes that a caller cannot predict,
+    // so say it moved rather than reporting a no-op success on the old id.
+    output.stdout(
+      result.entry.id === args.entryId
+        ? `Updated ${result.entry.id}.`
+        : `Updated ${args.entryId} — its source changed, so it is now ${result.entry.id}.`,
+    );
     return 0;
   },
 });

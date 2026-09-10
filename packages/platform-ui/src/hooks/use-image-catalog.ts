@@ -79,7 +79,7 @@ export function useImageCatalogEntry(
 }
 
 /**
- * Register an entry against a source — the one write the catalog has.
+ * Register an entry against a source.
  *
  * Both callers are the same `POST`, because both are the same act. Describing
  * a discovered entry writes the sentence for a source the platform already
@@ -92,12 +92,49 @@ export function useImageCatalogEntry(
  * in the same request — which is why this is the moment a card stops saying
  * "not probed". No optimistic update: the probe is the point, and guessing the
  * answer locally to correct it a second later is worse than a pending button.
+ *
+ * Once the row is stored, changing it is `useUpdateImageEntry`: a second `POST`
+ * against the same source conflicts on the id that source derives.
  */
 export function useCatalogueImage(namespace: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { name: string; intent: string; source: ImageCatalogEntryView['source'] }) =>
       mediforce.imageCatalog.create({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entry.id),
+      });
+    },
+  });
+}
+
+/**
+ * Change a stored entry's source, name or sentence — everything a human wrote.
+ *
+ * `source` is optional and **re-keys** the entry when it changes: the id derives
+ * from the source (ADR-0022 decision 1), so the handler writes the row at the
+ * new id and drops the old one. `data.entry.id` is therefore the id to
+ * invalidate, not the one that was sent. Everything else on the row is derived
+ * from the image on every read, so these three fields are the whole editable
+ * surface.
+ *
+ * Only for a `catalogued` entry. A `discovered` one is computed per read rather
+ * than stored, so there is no row to patch until `useCatalogueImage` writes it.
+ *
+ * The response is a re-probed view — the handler refreshes capabilities in the
+ * same request — so both reads are invalidated rather than patched locally.
+ */
+export function useUpdateImageEntry(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      name: string;
+      intent: string;
+      source?: ImageCatalogEntryView['source'];
+    }) => mediforce.imageCatalog.update({ namespace, ...input }),
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
       void queryClient.invalidateQueries({
