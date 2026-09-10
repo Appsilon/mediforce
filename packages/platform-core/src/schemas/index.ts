@@ -270,6 +270,19 @@ export {
 } from './workflow-assistant-tools';
 
 export {
+  ListSecretsToolSchema,
+  ListAgentsToolSchema,
+  ListToolCatalogToolSchema,
+  CreateAgentToolSchema,
+  CreateToolCatalogEntryToolSchema,
+  WORKFLOW_ASSISTANT_PLATFORM_TOOLS,
+  isPlatformToolName,
+  type CreateAgentTool,
+  type CreateToolCatalogEntryTool,
+  type WorkflowAssistantPlatformToolName,
+} from './workflow-assistant-platform-tools';
+
+export {
   applyWorkflowAssistantToolCalls,
   type ToolCallOutcome,
   type ApplyToolCallsResult,

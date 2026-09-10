@@ -1,8 +1,12 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import type { NamespaceSecretsRepository, ModelRegistryRepository, ModelRegistryEntry } from '@mediforce/platform-core';
-import { InMemoryAuditRepository, InMemoryProcessInstanceRepository } from '@mediforce/platform-core/testing';
+import {
+  InMemoryAgentDefinitionRepository,
+  InMemoryAuditRepository,
+  InMemoryProcessInstanceRepository,
+} from '@mediforce/platform-core/testing';
 import { askWorkflowAssistant } from '../ask-workflow-assistant';
-import { HandlerError, ValidationError } from '../../../errors';
+import { ForbiddenError, HandlerError, ValidationError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
@@ -693,5 +697,113 @@ describe('askWorkflowAssistant handler', () => {
 
     await expect(askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope))
       .rejects.toThrow(/truncated/i);
+  });
+});
+
+// Platform tools run inside the turn, unlike the canvas tools the browser
+// applies. This covers the whole loop: the model asks, the platform answers as
+// the caller, and the answer goes back into the conversation.
+describe('askWorkflowAssistant — platform tools', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  afterEach(() => {
+    fetchSpy?.mockRestore();
+  });
+
+  /** Two model turns: the first calls a tool, the second replies in words. */
+  function mockToolThenReply(toolName: string, args: unknown, reply = 'Done.') {
+    let call = 0;
+    return vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      call += 1;
+      const body = call === 1
+        ? {
+            choices: [{
+              message: {
+                content: '',
+                tool_calls: [{ id: 'call-1', type: 'function', function: { name: toolName, arguments: JSON.stringify(args) } }],
+              },
+            }],
+          }
+        : { choices: [{ message: { content: reply, tool_calls: [] } }] };
+      return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+    });
+  }
+
+  /** What the model was told back, for the tool call it made. */
+  function toolResultSentBack(spy: ReturnType<typeof vi.spyOn>): unknown {
+    const secondRequest = spy.mock.calls[1]?.[1] as { body?: string } | undefined;
+    const body = JSON.parse(secondRequest?.body ?? '{}') as {
+      messages: { role: string; content: string }[];
+    };
+    const toolMessage = body.messages.find((m) => m.role === 'tool');
+    return JSON.parse(toolMessage?.content ?? 'null');
+  }
+
+  it('creates an agent in the workspace and tells the model it worked', async () => {
+    fetchSpy = mockToolThenReply('create_agent', {
+      name: 'Report writer',
+      description: 'Writes the validation report',
+      systemPrompt: 'You write reports.',
+      foundationModel: 'anthropic/claude-sonnet-4.6',
+      inputDescription: 'Findings',
+      outputDescription: 'An HTML report',
+    }, 'Created the Report writer agent.');
+
+    const agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+      agentDefinitionRepo,
+    });
+
+    const result = await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    expect(result.reply).toBe('Created the Report writer agent.');
+    // No canvas mutation: this one changed the platform, not the workflow.
+    expect(result.toolCalls).toBeUndefined();
+
+    const agents = await agentDefinitionRepo.listVisibleTo(['team-alpha']);
+    expect(agents.map((a) => a.name)).toEqual(['Report writer']);
+    expect(agents[0].namespace).toBe('team-alpha');
+    expect(toolResultSentBack(fetchSpy)).toMatchObject({ created: { name: 'Report writer' } });
+  });
+
+  it('answers list_secrets with key names, never values', async () => {
+    fetchSpy = mockToolThenReply('list_secrets', {}, 'You have OPENROUTER_API_KEY and STUDY_ID set.');
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test-secret-value', STUDY_ID: 'CDISCPILOT01' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    const sentBack = toolResultSentBack(fetchSpy);
+    expect(sentBack).toEqual({ keys: ['OPENROUTER_API_KEY', 'STUDY_ID'] });
+    expect(JSON.stringify(sentBack)).not.toContain('or-test-secret-value');
+    expect(JSON.stringify(sentBack)).not.toContain('CDISCPILOT01');
+  });
+
+  it('relays a refusal instead of failing the conversation', async () => {
+    // The assistant has the caller's permissions and nothing more. A member who
+    // may not create an agent gets told so, in the same turn, and the reply
+    // still comes back — which is what lets the assistant say "ask an admin".
+    fetchSpy = mockToolThenReply('create_agent', {
+      name: 'X', description: 'X', systemPrompt: 'X',
+      foundationModel: 'anthropic/claude-sonnet-4.6', inputDescription: 'X', outputDescription: 'X',
+    }, 'That needs an admin — I cannot create agents for you.');
+
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+    scope.agentDefinitions.create = () => Promise.reject(new ForbiddenError('Only admins may create agents'));
+
+    const result = await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    expect(result.reply).toBe('That needs an admin — I cannot create agents for you.');
+    expect(toolResultSentBack(fetchSpy)).toEqual({
+      error: 'Only admins may create agents',
+      needsAdmin: true,
+    });
   });
 });
