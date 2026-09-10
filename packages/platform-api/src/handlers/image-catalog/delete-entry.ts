@@ -1,10 +1,16 @@
-import { assertCallerIsNamespaceAdmin, assertNamespaceAccess } from '../../auth';
+import {
+  assertCallerIsNamespaceAdmin,
+  assertNamespaceAccess,
+  type CallerIdentity,
+} from '../../auth';
+import { ConflictError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type {
   DeleteImageCatalogEntryInput,
   DeleteImageCatalogEntryOutput,
 } from '../../contract/image-catalog';
 import { actorFromCaller } from '../_helpers';
+import { findWorkflowImagePins, type WorkflowImagePin } from '../workflows/_image-pins';
 import { deleteDockerImage } from '../docker-images/delete-image';
 import { fetchDaemonImages } from '../system/_docker';
 import { discoverEntries } from './_discovered';
@@ -15,27 +21,27 @@ export async function deleteImageCatalogEntry(
   scope: CallerScope,
 ): Promise<DeleteImageCatalogEntryOutput> {
   assertNamespaceAccess(scope.caller, input.namespace);
+  // Admin or owner of this workspace, for the whole delete and not only its
+  // image half. An entry exists *for* the images behind it, so a record-only
+  // delete is not a lesser act with a lighter gate — for anything this
+  // namespace built it is barely an act at all, since the row is re-derived on
+  // the next read (ADR-0022 decision 7). Creating stays a member's right; the
+  // asymmetry is deliberate and recorded in the ADR.
+  assertCallerIsNamespaceAdmin(scope.caller, input.namespace);
 
-  // Deleting an entry removes an offer, never a capability: no Workflow
-  // Definition points at one, so no run changes behaviour (ADR-0022
-  // decision 3). Fetch-before-delete only so an idempotent no-op does not
-  // emit a misleading audit entry.
+  // Fetch-before-delete only so an idempotent no-op does not emit a
+  // misleading audit entry.
   const existing = await scope.imageCatalog.getById(input.namespace, input.id);
 
   const deletedImages: string[] = [];
   if (input.withImages === true) {
-    // The image half is a different act under a different gate — the daemon is
-    // deployment-wide, so this destroys artifacts steps in other namespaces may
-    // pin. Asserted up front: a caller who may not delete images must not get a
-    // half-done delete either.
+    // The daemon is deployment-wide, so this destroys artifacts that steps in
+    // other namespaces may pin.
     //
-    // Admin **of this workspace**, which is stricter than the gate
-    // `deleteDockerImage` applies underneath: that one is documented as a loose
-    // approximation — owner or admin of *any* namespace — which nearly every
-    // user satisfies through their own personal workspace. Inheriting it here
-    // would make "admin-gated" a claim this code does not keep, and it is also
-    // exactly what the dialog offers, so the two would disagree.
-    assertCallerIsNamespaceAdmin(scope.caller, input.namespace);
+    // The gate above already asserted admin of this workspace, which is
+    // stricter than the one `deleteDockerImage` applies underneath: that one is
+    // documented as a loose approximation — owner or admin of *any* namespace —
+    // which nearly every user satisfies through their own personal workspace.
 
     const daemon = await fetchDaemonImages();
     // A discovered entry is derived on read rather than stored (ADR-0022
@@ -63,6 +69,20 @@ export async function deleteImageCatalogEntry(
     // other entry offers. Deduplicated because two versions can share a tag
     // only by naming the same artifact twice.
     const tags = [...new Set(versions.map((version) => version.imageTag))];
+
+    // A live version pinning one of these tags is a run that will fail at
+    // container start, and unlike a superseded version its author can still
+    // re-point it — so this refuses rather than breaking it. Judged
+    // deployment-wide, because the daemon is: a step in a namespace this caller
+    // cannot read breaks just the same.
+    const pins = findWorkflowImagePins(
+      await scope.workflowDefinitions.listGroupsForImageAudit(),
+      tags,
+    );
+    const live = pins.filter((pin) => pin.live);
+    if (live.length > 0) {
+      throw new ConflictError(describeLivePins(live, scope.caller));
+    }
 
     // Images first, and every one of them: the entry is the only handle anyone
     // has on what is left behind, so removing the row while a tag survives
@@ -103,4 +123,36 @@ export async function deleteImageCatalogEntry(
   }
 
   return { success: true, deletedImages };
+}
+
+/**
+ * Why a delete was refused, in terms the caller can act on.
+ *
+ * Redacted, because the scan behind it is deployment-wide while workflow names
+ * are not: a private workflow in a namespace this caller has not joined is
+ * counted, never named. The count still has to be there — a block with no
+ * reason is indistinguishable from a bug.
+ */
+function describeLivePins(live: readonly WorkflowImagePin[], caller: CallerIdentity): string {
+  const visible = live.filter(
+    (pin) =>
+      caller.isSystemActor || caller.namespaces.has(pin.namespace) || pin.visibility === 'public',
+  );
+  const hidden = live.length - visible.length;
+
+  const named = visible.map(
+    (pin) => `${pin.namespace}/${pin.name} v${String(pin.version)} (${pin.steps.join(', ')})`,
+  );
+  if (hidden > 0) {
+    named.push(
+      `${String(hidden)} more in ${hidden === 1 ? 'a workspace' : 'workspaces'} you cannot see`,
+    );
+  }
+
+  return (
+    `Cannot delete these images: ${String(live.length)} workflow ${live.length === 1 ? 'version' : 'versions'} ` +
+    `still ${live.length === 1 ? 'runs' : 'run'} on ${live.length === 1 ? 'it' : 'them'} — ${named.join('; ')}. ` +
+    'Point those steps at another image, or archive the version, then delete again. ' +
+    'Superseded and archived versions do not block, since a registered version cannot be re-pointed.'
+  );
 }

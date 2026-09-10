@@ -5,56 +5,87 @@ import { AlertTriangle, Loader2, X } from 'lucide-react';
 import { useState } from 'react';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { useDeleteImageEntry } from '@/hooks/use-image-catalog';
-import { useWorkflowsByImage } from '@/hooks/use-workflows-by-image';
+import { useArchiveWorkflowVersion } from '@/hooks/use-archive-workflow-version';
+import { useWorkflowsByImage, type WorkflowImageMatch } from '@/hooks/use-workflows-by-image';
 
 /**
- * Retire an entry — and, if an admin asks for it, the images behind it.
+ * Retire an entry and the images behind it.
  *
- * The dialog exists because these are two acts, not one, and only one of them
- * is safe. **Removing the entry removes an offer**: no Workflow Definition
- * references an entry, so no run changes behaviour and no pinned version stops
- * resolving (ADR-0022 decision 3) — which is why any member may do it.
- * **Removing the images destroys artifacts on a deployment-wide daemon**,
- * where a tag can back steps in namespaces this reader cannot see, so it is
- * admin-gated, opt-in, and shown with what it will take.
+ * One act, not two: an entry is an offer *for* images, and a record whose
+ * images stay on the daemon achieves nothing — for anything this workspace
+ * built, the row is re-derived on the next read and comes back marked "Needs a
+ * description", losing only the sentence somebody wrote. So delete means both,
+ * and when the daemon holds no image for the entry it simply removes the
+ * record.
  *
- * The workflows pinning those tags are named before the click rather than
- * discovered afterwards. The scan behind them is deployment-wide for exactly
- * this reason: a public workflow in a workspace the reader never joined is
- * still a step that breaks.
+ * That makes it destructive and deployment-wide, which is why it is
+ * admin-gated and why this dialog leads with what pins those images:
+ *
+ * - **A live version** — the one a run starts from — **blocks the delete.** Its
+ *   author can still re-point the step, so breaking it is a choice nobody needs
+ *   to make. Archiving that version is offered here, since the alternative is
+ *   deleting a whole workflow to reclaim one image.
+ * - **A superseded or archived version does not block.** A registered version
+ *   is immutable, so no edit can move it off the image; refusing on its account
+ *   would mean an image pinned once could never be reclaimed. It is listed, so
+ *   the loss is seen rather than discovered later.
  */
+
+function PinLine({ pin, handle }: { pin: WorkflowImageMatch; handle: string }) {
+  return (
+    <>
+      <span className="font-medium">{pin.title ?? pin.name}</span>
+      <span
+        className="text-muted-foreground"
+        title={pin.namespace === handle ? undefined : `In @${pin.namespace}, not @${handle}`}
+      >
+        {' '}
+        — {pin.namespace}/{pin.name} v{pin.version} · {pin.steps.join(', ')}
+        {pin.archived ? ' · archived' : ''}
+      </span>
+    </>
+  );
+}
+
 export function DeleteImageEntryDialog({
   entry,
   handle,
-  canAdmin,
   open,
   onOpenChange,
 }: {
   entry: ImageCatalogEntryView;
   handle: string;
-  canAdmin: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  // A discovered entry is derived from the daemon rather than stored, so there
-  // is no record to remove — its images are the only thing there is to delete.
-  const storedRow = entry.origin === 'catalogued';
-  const [withImages, setWithImages] = useState(storedRow === false);
   const remove = useDeleteImageEntry(handle);
+  const archive = useArchiveWorkflowVersion();
   const tags = entry.versions.map((version) => version.imageTag);
-  const usage = useWorkflowsByImage(tags, open && tags.length > 0);
-  const pinned = usage.workflows ?? [];
+  // `all`, not the default: every version and archived workflows included. The
+  // narrow answer would hide exactly the history this delete destroys.
+  const usage = useWorkflowsByImage(tags, open && tags.length > 0, 'all');
+  const pins = usage.workflows ?? [];
+  const live = pins.filter((pin) => pin.live);
+  const historical = pins.filter((pin) => pin.live === false);
+  const [archived, setArchived] = useState<ReadonlySet<string>>(new Set());
+  const blockingLive = live.filter((pin) => !archived.has(pinKey(pin)));
 
-  const imagesOffered = canAdmin && tags.length > 0;
-  const deletingImages = imagesOffered && withImages;
-  // Nothing to do: no row to remove, and no permission or no image to remove
-  // either. Saying so beats a button that would report success on a no-op.
-  const nothingToDo = storedRow === false && deletingImages === false;
+  const storedRow = entry.origin === 'catalogued';
+  // Until the scan answers, there is nothing to judge — the button waits rather
+  // than offering a delete whose blast radius is still unknown.
+  const blocked = usage.loading || blockingLive.length > 0;
 
-  function handleDelete() {
-    remove.mutate(
-      { id: entry.id, withImages: deletingImages },
-      { onSuccess: () => onOpenChange(false) },
+  function pinKey(pin: WorkflowImageMatch): string {
+    return `${pin.namespace}:${pin.name}:${pin.version}`;
+  }
+
+  function handleArchive(pin: WorkflowImageMatch) {
+    archive.mutate(
+      { namespace: pin.namespace, name: pin.name, version: pin.version },
+      {
+        onSuccess: () =>
+          setArchived((current) => new Set(current).add(pinKey(pin))),
+      },
     );
   }
 
@@ -71,20 +102,19 @@ export function DeleteImageEntryDialog({
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border bg-background p-6 shadow-lg">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
-              <Dialog.Title className="text-lg font-semibold">
-                {storedRow ? `Delete ${entry.name}?` : `Delete the images of ${entry.name}?`}
-              </Dialog.Title>
+              <Dialog.Title className="text-lg font-semibold">Delete {entry.name}?</Dialog.Title>
               <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-                {storedRow ? (
+                {tags.length === 0 ? (
                   <>
-                    Removing the entry removes an <em>offer</em>, never a capability: no workflow
-                    points at an entry — a step pins an image tag — so nothing that runs today
-                    changes. It can be catalogued again.
+                    No image for this entry is on the daemon, so this removes the record and
+                    nothing else. The source can be catalogued again.
                   </>
                 ) : (
                   <>
-                    Nobody has described this image, so there is no record to remove. What can be
-                    deleted is the image itself, from the deployment&apos;s daemon.
+                    Removes the entry <strong>and</strong> its{' '}
+                    {tags.length === 1 ? 'image' : `${String(tags.length)} images`} from the
+                    deployment&apos;s daemon. The daemon is shared by every workspace, and this
+                    cannot be undone — a deleted image is rebuilt or pulled again, never restored.
                   </>
                 )}
               </Dialog.Description>
@@ -105,7 +135,7 @@ export function DeleteImageEntryDialog({
             {tags.length > 0 && (
               <div className="space-y-1.5">
                 <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  {tags.length} version{tags.length === 1 ? '' : 's'} on the daemon
+                  {tags.length} version{tags.length === 1 ? '' : 's'} to remove
                 </p>
                 <ul className="max-h-32 divide-y overflow-y-auto rounded-md border bg-muted/20">
                   {tags.map((tag) => (
@@ -117,74 +147,106 @@ export function DeleteImageEntryDialog({
               </div>
             )}
 
-            {imagesOffered && (
-              <label className="flex items-start gap-2.5 rounded-md border p-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={withImages}
-                  onChange={(event) => setWithImages(event.target.checked)}
-                  disabled={remove.isPending || storedRow === false}
-                  className="mt-0.5 h-4 w-4 shrink-0"
-                />
-                <span>
-                  <span className="font-medium">
-                    Also remove {tags.length === 1 ? 'this image' : `these ${String(tags.length)} images`}{' '}
-                    from the machine
-                  </span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    Runs <code>docker rmi</code> on each tag on the deployment&apos;s daemon. The
-                    daemon is shared by every workspace, and this cannot be undone — a deleted
-                    image is rebuilt or pulled again, not restored.
-                  </span>
-                </span>
-              </label>
-            )}
-
-            {canAdmin === false && tags.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                The {tags.length === 1 ? 'image' : 'images'} behind this entry stay on the daemon.
-                Deleting from it is deployment-wide, so it is an admin&apos;s call — through{' '}
-                <strong>Admin → Infrastructure</strong>.
+            {usage.error !== null && (
+              <p className="text-xs text-destructive">
+                Could not check which workflows use these images: {usage.error.message}
               </p>
             )}
 
-            {deletingImages && pinned.length > 0 && (
-              <div className="flex items-start gap-2.5 rounded-md border border-destructive bg-destructive/10 px-3 py-2">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
-                <div className="space-y-1 text-xs">
-                  <p className="font-medium text-destructive">
-                    {pinned.length === 1 ? 'A workflow step pins' : 'Workflow steps pin'} an image
-                    you are about to delete. {pinned.length === 1 ? 'It' : 'They'} will fail at
-                    container start until the image is built or pulled again.
+            {usage.loading && (
+              <p className="text-xs text-muted-foreground animate-pulse">
+                Checking which workflows use these images…
+              </p>
+            )}
+
+            {blockingLive.length > 0 && (
+              <div
+                data-testid="delete-blocked"
+                className="space-y-2 rounded-md border border-destructive bg-destructive/10 px-3 py-2"
+              >
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
+                  <p className="text-xs font-medium text-destructive">
+                    {blockingLive.length === 1
+                      ? 'A workflow version that runs today pins one of these images.'
+                      : `${String(blockingLive.length)} workflow versions that run today pin these images.`}{' '}
+                    Point those steps at another image, or archive the version, and this delete
+                    unblocks.
                   </p>
-                  <ul className="space-y-0.5 text-muted-foreground">
-                    {pinned.map((workflow) => (
-                      <li key={`${workflow.namespace}:${workflow.name}`}>
-                        {workflow.title ?? workflow.name}
-                        <span className={workflow.namespace === handle ? '' : 'font-medium'}>
-                          {' '}
-                          — {workflow.namespace}/{workflow.name} · {workflow.steps.join(', ')}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
                 </div>
+                <ul className="space-y-1.5">
+                  {blockingLive.map((pin) => (
+                    <li
+                      key={pinKey(pin)}
+                      className="flex items-start justify-between gap-3 text-xs"
+                    >
+                      <span>
+                        <PinLine pin={pin} handle={handle} />
+                      </span>
+                      {pin.isDefault ? (
+                        // Archiving a workflow's chosen default would leave it
+                        // pointing at a version that cannot run — a worse mess
+                        // than the image staying. Only the platform's UI
+                        // enforces that rule, so it has to be honoured here.
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                          default version
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleArchive(pin)}
+                          disabled={archive.isPending}
+                          className="shrink-0 rounded-md border bg-background px-2 py-1 text-[11px] font-medium transition-colors hover:bg-muted disabled:opacity-50"
+                        >
+                          Archive v{pin.version}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {archive.error !== null && (
+                  <p className="text-xs text-destructive">{archive.error.message}</p>
+                )}
+                <p className="text-[11px] text-muted-foreground">
+                  Archiving one version leaves the rest of the workflow alone — the whole workflow
+                  does not have to go to reclaim an image. A version the workflow pins as its{' '}
+                  <strong>default</strong> cannot be archived that way: point its step at another
+                  image, or make a different version the default first.
+                </p>
               </div>
             )}
 
-            {deletingImages && usage.loading && (
-              <p className="text-xs text-muted-foreground animate-pulse">
-                Checking which workflows pin these images…
-              </p>
+            {historical.length > 0 && (
+              <div className="space-y-1.5 rounded-md border bg-muted/20 px-3 py-2">
+                <p className="text-xs">
+                  <strong>
+                    {historical.length === 1
+                      ? 'One superseded version'
+                      : `${String(historical.length)} superseded versions`}
+                  </strong>{' '}
+                  <span className="text-muted-foreground">
+                    also{historical.length === 1 ? 's' : ''} pin{historical.length === 1 ? 's' : ''}{' '}
+                    these images. They do not block: a registered version is immutable, so no edit
+                    can move it off the image. Re-running one after this would fail at container
+                    start.
+                  </span>
+                </p>
+                <ul className="max-h-28 space-y-0.5 overflow-y-auto">
+                  {historical.map((pin) => (
+                    <li key={pinKey(pin)} className="text-xs">
+                      <PinLine pin={pin} handle={handle} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {remove.error !== null && (
               <div className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 <p className="break-all">{remove.error.message}</p>
                 <p className="mt-1 text-xs">
-                  The entry was kept: a version that would not delete is left reachable rather than
-                  orphaned under a name nobody wrote. Docker refuses an image a container is using,
-                  or one another image was built on.
+                  Nothing was removed. Docker refuses an image a container is using, or one another
+                  image was built on.
                 </p>
               </div>
             )}
@@ -200,14 +262,19 @@ export function DeleteImageEntryDialog({
               </button>
               <button
                 type="button"
-                onClick={handleDelete}
-                disabled={remove.isPending || nothingToDo}
+                onClick={() =>
+                  remove.mutate(
+                    { id: entry.id, withImages: tags.length > 0 },
+                    { onSuccess: () => onOpenChange(false) },
+                  )
+                }
+                disabled={remove.isPending || blocked}
                 className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
               >
                 {remove.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                {deletingImages
-                  ? `Delete ${storedRow ? 'entry and ' : ''}${String(tags.length)} image${tags.length === 1 ? '' : 's'}`
-                  : 'Delete entry'}
+                {tags.length === 0
+                  ? 'Delete entry'
+                  : `Delete ${storedRow ? 'entry and ' : ''}${String(tags.length)} image${tags.length === 1 ? '' : 's'}`}
               </button>
             </div>
           </div>

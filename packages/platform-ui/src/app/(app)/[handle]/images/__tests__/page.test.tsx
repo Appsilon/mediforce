@@ -9,6 +9,7 @@ const getMock = vi.fn();
 const createMock = vi.fn();
 const updateMock = vi.fn();
 const deleteMock = vi.fn();
+const archiveVersionMock = vi.fn();
 const buildMock = vi.fn();
 const apiFetchMock = vi.fn();
 const searchParams = new URLSearchParams();
@@ -18,6 +19,9 @@ vi.mock('@/lib/mediforce', () => ({
     status = 500;
   },
   mediforce: {
+    workflows: {
+      archiveVersion: (...args: unknown[]) => archiveVersionMock(...args),
+    },
     imageCatalog: {
       list: (...args: unknown[]) => listMock(...args),
       get: (...args: unknown[]) => getMock(...args),
@@ -176,6 +180,7 @@ beforeEach(() => {
       ],
     },
   });
+  archiveVersionMock.mockResolvedValue({ success: true, name: 'sdtm-qc', version: 4 });
   apiFetchMock.mockResolvedValue({
     ok: true,
     json: async () => ({
@@ -185,6 +190,9 @@ beforeEach(() => {
           namespace: 'acme',
           title: 'SDTM QC',
           version: 4,
+          live: true,
+          isDefault: false,
+          archived: false,
           steps: ['analyse'],
           images: ['mediforce-built:aaaa1111'],
         },
@@ -655,25 +663,17 @@ describe('ImagesPage', () => {
     expect(within(dialog).queryByLabelText('Repository')).not.toBeInTheDocument();
   });
 
-  it('deletes the entry alone for a member, who cannot touch the daemon', async () => {
-    const user = userEvent.setup();
+  it('offers no Delete to a member — retiring an entry takes its images', async () => {
     renderPage();
 
     const card = await screen.findByTestId('image-entry-tealflow');
-    await user.click(within(card).getByRole('button', { name: 'Delete' }));
-
-    const dialog = await screen.findByRole('dialog');
-    // Removing an entry removes an offer, so it needs no admin — but the
-    // images are deployment-wide, and a member is told where that lives.
-    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
-    expect(within(dialog).getByText(/stay on the daemon/)).toBeInTheDocument();
-
-    await user.click(within(dialog).getByRole('button', { name: 'Delete entry' }));
-
-    expect(deleteMock).toHaveBeenCalledWith({ namespace: 'acme', id: 'tealflow' });
+    // A member may still add an entry; deleting one destroys artifacts on a
+    // daemon every workspace shares.
+    expect(within(card).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Edit' })).toBeInTheDocument();
   });
 
-  it('offers an admin the images too, naming every tag it would destroy', async () => {
+  it('refuses to delete while a live workflow version pins one of the images', async () => {
     role.value = { role: 'admin', canAdmin: true, loading: false };
     const user = userEvent.setup();
     renderPage();
@@ -682,18 +682,104 @@ describe('ImagesPage', () => {
     await user.click(within(card).getByRole('button', { name: 'Delete' }));
 
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('mediforce-built:aaaa1111')).toBeInTheDocument();
-    expect(within(dialog).getByText('mediforce-built:bbbb2222')).toBeInTheDocument();
+    expect(await within(dialog).findByTestId('delete-blocked')).toBeInTheDocument();
+    expect(within(dialog).getByText(/acme\/sdtm-qc v4/)).toBeInTheDocument();
+    // Blocked, not warned: the author can still re-point that step, so nobody
+    // has to choose to break it.
+    expect(
+      within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }),
+    ).toBeDisabled();
+    expect(deleteMock).not.toHaveBeenCalled();
+  });
 
-    // Off by default: the destructive half is asked for, never assumed.
-    const checkbox = within(dialog).getByRole('checkbox');
-    expect(checkbox).not.toBeChecked();
-    expect(within(dialog).getByRole('button', { name: 'Delete entry' })).toBeInTheDocument();
+  it('archives the blocking version in place, rather than the whole workflow', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    const user = userEvent.setup();
+    renderPage();
 
-    await user.click(checkbox);
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByTestId('delete-blocked');
 
-    // The count is on the button, so the last thing read before clicking says
-    // how much is about to be destroyed.
+    await user.click(within(dialog).getByRole('button', { name: 'Archive v4' }));
+
+    expect(archiveVersionMock).toHaveBeenCalledWith(
+      { name: 'sdtm-qc', version: 4, archived: true },
+      { namespace: 'acme' },
+    );
+    // With the blocker archived the delete unblocks, without a reload.
+    expect(
+      await within(dialog).findByRole('button', { name: 'Delete entry and 2 images' }),
+    ).toBeEnabled();
+  });
+
+  it('will not archive a version the workflow pins as its default', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    apiFetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        workflows: [
+          {
+            name: 'sdtm-qc',
+            namespace: 'acme',
+            title: 'SDTM QC',
+            version: 4,
+            live: true,
+            isDefault: true,
+            archived: false,
+            steps: ['analyse'],
+            images: ['mediforce-built:aaaa1111'],
+          },
+        ],
+      }),
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByTestId('delete-blocked');
+
+    // Archiving a chosen default leaves the workflow pointing at something
+    // that cannot run — a worse outcome than the image staying.
+    expect(within(dialog).queryByRole('button', { name: /Archive v/ })).not.toBeInTheDocument();
+    expect(within(dialog).getByText('default version')).toBeInTheDocument();
+  });
+
+  it('deletes entry and images when only a superseded version pins them', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    apiFetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        workflows: [
+          {
+            name: 'sdtm-qc',
+            namespace: 'acme',
+            title: 'SDTM QC',
+            version: 2,
+            live: false,
+            isDefault: false,
+            archived: false,
+            steps: ['analyse'],
+            images: ['mediforce-built:aaaa1111'],
+          },
+        ],
+      }),
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+
+    // Listed, so the loss is seen — but not blocking, because a registered
+    // version is immutable and could never be re-pointed.
+    expect(await within(dialog).findByText(/superseded version/)).toBeInTheDocument();
+    expect(within(dialog).queryByTestId('delete-blocked')).not.toBeInTheDocument();
+
     await user.click(within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }));
 
     expect(deleteMock).toHaveBeenCalledWith({
@@ -703,49 +789,32 @@ describe('ImagesPage', () => {
     });
   });
 
-  it('names the workflow that pins an image before it is destroyed', async () => {
+  it('removes only the record when the daemon holds no image for the entry', async () => {
     role.value = { role: 'admin', canAdmin: true, loading: false };
+    listMock.mockResolvedValue({
+      entries: [{ ...TEALFLOW, availability: 'absent', versions: [] }],
+    });
+    getMock.mockResolvedValue({
+      entry: { ...TEALFLOW, availability: 'absent', versions: [] },
+    });
     const user = userEvent.setup();
     renderPage();
 
     const card = await screen.findByTestId('image-entry-tealflow');
     await user.click(within(card).getByRole('button', { name: 'Delete' }));
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('checkbox'));
-
-    // The scan is deployment-wide on purpose: a step that breaks is a step
-    // that breaks, whichever workspace it lives in.
-    expect(await within(dialog).findByText(/will fail at container start/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/acme\/sdtm-qc/)).toBeInTheDocument();
-  });
-
-  it('has only images to delete for an entry nobody described', async () => {
-    role.value = { role: 'admin', canAdmin: true, loading: false };
-    listMock.mockResolvedValue({ entries: [GOLDEN, DISCOVERED] });
-    const user = userEvent.setup();
-    renderPage();
-
-    const card = await screen.findByTestId('image-entry-cdisc-case-1-1a2b3c4d');
-    await user.click(within(card).getByRole('button', { name: 'Delete' }));
 
     const dialog = await screen.findByRole('dialog');
-    // Derived on read, not stored: there is no record to remove, so the image
-    // half is the whole act and cannot be turned off.
-    expect(within(dialog).getByText(/no record to remove/)).toBeInTheDocument();
-    expect(within(dialog).getByRole('checkbox')).toBeDisabled();
-    expect(within(dialog).getByRole('checkbox')).toBeChecked();
+    expect(within(dialog).getByText(/removes the record and nothing else/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Delete entry' }));
 
-    await user.click(within(dialog).getByRole('button', { name: 'Delete 1 image' }));
-
-    expect(deleteMock).toHaveBeenCalledWith({
-      namespace: 'acme',
-      id: 'cdisc-case-1-1a2b3c4d',
-      withImages: true,
-    });
+    // No `withImages`: there is nothing on the daemon to remove, so the
+    // destructive half is not claimed.
+    expect(deleteMock).toHaveBeenCalledWith({ namespace: 'acme', id: 'tealflow' });
   });
 
   it('keeps the dialog open and explains a refusal from the daemon', async () => {
     role.value = { role: 'admin', canAdmin: true, loading: false };
+    apiFetchMock.mockResolvedValue({ ok: true, json: async () => ({ workflows: [] }) });
     deleteMock.mockRejectedValue(
       new Error('conflict: unable to delete (must be forced) - image is being used'),
     );
@@ -755,12 +824,11 @@ describe('ImagesPage', () => {
     const card = await screen.findByTestId('image-entry-tealflow');
     await user.click(within(card).getByRole('button', { name: 'Delete' }));
     const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('checkbox'));
-    await user.click(within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }));
+    await user.click(
+      await within(dialog).findByRole('button', { name: 'Delete entry and 2 images' }),
+    );
 
     expect(await within(dialog).findByText(/image is being used/)).toBeInTheDocument();
-    // The entry survives a failed image delete, and the dialog says so rather
-    // than leaving the reader to guess what state they are in.
-    expect(within(dialog).getByText(/The entry was kept/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Nothing was removed/)).toBeInTheDocument();
   });
 });

@@ -288,7 +288,7 @@ export const TREE: Record<string, BranchEntry> = {
         fn: imagesUpdateCommand,
       },
       delete: {
-        description: 'Remove an entry, and with --with-images its images too',
+        description: 'Delete an entry and its images (admin/owner; blocked by live pins)',
         fn: imagesDeleteCommand,
       },
       build: { description: 'Build a version from --repo/--commit, no workflow run', fn: imagesBuildCommand },
