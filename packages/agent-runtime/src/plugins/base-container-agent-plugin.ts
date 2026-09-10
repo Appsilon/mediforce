@@ -402,6 +402,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *  but before the Docker container is spawned. Override to write additional files
    *  (e.g. agent config) into the output dir that will be mounted at /output. */
   protected async prepareOutputDir(outputDir: string): Promise<void> {
+    await writeFile(
+      join(outputDir, 'input.json'),
+      JSON.stringify(this.context.stepInput, null, 2),
+      'utf-8',
+    );
     await this.writeMcpConfig(outputDir);
   }
 
