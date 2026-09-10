@@ -29,6 +29,7 @@ import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller } from '../_helpers';
 import { HandlerError, ValidationError } from '../../errors';
 import { callOpenRouter, type OpenRouterChatMessage, type OpenRouterToolDefinition } from '../../services/openrouter-client';
+import { PlanQuestionSchema } from '../../contract/workflow-assistant';
 import { buildWorkflowAssistantSystemPrompt } from './_lib/system-prompt';
 import { runPlatformTool } from './_lib/run-platform-tool';
 
@@ -150,16 +151,44 @@ export function parseMutationToolCall(toolName: string, parsedArguments: unknown
 
 type Transitions = WorkflowDefinition['transitions'];
 
+type ValidatedGraph =
+  | { valid: true; steps: WorkflowStep[]; transitions: Transitions }
+  | { valid: false; errors: string[]; steps: WorkflowStep[]; transitions: Transitions };
+
+/**
+ * The canvas as it stands after the calls so far, in the terms the model needs
+ * to fix it: every step's real id, and every edge.
+ *
+ * Without this a retry was unanswerable. The canvas state in the conversation
+ * is the one sent at the start; a step added this turn carries an id the
+ * reducer assigned, which the model has never seen; and the `clientId` it used
+ * is dead by the next response. So "reconnect the disconnected step" named
+ * something it could not name, every guess came back as an unknown step, and
+ * the loop ran to its cap.
+ */
+function describeGraph(steps: WorkflowStep[], transitions: Transitions): string {
+  const stepList = steps.map((step) => `${step.id} (${step.name})`).join(', ');
+  const edgeList = transitions.length > 0
+    ? transitions.map((t) => `${t.from} → ${t.to}`).join(', ')
+    : 'none';
+  return `The canvas now holds these steps, by id: ${stepList}. Transitions: ${edgeList}.`;
+}
+
 export function validateResultingGraph(
-  currentDefinition: { steps: WorkflowStep[]; transitions: Transitions; settings?: WorkflowSettings },
+  currentDefinition: {
+    steps: WorkflowStep[];
+    transitions: Transitions;
+    settings?: WorkflowSettings & { inputForNextRun?: WorkflowDefinition['inputForNextRun'] };
+  },
   toolCalls: WorkflowAssistantToolCall[],
   namespace: string,
-): { valid: true } | { valid: false; errors: string[] } {
+): ValidatedGraph {
   const applied = applyWorkflowAssistantToolCalls(
     currentDefinition.steps,
     currentDefinition.transitions,
     toolCalls,
     currentDefinition.settings ?? {},
+    currentDefinition.settings?.inputForNextRun,
   );
   const mergedTransitions = mergeVerdictTransitions(applied.steps, applied.transitions);
   const orderedSteps = ensureEntryStepFirst(applied.steps, mergedTransitions);
@@ -190,14 +219,71 @@ export function validateResultingGraph(
     ...applied.settings,
     steps: orderedSteps,
     transitions: mergedTransitions,
+    // An entry naming a step that does not exist is refused here, which is the
+    // only check carry-over gets before a save.
+    ...(applied.inputForNextRun === undefined ? {} : { inputForNextRun: applied.inputForNextRun }),
   });
   const schemaErrors = templateParse.success
     ? []
     : templateParse.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`);
+  const applied_ = { steps: orderedSteps, transitions: mergedTransitions };
   if (graphErrors.length === 0 && referenceErrors.length === 0 && outcomeErrors.length === 0 && schemaErrors.length === 0) {
-    return { valid: true };
+    return { valid: true, ...applied_ };
   }
-  return { valid: false, errors: [...graphErrors, ...referenceErrors, ...outcomeErrors, ...schemaErrors] };
+  return {
+    valid: false,
+    errors: [...graphErrors, ...referenceErrors, ...outcomeErrors, ...schemaErrors],
+    ...applied_,
+  };
+}
+
+/** What the assistant says when it could not finish: the reply the person
+ *  reads, and at most a few questions with the answer it would take. */
+const StuckReplySchema = z.object({
+  reply: z.string().min(1).max(1000),
+  questions: z.array(PlanQuestionSchema).max(3),
+});
+
+/**
+ * The turn after a build that could not finish.
+ *
+ * Throwing here is what the pane turned into an error toast: the person's turn
+ * was gone and there was nothing to act on, while the model knew exactly what
+ * it had been unable to resolve. One more short call turns that into a question
+ * with a recommended answer, which is the same shape the planning turn returns
+ * and the same card renders. Returns null when even this fails — then an error
+ * is the honest answer.
+ */
+async function askWhatItCouldNotResolve(
+  model: string,
+  apiKey: string,
+  messages: OpenRouterChatMessage[],
+  errors: string[],
+): Promise<z.infer<typeof StuckReplySchema> | null> {
+  try {
+    const response = await callOpenRouter({
+      model,
+      apiKey,
+      maxTokens: 500,
+      messages: [
+        ...messages,
+        {
+          role: 'user',
+          content: `You could not finish this build. What stopped you: ${errors.join('; ')}.\n\nDo not try again. Answer with a single JSON object and nothing else: {"reply": "one or two sentences saying plainly what you could not do", "questions": [{"id": "...", "question": "...", "recommended": "..."}]}. Ask at most two questions, only ones whose answer would let you finish, each with the answer you would take if the person simply agreed. If nothing they could tell you would help, return an empty questions array and say what is wrong instead.`,
+        },
+      ],
+    });
+    const content = response.content;
+    const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(content);
+    const candidate = (fenced?.[1] ?? content).trim();
+    const start = candidate.indexOf('{');
+    const end = candidate.lastIndexOf('}');
+    if (start === -1 || end <= start) return null;
+    const parsed = StuckReplySchema.safeParse(JSON.parse(candidate.slice(start, end + 1)));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function askWorkflowAssistant(
@@ -350,7 +436,7 @@ export async function askWorkflowAssistant(
       }
       messages.push({
         role: 'user',
-        content: `Those changes were applied, but the resulting workflow graph is incomplete: ${graphCheck.errors.join('; ')}. Fix this before finishing — use update_step's insertAfterId/insertBeforeId to connect a disconnected step (referencing it by its real id from canvas state, or by the clientId you assigned it earlier in this response if it's a step you just added) or add_step if a step is genuinely missing. Then write a short reply summarizing what you built, same as any other turn.`,
+        content: `Those changes were applied, but the resulting workflow graph is incomplete: ${graphCheck.errors.join('; ')}.\n\n${describeGraph(graphCheck.steps, graphCheck.transitions)}\n\nFix it with those ids — update_step's insertAfterId/insertBeforeId connects a step that exists, add_step adds one that is genuinely missing. The clientIds from your previous response no longer resolve; use the ids above. Then write a short reply summarizing what you built, same as any other turn.`,
       });
       continue;
     }
@@ -377,6 +463,13 @@ export async function askWorkflowAssistant(
         });
       }
     }
+  }
+
+  const stuck = await askWhatItCouldNotResolve(model, apiKey, messages, lastErrors);
+  if (stuck !== null) {
+    return stuck.questions.length > 0
+      ? { reply: stuck.reply, questions: stuck.questions }
+      : { reply: stuck.reply };
   }
 
   throw new HandlerError(

@@ -272,3 +272,104 @@ describe('applyWorkflowAssistantToolCalls — workflow files', () => {
     ]);
   });
 });
+
+describe('applyWorkflowAssistantToolCalls — a condition on an edge added in the same batch', () => {
+  it('resolves a clientId the way every other tool does', () => {
+    // Steps and their conditions arrive together: "add a check step and only
+    // escalate when severity is high" is one request. Without resolution the
+    // condition lands on nothing, because the step it names has no real id yet.
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'add_step', arguments: { clientId: 'check', type: 'creation', executor: 'script', name: 'Check severity', insertAfterId: 'draft', insertBeforeId: 'done' } },
+      { tool: 'set_transition_condition', arguments: { from: 'check', to: 'done', when: 'output.severity == "high"' } },
+    ];
+    const { transitions, outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions, calls,
+    );
+    expect(outcomes.find((o) => o.tool === 'set_transition_condition')?.error).toBeUndefined();
+    expect(transitions).toContainEqual(
+      expect.objectContaining({ to: 'done', when: 'output.severity == "high"' }),
+    );
+  });
+
+  it('still refuses an edge that genuinely does not exist', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'set_transition_condition', arguments: { from: 'draft', to: 'nowhere', when: 'x == 1' } },
+    ];
+    const { outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions, calls,
+    );
+    expect(outcomes.find((o) => o.tool === 'set_transition_condition')?.error).toContain('nowhere');
+  });
+});
+
+describe('applyWorkflowAssistantToolCalls — carry-over between runs', () => {
+  it('sets inputForNextRun, which no tool could reach before', () => {
+    // "Remember the file listing so the next run can diff against it" is the
+    // whole point of a polling workflow, and it had no tool at all.
+    const { inputForNextRun } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions,
+      [{ tool: 'update_workflow', arguments: { inputForNextRun: [{ stepId: 'draft', output: 'listing', as: 'previousListing' }] } }],
+    );
+    expect(inputForNextRun).toEqual([{ stepId: 'draft', output: 'listing', as: 'previousListing' }]);
+  });
+
+  it('resolves a clientId in the step it carries from', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'add_step', arguments: { clientId: 'poll', type: 'creation', executor: 'script', name: 'Poll', insertAfterId: 'draft', insertBeforeId: 'done' } },
+      { tool: 'update_workflow', arguments: { inputForNextRun: [{ stepId: 'poll', output: 'listing', as: 'previousListing' }] } },
+    ];
+    const { inputForNextRun, steps } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions, calls,
+    );
+    const added = steps.find((s) => s.name === 'Poll');
+    expect(inputForNextRun?.[0]?.stepId).toBe(added?.id);
+  });
+
+  it('leaves carry-over alone when the call does not mention it', () => {
+    const { inputForNextRun } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions,
+      [{ tool: 'update_workflow', arguments: { preamble: 'House rules.' } }],
+      {},
+      [{ stepId: 'draft', output: 'listing', as: 'previousListing' }],
+    );
+    expect(inputForNextRun).toEqual([{ stepId: 'draft', output: 'listing', as: 'previousListing' }]);
+  });
+});
+
+describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not carry', () => {
+  it('says to write the file, rather than leaving a step that cannot build', () => {
+    // The failure this replaces: the model names `container/Dockerfile`, no
+    // file exists, and the step registers with nothing to build from. The
+    // message names the tool that fixes it, in the model's own vocabulary.
+    const { outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions,
+      [{
+        tool: 'add_step',
+        arguments: {
+          type: 'creation', executor: 'script', name: 'Validate',
+          insertAfterId: 'draft', insertBeforeId: 'done',
+          script: { command: 'python3 /artifacts/scripts/validate.py', dockerfile: 'container/Dockerfile' },
+        },
+      }],
+    );
+    const outcome = outcomes.find((o) => o.tool === 'add_step');
+    expect(outcome?.error).toContain('container/Dockerfile');
+    expect(outcome?.error).toContain('write_workflow_file');
+  });
+
+  it('is silent when the workflow carries it', () => {
+    const { outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions,
+      [{
+        tool: 'add_step',
+        arguments: {
+          type: 'creation', executor: 'script', name: 'Validate',
+          insertAfterId: 'draft', insertBeforeId: 'done',
+          script: { command: 'python3 /artifacts/run.py', dockerfile: 'Dockerfile' },
+        },
+      }],
+      { artifacts: [{ path: 'Dockerfile', contents: 'FROM python:3.12-slim\n' }] },
+    );
+    expect(outcomes.find((o) => o.tool === 'add_step')?.error).toBeUndefined();
+  });
+});

@@ -610,7 +610,11 @@ describe('askWorkflowAssistant handler', () => {
 
     await expect(askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope))
       .rejects.toThrow(HandlerError);
-    expect(fetchSpy).toHaveBeenCalledTimes(12);
+    // Twelve build turns, then one more that tries to turn the failure into a
+    // question. This model answers that with another tool call rather than the
+    // question it was asked for, so there is nothing to hand back and the error
+    // stands.
+    expect(fetchSpy).toHaveBeenCalledTimes(13);
   });
 
   it('throws HandlerError when OPENROUTER_API_KEY is missing', async () => {
@@ -805,5 +809,204 @@ describe('askWorkflowAssistant — platform tools', () => {
       error: 'Only admins may create agents',
       needsAdmin: true,
     });
+  });
+});
+
+// A build that cannot finish used to throw, which the pane showed as an error
+// toast: the turn was gone and the person had nothing to act on. It asks now.
+describe('askWorkflowAssistant — when it cannot finish', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  afterEach(() => { fetchSpy?.mockRestore(); });
+
+  /** A model that keeps making the same rejected call, then answers the
+   *  "ask the user" turn with a question. */
+  function mockStuckThenQuestion(question: unknown) {
+    let call = 0;
+    return vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init) => {
+      call += 1;
+      const body = JSON.parse((init as { body?: string } | undefined)?.body ?? '{}') as {
+        messages?: { role: string; content?: string }[];
+      };
+      const asksForQuestion = body.messages?.some(
+        (m) => typeof m.content === 'string' && m.content.includes('could not finish'),
+      ) === true;
+      const payload = asksForQuestion
+        ? { choices: [{ message: { content: JSON.stringify(question), tool_calls: [] } }] }
+        : {
+            choices: [{
+              message: {
+                content: '',
+                tool_calls: [{
+                  id: `call-${String(call)}`,
+                  type: 'function',
+                  function: { name: 'remove_step', arguments: JSON.stringify({ stepId: 'ghost' }) },
+                }],
+              },
+            }],
+          };
+      return Promise.resolve(new Response(JSON.stringify(payload), { status: 200 }));
+    });
+  }
+
+  it('comes back with a question instead of throwing', async () => {
+    fetchSpy = mockStuckThenQuestion({
+      reply: 'I could not remove that step — it is not on the canvas any more.',
+      questions: [{ id: 'which-step', question: 'Which step did you mean?', recommended: 'the review step' }],
+    });
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    const result = await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    expect(result.reply).toContain('could not remove that step');
+    expect(result.questions?.[0]).toMatchObject({ id: 'which-step', recommended: 'the review step' });
+  });
+
+  it('still fails loudly when even the question cannot be written', async () => {
+    // Nothing to act on and nothing to say: an error is the honest answer, and
+    // the pane still has its toast for it.
+    let call = 0;
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      call += 1;
+      return Promise.resolve(new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: 'not json',
+            tool_calls: call > 12 ? [] : [{
+              id: `c${String(call)}`,
+              type: 'function',
+              function: { name: 'remove_step', arguments: JSON.stringify({ stepId: 'ghost' }) },
+            }],
+          },
+        }],
+      }), { status: 200 }));
+    });
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    await expect(askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope))
+      .rejects.toThrow(HandlerError);
+  });
+});
+
+// The retry loop used to ask the model to reconnect a step it had no way to
+// name: the canvas state in the conversation is the one sent at the start, the
+// steps it just added carry reducer-assigned ids it has never seen, and the
+// clientIds it used died with the previous response. So it guessed, every guess
+// was rejected as an unknown step, and a five-step workflow burned the cap.
+describe('askWorkflowAssistant — naming the steps it just created', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  afterEach(() => { fetchSpy?.mockRestore(); });
+
+  /** Adds a decision step whose verdict points at nothing — an incomplete graph
+   *  the model then has to fix, which is when it needs the real ids. */
+  function mockOrphanThenReply() {
+    let call = 0;
+    return vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      call += 1;
+      if (call === 1) {
+        return Promise.resolve(new Response(JSON.stringify({
+          choices: [{
+            message: {
+              content: '',
+              tool_calls: [{
+                id: 'call-1',
+                type: 'function',
+                function: {
+                  name: 'add_step',
+                  arguments: JSON.stringify({
+                    type: 'decision',
+                    executor: 'human',
+                    name: 'Poll SFTP',
+                    insertAfterId: 'draft',
+                    insertBeforeId: 'review',
+                    verdicts: { approve: { target: 'nowhere' } },
+                  }),
+                },
+              }],
+            },
+          }],
+        }), { status: 200 }));
+      }
+      if (call === 2) {
+        return Promise.resolve(new Response(JSON.stringify({
+          choices: [{
+            message: {
+              content: '',
+              tool_calls: [{
+                id: 'call-2',
+                type: 'function',
+                function: {
+                  name: 'update_step',
+                  arguments: JSON.stringify({ stepId: 'poll-sftp', verdicts: { approve: { target: 'review' } } }),
+                },
+              }],
+            },
+          }],
+        }), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({
+        choices: [{ message: { content: 'Built it.', tool_calls: [] } }],
+      }), { status: 200 }));
+    });
+  }
+
+  function secondRequestMessages(spy: ReturnType<typeof vi.spyOn>): { role: string; content?: string }[] {
+    const init = spy.mock.calls[1]?.[1] as { body?: string } | undefined;
+    return (JSON.parse(init?.body ?? '{}') as { messages?: { role: string; content?: string }[] }).messages ?? [];
+  }
+
+  it('tells the model the ids the canvas now has, so it can reference them', async () => {
+    fetchSpy = mockOrphanThenReply();
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    const retry = secondRequestMessages(fetchSpy).at(-1);
+    expect(retry?.role).toBe('user');
+    // The id the reducer assigned to the step it just added — the one thing it
+    // could not have known and needs in order to connect it.
+    expect(retry?.content).toContain('poll-sftp');
+    // And the steps that were already there, so a fix can reference either.
+    expect(retry?.content).toContain('draft');
+    expect(retry?.content).toContain('done');
+  });
+
+  it('describes the transitions too, so it can see what is missing', async () => {
+    fetchSpy = mockOrphanThenReply();
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    const retry = secondRequestMessages(fetchSpy).at(-1);
+    // Inserting between two steps rewires both edges, and the model has to see
+    // that rather than the edge list it sent.
+    expect(retry?.content).toMatch(/draft → poll-sftp/);
+    expect(retry?.content).toMatch(/poll-sftp → review/);
+  });
+
+  it('stops telling it to use a clientId from a previous response', async () => {
+    // They are dead by the next response, and the prompt says so — asking for
+    // one here is what sent it guessing.
+    fetchSpy = mockOrphanThenReply();
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    const retry = secondRequestMessages(fetchSpy).at(-1);
+    expect(retry?.content).not.toContain('clientId you assigned it earlier');
   });
 });

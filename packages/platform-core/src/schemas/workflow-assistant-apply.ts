@@ -5,6 +5,7 @@ import type { z } from 'zod';
 import type { WorkflowAssistantToolCall } from './workflow-assistant-tools';
 
 type Transitions = WorkflowDefinition['transitions'];
+type InputForNextRunEntry = NonNullable<WorkflowDefinition['inputForNextRun']>[number];
 
 export interface ToolCallOutcome {
   tool: WorkflowAssistantToolCall['tool'];
@@ -34,8 +35,26 @@ export interface ApplyToolCallsResult {
   steps: WorkflowStep[];
   transitions: Transitions;
   settings: WorkflowSettings;
+  /** Outputs carried into the next run. Graph-adjacent rather than settings:
+   *  every entry names a step, so it is resolved and validated with them. */
+  inputForNextRun: InputForNextRunEntry[] | undefined;
   outcomes: ToolCallOutcome[];
   addedStepIds: string[];
+}
+
+/** A step that names a Dockerfile the workflow does not carry has nothing to
+ *  build from: the repository build fields are not the assistant's to write, so
+ *  the file has to be one it wrote. Reported against the call that named it,
+ *  naming the tool that fixes it. */
+function missingDockerfileError(
+  step: WorkflowStep,
+  artifacts: { path: string }[] | undefined,
+): string | null {
+  const config = step.executor === 'script' ? step.script : step.executor === 'agent' ? step.agent : undefined;
+  const dockerfile = config?.dockerfile;
+  if (typeof dockerfile !== 'string' || dockerfile === '') return null;
+  if (artifacts?.some((artifact) => artifact.path === dockerfile) === true) return null;
+  return `This workflow carries no '${dockerfile}', so the step has nothing to build from — write it with write_workflow_file first, or drop the dockerfile and use an image that already exists.`;
 }
 
 export function applyWorkflowAssistantToolCalls(
@@ -43,10 +62,12 @@ export function applyWorkflowAssistantToolCalls(
   transitions: Transitions,
   toolCalls: WorkflowAssistantToolCall[],
   settings: WorkflowSettings = {},
+  inputForNextRun?: InputForNextRunEntry[],
 ): ApplyToolCallsResult {
   let workingSteps: WorkflowStep[] = [...steps];
   let workingTransitions: Transitions = [...transitions];
   let workingSettings: WorkflowSettings = { ...settings };
+  let workingInputForNextRun = inputForNextRun;
   const clientIdToRealId = new Map<string, string>();
   const outcomes: ToolCallOutcome[] = [];
   const addedStepIds: string[] = [];
@@ -124,7 +145,10 @@ export function applyWorkflowAssistantToolCalls(
       }
       if (clientId) clientIdToRealId.set(clientId, newId);
       addedStepIds.push(newId);
-      outcomes.push({ tool: 'add_step', stepId: newId });
+      const buildError = missingDockerfileError(newStep, workingSettings.artifacts);
+      outcomes.push(buildError === null
+        ? { tool: 'add_step', stepId: newId }
+        : { tool: 'add_step', stepId: newId, error: buildError });
     } else if (call.tool === 'update_workflow') {
       // Patch, not replace: a call naming one field must leave the others
       // alone, or "also set the preamble" would clear the env set a turn ago.
@@ -134,7 +158,19 @@ export function applyWorkflowAssistantToolCalls(
       // wrote — narrowing a public workflow on an unrelated edit. Only keys the
       // call actually supplied are applied.
       const supplied = Object.entries(call.arguments).filter(([, value]) => value !== undefined);
-      const patch = Object.fromEntries(supplied) as WorkflowSettings;
+      const patch = Object.fromEntries(supplied) as WorkflowSettings & {
+        inputForNextRun?: InputForNextRunEntry[];
+      };
+      // Carry-over names steps, so it travels with the graph rather than the
+      // settings — and its ids go through the same resolution, or an entry
+      // naming a step added in this very batch would point at nothing.
+      if (patch.inputForNextRun !== undefined) {
+        workingInputForNextRun = patch.inputForNextRun.map((entry) => ({
+          ...entry,
+          stepId: resolveId(entry.stepId) ?? entry.stepId,
+        }));
+        delete patch.inputForNextRun;
+      }
       // `env` and `metadata` are maps: a shallow spread would make "add
       // STUDY_ID" drop every other variable, and "set a category" wipe the
       // display name. Merged key by key, so a patch adds rather than replaces.
@@ -181,7 +217,12 @@ export function applyWorkflowAssistantToolCalls(
       };
       outcomes.push({ tool: 'remove_workflow_file', stepId: path });
     } else if (call.tool === 'set_transition_condition') {
-      const { from, to, when } = call.arguments;
+      const { from: rawFrom, to: rawTo, when } = call.arguments;
+      // Same resolution as every other tool: "add a check step, and only
+      // escalate when severity is high" is one request, and the step it names
+      // has no real id until this batch is applied.
+      const from = resolveId(rawFrom) ?? rawFrom;
+      const to = resolveId(rawTo) ?? rawTo;
       const edge = workingTransitions.find((t) => t.from === from && t.to === to);
       if (edge === undefined) {
         outcomes.push({
@@ -252,5 +293,12 @@ export function applyWorkflowAssistantToolCalls(
     }
   }
 
-  return { steps: workingSteps, transitions: workingTransitions, settings: workingSettings, outcomes, addedStepIds };
+  return {
+    steps: workingSteps,
+    transitions: workingTransitions,
+    settings: workingSettings,
+    inputForNextRun: workingInputForNextRun,
+    outcomes,
+    addedStepIds,
+  };
 }

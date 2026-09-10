@@ -46,6 +46,7 @@ export { listWorkflowVersions } from './workflows/list-workflow-versions';
 export { getWorkflow } from './workflows/get-workflow';
 export { registerWorkflow } from './workflows/register-workflow';
 export { askWorkflowAssistant } from './workflow-assistant/ask-workflow-assistant';
+export { planWorkflowBuild } from './workflow-assistant/plan-workflow-build';
 export { validateWorkflow } from './workflows/validate-workflow';
 export { getWorkflowSchema } from './workflows/get-workflow-schema';
 export { setWorkflowVisibility } from './workflows/set-visibility';

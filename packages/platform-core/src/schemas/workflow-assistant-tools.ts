@@ -34,14 +34,30 @@ function preprocessJsonStringObject(val: unknown): unknown {
 // with hand-editing — including `stepParams`, which is not the legacy bag its
 // old comment claimed: `execute-agent-step` merges it into the agent's input
 // context, under `appContext`.
+/**
+ * The build fields the assistant does not author. A repository build context is
+ * the user's to set in the step editor: the assistant carries its files, and a
+ * model asked for a step that needs dependencies will otherwise write a
+ * plausible-looking repo URL and a placeholder SHA — a build that can never run.
+ * Dropped rather than rejected, so a model that writes them anyway still gets a
+ * usable step instead of a rejected call it retries until the turn dies.
+ */
+function withoutRepoBuildFields<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((value) => {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
+    const { repo: _repo, commit: _commit, repoAuth: _repoAuth, ...rest } = value as Record<string, unknown>;
+    return rest;
+  }, schema);
+}
+
 const StepConfigSchema = WorkflowStepSchema.omit({
   id: true,
   plugin: true,
   metadata: true,
 }).extend({
   type: WorkflowStepSchema.shape.type.unwrap().exclude(['terminal']),
-  agent: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.agent),
-  script: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.script),
+  agent: z.preprocess(preprocessJsonStringObject, withoutRepoBuildFields(WorkflowStepSchema.shape.agent)),
+  script: z.preprocess(preprocessJsonStringObject, withoutRepoBuildFields(WorkflowStepSchema.shape.script)),
   databricks: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.databricks),
   review: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.review),
   cowork: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.cowork),
@@ -144,7 +160,6 @@ export const UpdateWorkflowToolSchema = WorkflowAuthorableSchema.omit({
   name: true,
   steps: true,
   transitions: true,
-  inputForNextRun: true,
 }).omit({
   // Visibility has its own control on the workflow page, which PATCHes every
   // version at once. Writing it through a register — which touches only the new

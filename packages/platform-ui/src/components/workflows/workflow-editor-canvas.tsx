@@ -35,6 +35,8 @@ import { useToast } from '@/components/command-palette';
 import { applyWorkflowAssistantToolCalls, type WorkflowAssistantToolCall } from '@mediforce/platform-core';
 import { CodeEditor } from './workflow-editor/code-editor';
 import { WorkflowFilesPanel } from './workflow-files-panel';
+import { AssistantPlan, answersMessage } from './assistant-plan';
+import type { PlanWorkflowBuildOutput } from '@mediforce/platform-api/contract';
 
 interface AssistantMessage {
   role: 'user' | 'assistant';
@@ -438,7 +440,19 @@ export function WorkflowEditorCanvas({
   const [assistantModel, setAssistantModel] = useState<string | undefined>(undefined);
   const [assistantSettingsOpen, setAssistantSettingsOpen] = useState(false);
   const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantPlanning, setAssistantPlanning] = useState(false);
   const [assistantPhase, setAssistantPhase] = useState(0);
+  /** What this turn said it would do, and what it asked first. Written by the
+   *  planning call, cleared when the build starts. */
+  const [assistantPlan, setAssistantPlan] = useState<PlanWorkflowBuildOutput | null>(null);
+  const [assistantAnswers, setAssistantAnswers] = useState<Record<string, string>>({});
+  /** Phases for the build now running, written for this workflow rather than
+   *  the generic list they replace. Empty falls back to that list. */
+  const [assistantPhases, setAssistantPhases] = useState<readonly string[]>(ASSISTANT_PHASES);
+  const [assistantElapsed, setAssistantElapsed] = useState(0);
+  /** Something arrived while the pane was collapsed. Cleared on opening it. */
+  const [assistantUnread, setAssistantUnread] = useState(false);
+  const assistantScrollRef = useRef<HTMLDivElement>(null);
   const assistantInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -453,11 +467,27 @@ export function WorkflowEditorCanvas({
   useEffect(() => {
     if (!assistantLoading) return;
     setAssistantPhase(0);
+    setAssistantElapsed(0);
+    const started = Date.now();
     const timer = setInterval(() => {
-      setAssistantPhase((p) => Math.min(p + 1, ASSISTANT_PHASES.length - 1));
+      setAssistantElapsed(Math.round((Date.now() - started) / 1000));
+      setAssistantPhase((p) => Math.min(p + 1, assistantPhases.length - 1));
     }, 2500);
     return () => clearInterval(timer);
-  }, [assistantLoading]);
+  }, [assistantLoading, assistantPhases]);
+
+  // A reply is only useful if it is seen. The thread scrolls to the newest
+  // message, and when the pane is collapsed the toggle carries a mark instead —
+  // an answer nobody notices is the same as no answer.
+  useEffect(() => {
+    if (assistantMessages.length === 0 && assistantPlan === null) return;
+    if (!aiPaneOpen) {
+      setAssistantUnread(true);
+      return;
+    }
+    const el = assistantScrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [assistantMessages, assistantPlan, aiPaneOpen]);
 
   // Seeds the notifications role pick-list. Fetched here rather than threaded
   // through the pages: the canvas already knows the handle, and that panel is
@@ -471,6 +501,9 @@ export function WorkflowEditorCanvas({
   // update. Returns a success summary and any tool-call errors separately so the
   // UI never presents a failure as a confirmed change.
 
+  const assistantMessagesRef = useRef(assistantMessages);
+  assistantMessagesRef.current = assistantMessages;
+
   const settingsDraftRef = useRef(settingsDraft);
   settingsDraftRef.current = settingsDraft;
 
@@ -480,10 +513,14 @@ export function WorkflowEditorCanvas({
       editedTransitionsRef.current,
       toolCalls,
       settingsDraftRef.current,
+      editedInputForNextRunRef.current,
     );
     saveSnapshot();
     setEditedSteps(result.steps);
     setEditedTransitions(result.transitions);
+    // Carry-over names steps, so it lands with them rather than through the
+    // page's settings draft.
+    setEditedInputForNextRun(result.inputForNextRun);
     // The page owns the workflow-level fields, so the reducer's settings go
     // back the same way the settings panel's edits do.
     onSettingsChange?.(result.settings);
@@ -522,21 +559,41 @@ export function WorkflowEditorCanvas({
     };
   }, [saveSnapshot, onSettingsChange]);
 
-  const sendAssistantMessage = useCallback(async () => {
-    const content = assistantInput.trim();
-    if (!content || assistantLoading || !namespace) return;
+  /** The canvas as the assistant sees it, for both calls. */
+  const assistantWorkflowDefinition = useCallback(() => ({
+    steps: editedStepsRef.current,
+    transitions: editedTransitionsRef.current,
+    // Carry-over goes with the workflow level so the assistant can read
+    // what is set before patching it, the same as every other field.
+    settings: {
+      ...pruneWorkflowSettings(settingsDraftRef.current ?? {}),
+      ...(editedInputForNextRunRef.current === undefined
+        ? {}
+        : { inputForNextRun: editedInputForNextRunRef.current }),
+    },
+  }), []);
 
-    const nextMessages: AssistantMessage[] = [...assistantMessages, { role: 'user', content }];
-    setAssistantMessages(nextMessages);
-    setAssistantInput('');
+  /**
+   * The build itself. Split from sending a message so the plan can sit between
+   * them: answers to the plan's questions are appended as one message, which is
+   * how the build hears them without a second round of asking.
+   */
+  const runAssistantBuild = useCallback(async (extra?: string) => {
+    if (assistantLoading || !namespace) return;
+    const answered = extra === undefined || extra === ''
+      ? assistantMessagesRef.current
+      : [...assistantMessagesRef.current, { role: 'user' as const, content: extra }];
+    if (extra !== undefined && extra !== '') setAssistantMessages(answered);
+    setAssistantPlan(null);
+    setAssistantAnswers({});
     setAssistantLoading(true);
 
     try {
       const result = await mediforce.assistant.ask(
         {
-          messages: nextMessages,
+          messages: answered,
           model: assistantModel,
-          workflowDefinition: { steps: editedSteps, transitions: editedTransitions, settings: pruneWorkflowSettings(settingsDraftRef.current ?? {}) },
+          workflowDefinition: assistantWorkflowDefinition(),
         },
         { namespace },
       );
@@ -547,8 +604,17 @@ export function WorkflowEditorCanvas({
         content: replyText,
         ...(applied.summary ? { changes: applied.summary } : {}),
       }]);
+      // A build that could not finish comes back asking. Rendered as the same
+      // card the plan uses, because answering is the way out of it — a toast
+      // would say the turn is over and leave nothing to act on.
+      if (result.questions !== undefined && result.questions.length > 0) {
+        setAssistantPlan({ plan: [], questions: result.questions, phases: [] });
+      }
       if (applied.error) {
-        toast({ variant: 'error', title: "Couldn't apply every change", description: applied.error });
+        setAssistantMessages((prev) => [...prev, {
+          role: 'assistant',
+          content: `Not everything landed: ${applied.error}`,
+        }]);
       }
       if (result.toolCalls) {
         // editedStepsRef only settles one macrotask after the state update commits.
@@ -565,7 +631,48 @@ export function WorkflowEditorCanvas({
     } finally {
       setAssistantLoading(false);
     }
-  }, [assistantInput, assistantLoading, assistantMessages, assistantModel, namespace, editedSteps, editedTransitions, applyAssistantToolCalls, toast]);
+  }, [assistantLoading, assistantModel, namespace, assistantWorkflowDefinition, applyAssistantToolCalls, toast]);
+
+  /**
+   * Sending a message plans first, then builds. The plan is one short call: it
+   * says what it is about to do and asks only what it cannot infer, so a wrong
+   * assumption costs a sentence rather than a minute of building. When it has
+   * nothing to ask, the build starts straight away and the plan is just the
+   * status the pane shows while it runs.
+   */
+  const sendAssistantMessage = useCallback(async () => {
+    const content = assistantInput.trim();
+    if (!content || assistantLoading || assistantPlanning || !namespace) return;
+
+    const nextMessages: AssistantMessage[] = [...assistantMessagesRef.current, { role: 'user', content }];
+    setAssistantMessages(nextMessages);
+    setAssistantInput('');
+    setAssistantPlanning(true);
+
+    let planned: PlanWorkflowBuildOutput | null = null;
+    try {
+      planned = await mediforce.assistant.plan(
+        { messages: nextMessages, model: assistantModel, workflowDefinition: assistantWorkflowDefinition() },
+        { namespace },
+      );
+    } catch {
+      // The plan is an aid, not the work: a planning call that fails must not
+      // cost the user their turn, so the build runs as it always did.
+      planned = null;
+    } finally {
+      setAssistantPlanning(false);
+    }
+
+    setAssistantPhases(planned !== null && planned.phases.length > 0 ? planned.phases : ASSISTANT_PHASES);
+    if (planned !== null && planned.questions.length > 0) {
+      setAssistantPlan(planned);
+      return;
+    }
+    if (planned !== null && planned.plan.length > 0) {
+      setAssistantMessages((prev) => [...prev, { role: 'assistant', content: planned.plan.join('\n') }]);
+    }
+    await runAssistantBuild();
+  }, [assistantInput, assistantLoading, assistantPlanning, assistantModel, namespace, assistantWorkflowDefinition, runAssistantBuild]);
 
   const moveStep = useCallback((stepId: string, direction: 'up' | 'down') => {
     saveSnapshot();
@@ -892,7 +999,7 @@ export function WorkflowEditorCanvas({
                   <Settings className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => setAiPaneOpen(false)}
+                  onClick={() => { setAiPaneOpen(false); setAssistantUnread(false); }}
                   className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   title="Collapse AI Assistant"
                   aria-label="Collapse AI Assistant"
@@ -914,7 +1021,7 @@ export function WorkflowEditorCanvas({
                 />
               </div>
             )}
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            <div ref={assistantScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
               {assistantMessages.length === 0 ? (
                 <div className="text-sm text-muted-foreground text-center py-6 space-y-3">
                   <p>Describe the workflow you want to build, or ask a question.</p>
@@ -958,11 +1065,32 @@ export function WorkflowEditorCanvas({
                   </div>
                 ))
               )}
+              {assistantPlanning && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Reading what you asked for…
+                </div>
+              )}
               {assistantLoading && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  {ASSISTANT_PHASES[assistantPhase]}
+                  <span>{assistantPhases[assistantPhase] ?? assistantPhases[0]}</span>
+                  {assistantElapsed > 0 && (
+                    <span className="tabular-nums text-xs text-muted-foreground/70">
+                      {assistantElapsed}s
+                    </span>
+                  )}
                 </div>
+              )}
+
+              {assistantPlan !== null && !assistantLoading && (
+                <AssistantPlan
+                  plan={assistantPlan}
+                  answers={assistantAnswers}
+                  onAnswer={(id: string, value: string) => setAssistantAnswers((prev) => ({ ...prev, [id]: value }))}
+                  onBuild={() => void runAssistantBuild(answersMessage(assistantPlan, assistantAnswers))}
+                  onCancel={() => { setAssistantPlan(null); setAssistantAnswers({}); }}
+                />
               )}
             </div>
             <div className="shrink-0 border-t p-3">
@@ -978,13 +1106,13 @@ export function WorkflowEditorCanvas({
                     }
                   }}
                   rows={1}
-                  disabled={assistantLoading || !namespace}
+                  disabled={assistantLoading || assistantPlanning || !namespace}
                   placeholder={namespace ? 'Ask AI to build your workflow…' : 'Save the workflow first'}
                   className="flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed max-h-48 overflow-y-auto leading-relaxed"
                 />
                 <button
                   onClick={() => void sendAssistantMessage()}
-                  disabled={assistantLoading || !namespace || assistantInput.trim().length === 0}
+                  disabled={assistantLoading || assistantPlanning || !namespace || assistantInput.trim().length === 0}
                   className="shrink-0 pb-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   aria-label="Send message to the assistant"
                 >
@@ -995,16 +1123,30 @@ export function WorkflowEditorCanvas({
           </div>
         ) : (
           <button
-            onClick={() => setAiPaneOpen(true)}
-            className="w-10 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col items-center justify-between py-4 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Expand AI Assistant"
-            aria-label="Expand AI Assistant"
+            onClick={() => { setAiPaneOpen(true); setAssistantUnread(false); }}
+            className={cn(
+              'w-10 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col items-center justify-between py-4 transition-colors',
+              assistantUnread
+                ? 'border-primary/40 text-primary hover:bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+            )}
+            title={assistantUnread ? 'The AI Assistant has something for you' : 'Expand AI Assistant'}
+            aria-label={assistantUnread ? 'Expand AI Assistant — it has something for you' : 'Expand AI Assistant'}
           >
-            <Sparkles className="h-4 w-4 shrink-0" />
+            <span className="relative inline-flex shrink-0">
+              <Sparkles className="h-4 w-4" />
+              {assistantUnread && (
+                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-white dark:ring-background" />
+              )}
+            </span>
             <span className="text-[11px] font-semibold tracking-wide [writing-mode:vertical-rl] rotate-180 select-none">
               AI Assistant
             </span>
-            <ChevronLeft className="h-4 w-4 shrink-0" />
+            {assistantLoading || assistantPlanning ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+            ) : (
+              <ChevronLeft className="h-4 w-4 shrink-0" />
+            )}
           </button>
         )}
 

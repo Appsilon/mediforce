@@ -337,4 +337,64 @@ describe('WorkflowEngine — task_assigned notification dispatch', () => {
       expect(notificationService.sent).toHaveLength(0);
     });
   });
+
+  // An `assignedTo` that names nobody used to become the task's assignee
+  // verbatim, which made a task only a user with that literal id could
+  // complete — and no such user exists. The run was then unfinishable by
+  // anyone, owner included, because there is no unclaim and no override.
+  describe('pre-assignment that cannot be resolved', () => {
+  const unresolvableDef: WorkflowDefinition = {
+    ...humanProcessDef,
+    name: 'human-process-unresolvable',
+    steps: humanProcessDef.steps.map((step) =>
+      step.id === 'review'
+        ? { ...step, assignedTo: 'data-manager@company.com' }
+        : step,
+    ),
+  };
+
+  async function runTo(directory: InMemoryUserDirectoryService) {
+    await processRepo.saveWorkflowDefinition(unresolvableDef);
+    const engine = new WorkflowEngine(
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      undefined,
+      notificationService,
+      humanTaskRepo,
+      undefined,
+      directory,
+    );
+    const instance = await engine.createInstance('test', 'human-process-unresolvable', 1, 'user-1', 'manual', {});
+    await engine.startInstance(instance.id);
+    await engine.advanceStep(instance.id, { result: 'done' }, actor);
+    return humanTaskRepo.getAll();
+  }
+
+  it('leaves the task claimable instead of assigning an address as a user', async () => {
+    // Nobody in the directory has that address.
+    const tasks = await runTo(directoryWith(['reviewer', 'uid-r1', 'reviewer@example.com']));
+
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].assignedUserId).toBeNull();
+    expect(tasks[0].status).toBe('pending');
+  });
+
+  it('records why it is unassigned, so the run says what went wrong', async () => {
+    await runTo(directoryWith(['reviewer', 'uid-r1', 'reviewer@example.com']));
+
+    const entry = auditRepo.getAll().find((e) => e.action === 'task.assignee_unresolved');
+    expect(entry?.description).toContain('data-manager@company.com');
+  });
+
+  it('still pre-assigns when the address does resolve to a member', async () => {
+    const tasks = await runTo(directoryWith(
+      ['reviewer', 'uid-r1', 'reviewer@example.com'],
+      ['reviewer', 'uid-dm', 'data-manager@company.com'],
+    ));
+
+    expect(tasks[0].assignedUserId).toBe('uid-dm');
+    expect(tasks[0].status).toBe('claimed');
+  });
+});
 });

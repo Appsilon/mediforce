@@ -156,3 +156,70 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
   });
 
 });
+
+// The authoring judgment the /design-workflow skill applies, in the assistant
+// that replaces it: pushing back on the shape, not just building it correctly.
+describe('buildWorkflowAssistantSystemPrompt — challenging the design', () => {
+  const prompt = buildWorkflowAssistantSystemPrompt();
+
+  it('says a workflow may be the wrong shape for the job', () => {
+    expect(prompt).toMatch(/Does this need a workflow at all/);
+    expect(prompt).toMatch(/one script step on a cron trigger/);
+  });
+
+  it('routes deterministic work away from agent steps, and side effects to actions', () => {
+    // The most expensive authoring mistake: a model doing what a parser does,
+    // once per run, forever.
+    expect(prompt).toMatch(/Is that really an agent step/);
+    expect(prompt).toMatch(/Deterministic parsing, validation, format conversion/);
+    expect(prompt).toMatch(/judgment, synthesis, planning and language understanding/);
+  });
+
+  it('states where code lives, and what a Dockerfile costs', () => {
+    expect(prompt).toMatch(/inline script .* is the default/);
+    expect(prompt).toMatch(/minutes of build on the first run/);
+  });
+
+  it('lists what a finished design has to resolve', () => {
+    expect(prompt).toMatch(/Cover the whole design/);
+    expect(prompt).toMatch(/inputForNextRun/);
+    expect(prompt).toMatch(/list_secrets.*list_agents.*list_tool_catalog.* are there to be called/);
+  });
+
+  it('forbids inventing a repository or a commit, which the older references still describe', () => {
+    // The reference docs below the prompt taught the pinned-repo shape as the
+    // only way to run a script file. A model following them writes a
+    // github.com/user/... URL and forty zeros, and the workflow can never run.
+    expect(prompt).toMatch(/Never invent a repository or a commit/);
+    expect(prompt).toMatch(/placeholder SHA \(forty zeros\)/);
+    expect(prompt).toMatch(/When a step needs a file, write the file/);
+  });
+
+  it('asks for a plan first on a large build, rather than a form', () => {
+    expect(prompt).toMatch(/more than about five steps/);
+    expect(prompt).toMatch(/Not a form to fill in/);
+  });
+});
+
+// "A data manager reviews the report" produced `assignedTo:
+// "data-manager@company.com"`, which resolves to no user: the task was created
+// assigned to that literal string, the UI showed it claimed by someone who does
+// not exist, and nobody — owner included — could complete the run.
+describe('buildWorkflowAssistantSystemPrompt — who does a human step', () => {
+  const prompt = buildWorkflowAssistantSystemPrompt();
+
+  it('sends a job title to allowedRoles, not assignedTo', () => {
+    expect(prompt).toMatch(/is a role, not a person/);
+    expect(prompt).toMatch(/allowedRoles: \["data-manager"\]/);
+  });
+
+  it('says what assignedTo actually takes, and what happens when it is not that', () => {
+    expect(prompt).toMatch(/pre-assigns to one specific \*user id\*/);
+    expect(prompt).toMatch(/leaves such a task unassigned and records that the value named nobody/);
+  });
+
+  it('keeps assignedTo for an identity the run genuinely knows', () => {
+    expect(prompt).toMatch(/triggerPayload\.userId/);
+    expect(prompt).toMatch(/set the role and say which role you used/);
+  });
+});
