@@ -145,6 +145,38 @@ export function useUpdateImageEntry(namespace: string) {
 }
 
 /**
+ * Remove an entry, and — only if asked — the images behind it.
+ *
+ * Two acts under two gates, which is why `withImages` is a separate flag and
+ * not the default. Removing the entry removes an offer: no Workflow Definition
+ * references one, so nothing that runs today changes (ADR-0022 decision 3).
+ * Removing the images acts on the **deployment-wide** daemon, where a tag can
+ * back steps in namespaces the caller cannot even see, so the handler puts it
+ * behind Infrastructure's admin gate and audits it under `_system`.
+ *
+ * Both reads are invalidated rather than patched: with the entry gone the list
+ * is what says so, and if its images went too, every other entry's lineage and
+ * `unused` marks were computed against images that no longer exist.
+ */
+export function useDeleteImageEntry(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; withImages: boolean }) =>
+      mediforce.imageCatalog.delete({
+        namespace,
+        id: input.id,
+        ...(input.withImages ? { withImages: true } : {}),
+      }),
+    onSuccess: (_data, input) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, input.id),
+      });
+    },
+  });
+}
+
+/**
  * Build one version of a built entry, without running a workflow.
  *
  * The request stays open for the whole build — minutes, not the sub-second the

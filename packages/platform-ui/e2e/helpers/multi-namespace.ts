@@ -35,7 +35,11 @@ export interface UserCaller {
 }
 
 export interface MultiNamespaceFixture {
-  /** Member of the `test` namespace (seeded by auth-setup). */
+  /**
+   * The `test` namespace's **owner** (seeded by auth-setup), which is what
+   * makes it the happy-path caller — and unusable for a role gate, since it
+   * satisfies every admin assert. Seed a `member`-role user for those.
+   */
   readonly member: UserCaller;
   /** Member of the `other` namespace only — used for 404 anti-enum probes. */
   readonly outsider: UserCaller;

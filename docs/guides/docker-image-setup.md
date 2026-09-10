@@ -181,6 +181,48 @@ An entry marked **Needs a description** offers **Describe** rather than
 re-pointing it would describe a different one while leaving this one still
 undescribed. Describe it first, then **Edit** can correct it.
 
+## Removing an entry, and its images
+
+**Delete** on any entry withdraws it from the catalog. That removes an
+**offer**, never a capability: no workflow definition references an entry — a
+step stores an image string — so no run changes behaviour and no pinned version
+stops resolving. Any workspace member may do it, and the source can be
+catalogued again afterwards. `mediforce images delete <entry-id> --namespace
+<handle>` is the same write.
+
+### Deleting the images too
+
+An admin can tick **Also remove these images from the machine**, which runs
+`docker rmi` on every tag the entry offers. This is a different act under a
+different gate, and the difference is not cosmetic:
+
+- **The daemon is deployment-wide.** One tag can back steps in workspaces you
+  cannot see, so the dialog names every workflow that pins what you are about
+  to destroy — the `used by` scan is deployment-wide for exactly this reason. A
+  step whose image is gone fails at container start until it is built or pulled
+  again.
+- **It cannot be undone.** A deleted image is rebuilt or pulled again, never
+  restored. There is no registry to fall back on
+  ([ADR-0022](../adr/0022-image-catalog.md)).
+- **Deletion is by tag, not by image id**, so an image a second tag still
+  references survives rather than needing a force that would take a version
+  some other entry offers.
+- **Images go first, and all of them must go.** Docker refuses an image a
+  running container is using, or one another image was built on; when that
+  happens the entry is kept, because the entry is the only handle anyone has on
+  the versions left behind. Delete the entry alone, or clear the blockage
+  first.
+
+A member sees the version list and is told the images stay — removing them
+needs **admin of this workspace**, through **Admin → Infrastructure** or this
+checkbox.
+`mediforce images delete <entry-id> --namespace <handle> --with-images` is the
+same write, and `mediforce system rmi <id-or-tag>` still removes one image on
+its own.
+
+An entry marked **Needs a description** has no stored record to remove, so
+there **Delete** only offers the images — and only to an admin.
+
 ## Backfilling an existing deployment
 
 For those hand-built and pulled images, `scripts/migrations/adopt_daemon_images.py`
