@@ -93,3 +93,48 @@ describe('validateResultingGraph', () => {
     expect(result.valid).toBe(true);
   });
 });
+
+describe('validateResultingGraph — a defect the canvas already had', () => {
+  const brokenSteps: WorkflowStep[] = [
+    { id: 'start', name: 'Start', type: 'creation', executor: 'human' },
+    {
+      id: 'check', name: 'Check', type: 'decision', executor: 'human',
+      verdicts: { pass: { target: 'done' }, fail: { target: 'fix' } },
+    },
+    { id: 'fix', name: 'Fix', type: 'creation', executor: 'human' },
+    { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+  ];
+  const brokenTransitions: WorkflowDefinition['transitions'] = [
+    { from: 'start', to: 'check' },
+    { from: 'check', to: 'done' },
+    { from: 'check', to: 'fix', when: 'verdict == "fail"' },
+    { from: 'fix', to: 'done' },
+  ];
+  const broken = { steps: brokenSteps, transitions: brokenTransitions };
+
+  it('lets an unrelated edit through, rather than refusing to touch the workflow', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'update_workflow', arguments: { preamble: 'House rules.' } },
+    ];
+    const result = validateResultingGraph(broken, calls, 'team-alpha');
+    expect(result.valid).toBe(true);
+    expect(result.inheritedErrors.join(' ')).toMatch(/"check"/);
+  });
+
+  it('still refuses an error this turn introduced', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'remove_step', arguments: { stepId: 'nonexistent' } },
+    ];
+    const result = validateResultingGraph(broken, calls, 'team-alpha');
+    expect(result.valid).toBe(false);
+  });
+
+  it('reports nothing inherited when the canvas was sound', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'update_workflow', arguments: { preamble: 'House rules.' } },
+    ];
+    const result = validateResultingGraph(base, calls, 'team-alpha');
+    expect(result.valid).toBe(true);
+    expect(result.inheritedErrors).toEqual([]);
+  });
+});

@@ -675,14 +675,14 @@ test.describe('Workflow Editor Journey', () => {
     const canvas = page.getByTestId('authoring-path-canvas');
     await expect(canvas).toContainText('Exact control over one block');
     await expect(page.getByTestId('authoring-path-assistant')).toContainText('OPENROUTER_API_KEY');
-    // The path a reader without a checkout cannot otherwise discover, with the
-    // clone it needs rather than the skill name alone.
-    await expect(page.getByTestId('authoring-path-agent')).toContainText(
-      'git clone https://github.com/Appsilon/mediforce',
-    );
+    await expect(page.getByTestId('authoring-path-agent')).toHaveCount(0);
+
+    await page.mouse.click(60, 400);
+    await expect(page.getByTestId('authoring-path-canvas')).toBeHidden();
 
     // Import is a click, not an instruction: the importer lives on the
     // workspace home, so the entry navigates there with the dialog open.
+    await page.getByRole('button', { name: /ways to author/i }).click();
     await page.getByTestId('authoring-path-import').getByRole('link').click();
     await page.waitForURL(new RegExp(`/${TEST_ORG_HANDLE}\\?import=source`), { timeout: 15_000 });
     await expect(page.getByRole('dialog').getByLabel('Repository URL')).toBeVisible({ timeout: 15_000 });

@@ -83,10 +83,29 @@ function fixedNamespaceSecrets(values: Record<string, string>): NamespaceSecrets
   };
 }
 
-function mockOpenRouterResponse(body: unknown) {
+interface MockOpenRouterBody {
+  choices: {
+    message: {
+      content: string;
+      tool_calls?: { id: string; type: string; function: { name: string; arguments: string } }[];
+    };
+    finish_reason?: string;
+  }[];
+}
+
+function mockOpenRouterResponse(body: MockOpenRouterBody) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
     Promise.resolve(new Response(JSON.stringify(body), { status: 200 })),
   );
+}
+
+function mockOpenRouterTurn(body: MockOpenRouterBody) {
+  const closing: MockOpenRouterBody = {
+    choices: [{ message: { content: body.choices[0]?.message.content ?? '', tool_calls: [] } }],
+  };
+  return vi.spyOn(globalThis, 'fetch')
+    .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(body), { status: 200 })))
+    .mockImplementation(() => Promise.resolve(new Response(JSON.stringify(closing), { status: 200 })));
 }
 
 const baseInput = {
@@ -182,7 +201,7 @@ describe('askWorkflowAssistant handler', () => {
   });
 
   it('returns a validated tool call when the model calls add_step', async () => {
-    fetchSpy = mockOpenRouterResponse({
+    fetchSpy = mockOpenRouterTurn({
       choices: [{
         message: {
           content: 'Added a human review step.',
@@ -211,7 +230,7 @@ describe('askWorkflowAssistant handler', () => {
   });
 
   it("returns the model's own narration alongside tool calls instead of dropping it", async () => {
-    fetchSpy = mockOpenRouterResponse({
+    fetchSpy = mockOpenRouterTurn({
       choices: [{
         message: {
           content: 'Added a human review step after the draft.',
@@ -237,7 +256,7 @@ describe('askWorkflowAssistant handler', () => {
   });
 
   it('returns every tool call when the model batches several in one response', async () => {
-    fetchSpy = mockOpenRouterResponse({
+    fetchSpy = mockOpenRouterTurn({
       choices: [{
         message: {
           content: 'Swapped the review step for a Generate agent step.',
@@ -318,7 +337,10 @@ describe('askWorkflowAssistant handler', () => {
             }],
           },
         }],
-      }), { status: 200 }));
+      }), { status: 200 }))
+      .mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
+        choices: [{ message: { content: 'Set up the review step as an approve/reject decision.', tool_calls: [] } }],
+      }), { status: 200 })));
 
     const scope = createTestScope({
       namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
@@ -327,7 +349,7 @@ describe('askWorkflowAssistant handler', () => {
 
     const result = await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
     expect(result.reply).toBe('Set up the review step as an approve/reject decision.');
     expect(result.toolCalls).toHaveLength(2);
 
@@ -339,7 +361,7 @@ describe('askWorkflowAssistant handler', () => {
   });
 
   it('resolves a verdict target that references a new step\'s clientId, using its real (slugified) id — not the clientId string itself', async () => {
-    fetchSpy = mockOpenRouterResponse({
+    fetchSpy = mockOpenRouterTurn({
       choices: [{
         message: {
           content: 'Added the results email and connected approval to it.',
@@ -378,7 +400,7 @@ describe('askWorkflowAssistant handler', () => {
 
     const result = await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
 
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(result.toolCalls).toHaveLength(2);
     expect(result.toolCalls?.[1]).toEqual({
       tool: 'update_step',
@@ -433,7 +455,10 @@ describe('askWorkflowAssistant handler', () => {
             }],
           },
         }],
-      }), { status: 200 }));
+      }), { status: 200 }))
+      .mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
+        choices: [{ message: { content: 'Fixed it.', tool_calls: [] } }],
+      }), { status: 200 })));
 
     const scope = createTestScope({
       namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
@@ -442,7 +467,7 @@ describe('askWorkflowAssistant handler', () => {
 
     const result = await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
     expect(result).toEqual({
       reply: 'Fixed it.',
       toolCalls: [{ tool: 'add_step', arguments: { type: 'creation', executor: 'human', name: 'Review', insertAfterId: 'review', insertBeforeId: 'done' } }],
@@ -569,7 +594,10 @@ describe('askWorkflowAssistant handler', () => {
             }],
           },
         }],
-      }), { status: 200 }));
+      }), { status: 200 }))
+      .mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
+        choices: [{ message: { content: 'Added a Generate step using the cheapest available model.', tool_calls: [] } }],
+      }), { status: 200 })));
 
     const scope = createTestScope({
       namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
@@ -579,7 +607,7 @@ describe('askWorkflowAssistant handler', () => {
 
     const result = await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
     expect(result).toEqual({
       reply: 'Added a Generate step using the cheapest available model.',
       toolCalls: [{
@@ -707,6 +735,128 @@ describe('askWorkflowAssistant handler', () => {
 // Platform tools run inside the turn, unlike the canvas tools the browser
 // applies. This covers the whole loop: the model asks, the platform answers as
 // the caller, and the answer goes back into the conversation.
+describe('askWorkflowAssistant — scheduling an unsaved workflow', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  afterEach(() => {
+    fetchSpy?.mockRestore();
+  });
+
+  it('does not offer the schedule tool at all when the workflow has never been saved', async () => {
+    fetchSpy = mockOpenRouterTurn({
+      choices: [{ message: { content: 'That needs the workflow saved first.', tool_calls: [] } }],
+    });
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    const body = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body)) as { tools: { function: { name: string } }[] };
+    const offered = body.tools.map((tool) => tool.function.name);
+    expect(offered).not.toContain('create_cron_trigger');
+    expect(offered).toContain('list_roles');
+  });
+
+  it('offers it once the canvas names a saved workflow', async () => {
+    fetchSpy = mockOpenRouterTurn({
+      choices: [{ message: { content: 'Scheduled.', tool_calls: [] } }],
+    });
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha', workflowName: 'sample-qc-check' }, scope);
+
+    const body = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body)) as { tools: { function: { name: string } }[] };
+    expect(body.tools.map((tool) => tool.function.name)).toContain('create_cron_trigger');
+  });
+});
+
+describe('askWorkflowAssistant — a batch that leaves the graph valid', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  afterEach(() => {
+    fetchSpy?.mockRestore();
+  });
+
+  it('keeps the turn going until the model stops calling tools', async () => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: "I'll build the workflow you described.",
+            tool_calls: [{
+              id: 'call_1',
+              type: 'function',
+              function: { name: 'update_workflow', arguments: JSON.stringify({ preamble: 'House rules.' }) },
+            }],
+          },
+        }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: '',
+            tool_calls: [{
+              id: 'call_2',
+              type: 'function',
+              function: { name: 'add_step', arguments: JSON.stringify({ type: 'creation', executor: 'human', name: 'Sign-off', insertAfterId: 'review', insertBeforeId: 'done' }) },
+            }],
+          },
+        }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{ message: { content: 'Added a sign-off step and the house rules.', tool_calls: [] } }],
+      }), { status: 200 }));
+
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    const result = await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(result.reply).toBe('Added a sign-off step and the house rules.');
+    expect(result.toolCalls?.map((call) => call.tool)).toEqual(['update_workflow', 'add_step']);
+  });
+
+  it('asks for the summary when the model stops calling tools without writing one', async () => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: '',
+            tool_calls: [{
+              id: 'call_1',
+              type: 'function',
+              function: { name: 'add_step', arguments: JSON.stringify({ type: 'creation', executor: 'human', name: 'Sign-off', insertAfterId: 'review', insertBeforeId: 'done' }) },
+            }],
+          },
+        }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{ message: { content: '', tool_calls: [] } }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{ message: { content: 'Added a sign-off step before the end.', tool_calls: [] } }],
+      }), { status: 200 }));
+
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    const result = await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    expect(result.reply).toBe('Added a sign-off step before the end.');
+    expect(result.toolCalls).toHaveLength(1);
+  });
+});
+
 describe('askWorkflowAssistant — platform tools', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 

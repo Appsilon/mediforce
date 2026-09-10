@@ -142,7 +142,18 @@ Runtimes and how each is launched are the `RUNTIME_CONFIG` map in
 | Command | `command` + a file the workflow carries, `image`, or `dockerfile` (carried, or `repo`+`commit`) | the named/built image | any shell command in that image |
 
 Every script reads `/output/input.json` and writes `/output/result.json`. The
-working directory is `/workspace` (the per-run git worktree). A third mode is
+working directory is `/workspace` (the per-run git worktree).
+
+**`/output` does not survive the step.** It is an ephemeral host-container
+channel, deleted when the step ends: what a step leaves there becomes a
+downloadable Output File and is copied into the run worktree at
+`/workspace/.mediforce/output/<stepId>/<file>`. The next step starts with an
+empty `/output`, so a step reading `/output/<file>` from an earlier step fails
+with `FileNotFoundError`. A file handed from one step to the next is written to
+`/output` (so it is kept and downloadable) and read from
+`/workspace/.mediforce/output/<producing-step-id>/<file>`, which every container
+mounts. Small values need no file at all: `result.json` is the step's output and
+later steps read it as `${steps.<id>.<field>}`. A third mode is
 `plugin: databricks-job`, which requires step-level `databricks`
 (`DatabricksJobConfigSchema`) instead of `script`.
 
@@ -150,6 +161,13 @@ working directory is `/workspace` (the per-run git worktree). A third mode is
 already reachable in the container: **carried by the workflow** and mounted at
 `/artifacts`, baked into the image, present at `/workspace` (via
 `workspace.remote`), or self-contained (`python3 -c "..."`).
+
+A carried `Dockerfile` starts from the language's own image (`python:3.12-slim`,
+`node:22-slim`, `rocker/r-ver:4.4`), not a bare OS image: a distribution's
+system Python is externally managed and `pip install` into it fails. Where a
+different base is unavoidable, install into an environment the image makes
+itself — a `venv` on the PATH, `renv`, a local `node_modules` — rather than
+globally.
 
 To run a script *file*, the first option is to carry it: `artifacts` on the
 definition holds text files, they are mounted read-only at `/artifacts`, and a

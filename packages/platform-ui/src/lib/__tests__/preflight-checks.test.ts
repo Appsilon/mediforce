@@ -406,3 +406,44 @@ describe('runPreflightChecks — files the workflow references but does not carr
     expect(runPreflightChecks(wd, ctx).filter((w) => w.category === 'missing-file')).toEqual([]);
   });
 });
+
+describe('runPreflightChecks — an input contract the first step asks for again', () => {
+  const ctx = { dockerAvailable: false, handle: 'acme', workflowName: 'test-wf' };
+
+  it('warns when a required trigger input is also a param on the entry step', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.triggerInput = [
+      { name: 'app_name', type: 'string', required: true },
+      { name: 'app_description', type: 'textarea', required: true },
+    ];
+    wd.steps[0].name = 'Collect requirements';
+    wd.steps[0].executor = 'human';
+    wd.steps[0].params = [
+      { name: 'app_name', type: 'string', required: true },
+      { name: 'app_description', type: 'textarea', required: true },
+    ];
+
+    const warning = runPreflightChecks(wd, ctx).find((w) => w.category === 'contract-collected-twice');
+    expect(warning?.resource).toBe('app_name, app_description');
+    expect(warning?.stepNames).toEqual(['Collect requirements']);
+    expect(warning?.message).toMatch(/cannot start/i);
+  });
+
+  it('says nothing when the entry step asks for something else', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.triggerInput = [{ name: 'study_id', type: 'string', required: true }];
+    wd.steps[0].executor = 'human';
+    wd.steps[0].params = [{ name: 'comment', type: 'string', required: false }];
+
+    expect(runPreflightChecks(wd, ctx).filter((w) => w.category === 'contract-collected-twice')).toEqual([]);
+  });
+
+  it('says nothing when the duplicated field is optional, since the run can still start', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.triggerInput = [{ name: 'app_name', type: 'string', required: false }];
+    wd.steps[0].executor = 'human';
+    wd.steps[0].params = [{ name: 'app_name', type: 'string', required: true }];
+
+    expect(runPreflightChecks(wd, ctx).filter((w) => w.category === 'contract-collected-twice')).toEqual([]);
+  });
+});

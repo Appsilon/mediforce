@@ -34,14 +34,7 @@ function preprocessJsonStringObject(val: unknown): unknown {
 // with hand-editing — including `stepParams`, which is not the legacy bag its
 // old comment claimed: `execute-agent-step` merges it into the agent's input
 // context, under `appContext`.
-/**
- * The build fields the assistant does not author. A repository build context is
- * the user's to set in the step editor: the assistant carries its files, and a
- * model asked for a step that needs dependencies will otherwise write a
- * plausible-looking repo URL and a placeholder SHA — a build that can never run.
- * Dropped rather than rejected, so a model that writes them anyway still gets a
- * usable step instead of a rejected call it retries until the turn dies.
- */
+// The build fields the assistant does not author.
 function withoutRepoBuildFields<T extends z.ZodTypeAny>(schema: T) {
   return z.preprocess((value) => {
     if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
@@ -101,14 +94,7 @@ const PRESET_BY_ID = new Map(BLOCK_PRESETS.map((preset) => [preset.id, preset]))
 // entries and that their ids are unique.
 const BLOCK_PRESET_IDS = BLOCK_PRESETS.map((preset) => preset.id) as [string, ...string[]];
 
-/**
- * Merge a named block preset underneath the call's own fields.
- *
- * This is what makes "the same block whether the user clicked it or asked for it"
- * a property of the code rather than an instruction in the prompt: `presetId`
- * resolves to the exact payload the Add Block panel inserts, and anything the
- * assistant states explicitly (a name, a real recipient) still wins over it.
- */
+// Merge a named block preset underneath the call's own fields.
 function resolvePreset(val: unknown): unknown {
   if (val === null || typeof val !== 'object' || Array.isArray(val)) return val;
   const call = val as Record<string, unknown>;
@@ -145,17 +131,7 @@ export const RemoveStepToolSchema = z.object({
 });
 export type RemoveStepTool = z.infer<typeof RemoveStepToolSchema>;
 
-/**
- * The workflow level, which no tool could reach: all three step tools are
- * step-scoped, so a request like "make the study ID a required input" or "add
- * these house rules to every agent step" had no way to land however it was
- * phrased.
- *
- * Patch semantics — a call naming one field leaves the others alone, so the
- * assistant can answer "also set the preamble" without re-sending `env`.
- * `name` is excluded: renaming a registered workflow is a different operation
- * from editing a draft version, and the canvas cannot do it either.
- */
+// The workflow level, which no tool could reach: all three step tools are step-scoped, so a request like "make the study ID a required input" or "add these house rules to every agent step" had no way to land however it was phrased.
 export const UpdateWorkflowToolSchema = WorkflowAuthorableSchema.omit({
   name: true,
   steps: true,
@@ -168,15 +144,7 @@ export const UpdateWorkflowToolSchema = WorkflowAuthorableSchema.omit({
 }).partial();
 export type UpdateWorkflowTool = z.infer<typeof UpdateWorkflowToolSchema>;
 
-/**
- * Conditional routing. `when` is evaluated by the transition-resolver's own
- * expression language — not the `${...}` interpolation steps use — and the
- * canvas preserves it on rewire and renders it as an edge label, but no control
- * could write it.
- *
- * Omitting `when` clears the condition, which is how an edge goes back to
- * unconditional.
- */
+// Conditional routing.
 export const SetTransitionConditionToolSchema = z.object({
   from: z.string().min(1),
   to: z.string().min(1),
@@ -184,16 +152,15 @@ export const SetTransitionConditionToolSchema = z.object({
 });
 export type SetTransitionConditionTool = z.infer<typeof SetTransitionConditionToolSchema>;
 
-/**
- * Write one file the workflow carries: a script a step runs, a Dockerfile its
- * image is built from, a SKILL.md an agent reads. Upserts by path, so changing
- * one file does not mean resending the rest — a model that has to resend
- * everything eventually drops something, and these files are what a run
- * executes.
- *
- * The path is validated the same way the definition validates it, so a file
- * that could not be written is refused when the assistant proposes it.
- */
+// Remove one edge between two steps.
+export const RemoveTransitionToolSchema = z.object({
+  from: z.string().min(1),
+  to: z.string().min(1),
+  when: z.string().min(1).optional(),
+});
+export type RemoveTransitionTool = z.infer<typeof RemoveTransitionToolSchema>;
+
+// Write one file the workflow carries: a script a step runs, a Dockerfile its image is built from, a SKILL.md an agent reads.
 export const WriteWorkflowFileToolSchema = WorkflowArtifactSchema;
 export type WriteWorkflowFileTool = z.infer<typeof WriteWorkflowFileToolSchema>;
 
@@ -210,6 +177,7 @@ export const WORKFLOW_ASSISTANT_TOOLS = {
   remove_step: RemoveStepToolSchema,
   update_workflow: UpdateWorkflowToolSchema,
   set_transition_condition: SetTransitionConditionToolSchema,
+  remove_transition: RemoveTransitionToolSchema,
   write_workflow_file: WriteWorkflowFileToolSchema,
   remove_workflow_file: RemoveWorkflowFileToolSchema,
 } as const;
@@ -228,6 +196,7 @@ export const WorkflowAssistantToolCallSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('remove_step'), arguments: RemoveStepToolSchema }),
   z.object({ tool: z.literal('update_workflow'), arguments: UpdateWorkflowToolSchema }),
   z.object({ tool: z.literal('set_transition_condition'), arguments: SetTransitionConditionToolSchema }),
+  z.object({ tool: z.literal('remove_transition'), arguments: RemoveTransitionToolSchema }),
   z.object({ tool: z.literal('write_workflow_file'), arguments: WriteWorkflowFileToolSchema }),
   z.object({ tool: z.literal('remove_workflow_file'), arguments: RemoveWorkflowFileToolSchema }),
 ]);

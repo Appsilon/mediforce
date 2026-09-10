@@ -336,12 +336,121 @@ describe('applyWorkflowAssistantToolCalls — carry-over between runs', () => {
   });
 });
 
-describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not carry', () => {
-  it('says to write the file, rather than leaving a step that cannot build', () => {
-    // The failure this replaces: the model names `container/Dockerfile`, no
-    // file exists, and the step registers with nothing to build from. The
-    // message names the tool that fixes it, in the model's own vocabulary.
+describe('applyWorkflowAssistantToolCalls — a Dockerfile an imported workflow builds from git', () => {
+  it('keeps it on a step that pins repo and commit, which is where that file lives', () => {
+    const canvas = baseCanvas();
+    const withGitBuild: typeof canvas.steps = canvas.steps.map((step) => (step.id === 'draft'
+      ? {
+        ...step,
+        executor: 'script' as const,
+        plugin: 'script-container',
+        script: {
+          command: 'python3 validate.py',
+          dockerfile: 'container/Dockerfile',
+          repo: 'https://github.com/acme/pipelines.git',
+          commit: 'a'.repeat(40),
+        },
+      }
+      : step));
+    const { steps } = applyWorkflowAssistantToolCalls(
+      withGitBuild, canvas.transitions,
+      [{ tool: 'update_step', arguments: { stepId: 'draft', name: 'Validate the extract' } }],
+    );
+    const draft = steps.find((step) => step.id === 'draft');
+    expect(draft?.executor === 'script' ? draft.script?.dockerfile : undefined).toBe('container/Dockerfile');
+  });
+
+  it('keeps it when the workflow takes its files from an external repo', () => {
+    const canvas = baseCanvas();
+    const withRepoFiles: typeof canvas.steps = canvas.steps.map((step) => (step.id === 'draft'
+      ? { ...step, executor: 'agent' as const, plugin: 'claude-code-agent', agent: { dockerfile: 'container/Dockerfile' } }
+      : step));
+    const { steps } = applyWorkflowAssistantToolCalls(
+      withRepoFiles, canvas.transitions,
+      [{ tool: 'update_step', arguments: { stepId: 'draft', name: 'Interpret' } }],
+      { externalSkillsRepo: { url: 'https://github.com/acme/pipelines.git', commit: 'b'.repeat(40) } },
+    );
+    const draft = steps.find((step) => step.id === 'draft');
+    expect(draft?.executor === 'agent' ? draft.agent?.dockerfile : undefined).toBe('container/Dockerfile');
+  });
+});
+
+describe('applyWorkflowAssistantToolCalls — removing a transition', () => {
+  it('drops the edge it names', () => {
+    const canvas = baseCanvas();
+    const { transitions, outcomes } = applyWorkflowAssistantToolCalls(
+      canvas.steps,
+      [...canvas.transitions, { from: 'draft', to: 'done', when: 'output.ok == true' }],
+      [{ tool: 'remove_transition', arguments: { from: 'draft', to: 'done', when: 'output.ok == true' } }],
+    );
+    expect(transitions).toEqual(canvas.transitions);
+    expect(outcomes.find((outcome) => outcome.tool === 'remove_transition')?.stepId).toBe('draft → done');
+  });
+
+  it('removes every edge between the two steps when no condition is named', () => {
+    const canvas = baseCanvas();
+    const { transitions } = applyWorkflowAssistantToolCalls(
+      canvas.steps,
+      [{ from: 'draft', to: 'done' }, { from: 'draft', to: 'done', when: 'else' }],
+      [{ tool: 'remove_transition', arguments: { from: 'draft', to: 'done' } }],
+    );
+    expect(transitions.filter((t) => t.from === 'draft' && t.to === 'done')).toEqual([]);
+  });
+
+  it('reports an edge that is not there rather than pretending', () => {
+    const canvas = baseCanvas();
     const { outcomes } = applyWorkflowAssistantToolCalls(
+      canvas.steps, canvas.transitions,
+      [{ tool: 'remove_transition', arguments: { from: 'done', to: 'draft' } }],
+    );
+    expect(outcomes.find((outcome) => outcome.tool === 'remove_transition')?.error)
+      .toMatch(/no transition/i);
+  });
+});
+
+describe('applyWorkflowAssistantToolCalls — an agent step bound to an MCP server', () => {
+  it('keeps the agentId and the step restrictions, which is the only route an MCP has to a step', () => {
+    const { steps } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions,
+      [{
+        tool: 'add_step',
+        arguments: {
+          type: 'creation', executor: 'agent', name: 'File the issue',
+          agentId: 'issue-filer',
+          mcpRestrictions: { github: { denyTools: ['delete_repository'] } },
+          insertAfterId: 'draft', insertBeforeId: 'done',
+        },
+      }],
+    );
+    const added = steps.find((step) => step.name === 'File the issue');
+    expect(added?.agentId).toBe('issue-filer');
+    expect(added?.mcpRestrictions).toEqual({ github: { denyTools: ['delete_repository'] } });
+  });
+});
+
+describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not carry', () => {
+  it('keeps it when the file arrives later in the same batch', () => {
+    const { steps, outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions,
+      [
+        {
+          tool: 'add_step',
+          arguments: {
+            type: 'creation', executor: 'script', name: 'Validate',
+            insertAfterId: 'draft', insertBeforeId: 'done',
+            script: { command: 'python3 /artifacts/scripts/validate.py', dockerfile: 'container/Dockerfile' },
+          },
+        },
+        { tool: 'write_workflow_file', arguments: { path: 'container/Dockerfile', contents: 'FROM python:3.12-slim\n' } },
+      ],
+    );
+    expect(outcomes.every((outcome) => outcome.error === undefined)).toBe(true);
+    const added = steps.find((step) => step.name === 'Validate');
+    expect(added?.executor === 'script' ? added.script?.dockerfile : undefined).toBe('container/Dockerfile');
+  });
+
+  it('drops the dockerfile rather than refusing the step nothing carries a file for', () => {
+    const { steps, outcomes } = applyWorkflowAssistantToolCalls(
       baseCanvas().steps, baseCanvas().transitions,
       [{
         tool: 'add_step',
@@ -352,13 +461,15 @@ describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not
         },
       }],
     );
-    const outcome = outcomes.find((o) => o.tool === 'add_step');
-    expect(outcome?.error).toContain('container/Dockerfile');
-    expect(outcome?.error).toContain('write_workflow_file');
+    expect(outcomes.every((outcome) => outcome.error === undefined)).toBe(true);
+    const added = steps.find((step) => step.name === 'Validate');
+    expect(added?.executor === 'script' ? added.script?.dockerfile : undefined).toBeUndefined();
+    expect(added?.executor === 'script' ? added.script?.command : undefined)
+      .toBe('python3 /artifacts/scripts/validate.py');
   });
 
-  it('is silent when the workflow carries it', () => {
-    const { outcomes } = applyWorkflowAssistantToolCalls(
+  it('leaves the step alone when the workflow carries the file', () => {
+    const { steps, outcomes } = applyWorkflowAssistantToolCalls(
       baseCanvas().steps, baseCanvas().transitions,
       [{
         tool: 'add_step',
@@ -370,6 +481,82 @@ describe('applyWorkflowAssistantToolCalls — a Dockerfile the workflow does not
       }],
       { artifacts: [{ path: 'Dockerfile', contents: 'FROM python:3.12-slim\n' }] },
     );
-    expect(outcomes.find((o) => o.tool === 'add_step')?.error).toBeUndefined();
+    expect(outcomes.find((outcome) => outcome.tool === 'add_step')?.error).toBeUndefined();
+    const added = steps.find((step) => step.name === 'Validate');
+    expect(added?.executor === 'script' ? added.script?.dockerfile : undefined).toBe('Dockerfile');
+  });
+
+  it('leaves a step the batch never touched alone', () => {
+    const canvas = baseCanvas();
+    const withBuild: typeof canvas.steps = canvas.steps.map((step) => (step.id === 'draft'
+      ? { ...step, executor: 'script' as const, plugin: 'script-container', script: { command: 'python3 run.py', dockerfile: 'container/Dockerfile' } }
+      : step));
+    const { steps } = applyWorkflowAssistantToolCalls(
+      withBuild, canvas.transitions,
+      [{ tool: 'update_workflow', arguments: { preamble: 'House rules.' } }],
+    );
+    const draft = steps.find((step) => step.id === 'draft');
+    expect(draft?.executor === 'script' ? draft.script?.dockerfile : undefined).toBe('container/Dockerfile');
+  });
+});
+
+describe('applyWorkflowAssistantToolCalls — a condition on an edge the batch replaced', () => {
+  it('puts the condition on the edge that replaced it, rather than refusing', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'add_step', arguments: { clientId: 'validate', type: 'creation', executor: 'script', name: 'Validate', insertAfterId: 'draft', insertBeforeId: 'done' } },
+      { tool: 'set_transition_condition', arguments: { from: 'draft', to: 'done', when: 'output.newFiles > 0' } },
+    ];
+    const { transitions, outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions, calls,
+    );
+    const outcome = outcomes.find((o) => o.tool === 'set_transition_condition');
+    expect(outcome?.error).toBeUndefined();
+    expect(transitions).toContainEqual({ from: 'draft', to: 'validate', when: 'output.newFiles > 0' });
+    expect(outcome?.stepId).toBe('draft → validate');
+  });
+
+  it('refuses when the step branches, because then it would be a guess', () => {
+    const canvas = {
+      steps: [
+        { id: 'draft', name: 'Draft', type: 'creation' as const, executor: 'human' as const },
+        { id: 'left', name: 'Left', type: 'creation' as const, executor: 'human' as const },
+        { id: 'right', name: 'Right', type: 'creation' as const, executor: 'human' as const },
+        { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
+      ],
+      transitions: [
+        { from: 'draft', to: 'left' },
+        { from: 'draft', to: 'right' },
+        { from: 'left', to: 'done' },
+        { from: 'right', to: 'done' },
+      ],
+    };
+    const { outcomes } = applyWorkflowAssistantToolCalls(canvas.steps, canvas.transitions, [
+      { tool: 'set_transition_condition', arguments: { from: 'draft', to: 'done', when: 'x == 1' } },
+    ]);
+    const error = outcomes.find((o) => o.tool === 'set_transition_condition')?.error;
+    expect(error).toContain('draft → left');
+    expect(error).toContain('draft → right');
+  });
+
+  it('says so plainly when the step has no outgoing edge at all', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'set_transition_condition', arguments: { from: 'done', to: 'draft', when: 'x == 1' } },
+    ];
+    const { outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions, calls,
+    );
+    expect(outcomes.find((o) => o.tool === 'set_transition_condition')?.error)
+      .toContain('nothing leaves "done"');
+  });
+
+  it('still names an unknown step as unknown', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'set_transition_condition', arguments: { from: 'ghost', to: 'done', when: 'x == 1' } },
+    ];
+    const { outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions, calls,
+    );
+    expect(outcomes.find((o) => o.tool === 'set_transition_condition')?.error)
+      .toContain('"ghost" is not a step');
   });
 });

@@ -14,9 +14,8 @@ workflow MUST satisfy, see
 ## Pick an authoring path
 
 The product states this same fork: **Ways to author**, in the Workflow Designer
-toolbar, names each path with a reason to pick it and the first move it takes —
-including the clone and the `/design-workflow` invocation, which are useless as
-a name alone. It is the summary of the sections below, worded in
+toolbar, names each path with a reason to pick it and the first move it takes.
+It is the summary of the sections below, worded in
 [`authoring-paths.ts`](../../packages/platform-ui/src/lib/authoring-paths.ts);
 change one, change the other. Its footer opens this file on GitHub
 (`CREATE_WORKFLOW_URL` in
@@ -60,7 +59,9 @@ placing and wiring blocks by hand.
   asks only what it genuinely cannot infer — each question carrying the answer
   it would otherwise have used, so agreeing is one click. Nothing to ask means
   it says the plan and starts. While it builds, the pane shows the phases that
-  planning turn named for *this* workflow, with the seconds elapsed.
+  planning turn named for *this* workflow, with the time elapsed, and a stop
+  button beside them ends the turn — the request is aborted, and nothing is applied,
+  since the canvas only changes when a turn returns.
 - **Validation & retry.** Every proposed change is validated against the same
   graph, reference, and schema gates as registration before it is applied; if the
   result would be invalid the assistant is told why and retries, so it does not
@@ -73,44 +74,18 @@ placing and wiring blocks by hand.
 
 ### Agent — the `/design-workflow` skill
 
-Run the [`design-workflow`](../../skills/design-workflow/SKILL.md) skill. It is the
-agent form of Workflow Designer: same intelligence, driven against the
-checked-out source instead of a live UI. Invoke it with `/design-workflow` (or
-just ask an agent to "design a workflow" / "author a workflow"), then follow the
-interview.
+Deprecated for authoring. The skill exists for one reason: the canvas could not
+author the *package* — the scripts a step runs, the Dockerfile its image is
+built from, the skills its agents read — so anything past an inline script meant
+a git checkout, a second tool and a CLI hand-off.
 
-What the skill does for you:
-
-1. **Loads the authority first.** It reads the capability map, `CONTEXT.md`
-   glossary, the golden rules, and the `docs/workflow-examples/` files before
-   proposing structure — so it authors from the source of truth, not from
-   memory.
-2. **Picks a mode.** `create-new` from an idea, or `edit-existing` when you
-   point it at a folder that already contains a `src/*.wd.json` (it recaps the
-   current workflow before touching it).
-3. **Interviews and challenges.** One question at a time, it steers the design
-   toward the golden standards — pushing back when a step should be a `script`
-   or `action` rather than an `agent`, when the whole thing needs no workflow at
-   all, and when substantial script code should move from inline to a pinned
-   command. It ends with a written spec recap you confirm before any files are
-   generated.
-4. **Generates the package.** The `.wd.json` plus `README.md`, `workflows-index.json`,
-   and
-   only the `Dockerfile` / `scripts/` / `skills/` / `setup/` the design actually
-   needs, in the canonical repo layout. It is honest about three tiers:
-   schema-validated (`.wd.json`), templated-but-not-runtime-verified (infra),
-   and MANUAL platform setup (Tool Catalog, Agent Definitions, secrets).
-5. **Validates against this checkout.** Runs the `register --dry-run` schema
-   check, verifies the Dockerfile build context, syntax-checks every generated
-   script, and runs a behavior test per non-trivial script (persisting tests
-   under `tests/`).
-6. **Pins runtime sources and hands off.** Fills each `commit` with an all-zeros
-   sentinel until you commit once and give it the real SHA, which it edits in —
-   then reports the files written, the MANUAL setup left, and the register /
-   import / UI commands filled in with your values.
-
-The skill does **not** run `git commit` / `push` for you and never targets
-production — you own the commit and the SHA.
+A workflow carries those files itself now
+([container-steps.md](../reference/container-steps.md)), the **Files** panel
+edits and uploads them, and the AI Assistant writes them, challenges the design
+and sets up the agents and Tool Catalog entries a workflow needs. Reach for the
+skill only for what still lives in a repository: generating a whole package into
+the canonical layout, running the behaviour tests it writes under `tests/`, and
+pinning `commit` SHAs. It is no longer listed in **Ways to author**.
 
 ### By hand — blocks on the canvas
 

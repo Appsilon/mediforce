@@ -7,7 +7,13 @@ export interface PreflightAction {
 }
 
 export interface PreflightWarning {
-  category: 'missing-image' | 'missing-secret' | 'missing-file' | 'low-credits' | 'unknown-model';
+  category:
+    | 'missing-image'
+    | 'missing-secret'
+    | 'missing-file'
+    | 'low-credits'
+    | 'unknown-model'
+    | 'contract-collected-twice';
   resource: string;
   stepNames: string[];
   message: string;
@@ -191,6 +197,25 @@ export function runPreflightChecks(
       stepNames,
       message: `Image '${image}' not found on platform`,
       actions,
+    });
+  }
+
+  // `triggerInput` is the workflow's total contract and is checked before a run starts, so a required field there cannot be gathered by a step later: the run is refused with "Invalid payload" before anyone reaches that step.
+  const entryStep = steps[0];
+  const collectedTwice = (definition.triggerInput ?? [])
+    .filter((field) => field.required === true)
+    .filter((field) => (entryStep?.params ?? []).some((param) => param.name === field.name))
+    .map((field) => field.name);
+  if (collectedTwice.length > 0 && entryStep !== undefined) {
+    warnings.push({
+      category: 'contract-collected-twice',
+      resource: collectedTwice.join(', '),
+      stepNames: [entryStep.name],
+      message: `The run cannot start without ${collectedTwice.join(', ')}, which '${entryStep.name}' asks for again. Either supply ${collectedTwice.length === 1 ? 'it' : 'them'} when starting the run, or make ${collectedTwice.length === 1 ? 'it' : 'them'} optional in the input contract and let the step collect ${collectedTwice.length === 1 ? 'it' : 'them'}.`,
+      actions: [{
+        label: 'Edit the input contract',
+        href: `/${options.handle}/workflows/${encodedName}?tab=triggers`,
+      }],
     });
   }
 

@@ -207,8 +207,14 @@ Example: [`06-env-secrets-databricks.wd.json`](../workflow-examples/06-env-secre
 Installing an MCP executable in Docker makes it runnable. It does not make it
 visible, reviewable, scoped, or auditable in Mediforce.
 
-`MANUAL`: a workflow can reference `agentId` and `mcpRestrictions`, but Tool
-Catalog entries and Agent Definition MCP bindings are platform setup.
+`MANUAL` for the `/design-workflow` skill: a package it generates can reference
+`agentId` and `mcpRestrictions`, but the Tool Catalog entry and the Agent
+Definition binding are platform setup a person does. The in-app **AI Assistant**
+does both itself, as the person asking: it lists the catalog, lists the agents
+with the servers each is bound to, reuses one or creates an agent bound to the
+entry, and points the step at it with `agentId`. Adding a Tool Catalog entry is
+admin-only, so a member is told who can add the server rather than being given a
+workflow that quietly has no MCP.
 
 MUST for governable MCPs:
 

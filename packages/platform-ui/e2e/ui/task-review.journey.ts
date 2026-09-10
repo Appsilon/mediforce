@@ -30,7 +30,7 @@ test.describe('Task Review Journey', () => {
   test('reviewer approves a task and sees confirmation', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-review-target`);
-    await expect(page.getByText(/Human Review/)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/Human Review/).first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/pending/i)).toBeVisible();
 
     // Previous Step Output panel is open by default; both Report and Extracted

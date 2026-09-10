@@ -66,16 +66,14 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/continueOnError/);
   });
 
-  it('tells the model it cannot create triggers and to direct schedule/webhook requests to the Triggers tab', () => {
-    expect(prompt).toMatch(/can't create triggers/i);
-    expect(prompt).toMatch(/Triggers\*\* tab|Triggers tab|trigger-add/);
-    expect(prompt).toMatch(/\$\{triggerPayload\./);
+  it('declines webhooks the same way, and still reads trigger inputs in steps', () => {
+    expect(prompt).toMatch(/covers webhooks, which you cannot create at any time/);
+    expect(prompt).toMatch(/\$\{triggerPayload\.<field>\}/);
   });
 
-  it('warns that the inline script runtime is stdlib-only and to prefer an agent step for third-party packages', () => {
-    expect(prompt).toMatch(/standard-library-only/i);
+  it('warns that the inline script runtime carries no third-party packages', () => {
+    expect(prompt).toMatch(/the standard library and nothing else/i);
     expect(prompt).toMatch(/ModuleNotFoundError/);
-    expect(prompt).toMatch(/Prefer an `agent` step for anything needing third-party packages/);
   });
 
   it('tells the model a large build may span several turns and cut-off steps are kept', () => {
@@ -104,6 +102,58 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
   it('requires secrets to be referenced with {{SECRET_NAME}} in a step env, not ${secrets.X}', () => {
     expect(prompt).toMatch(/referenced with `\{\{SECRET_NAME\}\}` in a step's `env` map — never `\$\{secrets\.NAME\}`/);
     expect(prompt).toMatch(/"HARVEST_API_KEY": "\{\{HARVEST_API_KEY\}\}"/);
+  });
+
+  it('never sends the reader to a terminal: no CLI, no git, no repo paths', () => {
+    expect(prompt).toMatch(/never name a command for them to run/i);
+    expect(prompt).toMatch(/never quote their instructions back/i);
+  });
+
+  it('sends any third-party package to a carried file plus a Dockerfile, in every language', () => {
+    expect(prompt).toMatch(/standard library/i);
+    expect(prompt).toMatch(/write_workflow_file/);
+    expect(prompt).toMatch(/pandas/);
+    expect(prompt).not.toMatch(/pip", "install"/);
+    expect(prompt).toMatch(/python:3\.12-slim/);
+    expect(prompt).toMatch(/rocker\/r-ver/);
+    expect(prompt).toMatch(/externally managed/i);
+    expect(prompt).toMatch(/venv/);
+  });
+
+  it('says how a file crosses from one step to the next, since /output does not survive', () => {
+    expect(prompt).toMatch(/\/workspace\/\.mediforce\/output\//);
+    expect(prompt).toMatch(/wiped|deleted|does not survive/i);
+  });
+
+  it('names the tool that removes an edge, and says a stale defect is not yours to hide', () => {
+    expect(prompt).toMatch(/remove_transition/);
+    expect(prompt).toMatch(/already had|arrived with/i);
+  });
+
+  it('never asks for the same field twice, as a trigger input and as an entry-step param', () => {
+    expect(prompt).toMatch(/never both/i);
+    expect(prompt).toMatch(/Invalid payload/);
+  });
+
+  it('declines an unschedulable request in one sentence rather than explaining the workaround', () => {
+    expect(prompt).toMatch(/create_cron_trigger/);
+    expect(prompt).toMatch(/the whole answer is one sentence/i);
+    expect(prompt).toMatch(/Do not describe the Triggers tab/);
+    expect(prompt).toMatch(/never a command/);
+  });
+
+  it('checks a role exists before leaning on it, and points at Settings for granting one', () => {
+    expect(prompt).toMatch(/list_roles/);
+    expect(prompt).toMatch(/Settings → Members/);
+    expect(prompt).toMatch(/nobody holds it yet/i);
+    expect(prompt).toMatch(/Access\*\* tab/);
+  });
+
+  it('states the only route an MCP server has to a step: a saved agent the step names with agentId', () => {
+    expect(prompt).toMatch(/`agentId`/);
+    expect(prompt).toMatch(/no MCP at all|reaches no MCP|gets no MCP/i);
+    expect(prompt).toMatch(/list_tool_catalog/);
+    expect(prompt).toMatch(/mcpRestrictions/);
   });
 
   it('documents that update_step can connect an already-existing step, and that every response is graph-checked before finishing', () => {
@@ -221,5 +271,22 @@ describe('buildWorkflowAssistantSystemPrompt — who does a human step', () => {
   it('keeps assignedTo for an identity the run genuinely knows', () => {
     expect(prompt).toMatch(/triggerPayload\.userId/);
     expect(prompt).toMatch(/set the role and say which role you used/);
+  });
+});
+
+describe('buildWorkflowAssistantSystemPrompt — conditions and splicing', () => {
+  const prompt = buildWorkflowAssistantSystemPrompt();
+
+  it('says inserting a step replaces the edge that joined the two', () => {
+    expect(prompt).toMatch(/replaces the edge that joined them/);
+  });
+
+  it('says naming the old edge is fine when the step has one way out', () => {
+    expect(prompt).toMatch(/fine when the step you condition has one way out/);
+    expect(prompt).toMatch(/refused only when the step branches/);
+  });
+
+  it('tells it never to re-add an edge it just split', () => {
+    expect(prompt).toMatch(/that splits the graph again/);
   });
 });

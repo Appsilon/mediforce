@@ -13,17 +13,61 @@ function buildScope(overrides: Record<string, unknown> = {}): CallerScope {
     agentDefinitions: {
       list: vi.fn().mockResolvedValue([
         { id: 'agent-1', name: 'Validator', description: 'Validates', foundationModel: 'anthropic/claude-sonnet-4.6', namespace: 'acme' },
+        {
+          id: 'agent-2',
+          name: 'Issue filer',
+          description: 'Files issues',
+          foundationModel: 'anthropic/claude-sonnet-4.6',
+          namespace: 'acme',
+          mcpServers: {
+            github: { type: 'stdio', catalogId: 'github' },
+            docs: { type: 'http', url: 'https://mcp.example.com/docs' },
+          },
+        },
       ]),
       create: vi.fn().mockImplementation((input: Record<string, unknown>) =>
         Promise.resolve({ id: 'agent-new', ...input })),
+    },
+    workspaces: {
+      getMembers: vi.fn().mockResolvedValue([
+        { uid: 'u1', role: 'owner', joinedAt: '2026-01-01' },
+        { uid: 'u2', role: 'member', joinedAt: '2026-01-02' },
+      ]),
+    },
+    workflowDefinitions: {
+      isNameDeleted: vi.fn().mockResolvedValue(false),
+      getDefaultVersion: vi.fn().mockResolvedValue(1),
+      listVersions: vi.fn().mockResolvedValue([{ name: 'sample-qc-check', version: 1, archived: false }]),
+      get: vi.fn().mockResolvedValue({ name: 'sample-qc-check', version: 1, namespace: 'acme', steps: [], transitions: [] }),
+    },
+    triggers: {
+      listByWorkflow: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockImplementation((row: Record<string, unknown>) => Promise.resolve(row)),
     },
     toolCatalog: {
       list: vi.fn().mockResolvedValue([
         { id: 'github', command: 'npx', args: ['-y', 'mcp-github'], description: 'GitHub MCP' },
       ]),
     },
-    system: { audit: { append: vi.fn().mockResolvedValue(undefined) } },
-    caller: { kind: 'user', userId: 'u1', email: 'someone@example.com' },
+    system: {
+      audit: { append: vi.fn().mockResolvedValue(undefined) },
+      userDirectory: {
+        getUserMetadata: vi.fn().mockResolvedValue({ email: 'a@b.com', displayName: 'A', lastSignInTime: null }),
+        getGrantsForUser: vi.fn().mockImplementation((uid: string) => Promise.resolve(
+          uid === 'u1'
+            ? [{ role: 'data-manager', workflowName: null }, { role: 'reviewer', workflowName: null }]
+            : [{ role: 'reviewer', workflowName: null }],
+        )),
+      },
+    },
+    caller: {
+      kind: 'user',
+      userId: 'u1',
+      email: 'someone@example.com',
+      namespaces: new Set(['acme']),
+      namespaceRoles: new Map([['acme', 'owner']]),
+      isSystemActor: false,
+    },
     ...overrides,
   } as unknown as CallerScope;
 }
@@ -38,16 +82,52 @@ describe('runPlatformTool', () => {
     expect(JSON.stringify(result)).not.toContain('sk-live-abc');
   });
 
-  it('lists the agents a step could point at', async () => {
+  it('lists the agents a step could point at, with the MCP servers each is bound to', async () => {
     const result = await runPlatformTool('list_agents', {}, buildScope(), 'acme');
     expect(result).toEqual({
-      agents: [{ id: 'agent-1', name: 'Validator', description: 'Validates', foundationModel: 'anthropic/claude-sonnet-4.6' }],
+      agents: [
+        { id: 'agent-1', name: 'Validator', description: 'Validates', foundationModel: 'anthropic/claude-sonnet-4.6' },
+        {
+          id: 'agent-2',
+          name: 'Issue filer',
+          description: 'Files issues',
+          foundationModel: 'anthropic/claude-sonnet-4.6',
+          mcpServers: { github: 'github', docs: 'https://mcp.example.com/docs' },
+        },
+      ],
     });
   });
 
   it('lists the tool catalog an agent can bind to', async () => {
     const result = await runPlatformTool('list_tool_catalog', {}, buildScope(), 'acme');
     expect(result).toEqual({ servers: [{ id: 'github', description: 'GitHub MCP' }] });
+  });
+
+  it('lists the roles this workspace grants, with how many people hold each', async () => {
+    const result = await runPlatformTool('list_roles', {}, buildScope(), 'acme');
+    expect(result).toEqual({
+      roles: [
+        { role: 'data-manager', heldBy: 1 },
+        { role: 'reviewer', heldBy: 2 },
+      ],
+    });
+  });
+
+  it('puts a saved workflow on a schedule', async () => {
+    const scope = buildScope();
+    const result = await runPlatformTool(
+      'create_cron_trigger',
+      { schedule: '0 9 * * 1' },
+      scope,
+      'acme',
+      'sample-qc-check',
+    );
+    expect(result).toEqual({ created: { name: 'schedule', schedule: '0 9 * * 1' } });
+  });
+
+  it('says a schedule needs a saved workflow, rather than failing the turn', async () => {
+    const result = await runPlatformTool('create_cron_trigger', { schedule: '0 9 * * 1' }, buildScope(), 'acme');
+    expect(result).toMatchObject({ needsSave: true });
   });
 
   it('creates an agent in the workspace being worked in', async () => {

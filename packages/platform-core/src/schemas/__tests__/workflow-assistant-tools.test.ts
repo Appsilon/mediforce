@@ -239,6 +239,7 @@ describe('WORKFLOW_ASSISTANT_TOOLS', () => {
     expect(Object.keys(WORKFLOW_ASSISTANT_TOOLS).sort()).toEqual([
       'add_step',
       'remove_step',
+      'remove_transition',
       'remove_workflow_file',
       'set_transition_condition',
       'update_step',

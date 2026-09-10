@@ -4,6 +4,8 @@ import type { CallerScope } from '../../../repositories/index';
 import { HandlerError } from '../../../errors';
 import { createAgent } from '../../agents/create-agent';
 import { createToolCatalogEntry } from '../../tool-catalog/create-entry';
+import { createTrigger } from '../../triggers/manage-triggers';
+import { listNamespaceMembers } from '../../users/list-members';
 
 /**
  * Runs one platform tool for the assistant, as the person who asked.
@@ -19,6 +21,8 @@ export async function runPlatformTool(
   rawArguments: unknown,
   scope: CallerScope,
   namespace: string,
+  // The saved workflow the canvas is a version of.
+  workflowName?: string,
 ): Promise<unknown> {
   if (!isPlatformToolName(toolName)) {
     const valid = Object.keys(WORKFLOW_ASSISTANT_PLATFORM_TOOLS).join(', ');
@@ -45,12 +49,19 @@ export async function runPlatformTool(
       case 'list_agents': {
         const agents = await scope.agentDefinitions.list(namespace);
         return {
-          agents: agents.map((agent) => ({
-            id: agent.id,
-            name: agent.name,
-            description: agent.description,
-            foundationModel: agent.foundationModel,
-          })),
+          agents: agents.map((agent) => {
+            // The MCP servers each agent is bound to, named by what a binding points at: a catalog id for stdio, the URL for http.
+            const bindings = Object.entries(agent.mcpServers ?? {}).map(
+              ([name, binding]) => [name, binding.type === 'stdio' ? binding.catalogId : binding.url] as const,
+            );
+            return {
+              id: agent.id,
+              name: agent.name,
+              description: agent.description,
+              foundationModel: agent.foundationModel,
+              ...(bindings.length === 0 ? {} : { mcpServers: Object.fromEntries(bindings) }),
+            };
+          }),
         };
       }
       case 'list_tool_catalog': {
@@ -78,6 +89,41 @@ export async function runPlatformTool(
           iconName: 'bot',
         }, scope);
         return { created: { id: agent.id, name: agent.name } };
+      }
+      case 'list_roles': {
+        // Read from the roster rather than a role table: a role exists in this workspace exactly when somebody has been granted it.
+        const { members } = await listNamespaceMembers({ namespace }, scope);
+        const holders = new Map<string, number>();
+        for (const member of members) {
+          for (const grant of member.grants) {
+            holders.set(grant.role, (holders.get(grant.role) ?? 0) + 1);
+          }
+        }
+        return {
+          roles: [...holders.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([role, heldBy]) => ({ role, heldBy })),
+        };
+      }
+      case 'create_cron_trigger': {
+        const input = parsed.data as z.infer<typeof WORKFLOW_ASSISTANT_PLATFORM_TOOLS['create_cron_trigger']>;
+        if (workflowName === undefined) {
+          // A trigger attaches to a registered workflow, and this canvas has never been saved.
+          return {
+            error: 'A schedule attaches to a saved workflow, and this one has never been saved. Tell them plainly: the schedule cannot be attached yet and will not take effect until the workflow is saved at least once, and you will add it as soon as they save.',
+            needsSave: true,
+          };
+        }
+        const { trigger } = await createTrigger({
+          namespace,
+          definitionName: workflowName,
+          triggerName: input.name ?? 'schedule',
+          type: 'cron',
+          schedule: input.schedule,
+          enabled: true,
+          ...(input.payload === undefined ? {} : { payload: input.payload }),
+        }, scope);
+        return { created: { name: trigger.name, schedule: input.schedule } };
       }
       case 'create_tool_catalog_entry': {
         const input = parsed.data as z.infer<typeof WORKFLOW_ASSISTANT_PLATFORM_TOOLS['create_tool_catalog_entry']>;

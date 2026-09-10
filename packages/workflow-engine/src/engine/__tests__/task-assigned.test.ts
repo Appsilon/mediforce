@@ -387,6 +387,25 @@ describe('WorkflowEngine — task_assigned notification dispatch', () => {
     expect(entry?.description).toContain('data-manager@company.com');
   });
 
+  it('leaves it unassigned when there is no directory to resolve against either', async () => {
+    await processRepo.saveWorkflowDefinition(unresolvableDef);
+    const engine = new WorkflowEngine(
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      undefined,
+      notificationService,
+      humanTaskRepo,
+    );
+    const instance = await engine.createInstance('test', 'human-process-unresolvable', 1, 'user-1', 'manual', {});
+    await engine.startInstance(instance.id);
+    await engine.advanceStep(instance.id, { result: 'done' }, actor);
+
+    const tasks = humanTaskRepo.getAll();
+    expect(tasks[0].assignedUserId).toBeNull();
+    expect(tasks[0].status).toBe('pending');
+  });
+
   it('still pre-assigns when the address does resolve to a member', async () => {
     const tasks = await runTo(directoryWith(
       ['reviewer', 'uid-r1', 'reviewer@example.com'],

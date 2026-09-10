@@ -114,3 +114,84 @@ describe('validateStepGraph verdict routing', () => {
     expect(creationResult.errors.some((e) => /Step "end" is unreachable from the entry point/.test(e))).toBe(true);
   });
 });
+
+describe('validateStepGraph — a fork the engine cannot resolve', () => {
+  it('rejects two outgoing transitions when one carries no condition', () => {
+    const def = definition(
+      [step('check'), step('fix'), step('done', { type: 'terminal' })],
+      [
+        { from: 'check', to: 'fix', when: 'output.status == "bad"' },
+        { from: 'check', to: 'done' },
+        { from: 'fix', to: 'done' },
+      ],
+    );
+    const result = validateStepGraph(def);
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toMatch(/"check".*condition/i);
+    expect(result.errors.join(' ')).toMatch(/done/);
+  });
+
+  it('accepts a single unconditional transition, which is the ordinary case', () => {
+    const def = definition(
+      [step('check'), step('done', { type: 'terminal' })],
+      [{ from: 'check', to: 'done' }],
+    );
+    expect(validateStepGraph(def).valid).toBe(true);
+  });
+
+  it('accepts a fork where every branch is conditioned', () => {
+    const def = definition(
+      [step('check'), step('fix'), step('done', { type: 'terminal' })],
+      [
+        { from: 'check', to: 'fix', when: 'output.status == "bad"' },
+        { from: 'check', to: 'done', when: 'else' },
+        { from: 'fix', to: 'done' },
+      ],
+    );
+    expect(validateStepGraph(def).valid).toBe(true);
+  });
+
+  it('leaves a decision step alone: its verdicts are the routing', () => {
+    const def = definition(
+      [
+        step('review', {
+          type: 'decision',
+          verdicts: { approve: { target: 'done' }, reject: { target: 'fix' } },
+        }),
+        step('fix'),
+        step('done', { type: 'terminal' }),
+      ],
+      [
+        { from: 'review', to: 'done' },
+        { from: 'review', to: 'fix' },
+        { from: 'fix', to: 'done' },
+      ],
+    );
+    expect(validateStepGraph(def).valid).toBe(true);
+  });
+
+  it('rejects a decision step whose transitions mix conditioned and unconditioned', () => {
+    const def = definition(
+      [
+        step('test', {
+          type: 'decision',
+          verdicts: { pass: { target: 'review' }, fail: { target: 'fix' } },
+        }),
+        step('fix'),
+        step('review'),
+        step('done', { type: 'terminal' }),
+      ],
+      [
+        { from: 'test', to: 'review' },
+        { from: 'test', to: 'fix', when: 'verdict == "fail"' },
+        { from: 'fix', to: 'done' },
+        { from: 'review', to: 'done' },
+      ],
+    );
+    const result = validateStepGraph(def);
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toMatch(/"test"/);
+    expect(result.errors.join(' ')).toMatch(/some of its transitions carry a condition/i);
+  });
+
+});

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { X, HelpCircle, Save, KeyRound, Code2, FileCode, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle } from 'lucide-react';
+import { X, HelpCircle, Save, KeyRound, Code2, FileCode, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle, Square } from 'lucide-react';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import {
@@ -27,22 +27,22 @@ import { WorkflowSettingsPanel } from './workflow-settings-panel';
 import { WorkflowNotificationsPanel } from './workflow-notifications-panel';
 import { pruneWorkflowSettings } from './workflow-settings-utils';
 import type { WorkflowSettingsDraft } from './workflow-settings-utils';
+import { unheldStepRoles } from './workflow-editor-utils';
 import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
-import { mediforce, ApiError } from '@/lib/mediforce';
+import { mediforce, mediforceSilent, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { applyWorkflowAssistantToolCalls, type WorkflowAssistantToolCall } from '@mediforce/platform-core';
 import { CodeEditor } from './workflow-editor/code-editor';
 import { WorkflowFilesPanel } from './workflow-files-panel';
 import { AssistantPlan, answersMessage } from './assistant-plan';
+import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import type { PlanWorkflowBuildOutput } from '@mediforce/platform-api/contract';
+import { messagesForModel, type AssistantMessage } from '@/lib/assistant-conversation';
+import { formatDuration } from '@/lib/format';
 
-interface AssistantMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  changes?: string;
-}
 
 // Rotating status shown while the assistant works — the request is a single
 // non-streaming call, so these are indicative phases, not live server progress.
@@ -452,8 +452,23 @@ export function WorkflowEditorCanvas({
   const [assistantElapsed, setAssistantElapsed] = useState(0);
   /** Something arrived while the pane was collapsed. Cleared on opening it. */
   const [assistantUnread, setAssistantUnread] = useState(false);
+  // Whether this workspace holds the key every assistant turn needs.
+  const [assistantKeyMissing, setAssistantKeyMissing] = useState(false);
+  // The turn in flight, so the halt button can stop it.
+  const assistantAbortRef = useRef<AbortController | null>(null);
+  const heldRolesRef = useRef<string[] | null>(null);
   const assistantScrollRef = useRef<HTMLDivElement>(null);
   const assistantInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!aiPaneOpen || !namespace) return;
+    let cancelled = false;
+    // `mediforceSilent`: a probe that fails is not the person's problem, and a toast about it would be the third one this pane has learned not to raise.
+    void mediforceSilent.secrets.list({ namespace })
+      .then(({ keys }) => { if (!cancelled) setAssistantKeyMissing(keys.includes('OPENROUTER_API_KEY') === false); })
+      .catch(() => { if (!cancelled) setAssistantKeyMissing(false); });
+    return () => { cancelled = true; };
+  }, [aiPaneOpen, namespace]);
 
   useEffect(() => {
     const el = assistantInputRef.current;
@@ -492,8 +507,9 @@ export function WorkflowEditorCanvas({
   // Seeds the notifications role pick-list. Fetched here rather than threaded
   // through the pages: the canvas already knows the handle, and that panel is
   // the only consumer.
-  const { roles: workspaceRoles } = useWorkspaceRoles(namespace ?? '', {
-    enabled: rightPanelView === 'notifications',
+  const { roles: workspaceRoles, heldRoles } = useWorkspaceRoles(namespace ?? '', {
+    // Also while the assistant pane is open: a step it writes can name a role nobody holds, and the person reading the reply never opens the panel where that warning already lives.
+    enabled: rightPanelView === 'notifications' || aiPaneOpen,
     workflowName,
   });
 
@@ -501,13 +517,11 @@ export function WorkflowEditorCanvas({
   // update. Returns a success summary and any tool-call errors separately so the
   // UI never presents a failure as a confirmed change.
 
-  const assistantMessagesRef = useRef(assistantMessages);
-  assistantMessagesRef.current = assistantMessages;
-
   const settingsDraftRef = useRef(settingsDraft);
   settingsDraftRef.current = settingsDraft;
+  heldRolesRef.current = heldRoles;
 
-  const applyAssistantToolCalls = useCallback((toolCalls: WorkflowAssistantToolCall[]): { summary: string; error: string | null } => {
+  const applyAssistantToolCalls = useCallback((toolCalls: WorkflowAssistantToolCall[]): { summary: string; error: string | null; steps: WorkflowStep[] } => {
     const result = applyWorkflowAssistantToolCalls(
       editedStepsRef.current,
       editedTransitionsRef.current,
@@ -554,6 +568,8 @@ export function WorkflowEditorCanvas({
       parts.push(`removed ${paths}`);
     }
     return {
+      // The graph the reducer produced, so a caller checking whether it can be saved reads what just landed rather than waiting for the state to commit and the mirror refs to catch up a macrotask later.
+      steps: result.steps,
       summary: parts.length > 0 ? `Updated the workflow: ${parts.join(', ')}.` : '',
       error: errors.length > 0 ? errors.join(' ') : null,
     };
@@ -573,31 +589,44 @@ export function WorkflowEditorCanvas({
     },
   }), []);
 
+  // Stop the turn in flight.
+  const haltAssistant = useCallback(() => {
+    assistantAbortRef.current?.abort();
+  }, []);
+
   /**
    * The build itself. Split from sending a message so the plan can sit between
    * them: answers to the plan's questions are appended as one message, which is
    * how the build hears them without a second round of asking.
    */
-  const runAssistantBuild = useCallback(async (extra?: string) => {
+  const runAssistantBuild = useCallback(async (extra?: string, base?: AssistantMessage[]) => {
     if (assistantLoading || !namespace) return;
+    // `base` is the thread as the caller knows it.
+    const thread = base ?? assistantMessages;
     const answered = extra === undefined || extra === ''
-      ? assistantMessagesRef.current
-      : [...assistantMessagesRef.current, { role: 'user' as const, content: extra }];
+      ? thread
+      : [...thread, { role: 'user' as const, content: extra }];
     if (extra !== undefined && extra !== '') setAssistantMessages(answered);
     setAssistantPlan(null);
     setAssistantAnswers({});
     setAssistantLoading(true);
+    const controller = new AbortController();
+    assistantAbortRef.current = controller;
 
     try {
-      const result = await mediforce.assistant.ask(
+      const result = await mediforceSilent.assistant.ask(
         {
-          messages: answered,
+          messages: messagesForModel(answered),
           model: assistantModel,
           workflowDefinition: assistantWorkflowDefinition(),
+          // A trigger attaches to a saved workflow, so the assistant needs to know whether this canvas is a version of one.
+          ...(workflowName === undefined ? {} : { workflowName }),
         },
-        { namespace },
+        { namespace, signal: controller.signal },
       );
-      const applied = result.toolCalls ? applyAssistantToolCalls(result.toolCalls) : { summary: '', error: null };
+      const applied = result.toolCalls
+        ? applyAssistantToolCalls(result.toolCalls)
+        : { summary: '', error: null, steps: null };
       const replyText = result.reply || (applied.summary ? 'Done.' : '');
       setAssistantMessages((prev) => [...prev, {
         role: 'assistant',
@@ -614,24 +643,43 @@ export function WorkflowEditorCanvas({
         setAssistantMessages((prev) => [...prev, {
           role: 'assistant',
           content: `Not everything landed: ${applied.error}`,
+          narration: true,
+          tone: 'warning',
         }]);
       }
-      if (result.toolCalls) {
-        // editedStepsRef only settles one macrotask after the state update commits.
-        setTimeout(() => {
-          const issue = validateSteps(editedStepsRef.current);
-          if (issue) {
-            setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `This will not save yet: ${issue}` }]);
-          }
-        }, 0);
+      if (applied.steps !== null) {
+        const issue = validateSteps(applied.steps);
+        if (issue) {
+          setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `This will not save yet: ${issue}`, narration: true, tone: 'warning' }]);
+        }
+        // A role nobody holds is a task nobody can claim.
+        const unheld = unheldStepRoles(applied.steps, heldRolesRef.current);
+        if (unheld.length > 0) {
+          setAssistantMessages((prev) => [...prev, {
+            role: 'assistant',
+            content: `Heads up: nobody holds ${unheld.map((role) => `"${role}"`).join(', ')} in this workspace, so ${unheld.length === 1 ? 'that step' : 'those steps'} will wait until someone is granted ${unheld.length === 1 ? 'it' : 'them'} in Settings → Members.`,
+            narration: true,
+            tone: 'warning',
+          }]);
+        }
       }
     } catch (err) {
-      const description = err instanceof ApiError || err instanceof Error ? err.message : 'Failed to reach the assistant';
-      toast({ variant: 'error', title: 'Assistant error', description });
+      // Halted on purpose: said in the thread rather than as an error, because it is the outcome the person asked for.
+      if (controller.signal.aborted) {
+        setAssistantMessages((prev) => [...prev, {
+          role: 'assistant',
+          content: 'Stopped. Nothing was changed on the canvas.',
+          narration: true,
+        }]);
+      } else {
+        const description = err instanceof ApiError || err instanceof Error ? err.message : 'Failed to reach the assistant';
+        toast({ variant: 'error', title: 'Assistant error', description });
+      }
     } finally {
+      assistantAbortRef.current = null;
       setAssistantLoading(false);
     }
-  }, [assistantLoading, assistantModel, namespace, assistantWorkflowDefinition, applyAssistantToolCalls, toast]);
+  }, [assistantMessages, assistantLoading, assistantModel, namespace, assistantWorkflowDefinition, applyAssistantToolCalls, toast]);
 
   /**
    * Sending a message plans first, then builds. The plan is one short call: it
@@ -644,23 +692,42 @@ export function WorkflowEditorCanvas({
     const content = assistantInput.trim();
     if (!content || assistantLoading || assistantPlanning || !namespace) return;
 
-    const nextMessages: AssistantMessage[] = [...assistantMessagesRef.current, { role: 'user', content }];
+    const nextMessages: AssistantMessage[] = [...assistantMessages, { role: 'user', content }];
     setAssistantMessages(nextMessages);
     setAssistantInput('');
     setAssistantPlanning(true);
+    const controller = new AbortController();
+    assistantAbortRef.current = controller;
 
     let planned: PlanWorkflowBuildOutput | null = null;
+    let refusal: ApiError | null = null;
     try {
-      planned = await mediforce.assistant.plan(
-        { messages: nextMessages, model: assistantModel, workflowDefinition: assistantWorkflowDefinition() },
-        { namespace },
+      planned = await mediforceSilent.assistant.plan(
+        { messages: messagesForModel(nextMessages), model: assistantModel, workflowDefinition: assistantWorkflowDefinition() },
+        { namespace, signal: controller.signal },
       );
-    } catch {
-      // The plan is an aid, not the work: a planning call that fails must not
-      // cost the user their turn, so the build runs as it always did.
+    } catch (err) {
+      // The plan is an aid, not the work, so a plan this pane merely could not read costs nobody their turn.
+      if (err instanceof ApiError) refusal = err;
       planned = null;
     } finally {
+      assistantAbortRef.current = null;
       setAssistantPlanning(false);
+    }
+
+    // The server refused the request, and the build is the same request with a longer prompt.
+    if (refusal !== null) {
+      toast({ variant: 'error', title: 'Assistant error', description: refusal.message });
+      return;
+    }
+
+    if (controller.signal.aborted) {
+      setAssistantMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: 'Stopped. Nothing was changed on the canvas.',
+        narration: true,
+      }]);
+      return;
     }
 
     setAssistantPhases(planned !== null && planned.phases.length > 0 ? planned.phases : ASSISTANT_PHASES);
@@ -669,10 +736,14 @@ export function WorkflowEditorCanvas({
       return;
     }
     if (planned !== null && planned.plan.length > 0) {
-      setAssistantMessages((prev) => [...prev, { role: 'assistant', content: planned.plan.join('\n') }]);
+      setAssistantMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: planned.plan.map((line) => `- ${line}`).join('\n'),
+        narration: true,
+      }]);
     }
-    await runAssistantBuild();
-  }, [assistantInput, assistantLoading, assistantPlanning, assistantModel, namespace, assistantWorkflowDefinition, runAssistantBuild]);
+    await runAssistantBuild(undefined, nextMessages);
+  }, [assistantMessages, assistantInput, assistantLoading, assistantPlanning, assistantModel, namespace, assistantWorkflowDefinition, runAssistantBuild, toast]);
 
   const moveStep = useCallback((stepId: string, direction: 'up' | 'down') => {
     saveSnapshot();
@@ -987,6 +1058,18 @@ export function WorkflowEditorCanvas({
                 <span className="text-sm font-semibold shrink-0">AI Assistant</span>
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                {assistantKeyMissing && (
+                  // Pulsing, because it is the difference between the pane working and every message failing, and it sits next to controls a person is about to reach for anyway.
+                  <InstantTooltip label="OPENROUTER_API_KEY is missing from this workspace">
+                    <span
+                      tabIndex={0}
+                      className="rounded-md p-1 text-amber-600 dark:text-amber-500 animate-pulse cursor-help"
+                      aria-label="The assistant needs a key: OPENROUTER_API_KEY is not set in this workspace"
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                    </span>
+                  </InstantTooltip>
+                )}
                 <button
                   onClick={() => setAssistantSettingsOpen((prev) => !prev)}
                   className={cn(
@@ -1026,8 +1109,8 @@ export function WorkflowEditorCanvas({
                 <div className="text-sm text-muted-foreground text-center py-6 space-y-3">
                   <p>Describe the workflow you want to build, or ask a question.</p>
                   <p className="text-xs">
-                    Working in a checkout? <span className="font-mono">/design-workflow</span> authors the
-                    whole package — scripts, Dockerfile, tests — not just the canvas.
+                    It writes the steps, the routing, and the files the workflow needs —
+                    a script, a Dockerfile, a skill.
                   </p>
                 </div>
               ) : (
@@ -1047,12 +1130,25 @@ export function WorkflowEditorCanvas({
                     <div className="flex flex-col gap-1 max-w-[85%] min-w-0">
                       {message.content && (
                         <div
+                          data-tone={message.tone}
                           className={cn(
-                            'rounded-lg px-3 py-2 whitespace-pre-wrap break-words',
-                            message.role === 'user' ? 'bg-primary/10' : 'bg-muted',
+                            'rounded-lg px-3 py-2 break-words',
+                            message.role === 'user'
+                              ? 'bg-primary/10 whitespace-pre-wrap'
+                              : 'cm-assistant-reply bg-muted',
+                            // A warning is not another reply: same thread, its own colour, so it is not read past.
+                            message.tone === 'warning'
+                              && 'bg-amber-50 dark:bg-amber-950/40 border border-amber-500/40 text-amber-900 dark:text-amber-200',
                           )}
                         >
-                          {message.content}
+                          {/* The model writes markdown, so the pane renders it:
+                              printed raw, a reply with a list or `code` reached
+                              the reader as asterisks and backticks. What the
+                              person typed is left alone, since their newlines
+                              are all the structure it has. */}
+                          {message.role === 'user'
+                            ? message.content
+                            : <MarkdownPresentation content={message.content} />}
                         </div>
                       )}
                       {message.changes && (
@@ -1065,21 +1161,30 @@ export function WorkflowEditorCanvas({
                   </div>
                 ))
               )}
-              {assistantPlanning && (
+              {(assistantPlanning || assistantLoading) && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Reading what you asked for…
-                </div>
-              )}
-              {assistantLoading && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <span>{assistantPhases[assistantPhase] ?? assistantPhases[0]}</span>
-                  {assistantElapsed > 0 && (
-                    <span className="tabular-nums text-xs text-muted-foreground/70">
-                      {assistantElapsed}s
+                  {/* The phrase rotates and the counter grows a digit, so both
+                      are kept off the button: it stays put at the end of the
+                      row instead of sliding about while the turn runs. */}
+                  <span className="min-w-0 flex-1 truncate">
+                    {assistantPlanning
+                      ? 'Reading what you asked for…'
+                      : assistantPhases[assistantPhase] ?? assistantPhases[0]}
+                  </span>
+                  {assistantLoading && assistantElapsed > 0 && (
+                    <span className="shrink-0 tabular-nums text-xs text-muted-foreground/70">
+                      {formatDuration(assistantElapsed * 1000)}
                     </span>
                   )}
+                  <button
+                    onClick={haltAssistant}
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border hover:bg-muted hover:text-foreground transition-colors"
+                    title="Stop the assistant"
+                    aria-label="Stop the assistant"
+                  >
+                    <Square className="h-2 w-2 fill-current" />
+                  </button>
                 </div>
               )}
 

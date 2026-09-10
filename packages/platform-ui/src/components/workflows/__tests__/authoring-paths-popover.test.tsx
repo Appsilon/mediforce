@@ -22,24 +22,19 @@ describe('AuthoringPathsPopover (#1185)', () => {
     }
   });
 
-  it('covers the paths that live outside the browser, not only the canvas ones', () => {
+  it('covers the path that lives outside the browser', () => {
     openPopover();
 
-    // The two paths a checkout-less user cannot discover by clicking around:
-    // the agent skill and the CLI it hands off to.
-    expect(screen.getByTestId('authoring-path-agent')).toHaveTextContent('/design-workflow');
-    expect(screen.getByTestId('authoring-path-agent')).toHaveTextContent('mediforce workflow register');
     expect(screen.getByTestId('authoring-path-import')).toHaveTextContent(/git/i);
   });
 
-  it('says how to reach the agent skill, not only that it exists', () => {
+  it('sends nobody to a checkout for what the app can do', () => {
     openPopover();
 
-    // Naming the skill is useless to someone who has never cloned the repo:
-    // the entry has to carry the clone and the invocation.
-    const agent = screen.getByTestId('authoring-path-agent');
-    expect(agent).toHaveTextContent('git clone https://github.com/Appsilon/mediforce');
-    expect(agent).toHaveTextContent(/Claude Code/i);
+    expect(screen.queryByTestId('authoring-path-agent')).toBeNull();
+    expect(document.body.textContent).not.toContain('/design-workflow');
+    expect(document.body.textContent).not.toContain('git clone');
+    expect(screen.getByTestId('authoring-path-assistant')).toHaveTextContent(/a script, a Dockerfile, a skill/);
   });
 
   it('states how to start every path it names', () => {
