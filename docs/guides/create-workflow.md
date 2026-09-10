@@ -37,10 +37,12 @@ placing and wiring blocks by hand.
   assistant calls a model via OpenRouter. Without it the pane reports the missing
   key. Pick the model in the pane's settings (only tool-capable, sufficiently
   large-context models are offered).
-- **What it can change.** Steps only: it adds, updates, and removes steps (and
-  their transitions/verdicts) on the canvas. It does not edit triggers, secrets,
-  or other workspace state — set those yourself (triggers are attached after
-  registration; see below).
+- **What it can change.** The whole definition: it adds, updates and removes
+  steps (with their transitions and verdicts), sets conditional routing on an
+  edge, and writes the workflow-level fields — `triggerInput`, `preamble`,
+  `env`, `notifications`, `workspace`, `externalSkillsRepo`, `url`. It does not
+  edit secrets or other workspace state — set those yourself (triggers are
+  attached after registration; see below).
 - **Validation & retry.** Every proposed change is validated against the same
   graph, reference, and schema gates as registration before it is applied; if the
   result would be invalid the assistant is told why and retries, so it does not
@@ -129,8 +131,9 @@ For an end-to-end production-style package, read
 
 ## Define the input contract
 
-Declare the workflow's complete external input under `triggerInput` in the
-`.wd.json`. It is a strict, trigger-agnostic contract: manual forms, webhook
+Declare the workflow's complete external input under `triggerInput` — in the
+editor's **Settings** panel, by asking the AI Assistant, or in the `.wd.json`.
+It is a strict, trigger-agnostic contract: manual forms, webhook
 bodies, cron payloads, and spawned child runs all validate against it. Steps read
 validated values as `${triggerPayload.<field>}` regardless of how the Run was
 started.

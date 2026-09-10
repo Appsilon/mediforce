@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, Check, AlertTriangle } from 'lucide-react';
+import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle } from 'lucide-react';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
@@ -28,6 +28,11 @@ import { StepEditor } from './workflow-editor/step-editor';
 import { ModelPicker } from './workflow-editor/model-picker';
 import { selectBase } from './workflow-editor/step-editor-fields';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
+import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
+import { WorkflowSettingsPanel } from './workflow-settings-panel';
+import { WorkflowNotificationsPanel } from './workflow-notifications-panel';
+import { pruneWorkflowSettings } from './workflow-settings-utils';
+import type { WorkflowSettingsDraft } from './workflow-settings-utils';
 import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 import { mediforce, ApiError } from '@/lib/mediforce';
@@ -121,6 +126,10 @@ export interface WorkflowEditorCanvasProps {
   /** Applied when a pasted document carries fields outside the graph, so the
    *  source panel can round-trip a whole definition instead of refusing it. */
   onNonGraphFieldsChange?: (fields: Record<string, unknown>) => void;
+  /** The workflow-level fields the settings panel edits. Owned by the page,
+   *  which is what registers them. */
+  settingsDraft?: WorkflowSettingsDraft;
+  onSettingsChange?: (draft: WorkflowSettingsDraft) => void;
   workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
   workflowName?: string;
   namespace?: string;
@@ -159,6 +168,8 @@ export function WorkflowEditorCanvas({
   initialInputForNextRun,
   wdJsonFields,
   onNonGraphFieldsChange,
+  settingsDraft,
+  onSettingsChange,
   workflowExternalSkillsRepo,
   workflowName,
   namespace,
@@ -168,7 +179,7 @@ export function WorkflowEditorCanvas({
   stepErrors,
 }: WorkflowEditorCanvasProps) {
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
-  const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'add-block' | null>(null);
+  const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'settings' | 'notifications' | 'add-block' | null>(null);
   const [addBlockContext, setAddBlockContext] = useState<{ fromId: string; toId: string } | null>(null);
   const [aiPaneOpen, setAiPaneOpen] = useState(false);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
@@ -253,6 +264,14 @@ export function WorkflowEditorCanvas({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape closes the Advanced and Notifications panels, including from
+      // inside their own fields, which is where a person editing them is. The
+      // JSON panel is left out on purpose: closing it asks about unapplied
+      // changes first, so it cannot be dismissed by a keystroke.
+      if (e.key === 'Escape' && (rightPanelView === 'settings' || rightPanelView === 'notifications')) {
+        setRightPanelView(null);
+        return;
+      }
       // Don't hijack native undo/redo while the user is typing in a form field
       // or the JSON/code editor — this shortcut is only for the diagram's own
       // edit history.
@@ -276,7 +295,7 @@ export function WorkflowEditorCanvas({
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [undoEdit, redoEdit]);
+  }, [undoEdit, redoEdit, rightPanelView]);
 
   useEffect(() => {
     onChange?.(editedSteps, editedTransitions, editedInputForNextRun);
@@ -509,14 +528,34 @@ export function WorkflowEditorCanvas({
     return () => clearInterval(timer);
   }, [assistantLoading]);
 
+  // Seeds the notifications role pick-list. Fetched here rather than threaded
+  // through the pages: the canvas already knows the handle, and that panel is
+  // the only consumer.
+  const { roles: workspaceRoles } = useWorkspaceRoles(namespace ?? '', {
+    enabled: rightPanelView === 'notifications',
+    workflowName,
+  });
+
   // Applies the whole batch through the shared reducer in one atomic state
   // update. Returns a success summary and any tool-call errors separately so the
   // UI never presents a failure as a confirmed change.
+
+  const settingsDraftRef = useRef(settingsDraft);
+  settingsDraftRef.current = settingsDraft;
+
   const applyAssistantToolCalls = useCallback((toolCalls: WorkflowAssistantToolCall[]): { summary: string; error: string | null } => {
-    const result = applyWorkflowAssistantToolCalls(editedStepsRef.current, editedTransitionsRef.current, toolCalls);
+    const result = applyWorkflowAssistantToolCalls(
+      editedStepsRef.current,
+      editedTransitionsRef.current,
+      toolCalls,
+      settingsDraftRef.current,
+    );
     saveSnapshot();
     setEditedSteps(result.steps);
     setEditedTransitions(result.transitions);
+    // The page owns the workflow-level fields, so the reducer's settings go
+    // back the same way the settings panel's edits do.
+    onSettingsChange?.(result.settings);
     const lastAdded = result.addedStepIds[result.addedStepIds.length - 1];
     if (lastAdded) setSelectedStepId(lastAdded);
 
@@ -529,11 +568,18 @@ export function WorkflowEditorCanvas({
     if (counts.add_step) parts.push(`added ${String(counts.add_step)} step${counts.add_step > 1 ? 's' : ''}`);
     if (counts.update_step) parts.push(`updated ${String(counts.update_step)} step${counts.update_step > 1 ? 's' : ''}`);
     if (counts.remove_step) parts.push(`removed ${String(counts.remove_step)} step${counts.remove_step > 1 ? 's' : ''}`);
+    if (counts.update_workflow) {
+      const fields = result.outcomes.filter((o) => o.tool === 'update_workflow').map((o) => o.stepId).join(', ');
+      parts.push(`set ${fields}`);
+    }
+    if (counts.set_transition_condition) {
+      parts.push(`set ${String(counts.set_transition_condition)} routing condition${counts.set_transition_condition > 1 ? 's' : ''}`);
+    }
     return {
-      summary: parts.length > 0 ? `Updated the workflow — ${parts.join(', ')}.` : '',
+      summary: parts.length > 0 ? `Updated the workflow: ${parts.join(', ')}.` : '',
       error: errors.length > 0 ? errors.join(' ') : null,
     };
-  }, [saveSnapshot]);
+  }, [saveSnapshot, onSettingsChange]);
 
   const sendAssistantMessage = useCallback(async () => {
     const content = assistantInput.trim();
@@ -549,7 +595,7 @@ export function WorkflowEditorCanvas({
         {
           messages: nextMessages,
           model: assistantModel,
-          workflowDefinition: { steps: editedSteps, transitions: editedTransitions },
+          workflowDefinition: { steps: editedSteps, transitions: editedTransitions, settings: pruneWorkflowSettings(settingsDraftRef.current ?? {}) },
         },
         { namespace },
       );
@@ -568,7 +614,7 @@ export function WorkflowEditorCanvas({
         setTimeout(() => {
           const issue = validateSteps(editedStepsRef.current);
           if (issue) {
-            setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `Heads up — this won't save yet: ${issue}` }]);
+            setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `This will not save yet: ${issue}` }]);
           }
         }, 0);
       }
@@ -737,8 +783,8 @@ export function WorkflowEditorCanvas({
       if (split.ignored.length > 0) {
         toast({
           variant: 'warning',
-          title: 'Some fields come from the platform',
-          description: `${split.ignored.join(', ')} ${split.ignored.length === 1 ? 'is' : 'are'} assigned when a version registers, so the pasted value was not used. Everything else was applied.`,
+          title: 'Some fields are not the file\u2019s to set',
+          description: `${split.ignored.join(', ')} ${split.ignored.length === 1 ? 'is' : 'are'} decided here rather than in the pasted definition, so ${split.ignored.length === 1 ? 'that value' : 'those values'} ${split.ignored.length === 1 ? 'was' : 'were'} not used. Everything else was applied.`,
         });
       }
     } catch (err) {
@@ -774,6 +820,24 @@ export function WorkflowEditorCanvas({
 
         <div className="ml-auto flex items-center gap-1.5">
           <AuthoringPathsPopover />
+
+          <button
+            onClick={() => setRightPanelView('notifications')}
+            aria-label="Notifications"
+            title="Who is told when a task is assigned or an agent escalates"
+            className="inline-flex items-center rounded-md border p-1.5 text-foreground transition-colors hover:bg-muted"
+          >
+            <Bell className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            onClick={() => setRightPanelView('settings')}
+            aria-label="Advanced"
+            title="Advanced: the preamble every agent step in this workflow gets"
+            className="inline-flex items-center rounded-md border p-1.5 text-foreground transition-colors hover:bg-muted"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+          </button>
 
           <button
             onClick={() => setRightPanelView('secrets')}
@@ -1019,6 +1083,58 @@ export function WorkflowEditorCanvas({
             ) : (
               <p className="text-sm text-muted-foreground">Save the workflow first to manage secrets.</p>
             )}
+          </div>
+        </div>
+      )}
+
+      {rightPanelView === 'settings' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
+          <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-lg mx-4 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">Advanced</h2>
+              </div>
+              <button
+                onClick={() => setRightPanelView(null)}
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This applies to the whole workflow, not a single step, and saves with the next version.
+            </p>
+            <WorkflowSettingsPanel
+              draft={settingsDraft ?? {}}
+              onChange={(patch) => onSettingsChange?.({ ...settingsDraft, ...patch })}
+            />
+          </div>
+        </div>
+      )}
+
+      {rightPanelView === 'notifications' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
+          <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-lg mx-4 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Bell className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">Notifications</h2>
+              </div>
+              <button
+                onClick={() => setRightPanelView(null)}
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <WorkflowNotificationsPanel
+              draft={settingsDraft ?? {}}
+              onChange={(patch) => onSettingsChange?.({ ...settingsDraft, ...patch })}
+              workspaceRoles={workspaceRoles}
+            />
           </div>
         </div>
       )}

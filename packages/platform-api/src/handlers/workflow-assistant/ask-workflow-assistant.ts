@@ -13,6 +13,7 @@ import {
   parseWorkflowTemplate,
   applyWorkflowAssistantToolCalls,
   type WorkflowAssistantToolName,
+  type WorkflowSettings,
   type WorkflowStep,
   type WorkflowDefinition,
 } from '@mediforce/platform-core';
@@ -96,12 +97,14 @@ function getValueAtPath(input: unknown, path: readonly PropertyKey[]): unknown {
 }
 
 export function parseMutationToolCall(toolName: string, parsedArguments: unknown): ParsedMutationCall {
-  const schema = toolName === 'add_step' ? AddStepToolSchema
-    : toolName === 'update_step' ? UpdateStepToolSchema
-    : toolName === 'remove_step' ? RemoveStepToolSchema
-    : null;
-  if (!schema) {
-    return { ok: false, error: `Unknown tool '${toolName}'. Valid tools: add_step, update_step, remove_step, list_models.` };
+  // Driven off the registry that `buildToolDefinitions` advertises to the
+  // model. A hand-written ladder here meant a tool could be offered and then
+  // rejected on arrival — and because the completeness gate requires every
+  // resolved call to be a mutation, a rejected one discarded the whole batch.
+  const schema: z.ZodType | undefined = WORKFLOW_ASSISTANT_TOOLS[toolName as WorkflowAssistantToolName];
+  if (schema === undefined) {
+    const valid = [...Object.keys(WORKFLOW_ASSISTANT_TOOLS), 'list_models'].join(', ');
+    return { ok: false, error: `Unknown tool '${toolName}'. Valid tools: ${valid}.` };
   }
   const result = schema.safeParse(parsedArguments);
   if (!result.success) {
@@ -134,7 +137,7 @@ export function parseMutationToolCall(toolName: string, parsedArguments: unknown
 type Transitions = WorkflowDefinition['transitions'];
 
 export function validateResultingGraph(
-  currentDefinition: { steps: WorkflowStep[]; transitions: Transitions },
+  currentDefinition: { steps: WorkflowStep[]; transitions: Transitions; settings?: WorkflowSettings },
   toolCalls: WorkflowAssistantToolCall[],
   namespace: string,
 ): { valid: true } | { valid: false; errors: string[] } {
@@ -142,6 +145,7 @@ export function validateResultingGraph(
     currentDefinition.steps,
     currentDefinition.transitions,
     toolCalls,
+    currentDefinition.settings ?? {},
   );
   const mergedTransitions = mergeVerdictTransitions(applied.steps, applied.transitions);
   const orderedSteps = ensureEntryStepFirst(applied.steps, mergedTransitions);
@@ -164,8 +168,12 @@ export function validateResultingGraph(
   // Canonical cross-field validation (same gate register uses): catches rules the
   // graph/reference checks don't — e.g. an `action` executor with no action config,
   // a wait action with neither duration nor deadline. Templates carry no namespace.
+  // The workflow-level fields go through the same parse, so a model writing
+  // `url: 'not-a-url'` is told at the gate rather than failing the whole save
+  // later at register — which is what the guide promises this gate does.
   const templateParse = parseWorkflowTemplate({
     name: 'simulated',
+    ...applied.settings,
     steps: orderedSteps,
     transitions: mergedTransitions,
   });

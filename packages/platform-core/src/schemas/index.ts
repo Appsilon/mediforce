@@ -258,12 +258,17 @@ export {
   type ListModelsTool,
   type WorkflowAssistantToolName,
   type WorkflowAssistantToolCall,
+  UpdateWorkflowToolSchema,
+  SetTransitionConditionToolSchema,
+  type UpdateWorkflowTool,
+  type SetTransitionConditionTool,
 } from './workflow-assistant-tools';
 
 export {
   applyWorkflowAssistantToolCalls,
   type ToolCallOutcome,
   type ApplyToolCallsResult,
+  type WorkflowSettings,
 } from './workflow-assistant-apply';
 
 export {

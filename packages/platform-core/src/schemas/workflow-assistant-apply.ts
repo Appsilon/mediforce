@@ -1,18 +1,39 @@
 import { uniqueSlug } from '../utils/slug';
 import type { WorkflowStep, WorkflowDefinition } from './workflow-definition';
+import type { WorkflowAuthorableSchema } from './workflow-definition';
+import type { z } from 'zod';
 import type { WorkflowAssistantToolCall } from './workflow-assistant-tools';
 
 type Transitions = WorkflowDefinition['transitions'];
 
 export interface ToolCallOutcome {
   tool: WorkflowAssistantToolCall['tool'];
+  /** The step a call touched. For the workflow-level tools there is no step, so
+   *  it names what changed instead — the field list, or the edge. */
   stepId: string;
   error?: string;
 }
 
+/** The workflow-level fields the assistant can now write, held alongside the
+ *  graph because a step tool and a settings tool arrive in the same batch. */
+export type WorkflowSettings = Partial<
+  Omit<
+    z.infer<typeof WorkflowAuthorableSchema>,
+    'name' | 'steps' | 'transitions' | 'inputForNextRun' | 'externalSkillsRepo'
+  >
+> & {
+  /** Partial because an editor holds it while it is being typed: the definition
+   *  requires `commit`, but demanding it on the first keystroke would make the
+   *  field unfillable. Registration is what validates the finished value. */
+  externalSkillsRepo?: Partial<
+    NonNullable<z.infer<typeof WorkflowAuthorableSchema>['externalSkillsRepo']>
+  >;
+};
+
 export interface ApplyToolCallsResult {
   steps: WorkflowStep[];
   transitions: Transitions;
+  settings: WorkflowSettings;
   outcomes: ToolCallOutcome[];
   addedStepIds: string[];
 }
@@ -21,9 +42,11 @@ export function applyWorkflowAssistantToolCalls(
   steps: WorkflowStep[],
   transitions: Transitions,
   toolCalls: WorkflowAssistantToolCall[],
+  settings: WorkflowSettings = {},
 ): ApplyToolCallsResult {
   let workingSteps: WorkflowStep[] = [...steps];
   let workingTransitions: Transitions = [...transitions];
+  let workingSettings: WorkflowSettings = { ...settings };
   const clientIdToRealId = new Map<string, string>();
   const outcomes: ToolCallOutcome[] = [];
   const addedStepIds: string[] = [];
@@ -102,6 +125,48 @@ export function applyWorkflowAssistantToolCalls(
       if (clientId) clientIdToRealId.set(clientId, newId);
       addedStepIds.push(newId);
       outcomes.push({ tool: 'add_step', stepId: newId });
+    } else if (call.tool === 'update_workflow') {
+      // Patch, not replace: a call naming one field must leave the others
+      // alone, or "also set the preamble" would clear the env set a turn ago.
+      //
+      // `visibility` carries a `.default('private')` that `.partial()` does not
+      // strip, so a parsed patch always claims a visibility the model never
+      // wrote — narrowing a public workflow on an unrelated edit. Only keys the
+      // call actually supplied are applied.
+      const supplied = Object.entries(call.arguments).filter(([, value]) => value !== undefined);
+      const patch = Object.fromEntries(supplied) as WorkflowSettings;
+      // `env` and `metadata` are maps: a shallow spread would make "add
+      // STUDY_ID" drop every other variable, and "set a category" wipe the
+      // display name. Merged key by key, so a patch adds rather than replaces.
+      workingSettings = {
+        ...workingSettings,
+        ...patch,
+        ...(patch.env === undefined ? {} : { env: { ...workingSettings.env, ...patch.env } }),
+        ...(patch.metadata === undefined ? {} : { metadata: { ...workingSettings.metadata, ...patch.metadata } }),
+        ...(patch.externalSkillsRepo === undefined
+          ? {}
+          : { externalSkillsRepo: { ...workingSettings.externalSkillsRepo, ...patch.externalSkillsRepo } }),
+      };
+      outcomes.push({ tool: 'update_workflow', stepId: supplied.map(([key]) => key).join(', ') });
+    } else if (call.tool === 'set_transition_condition') {
+      const { from, to, when } = call.arguments;
+      const edge = workingTransitions.find((t) => t.from === from && t.to === to);
+      if (edge === undefined) {
+        outcomes.push({
+          tool: 'set_transition_condition',
+          stepId: `${from} → ${to}`,
+          error: `There is no transition from "${from}" to "${to}" — add the edge before giving it a condition.`,
+        });
+        continue;
+      }
+      workingTransitions = workingTransitions.map((t) => {
+        if (t.from !== from || t.to !== to) return t;
+        // An omitted `when` clears it, which is how an edge goes back to
+        // unconditional; keeping the key with `undefined` would serialise.
+        const { when: _dropped, ...rest } = t;
+        return when === undefined ? rest : { ...rest, when };
+      });
+      outcomes.push({ tool: 'set_transition_condition', stepId: `${from} → ${to}` });
     } else if (call.tool === 'update_step') {
       const { stepId, insertAfterId, insertBeforeId, ...patch } = call.arguments;
       const realId = resolveId(stepId) ?? stepId;
@@ -155,5 +220,5 @@ export function applyWorkflowAssistantToolCalls(
     }
   }
 
-  return { steps: workingSteps, transitions: workingTransitions, outcomes, addedStepIds };
+  return { steps: workingSteps, transitions: workingTransitions, settings: workingSettings, outcomes, addedStepIds };
 }

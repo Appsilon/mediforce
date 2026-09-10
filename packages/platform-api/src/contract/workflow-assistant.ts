@@ -3,6 +3,7 @@ import {
   WorkflowStepSchema,
   TransitionSchema,
   WorkflowAssistantToolCallSchema,
+  UpdateWorkflowToolSchema,
 } from '@mediforce/platform-core';
 
 // Size caps bound a single request before it reaches OpenRouter — the whole
@@ -25,6 +26,11 @@ export const AskWorkflowAssistantInputSchema = z.object({
   workflowDefinition: z.object({
     steps: z.array(WorkflowStepSchema).max(MAX_STEPS),
     transitions: z.array(TransitionSchema).max(MAX_TRANSITIONS),
+    // The workflow level, so `update_workflow` patches from what is actually
+    // set rather than blind — and so the assistant can answer what the input
+    // contract or the preamble currently is. Optional: a caller that only
+    // edits the graph need not send it.
+    settings: UpdateWorkflowToolSchema.optional(),
   }),
 });
 export type AskWorkflowAssistantInput = z.infer<typeof AskWorkflowAssistantInputSchema>;

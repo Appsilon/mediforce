@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { WorkflowStep, WorkflowDefinition } from '../workflow-definition';
 import { applyWorkflowAssistantToolCalls } from '../workflow-assistant-apply';
+import { UpdateWorkflowToolSchema } from '../workflow-assistant-tools';
 import type { WorkflowAssistantToolCall } from '../workflow-assistant-tools';
 
 type Transitions = WorkflowDefinition['transitions'];
@@ -101,5 +102,99 @@ describe('applyWorkflowAssistantToolCalls', () => {
     const { outcomes } = applyWorkflowAssistantToolCalls(baseCanvas().steps, baseCanvas().transitions, calls);
     const updateOutcome = outcomes.find((o) => o.tool === 'update_step');
     expect(updateOutcome?.error).toMatch(/doesn't exist/);
+  });
+});
+
+// The assistant could only ever reach step-level fields: its three tools are
+// all step-scoped and the reducer took only (steps, transitions). Everything at
+// the workflow level — the input contract, the agent preamble, env — was
+// unreachable by prompt no matter how the request was phrased.
+describe('applyWorkflowAssistantToolCalls — the workflow level', () => {
+  it('sets the input contract the whole workflow validates against', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'update_workflow', arguments: {
+        triggerInput: [{ name: 'studyId', type: 'string', required: true }],
+      } },
+    ];
+    const { settings } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions, calls,
+    );
+    expect(settings.triggerInput).toEqual([{ name: 'studyId', type: 'string', required: true }]);
+  });
+
+  it('patches rather than replaces, so setting one field keeps the rest', () => {
+    const { settings } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps,
+      baseCanvas().transitions,
+      [{ tool: 'update_workflow', arguments: { preamble: 'House rules.' } }],
+      { env: { STUDY_ID: 'CDISCPILOT01' } },
+    );
+    expect(settings.preamble).toBe('House rules.');
+    expect(settings.env).toEqual({ STUDY_ID: 'CDISCPILOT01' });
+  });
+
+  it('cannot touch visibility, which has its own control', () => {
+    // Its editor on the workflow page PATCHes every version at once; a register
+    // writes only the new one, so two controls would disagree.
+    expect('visibility' in UpdateWorkflowToolSchema.shape).toBe(false);
+  });
+
+  it('merges env and metadata rather than replacing them', () => {
+    // "add STUDY_ID to env" must not drop the other variables, and setting a
+    // metadata key must not wipe the display name.
+    const { settings } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps,
+      baseCanvas().transitions,
+      [{ tool: 'update_workflow', arguments: { env: { STUDY_ID: 'X' }, metadata: { category: 'safety' } } }],
+      { env: { LAKE_PATH: '/output/lake' }, metadata: { displayName: 'Landing Zone' } },
+    );
+    expect(settings.env).toEqual({ LAKE_PATH: '/output/lake', STUDY_ID: 'X' });
+    expect(settings.metadata).toEqual({ displayName: 'Landing Zone', category: 'safety' });
+  });
+
+  it('reports which fields it changed, so the pane can summarise the edit', () => {
+    const { outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps,
+      baseCanvas().transitions,
+      [{ tool: 'update_workflow', arguments: { preamble: 'x', url: 'https://example.com' } }],
+    );
+    const outcome = outcomes.find((o) => o.tool === 'update_workflow');
+    expect(outcome?.error).toBeUndefined();
+    expect(outcome?.stepId).toContain('preamble');
+  });
+});
+
+describe('applyWorkflowAssistantToolCalls — transition conditions', () => {
+  it('sets a when expression on an existing edge', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'set_transition_condition', arguments: { from: 'draft', to: 'done', when: 'output.ready == true' } },
+    ];
+    const { transitions } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions, calls,
+    );
+    expect(transitions).toEqual([{ from: 'draft', to: 'done', when: 'output.ready == true' }]);
+  });
+
+  it('clears the condition when given no expression', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'set_transition_condition', arguments: { from: 'draft', to: 'done' } },
+    ];
+    const { transitions } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps,
+      [{ from: 'draft', to: 'done', when: 'output.ready == true' }],
+      calls,
+    );
+    expect(transitions).toEqual([{ from: 'draft', to: 'done' }]);
+  });
+
+  it('refuses an edge that does not exist rather than inventing one', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'set_transition_condition', arguments: { from: 'draft', to: 'nowhere', when: 'x == 1' } },
+    ];
+    const { transitions, outcomes } = applyWorkflowAssistantToolCalls(
+      baseCanvas().steps, baseCanvas().transitions, calls,
+    );
+    expect(transitions).toEqual(baseCanvas().transitions);
+    expect(outcomes.find((o) => o.tool === 'set_transition_condition')?.error).toContain('nowhere');
   });
 });

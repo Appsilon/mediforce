@@ -1,5 +1,7 @@
 'use client';
 
+import { pruneWorkflowSettings } from '@/components/workflows/workflow-settings-utils';
+import type { WorkflowSettingsDraft } from '@/components/workflows/workflow-settings-utils';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Save } from 'lucide-react';
@@ -113,7 +115,9 @@ export default function NewWorkflowPage() {
   // Fields outside the graph that a pasted definition carried — the only way
   // to declare them when creating a workflow, since there is no settings form
   // yet. Merged under the page's own fields on register.
-  const [pastedFields, setPastedFields] = useState<Record<string, unknown>>({});
+  // The workflow-level fields: what the settings panel edits and what a pasted
+  // definition supplies. One state, so the two surfaces cannot disagree.
+  const [settingsDraft, setSettingsDraft] = useState<WorkflowSettingsDraft>({});
 
   const registerCurrentCanvas = useCallback(async (versionTitle: string) => {
     const steps = currentStepsRef.current;
@@ -143,30 +147,26 @@ export default function NewWorkflowPage() {
     const orderedSteps = ensureEntryStepFirst(steps, mergedTransitions);
 
     try {
+      const pasted = pruneWorkflowSettings(settingsDraft);
       const result = await mediforceSilent.workflows.register(
         {
-          title: versionTitle || undefined,
-          description: description.trim() || undefined,
           steps: orderedSteps,
           transitions: mergedTransitions,
           // Declarable here only through the source-code panel, which applies it
           // with the rest of the graph — a field that panel accepts has to reach
           // the registration, not be dropped on the way out.
           inputForNextRun: currentInputForNextRunRef.current,
-          // After the page's own fields: a pasted title shown in the panel has
-          // to be the one that registers. `name` stays the page's, since the
-          // route and the save dialog both key off it.
-          ...pastedFields,
+          ...pasted,
+          // This page's own fields last: each one has an input the author can
+          // see, so a pasted value that fills that input is already what they
+          // are looking at, and letting the paste win instead meant editing it
+          // here was silently discarded. The display name follows the name
+          // field for the same reason, without dropping the rest of a pasted
+          // `metadata`.
+          title: versionTitle || undefined,
+          description: description.trim() || undefined,
           name: workflowId,
-          // After the spread as well: a pasted `metadata` carries its own keys,
-          // and letting it replace this one wholesale drops the display name
-          // and leaves the workflow calling itself by its id.
-          metadata: {
-            ...(typeof pastedFields.metadata === 'object' && pastedFields.metadata !== null
-              ? pastedFields.metadata as Record<string, unknown>
-              : {}),
-            [DISPLAY_NAME_KEY]: workflowName.trim(),
-          },
+          metadata: { ...pasted.metadata, [DISPLAY_NAME_KEY]: workflowName.trim() },
         },
         { namespace: effectiveNamespace },
       );
@@ -180,7 +180,7 @@ export default function NewWorkflowPage() {
       toast({ title: 'Save failed', description: message, variant: 'error' });
       throw err;
     }
-  }, [workflowName, effectiveNamespace, description, pastedFields, toast]);
+  }, [workflowName, effectiveNamespace, description, settingsDraft, toast]);
 
   const handleSave = useCallback(async (versionTitle: string) => {
     setDialogOpen(false);
@@ -345,15 +345,18 @@ export default function NewWorkflowPage() {
         initialSteps={TEMPLATE_STEPS}
         initialTransitions={TEMPLATE_TRANSITIONS}
         namespace={effectiveNamespace}
-        wdJsonFields={{ ...wdJsonFields, ...pastedFields }}
+        wdJsonFields={{ ...wdJsonFields, ...settingsDraft }}
+        settingsDraft={settingsDraft}
+        onSettingsChange={setSettingsDraft}
         onNonGraphFieldsChange={(fields) => {
-          setPastedFields(fields);
-          // The create page owns name and description as form state, so a paste
-          // has to fill the inputs rather than register values the author
-          // cannot see. `title` is the version title, asked for on save.
+          setSettingsDraft(fields);
+          // The create page owns the name and description as form state, so a
+          // paste has to fill the inputs rather than register values the author
+          // cannot see. The name comes from the pasted `title`, not its `name`:
+          // `name` is the definition's id, so using it put "landing-zone-
+          // CDISCPILOT01" where "Landing Zone — CDISCPILOT01" belongs, and the
+          // id this page registers is slugified from the field anyway.
           if (typeof fields.description === 'string') setDescription(fields.description);
-          // The title, not the id: the field is the workflow's display name,
-          // and the id is derived from it below.
           const pastedName = pastedWorkflowName(fields);
           if (pastedName !== null) setWorkflowName(pastedName);
         }}
@@ -365,7 +368,7 @@ export default function NewWorkflowPage() {
       <UnsavedChangesGuard when={hasUnsavedChanges} />
 
       <SaveVersionDialog
-        suggestedTitle={typeof pastedFields.title === 'string' ? pastedFields.title : undefined}
+        suggestedTitle={typeof settingsDraft.title === 'string' ? settingsDraft.title : undefined}
         open={dialogOpen}
         nextVersion={1}
         confirmLabel="Publish workflow"

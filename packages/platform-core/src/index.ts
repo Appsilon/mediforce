@@ -293,8 +293,13 @@ export {
   type ListModelsTool,
   type WorkflowAssistantToolName,
   type WorkflowAssistantToolCall,
+  UpdateWorkflowToolSchema,
+  SetTransitionConditionToolSchema,
+  type UpdateWorkflowTool,
+  type SetTransitionConditionTool,
   type ToolCallOutcome,
   type ApplyToolCallsResult,
+  type WorkflowSettings,
 } from './schemas/index';
 
 // Interfaces (repository and service contracts)

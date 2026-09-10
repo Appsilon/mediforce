@@ -142,11 +142,17 @@ describe('AddStepToolSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('omits only machine-managed fields (id/plugin/metadata/stepParams)', () => {
+  it('omits only machine-managed fields (id/plugin/metadata)', () => {
     const shape = AddStepToolFieldsSchema.shape;
-    for (const field of ['plugin', 'metadata', 'stepParams'] as const) {
+    for (const field of ['plugin', 'metadata'] as const) {
       expect(field in shape).toBe(false);
     }
+  });
+
+  it('exposes stepParams, which is read at runtime rather than legacy', () => {
+    // `execute-agent-step` merges it into the agent's input context under
+    // `appContext`, so hiding it left a live field nothing could author.
+    expect('stepParams' in AddStepToolFieldsSchema.shape).toBe(true);
   });
 
   it('exposes the user-authorable fields the assistant previously lacked, for parity with hand-editing', () => {
@@ -226,8 +232,16 @@ describe('RemoveStepToolSchema', () => {
 });
 
 describe('WORKFLOW_ASSISTANT_TOOLS', () => {
-  it('exposes exactly the three canvas-mutation tools', () => {
-    expect(Object.keys(WORKFLOW_ASSISTANT_TOOLS).sort()).toEqual(['add_step', 'remove_step', 'update_step']);
+  it('exposes the step tools and the workflow-level ones', () => {
+    // The three step tools were the whole surface, which is why no phrasing of
+    // "make the study ID a required input" could land.
+    expect(Object.keys(WORKFLOW_ASSISTANT_TOOLS).sort()).toEqual([
+      'add_step',
+      'remove_step',
+      'set_transition_condition',
+      'update_step',
+      'update_workflow',
+    ]);
   });
 });
 
