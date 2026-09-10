@@ -108,23 +108,6 @@ describe('runPlatformTool', () => {
     expect(result).toEqual({ servers: [{ id: 'github', description: 'GitHub MCP' }] });
   });
 
-  it('creates an agent in the workspace being worked in', async () => {
-    const scope = buildScope();
-    const result = await runPlatformTool('create_agent', {
-      name: 'Report writer',
-      description: 'Writes the validation report',
-      systemPrompt: 'You write reports.',
-      foundationModel: 'anthropic/claude-sonnet-4.6',
-      inputDescription: 'Findings',
-      outputDescription: 'An HTML report',
-    }, scope, 'acme');
-
-    expect(result).toMatchObject({ created: { id: 'agent-new', name: 'Report writer' } });
-    const created = vi.mocked(scope.agentDefinitions.create).mock.calls[0][0];
-    expect(created).toMatchObject({ namespace: 'acme', kind: 'plugin', visibility: 'private' });
-  });
-
-  it('reports a refusal as a result, not an exception', async () => {
   it('lists the roles this workspace grants, with how many people hold each', async () => {
     // A step's `allowedRoles` naming a role nobody holds is a task nobody can
     // claim. The assistant could not check, so it wrote whatever word the
@@ -157,6 +140,23 @@ describe('runPlatformTool', () => {
     expect(result).toMatchObject({ needsSave: true });
   });
 
+  it('creates an agent in the workspace being worked in', async () => {
+    const scope = buildScope();
+    const result = await runPlatformTool('create_agent', {
+      name: 'Report writer',
+      description: 'Writes the validation report',
+      systemPrompt: 'You write reports.',
+      foundationModel: 'anthropic/claude-sonnet-4.6',
+      inputDescription: 'Findings',
+      outputDescription: 'An HTML report',
+    }, scope, 'acme');
+
+    expect(result).toMatchObject({ created: { id: 'agent-new', name: 'Report writer' } });
+    const created = vi.mocked(scope.agentDefinitions.create).mock.calls[0][0];
+    expect(created).toMatchObject({ namespace: 'acme', kind: 'plugin', visibility: 'private' });
+  });
+
+  it('reports a refusal as a result, not an exception', async () => {
     // The assistant acts as the person who asked. When they may not do a thing,
     // the turn continues and the model tells them an admin is needed — it does
     // not crash the conversation, and it does not find another way through.

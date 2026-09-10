@@ -162,6 +162,13 @@ already reachable in the container: **carried by the workflow** and mounted at
 `/artifacts`, baked into the image, present at `/workspace` (via
 `workspace.remote`), or self-contained (`python3 -c "..."`).
 
+A carried `Dockerfile` starts from the language's own image (`python:3.12-slim`,
+`node:22-slim`, `rocker/r-ver:4.4`), not a bare OS image: a distribution's
+system Python is externally managed and `pip install` into it fails. Where a
+different base is unavoidable, install into an environment the image makes
+itself — a `venv` on the PATH, `renv`, a local `node_modules` — rather than
+globally.
+
 To run a script *file*, the first option is to carry it: `artifacts` on the
 definition holds text files, they are mounted read-only at `/artifacts`, and a
 step runs one as `python3 /artifacts/scripts/poll.py` — no repository, no

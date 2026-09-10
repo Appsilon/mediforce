@@ -66,16 +66,14 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/continueOnError/);
   });
 
-  it('tells the model it cannot create triggers and to direct schedule/webhook requests to the Triggers tab', () => {
-    expect(prompt).toMatch(/can't create triggers/i);
-    expect(prompt).toMatch(/Triggers\*\* tab|Triggers tab|trigger-add/);
-    expect(prompt).toMatch(/\$\{triggerPayload\./);
+  it('keeps webhook triggers on the Triggers tab, and reads trigger inputs in steps', () => {
+    expect(prompt).toMatch(/name the workflow's \*\*Triggers\*\* tab as where they add one/);
+    expect(prompt).toMatch(/\$\{triggerPayload\.<field>\}/);
   });
 
-  it('warns that the inline script runtime is stdlib-only and to prefer an agent step for third-party packages', () => {
-    expect(prompt).toMatch(/standard-library-only/i);
+  it('warns that the inline script runtime carries no third-party packages', () => {
+    expect(prompt).toMatch(/the standard library and nothing else/i);
     expect(prompt).toMatch(/ModuleNotFoundError/);
-    expect(prompt).toMatch(/Prefer an `agent` step for anything needing third-party packages/);
   });
 
   it('tells the model a large build may span several turns and cut-off steps are kept', () => {
@@ -106,6 +104,32 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/"HARVEST_API_KEY": "\{\{HARVEST_API_KEY\}\}"/);
   });
 
+  it('never sends the reader to a terminal: no CLI, no git, no repo paths', () => {
+    // The reader is in a browser and has no checkout. The prompt itself used to
+    // name `mediforce workflow trigger-add`, so the assistant handed a person
+    // in the app a command they cannot run.
+    expect(prompt).toMatch(/never name a command for them to run/i);
+    // The embedded references are written for a repo reader and are full of
+    // commands, which is where the CLI answer came from. The rule has to name
+    // them, since they cannot be scrubbed without breaking their other reader.
+    expect(prompt).toMatch(/never quote their instructions back/i);
+  });
+
+  it('sends any third-party package to a carried file plus a Dockerfile, in every language', () => {
+    // The old advice was pip-install-at-the-top-of-the-script, from before a
+    // workflow could carry its own Dockerfile.
+    expect(prompt).toMatch(/standard library/i);
+    expect(prompt).toMatch(/write_workflow_file/);
+    expect(prompt).toMatch(/pandas/);
+    expect(prompt).not.toMatch(/pip", "install"/);
+    // …and from the language's own base image, since a system Python refuses
+    // `pip install` outright.
+    expect(prompt).toMatch(/python:3\.12-slim/);
+    expect(prompt).toMatch(/rocker\/r-ver/);
+    expect(prompt).toMatch(/externally managed/i);
+    expect(prompt).toMatch(/venv/);
+  });
+
   it('says how a file crosses from one step to the next, since /output does not survive', () => {
     // The live failure: a reader step written as `pd.read_csv('/output/samples.csv')`,
     // which the producing step really did write, dies with FileNotFoundError
@@ -114,37 +138,6 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/wiped|deleted|does not survive/i);
   });
 
-  it('states the only route an MCP server has to a step: a saved agent the step names with agentId', () => {
-    // `resolveMcpForStep` returns null when `agentId` is unset, so an inline
-    // agent step reaches no MCP at all however the request was phrased. The
-    // prompt has to say so, or "use the GitHub MCP" produces a step that
-    // silently has none.
-    expect(prompt).toMatch(/`agentId`/);
-    expect(prompt).toMatch(/no MCP at all|reaches no MCP|gets no MCP/i);
-    expect(prompt).toMatch(/list_tool_catalog/);
-    expect(prompt).toMatch(/mcpRestrictions/);
-  });
-
-  it('checks a role exists before leaning on it, and points at Settings for granting one', () => {
-    expect(prompt).toMatch(/list_roles/);
-    expect(prompt).toMatch(/Settings → Members/);
-    expect(prompt).toMatch(/nobody holds it yet/i);
-    expect(prompt).toMatch(/Access\*\* tab/);
-  });
-
-  it('documents that update_step can connect an already-existing step, and that every response is graph-checked before finishing', () => {
-    expect(prompt).toMatch(/`update_step` also accepts `insertAfterId`\/`insertBeforeId`/);
-    expect(prompt).toMatch(/checked for structural completeness/i);
-    expect(prompt).toMatch(/no separate "add a transition" tool/i);
-  });
-
-  it('requires every verdict target to be a real step id or a clientId — never an invented value that merely sounds right', () => {
-    expect(prompt).toMatch(/Every verdict's `target` must be a real step id/);
-    expect(prompt).toMatch(/or in a verdict's `target`, within the same response/);
-  });
-
-  it('requires a params field on human input steps and explains how collected input flows downstream', () => {
-    expect(prompt).toMatch(/needs a `params` array/);
   it('can schedule a saved workflow, and says out loud that an unsaved one cannot be', () => {
     expect(prompt).toMatch(/create_cron_trigger/);
     expect(prompt).toMatch(/never been saved/i);
@@ -160,6 +153,30 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/Access\*\* tab/);
   });
 
+  it('states the only route an MCP server has to a step: a saved agent the step names with agentId', () => {
+    // `resolveMcpForStep` returns null when `agentId` is unset, so an inline
+    // agent step reaches no MCP at all however the request was phrased. The
+    // prompt has to say so, or "use the GitHub MCP" produces a step that
+    // silently has none.
+    expect(prompt).toMatch(/`agentId`/);
+    expect(prompt).toMatch(/no MCP at all|reaches no MCP|gets no MCP/i);
+    expect(prompt).toMatch(/list_tool_catalog/);
+    expect(prompt).toMatch(/mcpRestrictions/);
+  });
+
+  it('documents that update_step can connect an already-existing step, and that every response is graph-checked before finishing', () => {
+    expect(prompt).toMatch(/`update_step` also accepts `insertAfterId`\/`insertBeforeId`/);
+    expect(prompt).toMatch(/checked for structural completeness/i);
+    expect(prompt).toMatch(/no separate "add a transition" tool/i);
+  });
+
+  it('requires every verdict target to be a real step id or a clientId — never an invented value that merely sounds right', () => {
+    expect(prompt).toMatch(/Every verdict's `target` must be a real step id/);
+    expect(prompt).toMatch(/or in a verdict's `target`, within the same response/);
+  });
+
+  it('requires a params field on human input steps and explains how collected input flows downstream', () => {
+    expect(prompt).toMatch(/needs a `params` array/);
     expect(prompt).toMatch(/automatically receives the \*immediately preceding\* step's output/);
     expect(prompt).toMatch(/\$\{steps\.share-two-words\.words\}/);
   });
