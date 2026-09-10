@@ -456,7 +456,7 @@ export async function askWorkflowAssistant(
         const result = await runListModelsTool(scope);
         messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify(result) });
       } else if (r.kind === 'platform') {
-        const result = await runPlatformTool(r.toolName, r.arguments, scope, input.namespace);
+        const result = await runPlatformTool(r.toolName, r.arguments, scope, input.namespace, input.workflowName);
         messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify(result) });
       } else if (r.kind === 'error') {
         messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify({ error: r.error }) });

@@ -4,6 +4,7 @@ import type { CallerScope } from '../../../repositories/index';
 import { HandlerError } from '../../../errors';
 import { createAgent } from '../../agents/create-agent';
 import { createToolCatalogEntry } from '../../tool-catalog/create-entry';
+import { createTrigger } from '../../triggers/manage-triggers';
 
 /**
  * Runs one platform tool for the assistant, as the person who asked.
@@ -19,6 +20,10 @@ export async function runPlatformTool(
   rawArguments: unknown,
   scope: CallerScope,
   namespace: string,
+  /** The saved workflow the canvas is a version of. Absent on a workflow that
+   *  has never been saved, which is the one case a trigger cannot be attached
+   *  to yet. */
+  workflowName?: string,
 ): Promise<unknown> {
   if (!isPlatformToolName(toolName)) {
     const valid = Object.keys(WORKFLOW_ASSISTANT_PLATFORM_TOOLS).join(', ');
@@ -90,6 +95,28 @@ export async function runPlatformTool(
           iconName: 'bot',
         }, scope);
         return { created: { id: agent.id, name: agent.name } };
+      }
+      case 'create_cron_trigger': {
+        const input = parsed.data as z.infer<typeof WORKFLOW_ASSISTANT_PLATFORM_TOOLS['create_cron_trigger']>;
+        if (workflowName === undefined) {
+          // A trigger attaches to a registered workflow, and this canvas has
+          // never been saved. Reported rather than thrown: the build carries
+          // on, and the reply says the schedule comes after the first save.
+          return {
+            error: 'A schedule attaches to a saved workflow, and this one has never been saved. Tell them plainly: the schedule cannot be attached yet and will not take effect until the workflow is saved at least once, and you will add it as soon as they save.',
+            needsSave: true,
+          };
+        }
+        const { trigger } = await createTrigger({
+          namespace,
+          definitionName: workflowName,
+          triggerName: input.name ?? 'schedule',
+          type: 'cron',
+          schedule: input.schedule,
+          enabled: true,
+          ...(input.payload === undefined ? {} : { payload: input.payload }),
+        }, scope);
+        return { created: { name: trigger.name, schedule: input.schedule } };
       }
       case 'create_tool_catalog_entry': {
         const input = parsed.data as z.infer<typeof WORKFLOW_ASSISTANT_PLATFORM_TOOLS['create_tool_catalog_entry']>;

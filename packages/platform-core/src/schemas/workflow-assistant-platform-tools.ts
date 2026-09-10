@@ -58,7 +58,25 @@ export const CreateToolCatalogEntryToolSchema = z.object({
 });
 export type CreateToolCatalogEntryTool = z.infer<typeof CreateToolCatalogEntryToolSchema>;
 
+/**
+ * Put this workflow on a schedule. A trigger is a resource attached to a
+ * *registered* workflow rather than a field of the definition, which is why it
+ * is a platform call and not a canvas edit — and why it needs the workflow to
+ * have been saved at least once.
+ */
+export const CreateCronTriggerToolSchema = z.object({
+  /** Standard five-field cron, e.g. `0 9 * * 1` for Mondays at 09:00. */
+  schedule: z.string().min(1),
+  /** Names the row, so a workflow can carry more than one schedule. */
+  name: z.string().min(1).max(100).optional(),
+  /** The static input every tick hands the run. Validated against the
+   *  workflow's `triggerInput`, so it has to satisfy that contract. */
+  payload: z.record(z.string(), z.unknown()).optional(),
+});
+export type CreateCronTriggerTool = z.infer<typeof CreateCronTriggerToolSchema>;
+
 export const WORKFLOW_ASSISTANT_PLATFORM_TOOLS = {
+  create_cron_trigger: CreateCronTriggerToolSchema,
   list_secrets: ListSecretsToolSchema,
   list_agents: ListAgentsToolSchema,
   list_tool_catalog: ListToolCatalogToolSchema,

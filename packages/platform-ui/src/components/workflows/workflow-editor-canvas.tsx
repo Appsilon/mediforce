@@ -631,6 +631,9 @@ export function WorkflowEditorCanvas({
           role: 'assistant',
           content: `Not everything landed: ${applied.error}`,
           narration: true,
+          // A trigger attaches to a saved workflow, so the assistant needs to
+          // know whether this canvas is a version of one.
+          ...(workflowName === undefined ? {} : { workflowName }),
         }]);
       }
       if (applied.steps !== null) {
