@@ -138,6 +138,15 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/wiped|deleted|does not survive/i);
   });
 
+  it('never asks for the same field twice, as a trigger input and as an entry-step param', () => {
+    // The shape the assistant kept building: `triggerInput` declares the
+    // fields and the first human step collects them again. The contract is
+    // checked before the run starts, so the run is refused with "Invalid
+    // payload" before anyone reaches the step meant to fill it in.
+    expect(prompt).toMatch(/never both/i);
+    expect(prompt).toMatch(/Invalid payload/);
+  });
+
   it('declines an unschedulable request in one sentence rather than explaining the workaround', () => {
     // Offered the tool and refused by it, the model talked its way to the
     // Triggers tab and then to a CLI command. There is nothing to explain.
