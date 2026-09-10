@@ -4,6 +4,8 @@ import type { WorkflowDefinition } from '@mediforce/platform-core';
 
 const fake = vi.hoisted(() => {
   const definitions: WorkflowDefinition[] = [];
+  /** `namespace:name` -> pinned default version, for the liveness tests. */
+  const defaultVersions = new Map<string, number>();
 
   const services = {
     namespaceRepo: {
@@ -17,16 +19,19 @@ const fake = vi.hoisted(() => {
       ],
     },
     processRepo: {
-      listAllWorkflowDefinitions: async () => {
+      // Honours `includeArchived` and the default-version map, because both
+      // decide which pins the route reports and whether they count as live.
+      listAllWorkflowDefinitions: async (includeArchived: boolean) => {
         const grouped = new Map<string, WorkflowDefinition[]>();
         for (const d of definitions) {
+          if (includeArchived !== true && d.archived === true) continue;
           const key = `${d.namespace}:${d.name}`;
           const existing = grouped.get(key) ?? [];
           existing.push(d);
           grouped.set(key, existing);
         }
         return {
-          definitions: Array.from(grouped.entries()).map(([_key, versions]) => {
+          definitions: Array.from(grouped.entries()).map(([key, versions]) => {
             const namespace = versions[0].namespace;
             const name = versions[0].name;
             return {
@@ -34,7 +39,7 @@ const fake = vi.hoisted(() => {
               name,
               versions,
               latestVersion: Math.max(...versions.map((v) => v.version)),
-              defaultVersion: null,
+              defaultVersion: defaultVersions.get(key) ?? null,
             };
           }),
         };
@@ -42,7 +47,7 @@ const fake = vi.hoisted(() => {
     },
   };
 
-  return { definitions, services };
+  return { definitions, defaultVersions, services };
 });
 
 vi.mock('@/lib/platform-services', () => ({
@@ -90,6 +95,7 @@ function req(...images: string[]): NextRequest {
 describe('GET /api/workflow-definitions/by-image', () => {
   beforeEach(() => {
     fake.definitions.length = 0;
+    fake.defaultVersions.clear();
   });
 
   it('returns 400 when image param missing', async () => {
@@ -289,5 +295,66 @@ describe('GET /api/workflow-definitions/by-image', () => {
       new NextRequest('http://localhost/api/workflow-definitions/by-image?image=x:y'),
     );
     expect(res.status).toBe(401);
+  });
+
+  it('reports only the live version by default', async () => {
+    fake.definitions.push(
+      makeWorkflow({ name: 'qc', namespace: 'acme', version: 2 }, ['tealflow:v9']),
+      makeWorkflow({ name: 'qc', namespace: 'acme', version: 1 }, ['tealflow:v9']),
+    );
+
+    const body = (await (await GET(req('tealflow:v9'))).json()) as {
+      workflows: { version: number; live: boolean }[];
+    };
+
+    // A superseded version is not a workflow anybody runs, so "used by" stays
+    // the narrow answer it always was.
+    expect(body.workflows).toHaveLength(1);
+    expect(body.workflows[0].version).toBe(2);
+    expect(body.workflows[0].live).toBe(true);
+  });
+
+  it('reports every version, archived included, under scope=all', async () => {
+    fake.definitions.push(
+      makeWorkflow({ name: 'qc', namespace: 'acme', version: 3 }, ['tealflow:v9']),
+      makeWorkflow({ name: 'qc', namespace: 'acme', version: 1 }, ['tealflow:v9']),
+      makeWorkflow({ name: 'old', namespace: 'acme', version: 1, archived: true }, [
+        'tealflow:v9',
+      ]),
+    );
+
+    const res = await GET(
+      new NextRequest(
+        'http://localhost/api/workflow-definitions/by-image?image=tealflow%3Av9&scope=all',
+        { headers: { cookie: 'authjs.session-token=tok-123' } },
+      ),
+    );
+    const body = (await res.json()) as {
+      workflows: { name: string; version: number; live: boolean; archived: boolean }[];
+    };
+
+    // The wide answer is what a reader needs before destroying an artifact:
+    // the narrow one hides the history it would take with it.
+    expect(body.workflows).toHaveLength(3);
+    expect(body.workflows.find((w) => w.version === 1 && w.name === 'qc')?.live).toBe(false);
+    const archived = body.workflows.find((w) => w.name === 'old');
+    expect(archived?.archived).toBe(true);
+    expect(archived?.live).toBe(false);
+  });
+
+  it('treats the default version as live, not the newest', async () => {
+    fake.definitions.push(
+      makeWorkflow({ name: 'qc', namespace: 'acme', version: 3 }, ['tealflow:v9']),
+      makeWorkflow({ name: 'qc', namespace: 'acme', version: 2 }, ['tealflow:v9']),
+    );
+    fake.defaultVersions.set('acme:qc', 2);
+
+    const body = (await (await GET(req('tealflow:v9'))).json()) as {
+      workflows: { version: number }[];
+    };
+
+    // A run starts from the default version; the newest may be a draft nobody
+    // runs, which the old latest-only scan reported instead.
+    expect(body.workflows.map((w) => w.version)).toEqual([2]);
   });
 });

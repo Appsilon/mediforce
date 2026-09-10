@@ -181,47 +181,58 @@ An entry marked **Needs a description** offers **Describe** rather than
 re-pointing it would describe a different one while leaving this one still
 undescribed. Describe it first, then **Edit** can correct it.
 
-## Removing an entry, and its images
+## Removing an entry and its images
 
-**Delete** on any entry withdraws it from the catalog. That removes an
-**offer**, never a capability: no workflow definition references an entry — a
-step stores an image string — so no run changes behaviour and no pinned version
-stops resolving. Any workspace member may do it, and the source can be
-catalogued again afterwards. `mediforce images delete <entry-id> --namespace
-<handle>` is the same write.
+**Delete** on an entry removes it **and** every image behind it, running
+`docker rmi` on each tag it offered. Admin or owner of the workspace, and
+`mediforce images delete <entry-id> --namespace <handle>` is the same write.
 
-### Deleting the images too
+The two are one act on purpose. An entry exists *for* its images, and for a
+source this workspace built, removing the record alone achieves nothing: the row
+is re-derived on the next read and comes back marked **Needs a description**
+([ADR-0022](../adr/0022-image-catalog.md) decision 7), the image stays on the
+daemon, and the step-editor picker goes on offering it. The only thing lost is
+the sentence somebody wrote. When the daemon holds no image for the entry —
+catalogued but never built, or the images already gone — the delete is just the
+record, and the dialog says so.
 
-An admin can tick **Also remove these images from the machine**, which runs
-`docker rmi` on every tag the entry offers. This is a different act under a
-different gate, and the difference is not cosmetic:
+Two things to expect, because the daemon is shared by every workspace:
 
-- **The daemon is deployment-wide.** One tag can back steps in workspaces you
-  cannot see, so the dialog names every workflow that pins what you are about
-  to destroy — the `used by` scan is deployment-wide for exactly this reason. A
-  step whose image is gone fails at container start until it is built or pulled
-  again.
 - **It cannot be undone.** A deleted image is rebuilt or pulled again, never
-  restored. There is no registry to fall back on
-  ([ADR-0022](../adr/0022-image-catalog.md)).
+  restored; there is no registry to fall back on.
 - **Deletion is by tag, not by image id**, so an image a second tag still
   references survives rather than needing a force that would take a version
-  some other entry offers.
-- **Images go first, and all of them must go.** Docker refuses an image a
-  running container is using, or one another image was built on; when that
-  happens the entry is kept, because the entry is the only handle anyone has on
-  the versions left behind. Delete the entry alone, or clear the blockage
-  first.
+  some other entry offers. Docker also refuses an image a running container is
+  using, or one another image was built on — and the entry is then kept, since
+  it is the only handle anyone has on the versions left behind.
 
-A member sees the version list and is told the images stay — removing them
-needs **admin of this workspace**, through **Admin → Infrastructure** or this
-checkbox.
-`mediforce images delete <entry-id> --namespace <handle> --with-images` is the
-same write, and `mediforce system rmi <id-or-tag>` still removes one image on
-its own.
+### What blocks a delete
 
-An entry marked **Needs a description** has no stored record to remove, so
-there **Delete** only offers the images — and only to an admin.
+A **live** workflow version pinning one of the images blocks it. Live means the
+version a run starts from: the workflow's **default** version where one is set,
+otherwise its latest, and not archived. That step can still be re-pointed, so
+nothing has to break — the delete is refused and names the workflow, version and
+steps, with **Archive this version** offered right there. Archiving one version
+leaves the rest of the workflow alone; the whole workflow never has to go to
+reclaim an image.
+
+A version the workflow pins as its **default** is not offered that button, since
+archiving it would leave the workflow pointing at a version that cannot run.
+Point its step at another image, or make a different version the default first.
+
+A **superseded or archived** version does not block, and is listed anyway. A
+registered version is immutable — there is no editing v2 in place — so it could
+never be moved off the image, and refusing on its account would mean an image
+pinned once could never be reclaimed. Re-running one after the delete fails at
+container start.
+
+The check is deployment-wide, because the daemon is: a step in a workspace you
+cannot see blocks the delete just the same, and is reported as a count rather
+than by name.
+
+`mediforce images delete --keep-images` removes only the record — rarely what
+you want, for the reason above — and `mediforce system rmi <id-or-tag>` still
+removes one image on its own.
 
 ## Backfilling an existing deployment
 

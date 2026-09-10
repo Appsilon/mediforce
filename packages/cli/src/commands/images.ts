@@ -271,7 +271,7 @@ export const imagesUpdateCommand = defineCommand({
 export const imagesDeleteCommand = defineCommand({
   name: 'mediforce images delete',
   description:
-    'Remove an entry. Removes an offer, never a capability — no workflow points at an entry. --with-images also destroys its images on the daemon (admin only).',
+    "Delete an entry and the images behind it. Admin/owner only. Refused while a live workflow version still pins one of them — superseded and archived versions do not block.",
   args: {
     entryId: {
       type: 'positional',
@@ -279,14 +279,14 @@ export const imagesDeleteCommand = defineCommand({
       description: 'Entry id (from `images list`)',
     },
     namespace: { type: 'string', required: true, description: 'Namespace handle' },
-    'with-images': {
+    'keep-images': {
       type: 'boolean',
       description:
-        "Also remove the entry's versions from the deployment's Docker daemon. Destructive and admin-gated: a tag can back steps in namespaces you cannot see",
+        'Remove only the catalog record, leaving the images on the daemon. Rarely what you want: anything this namespace built is re-derived on the next read as an undescribed entry',
     },
   },
   async run({ args, output, mediforce, jsonMode }) {
-    const withImages = args['with-images'] === true;
+    const withImages = args['keep-images'] !== true;
     const result = await mediforce.imageCatalog.delete({
       namespace: args.namespace,
       id: args.entryId,

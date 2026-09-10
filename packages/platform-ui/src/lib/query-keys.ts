@@ -186,9 +186,12 @@ export const queryKeys = {
    *  list-prefix invalidation must not clobber it. */
   imageCatalogEntry: (handle: string, id: string) => ['image-catalog-entry', handle, id] as const,
   /** Workflows whose steps pin any of the given images, keyed by the set asked
-   *  for — two entries asking about different versions are two answers. */
+   *  for — two entries asking about different versions are two answers.
+   *  `workflowsByImageAll` is the prefix, for the writes that change every
+   *  answer at once (archiving a version changes which pins are live). */
   workflowsByImage: (images: readonly string[]) =>
     ['workflows-by-image', [...images].sort().join(' ')] as const,
+  workflowsByImageAll: () => ['workflows-by-image'] as const,
   /** Workspace-wide audit trail (Monitoring → Users / Tasks tabs) —
    *  keyset-paginated, server-side filtered by action set + actor +
    *  date range. Each tab passes its own `actions` slice, so the two

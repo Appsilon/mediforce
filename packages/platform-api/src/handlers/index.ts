@@ -41,6 +41,11 @@ export {
   deleteAgentOAuthToken,
 } from './agents/oauth-tokens';
 
+export {
+  findWorkflowImagePins,
+  normalizeImageRef,
+  type WorkflowImagePin,
+} from './workflows/_image-pins';
 export { listWorkflows } from './workflows/list-workflows';
 export { listWorkflowVersions } from './workflows/list-workflow-versions';
 export { getWorkflow } from './workflows/get-workflow';

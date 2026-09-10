@@ -572,9 +572,7 @@ test.describe('image catalog API journey', () => {
     }
   });
 
-  test('a plain member may delete the entry but not the images behind it', async ({
-    request,
-  }) => {
+  test('a plain member cannot delete an entry at all', async ({ request }) => {
     const payload = entryPayload(`rmi-gate-${Date.now()}`);
     const createRes = await request.post(catalogUrl(), {
       headers: apiKeyHeaders(),
@@ -583,34 +581,124 @@ test.describe('image catalog API journey', () => {
     const { entry } = (await createRes.json()) as { entry: EntryView };
 
     try {
-      // The daemon is deployment-wide, so destroying an image is
-      // Infrastructure's admin gate — not the member gate the entry carries.
-      const refused = await request.delete(
+      // Deleting takes the images with it, and the daemon is deployment-wide —
+      // so the whole act carries the workspace's admin gate, not only its
+      // image half. Members may still create an entry.
+      for (const url of [
         `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
-        { headers: sessionCookieHeaders(plainMember) },
-      );
-      expect(refused.status(), await refused.text()).toBe(403);
+        `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
+      ]) {
+        const refused = await request.delete(url, {
+          headers: sessionCookieHeaders(plainMember),
+        });
+        expect(refused.status(), await refused.text()).toBe(403);
+      }
 
-      // Still there: a caller refused the image half gets no delete at all,
-      // rather than a half-done one.
       const stillThere = await request.get(
         `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
         { headers: apiKeyHeaders() },
       );
       expect(stillThere.ok(), await stillThere.text()).toBe(true);
-
-      // The offer is theirs to withdraw, though: no Workflow Definition
-      // references an entry, so this destroys nothing (decision 3).
-      const allowed = await request.delete(
-        `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
-        { headers: sessionCookieHeaders(plainMember) },
-      );
-      expect(allowed.ok(), await allowed.text()).toBe(true);
-      expect(((await allowed.json()) as { deletedImages: string[] }).deletedImages).toEqual([]);
     } finally {
       await request.delete(`/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`, {
         headers: apiKeyHeaders(),
       });
+    }
+  });
+
+  test('a live workflow version blocks the delete until it is archived', async ({ request }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    const stamp = Date.now();
+    const reference = `mediforce-e2e-pinned-${stamp}`;
+    const tag = `${reference}:v1`;
+    const workflowName = `e2e-pin-${stamp}`;
+    let entryId = '';
+
+    try {
+      docker('image', 'inspect', PROBE_BASE_IMAGE);
+    } catch {
+      docker('pull', PROBE_BASE_IMAGE);
+    }
+    deriveImage(tag, PROBE_BASE_IMAGE, 'mkdir /e2e-pin-marker');
+
+    try {
+      const createRes = await request.post(catalogUrl(), {
+        headers: apiKeyHeaders(),
+        data: {
+          name: `E2E pinned ${stamp}`,
+          intent: 'Proves a live pin blocks the composite delete.',
+          source: { kind: 'referenced', reference },
+        },
+      });
+      expect(createRes.status(), await createRes.text()).toBe(201);
+      entryId = ((await createRes.json()) as { entry: EntryView }).entry.id;
+
+      const workflowRes = await request.post(
+        `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
+        {
+          headers: apiKeyHeaders(),
+          data: {
+            name: workflowName,
+            title: `E2E Pin ${stamp}`,
+            steps: [
+              {
+                id: 'analyse',
+                name: 'Analyse',
+                type: 'creation',
+                executor: 'agent',
+                autonomyLevel: 'L2',
+                agent: { image: tag },
+              },
+              { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+            ],
+            transitions: [{ from: 'analyse', to: 'done' }],
+          },
+        },
+      );
+      expect(workflowRes.status(), await workflowRes.text()).toBe(201);
+
+      const blocked = await request.delete(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        { headers: apiKeyHeaders() },
+      );
+      // 409 and named, so the message is actionable rather than a bare refusal.
+      expect(blocked.status(), await blocked.text()).toBe(409);
+      expect(await blocked.text()).toContain(workflowName);
+
+      // Nothing destroyed: the image is still on the daemon and the entry with it.
+      docker('image', 'inspect', tag);
+
+      // Archiving the version that pins it is the remedy — one version, not the
+      // whole workflow.
+      const archived = await request.post(
+        `/api/workflow-definitions/${workflowName}/versions/1/archive?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders(), data: { archived: true } },
+      );
+      expect(archived.ok(), await archived.text()).toBe(true);
+
+      const allowed = await request.delete(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(allowed.ok(), await allowed.text()).toBe(true);
+      expect(((await allowed.json()) as { deletedImages: string[] }).deletedImages).toEqual([tag]);
+      entryId = '';
+      expect(() => docker('image', 'inspect', tag)).toThrow();
+    } finally {
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+      await request.delete(
+        `/api/workflow-definitions/${workflowName}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders() },
+      );
+      try {
+        docker('rmi', '-f', tag);
+      } catch {
+        /* the delete under test removed it */
+      }
     }
   });
 
