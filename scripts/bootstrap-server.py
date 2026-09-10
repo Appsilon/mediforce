@@ -1438,7 +1438,7 @@ def step_postgres_dir(ctx: Context) -> None:
     before the container starts, or initdb fails.
 
     Idempotent — verifies existing ownership and exits early if already
-    correct. Uses the same rootful-alpine trick as deploy-staging.sh
+    correct. Uses the same rootful-alpine trick as deploy.sh
     because the deploy user lacks sudo.
     """
     host_dir = "/var/lib/mediforce/postgres-data"
