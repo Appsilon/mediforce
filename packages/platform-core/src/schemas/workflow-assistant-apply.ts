@@ -294,6 +294,25 @@ export function applyWorkflowAssistantToolCalls(
         return when === undefined ? rest : { ...rest, when };
       });
       outcomes.push({ tool: 'set_transition_condition', stepId: `${from} → ${to}` });
+    } else if (call.tool === 'remove_transition') {
+      const { when } = call.arguments;
+      const from = resolveId(call.arguments.from) ?? call.arguments.from;
+      const to = resolveId(call.arguments.to) ?? call.arguments.to;
+      const matches = (edge: Transitions[number]): boolean =>
+        edge.from === from && edge.to === to && (when === undefined || edge.when === when);
+      if (workingTransitions.some(matches) === false) {
+        outcomes.push({
+          tool: 'remove_transition',
+          stepId: `${from} → ${to}`,
+          error: `There is no transition from "${from}" to "${to}"${when === undefined ? '' : ` with the condition ${when}`}.`,
+        });
+        continue;
+      }
+      // Every edge between the two when no condition is named: a pair that
+      // differs only in `when` is the shape this tool exists to clean up, and
+      // naming the condition is how one of the pair is kept.
+      workingTransitions = workingTransitions.filter((edge) => matches(edge) === false);
+      outcomes.push({ tool: 'remove_transition', stepId: `${from} → ${to}` });
     } else if (call.tool === 'update_step') {
       const { stepId, insertAfterId, insertBeforeId, ...patch } = call.arguments;
       const realId = resolveId(stepId) ?? stepId;

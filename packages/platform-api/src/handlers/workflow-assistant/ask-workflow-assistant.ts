@@ -160,8 +160,8 @@ export function parseMutationToolCall(toolName: string, parsedArguments: unknown
 type Transitions = WorkflowDefinition['transitions'];
 
 type ValidatedGraph =
-  | { valid: true; steps: WorkflowStep[]; transitions: Transitions }
-  | { valid: false; errors: string[]; steps: WorkflowStep[]; transitions: Transitions };
+  | { valid: true; steps: WorkflowStep[]; transitions: Transitions; inheritedErrors: string[] }
+  | { valid: false; errors: string[]; steps: WorkflowStep[]; transitions: Transitions; inheritedErrors: string[] };
 
 /**
  * The canvas as it stands after the calls so far, in the terms the model needs
@@ -180,6 +180,37 @@ function describeGraph(steps: WorkflowStep[], transitions: Transitions): string 
     ? transitions.map((t) => `${t.from} → ${t.to}`).join(', ')
     : 'none';
   return `The canvas now holds these steps, by id: ${stepList}. Transitions: ${edgeList}.`;
+}
+
+/** The graph and reference errors a definition already carries, so the gate can
+ *  tell a defect this turn introduced from one it inherited. */
+function collectGraphErrors(
+  steps: WorkflowStep[],
+  transitions: Transitions,
+  namespace: string,
+): string[] {
+  const merged = mergeVerdictTransitions(steps, transitions);
+  const ordered = ensureEntryStepFirst(steps, merged);
+  const graph = validateStepGraph(toProcessDefinition({
+    name: 'simulated',
+    version: 1,
+    namespace,
+    visibility: 'private',
+    steps: ordered,
+    transitions: merged,
+  }));
+  return [
+    ...(graph.valid ? [] : graph.errors),
+    ...validateStepReferences(steps, merged).filter((i) => i.severity === 'error').map((i) => i.message),
+  ];
+}
+
+/** What to tell the model about defects the canvas arrived with. Reported, not
+ *  enforced: it did not cause them, and the person may not want them touched —
+ *  but a workflow that cannot run is worth a sentence. */
+function inheritedNote(inheritedErrors: string[]): string {
+  if (inheritedErrors.length === 0) return '';
+  return `\n\nSeparately, this workflow already had ${inheritedErrors.length === 1 ? 'a problem' : 'problems'} before you touched it: ${inheritedErrors.join('; ')}. Do not silently fix ${inheritedErrors.length === 1 ? 'it' : 'them'} unless that is what was asked — mention ${inheritedErrors.length === 1 ? 'it' : 'them'} in your reply and offer to.`;
 }
 
 export function validateResultingGraph(
@@ -235,14 +266,24 @@ export function validateResultingGraph(
     ? []
     : templateParse.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`);
   const applied_ = { steps: orderedSteps, transitions: mergedTransitions };
-  if (graphErrors.length === 0 && referenceErrors.length === 0 && outcomeErrors.length === 0 && schemaErrors.length === 0) {
-    return { valid: true, ...applied_ };
+
+  // What the canvas was already wrong about before this turn touched it. A
+  // workflow can arrive here invalid — pasted, imported, or authored before a
+  // rule existed — and failing the gate on that made it uneditable: the model
+  // was told to fix something it had not caused, often had no tool for, and
+  // spent its whole turn on. Inherited errors are reported, not enforced; only
+  // what this turn introduced fails the gate.
+  const inheritedErrors = collectGraphErrors(
+    currentDefinition.steps,
+    currentDefinition.transitions,
+    namespace,
+  );
+  const introduced = (error: string): boolean => inheritedErrors.includes(error) === false;
+  const errors = [...graphErrors, ...referenceErrors, ...outcomeErrors, ...schemaErrors].filter(introduced);
+  if (errors.length === 0) {
+    return { valid: true, ...applied_, inheritedErrors };
   }
-  return {
-    valid: false,
-    errors: [...graphErrors, ...referenceErrors, ...outcomeErrors, ...schemaErrors],
-    ...applied_,
-  };
+  return { valid: false, errors, ...applied_, inheritedErrors };
 }
 
 /** What the assistant says when it could not finish: the reply the person
@@ -435,7 +476,7 @@ export async function askWorkflowAssistant(
         }
         messages.push({
           role: 'user',
-          content: `Those changes were applied.\n\n${describeGraph(graphCheck.steps, graphCheck.transitions)}\n\nIf anything the request asked for is still missing — a step, a file, a condition, a workflow-level field — continue with more tool calls, using the ids above (the clientIds from your previous response no longer resolve) and without repeating what is already applied. If it is all there, reply with no tool calls: one or two sentences in plain language summarizing what you built.`,
+          content: `Those changes were applied.\n\n${describeGraph(graphCheck.steps, graphCheck.transitions)}\n\nIf anything the request asked for is still missing — a step, a file, a condition, a workflow-level field — continue with more tool calls, using the ids above (the clientIds from your previous response no longer resolve) and without repeating what is already applied. If it is all there, reply with no tool calls: one or two sentences in plain language summarizing what you built.${inheritedNote(graphCheck.inheritedErrors)}`,
         });
         continue;
       }

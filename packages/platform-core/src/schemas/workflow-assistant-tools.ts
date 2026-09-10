@@ -185,6 +185,23 @@ export const SetTransitionConditionToolSchema = z.object({
 export type SetTransitionConditionTool = z.infer<typeof SetTransitionConditionToolSchema>;
 
 /**
+ * Remove one edge between two steps.
+ *
+ * The verb the graph tools were missing: transitions otherwise only changed as
+ * a side effect of adding, removing or re-inserting a step, so a workflow
+ * carrying an edge it should not — a hand-written transition beside a verdict
+ * step's own routing, say — could be diagnosed and never repaired. `when`
+ * narrows it to one edge of a pair; omitted, every edge between the two steps
+ * goes.
+ */
+export const RemoveTransitionToolSchema = z.object({
+  from: z.string().min(1),
+  to: z.string().min(1),
+  when: z.string().min(1).optional(),
+});
+export type RemoveTransitionTool = z.infer<typeof RemoveTransitionToolSchema>;
+
+/**
  * Write one file the workflow carries: a script a step runs, a Dockerfile its
  * image is built from, a SKILL.md an agent reads. Upserts by path, so changing
  * one file does not mean resending the rest — a model that has to resend
@@ -210,6 +227,7 @@ export const WORKFLOW_ASSISTANT_TOOLS = {
   remove_step: RemoveStepToolSchema,
   update_workflow: UpdateWorkflowToolSchema,
   set_transition_condition: SetTransitionConditionToolSchema,
+  remove_transition: RemoveTransitionToolSchema,
   write_workflow_file: WriteWorkflowFileToolSchema,
   remove_workflow_file: RemoveWorkflowFileToolSchema,
 } as const;
@@ -228,6 +246,7 @@ export const WorkflowAssistantToolCallSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('remove_step'), arguments: RemoveStepToolSchema }),
   z.object({ tool: z.literal('update_workflow'), arguments: UpdateWorkflowToolSchema }),
   z.object({ tool: z.literal('set_transition_condition'), arguments: SetTransitionConditionToolSchema }),
+  z.object({ tool: z.literal('remove_transition'), arguments: RemoveTransitionToolSchema }),
   z.object({ tool: z.literal('write_workflow_file'), arguments: WriteWorkflowFileToolSchema }),
   z.object({ tool: z.literal('remove_workflow_file'), arguments: RemoveWorkflowFileToolSchema }),
 ]);
