@@ -5,6 +5,8 @@ import type { WorkflowStep } from '@mediforce/platform-core';
 
 // ---- Mocks (must be before component import) ----
 
+const secretState = vi.hoisted(() => ({ keys: ['OPENROUTER_API_KEY'] as string[] }));
+
 const assistantState = vi.hoisted(() => ({
   planCalls: [] as { messages: { role: string; content: string }[]; signal?: AbortSignal }[],
   askCalls: [] as { messages: { role: string; content: string }[]; signal?: AbortSignal }[],
@@ -13,33 +15,43 @@ const assistantState = vi.hoisted(() => ({
   askResolver: null as null | ((value: unknown) => void),
   /** Set to answer the build immediately instead of leaving it in flight. */
   askResult: null as null | { reply?: string; toolCalls?: unknown[] },
+  /** Set to make the planning call fail the way a refused request does. */
+  planError: null as null | Error,
 }));
 
-vi.mock('@/lib/mediforce', () => ({
-  ApiError: class ApiError extends Error {},
-  mediforce: {
-    assistant: {
-      plan: (input: { messages: { role: string; content: string }[] }, options: { signal?: AbortSignal }) => {
-        assistantState.planCalls.push({ messages: input.messages, signal: options.signal });
-        return Promise.resolve(assistantState.plan);
-      },
-      ask: (input: { messages: { role: string; content: string }[] }, options: { signal?: AbortSignal }) => {
-        assistantState.askCalls.push({ messages: input.messages, signal: options.signal });
-        if (assistantState.askResult !== null) return Promise.resolve(assistantState.askResult);
-        return new Promise((resolve, reject) => {
-          assistantState.askResolver = resolve;
-          options.signal?.addEventListener('abort', () => {
-            reject(new DOMException('Aborted', 'AbortError'));
-          });
-        });
-      },
+vi.mock('@/lib/mediforce', () => {
+  const assistant = {
+    plan: (input: { messages: { role: string; content: string }[] }, options: { signal?: AbortSignal }) => {
+      assistantState.planCalls.push({ messages: input.messages, signal: options.signal });
+      if (assistantState.planError !== null) return Promise.reject(assistantState.planError);
+      return Promise.resolve(assistantState.plan);
     },
-  },
-}));
+    ask: (input: { messages: { role: string; content: string }[] }, options: { signal?: AbortSignal }) => {
+      assistantState.askCalls.push({ messages: input.messages, signal: options.signal });
+      if (assistantState.askResult !== null) return Promise.resolve(assistantState.askResult);
+      return new Promise((resolve, reject) => {
+        assistantState.askResolver = resolve;
+        options.signal?.addEventListener('abort', () => {
+          reject(new DOMException('Aborted', 'AbortError'));
+        });
+      });
+    },
+  };
+  const secrets = { list: () => Promise.resolve({ keys: secretState.keys }) };
+  return {
+    ApiError: class ApiError extends Error {},
+    mediforce: { assistant, secrets },
+    mediforceSilent: { assistant, secrets },
+  };
+});
+
+const toastState = vi.hoisted(() => ({ calls: [] as { title?: string }[] }));
 
 vi.mock('@/components/command-palette', () => ({
-  useToast: () => vi.fn(),
+  useToast: () => ({ toast: (opts: { title?: string }) => { toastState.calls.push(opts); } }),
 }));
+
+const roleState = vi.hoisted(() => ({ held: ['data-manager'] as string[] | null }));
 
 vi.mock('@/hooks/use-workspace-roles', () => ({
   useWorkspaceRoles: () => ({ roles: [], workflowNames: [], heldRoles: roleState.held, loading: false, error: null }),
@@ -51,8 +63,6 @@ vi.mock('@/hooks/use-docker-images', () => ({
 }));
 
 // Renders the selected step; adding a step selects it, and the real editor
-const roleState = vi.hoisted(() => ({ held: ['data-manager'] as string[] | null }));
-
 // wants the auth context this test has no use for.
 vi.mock('../workflow-editor/step-editor', () => ({
   StepEditor: () => <div data-testid="step-editor" />,
@@ -63,9 +73,18 @@ vi.mock('@/components/workflows/workflow-diagram', () => ({
 }));
 
 import { WorkflowEditorCanvas } from '../workflow-editor-canvas';
+// The mocked client's own error class: the pane tells a refused request apart
+// from a plan it merely could not read.
+import { ApiError } from '@/lib/mediforce';
 
 // jsdom has no scrolling; the pane scrolls its thread to the newest message.
 Element.prototype.scrollTo = vi.fn();
+// …and no ResizeObserver, which the tooltip's arrow measures itself with.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver;
 
 const STEPS: WorkflowStep[] = [
   { id: 'draft', name: 'Draft', type: 'creation', executor: 'human' },
@@ -96,6 +115,10 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
     assistantState.askCalls = [];
     assistantState.askResolver = null;
     assistantState.askResult = null;
+    secretState.keys = ['OPENROUTER_API_KEY'];
+    toastState.calls = [];
+    assistantState.planError = null;
+    roleState.held = ['data-manager'];
     assistantState.plan = { plan: ['Poll SFTP, validate, then report.'], questions: [], phases: [] };
   });
 
@@ -115,10 +138,6 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
     // Read from the graph the reducer just returned. It used to be read back
     // from a ref mirroring state one macrotask later, which needed a
     // setTimeout to be true at all.
-    secretState.keys = ['OPENROUTER_API_KEY'];
-    toastState.calls = [];
-    assistantState.planError = null;
-    roleState.held = ['data-manager'];
     assistantState.askResult = {
       reply: 'Added a validation step.',
       toolCalls: [{
@@ -134,19 +153,6 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
     });
   });
 
-  it('halts the turn in flight and says so, rather than leaving it running', async () => {
-    openAssistant();
-    await ask('Build a CDISC validation workflow.');
-
-    fireEvent.click(screen.getByLabelText('Stop the assistant'));
-
-    expect(assistantState.askCalls[0]?.signal?.aborted).toBe(true);
-    await waitFor(() => {
-      expect(screen.getByText(/Stopped\. Nothing was changed on the canvas\./)).toBeTruthy();
-    });
-    expect(screen.queryByLabelText('Stop the assistant')).toBeNull();
-  });
-});
   it('warns, before you type, when the workspace has no OpenRouter key', async () => {
     // Without it every turn fails at the server. Saying so up front beats
     // three error toasts after the fact.
@@ -237,3 +243,16 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
     expect(screen.queryByText(/\*\*Poll\*\*/)).toBeNull();
   });
 
+  it('halts the turn in flight and says so, rather than leaving it running', async () => {
+    openAssistant();
+    await ask('Build a CDISC validation workflow.');
+
+    fireEvent.click(screen.getByLabelText('Stop the assistant'));
+
+    expect(assistantState.askCalls[0]?.signal?.aborted).toBe(true);
+    await waitFor(() => {
+      expect(screen.getByText(/Stopped\. Nothing was changed on the canvas\./)).toBeTruthy();
+    });
+    expect(screen.queryByLabelText('Stop the assistant')).toBeNull();
+  });
+});

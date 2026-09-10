@@ -458,10 +458,10 @@ export function WorkflowEditorCanvas({
   const [assistantKeyMissing, setAssistantKeyMissing] = useState(false);
   /** The turn in flight, so the halt button can stop it. */
   const assistantAbortRef = useRef<AbortController | null>(null);
+  const heldRolesRef = useRef<string[] | null>(null);
   const assistantScrollRef = useRef<HTMLDivElement>(null);
   const assistantInputRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
   useEffect(() => {
     if (!aiPaneOpen || !namespace) return;
     let cancelled = false;
@@ -473,9 +473,9 @@ export function WorkflowEditorCanvas({
     return () => { cancelled = true; };
   }, [aiPaneOpen, namespace]);
 
+  useEffect(() => {
     const el = assistantInputRef.current;
     if (!el) return;
-  const heldRolesRef = useRef<string[] | null>(null);
     el.style.height = 'auto';
     el.style.height = `${String(el.scrollHeight)}px`;
   }, [assistantInput]);
@@ -631,6 +631,9 @@ export function WorkflowEditorCanvas({
           messages: messagesForModel(answered),
           model: assistantModel,
           workflowDefinition: assistantWorkflowDefinition(),
+          // A trigger attaches to a saved workflow, so the assistant needs to
+          // know whether this canvas is a version of one.
+          ...(workflowName === undefined ? {} : { workflowName }),
         },
         { namespace, signal: controller.signal },
       );
@@ -654,15 +657,23 @@ export function WorkflowEditorCanvas({
           role: 'assistant',
           content: `Not everything landed: ${applied.error}`,
           narration: true,
-          // A trigger attaches to a saved workflow, so the assistant needs to
-          // know whether this canvas is a version of one.
-          ...(workflowName === undefined ? {} : { workflowName }),
         }]);
       }
       if (applied.steps !== null) {
         const issue = validateSteps(applied.steps);
         if (issue) {
           setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `This will not save yet: ${issue}`, narration: true }]);
+        }
+        // A role nobody holds is a task nobody can claim. Said here rather than
+        // left to the prompt: the model may not check, and the step panel that
+        // already warns about it is not where this person is looking.
+        const unheld = unheldStepRoles(applied.steps, heldRolesRef.current);
+        if (unheld.length > 0) {
+          setAssistantMessages((prev) => [...prev, {
+            role: 'assistant',
+            content: `Heads up: nobody holds ${unheld.map((role) => `"${role}"`).join(', ')} in this workspace, so ${unheld.length === 1 ? 'that step' : 'those steps'} will wait until someone is granted ${unheld.length === 1 ? 'it' : 'them'} in Settings → Members.`,
+            narration: true,
+          }]);
         }
       }
     } catch (err) {
@@ -681,17 +692,6 @@ export function WorkflowEditorCanvas({
     } finally {
       assistantAbortRef.current = null;
       setAssistantLoading(false);
-        // A role nobody holds is a task nobody can claim. Said here rather than
-        // left to the prompt: the model may not check, and the step panel that
-        // already warns about it is not where this person is looking.
-        const unheld = unheldStepRoles(applied.steps, heldRolesRef.current);
-        if (unheld.length > 0) {
-          setAssistantMessages((prev) => [...prev, {
-            role: 'assistant',
-            content: `Heads up: nobody holds ${unheld.map((role) => `"${role}"`).join(', ')} in this workspace, so ${unheld.length === 1 ? 'that step' : 'those steps'} will wait until someone is granted ${unheld.length === 1 ? 'it' : 'them'} in Settings → Members.`,
-            narration: true,
-          }]);
-        }
     }
   }, [assistantMessages, assistantLoading, assistantModel, namespace, assistantWorkflowDefinition, applyAssistantToolCalls, toast]);
 
@@ -757,7 +757,7 @@ export function WorkflowEditorCanvas({
       setAssistantMessages((prev) => [...prev, { role: 'assistant', content: planned.plan.join('\n'), narration: true }]);
     }
     await runAssistantBuild(undefined, nextMessages);
-  }, [assistantMessages, assistantInput, assistantLoading, assistantPlanning, assistantModel, namespace, assistantWorkflowDefinition, runAssistantBuild]);
+  }, [assistantMessages, assistantInput, assistantLoading, assistantPlanning, assistantModel, namespace, assistantWorkflowDefinition, runAssistantBuild, toast]);
 
   const moveStep = useCallback((stepId: string, direction: 'up' | 'down') => {
     saveSnapshot();
