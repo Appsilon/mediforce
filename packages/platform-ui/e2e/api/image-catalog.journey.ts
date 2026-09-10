@@ -1,4 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
@@ -102,6 +105,40 @@ function labelAsBuilt(
   } finally {
     docker('rm', '-f', container);
   }
+}
+
+/**
+ * A throwaway git repo with a one-line Dockerfile, returned with its commit.
+ *
+ * A real repo rather than a stub: the build path clones and checks out, so a
+ * fixture that skipped git would test everything except the part that runs in
+ * production. A bare absolute path keeps it off the network and is the local
+ * form `resolveRepoCloneTargets` accepts — `file://` is not, and is rewritten
+ * into a GitHub SSH reference. `_discovered.ts` drops local paths, but nothing
+ * about *versions* does, and this exercise is a catalogued entry gaining one.
+ */
+function createBuildFixtureRepo(): { repoUrl: string; commit: string; dir: string } {
+  const dir = mkdtempSync(join(tmpdir(), 'mediforce-e2e-buildsrc-'));
+  writeFileSync(join(dir, 'Dockerfile'), `FROM ${PROBE_BASE_IMAGE}\nRUN touch /built-on-demand\n`);
+  const git = (...args: string[]): void => {
+    execFileSync('git', ['-C', dir, ...args], {
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'e2e',
+        GIT_AUTHOR_EMAIL: 'e2e@example.com',
+        GIT_COMMITTER_NAME: 'e2e',
+        GIT_COMMITTER_EMAIL: 'e2e@example.com',
+      },
+    });
+  };
+  git('init', '--initial-branch=main');
+  git('add', 'Dockerfile');
+  git('commit', '-m', 'fixture');
+  const commit = execFileSync('git', ['-C', dir, 'rev-parse', 'HEAD'], { stdio: 'pipe' })
+    .toString()
+    .trim();
+  return { repoUrl: dir, commit, dir };
 }
 
 function dockerAvailable(): boolean {
@@ -471,6 +508,81 @@ test.describe('image catalog API journey', () => {
     await request.delete(`/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`, {
       headers: apiKeyHeaders(),
     });
+  });
+
+  test('a member builds a version on demand and it lands under the entry', async ({ request }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    // A clone plus a real `docker build`, on a daemon shared with every other
+    // test in this file.
+    test.setTimeout(300_000);
+
+    const fixture = createBuildFixtureRepo();
+    let entryId = '';
+    let builtTag = '';
+    try {
+      // Catalogue the source first, so the assertion is that the build lands as
+      // a *version of an entry an author already chose* — the property that
+      // makes a rebuild an update rather than a new row (ADR-0022 decision 1).
+      const createRes = await request.post(catalogUrl(), {
+        headers: apiKeyHeaders(),
+        data: {
+          name: 'E2E on-demand build',
+          intent: 'Proves a build with no workflow run lands in the catalog.',
+          source: { kind: 'built', repo: fixture.repoUrl, dockerfile: 'Dockerfile' },
+        },
+      });
+      expect(createRes.status(), await createRes.text()).toBe(201);
+      entryId = ((await createRes.json()) as { entry: EntryView }).entry.id;
+
+      // A plain member, not an admin: the build gate matches the create gate.
+      const buildRes = await request.post(`/api/image-catalog/build?namespace=${TEST_ORG_HANDLE}`, {
+        headers: sessionCookieHeaders(callers.member),
+        data: { repo: fixture.repoUrl, commit: fixture.commit, dockerfile: 'Dockerfile' },
+      });
+      expect(buildRes.status(), await buildRes.text()).toBe(200);
+      const built = (await buildRes.json()) as { imageTag: string; entryId: string };
+      builtTag = built.imageTag;
+
+      // The tag is the one a build-mode step pinning this commit would resolve
+      // to, so that step finds this image cached instead of rebuilding it.
+      expect(built.imageTag).toMatch(/^mediforce-built:[0-9a-f]{12}$/);
+      expect(built.entryId).toBe(entryId);
+
+      const getRes = await request.get(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(getRes.ok(), await getRes.text()).toBe(true);
+      const { entry } = (await getRes.json()) as { entry: EntryView };
+      expect(entry.availability).toBe('present');
+      const version = entry.versions.find((candidate) => candidate.imageTag === built.imageTag);
+      expect(version, `no version for ${built.imageTag}`).toBeDefined();
+      // Provenance the *build* wrote, read back by the catalog with no help:
+      // this is what makes the on-demand path indistinguishable from a step's.
+      expect(version?.lineage.ownLabels['mediforce.build.commit']).toBe(fixture.commit);
+    } finally {
+      if (builtTag !== '') {
+        try {
+          docker('rmi', '-f', builtTag);
+        } catch {
+          // The build may not have produced it; the assertions already said so.
+        }
+      }
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+      rmSync(fixture.dir, { recursive: true, force: true });
+    }
+  });
+
+  test('a caller from another namespace cannot build', async ({ request }) => {
+    const buildRes = await request.post(`/api/image-catalog/build?namespace=${TEST_ORG_HANDLE}`, {
+      headers: sessionCookieHeaders(callers.outsider),
+      data: { repo: 'Appsilon/nope', commit: 'abc1234', dockerfile: 'Dockerfile' },
+    });
+    expect(buildRes.status()).toBe(403);
   });
 
   test('a caller from another namespace cannot see or write the catalog', async ({ request }) => {

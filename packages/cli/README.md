@@ -46,7 +46,12 @@ from a `FROM` string — and `images show` prints, per version, that base and th
 layer summary the version adds over it. A row reading *"built here, not
 described yet"* is a source the platform built for that namespace which nobody
 has written a sentence for; `images create` on its source registers it
-([ADR-0022](../../docs/adr/0022-image-catalog.md) decision 7).
+([ADR-0022](../../docs/adr/0022-image-catalog.md) decision 7). `images build
+--repo --commit [--dockerfile]` builds one version of a built source there and
+then, instead of waiting for a workflow run to build it lazily: it mints the
+same tag a build-mode step pinning that commit resolves to, so that step finds
+the image cached rather than rebuilding it. It holds the connection for the
+whole build — minutes, not the sub-second every other command takes.
 
 ## Rules
 

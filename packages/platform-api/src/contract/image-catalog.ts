@@ -139,6 +139,28 @@ export const UpdateImageCatalogEntryOutputSchema = z.object({
   entry: ImageCatalogEntryViewSchema,
 });
 
+/**
+ * POST input for a build: the source and one commit.
+ *
+ * No `image` field. The tag is `deriveBuildTag`'s output for these exact
+ * inputs, so accepting one would let a caller mint an image that no step
+ * pinning this commit can find — the cache key and the catalog key would
+ * disagree (ADR-0022 decision 1).
+ */
+export const BuildImageCatalogVersionInputSchema = NamespaceQuery.extend({
+  repo: z.string().min(1),
+  commit: z.string().min(1),
+  /** Empty is a value, not an absence — it is what the entry is keyed on. */
+  dockerfile: z.string().default(''),
+}).strict();
+
+export const BuildImageCatalogVersionOutputSchema = z.object({
+  /** The tag the image was built under, which a step pinning this commit hits. */
+  imageTag: z.string(),
+  /** The entry this build belongs to — catalogued or discovered, same id. */
+  entryId: z.string(),
+});
+
 export const DeleteImageCatalogEntryInputSchema = NamespaceQuery.extend({
   id: z.string().min(1),
 });
@@ -164,5 +186,7 @@ export type UpdateImageCatalogEntryInputApi = z.infer<
   typeof UpdateImageCatalogEntryInputApiSchema
 >;
 export type UpdateImageCatalogEntryOutput = z.infer<typeof UpdateImageCatalogEntryOutputSchema>;
+export type BuildImageCatalogVersionInput = z.infer<typeof BuildImageCatalogVersionInputSchema>;
+export type BuildImageCatalogVersionOutput = z.infer<typeof BuildImageCatalogVersionOutputSchema>;
 export type DeleteImageCatalogEntryInput = z.infer<typeof DeleteImageCatalogEntryInputSchema>;
 export type DeleteImageCatalogEntryOutput = z.infer<typeof DeleteImageCatalogEntryOutputSchema>;

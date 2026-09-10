@@ -49,6 +49,34 @@ export interface ImageProvenance {
 }
 
 /**
+ * The inputs a build needs, as sent across a process boundary.
+ *
+ * The platform builds an image in two places — in-process when the daemon is
+ * local, and over the worker's HTTP route when it is not — and both call the
+ * same `buildImageFromRepo`. Shared here so the two processes cannot drift
+ * apart on a field, which the container-worker README calls out as the hazard
+ * of a cross-process payload.
+ */
+export const BuildImageRequestSchema = z
+  .object({
+    /** Tag to build under — `deriveBuildTag`'s output for a build-mode step. */
+    image: z.string().min(1),
+    /** Normalized git URL cloned for the build context. */
+    repoUrl: z.string().min(1),
+    /** Pre-normalization reference, which picks the clone transport. */
+    repoRef: z.string().min(1).optional(),
+    commit: z.string().min(1),
+    /** Empty is a value, not an absence: it is what `deriveBuildTag` hashes. */
+    dockerfile: z.string().default(''),
+    repoToken: z.string().optional(),
+    workflow: z.string().optional(),
+    namespace: z.string().optional(),
+  })
+  .strict();
+
+export type BuildImageRequest = z.infer<typeof BuildImageRequestSchema>;
+
+/**
  * `--label` arguments for `docker build`, one flag pair per known fact.
  *
  * Labels are immutable and travel with the image, so the repo URL is redacted

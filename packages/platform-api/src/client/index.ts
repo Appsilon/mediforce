@@ -192,6 +192,8 @@ import {
   CreateImageCatalogEntryOutputSchema,
   UpdateImageCatalogEntryInputApiSchema,
   UpdateImageCatalogEntryOutputSchema,
+  BuildImageCatalogVersionInputSchema,
+  BuildImageCatalogVersionOutputSchema,
   DeleteImageCatalogEntryInputSchema,
   DeleteImageCatalogEntryOutputSchema,
   ListNamespaceMembersInputSchema,
@@ -289,6 +291,8 @@ import {
   type CreateImageCatalogEntryOutput,
   type UpdateImageCatalogEntryInputApi,
   type UpdateImageCatalogEntryOutput,
+  type BuildImageCatalogVersionInput,
+  type BuildImageCatalogVersionOutput,
   type DeleteImageCatalogEntryInput,
   type DeleteImageCatalogEntryOutput,
   type ListTasksInput,
@@ -798,6 +802,9 @@ export class Mediforce {
     create: (input: CreateImageCatalogEntryInputApi) => Promise<CreateImageCatalogEntryOutput>;
     update: (input: UpdateImageCatalogEntryInputApi) => Promise<UpdateImageCatalogEntryOutput>;
     delete: (input: DeleteImageCatalogEntryInput) => Promise<DeleteImageCatalogEntryOutput>;
+    /** Build one version of a built source. Long-running: it clones and runs a
+     *  Dockerfile on the deployment's daemon before resolving. */
+    build: (input: BuildImageCatalogVersionInput) => Promise<BuildImageCatalogVersionOutput>;
   };
 
   readonly users: {
@@ -2064,6 +2071,18 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.delete');
         return DeleteImageCatalogEntryOutputSchema.parse(body);
+      },
+      build: async (input) => {
+        const validated = BuildImageCatalogVersionInputSchema.parse(input);
+        const { namespace, ...buildBody } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/image-catalog/build${qs}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.build');
+        return BuildImageCatalogVersionOutputSchema.parse(body);
       },
     };
 

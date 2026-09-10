@@ -259,3 +259,35 @@ export const imagesDeleteCommand = defineCommand({
     return 0;
   },
 });
+
+export const imagesBuildCommand = defineCommand({
+  name: 'mediforce images build',
+  description:
+    'Build one version of a built source on the deployment, without running a workflow.',
+  args: {
+    namespace: { type: 'string', required: true, description: 'Namespace handle' },
+    repo: { type: 'string', required: true, description: 'Git repo to build from' },
+    commit: { type: 'string', required: true, description: 'Commit to check out and build' },
+    dockerfile: { type: 'string', description: 'Dockerfile path inside --repo' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    if (jsonMode === false) {
+      // A clone plus a Dockerfile takes minutes and the command shows nothing
+      // until it lands, so say so rather than looking hung.
+      output.stdout(`Building ${args.repo}@${args.commit.slice(0, 8)} — this takes a few minutes...`);
+    }
+    const result = await mediforce.imageCatalog.build({
+      namespace: args.namespace,
+      repo: args.repo,
+      commit: args.commit,
+      dockerfile: args.dockerfile ?? '',
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    output.stdout(`Built ${result.imageTag} for entry ${result.entryId}.`);
+    output.stdout('It is offered in the catalog — `mediforce images list` to see it.');
+    return 0;
+  },
+});

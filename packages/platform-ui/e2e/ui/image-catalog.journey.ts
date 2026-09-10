@@ -120,6 +120,11 @@ test.describe('Image Catalog UI journey', () => {
       );
       expect(workflowRes.status(), await workflowRes.text()).toBe(201);
 
+      page.on('response', (res) => {
+        if (res.url().includes('/api/image-catalog')) {
+          console.log('DEBUG resp', res.request().method(), res.status(), res.url());
+        }
+      });
       await page.goto(`/${TEST_ORG_HANDLE}/images`);
       await expect(page.getByRole('heading', { name: 'Images' })).toBeVisible({ timeout: 30_000 });
 
@@ -168,6 +173,67 @@ test.describe('Image Catalog UI journey', () => {
         { headers: AUTH },
       );
       docker('rmi', `${derivedReference}:v1`, `${baseReference}:v1`);
+    }
+  });
+
+  test('an author catalogues a repository nobody here has built from yet', async ({
+    page,
+    request,
+  }) => {
+    // One catalog read per navigation, each shelling out to Docker.
+    test.setTimeout(120_000);
+    trackPageErrors(page);
+
+    const stamp = Date.now();
+    // A repo the platform has never built from: the entry it creates has no
+    // image behind it, which is the state this flow exists for and the one
+    // **Describe** can never reach — that one only ever names a source some
+    // build already recorded.
+    const repo = `Appsilon/e2e-added-${stamp}`;
+    const intent = `Catalogued from the Images view ${stamp}, never built here.`;
+    let entryId = '';
+
+    try {
+      await page.goto(`/${TEST_ORG_HANDLE}/images`);
+      await page.getByRole('button', { name: /Add image/ }).click();
+
+      // Scoped to the dialog and exact: `getByLabel` matches substrings, and
+      // the page behind it carries labels of its own.
+      const dialog = page.getByRole('dialog');
+      await dialog.getByLabel('Repository', { exact: true }).fill(repo);
+      await dialog.getByLabel(/Dockerfile/).fill('container/Dockerfile');
+      await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue(`e2e-added-${stamp}`);
+      await dialog.getByLabel('Intent', { exact: true }).fill(intent);
+      await dialog.getByRole('button', { name: 'Add to the catalog' }).click();
+
+      // The dialog closes only once the write resolved, so this is the gate
+      // that keeps the assertions below from racing the request.
+      await expect(dialog).toBeHidden({ timeout: 60_000 });
+
+      // The row renders from a catalog read, so seeing it means the entry was
+      // persisted and read back rather than merely POSTed.
+      await expect(page.getByText(intent)).toBeVisible({ timeout: 60_000 });
+
+      const listRes = await request.get(`/api/image-catalog?namespace=${TEST_ORG_HANDLE}`, {
+        headers: AUTH,
+      });
+      const { entries } = (await listRes.json()) as {
+        entries: { id: string; source: { repo?: string }; availability: string }[];
+      };
+      const added = entries.find((entry) => entry.source.repo?.includes(`e2e-added-${stamp}`));
+      expect(added, 'the added entry is not in the catalog').toBeDefined();
+      entryId = added?.id ?? '';
+      // Stored in one canonical form, so the entry matches images built from
+      // it however a step author wrote the reference.
+      expect(added?.source.repo).toBe(`git@github.com:${repo}.git`);
+      // Nothing built it, and the entry says so rather than hiding.
+      expect(added?.availability).toBe('absent');
+    } finally {
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: AUTH,
+        });
+      }
     }
   });
 });
