@@ -95,14 +95,26 @@ export function validateStepGraph(definition: ProcessDefinition): ValidationResu
       // transitions are informational (for graph visualization) and don't need
       // `when`. Verdicts on other step types don't route, so no exemption.
       const step = definition.steps.find((s) => s.id === stepId);
+      const missingWhen = transitions.filter((t) => !t.when);
       if (!routesViaVerdicts(step)) {
-        const missingWhen = transitions.filter((t) => !t.when);
         if (missingWhen.length > 0) {
           errors.push(
             `Step "${stepId}" has multiple outgoing transitions but not all have 'when' conditions. ` +
               `Missing on transitions to: ${missingWhen.map((t) => t.to).join(', ')}`,
           );
         }
+      } else if (missingWhen.length > 0 && missingWhen.length < transitions.length) {
+        // A verdict step's transitions are normally all unconditioned — they
+        // mirror the verdict targets and the engine routes by verdict. But the
+        // engine falls back to them whenever a step's output names no verdict,
+        // and a mixed set is exactly what it refuses. Caught here rather than
+        // five minutes into a run: an agent that answers `PASS` instead of a
+        // verdict name is ordinary, and this shape turns that into a crash.
+        errors.push(
+          `Step "${stepId}" routes by verdict, but some of its transitions carry a condition and some do not ` +
+            `(no condition on: ${missingWhen.map((t) => t.to).join(', ')}). ` +
+            `Let the verdicts route it and drop the 'when', or condition every transition.`,
+        );
       }
     }
   }
