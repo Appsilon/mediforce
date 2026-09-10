@@ -219,7 +219,10 @@ function UsedBy({
   return (
     <ul className="space-y-1">
       {workflows.map((workflow) => (
-        <li key={`${workflow.namespace}:${workflow.name}`} className="text-xs">
+        <li
+          key={`${workflow.namespace}:${workflow.name}:${workflow.version}`}
+          className="text-xs"
+        >
           {workflow.namespace === handle ? (
             <Link
               href={routes.workflow(workflow.namespace, workflow.name)}
@@ -424,17 +427,19 @@ function EntryCard({
             >
               {discovered ? 'Describe' : 'Edit'}
             </button>
-            {/* Any member, for the same reason: removing an entry removes an
-                offer, not a capability. The dialog is where the destructive
-                half — the images themselves — is asked for, and it is the
-                admin gate that decides whether it is offered at all. */}
-            <button
-              type="button"
-              onClick={() => setDeleting(true)}
-              className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive/10 hover:text-destructive"
-            >
-              Delete
-            </button>
+            {/* Admin only. Delete takes the entry's images with it, and the
+                daemon is deployment-wide — one tag can back steps in
+                workspaces this reader cannot see. A member can still add an
+                entry; retiring one is an admin's call. */}
+            {canAdmin && (
+              <button
+                type="button"
+                onClick={() => setDeleting(true)}
+                className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                Delete
+              </button>
+            )}
           </div>
         </div>
         {writingDescription && (
@@ -457,7 +462,6 @@ function EntryCard({
           <DeleteImageEntryDialog
             entry={shown}
             handle={handle}
-            canAdmin={canAdmin}
             open={deleting}
             onOpenChange={setDeleting}
           />

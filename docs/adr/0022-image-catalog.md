@@ -49,18 +49,44 @@ than upserted, since that would overwrite the occupant's sentence and delete the
 row being edited. A re-key audits against both ids — it is the one update that
 leaves an id with no row.
 
-**Deleting an entry may now take its images with it**, which splits decision
-3's write gate rather than widening it. The entry half stays a member's right
-for the reason stated there — it removes an offer, and no Workflow Definition
-references an entry. The image half is a different act on a deployment-wide
-daemon, so it requires **admin of the workspace whose catalog it is** and keeps
-the `_system` audit **Admin → Infrastructure** already used, and it is opt-in:
-absent means no. It does *not* simply inherit
+**Deleting an entry takes its images with it, and needs admin of the
+workspace.** This narrows decision 3's write gate, and the reason the original
+formulation does not survive is decision 7. "Removing an entry removes an offer"
+is true of the *row*, but for a source this namespace built the row is
+re-derived on the next read: deleting the record alone loses the sentence
+somebody wrote, leaves the image on the daemon, keeps it in the step-editor
+picker, and brings the entry back marked *needs a description*. A delete that
+achieves that is not a lesser act deserving a lighter gate; it is a worse one.
+So the entry and its images are one act — and when the daemon holds no image
+for the entry, that act is just the record. Creating stays a member's right, so
+a member can add an entry they cannot remove; that asymmetry is accepted, on
+the ground that adding an offer is reversible by an admin while destroying a
+deployment-wide artifact is not reversible by anyone.
+
+The gate is `assertCallerIsNamespaceAdmin`, not
 `assertCallerCanAdminDockerImages`, whose own comment calls it a loose
 approximation until #376 — owner or admin of *any* namespace, which nearly
-every user satisfies through a personal workspace. That gate still applies
-underneath, so Infrastructure is unchanged; this one is additional and is what
-the dialog's checkbox actually reflects.
+every user satisfies through a personal workspace. That looser gate still
+applies underneath via `deleteDockerImage`, so **Admin → Infrastructure** is
+unchanged.
+
+**A live workflow version blocks the delete; a superseded one does not.** Live
+means the version a run starts from — the workflow's default version where one
+is set, otherwise its latest, and not archived. The asymmetry is forced by
+immutability: a registered version cannot be edited, so a historical pin can
+never be moved off the image, and refusing on its account would mean an image
+pinned once could never be reclaimed. A live pin *can* be re-pointed, so it is
+refused with a 409 that names the workflow, version and steps, and the UI offers
+to archive that one version rather than the whole workflow. A version pinned as
+the workflow's default is excluded from that remedy: archiving it would leave
+the workflow pointing at something that cannot run — a rule only the definitions
+UI enforced, and which this flow must therefore honour itself.
+
+The judgement is deployment-wide because the daemon is, so a step in a namespace
+the caller cannot read blocks the delete just the same. The *disclosure* is not:
+the 409 names only what that caller may already see and counts the rest. The
+deliberately unfiltered read behind it is `listGroupsForImageAudit`, which says
+so in its own comment; every other read stays namespace-filtered.
 Images are deleted by tag rather than by image id, so an artifact a second tag
 still references survives instead of needing a force that would destroy a
 version another entry offers; and they go before the row, all or nothing, since
@@ -489,9 +515,10 @@ User-visible changes, each a §12 gate in the issue that made it:
   against its own base is in scope (#1296); a general diff tool is not.
 - **Garbage collection of superseded versions.** Marking a version superseded
   and unused is in scope; picking one version off an entry and deleting it is
-  not. Deleting an entry's images *together with the entry* is in scope and
-  keeps Infrastructure's admin gate — the catalog offers the composite act,
-  never a second, looser way to destroy an image.
+  not — a delete is all of an entry's versions or none. Deleting an entry's
+  images *together with the entry* is in scope and needs admin of the
+  workspace, so the catalog never becomes a second, looser way to destroy an
+  image.
 - **Any write path to git.** The catalog reads Dockerfiles; it never proposes
   changes to them.
 - **Run-time enforcement of catalog membership** (decision 5).
