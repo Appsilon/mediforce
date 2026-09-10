@@ -37,6 +37,8 @@ import { applyWorkflowAssistantToolCalls, type WorkflowAssistantToolCall } from 
 import { CodeEditor } from './workflow-editor/code-editor';
 import { WorkflowFilesPanel } from './workflow-files-panel';
 import { AssistantPlan, answersMessage } from './assistant-plan';
+import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import type { PlanWorkflowBuildOutput } from '@mediforce/platform-api/contract';
 import { messagesForModel, type AssistantMessage } from '@/lib/assistant-conversation';
 import { formatDuration } from '@/lib/format';
@@ -1105,11 +1107,20 @@ export function WorkflowEditorCanvas({
                       {message.content && (
                         <div
                           className={cn(
-                            'rounded-lg px-3 py-2 whitespace-pre-wrap break-words',
-                            message.role === 'user' ? 'bg-primary/10' : 'bg-muted',
+                            'rounded-lg px-3 py-2 break-words',
+                            message.role === 'user'
+                              ? 'bg-primary/10 whitespace-pre-wrap'
+                              : 'cm-assistant-reply bg-muted',
                           )}
                         >
-                          {message.content}
+                          {/* The model writes markdown, so the pane renders it:
+                              printed raw, a reply with a list or `code` reached
+                              the reader as asterisks and backticks. What the
+                              person typed is left alone, since their newlines
+                              are all the structure it has. */}
+                          {message.role === 'user'
+                            ? message.content
+                            : <MarkdownPresentation content={message.content} />}
                         </div>
                       )}
                       {message.changes && (
