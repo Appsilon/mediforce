@@ -1,49 +1,96 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-08-06
+last_reviewed: 2026-09-09
 ---
 
 # Getting a Docker image onto the platform
 
-This guide explains how to make a Docker image available to a Mediforce workflow step when you are not using the auto-build path (`repo` + `commit` on the step config).
+A step runs inside an image that must already be on the **deployment's Docker
+daemon** — the one the platform reaches over `/var/run/docker.sock`. There is no
+Mediforce image registry: the platform never pushes, holds no registry URL, and
+manages no registry credentials. "Available to the platform" always means
+"present on that daemon", which is what `mediforce system images` lists.
 
-## Prerequisites
+There are three ways an image gets there.
 
-- Docker installed locally
-- Access to the registry the Mediforce platform can reach (ask your namespace admin for the registry URL)
-- `docker login` completed for that registry
+## 1. Build from a repo (the self-service path)
 
-## Steps
+Set `repo` + `commit` (and optionally `dockerfile`) on the step. The platform
+clones at that commit and builds before the run, tagging the result
+`mediforce-built:<12 hex>` and labelling it with its provenance.
 
-### 1. Build the image
-
-```bash
-docker build -t <registry-url>/<image-name>:<tag> .
-```
-
-Example:
-```bash
-docker build -t registry.example.com/my-agent:v1.0.0 .
-```
-
-### 2. Push the image to the registry
+To build **before** a run — preparing an image, or checking a Dockerfile builds
+at all — trigger the same build directly:
 
 ```bash
-docker push <registry-url>/<image-name>:<tag>
+mediforce images build --namespace <handle> --repo <repo> --commit <sha> [--dockerfile <path>]
 ```
 
-### 3. Reference the image in your workflow step
+**Workspace → Images** has the same action as **Build** on any entry built from
+a repo. Both mint the tag a step pinning that commit resolves to, so the step
+then finds the image already built instead of rebuilding it. Any workspace
+member can do this; a build takes minutes and the command waits for it.
 
-In the workflow editor, set the `image` field on the step to the full image reference:
+This is the only route that needs no host access and no registry, so prefer it
+whenever the Dockerfile lives in a repo the deployment can clone. It also feeds
+the Image Catalog for free — see [below](#images-the-platform-built-are-offered-on-their-own).
+
+### The build context is the Dockerfile's own directory
+
+Every path a Dockerfile `COPY`s is resolved against the **build context**, and
+the platform uses the directory holding the Dockerfile. So everything the
+Dockerfile copies must sit **beside it**, and a Dockerfile in a subdirectory
+cannot reach files in its parent.
+
+This is the failure that looks least like itself. Given
+`apps/my-workflow/container/Dockerfile` containing:
+
+```dockerfile
+COPY scripts/ /opt/my-workflow/scripts/
+```
+
+…the build fails with `"/scripts": not found` even though `scripts/` is plainly
+there in `apps/my-workflow/` — because the context is `container/`, which holds
+only the Dockerfile.
+
+Put the Dockerfile at the root of what it needs to copy
+(`apps/my-workflow/Dockerfile`), or move the copied directories in beside it.
+There is no way to widen the context from a workflow step today: the context is
+derived, not declared.
+
+## 2. A public image reference
+
+Name a pullable reference in the step's `image` field:
 
 ```
-registry.example.com/my-agent:v1.0.0
+ghcr.io/my-org/my-agent:v1.0.0
 ```
 
-### 4. Verify availability
+`docker run` pulls it on first use if the daemon can reach it. This works
+without any platform configuration for a **public** image. A private one needs
+`docker login` performed on the host by an administrator — the platform cannot
+supply credentials on your behalf.
 
-After pushing, open the workflow editor. The amber warning on the step should disappear once the platform detects the image (the check runs every 60 seconds, or re-open the editor to force a refresh).
+Note that the step editor's amber "image not found" warning checks the daemon
+listing, so it persists until something actually pulls or builds the image onto
+the host. Pushing to a registry does not clear it.
+
+## 3. Built or loaded on the host
+
+Anything else — an image built from a local Dockerfile with no repo behind it,
+or moved across with `docker save` / `docker load` — requires shell access to
+the deployment host. Ask an administrator.
+
+## Verifying
+
+```bash
+mediforce images list --namespace <handle>   # the catalog, per namespace
+mediforce system images                      # every image on the daemon
+mediforce system status                      # Docker daemon reachability
+```
+
+Both report the daemon. Neither reports a registry, because there is none.
 
 ## Choosing a base image
 
@@ -60,10 +107,11 @@ Minimal base images (`alpine`, `scratch`, distroless) ship none of this. `alpine
 
 ## Troubleshooting
 
+- **`"/<path>": not found` on a `COPY`, for a path that exists in the repository** — the build context is the Dockerfile's own directory, so it cannot reach files above it. See [The build context is the Dockerfile's own directory](#the-build-context-is-the-dockerfiles-own-directory).
 - **`exec: "<binary>": executable file not found in $PATH`** — the image has no such executable. The container started and immediately exited 127. Point the step at an image that ships the tooling (see [Choosing a base image](#choosing-a-base-image)), or add it in a Dockerfile that builds `FROM` the minimal image.
-- **Image still shows as missing after pushing** — confirm the registry URL matches exactly what the platform can reach. Ask your namespace admin to verify registry connectivity via `mediforce system status`.
-- **Authentication error during push** — run `docker login <registry-url>` and retry.
-- **Using the auto-build path instead** — set `repo` and `commit` on the step. The platform will build the image automatically before the run starts.
+- **The image still shows as missing** — check `mediforce system images`. The warning tracks what is on the daemon, not what exists in a registry, so it clears only once the image has actually been pulled or built onto the host. If the reference is private, an administrator must `docker login` on the host.
+- **`not found locally and no repo+commit configured for auto-build`** — a build-mode step reached a tag that is not on the daemon and carries no build inputs to make it. Set `repo` and `commit` on the step, or use an image that is already present.
+- **Prefer the auto-build path** — set `repo` and `commit` on the step and the platform builds it before the run, with no host access and no registry involved.
 
 ## Images the platform built are offered on their own
 
@@ -80,6 +128,20 @@ This covers only what the platform built **for your namespace**. A pulled or
 hand-built image — `python`, `rocker/r-ver`, anything pushed to a registry —
 carries no build labels, so nothing can derive its source and it is catalogued
 by hand.
+
+## Cataloguing a repository nothing has built yet
+
+**Add image** on **Workspace → Images** registers the repository and Dockerfile
+an image is built from before anything has built it — the case **Describe**
+cannot cover, since that one only names a source some build already recorded.
+Give it the repository (`owner/repo`, or a full `git@…` / `https://…`
+reference), the Dockerfile path if it is not the default, and the sentence
+saying what the image is for. `mediforce images create --repo` is the same
+write.
+
+The entry appears with **no versions**, which is the honest state: a catalog
+entry is an offer, and nothing has built the image yet. **Build** on the new
+card, or `mediforce images build`, gives it its first one.
 
 ## Backfilling an existing deployment
 
@@ -121,4 +183,4 @@ source is skipped, not failed.
 - `mediforce system images` — the raw Docker daemon listing: every image on the
   host, `postgres` and dangling layers included. Deployment-wide and ops-facing;
   the one to reach for when hunting disk, not when choosing a step image.
-- `mediforce system status` — check Docker daemon and registry connectivity
+- `mediforce system status` — check Docker daemon reachability

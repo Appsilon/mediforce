@@ -516,6 +516,8 @@ export {
   UpdateImageCatalogEntryOutputSchema,
   DeleteImageCatalogEntryInputSchema,
   DeleteImageCatalogEntryOutputSchema,
+  BuildImageCatalogVersionInputSchema,
+  BuildImageCatalogVersionOutputSchema,
   type ImageCatalogVersion,
   type ImageCatalogAvailability,
   type ImageCatalogOrigin,
@@ -530,6 +532,8 @@ export {
   type UpdateImageCatalogEntryOutput,
   type DeleteImageCatalogEntryInput,
   type DeleteImageCatalogEntryOutput,
+  type BuildImageCatalogVersionInput,
+  type BuildImageCatalogVersionOutput,
 } from './image-catalog';
 
 export {

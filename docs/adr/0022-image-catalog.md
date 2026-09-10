@@ -24,6 +24,18 @@ behaviour of the one authors use. Decision 7 landed after the first workspace
 ran a build-mode workflow and found the image it had just built missing from
 its own catalog.
 
+#1344 later added a way to *produce* a version — `mediforce images build` and a
+**Build** action — without changing any of the seven decisions: it reuses
+`deriveBuildTag`, the existing builder and the existing provenance labels, so a
+build it triggers is indistinguishable from a step's and is picked up by
+decisions 1 and 7 with no code of its own. It does extend decision 3's write
+gate from "any member may describe an entry" to "any member may also build one
+of its versions", on the ground that the same member can already trigger the
+same build on the same host by running a build-mode step — so the gate would
+have removed the convenient path and not the capability. Whether host-side
+builds should be privileged at all is a question about build-mode steps, and
+this ADR does not answer it.
+
 Decision 7 is dated 2026-09-08 and revises one line of the original
 consequences — *"a new row appears only when someone catalogues a source nobody
 has catalogued before"*. That stays true of **rows**; it is no longer true of
