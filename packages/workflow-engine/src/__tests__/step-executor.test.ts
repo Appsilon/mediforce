@@ -212,6 +212,33 @@ describe('StepExecutor', () => {
     expect(failEvent).toBeDefined();
   });
 
+  it('a decision step that produced no verdict says so, rather than listing expressions', async () => {
+    const verdictDef: ProcessDefinition = {
+      name: 'verdict-process',
+      version: '1.0',
+      steps: [
+        {
+          id: 'test-app', name: 'Test App', type: 'decision',
+          verdicts: { pass: { target: 'done' }, fail: { target: 'test-app' } },
+        },
+        { id: 'done', name: 'Done', type: 'terminal' },
+      ],
+      transitions: [
+        { from: 'test-app', to: 'done', when: 'verdict == "pass"' },
+        { from: 'test-app', to: 'test-app', when: 'verdict == "fail"' },
+      ],
+    };
+    const instance = makeRunningInstance('test-app', { definitionName: 'verdict-process' });
+    await instanceRepo.create(instance);
+
+    await expect(
+      executor.executeStep(instance, { raw: 'It appears the input file is not found.' }, actor, verdictDef),
+    ).rejects.toThrow(/no `verdict`/i);
+
+    const updated = await instanceRepo.getById('instance-1');
+    expect(updated!.pauseReason).toBe('routing_error');
+  });
+
   it('no matching when expression: RoutingError thrown, instance paused with pauseReason=routing_error', async () => {
     const instance = makeRunningInstance('start', {
       definitionName: 'branching-process',
