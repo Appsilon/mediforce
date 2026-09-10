@@ -25,7 +25,7 @@ import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useImageCatalogEntries, useImageCatalogEntry } from '@/hooks/use-image-catalog';
 import { AddImageDialog } from '@/components/images/add-image-dialog';
 import { BuildImageDialog } from '@/components/images/build-image-dialog';
-import { DescribeImageDialog } from '@/components/images/describe-image-dialog';
+import { ImageDescriptionDialog } from '@/components/images/image-description-dialog';
 import { useWorkflowsByImage, type WorkflowImageMatch } from '@/hooks/use-workflows-by-image';
 import {
   groupByBase,
@@ -328,7 +328,7 @@ function EntryCard({
   // expanded card reads the entry on its own to get it.
   const detail = useImageCatalogEntry(handle, entry.id, expanded);
   const shown = detail.entry ?? entry;
-  const [describing, setDescribing] = useState(false);
+  const [writingDescription, setWritingDescription] = useState(false);
   const [building, setBuilding] = useState(false);
   const discovered = shown.origin === 'discovered';
   // Only a built source carries the recipe a build needs. A `referenced` entry
@@ -399,35 +399,35 @@ function EntryCard({
               {versions.length} version{versions.length === 1 ? '' : 's'}
             </span>
           </button>
-          {(discovered || buildable) && (
-            <div className="flex shrink-0 gap-2 py-3 pr-4">
-              {buildable && (
-                <button
-                  type="button"
-                  onClick={() => setBuilding(true)}
-                  className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
-                >
-                  Build
-                </button>
-              )}
-              {discovered && (
-                <button
-                  type="button"
-                  onClick={() => setDescribing(true)}
-                  className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
-                >
-                  Describe
-                </button>
-              )}
-            </div>
-          )}
+          <div className="flex shrink-0 gap-2 py-3 pr-4">
+            {buildable && (
+              <button
+                type="button"
+                onClick={() => setBuilding(true)}
+                className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
+              >
+                Build
+              </button>
+            )}
+            {/* Every entry carries the same human-written fields, so every
+                entry can be edited — any member, the gate the entry was
+                created under (ADR-0022 decision 3). A discovered entry has no
+                stored row yet, so the same form describes it into one. */}
+            <button
+              type="button"
+              onClick={() => setWritingDescription(true)}
+              className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
+            >
+              {discovered ? 'Describe' : 'Edit'}
+            </button>
+          </div>
         </div>
-        {describing && (
-          <DescribeImageDialog
+        {writingDescription && (
+          <ImageDescriptionDialog
             entry={shown}
             handle={handle}
-            open={describing}
-            onOpenChange={setDescribing}
+            open={writingDescription}
+            onOpenChange={setWritingDescription}
           />
         )}
         {building && (

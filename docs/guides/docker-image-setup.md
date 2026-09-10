@@ -143,6 +143,44 @@ The entry appears with **no versions**, which is the honest state: a catalog
 entry is an offer, and nothing has built the image yet. **Build** on the new
 card, or `mediforce images build`, gives it its first one.
 
+## Changing what an entry says
+
+**Edit** on any catalogued entry changes everything a human wrote on it: the
+**repository** and **Dockerfile** (or the **image reference**), the **name**,
+and the **intent** sentence. Versions, capabilities and lineage are derived from
+the image on every read, so there is nothing else to edit. The same write is
+`mediforce images update <entry-id> --namespace <handle> [--name …]
+[--intent …] [--repo … --dockerfile …] [--reference …]`. Any workspace member,
+the same gate the entry was created under.
+
+### Changing the source moves the entry
+
+An entry is keyed on its source, and its id is derived from it
+([ADR-0022](../adr/0022-image-catalog.md) decision 1), so correcting a
+repository or pointing at a different Dockerfile **re-keys** the entry: the row
+is written under the id its new source derives and the old one is removed. One
+entry, corrected — never the mistake sitting beside its fix. Two consequences
+worth expecting:
+
+- **The id changes**, so a bookmarked `?entry=<id>` link goes stale and the CLI
+  prints the new id. A source that only *spells* the same key differently
+  (`Appsilon/x` for `git@github.com:Appsilon/x.git`) canonicalises to the same
+  id and stays put.
+- **Versions built from the old source stop belonging to the entry.** They are
+  still on the daemon, so they reappear on their own as an undescribed entry
+  marked **Needs a description**. Nothing is deleted from the daemon.
+
+Re-keying onto a source some other entry already describes is refused with a
+conflict rather than overwriting that entry — edit or delete that one instead.
+Switching an entry between a repository and a pushed reference is not offered:
+that changes which inputs the platform holds for it, so catalogue it with
+**Add image** instead.
+
+An entry marked **Needs a description** offers **Describe** rather than
+**Edit**, and its source is read-only there: a build recorded that source, and
+re-pointing it would describe a different one while leaving this one still
+undescribed. Describe it first, then **Edit** can correct it.
+
 ## Backfilling an existing deployment
 
 For those hand-built and pulled images, `scripts/migrations/adopt_daemon_images.py`
