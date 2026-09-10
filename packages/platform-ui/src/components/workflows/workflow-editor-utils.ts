@@ -1,4 +1,5 @@
 import { WorkflowAuthorableSchema } from '@mediforce/platform-core';
+import { formatStepName } from '@/lib/format';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
 type Transitions = WorkflowDefinition['transitions'];
@@ -296,20 +297,18 @@ export function pruneCarryOver(
   return kept.length === entries.length ? entries : kept;
 }
 
-/**
- * What to call a workflow a paste is creating.
- *
- * A definition carries both: `name` is its id, `title` is what a person calls
- * it. The create page's name field is the display name, so it takes the title
- * when there is one and the id only as a fallback. Filling it with the id saved
- * a workflow displayed as `landing-zone-CDISCPILOT01`, case and all, while the
- * version it cut was named correctly.
- */
+/** What to call a workflow a paste is creating: its display name, else the
+ *  version's title, else its id title-cased. */
 export function pastedWorkflowName(fields: Record<string, unknown>): string | null {
+  const metadata = typeof fields.metadata === 'object' && fields.metadata !== null
+    ? fields.metadata as Record<string, unknown>
+    : {};
+  const displayName = typeof metadata.displayName === 'string' ? metadata.displayName.trim() : '';
+  if (displayName !== '') return displayName;
   const title = typeof fields.title === 'string' ? fields.title.trim() : '';
   if (title !== '') return title;
   const name = typeof fields.name === 'string' ? fields.name.trim() : '';
-  return name === '' ? null : name;
+  return name === '' ? null : formatStepName(name);
 }
 
 /**

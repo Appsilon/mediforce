@@ -430,7 +430,15 @@ describe('splitPastedDefinition — round-trips the packages we ship', () => {
 });
 
 describe('pastedWorkflowName', () => {
-  it('takes the title, which is what a person calls the workflow', () => {
+  it('takes the display name, which is what the workflow is called', () => {
+    expect(pastedWorkflowName({
+      name: 'tealflow',
+      title: 'Change from path to logic',
+      metadata: { displayName: 'Tealflow' },
+    })).toBe('Tealflow');
+  });
+
+  it('falls back to the title when no display name was carried', () => {
     // The failure this replaces: a definition carrying
     // `name: 'landing-zone-CDISCPILOT01'` and
     // `title: 'Landing Zone — CDISCPILOT01'` filled the name field with the id,
@@ -442,12 +450,13 @@ describe('pastedWorkflowName', () => {
     })).toBe('Landing Zone — CDISCPILOT01');
   });
 
-  it('falls back to the id when the paste carries no title', () => {
-    expect(pastedWorkflowName({ name: 'landing-zone' })).toBe('landing-zone');
+  it('title-cases the id when the paste carries neither', () => {
+    expect(pastedWorkflowName({ name: 'landing-zone-CDISCPILOT01' })).toBe('Landing Zone CDISCPILOT01');
   });
 
-  it('ignores a blank title', () => {
-    expect(pastedWorkflowName({ name: 'landing-zone', title: '   ' })).toBe('landing-zone');
+  it('ignores a blank display name and a blank title', () => {
+    expect(pastedWorkflowName({ name: 'landing-zone', title: '   ', metadata: { displayName: ' ' } }))
+      .toBe('Landing Zone');
   });
 
   it('returns null when the paste names the workflow neither way', () => {
