@@ -84,14 +84,15 @@ Two independent config surfaces, easy to confuse:
 | Field | Schema | Means |
 |---|---|---|
 | `workspace.remote`, `workspace.remoteAuth` | `WorkflowWorkspaceSchema` (workflow level) | Where the run worktree comes from. Unset → the bare repo is local-only. |
-| `image`, `dockerfile`, `repo`, `commit`, `repoAuth` | `ContainerSchema` (step level, merged into agent and script config) | Where the **image** comes from. `repo` + `commit` is the Docker build context, not the agent's working repo. |
+| `image`, `dockerfile`, `context`, `repo`, `commit`, `repoAuth` | `ContainerSchema` (step level, merged into agent and script config) | Where the **image** comes from. `repo` + `commit` is what the Docker build clones, not the agent's working repo; `context` picks the directory inside it the build sees (default: the Dockerfile's own), and `dockerfile` is then read from it. |
 
 Both live in
 [`workflow-definition.ts`](../../packages/platform-core/src/schemas/workflow-definition.ts).
 `commit` is an exact SHA in both cases — pinned, cannot drift.
 
 With `dockerfile` + `repo` + `commit` set, the image is built lazily on first
-use and tagged `mediforce-built:<hash>`, keyed on the build inputs; a rebuild
+use and tagged `mediforce-built:<hash>`, keyed on the build inputs — `context`
+folds in only when set, so a step without one keeps the tag it always had; a rebuild
 happens only when the pinned commit moves. With `image` alone, it must already
 exist locally or be pullable. Without either, the step fails unless
 `ALLOW_LOCAL_AGENTS=true` — a dev-only escape hatch that runs the step on the
@@ -101,7 +102,8 @@ host with no isolation.
 
 The derived tag is a hash, so the image carries what the tag cannot say. Every
 build writes `mediforce.build.repo`, `.commit`, `.dockerfile`, `.workflow` and
-`.namespace`, plus `org.opencontainers.image.source` and `.revision`
+`.namespace`, and `.context` — written empty when the step named none, so it
+overrides a context inherited from the base image — plus `org.opencontainers.image.source` and `.revision`
 ([`image-provenance.ts`](../../packages/platform-core/src/utils/image-provenance.ts),
 emitted by both the in-process and the `container-worker` builder). Overriding
 the two OCI keys is a correctness fix, not just interoperability: labels are

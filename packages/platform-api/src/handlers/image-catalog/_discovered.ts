@@ -1,4 +1,8 @@
-import { normalizeRepoUrls, type ImageCatalogEntry } from '@mediforce/platform-core';
+import {
+  BuildContextSchema,
+  normalizeRepoUrls,
+  type ImageCatalogEntry,
+} from '@mediforce/platform-core';
 import type { DockerImageInfo } from '../../contract/system';
 import { canonicalizeSource, deriveImageCatalogEntryId } from './_source';
 
@@ -70,6 +74,11 @@ export function discoverEntries(
       // An absent label and the empty key value are the same fact: the builders
       // label what `deriveBuildTag` hashed, which is `dockerfile ?? ''`.
       dockerfile: image.buildDockerfile ?? '',
+      // The daemon lists newest first, so the first build seen names the
+      // context the entry's Build action should reproduce. A label anyone
+      // could have written is checked first: the contract refuses an escaping
+      // context, and one such entry would fail the whole listing.
+      context: BuildContextSchema.safeParse(image.buildContext).success ? image.buildContext : undefined,
     });
     const id = deriveImageCatalogEntryId(source);
     if (known.has(id) || discovered.has(id)) continue;

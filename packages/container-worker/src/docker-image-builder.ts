@@ -6,13 +6,14 @@
  */
 import { execFileSync, execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { chmodSync, copyFileSync, existsSync, mkdtempSync, statSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { chmodSync, copyFileSync, existsSync, mkdtempSync, realpathSync, statSync } from 'node:fs';
+import { join, sep } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import {
   BUILD_LABELS,
   buildProvenanceLabelArgs,
   redactRepoCredentials,
+  resolveDockerBuildPaths,
   resolveRepoCloneTargets,
 } from '@mediforce/platform-core';
 
@@ -114,6 +115,29 @@ function cloneRepoAtCommit(
   );
 }
 
+/**
+ * Refuse a build path the checkout resolves outside the clone. Keep in sync
+ * with the copy in `packages/agent-runtime/src/plugins/docker-image-builder.ts`.
+ * `resolveDockerBuildPaths` already refused `..` in the strings; this catches a
+ * symlink committed to the repo, which `docker build` follows — a context of
+ * `ctx -> /` would otherwise send the build host's filesystem, deploy key
+ * included, to the daemon and into an image.
+ */
+export function assertInsideClone(cloneDir: string, relativePath: string): void {
+  const root = realpathSync(cloneDir);
+  let resolved: string;
+  try {
+    resolved = realpathSync(join(cloneDir, relativePath));
+  } catch {
+    // Missing: there is nothing to escape through, and `docker build` names
+    // the missing path itself.
+    return;
+  }
+  if (resolved !== root && resolved.startsWith(`${root}${sep}`) === false) {
+    throw new Error(`Build path "${relativePath}" resolves outside the repository.`);
+  }
+}
+
 export async function buildImageFromRepo(options: {
   image: string;
   repoUrl: string;
@@ -121,26 +145,25 @@ export async function buildImageFromRepo(options: {
   repoRef?: string;
   commit: string;
   dockerfile?: string;
+  /** Build context from the repo root; `dockerfile` is then read from it. */
+  context?: string;
   repoToken?: string;
   /** Workflow definition whose step triggered this build. Recorded as a label. */
   workflow?: string;
   /** Namespace owning that definition. Recorded as a label. */
   namespace?: string;
 }): Promise<void> {
-  const { image, repoUrl, commit, repoToken, workflow, namespace } = options;
-  // `-f` needs a concrete path, but the label must record what `deriveBuildTag`
-  // actually hashed — `dockerfile ?? ''`. Labelling the resolved default would
-  // make the image claim a Dockerfile its own tag never saw, so an Image
-  // Catalog entry keyed on `(repo, dockerfile)` could not match it
-  // (ADR-0022 decision 1).
-  const dockerfile = options.dockerfile ?? 'Dockerfile';
+  const { image, repoUrl, commit, context, repoToken, workflow, namespace } = options;
+  // Resolved for `-f` and the context; the labels keep the inputs as named,
+  // which is what `deriveBuildTag` hashed (see `resolveDockerBuildPaths`).
+  const paths = resolveDockerBuildPaths(options.dockerfile, context);
   const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-build-'));
 
   try {
     cloneRepoAtCommit(buildDir, options.repoRef ?? repoUrl, commit, repoToken);
+    assertInsideClone(buildDir, paths.context);
+    assertInsideClone(buildDir, paths.dockerfile);
 
-    const dockerfilePath = join(buildDir, dockerfile);
-    const buildContext = dirname(dockerfilePath);
     console.log(`[docker-image-builder] Building image "${image}" from ${repoUrl}@${commit.slice(0, 8)}`);
     // argv form, not a shell string: the label values carry a repo URL, a
     // workflow name and a namespace, none of which are safe to interpolate.
@@ -149,9 +172,9 @@ export async function buildImageFromRepo(options: {
       [
         'build',
         '-t', image,
-        ...buildProvenanceLabelArgs({ repoUrl, commit, dockerfile: options.dockerfile ?? '', workflow, namespace, repoToken }),
-        '-f', dockerfilePath,
-        buildContext,
+        ...buildProvenanceLabelArgs({ repoUrl, commit, dockerfile: options.dockerfile ?? '', context, workflow, namespace, repoToken }),
+        '-f', join(buildDir, paths.dockerfile),
+        join(buildDir, paths.context),
       ],
       { stdio: 'pipe' },
     );
@@ -167,11 +190,12 @@ export async function ensureImage(options: {
   repoRef?: string;
   commit?: string;
   dockerfile?: string;
+  context?: string;
   repoToken?: string;
   workflow?: string;
   namespace?: string;
 }): Promise<void> {
-  const { image, repoUrl, repoRef, commit, dockerfile, repoToken, workflow, namespace } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile, context, repoToken, workflow, namespace } = options;
 
   if (!repoUrl || !commit) {
     const exists = await imageExistsLocally(image);
@@ -191,5 +215,5 @@ export async function ensureImage(options: {
     console.log(`[docker-image-builder] Image "${image}" stale (${currentCommit?.slice(0, 8)} → ${commit.slice(0, 8)}), rebuilding`);
   }
 
-  await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, repoToken, workflow, namespace });
+  await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, context, repoToken, workflow, namespace });
 }

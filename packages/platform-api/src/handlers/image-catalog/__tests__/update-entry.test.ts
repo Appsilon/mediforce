@@ -134,6 +134,29 @@ describe('updateImageCatalogEntry handler', () => {
     expect(await repo.list('alpha')).toHaveLength(1);
   });
 
+  it('stores a new build context in place, since the context is not in the key', async () => {
+    const scope = scopeFor('u-member', ['alpha']);
+    const created = await createImageCatalogEntry({ namespace: 'alpha', ...TEALFLOW }, scope);
+
+    const { entry } = await updateImageCatalogEntry(
+      {
+        namespace: 'alpha',
+        id: created.entry.id,
+        source: { ...TEALFLOW.source, context: '.' },
+      },
+      scope,
+    );
+
+    expect(entry.id).toBe(created.entry.id);
+    const stored = await repo.getById('alpha', created.entry.id);
+    expect(stored?.source).toEqual({
+      kind: 'built',
+      repo: TEALFLOW_REPO_URL,
+      dockerfile: 'container/Dockerfile',
+      context: '.',
+    });
+  });
+
   it('refuses to re-key onto a source another entry already describes', async () => {
     const scope = scopeFor('u-member', ['alpha']);
     const tealflow = await createImageCatalogEntry({ namespace: 'alpha', ...TEALFLOW }, scope);

@@ -65,6 +65,28 @@ describe('resolveEntryVersions', () => {
     expect(versions[0].commit).toBe('abc1234');
   });
 
+  it('claims a build of the same Dockerfile from a wider context as a version', () => {
+    const images = [
+      image({ id: 'sha-root', buildRepo: REPO, buildDockerfile: 'container/Dockerfile', buildContext: '.' }),
+      image({ id: 'sha-dir', buildRepo: REPO, buildDockerfile: 'Dockerfile', buildContext: 'container' }),
+    ];
+
+    const versions = resolveEntryVersions(
+      { kind: 'built', repo: REPO, dockerfile: 'container/Dockerfile' },
+      images,
+    );
+
+    expect(versions.map((version) => version.imageId)).toEqual(['sha-root', 'sha-dir']);
+  });
+
+  it('does not claim the same dockerfile string read from another context', () => {
+    const images = [image({ buildRepo: REPO, buildDockerfile: 'Dockerfile', buildContext: 'container' })];
+
+    expect(
+      resolveEntryVersions({ kind: 'built', repo: REPO, dockerfile: 'Dockerfile' }, images),
+    ).toEqual([]);
+  });
+
   it('ignores unlabelled images entirely', () => {
     const images = [image({ repository: 'postgres', tag: '16' })];
 

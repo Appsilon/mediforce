@@ -19,6 +19,8 @@ export const DockerImageInfoSchema = z.object({
   buildCommit: z.string().optional(),
   /** Dockerfile path inside that repo (`mediforce.build.dockerfile`). */
   buildDockerfile: z.string().optional(),
+  /** Build context the step named, if any (`mediforce.build.context`). */
+  buildContext: z.string().optional(),
   /** Workflow definition whose step triggered the build (`mediforce.build.workflow`). */
   buildWorkflow: z.string().optional(),
   /** Namespace owning that definition (`mediforce.build.namespace`). */

@@ -188,7 +188,7 @@ export function useDeleteImageEntry(namespace: string) {
 export function useBuildImageVersion(namespace: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { repo: string; commit: string; dockerfile: string }) =>
+    mutationFn: (input: { repo: string; commit: string; dockerfile: string; context?: string }) =>
       mediforce.imageCatalog.build({ namespace, ...input }),
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });

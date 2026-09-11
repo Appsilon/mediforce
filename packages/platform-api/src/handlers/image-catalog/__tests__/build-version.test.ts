@@ -70,6 +70,22 @@ describe('buildImageCatalogVersion handler', () => {
     expect(builds.calls[0]?.dockerfile).toBe('');
   });
 
+  it('builds from a named context under the tag a step naming it resolves to', async () => {
+    const result = await buildImageCatalogVersion(
+      { ...input, context: '.' },
+      scopeFor('u-member', ['alpha']),
+    );
+
+    expect(result.imageTag).toBe(
+      deriveBuildTag('git@github.com:Appsilon/tealflow.git', input.commit, 'container/Dockerfile', '.'),
+    );
+    expect(builds.calls[0]?.context).toBe('.');
+    // The same Dockerfile, so the same entry as a build with no context.
+    const narrow = await buildImageCatalogVersion(input, scopeFor('u-member', ['alpha']));
+    expect(result.entryId).toBe(narrow.entryId);
+    expect(builds.calls[1]?.context).toBeUndefined();
+  });
+
   it('reports a failed build instead of returning a tag for an image that is not there', async () => {
     builds.fail = 'no such Dockerfile';
 

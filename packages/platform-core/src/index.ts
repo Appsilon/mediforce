@@ -572,6 +572,15 @@ export type {
   InspectedImage,
   ReadImageProvenance,
 } from './utils/image-provenance';
+export {
+  BuildContextSchema,
+  buildPathsStayInRepo,
+  builtSourceLine,
+  catalogDockerfileKey,
+  normalizeBuildContext,
+  resolveDockerBuildPaths,
+} from './utils/docker-build-paths';
+export type { DockerBuildPaths } from './utils/docker-build-paths';
 export { getWorkflowStatus, type WorkflowStatus } from './utils/workflow-status';
 export { toSlug, uniqueName, uniqueSlug } from './utils/slug';
 

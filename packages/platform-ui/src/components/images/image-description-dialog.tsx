@@ -3,8 +3,10 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle, Loader2, X } from 'lucide-react';
 import { useState } from 'react';
+import { builtSourceLine, catalogDockerfileKey } from '@mediforce/platform-core';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { useCatalogueImage, useUpdateImageEntry } from '@/hooks/use-image-catalog';
+import { DockerfileAndContextFields } from './build-source-fields';
 
 type Source = ImageCatalogEntryView['source'];
 
@@ -51,16 +53,34 @@ const COPY = {
 } as const;
 
 /** Compared field by field rather than by identity, so retyping the same value
- *  is not treated as a re-key. The server canonicalises before it decides, so
- *  this only governs whether the warning shows. */
+ *  is not sent as a change. */
 function sameSource(edited: Source, stored: Source): boolean {
   if (edited.kind === 'built' && stored.kind === 'built') {
-    return edited.repo === stored.repo && edited.dockerfile === stored.dockerfile;
+    return (
+      edited.repo === stored.repo &&
+      edited.dockerfile === stored.dockerfile &&
+      (edited.context ?? '') === (stored.context ?? '')
+    );
   }
   if (edited.kind === 'referenced' && stored.kind === 'referenced') {
     return edited.reference === stored.reference;
   }
   return false;
+}
+
+/** Whether the edit lands on the same key. A new context for the same
+ *  Dockerfile is not a re-key — the key is the file, not how it is built. The
+ *  server canonicalises the repo before it decides, so this only governs
+ *  whether the warning shows. */
+function sameKey(edited: Source, stored: Source): boolean {
+  if (edited.kind === 'built' && stored.kind === 'built') {
+    return (
+      edited.repo === stored.repo &&
+      catalogDockerfileKey(edited.dockerfile, edited.context) ===
+        catalogDockerfileKey(stored.dockerfile, stored.context)
+    );
+  }
+  return sameSource(edited, stored);
 }
 
 export function ImageDescriptionDialog({
@@ -88,6 +108,9 @@ export function ImageDescriptionDialog({
   const [dockerfile, setDockerfile] = useState(
     entry.source.kind === 'built' ? entry.source.dockerfile : '',
   );
+  const [context, setContext] = useState(
+    entry.source.kind === 'built' ? (entry.source.context ?? '') : '',
+  );
   const [reference, setReference] = useState(
     entry.source.kind === 'referenced' ? entry.source.reference : '',
   );
@@ -97,14 +120,20 @@ export function ImageDescriptionDialog({
   const error = catalogue.error ?? update.error;
 
   const editedSource: Source = built
-    ? { kind: 'built', repo: repo.trim(), dockerfile: dockerfile.trim() }
+    ? {
+        kind: 'built',
+        repo: repo.trim(),
+        dockerfile: dockerfile.trim(),
+        context: context.trim() === '' ? undefined : context.trim(),
+      }
     : { kind: 'referenced', reference: reference.trim() };
   const sourceChanged = !describing && !sameSource(editedSource, entry.source);
+  const rekeys = sourceChanged && !sameKey(editedSource, entry.source);
   const sourceIncomplete = built ? repo.trim() === '' : reference.trim() === '';
 
   const storedSourceLine =
     entry.source.kind === 'built'
-      ? `${entry.source.repo}${entry.source.dockerfile === '' ? '' : ` · ${entry.source.dockerfile}`}`
+      ? builtSourceLine(entry.source.repo, entry.source.dockerfile, entry.source.context)
       : entry.source.reference;
 
   // `mutate`, not `mutateAsync`: an async submit handler whose promise rejects
@@ -204,29 +233,13 @@ export function ImageDescriptionDialog({
                   </p>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label htmlFor="image-description-dockerfile" className="text-sm font-medium">
-                    Dockerfile <span className="text-muted-foreground">(optional)</span>
-                  </label>
-                  <input
-                    id="image-description-dockerfile"
-                    value={dockerfile}
-                    onChange={(event) => setDockerfile(event.target.value)}
-                    placeholder="container/Dockerfile"
-                    className="w-full rounded-md border bg-background px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Leave blank for the repository&apos;s default. Two Dockerfiles in one repository
-                    are two entries, because they are two images.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    <strong className="text-foreground">
-                      The build context is the directory the Dockerfile is in.
-                    </strong>{' '}
-                    Everything it <code>COPY</code>s must sit beside it, so a Dockerfile in{' '}
-                    <code>container/</code> cannot reach files in the directory above.
-                  </p>
-                </div>
+                <DockerfileAndContextFields
+                  idPrefix="image-description"
+                  dockerfile={dockerfile}
+                  onDockerfileChange={setDockerfile}
+                  context={context}
+                  onContextChange={setContext}
+                />
               </>
             ) : (
               <div className="space-y-1.5">
@@ -248,7 +261,7 @@ export function ImageDescriptionDialog({
               </div>
             )}
 
-            {sourceChanged && (
+            {rekeys && (
               <div className="flex items-start gap-2.5 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/20">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
                 <div className="space-y-1 text-xs text-muted-foreground">

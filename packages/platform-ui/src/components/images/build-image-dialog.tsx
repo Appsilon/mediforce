@@ -3,6 +3,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { ChevronDown, ChevronRight, Loader2, X } from 'lucide-react';
 import { useState } from 'react';
+import { builtSourceLine } from '@mediforce/platform-core';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { useBuildImageVersion } from '@/hooks/use-image-catalog';
 import { describeBuildFailure } from './build-error';
@@ -10,10 +11,10 @@ import { describeBuildFailure } from './build-error';
 /**
  * Build one more version of an entry the workspace already offers.
  *
- * One field. The entry's source is `(repo, dockerfile)` — the build recipe with
- * the commit left out — so the commit is the only thing left to ask for, and
- * the source is shown rather than edited: changing it would be building a
- * different image, which is a different entry (ADR-0022 decision 1).
+ * One field. The entry's source is `(repo, dockerfile, context)` — the build
+ * recipe with the commit left out — so the commit is the only thing left to ask
+ * for, and the source is shown rather than edited: changing it is **Edit**'s
+ * job (ADR-0022 decision 1).
  */
 export function BuildImageDialog({
   entry,
@@ -29,7 +30,8 @@ export function BuildImageDialog({
   const [commit, setCommit] = useState('');
   const [showFullError, setShowFullError] = useState(false);
   const build = useBuildImageVersion(handle);
-  const failure = build.error === null ? null : describeBuildFailure(build.error.message);
+  const context = entry.source.kind === 'built' ? entry.source.context : undefined;
+  const failure = build.error === null ? null : describeBuildFailure(build.error.message, context);
 
   if (entry.source.kind !== 'built') return null;
   const { repo, dockerfile } = entry.source;
@@ -40,7 +42,7 @@ export function BuildImageDialog({
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     build.mutate(
-      { repo, commit: commit.trim(), dockerfile },
+      { repo, commit: commit.trim(), dockerfile, context },
       { onSuccess: () => onOpenChange(false) },
     );
   }
@@ -84,8 +86,7 @@ export function BuildImageDialog({
                 Source
               </p>
               <p className="mt-0.5 break-all font-mono text-xs">
-                {repo}
-                {dockerfile === '' ? '' : ` · ${dockerfile}`}
+                {builtSourceLine(repo, dockerfile, context)}
               </p>
             </div>
 
@@ -108,12 +109,23 @@ export function BuildImageDialog({
             </div>
 
             <div className="rounded-md border bg-muted/30 px-3 py-2">
-              <p className="text-xs text-muted-foreground">
-                <strong className="text-foreground">The build context is the Dockerfile&apos;s own
-                directory.</strong>{' '}
-                Everything the Dockerfile <code>COPY</code>s must sit beside it — one in{' '}
-                <code>container/</code> cannot reach files in the directory above.
-              </p>
+              {context === undefined ? (
+                <p className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">The build context is the Dockerfile&apos;s own
+                  directory.</strong>{' '}
+                  Everything the Dockerfile <code>COPY</code>s must sit beside it — one in{' '}
+                  <code>container/</code> cannot reach files in the directory above unless the
+                  entry sets a build context.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">
+                    Built from the context <code>{context}</code>.
+                  </strong>{' '}
+                  Everything the Dockerfile <code>COPY</code>s is read from there, not from the
+                  directory the Dockerfile sits in.
+                </p>
+              )}
             </div>
 
             {failure !== null && (

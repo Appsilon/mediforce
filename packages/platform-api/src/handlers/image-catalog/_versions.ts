@@ -1,4 +1,5 @@
 import {
+  catalogDockerfileKey,
   normalizeRepoUrls,
   unknownImageCapabilities,
   type ImageCapabilityCache,
@@ -21,15 +22,19 @@ export type ResolvedVersion = Omit<ImageCatalogVersion, 'lineage'>;
  *  `dockerfile ?? ''` — so an absent label and the empty key value are the same
  *  fact and must compare equal here.
  *
+ *  Both sides compare as `catalogDockerfileKey`, the Dockerfile's path from the
+ *  repo root once a context is named, so a build of `container/Dockerfile` from
+ *  the repo root is a version of the entry for `container/Dockerfile`.
+ *
  *  The repo is normalised on both sides. An entry's is already canonical, but a
  *  label carries whatever reference the step author wrote, so an
  *  `https://github.com/…` build and a `git@github.com:….git` entry are the same
  *  source and used to resolve to zero versions. */
-function matchesBuilt(image: DockerImageInfo, repo: string, dockerfile: string): boolean {
+function matchesBuilt(image: DockerImageInfo, repo: string, dockerfileKey: string): boolean {
   if (image.buildRepo === undefined) return false;
   return (
     normalizeRepoUrls(image.buildRepo).gitUrl === repo &&
-    (image.buildDockerfile ?? '') === dockerfile
+    catalogDockerfileKey(image.buildDockerfile ?? '', image.buildContext) === dockerfileKey
   );
 }
 
@@ -52,7 +57,9 @@ export function resolveEntryVersions(
 ): ResolvedVersion[] {
   const matched =
     source.kind === 'built'
-      ? images.filter((image) => matchesBuilt(image, source.repo, source.dockerfile))
+      ? images.filter((image) =>
+          matchesBuilt(image, source.repo, catalogDockerfileKey(source.dockerfile, source.context)),
+        )
       : images.filter((image) => image.repository === source.reference);
 
   return matched.map((image) => ({

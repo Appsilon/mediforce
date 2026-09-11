@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
@@ -41,7 +41,7 @@ interface EntryView {
   id: string;
   name: string;
   intent: string;
-  source: { kind: string; repo?: string; dockerfile?: string; reference?: string };
+  source: { kind: string; repo?: string; dockerfile?: string; context?: string; reference?: string };
   origin: 'catalogued' | 'discovered';
   versions: VersionView[];
   availability: 'present' | 'absent' | 'unknown';
@@ -120,9 +120,16 @@ function labelAsBuilt(
  * into a GitHub SSH reference. `_discovered.ts` drops local paths, but nothing
  * about *versions* does, and this exercise is a catalogued entry gaining one.
  */
-function createBuildFixtureRepo(): { repoUrl: string; commit: string; dir: string } {
+function createBuildFixtureRepo(
+  files: Record<string, string> = {
+    Dockerfile: `FROM ${PROBE_BASE_IMAGE}\nRUN touch /built-on-demand\n`,
+  },
+): { repoUrl: string; commit: string; dir: string } {
   const dir = mkdtempSync(join(tmpdir(), 'mediforce-e2e-buildsrc-'));
-  writeFileSync(join(dir, 'Dockerfile'), `FROM ${PROBE_BASE_IMAGE}\nRUN touch /built-on-demand\n`);
+  for (const [path, content] of Object.entries(files)) {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), content);
+  }
   const git = (...args: string[]): void => {
     execFileSync('git', ['-C', dir, ...args], {
       stdio: 'pipe',
@@ -136,7 +143,7 @@ function createBuildFixtureRepo(): { repoUrl: string; commit: string; dir: strin
     });
   };
   git('init', '--initial-branch=main');
-  git('add', 'Dockerfile');
+  git('add', '.');
   git('commit', '-m', 'fixture');
   const commit = execFileSync('git', ['-C', dir, 'rev-parse', 'HEAD'], { stdio: 'pipe' })
     .toString()
@@ -899,6 +906,100 @@ test.describe('image catalog API journey', () => {
       }
       rmSync(fixture.dir, { recursive: true, force: true });
     }
+  });
+
+  test('a Dockerfile in a subdirectory builds from a context that reaches its siblings', async ({
+    request,
+  }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    test.setTimeout(300_000);
+
+    // container/Dockerfile copies from scripts/ — outside its own directory, so
+    // it only builds when the context is the repo root.
+    const fixture = createBuildFixtureRepo({
+      'container/Dockerfile': `FROM ${PROBE_BASE_IMAGE}\nCOPY scripts/hello.sh /hello.sh\n`,
+      'scripts/hello.sh': 'echo hello\n',
+    });
+    let entryId = '';
+    let builtTag = '';
+    try {
+      const createRes = await request.post(catalogUrl(), {
+        headers: apiKeyHeaders(),
+        data: {
+          name: 'E2E context build',
+          intent: 'Proves a subdirectory Dockerfile builds from a wider context.',
+          source: { kind: 'built', repo: fixture.repoUrl, dockerfile: 'container/Dockerfile', context: '.' },
+        },
+      });
+      expect(createRes.status(), await createRes.text()).toBe(201);
+      const created = ((await createRes.json()) as { entry: EntryView }).entry;
+      entryId = created.id;
+      expect(created.source.context).toBe('.');
+
+      const buildRes = await request.post(`/api/image-catalog/build?namespace=${TEST_ORG_HANDLE}`, {
+        headers: apiKeyHeaders(),
+        data: {
+          repo: fixture.repoUrl,
+          commit: fixture.commit,
+          dockerfile: 'container/Dockerfile',
+          context: '.',
+        },
+      });
+      expect(buildRes.status(), await buildRes.text()).toBe(200);
+      const built = (await buildRes.json()) as { imageTag: string; entryId: string };
+      builtTag = built.imageTag;
+      expect(built.entryId).toBe(entryId);
+
+      const getRes = await request.get(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders() },
+      );
+      const { entry } = (await getRes.json()) as { entry: EntryView };
+      const version = entry.versions.find((candidate) => candidate.imageTag === built.imageTag);
+      expect(version, `no version for ${built.imageTag}`).toBeDefined();
+      expect(version?.lineage.ownLabels['mediforce.build.context']).toBe('.');
+    } finally {
+      if (builtTag !== '') {
+        try {
+          docker('rmi', '-f', builtTag);
+        } catch {
+          // The build may not have produced it; the assertions already said so.
+        }
+      }
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+      rmSync(fixture.dir, { recursive: true, force: true });
+    }
+  });
+
+  test('a build context or Dockerfile outside the repository is refused by the contract', async ({
+    request,
+  }) => {
+    const contextRes = await request.post(`/api/image-catalog/build?namespace=${TEST_ORG_HANDLE}`, {
+      headers: apiKeyHeaders(),
+      data: { repo: 'Appsilon/nope', commit: 'abc1234', dockerfile: 'Dockerfile', context: '../..' },
+    });
+    expect(contextRes.status(), await contextRes.text()).toBe(400);
+
+    // A 400, not a 500 from a build that failed on it.
+    const dockerfileRes = await request.post(`/api/image-catalog/build?namespace=${TEST_ORG_HANDLE}`, {
+      headers: apiKeyHeaders(),
+      data: { repo: 'Appsilon/nope', commit: 'abc1234', dockerfile: '../../Dockerfile', context: 'app' },
+    });
+    expect(dockerfileRes.status(), await dockerfileRes.text()).toBe(400);
+
+    const createRes = await request.post(catalogUrl(), {
+      headers: apiKeyHeaders(),
+      data: {
+        name: 'E2E escaping source',
+        intent: 'Must never be stored.',
+        source: { kind: 'built', repo: 'Appsilon/nope', dockerfile: '../../Dockerfile', context: 'app' },
+      },
+    });
+    expect(createRes.status(), await createRes.text()).toBe(400);
   });
 
   test('a caller from another namespace cannot build', async ({ request }) => {

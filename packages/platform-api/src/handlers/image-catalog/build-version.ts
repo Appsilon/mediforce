@@ -41,6 +41,7 @@ export async function buildImageCatalogVersion(
     kind: 'built',
     repo: input.repo,
     dockerfile: input.dockerfile,
+    context: input.context,
   });
   if (source.kind !== 'built') {
     throw new HandlerError('validation', 'A build needs a built source.');
@@ -49,7 +50,7 @@ export async function buildImageCatalogVersion(
   // The canonical repo is what the entry is keyed on and what the tag hashes,
   // so both sides of "did this build land under the entry" use one value.
   const repoUrl = normalizeRepoUrls(source.repo).gitUrl;
-  const imageTag = deriveBuildTag(repoUrl, input.commit, source.dockerfile);
+  const imageTag = deriveBuildTag(repoUrl, input.commit, source.dockerfile, source.context);
   const entryId = deriveImageCatalogEntryId(source);
 
   try {
@@ -59,6 +60,7 @@ export async function buildImageCatalogVersion(
       repoRef: input.repo,
       commit: input.commit,
       dockerfile: source.dockerfile,
+      context: source.context,
       namespace: input.namespace,
     });
   } catch (error) {
@@ -81,6 +83,7 @@ export async function buildImageCatalogVersion(
       namespace: input.namespace,
       repo: source.repo,
       dockerfile: source.dockerfile,
+      context: source.context,
       commit: input.commit,
     },
     outputSnapshot: { imageTag, entryId },

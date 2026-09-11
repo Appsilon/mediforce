@@ -19,6 +19,23 @@ describe('describeBuildFailure', () => {
     expect(failure.summary).toContain('beside it');
   });
 
+  it('points at the build context setting when the entry names none', () => {
+    const failure = describeBuildFailure(CONTEXT_MISMATCH);
+
+    // The fix exists now, so the hint names it rather than only the rule.
+    expect(failure.summary).toMatch(/set a build context/i);
+  });
+
+  it('names the context it used when the entry already sets one', () => {
+    const failure = describeBuildFailure(CONTEXT_MISMATCH, 'apps/golden-standard-workflow');
+
+    expect(failure.explained).toBe(true);
+    expect(failure.summary).toContain('"apps/golden-standard-workflow"');
+    // Not the no-context rule: with a context, COPY paths are not read from
+    // beside the Dockerfile, so that sentence would send the reader the wrong way.
+    expect(failure.summary).not.toContain('beside it');
+  });
+
   it('keeps the whole output, which is the only evidence of what happened', () => {
     expect(describeBuildFailure(CONTEXT_MISMATCH).detail).toContain('#7 [5/6] COPY mcp/');
   });
