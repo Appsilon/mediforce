@@ -120,11 +120,6 @@ test.describe('Image Catalog UI journey', () => {
       );
       expect(workflowRes.status(), await workflowRes.text()).toBe(201);
 
-      page.on('response', (res) => {
-        if (res.url().includes('/api/image-catalog')) {
-          console.log('DEBUG resp', res.request().method(), res.status(), res.url());
-        }
-      });
       await page.goto(`/${TEST_ORG_HANDLE}/images`);
       await expect(page.getByRole('heading', { name: 'Images' })).toBeVisible({ timeout: 30_000 });
 
@@ -141,7 +136,8 @@ test.describe('Image Catalog UI journey', () => {
       await page.getByLabel('Search images').fill('');
 
       // Expand: version history, and the layer summary named for what it is.
-      await derivedCard.getByRole('button').click();
+      // The expand toggle, not the card's Edit / Delete actions.
+      await derivedCard.getByRole('button', { expanded: false }).click();
       await expect(derivedCard.getByText(`${derivedReference}:v1`)).toBeVisible({
         timeout: 60_000,
       });
