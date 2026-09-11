@@ -45,7 +45,9 @@ describe('useProcessDefinitions', () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(listMock).toHaveBeenCalledWith({ includeCompletedRuns: true });
+    // Archived workflows too: the catalog hides them behind "Archived workflows",
+    // which has nothing to show if the server was never asked for them.
+    expect(listMock).toHaveBeenCalledWith({ includeCompletedRuns: true, includeArchived: true });
     expect(result.current.definitions).toHaveLength(1);
     const group = result.current.definitions[0];
     expect(group.name).toBe('wf-a');
@@ -89,7 +91,7 @@ describe('useProcessDefinitions', () => {
     const { wrapper } = createQueryWrapper();
     renderHook(() => useProcessDefinitions(false), { wrapper });
 
-    await waitFor(() => expect(listMock).toHaveBeenCalledWith({ includeCompletedRuns: false }));
+    await waitFor(() => expect(listMock).toHaveBeenCalledWith({ includeCompletedRuns: false, includeArchived: true }));
   });
 
   it('surfaces 4xx errors without retrying', async () => {

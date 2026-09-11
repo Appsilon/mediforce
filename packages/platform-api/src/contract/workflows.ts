@@ -104,6 +104,11 @@ export const WorkflowRunSummarySchema = z.object({
 export const WorkflowDefinitionGroupSchema = z.object({
   namespace: z.string().min(1),
   name: z.string().min(1),
+  /**
+   * The newest non-archived version — or, when every version is archived
+   * (only listed under `includeArchived`), the newest outright. `definition`
+   * is that version, so its `archived` flag means the whole workflow is.
+   */
   latestVersion: z.number().int().positive(),
   defaultVersion: z.number().int().positive().nullable(),
   definition: WorkflowDefinitionSchema.nullable(),
@@ -139,10 +144,11 @@ export const ListWorkflowsInputSchema = z.object({
    */
   includeCompletedRuns: z.boolean().default(true),
   /**
-   * When true, archived workflows are listed too. Off by default — the catalog
-   * hides them. The workspace danger dialog turns it on so the count it makes
-   * the operator type matches the set `resetNamespace` / the workspace cascade
-   * actually destroys, which includes archived workflows.
+   * When true, archived workflows are listed too. Off by default. The
+   * workspace catalog turns it on to offer them behind "Archived workflows" —
+   * the only way back to a workflow whose every version is archived — and the
+   * workspace danger dialog so the count it makes the operator type matches the
+   * set `resetNamespace` / the workspace cascade actually destroys.
    */
   includeArchived: z.boolean().default(false),
 });

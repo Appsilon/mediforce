@@ -23,6 +23,7 @@ import { OpenRouterCreditsIndicator } from '@/components/namespace/openrouter-cr
 import { WorkflowSecretKeysProvider } from '@/hooks/use-workflow-secret-keys';
 import { ImportWorkflowDialog, type ImportEntry } from '@/components/workflows/import-workflow-dialog';
 import { cn } from '@/lib/utils';
+import { queryKeys } from '@/lib/query-keys';
 import type { Namespace } from '@mediforce/platform-core';
 import { WorkspaceAccessError } from '@/components/workspace-access-error';
 
@@ -523,7 +524,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
         entry={importEntry}
         open={importOpen}
         onOpenChange={setImportOpen}
-        onImported={() => void queryClient.invalidateQueries({ queryKey: ['workflows', 'list'] })}
+        onImported={() => void queryClient.invalidateQueries({ queryKey: queryKeys.workflowsListAll() })}
       />
 
       {loading ? (
