@@ -606,7 +606,7 @@ test.describe('image catalog API journey', () => {
     }
   });
 
-  test('a live workflow version blocks the delete until it is archived', async ({ request }) => {
+  test('a delete stays blocked until no runnable version pins the image', async ({ request }) => {
     test.skip(!dockerAvailable(), 'Docker daemon not available');
     const stamp = Date.now();
     const reference = `mediforce-e2e-pinned-${stamp}`;
@@ -633,29 +633,33 @@ test.describe('image catalog API journey', () => {
       expect(createRes.status(), await createRes.text()).toBe(201);
       entryId = ((await createRes.json()) as { entry: EntryView }).entry.id;
 
-      const workflowRes = await request.post(
-        `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
-        {
-          headers: apiKeyHeaders(),
-          data: {
-            name: workflowName,
-            title: `E2E Pin ${stamp}`,
-            steps: [
-              {
-                id: 'analyse',
-                name: 'Analyse',
-                type: 'creation',
-                executor: 'agent',
-                autonomyLevel: 'L2',
-                agent: { image: tag },
-              },
-              { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
-            ],
-            transitions: [{ from: 'analyse', to: 'done' }],
+      // Two versions, both on the image: archiving the head hands runs back to
+      // v1, so only archiving both clears the way.
+      for (let registered = 0; registered < 2; registered += 1) {
+        const workflowRes = await request.post(
+          `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
+          {
+            headers: apiKeyHeaders(),
+            data: {
+              name: workflowName,
+              title: `E2E Pin ${stamp}`,
+              steps: [
+                {
+                  id: 'analyse',
+                  name: 'Analyse',
+                  type: 'creation',
+                  executor: 'agent',
+                  autonomyLevel: 'L2',
+                  agent: { image: tag },
+                },
+                { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+              ],
+              transitions: [{ from: 'analyse', to: 'done' }],
+            },
           },
-        },
-      );
-      expect(workflowRes.status(), await workflowRes.text()).toBe(201);
+        );
+        expect(workflowRes.status(), await workflowRes.text()).toBe(201);
+      }
 
       const blocked = await request.delete(
         `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
@@ -668,14 +672,24 @@ test.describe('image catalog API journey', () => {
       // Nothing destroyed: the image is still on the daemon and the entry with it.
       docker('image', 'inspect', tag);
 
-      // Archiving the version that pins it is the remedy — one version, not the
-      // whole workflow.
-      const archived = await request.post(
-        `/api/workflow-definitions/${workflowName}/versions/1/archive?namespace=${TEST_ORG_HANDLE}`,
-        { headers: apiKeyHeaders(), data: { archived: true } },
-      );
-      expect(archived.ok(), await archived.text()).toBe(true);
+      const archiveVersion = async (version: number) => {
+        const archived = await request.post(
+          `/api/workflow-definitions/${workflowName}/versions/${String(version)}/archive?namespace=${TEST_ORG_HANDLE}`,
+          { headers: apiKeyHeaders(), data: { archived: true } },
+        );
+        expect(archived.ok(), await archived.text()).toBe(true);
+      };
 
+      // Archiving the head is not enough: runs fall back to v1, which pins the
+      // same image, so deleting it would still break the next run.
+      await archiveVersion(2);
+      const stillBlocked = await request.delete(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(stillBlocked.status(), await stillBlocked.text()).toBe(409);
+
+      await archiveVersion(1);
       const allowed = await request.delete(
         `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
         { headers: apiKeyHeaders() },
@@ -684,6 +698,20 @@ test.describe('image catalog API journey', () => {
       expect(((await allowed.json()) as { deletedImages: string[] }).deletedImages).toEqual([tag]);
       entryId = '';
       expect(() => docker('image', 'inspect', tag)).toThrow();
+
+      // With every version archived the workflow is archived, not gone: the
+      // catalog still lists it — marked archived — so it can be restored.
+      const listRes = await request.get(
+        `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}&includeArchived=true`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(listRes.ok(), await listRes.text()).toBe(true);
+      const listed = (
+        (await listRes.json()) as {
+          definitions: { name: string; definition: { archived?: boolean } | null }[];
+        }
+      ).definitions.find((group) => group.name === workflowName);
+      expect(listed?.definition?.archived).toBe(true);
     } finally {
       if (entryId !== '') {
         await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {

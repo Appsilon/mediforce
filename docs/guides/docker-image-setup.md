@@ -209,12 +209,19 @@ Two things to expect, because the daemon is shared by every workspace:
 ### What blocks a delete
 
 A **live** workflow version pinning one of the images blocks it. Live means the
-version a run starts from: the workflow's **default** version where one is set,
-otherwise its latest, and not archived. That step can still be re-pointed, so
-nothing has to break — the delete is refused and names the workflow, version and
-steps, with **Archive this version** offered right there. Archiving one version
-leaves the rest of the workflow alone; the whole workflow never has to go to
-reclaim an image.
+version a run starts from: the workflow's **default** version when it is itself
+live, otherwise its newest non-archived version. That step can still be
+re-pointed, so nothing has to break — the delete is refused and names the
+workflow, version and steps, with **Archive this version** offered right there.
+Archiving one version leaves the rest of the workflow alone, and the dialog says
+which version runs fall back to — if that one pins the image too, it blocks next.
+
+When the pinning version is the workflow's **only** runnable one, the button reads
+**Archive workflow**, because that is what archiving it does. The workflow is not
+deleted: on the workspace page, **Display → Archived workflows** lists it, and
+**Unarchive** on its page brings it back — every version of it, including any
+archived earlier on purpose. Its step still names the deleted image, so rebuild
+or re-point that before running it again.
 
 A version the workflow pins as its **default** is not offered that button, since
 archiving it would leave the workflow pointing at a version that cannot run.
