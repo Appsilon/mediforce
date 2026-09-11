@@ -9,6 +9,7 @@ import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useWorkflowSecretKeysContext } from '@/hooks/use-workflow-secret-keys';
 import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
 import { cn } from '@/lib/utils';
+import { routes } from '@/lib/routes';
 
 const MAX_VISIBLE = 10;
 
@@ -139,7 +140,7 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
               </span>
               {canAdmin && warning.category === 'missing-image' && (
                 <Link
-                  href={`/${handle}/admin/infrastructure`}
+                  href={routes.adminInfrastructure(handle)}
                   className="ml-1.5 text-xs text-amber-700 underline hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200"
                 >
                   View images

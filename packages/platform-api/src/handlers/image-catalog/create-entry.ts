@@ -7,7 +7,7 @@ import type {
   CreateImageCatalogEntryOutput,
 } from '../../contract/image-catalog';
 import { actorFromCaller } from '../_helpers';
-import { getDockerInfo } from '../system/get-docker-info';
+import { fetchDaemonImages } from '../system/_docker';
 import { canonicalizeSource, deriveImageCatalogEntryId } from './_source';
 import { refreshEntryCapabilities } from './_capabilities';
 import { toEntryView } from './_view';
@@ -44,7 +44,7 @@ export async function createImageCatalogEntry(
 
   // One daemon read for the whole write: the probe and the response view
   // ask the same questions of it.
-  const daemon = await getDockerInfo({}, scope);
+  const daemon = await fetchDaemonImages();
   const entry = await scope.imageCatalog.upsert(namespace, parsed.data);
   const refreshedEntry = await refreshEntryCapabilities(namespace, entry, scope, daemon);
 

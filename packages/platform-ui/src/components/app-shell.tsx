@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronsUpDown, Building2, Check, ChevronRight, Wrench, Database } from 'lucide-react';
+import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronsUpDown, Building2, Check, ChevronRight, Wrench, Layers, Database } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import { BrandTheme } from './brand-theme';
 import { WorkspaceAvatar } from './workspace-avatar';
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { href: '', label: 'Workflows', icon: GitBranch, badge: null, exact: true },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null, exact: false },
   { href: '/tools', label: 'Tools', icon: Wrench, badge: null, exact: false },
+  { href: '/images', label: 'Images', icon: Layers, badge: null, exact: false },
   { href: '/tasks', label: 'Human actions', icon: User, badge: null, exact: false },
 ] as const;
 
@@ -95,6 +96,7 @@ function buildBreadcrumbs(pathname: string, handle: string, prefix: string): Cru
   if (s0 === 'monitoring') return [workflows, { label: 'Monitoring', href: null }];
   if (s0 === 'settings') return [{ label: 'Workspace settings', href: null }];
   if (s0 === 'catalog') return [workflows, { label: 'Catalog', href: null }];
+  if (s0 === 'images') return [workflows, { label: 'Images', href: null }];
 
   if (s0 === 'agents') {
     const agents: Crumb = { label: 'Agents', href: `${prefix}/agents` };
