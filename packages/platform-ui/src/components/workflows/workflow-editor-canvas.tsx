@@ -30,7 +30,7 @@ import { selectBase } from './workflow-editor/step-editor-fields';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
 import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
-import { useImageCapabilities } from '@/hooks/use-image-catalog';
+import { useImageCatalogEntries } from '@/hooks/use-image-catalog';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
@@ -187,7 +187,7 @@ export function WorkflowEditorCanvas({
 
   const { toast } = useToast();
   const { images: dockerImages, isAvailable: dockerAvailable } = useDockerImages();
-  const imageCapabilities = useImageCapabilities(namespace);
+  const { entries: catalogEntries } = useImageCatalogEntries(namespace);
   const warningStepIds = useMemo(() => {
     if (!dockerAvailable) return undefined;
     const map = new Map<string, string>();
@@ -844,7 +844,7 @@ export function WorkflowEditorCanvas({
               errors={stepErrors?.[selectedStep.id]}
               imageWarning={warningStepIds?.get(selectedStep.id)}
               dockerImages={dockerImages}
-              imageCapabilities={imageCapabilities}
+              catalogEntries={catalogEntries}
               workflowExternalSkillsRepo={workflowExternalSkillsRepo}
             />
           </div>

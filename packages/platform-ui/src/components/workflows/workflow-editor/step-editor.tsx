@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
@@ -12,8 +12,8 @@ import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
 import { DEFAULT_AGENT_IMAGE, defaultVerdictLabel, uniqueName, uniqueSlug } from '@mediforce/platform-core';
-import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig, ImageCapabilities } from '@mediforce/platform-core';
-import type { DockerImageInfo } from '@mediforce/platform-api/contract';
+import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
+import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
   STEP_TYPE_LABELS,
@@ -27,6 +27,15 @@ import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, se
 import { McpRestrictionsSection } from './mcp-restrictions-section';
 import { AllowedRolesField, AssignedToField } from './step-editor-roles';
 import { CollapsibleCard } from './collapsible-card';
+import {
+  buildImagePicker,
+  requiredRuntimeFor,
+  type ImagePickerGroup,
+} from './image-picker-options';
+
+/** Stable identity for "no catalog", so the picker memo is not defeated by a
+ *  fresh array on every render of a caller that passes none. */
+const NO_CATALOG_ENTRIES: ImageCatalogEntryView[] = [];
 
 function friendlyFieldError(message: string): string {
   if (/too small|>=1|at least 1/i.test(message)) return 'This field cannot be empty.';
@@ -73,39 +82,56 @@ const riMono = inputBaseMono;
 const rs = selectBase;
 const rt = textareaBase;
 
-function imageRef(img: DockerImageInfo): string {
-  return img.tag && img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.repository;
-}
-
+/**
+ * What the agent picker puts in the definition for a chosen image.
+ *
+ * `mediforce-golden-image:latest` collapses to the untagged form because that
+ * is what registration persists; without it a step already carrying the
+ * untagged default would match no option and be silently rewritten on save.
+ */
 function pickerImageValue(image: string): string {
   return image === `${DEFAULT_AGENT_IMAGE}:latest` ? DEFAULT_AGENT_IMAGE : image;
 }
 
-/**
- * Agent images with the ones a probe found agent-capable first. An image the
- * probe answered for is judged by that answer — a bare `alpine` or a language
- * runtime carries no agent CLI and fails at container start, so it is dropped
- * rather than offered. An image with no answer (uncatalogued, or a daemon that
- * could not be reached) stays offered, and the golden image keeps the star it
- * has always carried: it is the one image the platform ships an agent CLI in.
- */
-function agentImageOptions(
-  images: DockerImageInfo[],
-  capabilitiesByImageId: Record<string, ImageCapabilities>,
-): Array<{ img: DockerImageInfo; label: string }> {
-  return images
-    .filter((img) => {
-      const capabilities = capabilitiesByImageId[img.id];
-      return capabilities?.status !== 'known' || capabilities.agentCapable;
-    })
-    .map((img) => {
-      const capabilities = capabilitiesByImageId[img.id];
-      const recommended = capabilities?.status === 'known'
-        ? capabilities.agentCapable
-        : pickerImageValue(imageRef(img)) === DEFAULT_AGENT_IMAGE;
-      return { img, recommended, label: recommended ? `★ ${imageRef(img)}` : imageRef(img) };
-    })
-    .sort((a, b) => Number(b.recommended) - Number(a.recommended));
+/** The script picker saves the reference as-is — the normalisation above is
+ *  about the agent default, which script steps do not have. */
+function identityImageValue(image: string): string {
+  return image;
+}
+
+/** Whether the picker already offers this value, so the step's own image is
+ *  only appended as an extra option when nothing else carries it. */
+function offersValue(
+  groups: ImagePickerGroup[],
+  value: string,
+  normalize: (ref: string) => string,
+): boolean {
+  return groups.some((group) =>
+    group.options.some((option) => normalize(option.value) === normalize(value)),
+  );
+}
+
+/** The catalog's groups as `<optgroup>`s. A group with no label is the daemon
+ *  fallback, which has no base to group by, so its options sit flat. */
+function ImageOptions({
+  groups,
+  normalize,
+}: {
+  groups: ImagePickerGroup[];
+  normalize: (ref: string) => string;
+}) {
+  return (
+    <>
+      {groups.map((group) => {
+        const options = group.options.map((option) => (
+          <option key={option.value} value={normalize(option.value)}>{option.label}</option>
+        ));
+        return group.label === null
+          ? <React.Fragment key={group.key}>{options}</React.Fragment>
+          : <optgroup key={group.key} label={group.label}>{options}</optgroup>;
+      })}
+    </>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +290,7 @@ export function StepEditor({
   errors,
   imageWarning,
   dockerImages,
-  imageCapabilities = {},
+  catalogEntries = NO_CATALOG_ENTRIES,
   workflowExternalSkillsRepo,
 }: {
   step: WorkflowStep;
@@ -275,7 +301,7 @@ export function StepEditor({
   errors?: Record<string, string>;
   imageWarning?: string;
   dockerImages?: DockerImageInfo[];
-  imageCapabilities?: Record<string, ImageCapabilities>;
+  catalogEntries?: ImageCatalogEntryView[];
   workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
 }) {
   const isNewStep = step.id.startsWith('new-step-');
@@ -401,6 +427,32 @@ export function StepEditor({
     : agentBuildsFromWorkflowSource
       ? 'Built from workflow source'
       : `Default — ${DEFAULT_AGENT_IMAGE}`;
+
+  // The picker's options come from the namespace's image catalog: name and
+  // intent instead of a bare `repo:tag`, grouped by what each was built on, and
+  // filtered to what the step can actually run — an agent step is not offered
+  // an image a probe proved carries no agent CLI, which is the `exec: "claude":
+  // executable file not found` class of run-time failure. It curates, it does
+  // not gate: the field beside the select still saves any string, and a step
+  // pinning an image no entry covers keeps it (ADR-0022 decision 5).
+  //
+  // A catalog with nothing to say — empty, or a daemon nobody could reach —
+  // degrades to the daemon listing the picker offered before it existed, so an
+  // author never faces an empty picker (AGENTS.md §13).
+  const agentImagePicker = useMemo(
+    () => buildImagePicker({ catalogEntries, dockerImages: dockerImages ?? [], executor: 'agent' }),
+    [catalogEntries, dockerImages],
+  );
+  const scriptRuntime = requiredRuntimeFor(step);
+  const scriptImagePicker = useMemo(
+    () => buildImagePicker({
+      catalogEntries,
+      dockerImages: dockerImages ?? [],
+      executor: 'script',
+      requiredRuntime: scriptRuntime,
+    }),
+    [catalogEntries, dockerImages, scriptRuntime],
+  );
 
   function updateAgent(patch: Partial<NonNullable<WorkflowStep['agent']>>) {
     onChange({ agent: { ...step.agent, ...patch } });
@@ -848,7 +900,7 @@ export function StepEditor({
 
         <FieldGroup>
           <FieldRow label="agent.image" tooltip={TIP.agentImage}>
-            {dockerImages && dockerImages.length > 0 ? (
+            {agentImagePicker.hasSource ? (
               <div className="grid gap-2 sm:grid-cols-2">
                 <select
                   aria-label="Known Docker image"
@@ -857,12 +909,8 @@ export function StepEditor({
                   className={rs}
                 >
                   <option value="">{agentBlankOptionLabel}</option>
-                  {agentImageOptions(dockerImages, imageCapabilities).map(({ img, label }) => (
-                    <option key={img.id} value={pickerImageValue(imageRef(img))}>{label}</option>
-                  ))}
-                  {step.agent?.image && !agentImageOptions(dockerImages, imageCapabilities).some(
-                    ({ img }) => pickerImageValue(imageRef(img)) === pickerImageValue(step.agent?.image ?? ''),
-                  ) && (
+                  <ImageOptions groups={agentImagePicker.groups} normalize={pickerImageValue} />
+                  {step.agent?.image && !offersValue(agentImagePicker.groups, step.agent.image, pickerImageValue) && (
                     <option value={step.agent.image}>{step.agent.image}</option>
                   )}
                 </select>
@@ -1041,7 +1089,7 @@ export function StepEditor({
         {step.plugin !== 'databricks-job' && (
           <FieldGroup>
             <FieldRow label="script.image" tooltip={TIP.scriptImage}>
-              {dockerImages && dockerImages.length > 0 ? (
+              {scriptImagePicker.hasSource ? (
                 <div className="grid gap-2 sm:grid-cols-2">
                   <select
                     aria-label="Known Docker image"
@@ -1050,11 +1098,8 @@ export function StepEditor({
                     className={rs}
                   >
                     <option value="">Select image…</option>
-                    {dockerImages.map((img) => {
-                      const ref = imageRef(img);
-                      return <option key={img.id} value={ref}>{ref}</option>;
-                    })}
-                    {step.script?.image && !dockerImages.some((img) => imageRef(img) === step.script?.image) && (
+                    <ImageOptions groups={scriptImagePicker.groups} normalize={identityImageValue} />
+                    {step.script?.image && !offersValue(scriptImagePicker.groups, step.script.image, identityImageValue) && (
                       <option value={step.script.image}>{step.script.image}</option>
                     )}
                   </select>

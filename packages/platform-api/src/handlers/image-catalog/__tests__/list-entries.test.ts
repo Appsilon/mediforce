@@ -14,14 +14,18 @@ import { EMPTY_DAEMON, TEALFLOW, builtImage, daemonWith, UNREACHABLE_DAEMON } fr
 const daemon = vi.hoisted(() => ({
   value: { available: false, images: [] } as DaemonImageListing,
 }));
+const probe = vi.hoisted(() => ({
+  answer: { status: 'unknown' } as { status: string; agentCapable?: boolean; runtimes?: string[] },
+}));
 vi.mock('../../system/_docker', () => ({
   fetchDaemonImages: async () => daemon.value,
-  probeImageCapabilities: async () => ({ status: 'unknown' }),
+  probeImageCapabilities: async () => probe.answer,
   fetchImageHistory: async () => null,
 }));
 
 const { createImageCatalogEntry } = await import('../create-entry');
 const { listImageCatalogEntries } = await import('../list-entries');
+const { getImageCatalogEntry } = await import('../get-entry');
 
 describe('listImageCatalogEntries handler', () => {
   let repo: InMemoryImageCatalogRepository;
@@ -31,6 +35,7 @@ describe('listImageCatalogEntries handler', () => {
     repo = new InMemoryImageCatalogRepository();
     auditRepo = new InMemoryAuditRepository();
     daemon.value = UNREACHABLE_DAEMON;
+    probe.answer = { status: 'unknown' };
   });
 
   const scopeFor = (uid: string, namespaces: string[]) =>
@@ -38,6 +43,72 @@ describe('listImageCatalogEntries handler', () => {
 
   it('is empty for a namespace nobody has catalogued anything in', async () => {
     const scope = scopeFor('u-member', ['alpha']);
+
+    expect(await listImageCatalogEntries({ namespace: 'alpha' }, scope)).toEqual({ entries: [] });
+  });
+
+  it('offers a source this namespace built that nobody has described yet', async () => {
+    const scope = scopeFor('u-member', ['alpha']);
+    daemon.value = daemonWith([builtImage({ buildNamespace: 'alpha' })]);
+
+    const { entries } = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].origin).toBe('discovered');
+    expect(entries[0].name).toBe('tealflow');
+    expect(entries[0].intent).toBe('');
+    // Derived from the same daemon read the stored entries use, so a discovered
+    // entry arrives with its versions rather than as a bare name.
+    expect(entries[0].versions.map((v) => v.imageTag)).toEqual(['mediforce-built:aaaaaaaaaaaa']);
+    expect(entries[0].availability).toBe('present');
+  });
+
+  it('starts no probe of its own for a discovered entry — a listing is polled', async () => {
+    const scope = scopeFor('u-member', ['alpha']);
+    daemon.value = daemonWith([
+      builtImage({ buildNamespace: 'alpha', id: 'sha-list-1', tag: 'list-1' }),
+    ]);
+
+    const { entries } = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+
+    expect(entries[0].versions.map((v) => v.capabilities)).toEqual([{ status: 'unknown' }]);
+  });
+
+  it('shows a discovered entry the capabilities an earlier entry read probed', async () => {
+    const scope = scopeFor('u-member', ['alpha']);
+    probe.answer = { status: 'known', agentCapable: false, runtimes: ['bash'] };
+    daemon.value = daemonWith([
+      builtImage({ buildNamespace: 'alpha', id: 'sha-list-2', tag: 'list-2' }),
+    ]);
+    const before = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+    await getImageCatalogEntry({ namespace: 'alpha', id: before.entries[0].id }, scope);
+
+    const { entries } = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+
+    expect(entries[0].versions[0].capabilities).toEqual({
+      status: 'known',
+      agentCapable: false,
+      runtimes: ['bash'],
+    });
+  });
+
+  it('replaces the discovered entry with the stored one, at the same id, once described', async () => {
+    const scope = scopeFor('u-member', ['alpha']);
+    daemon.value = daemonWith([builtImage({ buildNamespace: 'alpha' })]);
+    const before = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+
+    await createImageCatalogEntry({ namespace: 'alpha', ...TEALFLOW }, scope);
+    const { entries } = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].id).toBe(before.entries[0].id);
+    expect(entries[0].origin).toBe('catalogued');
+    expect(entries[0].intent).toBe(TEALFLOW.intent);
+  });
+
+  it('offers nothing for an image built for another namespace', async () => {
+    const scope = scopeFor('u-member', ['alpha']);
+    daemon.value = daemonWith([builtImage({ buildNamespace: 'beta' })]);
 
     expect(await listImageCatalogEntries({ namespace: 'alpha' }, scope)).toEqual({ entries: [] });
   });

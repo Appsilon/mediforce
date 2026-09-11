@@ -65,6 +65,46 @@ Minimal base images (`alpine`, `scratch`, distroless) ship none of this. `alpine
 - **Authentication error during push** — run `docker login <registry-url>` and retry.
 - **Using the auto-build path instead** — set `repo` and `commit` on the step. The platform will build the image automatically before the run starts.
 
+## Images the platform built are offered on their own
+
+An image a workflow in your workspace built appears in **Workspace → Images**
+within about 30 seconds of the build finishing, marked **Needs a description**.
+The build labelled its repository, Dockerfile, commit and the workflow that
+triggered it, so every fact on the entry is already there; the one thing missing
+is the sentence saying what the image is *for*. **Describe** on the card asks
+for that sentence and a name, registers the entry, and probes what is inside it
+([ADR-0022](../adr/0022-image-catalog.md) decision 7). Until then the image is
+still offered by the step-editor picker, labelled `not described yet`.
+
+This covers only what the platform built **for your namespace**. A pulled or
+hand-built image — `python`, `rocker/r-ver`, anything pushed to a registry —
+carries no build labels, so nothing can derive its source and it is catalogued
+by hand.
+
+## Backfilling an existing deployment
+
+For those hand-built and pulled images, `scripts/migrations/adopt_daemon_images.py`
+backfills the catalog from what the daemon already holds.
+
+It runs in two phases, because `intent` is the one field a human writes
+([ADR-0022](../adr/0022-image-catalog.md) decision 2) and a generated sentence
+would make the catalog unreadable:
+
+```bash
+# 1. Draft. Reads the daemon, groups it into sources, changes nothing.
+python3 scripts/migrations/adopt_daemon_images.py --namespace acme --draft images.json
+
+# 2. Fill in every "intent", then register.
+python3 scripts/migrations/adopt_daemon_images.py --apply images.json
+```
+
+Images are grouped by **source**, so five `mediforce-agent:*` tags become one
+entry with five versions rather than five rows. Test artifacts
+(`mediforce-test-*`, `mediforce-e2e-*`), dev-infra containers (`postgres`,
+`redis`) and images built from a local filesystem path are dropped by default —
+`--include-all` keeps them. Re-applying a draft is safe: an already-catalogued
+source is skipped, not failed.
+
 ## See also
 
 - **Workspace → Images** (`/<handle>/images`) — the same catalog in the browser,

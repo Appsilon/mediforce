@@ -1,12 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 import { NICE_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
-import type { ImageCapabilities } from '@mediforce/platform-core';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 
 /**
@@ -16,17 +14,22 @@ import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
  * NICE LIVE (30 s): the stored half only changes when a member registers or
  * edits an entry, and the derived half — versions, availability, lineage — is
  * recomputed per read from the daemon, so a build that finishes while the page
- * is open shows up within the cadence.
+ * is open shows up within the cadence. An editor left open must pick that up:
+ * an image whose probe failed at registration stays offered without a
+ * suitability claim until a later probe answers.
+ *
+ * `undefined` is a namespace not resolved yet, not an error — nothing is
+ * fetched and the caller renders on the empty list.
  */
-export function useImageCatalogEntries(namespace: string): {
+export function useImageCatalogEntries(namespace: string | undefined): {
   entries: ImageCatalogEntryView[];
   loading: boolean;
   error: Error | null;
 } {
   const query = useQuery({
-    queryKey: queryKeys.imageCatalog.list(namespace),
-    queryFn: async () => (await mediforce.imageCatalog.list({ namespace })).entries,
-    enabled: namespace !== '',
+    queryKey: queryKeys.imageCatalog.list(namespace ?? ''),
+    queryFn: async () => (await mediforce.imageCatalog.list({ namespace: namespace ?? '' })).entries,
+    enabled: namespace !== undefined && namespace !== '',
     staleTime: NICE_LIVE_INTERVAL_MS,
     refetchInterval: (q) => (q.state.error !== null ? false : NICE_LIVE_INTERVAL_MS),
     retry: stopRetryOn4xx,
@@ -34,7 +37,7 @@ export function useImageCatalogEntries(namespace: string): {
 
   return {
     entries: query.data ?? [],
-    loading: query.isPending && namespace !== '',
+    loading: query.isPending && namespace !== undefined && namespace !== '',
     error: (query.error as Error | null) ?? null,
   };
 }
@@ -76,33 +79,27 @@ export function useImageCatalogEntry(
 }
 
 /**
- * Daemon image ID → the capabilities probed when the image was catalogued,
- * flattened across every entry's versions.
+ * Describe a discovered entry — the sentence the platform cannot derive.
  *
- * NICE LIVE (30 s): the catalog only changes when a member registers or edits
- * an entry, but an editor left open must pick that up — an image whose probe
- * failed at registration stays offered without a suitability claim until a
- * later probe answers.
+ * A plain create: a discovered entry is not a row, so writing the sentence is
+ * what registers it, and the id is derived from the source it already carries,
+ * so the entry keeps the identity the listing showed. The response is a probed
+ * view — `createImageCatalogEntry` probes capabilities in the same request —
+ * which is why this is the moment the card stops saying "not probed".
+ *
+ * No optimistic update. The probe is the point: guessing the answer locally
+ * and correcting it a second later is worse than a pending button.
  */
-export function useImageCapabilities(
-  namespace: string | undefined,
-): Record<string, ImageCapabilities> {
-  const query = useQuery({
-    queryKey: queryKeys.imageCatalog.list(namespace ?? ''),
-    queryFn: async () => {
-      const { entries } = await mediforce.imageCatalog.list({ namespace: namespace ?? '' });
-      return entries;
+export function useDescribeImage(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; intent: string; source: ImageCatalogEntryView['source'] }) =>
+      mediforce.imageCatalog.create({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entry.id),
+      });
     },
-    enabled: namespace !== undefined && namespace !== '',
-    staleTime: NICE_LIVE_INTERVAL_MS,
-    refetchInterval: (q) => (q.state.error !== null ? false : NICE_LIVE_INTERVAL_MS),
-    retry: stopRetryOn4xx,
   });
-
-  const entries = query.data;
-  return useMemo(() => Object.fromEntries(
-    (entries ?? []).flatMap((entry) =>
-      entry.versions.map((version) => [version.imageId, version.capabilities] as const),
-    ),
-  ), [entries]);
 }

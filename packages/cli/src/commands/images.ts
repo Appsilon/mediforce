@@ -60,7 +60,13 @@ export const imagesListCommand = defineCommand({
     for (const entry of result.entries) {
       const indent = indentFor(entry, byId);
       output.stdout(`${indent}  ${entry.id}  ${entry.name}`);
-      output.stdout(`${indent}    ${entry.intent}`);
+      // A discovered entry has no sentence to print, so the line says what is
+      // missing and how to supply it rather than printing a blank.
+      output.stdout(
+        entry.origin === 'discovered'
+          ? `${indent}    (built here, not described yet — describe it with \`mediforce images create\`)`
+          : `${indent}    ${entry.intent}`,
+      );
       output.stdout(
         `${indent}    ${describeSource(entry)}  ·  ${String(entry.versions.length)} version(s)${AVAILABILITY_NOTE[entry.availability]}`,
       );
@@ -91,7 +97,11 @@ export const imagesShowCommand = defineCommand({
     }
     const { entry } = result;
     output.stdout(`${entry.name}  (${entry.id})`);
-    output.stdout(`  Intent:  ${entry.intent}`);
+    output.stdout(
+      entry.origin === 'discovered'
+        ? '  Intent:  not described yet — this image was built here and nobody has said what it is for'
+        : `  Intent:  ${entry.intent}`,
+    );
     output.stdout(`  Source:  ${describeSource(entry)}  [${entry.source.kind}]`);
     if (entry.declaredSource !== undefined) {
       const declared = [

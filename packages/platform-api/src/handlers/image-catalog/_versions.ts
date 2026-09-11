@@ -1,4 +1,5 @@
 import {
+  normalizeRepoUrls,
   unknownImageCapabilities,
   type ImageCapabilityCache,
   type ImageCatalogSource,
@@ -18,9 +19,18 @@ export type ResolvedVersion = Omit<ImageCatalogVersion, 'lineage'>;
  *  source. A step that named no Dockerfile carries no `mediforce.build.dockerfile`
  *  label at all — the builders label the value `deriveBuildTag` hashed, which is
  *  `dockerfile ?? ''` — so an absent label and the empty key value are the same
- *  fact and must compare equal here. */
+ *  fact and must compare equal here.
+ *
+ *  The repo is normalised on both sides. An entry's is already canonical, but a
+ *  label carries whatever reference the step author wrote, so an
+ *  `https://github.com/…` build and a `git@github.com:….git` entry are the same
+ *  source and used to resolve to zero versions. */
 function matchesBuilt(image: DockerImageInfo, repo: string, dockerfile: string): boolean {
-  return image.buildRepo === repo && (image.buildDockerfile ?? '') === dockerfile;
+  if (image.buildRepo === undefined) return false;
+  return (
+    normalizeRepoUrls(image.buildRepo).gitUrl === repo &&
+    (image.buildDockerfile ?? '') === dockerfile
+  );
 }
 
 /**

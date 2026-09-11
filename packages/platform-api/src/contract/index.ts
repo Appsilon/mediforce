@@ -490,6 +490,7 @@ export {
 export {
   ImageCatalogVersionSchema,
   ImageCatalogAvailabilitySchema,
+  ImageCatalogOriginSchema,
   ImageCatalogEntryViewSchema,
   ListImageCatalogEntriesInputSchema,
   ListImageCatalogEntriesOutputSchema,
@@ -503,6 +504,7 @@ export {
   DeleteImageCatalogEntryOutputSchema,
   type ImageCatalogVersion,
   type ImageCatalogAvailability,
+  type ImageCatalogOrigin,
   type ImageCatalogEntryView,
   type ListImageCatalogEntriesInput,
   type ListImageCatalogEntriesOutput,
