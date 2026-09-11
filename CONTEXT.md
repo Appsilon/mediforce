@@ -251,9 +251,11 @@ restricts one — a Step may still name any image string.
 One image the platform offers, identified by its **source**: either `built`
 `(repo, dockerfile)` or `referenced` (an untagged image reference). Deliberately
 **not** keyed on the commit, so a rebuild is another **Version** of a row the
-author already chose rather than a new row. Every fact on it is derived from
-the Docker daemon; the one thing a human writes is its **Intent**. Any Workspace
-member may create, edit and delete one — an entry executes nothing.
+author already chose rather than a new row — nor on the **build context** a
+`built` source may name, which is how the Dockerfile is built rather than which
+Dockerfile it is. Every fact on it is derived from the Docker daemon; the one
+thing a human writes is its **Intent**. Any Workspace member may create, edit
+and delete one — an entry executes nothing.
 
 **Discovered Entry** *(of an Image Catalog)*:
 An Image Catalog Entry the platform derived from an image this namespace built

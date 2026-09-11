@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  BuildContextSchema,
+  buildPathsStayInRepo,
   ImageBuildStepSchema,
   ImageCatalogDeclaredSourceSchema,
   ImageCatalogEntrySchema,
@@ -8,6 +10,20 @@ import {
 } from '@mediforce/platform-core';
 
 const NamespaceQuery = z.object({ namespace: z.string().min(1) });
+
+const ESCAPING_DOCKERFILE = 'dockerfile must stay inside the repository';
+
+/**
+ * A source as a caller writes it: the stored shape, plus a Dockerfile that
+ * stays inside the repo once read from its context. Checked here, not on
+ * `ImageCatalogSourceSchema`, which also parses every stored row on read — a
+ * row it refused would take the whole catalog listing down with it.
+ */
+const ImageCatalogSourceInputSchema = ImageCatalogSourceSchema.superRefine((source, ctx) => {
+  if (source.kind === 'built' && buildPathsStayInRepo(source.dockerfile, source.context) === false) {
+    ctx.addIssue({ code: 'custom', path: ['dockerfile'], message: ESCAPING_DOCKERFILE });
+  }
+});
 
 /** The catalog entry a version was built on, resolved by layer containment. */
 export const ImageCatalogVersionBaseSchema = z.object({
@@ -115,7 +131,7 @@ export const CreateImageCatalogEntryInputApiSchema = NamespaceQuery.extend({
   intent: z
     .string()
     .min(1, 'intent is required: one sentence saying what this image is for'),
-  source: ImageCatalogSourceSchema,
+  source: ImageCatalogSourceInputSchema,
   declaredSource: ImageCatalogDeclaredSourceSchema.optional(),
 }).strict();
 
@@ -141,7 +157,7 @@ export const UpdateImageCatalogEntryInputApiSchema = NamespaceQuery.extend({
     .string()
     .min(1, 'intent is required: one sentence saying what this image is for')
     .optional(),
-  source: ImageCatalogSourceSchema.optional(),
+  source: ImageCatalogSourceInputSchema.optional(),
   declaredSource: ImageCatalogDeclaredSourceSchema.optional(),
 }).strict();
 
@@ -162,7 +178,16 @@ export const BuildImageCatalogVersionInputSchema = NamespaceQuery.extend({
   commit: z.string().min(1),
   /** Empty is a value, not an absence — it is what the entry is keyed on. */
   dockerfile: z.string().default(''),
-}).strict();
+  /** Build context from the repo root, which `dockerfile` is then read from.
+   *  Absent: the directory the Dockerfile sits in. */
+  context: BuildContextSchema.optional(),
+})
+  .strict()
+  .superRefine((input, ctx) => {
+    if (buildPathsStayInRepo(input.dockerfile, input.context) === false) {
+      ctx.addIssue({ code: 'custom', path: ['dockerfile'], message: ESCAPING_DOCKERFILE });
+    }
+  });
 
 export const BuildImageCatalogVersionOutputSchema = z.object({
   /** The tag the image was built under, which a step pinning this commit hits. */

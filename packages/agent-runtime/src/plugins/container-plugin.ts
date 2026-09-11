@@ -59,7 +59,12 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
-import { normalizeRepoUrls, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
+import {
+  catalogDockerfileKey,
+  normalizeBuildContext,
+  normalizeRepoUrls,
+  DOCKER_IMAGE_SETUP_URL,
+} from '@mediforce/platform-core';
 import { artifactsBuildTag, artifactsDir } from './workflow-artifacts';
 import { cloneRepoAtCommit } from './git-clone';
 import { writeFile } from 'node:fs/promises';
@@ -103,12 +108,24 @@ export function resolveRepoToken(
  * Derive a deterministic image tag from the build inputs so callers that
  * omit `image` in build mode still get a stable, cacheable tag.
  * Format: `mediforce-built:<12-char-sha256-hex>`.
+ *
+ * A context-less build hashes exactly `repo \0 commit \0 dockerfile`, as
+ * written — the bytes every tag on a daemon or pinned by a registered step was
+ * minted from. A build naming a context hashes the Dockerfile's path from the
+ * repo root and the normalised context instead, so spellings of one build
+ * (`.`, `./`, `/`) land in one cache slot.
  */
-export function deriveBuildTag(repoUrl: string, commit: string, dockerfile?: string): string {
-  const hash = createHash('sha256')
-    .update(`${repoUrl}\0${commit}\0${dockerfile ?? ''}`)
-    .digest('hex')
-    .slice(0, 12);
+export function deriveBuildTag(
+  repoUrl: string,
+  commit: string,
+  dockerfile?: string,
+  context?: string,
+): string {
+  const inputs =
+    context === undefined || context === ''
+      ? `${repoUrl}\0${commit}\0${dockerfile ?? ''}`
+      : `${repoUrl}\0${commit}\0${catalogDockerfileKey(dockerfile ?? '', context)}\0${normalizeBuildContext(context)}`;
+  const hash = createHash('sha256').update(inputs).digest('hex').slice(0, 12);
   return `mediforce-built:${hash}`;
 }
 
@@ -118,6 +135,7 @@ export interface BuildSource {
   repoRef: string;
   commit: string;
   dockerfile?: string;
+  context?: string;
 }
 
 /**
@@ -132,10 +150,10 @@ export function resolveBuildSource(
   buildConfig: ContainerConfig,
   workflowRepo?: { url?: string; commit?: string },
 ): BuildSource | undefined {
-  const { dockerfile, repo, commit } = buildConfig;
+  const { dockerfile, context, repo, commit } = buildConfig;
 
   if (repo && commit) {
-    return { repoUrl: normalizeRepoUrls(repo).gitUrl, repoRef: repo, commit, dockerfile };
+    return { repoUrl: normalizeRepoUrls(repo).gitUrl, repoRef: repo, commit, dockerfile, context };
   }
 
   if (dockerfile && workflowRepo?.url && workflowRepo?.commit) {
@@ -145,6 +163,7 @@ export function resolveBuildSource(
       repoRef,
       commit: commit ?? workflowRepo.commit,
       dockerfile,
+      context,
     };
   }
 
@@ -163,7 +182,9 @@ export function resolveStepImage(
   if (!buildConfig) return undefined;
   if (buildConfig.image) return buildConfig.image;
   const source = resolveBuildSource(buildConfig, workflowRepo);
-  return source ? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile) : undefined;
+  return source
+    ? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile, source.context)
+    : undefined;
 }
 
 export function resolveImageBuild(
@@ -196,7 +217,7 @@ export function resolveImageBuild(
 
   return {
     ...source,
-    image: image ?? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile),
+    image: image ?? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile, source.context),
     repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
     workflow: workflowDefinition?.name,
     namespace: workflowDefinition?.namespace,

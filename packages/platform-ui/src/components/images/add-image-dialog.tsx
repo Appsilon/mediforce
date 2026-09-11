@@ -4,16 +4,17 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Loader2, X } from 'lucide-react';
 import { useState } from 'react';
 import { useCatalogueImage } from '@/hooks/use-image-catalog';
+import { DockerfileAndContextFields } from './build-source-fields';
 
 /**
  * Catalogue a source nobody here has built from yet.
  *
  * The counterpart to **Describe**, which registers a source the platform
  * already built and can therefore describe entirely on its own. Here nothing
- * has been built, so the repository and Dockerfile are typed rather than
- * derived — they are the entry's key ([ADR-0022](../../../docs/adr/0022-image-catalog.md)
- * decision 1), which is why they are asked for here and are not editable
- * afterwards.
+ * has been built, so the repository, Dockerfile and build context are typed
+ * rather than derived — the first two are the entry's key
+ * ([ADR-0022](../../../docs/adr/0022-image-catalog.md) decision 1), and the
+ * context is how its **Build** action builds it.
  *
  * The row lands with no versions. That is the honest state — a catalog entry
  * is an offer, and nothing has built the image yet — and **Build** on the new
@@ -39,6 +40,7 @@ export function AddImageDialog({
 }) {
   const [repo, setRepo] = useState('');
   const [dockerfile, setDockerfile] = useState('');
+  const [context, setContext] = useState('');
   const [name, setName] = useState('');
   // Once someone types a name, the repo stops overwriting it — a suggestion
   // that keeps reasserting itself is a field you cannot fill in.
@@ -59,7 +61,12 @@ export function AddImageDialog({
         intent: intent.trim(),
         // The empty string is a value, not an absence: it is what the entry is
         // keyed on for a source that names no Dockerfile.
-        source: { kind: 'built', repo: repo.trim(), dockerfile: dockerfile.trim() },
+        source: {
+          kind: 'built',
+          repo: repo.trim(),
+          dockerfile: dockerfile.trim(),
+          context: context.trim() === '' ? undefined : context.trim(),
+        },
       },
       { onSuccess: () => onOpenChange(false) },
     );
@@ -117,29 +124,13 @@ export function AddImageDialog({
               </p>
             </div>
 
-            <div className="space-y-1.5">
-              <label htmlFor="add-image-dockerfile" className="text-sm font-medium">
-                Dockerfile <span className="text-muted-foreground">(optional)</span>
-              </label>
-              <input
-                id="add-image-dockerfile"
-                value={dockerfile}
-                onChange={(event) => setDockerfile(event.target.value)}
-                placeholder="container/Dockerfile"
-                className="w-full rounded-md border bg-background px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-              <p className="text-xs text-muted-foreground">
-                Leave blank for the repository&apos;s default. Two Dockerfiles in one repository are
-                two entries, because they are two images.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                <strong className="text-foreground">
-                  The build context is the directory the Dockerfile is in.
-                </strong>{' '}
-                Everything it <code>COPY</code>s must sit beside it, so a Dockerfile in{' '}
-                <code>container/</code> cannot reach files in the directory above.
-              </p>
-            </div>
+            <DockerfileAndContextFields
+              idPrefix="add-image"
+              dockerfile={dockerfile}
+              onDockerfileChange={setDockerfile}
+              context={context}
+              onContextChange={setContext}
+            />
 
             <div className="space-y-1.5">
               <label htmlFor="add-image-name" className="text-sm font-medium">

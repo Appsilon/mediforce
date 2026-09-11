@@ -81,6 +81,42 @@ describe('discoverEntries', () => {
     expect(discovered).toHaveLength(2);
   });
 
+  it('carries the context the newest build used, so building again reproduces it', () => {
+    const [discovered] = discoverEntries(
+      'alpha',
+      [
+        builtImage({ buildNamespace: 'alpha', id: 'sha-new', buildContext: '.' }),
+        builtImage({ buildNamespace: 'alpha', id: 'sha-old' }),
+      ],
+      [],
+    );
+
+    expect(discovered.source).toEqual({
+      kind: 'built',
+      repo: TEALFLOW_REPO_URL,
+      dockerfile: 'container/Dockerfile',
+      context: '.',
+    });
+    // Still the entry for that Dockerfile — the context is not in the key.
+    expect(discovered.id).toBe(TEALFLOW_ENTRY.id);
+  });
+
+  it('drops a label context that leaves the repo, so one bad label cannot fail the listing', () => {
+    // Every entry in the listing is parsed by the contract, where a context of
+    // `../..` is refused — carrying it through would refuse the whole list.
+    const [discovered] = discoverEntries(
+      'alpha',
+      [builtImage({ buildNamespace: 'alpha', buildContext: '../..' })],
+      [],
+    );
+
+    expect(discovered.source).toEqual({
+      kind: 'built',
+      repo: TEALFLOW_REPO_URL,
+      dockerfile: 'container/Dockerfile',
+    });
+  });
+
   it('matches a source catalogued in shorthand against the URL the labels carry', () => {
     const shorthandEntry: ImageCatalogEntry = {
       ...TEALFLOW_ENTRY,

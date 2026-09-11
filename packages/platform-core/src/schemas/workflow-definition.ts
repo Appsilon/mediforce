@@ -9,6 +9,7 @@ import {
   CommitShaSchema,
 } from './process-definition';
 import { ProcessNotificationConfigSchema } from './process-config';
+import { BuildContextSchema } from '../utils/docker-build-paths';
 import { McpServerConfigSchema } from './mcp-server-config';
 import { StepMcpRestrictionSchema } from './agent-mcp-binding';
 
@@ -101,7 +102,7 @@ export type ActionConfig = z.infer<typeof ActionConfigSchema>;
  *                    Dockerfile, and runs the resulting image.
  *                    `image` is optional in build mode: when omitted the
  *                    runtime derives a deterministic tag from
- *                    sha256(repo + commit + dockerfile) so repeated builds
+ *                    sha256(repo + commit + dockerfile [+ context]) so repeated builds
  *                    of the same source hit the local image cache.
  *                    Supply `image` explicitly to control the registry tag
  *                    or when you push to a shared registry.
@@ -118,8 +119,17 @@ export const ContainerSchema = z.object({
    * Required in prebuilt mode; optional in build mode (auto-derived when absent).
    */
   image: z.string().optional(),
-  /** Path to a Dockerfile inside the cloned `repo`. Activates build mode. */
+  /**
+   * Path to a Dockerfile inside the cloned `repo`. Activates build mode.
+   * From the repo root, or from `context` when one is set.
+   */
   dockerfile: z.string().optional(),
+  /**
+   * Build context directory inside `repo`, from its root. Absent: the
+   * directory `dockerfile` sits in, so a Dockerfile in `container/` cannot
+   * `COPY` from `scripts/` — set `context: "."` to build from the repo root.
+   */
+  context: BuildContextSchema.optional(),
   /** Git repository URL for the Docker build context (SSH or HTTPS). */
   repo: z.string().optional(),
   /**
@@ -155,7 +165,7 @@ export const WorkflowAgentConfigSchema = z.object({
 /**
  * Config for deterministic script steps (executor='script', plugin='script-container').
  * Exactly one of `command` (run in `image`) or `inlineScript` (run via `runtime`)
- * must be set. Container image fields (`image`, `dockerfile`, `repo`, `commit`,
+ * must be set. Container image fields (`image`, `dockerfile`, `context`, `repo`, `commit`,
  * `repoAuth`) are shared with agent steps via ContainerSchema — both executor
  * flavours resolve container images identically.
  */

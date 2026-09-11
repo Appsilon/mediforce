@@ -1,5 +1,6 @@
 import { defineCommand } from '../define-command';
 import { printJson } from '../output';
+import { builtSourceLine } from '@mediforce/platform-core';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 
 /**
@@ -33,9 +34,12 @@ function indentFor(entry: ImageCatalogEntryView, byId: Map<string, ImageCatalogE
 
 function describeSource(entry: ImageCatalogEntryView): string {
   return entry.source.kind === 'built'
-    ? `${entry.source.repo}${entry.source.dockerfile === '' ? '' : ` · ${entry.source.dockerfile}`}`
+    ? builtSourceLine(entry.source.repo, entry.source.dockerfile, entry.source.context)
     : entry.source.reference;
 }
+
+const CONTEXT_FLAG_DESCRIPTION =
+  'Build context directory inside --repo, e.g. "." for the repo root. When set, --dockerfile is read from it; when absent, the context is the Dockerfile\'s own directory';
 
 export const imagesListCommand = defineCommand({
   name: 'mediforce images list',
@@ -158,6 +162,7 @@ export const imagesCreateCommand = defineCommand({
     },
     repo: { type: 'string', description: 'Git repo the image is built from (built source)' },
     dockerfile: { type: 'string', description: 'Dockerfile path inside --repo' },
+    context: { type: 'string', description: CONTEXT_FLAG_DESCRIPTION },
     reference: {
       type: 'string',
       description: 'Untagged image reference, e.g. mediforce-golden-image (referenced source)',
@@ -173,7 +178,12 @@ export const imagesCreateCommand = defineCommand({
     }
     const source =
       args.repo !== undefined
-        ? ({ kind: 'built', repo: args.repo, dockerfile: args.dockerfile ?? '' } as const)
+        ? ({
+            kind: 'built',
+            repo: args.repo,
+            dockerfile: args.dockerfile ?? '',
+            context: args.context,
+          } as const)
         : ({ kind: 'referenced', reference: args.reference as string } as const);
 
     const declaredSource = {
@@ -215,12 +225,14 @@ export const imagesUpdateCommand = defineCommand({
     intent: { type: 'string', description: 'New one-sentence intent' },
     repo: {
       type: 'string',
-      description: 'New git repo (built source). Re-keys the entry; pass --dockerfile with it',
+      description:
+        'New git repo (built source). Replaces the whole source, so pass --dockerfile and --context with it — either one left out resets to its default. Re-keys the entry when the Dockerfile it names changes',
     },
     dockerfile: {
       type: 'string',
       description: 'New Dockerfile path inside --repo. Empty means the default',
     },
+    context: { type: 'string', description: CONTEXT_FLAG_DESCRIPTION },
     reference: { type: 'string', description: 'New untagged image reference (referenced source)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
@@ -235,9 +247,18 @@ export const imagesUpdateCommand = defineCommand({
       output.stderr('--dockerfile changes the source, so pass --repo with it.');
       return 2;
     }
+    if (args.context !== undefined && args.repo === undefined) {
+      output.stderr('--context changes the source, so pass --repo with it.');
+      return 2;
+    }
     const source =
       args.repo !== undefined
-        ? ({ kind: 'built', repo: args.repo, dockerfile: args.dockerfile ?? '' } as const)
+        ? ({
+            kind: 'built',
+            repo: args.repo,
+            dockerfile: args.dockerfile ?? '',
+            context: args.context,
+          } as const)
         : args.reference !== undefined
           ? ({ kind: 'referenced', reference: args.reference } as const)
           : undefined;
@@ -318,6 +339,7 @@ export const imagesBuildCommand = defineCommand({
     repo: { type: 'string', required: true, description: 'Git repo to build from' },
     commit: { type: 'string', required: true, description: 'Commit to check out and build' },
     dockerfile: { type: 'string', description: 'Dockerfile path inside --repo' },
+    context: { type: 'string', description: CONTEXT_FLAG_DESCRIPTION },
   },
   async run({ args, output, mediforce, jsonMode }) {
     if (jsonMode === false) {
@@ -330,6 +352,7 @@ export const imagesBuildCommand = defineCommand({
       repo: args.repo,
       commit: args.commit,
       dockerfile: args.dockerfile ?? '',
+      context: args.context,
     });
     if (jsonMode) {
       printJson(output, result);

@@ -10,12 +10,14 @@
 
 import { z } from 'zod';
 import { normalizeRepoUrls, redactRepoCredentials } from './repo-url';
+import { BuildContextSchema } from './docker-build-paths';
 
 /** Label keys the platform writes on every image it builds. */
 export const BUILD_LABELS = {
   repo: 'mediforce.build.repo',
   commit: 'mediforce.build.commit',
   dockerfile: 'mediforce.build.dockerfile',
+  context: 'mediforce.build.context',
   workflow: 'mediforce.build.workflow',
   namespace: 'mediforce.build.namespace',
 } as const;
@@ -40,6 +42,8 @@ export interface ImageProvenance {
   commit: string;
   /** Dockerfile path inside the repo, as the build resolved it. */
   dockerfile: string;
+  /** Build context the step named, as written. Absent for one that named none. */
+  context?: string;
   /** Workflow definition whose step triggered the build. */
   workflow?: string;
   /** Namespace owning that definition. */
@@ -68,6 +72,8 @@ export const BuildImageRequestSchema = z
     commit: z.string().min(1),
     /** Empty is a value, not an absence: it is what `deriveBuildTag` hashes. */
     dockerfile: z.string().default(''),
+    /** Directory from the repo root; `dockerfile` is then read from it. */
+    context: BuildContextSchema.optional(),
     repoToken: z.string().optional(),
     workflow: z.string().optional(),
     namespace: z.string().optional(),
@@ -83,6 +89,12 @@ export type BuildImageRequest = z.infer<typeof BuildImageRequestSchema>;
  * before it goes in: an authenticated HTTPS reference would otherwise bake its
  * credentials into every layer of the result. A repo with no browsable HTTPS
  * form (a local path) gets no OCI source label rather than an empty one.
+ *
+ * The context label is the exception to "no value, no label": it is written
+ * empty when the build named none. Labels are inherited from the base image,
+ * so an image built `FROM` one that named a context would otherwise claim that
+ * context as its own, and the catalog would key it on the wrong Dockerfile.
+ * `readProvenanceLabels` reads the empty value as absent.
  */
 export function buildProvenanceLabelArgs(provenance: ImageProvenance): string[] {
   const repoUrl = redactRepoCredentials(provenance.repoUrl, provenance.repoToken);
@@ -98,9 +110,13 @@ export function buildProvenanceLabelArgs(provenance: ImageProvenance): string[] 
     [OCI_LABELS.revision, provenance.commit],
   ];
 
-  return labels.flatMap(([key, value]) =>
-    value === undefined || value.length === 0 ? [] : ['--label', `${key}=${value}`],
-  );
+  return [
+    ...labels.flatMap(([key, value]) =>
+      value === undefined || value.length === 0 ? [] : ['--label', `${key}=${value}`],
+    ),
+    '--label',
+    `${BUILD_LABELS.context}=${provenance.context ?? ''}`,
+  ];
 }
 
 /**
@@ -132,6 +148,7 @@ export interface ReadImageProvenance {
   buildRepo?: string;
   buildCommit?: string;
   buildDockerfile?: string;
+  buildContext?: string;
   buildWorkflow?: string;
   buildNamespace?: string;
 }
@@ -154,6 +171,7 @@ export function readProvenanceLabels(
     buildRepo: pick(BUILD_LABELS.repo),
     buildCommit: pick(BUILD_LABELS.commit),
     buildDockerfile: pick(BUILD_LABELS.dockerfile),
+    buildContext: pick(BUILD_LABELS.context),
     buildWorkflow: pick(BUILD_LABELS.workflow),
     buildNamespace: pick(BUILD_LABELS.namespace),
   };

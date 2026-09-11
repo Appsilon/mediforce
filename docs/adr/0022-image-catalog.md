@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-09-10
+last_reviewed: 2026-09-11
 ---
 
 # ADR-0022: The Image Catalog is an image the platform offers, keyed on its source
@@ -35,6 +35,26 @@ same build on the same host by running a build-mode step — so the gate would
 have removed the convenient path and not the capability. Whether host-side
 builds should be privileged at all is a question about build-mode steps, and
 this ADR does not answer it.
+
+**A built source may name a build context, and the key leaves it out.** With
+the context always the Dockerfile's own directory, a `container/Dockerfile` that
+`COPY`s `scripts/` could not be built at all. `context` is a directory from the
+repo root, and once it is set `dockerfile` is read from it — docker-compose's
+contract. It extends decision 1 without moving any existing key: the Dockerfile
+half of the key is `catalogDockerfileKey`, the Dockerfile's path from the repo
+root, which for a source with no context is `dockerfile` exactly as written, so
+no id minted before contexts existed changes. The context stays out of the key
+because it is how the file is built, not which file it is: one Dockerfile built
+from two contexts is one entry with versions of both, and the context stored on
+the entry is the one its **Build** action uses. Because `dockerfile` is read
+from the context, a change that makes the same path name a different file does
+re-key the entry. `deriveBuildTag` does fold the context in — only when set,
+and normalised, so no existing tag moves either — because two builds of one
+Dockerfile at one commit from different contexts are different images and must
+not share a cache slot. The `mediforce.build.context` label is written on every
+build, empty when none was named, so an image cannot inherit its base's. A path
+that climbs out of the repository is refused by the contract, and one the
+checkout reaches through a symlink is refused by the builders after cloning.
 
 An entry's **source became editable** after the Images view shipped without any
 way to change one: an entry added through **Add image** was final, so a mistyped
@@ -175,7 +195,9 @@ An entry's key is the **source**, in one of two forms:
   of each version is what `deriveBuildTag` already produces, so entries
   reconcile against the daemon listing with no second source of truth. An
   absent `dockerfile` is part of the key as the empty value, exactly as
-  `deriveBuildTag` folds `dockerfile ?? ''` today.
+  `deriveBuildTag` folds `dockerfile ?? ''` today. A source may also name a
+  build context, which is not part of the key — see the amendment on build
+  contexts at the top of this ADR.
 - **referenced** — an image reference with no tag, e.g. `mediforce-golden-image`
   or `registry.example.com/my-agent`. Its versions are tags or digests. This is
   the form for `mediforce-golden-image` itself and for anything hand-built and
