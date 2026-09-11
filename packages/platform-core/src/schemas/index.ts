@@ -176,6 +176,22 @@ export {
 } from './image-capabilities';
 
 export {
+  ImageBuildStepSchema,
+  IMAGE_HISTORY_TIMEOUT_MS,
+  imageHistoryArgs,
+  imageStepDelta,
+  isImageDescendantOf,
+  ownImageLabels,
+  parseImageHistory,
+  readableBuildStepCommand,
+  resolveImageBases,
+  resolveImageLineage,
+  type ImageBuildStep,
+  type ImageLineageFacts,
+  type LayeredImage,
+} from './image-lineage';
+
+export {
   ImageCatalogSourceSchema,
   ImageCatalogDeclaredSourceSchema,
   ImageCatalogEntrySchema,

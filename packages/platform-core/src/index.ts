@@ -152,6 +152,19 @@ export {
   unknownImageCapabilities,
   imageCapabilityProbeArgs,
   IMAGE_CAPABILITY_PROBE_TIMEOUT_MS,
+  ImageBuildStepSchema,
+  IMAGE_HISTORY_TIMEOUT_MS,
+  imageHistoryArgs,
+  imageStepDelta,
+  isImageDescendantOf,
+  ownImageLabels,
+  parseImageHistory,
+  readableBuildStepCommand,
+  resolveImageBases,
+  resolveImageLineage,
+  type ImageBuildStep,
+  type ImageLineageFacts,
+  type LayeredImage,
   buildTaskVerdicts,
   defaultVerdictIntent,
   defaultVerdictLabel,
@@ -544,14 +557,18 @@ export type { RepoCloneTarget } from './utils/repo-url';
 export {
   BUILD_LABELS,
   OCI_LABELS,
-  IMAGE_LABELS_FORMAT,
+  IMAGE_INSPECT_FORMAT,
   buildProvenanceLabelArgs,
-  imageLabelsInspectArgs,
-  parseImageProvenance,
+  imageInspectArgs,
+  parseImageInspect,
   readProvenanceLabels,
   shortImageId,
 } from './utils/image-provenance';
-export type { ImageProvenance, ReadImageProvenance } from './utils/image-provenance';
+export type {
+  ImageProvenance,
+  InspectedImage,
+  ReadImageProvenance,
+} from './utils/image-provenance';
 export { getWorkflowStatus, type WorkflowStatus } from './utils/workflow-status';
 export { toSlug, uniqueName, uniqueSlug } from './utils/slug';
 
