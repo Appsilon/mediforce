@@ -23,7 +23,8 @@ describe('buildProvenanceLabelArgs', () => {
     expect(label(args, 'mediforce.build.namespace')).toBe('acme');
     expect(label(args, 'org.opencontainers.image.source')).toBe('https://github.com/owner/repo');
     expect(label(args, 'org.opencontainers.image.revision')).toBe('abc123');
-    expect(args.filter((arg) => arg === '--label')).toHaveLength(7);
+    // The seven facts, plus the context label every build writes.
+    expect(args.filter((arg) => arg === '--label')).toHaveLength(8);
   });
 
   it('omits the facts a build outside a workflow does not have', () => {
@@ -35,6 +36,26 @@ describe('buildProvenanceLabelArgs', () => {
 
     expect(label(args, 'mediforce.build.workflow')).toBeUndefined();
     expect(label(args, 'mediforce.build.namespace')).toBeUndefined();
+  });
+
+  it('writes the build context, empty when the build named none', () => {
+    const withContext = buildProvenanceLabelArgs({
+      repoUrl: 'git@github.com:owner/repo.git',
+      commit: 'abc123',
+      dockerfile: 'container/Dockerfile',
+      context: '.',
+    });
+    const withoutContext = buildProvenanceLabelArgs({
+      repoUrl: 'git@github.com:owner/repo.git',
+      commit: 'abc123',
+      dockerfile: 'container/Dockerfile',
+    });
+
+    expect(label(withContext, 'mediforce.build.context')).toBe('.');
+    // Empty, not absent: labels are inherited, so an image built FROM one that
+    // named a context would otherwise claim that context as its own.
+    expect(label(withoutContext, 'mediforce.build.context')).toBe('');
+    expect(readProvenanceLabels({ 'mediforce.build.context': '' }).buildContext).toBeUndefined();
   });
 
   it('omits the OCI source for a repo with no browsable HTTPS form', () => {
@@ -67,6 +88,7 @@ describe('readProvenanceLabels', () => {
         'mediforce.build.repo': 'git@github.com:owner/repo.git',
         'mediforce.build.commit': 'abc123',
         'mediforce.build.dockerfile': 'container/Dockerfile',
+        'mediforce.build.context': '.',
         'mediforce.build.workflow': 'sdtm-mapping',
         'mediforce.build.namespace': 'acme',
         'org.opencontainers.image.source': 'https://github.com/owner/repo',
@@ -75,6 +97,7 @@ describe('readProvenanceLabels', () => {
       buildRepo: 'git@github.com:owner/repo.git',
       buildCommit: 'abc123',
       buildDockerfile: 'container/Dockerfile',
+      buildContext: '.',
       buildWorkflow: 'sdtm-mapping',
       buildNamespace: 'acme',
     });

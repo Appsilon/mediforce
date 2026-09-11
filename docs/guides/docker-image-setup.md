@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-09-09
+last_reviewed: 2026-09-11
 ---
 
 # Getting a Docker image onto the platform
@@ -16,7 +16,7 @@ There are three ways an image gets there.
 
 ## 1. Build from a repo (the self-service path)
 
-Set `repo` + `commit` (and optionally `dockerfile`) on the step. The platform
+Set `repo` + `commit` (and optionally `dockerfile` and `context`) on the step. The platform
 clones at that commit and builds before the run, tagging the result
 `mediforce-built:<12 hex>` and labelling it with its provenance.
 
@@ -24,7 +24,7 @@ To build **before** a run — preparing an image, or checking a Dockerfile build
 at all — trigger the same build directly:
 
 ```bash
-mediforce images build --namespace <handle> --repo <repo> --commit <sha> [--dockerfile <path>]
+mediforce images build --namespace <handle> --repo <repo> --commit <sha> [--dockerfile <path>] [--context <dir>]
 ```
 
 **Workspace → Images** has the same action as **Build** on any entry built from
@@ -36,12 +36,12 @@ This is the only route that needs no host access and no registry, so prefer it
 whenever the Dockerfile lives in a repo the deployment can clone. It also feeds
 the Image Catalog for free — see [below](#images-the-platform-built-are-offered-on-their-own).
 
-### The build context is the Dockerfile's own directory
+### Choosing the build context
 
-Every path a Dockerfile `COPY`s is resolved against the **build context**, and
-the platform uses the directory holding the Dockerfile. So everything the
-Dockerfile copies must sit **beside it**, and a Dockerfile in a subdirectory
-cannot reach files in its parent.
+Every path a Dockerfile `COPY`s is resolved against the **build context**. With
+no `context` set, the platform uses the directory holding the Dockerfile, so
+everything the Dockerfile copies must sit **beside it** and a Dockerfile in a
+subdirectory cannot reach files in its parent.
 
 This is the failure that looks least like itself. Given
 `apps/my-workflow/container/Dockerfile` containing:
@@ -54,10 +54,31 @@ COPY scripts/ /opt/my-workflow/scripts/
 there in `apps/my-workflow/` — because the context is `container/`, which holds
 only the Dockerfile.
 
-Put the Dockerfile at the root of what it needs to copy
-(`apps/my-workflow/Dockerfile`), or move the copied directories in beside it.
-There is no way to widen the context from a workflow step today: the context is
-derived, not declared.
+Name the directory the Dockerfile should see as `context`. It is a path from the
+repo root, and once it is set `dockerfile` is read **from the context**, the way
+docker-compose reads it:
+
+```json
+{
+  "script": {
+    "repo": "https://github.com/acme/workflow-repo.git",
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "context": "apps/my-workflow",
+    "dockerfile": "container/Dockerfile",
+    "command": "python /opt/my-workflow/scripts/run.py"
+  }
+}
+```
+
+Now `COPY scripts/` resolves against `apps/my-workflow/`. `"context": "."` is the
+repo root. A step with no `context` builds exactly as it always did — the same
+context, the same tag. A context or Dockerfile path that climbs out of the
+repository (`../..`) is refused before anything is cloned, and one that reaches
+outside it through a symlink in the checkout is refused before anything is
+built.
+
+The same field is **Build context** in **Add image** and **Edit**, and
+`--context` on `mediforce images create`, `update` and `build`.
 
 ## 2. A public image reference
 
@@ -107,7 +128,7 @@ Minimal base images (`alpine`, `scratch`, distroless) ship none of this. `alpine
 
 ## Troubleshooting
 
-- **`"/<path>": not found` on a `COPY`, for a path that exists in the repository** — the build context is the Dockerfile's own directory, so it cannot reach files above it. See [The build context is the Dockerfile's own directory](#the-build-context-is-the-dockerfiles-own-directory).
+- **`"/<path>": not found` on a `COPY`, for a path that exists in the repository** — with no `context` set, the build context is the Dockerfile's own directory, so it cannot reach files above it. Set `context`; see [Choosing the build context](#choosing-the-build-context).
 - **`exec: "<binary>": executable file not found in $PATH`** — the image has no such executable. The container started and immediately exited 127. Point the step at an image that ships the tooling (see [Choosing a base image](#choosing-a-base-image)), or add it in a Dockerfile that builds `FROM` the minimal image.
 - **The image still shows as missing** — check `mediforce system images`. The warning tracks what is on the daemon, not what exists in a registry, so it clears only once the image has actually been pulled or built onto the host. If the reference is private, an administrator must `docker login` on the host.
 - **`not found locally and no repo+commit configured for auto-build`** — a build-mode step reached a tag that is not on the daemon and carries no build inputs to make it. Set `repo` and `commit` on the step, or use an image that is already present.
@@ -135,7 +156,8 @@ by hand.
 an image is built from before anything has built it — the case **Describe**
 cannot cover, since that one only names a source some build already recorded.
 Give it the repository (`owner/repo`, or a full `git@…` / `https://…`
-reference), the Dockerfile path if it is not the default, and the sentence
+reference), the Dockerfile path if it is not the default, a build context if
+the Dockerfile copies files from outside its own directory, and the sentence
 saying what the image is for. `mediforce images create --repo` is the same
 write.
 
@@ -146,11 +168,12 @@ card, or `mediforce images build`, gives it its first one.
 ## Changing what an entry says
 
 **Edit** on any catalogued entry changes everything a human wrote on it: the
-**repository** and **Dockerfile** (or the **image reference**), the **name**,
-and the **intent** sentence. Versions, capabilities and lineage are derived from
-the image on every read, so there is nothing else to edit. The same write is
-`mediforce images update <entry-id> --namespace <handle> [--name …]
-[--intent …] [--repo … --dockerfile …] [--reference …]`. Any workspace member,
+**repository**, **Dockerfile** and **build context** (or the **image
+reference**), the **name**, and the **intent** sentence. Versions, capabilities
+and lineage are derived from the image on every read, so there is nothing else
+to edit. The same write is `mediforce images update <entry-id> --namespace
+<handle> [--name …] [--intent …] [--repo … --dockerfile … --context …]
+[--reference …]`. Any workspace member,
 the same gate the entry was created under.
 
 ### Changing the source moves the entry
@@ -169,6 +192,13 @@ worth expecting:
 - **Versions built from the old source stop belonging to the entry.** They are
   still on the daemon, so they reappear on their own as an undescribed entry
   marked **Needs a description**. Nothing is deleted from the daemon.
+
+The **build context is not part of the key** — the key is the Dockerfile's path
+from the repo root. Setting a context on `container/Dockerfile` keeps the id,
+and the same Dockerfile built from two contexts is one entry with versions of
+both. Because `dockerfile` is read from the context once one is set, a change
+that makes the same `dockerfile` string name a different file (`Dockerfile`
+with context `container` is `container/Dockerfile`) does move the entry.
 
 Re-keying onto a source some other entry already describes is refused with a
 conflict rather than overwriting that entry — edit or delete that one instead.

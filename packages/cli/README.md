@@ -49,14 +49,17 @@ has written a sentence for; `images create` on its source registers it
 ([ADR-0022](../../docs/adr/0022-image-catalog.md) decision 7). `images update`
 changes an entry's name, intent or **source** — and since the id derives from
 the source (decision 1), `--repo` / `--reference` re-key the entry, so the
-command prints the id it moved to rather than the one you passed.
+command prints the id it moved to rather than the one you passed. `--repo`
+replaces the whole built source, so pass `--dockerfile` and `--context` with it;
+either one left out resets to its default. `images create --repo` takes the
+same `--dockerfile` and `--context`.
 `images delete` removes an entry **and** the images behind it — one act,
 because a record whose images stay is re-derived on the next read — which needs
 admin of that workspace, audits under `_system` since the daemon is
 deployment-wide, and is refused while a live workflow version still pins one of
 them (`--keep-images` for the rare record-only case; `system rmi` still removes
 one image by id or tag).
-`images build --repo --commit [--dockerfile]` builds one version of a built
+`images build --repo --commit [--dockerfile] [--context]` builds one version of a built
 source there and then, instead of waiting for a workflow run to build it
 lazily: it mints the same tag a build-mode step pinning that commit resolves
 to, so that step finds the image cached rather than rebuilding it. It holds the
