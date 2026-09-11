@@ -199,7 +199,7 @@ test.describe('Image Catalog UI journey', () => {
       await dialog.getByLabel('Repository', { exact: true }).fill(repo);
       await dialog.getByLabel(/Dockerfile/).fill('container/Dockerfile');
       await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue(`e2e-added-${stamp}`);
-      await dialog.getByLabel('Intent', { exact: true }).fill(intent);
+      await dialog.getByLabel('Description', { exact: true }).fill(intent);
       await dialog.getByRole('button', { name: 'Add to the catalog' }).click();
 
       // The dialog closes only once the write resolved, so this is the gate
@@ -236,9 +236,9 @@ test.describe('Image Catalog UI journey', () => {
       const editDialog = page.getByRole('dialog');
       // Prefilled with what the entry says today rather than blank — an edit
       // form that starts empty is a retype, not an edit.
-      await expect(editDialog.getByLabel('Intent', { exact: true })).toHaveValue(intent);
+      await expect(editDialog.getByLabel('Description', { exact: true })).toHaveValue(intent);
       await editDialog.getByLabel('Name', { exact: true }).fill(revisedName);
-      await editDialog.getByLabel('Intent', { exact: true }).fill(revisedIntent);
+      await editDialog.getByLabel('Description', { exact: true }).fill(revisedIntent);
       await editDialog.getByRole('button', { name: 'Save changes' }).click();
       await expect(editDialog).toBeHidden({ timeout: 60_000 });
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { resolveDockerBuildPaths, type DockerBuildPaths } from '@mediforce/platform-core';
+
 /**
  * The Dockerfile and build-context inputs of a built source. **Add image** and
  * **Edit** ask for the same two things, with the same rules, so one component
@@ -31,11 +33,7 @@ export function DockerfileAndContextFields({
           placeholder="container/Dockerfile"
           className="w-full rounded-md border bg-background px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
-        <p className="text-xs text-muted-foreground">
-          From the repository root, or from the build context when one is set. Leave blank for
-          the default. Two Dockerfiles in one repository are two entries, because they are two
-          images.
-        </p>
+        <p className="text-xs text-muted-foreground">Relative to the build context</p>
       </div>
 
       <div className="space-y-1.5">
@@ -49,18 +47,43 @@ export function DockerfileAndContextFields({
           placeholder="."
           className="w-full rounded-md border bg-background px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
-        <p className="text-xs text-muted-foreground">
-          <strong className="text-foreground">
-            Blank builds from the directory the Dockerfile is in.
-          </strong>{' '}
-          Everything it <code>COPY</code>s must then sit beside it. To reach files elsewhere, name
-          a directory — <code>.</code> for the repository root — so{' '}
-          <code>container/Dockerfile</code> with context <code>.</code> can{' '}
-          <code>COPY scripts/</code>. The context is not part of the entry&apos;s key, but the
-          Dockerfile path is read from it — so a change that makes the same path name a different
-          file moves the entry.
-        </p>
       </div>
+
+      <BuildPathsPreview testId={`${idPrefix}-build-paths`} dockerfile={dockerfile} context={context} />
     </>
+  );
+}
+
+/** The two paths `docker build` will be handed, from the repo root — the same
+ *  resolution the builders run, so a mistyped combination shows before a build. */
+function BuildPathsPreview({
+  testId,
+  dockerfile,
+  context,
+}: {
+  testId: string;
+  dockerfile: string;
+  context: string;
+}) {
+  let paths: DockerBuildPaths | null;
+  try {
+    paths = resolveDockerBuildPaths(dockerfile, context);
+  } catch {
+    paths = null;
+  }
+
+  return (
+    <div data-testid={testId} className="rounded-md border bg-muted/30 px-3 py-2 text-xs">
+      {paths === null ? (
+        <p className="text-destructive">This path is outside the repository.</p>
+      ) : (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          <dt className="text-muted-foreground">Dockerfile</dt>
+          <dd className="break-all font-mono">/{paths.dockerfile}</dd>
+          <dt className="text-muted-foreground">Build context</dt>
+          <dd className="break-all font-mono">/{paths.context}</dd>
+        </dl>
+      )}
+    </div>
   );
 }

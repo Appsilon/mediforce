@@ -307,6 +307,7 @@ interactive exploration of ADaM datasets". Not a description of its contents;
 contents go stale on the next pin bump, intent does not. Required on every
 stored entry, and empty on exactly one thing: a **Discovered Entry**, which no
 build can write it for.
+Labelled **Description** in the Images view.
 
 ### Identity / auth
 
