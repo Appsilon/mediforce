@@ -14,6 +14,16 @@ const buildMock = vi.fn();
 const apiFetchMock = vi.fn();
 const searchParams = new URLSearchParams();
 
+// Radix positions an open tooltip with ResizeObserver, which jsdom lacks.
+vi.stubGlobal(
+  'ResizeObserver',
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+);
+
 vi.mock('@/lib/mediforce', () => ({
   ApiError: class ApiError extends Error {
     status = 500;
@@ -281,6 +291,29 @@ describe('ImagesPage', () => {
       'href',
       'https://github.com/Appsilon/tealflow/blob/c0ffee1234567/container/Dockerfile',
     );
+  });
+
+  it('explains which hash on a version is the commit and which is the image id', async () => {
+    renderPage();
+
+    await userEvent.click(
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
+    );
+
+    const current = (await screen.findByText('mediforce-built:aaaa1111')).closest('li') as HTMLElement;
+
+    await userEvent.hover(within(current).getByText('c0ffee1'));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Git commit the image was built from: c0ffee1234567',
+    );
+
+    await userEvent.hover(within(current).getByText('teal-new'));
+    expect(await screen.findByRole('tooltip', { name: /Docker image ID/ })).toHaveTextContent(
+      'Docker image ID: sha256:teal-new',
+    );
+
+    await userEvent.hover(within(current).getByText('current'));
+    expect(await screen.findByRole('tooltip', { name: /newest build/ })).toBeInTheDocument();
   });
 
   it('calls the layer delta layer commands, never the Dockerfile', async () => {
