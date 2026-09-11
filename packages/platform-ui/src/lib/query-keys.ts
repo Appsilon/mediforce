@@ -97,6 +97,12 @@ export const queryKeys = {
   workflowTriggers: (namespace: string, name: string) =>
     ['workflow-triggers', namespace, name] as const,
 
+  /** Workspace-home catalog (workflows.list), one slice per "completed runs"
+   *  toggle. `workflowsListAll` is the prefix a workflow write invalidates. */
+  workflowsList: (includeCompletedRuns: boolean) =>
+    ['workflows', 'list', includeCompletedRuns] as const,
+  workflowsListAll: () => ['workflows', 'list'] as const,
+
   /** Aggregate step-entry view for a process instance (processes.getSteps). */
   processSteps: (instanceId: string) => ['process-steps', instanceId] as const,
 

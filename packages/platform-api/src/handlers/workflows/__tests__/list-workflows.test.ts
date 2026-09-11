@@ -83,6 +83,23 @@ describe('listWorkflows handler', () => {
 
       expect(result.definitions.map((d) => d.name).sort()).toEqual(['flow-active', 'flow-archived']);
     });
+
+    it('marks a workflow archived only when every version is', async () => {
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({ name: 'flow-active', version: 2, archived: true }),
+      );
+      const scope = createTestScope({ processRepo });
+      const result = await listWorkflows({ includeCompletedRuns: true, includeArchived: true }, scope);
+
+      // An archived head over a live v1 is a workflow that still runs v1 — the
+      // catalog must not hide it behind "Archived workflows".
+      const active = result.definitions.find((d) => d.name === 'flow-active');
+      expect(active?.latestVersion).toBe(1);
+      expect(active?.definition?.archived).not.toBe(true);
+
+      const archived = result.definitions.find((d) => d.name === 'flow-archived');
+      expect(archived?.definition?.archived).toBe(true);
+    });
   });
 
   describe('visibility + namespace filtering for user callers', () => {
