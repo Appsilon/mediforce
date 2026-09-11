@@ -1,3 +1,4 @@
+import { pickRunnableVersion } from '@mediforce/platform-core';
 import { memoizeProcessRoleReads } from '../../auth';
 import type { CallerScope } from '../../repositories/index';
 import type {
@@ -50,7 +51,14 @@ export async function listWorkflows(
   // same numbers client-side.
   const summaries: WorkflowDefinitionGroupSummary[] = await Promise.all(
     inScope.map(async (group) => {
-      const latest = group.versions.find((v) => v.version === group.latestVersion) ?? null;
+      // With archived versions listed, the card still shows the newest live
+      // version: an archived head over a running v1 is not an archived
+      // workflow. Only when every version is archived does the card say so.
+      // `null`, not the default version: the card shows the newest definition.
+      const latest =
+        pickRunnableVersion(group.versions, null) ??
+        group.versions.find((v) => v.version === group.latestVersion) ??
+        null;
       const rawSummary = await scope.runs.summarizeRuns(
         group.namespace,
         group.name,
@@ -85,7 +93,7 @@ export async function listWorkflows(
       return {
         namespace: group.namespace,
         name: group.name,
-        latestVersion: group.latestVersion,
+        latestVersion: latest?.version ?? group.latestVersion,
         defaultVersion: group.defaultVersion,
         definition: latest,
         runSummary: { ...rawSummary, stepsByVersion },
