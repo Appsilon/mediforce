@@ -21,6 +21,7 @@ import { shortImageId } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
 import { ConceptPopover } from '@/components/ui/concept-intro';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useImageCatalogEntries, useImageCatalogEntry } from '@/hooks/use-image-catalog';
 import { AddImageDialog } from '@/components/images/add-image-dialog';
@@ -55,12 +56,22 @@ const AVAILABILITY: Record<
 
 function Chip({ children, title }: { children: ReactNode; title?: string }) {
   return (
-    <span
-      title={title}
-      className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
-    >
-      {children}
-    </span>
+    <InstantTooltip label={title}>
+      <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+        {children}
+      </span>
+    </InstantTooltip>
+  );
+}
+
+/** A cryptic value on a version row, explained on hover. */
+function ExplainedValue({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <InstantTooltip label={label}>
+      <span className="cursor-help font-mono text-muted-foreground underline decoration-dotted underline-offset-2">
+        {children}
+      </span>
+    </InstantTooltip>
   );
 }
 
@@ -277,14 +288,28 @@ function VersionRow({
   return (
     <li className="space-y-1.5 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="font-mono">{version.imageTag}</span>
+        <InstantTooltip label="Image tag — what a workflow step pins to run this version">
+          <span className="cursor-help font-mono">{version.imageTag}</span>
+        </InstantTooltip>
         {version.commit !== undefined && (
-          <span className="font-mono text-muted-foreground">{shortCommit(version.commit)}</span>
+          <ExplainedValue label={`Git commit the image was built from: ${version.commit}`}>
+            {shortCommit(version.commit)}
+          </ExplainedValue>
         )}
         <span className="text-muted-foreground">{version.created}</span>
         <span className="text-muted-foreground">{version.size}</span>
-        <span className="font-mono text-muted-foreground">{shortImageId(version.imageId)}</span>
-        {index === 0 ? <Chip>current</Chip> : <Chip>superseded</Chip>}
+        <ExplainedValue
+          label={`Docker image ID: ${version.imageId} — identifies the image contents; two tags with the same ID are the same image`}
+        >
+          {shortImageId(version.imageId)}
+        </ExplainedValue>
+        {index === 0 ? (
+          <Chip title="The newest build of this entry — what a new pin picks">current</Chip>
+        ) : (
+          <Chip title="An older build, replaced by a newer one — workflows pinning it keep running it">
+            superseded
+          </Chip>
+        )}
         {usedTags !== null && !usedTags.has(version.imageTag) && (
           <Chip title="No workflow step pins this version">unused</Chip>
         )}
