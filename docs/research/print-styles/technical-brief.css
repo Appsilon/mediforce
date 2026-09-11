@@ -1,0 +1,152 @@
+:root {
+  color-scheme: light;
+  --ink: #151b23;
+  --muted: #5f6b7a;
+  --rule: #c9d4e0;
+  --soft: #f2f6fa;
+  --accent: #0f4c81;
+}
+
+@page {
+  size: A4;
+  margin: 14mm 14mm 16mm;
+}
+
+html {
+  font-size: 16px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body {
+  color: var(--ink);
+  font-family: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  font-size: 10pt;
+  line-height: 1.45;
+  margin: 0 auto;
+  max-width: 960px;
+  padding: 14px 0 20px;
+}
+
+h1, h2, h3, h4 {
+  page-break-after: avoid;
+}
+
+h1 {
+  border-bottom: 2px solid var(--accent);
+  font-size: 22pt;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.9rem;
+  padding-bottom: 0.4rem;
+}
+
+h2 {
+  background: var(--soft);
+  border-left: 5px solid var(--accent);
+  font-size: 14pt;
+  font-weight: 700;
+  margin: 2rem 0 0.9rem;
+  padding: 0.45rem 0.7rem;
+}
+
+h3 {
+  color: var(--accent);
+  font-size: 11pt;
+  font-weight: 700;
+  margin: 1.4rem 0 0.45rem;
+}
+
+p, li {
+  orphans: 3;
+  widows: 3;
+}
+
+a {
+  color: #0a58a8;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 1.4rem 0;
+}
+
+blockquote {
+  background: var(--soft);
+  border-left: 4px solid #7aa5cc;
+  margin: 1rem 0;
+  padding: 0.8rem 0.9rem;
+}
+
+code {
+  background: #eaf1f8;
+  border-radius: 3px;
+  font-family: "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  padding: 0.1em 0.3em;
+}
+
+pre {
+  background: #f8fbfd;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-size: 0.84em;
+  padding: 0.85rem 0.95rem;
+  white-space: pre-wrap;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  border-collapse: collapse;
+  font-size: 0.86em;
+  margin: 0.9rem 0 1.2rem;
+  width: 100%;
+}
+
+th, td {
+  border: 1px solid var(--rule);
+  padding: 0.42rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: #e8f0f8;
+  font-weight: 700;
+}
+
+ul, ol {
+  padding-left: 1.2rem;
+}
+
+li {
+  margin: 0.12rem 0;
+}
+
+img, table, pre {
+  page-break-inside: avoid;
+}
+
+#TOC {
+  background: #f7fafc;
+  border: 1px solid var(--rule);
+  border-left: 5px solid var(--accent);
+  margin: 1.2rem 0 1.6rem;
+  padding: 0.85rem 0.9rem;
+}
+
+#TOC::before {
+  color: var(--accent);
+  content: "Document Map";
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+}
