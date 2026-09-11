@@ -18,7 +18,8 @@ import { queryKeys } from '@/lib/query-keys';
  * check has to be made rather than assumed.
  *
  * Invalidates every by-image read, because whether a version is archived is
- * exactly what those answers turn on.
+ * exactly what those answers turn on — and stays pending until they refetch,
+ * so a caller gating on `isPending` never acts on the pre-archive answer.
  */
 export function useArchiveWorkflowVersion() {
   const queryClient = useQueryClient();
@@ -28,8 +29,12 @@ export function useArchiveWorkflowVersion() {
         { name: input.name, version: input.version, archived: true },
         { namespace: input.namespace },
       ),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workflowsByImageAll() });
-    },
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.workflowsByImageAll() }),
+        // Archiving a workflow's last live version archives the workflow, which
+        // moves its card behind "Archived workflows".
+        queryClient.invalidateQueries({ queryKey: queryKeys.workflowsListAll() }),
+      ]),
   });
 }

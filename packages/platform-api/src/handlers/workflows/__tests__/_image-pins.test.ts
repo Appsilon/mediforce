@@ -101,6 +101,52 @@ describe('findWorkflowImagePins', () => {
     expect(pins[0].live).toBe(false);
   });
 
+  it('calls the newest live version live once the head is archived', () => {
+    const pins = findWorkflowImagePins(
+      [group([
+        { version: 2, image: 'tealflow:v2', archived: true },
+        { version: 1, image: 'tealflow:v2' },
+      ])],
+      ['tealflow:v2'],
+    );
+
+    // Runs fall back to v1 (`pickRunnableVersion`), so deleting the image
+    // breaks v1 — exactly the state the delete dialog's "Archive v2" leaves.
+    expect(pins.find((pin) => pin.version === 1)?.live).toBe(true);
+  });
+
+  it('calls the newest live version live when the pinned default is archived', () => {
+    const pins = findWorkflowImagePins(
+      [group(
+        [
+          { version: 2, image: 'tealflow:v2', archived: true },
+          { version: 1, image: 'tealflow:v2' },
+        ],
+        { defaultVersion: 2 },
+      )],
+      ['tealflow:v2'],
+    );
+
+    expect(pins.find((pin) => pin.version === 1)?.live).toBe(true);
+  });
+
+  it('names the version runs fall back to once a live version is archived', () => {
+    const pins = findWorkflowImagePins(
+      [
+        group([{ version: 2, image: 'tealflow:v2' }, { version: 1 }], { name: 'layered' }),
+        group(
+          [{ version: 2, image: 'tealflow:v2' }, { version: 1, archived: true }],
+          { name: 'single' },
+        ),
+      ],
+      ['tealflow:v2'],
+    );
+
+    expect(pins.find((pin) => pin.name === 'layered')?.fallbackVersion).toBe(1);
+    // Nothing left to run: archiving it archives the whole workflow.
+    expect(pins.find((pin) => pin.name === 'single')?.fallbackVersion).toBeNull();
+  });
+
   it('matches a bare repository against its implicit latest tag', () => {
     const pins = findWorkflowImagePins(
       [group([{ version: 1, image: 'mediforce-golden-image' }])],

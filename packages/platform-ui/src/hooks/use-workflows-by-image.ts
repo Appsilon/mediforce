@@ -13,11 +13,14 @@ export interface WorkflowImageMatch {
   title: string | undefined;
   version: number;
   /**
-   * A version a run can still start from: the workflow's default version if it
-   * sets one, otherwise its latest — and not archived. Only `scope: 'all'`
+   * The version a run starts from: the default version if it is live,
+   * otherwise the newest live one (`pickRunnableVersion`). Only `scope: 'all'`
    * returns anything else, so the default answer is all live.
    */
   live: boolean;
+  /** The version runs fall back to once this one is archived; `null` when none
+   *  would be left, so archiving it archives the whole workflow. */
+  fallbackVersion: number | null;
   /** The workflow explicitly pins this version as its default. Archiving one of
    *  those would leave it pointing at a version that cannot run, so the delete
    *  flow offers a different remedy for it. */

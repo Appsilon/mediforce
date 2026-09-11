@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { createQueryWrapper } from '@/test/react-query';
@@ -181,25 +181,26 @@ beforeEach(() => {
     },
   });
   archiveVersionMock.mockResolvedValue({ success: true, name: 'sdtm-qc', version: 4 });
-  apiFetchMock.mockResolvedValue({
-    ok: true,
-    json: async () => ({
-      workflows: [
-        {
-          name: 'sdtm-qc',
-          namespace: 'acme',
-          title: 'SDTM QC',
-          version: 4,
-          live: true,
-          isDefault: false,
-          archived: false,
-          steps: ['analyse'],
-          images: ['mediforce-built:aaaa1111'],
-        },
-      ],
-    }),
-  });
+  apiFetchMock.mockResolvedValue(pinScan([LIVE_PIN]));
 });
+
+/** v4 of a workflow with an older v3 to fall back to, pinning one image. */
+const LIVE_PIN = {
+  name: 'sdtm-qc',
+  namespace: 'acme',
+  title: 'SDTM QC',
+  version: 4,
+  live: true,
+  isDefault: false,
+  archived: false,
+  fallbackVersion: 3 as number | null,
+  steps: ['analyse'],
+  images: ['mediforce-built:aaaa1111'],
+};
+
+function pinScan(workflows: (typeof LIVE_PIN)[]) {
+  return { ok: true, json: async () => ({ workflows }) };
+}
 
 describe('ImagesPage', () => {
   it('shows an image this workspace built and nobody described, with what to do about it', async () => {
@@ -702,16 +703,89 @@ describe('ImagesPage', () => {
     const dialog = await screen.findByRole('dialog');
     await within(dialog).findByTestId('delete-blocked');
 
+    // Archiving v4 changes what runs, so the dialog says what that is.
+    expect(within(dialog).getByText(/runs fall back to v3/)).toBeInTheDocument();
+    apiFetchMock.mockResolvedValue(pinScan([{ ...LIVE_PIN, live: false, archived: true }]));
     await user.click(within(dialog).getByRole('button', { name: 'Archive v4' }));
 
     expect(archiveVersionMock).toHaveBeenCalledWith(
       { name: 'sdtm-qc', version: 4, archived: true },
       { namespace: 'acme' },
     );
-    // With the blocker archived the delete unblocks, without a reload.
+    // The rescan says nothing live pins it any more, so the delete unblocks
+    // without a reload.
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }),
+      ).toBeEnabled(),
+    );
+  });
+
+  it('stays blocked when the version runs fall back to pins the image too', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByTestId('delete-blocked');
+
+    apiFetchMock.mockResolvedValue(
+      pinScan([
+        { ...LIVE_PIN, live: false, archived: true },
+        { ...LIVE_PIN, version: 3, fallbackVersion: null },
+      ]),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Archive v4' }));
+
+    // Archiving v4 handed runs to v3, which pins the same image — only the
+    // fresh answer knows that, so the button never enables in between.
+    expect(await within(dialog).findByText(/acme\/sdtm-qc v3/)).toBeInTheDocument();
     expect(
-      await within(dialog).findByRole('button', { name: 'Delete entry and 2 images' }),
-    ).toBeEnabled();
+      within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }),
+    ).toBeDisabled();
+  });
+
+  it('names archiving a workflow\'s only runnable version for what it is', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    apiFetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        workflows: [
+          {
+            name: 'sdtm-qc',
+            namespace: 'acme',
+            title: 'SDTM QC',
+            version: 1,
+            live: true,
+            isDefault: false,
+            archived: false,
+            fallbackVersion: null,
+            steps: ['analyse'],
+            images: ['mediforce-built:aaaa1111'],
+          },
+        ],
+      }),
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByTestId('delete-blocked');
+
+    // Nothing is left to run once v1 goes, so the workflow goes with it — the
+    // button says so, and where to get it back.
+    expect(within(dialog).queryByRole('button', { name: 'Archive v1' })).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/Archived workflows/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Archive workflow' }));
+
+    expect(archiveVersionMock).toHaveBeenCalledWith(
+      { name: 'sdtm-qc', version: 1, archived: true },
+      { namespace: 'acme' },
+    );
   });
 
   it('will not archive a version the workflow pins as its default', async () => {

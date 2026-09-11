@@ -1,5 +1,5 @@
 ---
-status: finalized
+status: accepted
 audience: engineers
 last_reviewed: 2026-09-10
 ---
@@ -71,13 +71,18 @@ applies underneath via `deleteDockerImage`, so **Admin → Infrastructure** is
 unchanged.
 
 **A live workflow version blocks the delete; a superseded one does not.** Live
-means the version a run starts from — the workflow's default version where one
-is set, otherwise its latest, and not archived. The asymmetry is forced by
+means the version a run starts from, by the same `pickRunnableVersion` rule
+every firing uses: the default version when it is itself live, otherwise the
+newest non-archived one. Archiving the head therefore hands the pin to the
+version runs fall back to, which blocks in turn. The asymmetry is forced by
 immutability: a registered version cannot be edited, so a historical pin can
 never be moved off the image, and refusing on its account would mean an image
 pinned once could never be reclaimed. A live pin *can* be re-pointed, so it is
 refused with a 409 that names the workflow, version and steps, and the UI offers
-to archive that one version rather than the whole workflow. A version pinned as
+to archive that one version rather than the whole workflow — naming it
+**Archive workflow** when it is the only runnable version left, since archiving
+it then archives the workflow, which stays restorable from the workspace
+catalog's *Display → Archived workflows*. A version pinned as
 the workflow's default is excluded from that remedy: archiving it would leave
 the workflow pointing at something that cannot run — a rule only the definitions
 UI enforced, and which this flow must therefore honour itself.
