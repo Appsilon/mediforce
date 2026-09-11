@@ -1,9 +1,14 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
+  imageCapabilityProbeArgs,
   imageLabelsInspectArgs,
+  IMAGE_CAPABILITY_PROBE_TIMEOUT_MS,
+  parseImageCapabilities,
+  unknownImageCapabilities,
   parseImageProvenance,
   shortImageId,
+  type ImageCapabilities,
   type ReadImageProvenance,
 } from '@mediforce/platform-core';
 
@@ -61,6 +66,22 @@ export async function listImages(): Promise<DockerImage[]> {
     created: parsed.CreatedSince,
     ...provenance.get(shortImageId(parsed.ID)),
   }));
+}
+
+export async function probeImageCapabilities(image: string): Promise<ImageCapabilities> {
+  try {
+    const { stdout } = await execFileAsync(
+      'docker',
+      imageCapabilityProbeArgs(image),
+      { timeout: IMAGE_CAPABILITY_PROBE_TIMEOUT_MS },
+    );
+    return parseImageCapabilities(stdout);
+  } catch (error) {
+    const stdout = error instanceof Error && 'stdout' in error && typeof error.stdout === 'string'
+      ? error.stdout
+      : '';
+    return stdout.length > 0 ? parseImageCapabilities(stdout) : unknownImageCapabilities();
+  }
 }
 
 export async function removeImage(imageId: string): Promise<string> {

@@ -351,6 +351,13 @@
       "when": 1788889710066,
       "tag": "0049_image_catalog_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1788889810066,
+      "tag": "0050_image_catalog_capabilities",
+      "breakpoints": true
     }
   ]
 }

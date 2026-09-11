@@ -20,7 +20,7 @@ export async function toEntryViews(
   const images = docker.available ? docker.images : [];
 
   return entries.map((entry) => {
-    const versions = resolveEntryVersions(entry.source, images);
+    const versions = resolveEntryVersions(entry.source, images, entry.capabilities);
     return {
       ...entry,
       versions,

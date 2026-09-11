@@ -4,11 +4,13 @@ import type { Server } from 'node:http';
 vi.mock('../docker-info', () => ({
   listImages: vi.fn(),
   getDiskUsage: vi.fn(),
+  probeImageCapabilities: vi.fn(),
 }));
 
-import { listImages, getDiskUsage } from '../docker-info';
+import { listImages, getDiskUsage, probeImageCapabilities } from '../docker-info';
 const mockListImages = vi.mocked(listImages);
 const mockGetDiskUsage = vi.mocked(getDiskUsage);
+const mockProbeImageCapabilities = vi.mocked(probeImageCapabilities);
 
 let server: Server | null = null;
 
@@ -28,6 +30,8 @@ afterEach(() => {
     server.close();
     server = null;
   }
+  delete process.env.CONTAINER_WORKER_SECRET;
+  vi.clearAllMocks();
   vi.resetModules();
 });
 
@@ -61,6 +65,37 @@ describe('HTTP info server', () => {
     const res = await fetch(`http://localhost:${port}/disk`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(disk);
+  });
+
+  it('GET /images/:image/capabilities returns the bounded probe result', async () => {
+    mockProbeImageCapabilities.mockResolvedValue({
+      status: 'known', agentCapable: true, runtimes: ['claude', 'bash'],
+    });
+
+    const { port } = await getServer();
+    const res = await fetch(`http://localhost:${port}/images/mediforce-golden-image%3Alatest/capabilities`);
+
+    expect(res.status).toBe(200);
+    expect(mockProbeImageCapabilities).toHaveBeenCalledWith('mediforce-golden-image:latest');
+    expect(await res.json()).toEqual({
+      status: 'known', agentCapable: true, runtimes: ['claude', 'bash'],
+    });
+  });
+
+  it('GET /images/:image/capabilities needs the worker secret once one is set', async () => {
+    process.env.CONTAINER_WORKER_SECRET = 'worker-secret';
+    mockProbeImageCapabilities.mockResolvedValue({ status: 'unknown' });
+
+    const { port } = await getServer();
+    const url = `http://localhost:${port}/images/alpine%3A3.24/capabilities`;
+
+    const unauthorized = await fetch(url);
+    expect(unauthorized.status).toBe(401);
+    expect(mockProbeImageCapabilities).not.toHaveBeenCalled();
+
+    const authorized = await fetch(url, { headers: { 'X-Worker-Secret': 'worker-secret' } });
+    expect(authorized.status).toBe(200);
+    expect(mockProbeImageCapabilities).toHaveBeenCalledWith('alpine:3.24');
   });
 
   it('returns 404 for unknown routes', async () => {

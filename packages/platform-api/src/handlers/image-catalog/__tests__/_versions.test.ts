@@ -109,6 +109,24 @@ describe('resolveEntryVersions', () => {
     expect(version.workflow).toBe('adam-review');
     expect(version.namespace).toBe('appsilon');
   });
+
+  it('uses cached capabilities by immutable image ID and otherwise reports unknown', () => {
+    const images = [
+      image({ repository: 'mediforce-golden-image', tag: 'latest', id: 'known' }),
+      image({ repository: 'mediforce-golden-image', tag: 'v2', id: 'unprobed' }),
+    ];
+
+    const versions = resolveEntryVersions(
+      { kind: 'referenced', reference: 'mediforce-golden-image' },
+      images,
+      { known: { status: 'known', agentCapable: true, runtimes: ['claude', 'bash'] } },
+    );
+
+    expect(versions.map((version) => version.capabilities)).toEqual([
+      { status: 'known', agentCapable: true, runtimes: ['claude', 'bash'] },
+      { status: 'unknown' },
+    ]);
+  });
 });
 
 describe('entryAvailability', () => {

@@ -161,6 +161,21 @@ export {
 } from './agent-mcp-binding';
 
 export {
+  ImageRuntimeSchema,
+  KnownImageCapabilitiesSchema,
+  UnknownImageCapabilitiesSchema,
+  ImageCapabilitiesSchema,
+  ImageCapabilityCacheSchema,
+  parseImageCapabilities,
+  unknownImageCapabilities,
+  imageCapabilityProbeArgs,
+  IMAGE_CAPABILITY_PROBE_TIMEOUT_MS,
+  type ImageRuntime,
+  type ImageCapabilities,
+  type ImageCapabilityCache,
+} from './image-capabilities';
+
+export {
   ImageCatalogSourceSchema,
   ImageCatalogDeclaredSourceSchema,
   ImageCatalogEntrySchema,
