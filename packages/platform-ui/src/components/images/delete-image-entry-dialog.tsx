@@ -2,7 +2,6 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle, Loader2, X } from 'lucide-react';
-import { useState } from 'react';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { useDeleteImageEntry } from '@/hooks/use-image-catalog';
 import { useArchiveWorkflowVersion } from '@/hooks/use-archive-workflow-version';
@@ -65,28 +64,22 @@ export function DeleteImageEntryDialog({
   // narrow answer would hide exactly the history this delete destroys.
   const usage = useWorkflowsByImage(tags, open && tags.length > 0, 'all');
   const pins = usage.workflows ?? [];
-  const live = pins.filter((pin) => pin.live);
+  const blockingLive = pins.filter((pin) => pin.live);
   const historical = pins.filter((pin) => pin.live === false);
-  const [archived, setArchived] = useState<ReadonlySet<string>>(new Set());
-  const blockingLive = live.filter((pin) => !archived.has(pinKey(pin)));
 
   const storedRow = entry.origin === 'catalogued';
   // Until the scan answers, there is nothing to judge — the button waits rather
-  // than offering a delete whose blast radius is still unknown.
-  const blocked = usage.loading || blockingLive.length > 0;
+  // than offering a delete whose blast radius is still unknown. That includes
+  // the rescan after an archive: runs may fall back to a version pinning the
+  // same image, which only the fresh answer can say.
+  const blocked = usage.loading || archive.isPending || blockingLive.length > 0;
 
   function pinKey(pin: WorkflowImageMatch): string {
     return `${pin.namespace}:${pin.name}:${pin.version}`;
   }
 
   function handleArchive(pin: WorkflowImageMatch) {
-    archive.mutate(
-      { namespace: pin.namespace, name: pin.name, version: pin.version },
-      {
-        onSuccess: () =>
-          setArchived((current) => new Set(current).add(pinKey(pin))),
-      },
-    );
+    archive.mutate({ namespace: pin.namespace, name: pin.name, version: pin.version });
   }
 
   return (
@@ -170,46 +163,62 @@ export function DeleteImageEntryDialog({
                     {blockingLive.length === 1
                       ? 'A workflow version that runs today pins one of these images.'
                       : `${String(blockingLive.length)} workflow versions that run today pin these images.`}{' '}
-                    Point those steps at another image, or archive the version, and this delete
-                    unblocks.
+                    Point those steps at another image, or archive the version — if the version
+                    runs fall back to pins the image too, that one blocks next.
                   </p>
                 </div>
                 <ul className="space-y-1.5">
-                  {blockingLive.map((pin) => (
-                    <li
-                      key={pinKey(pin)}
-                      className="flex items-start justify-between gap-3 text-xs"
-                    >
-                      <span>
-                        <PinLine pin={pin} handle={handle} />
-                      </span>
-                      {pin.isDefault ? (
-                        // Archiving a workflow's chosen default would leave it
-                        // pointing at a version that cannot run — a worse mess
-                        // than the image staying. Only the platform's UI
-                        // enforces that rule, so it has to be honoured here.
-                        <span className="shrink-0 text-[11px] text-muted-foreground">
-                          default version
+                  {blockingLive.map((pin) => {
+                    const archivesWorkflow = pin.fallbackVersion === null;
+                    return (
+                      <li
+                        key={pinKey(pin)}
+                        className="flex items-start justify-between gap-3 text-xs"
+                      >
+                        <span>
+                          <PinLine pin={pin} handle={handle} />
+                          {pin.isDefault === false && (
+                            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                              {archivesWorkflow ? (
+                                <>
+                                  Its only runnable version, so archiving it archives the workflow.
+                                  It stays restorable: on the workspace page,{' '}
+                                  <strong>Display → Archived workflows</strong>.
+                                </>
+                              ) : (
+                                `Once archived, runs fall back to v${String(pin.fallbackVersion)}.`
+                              )}
+                            </span>
+                          )}
                         </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleArchive(pin)}
-                          disabled={archive.isPending}
-                          className="shrink-0 rounded-md border bg-background px-2 py-1 text-[11px] font-medium transition-colors hover:bg-muted disabled:opacity-50"
-                        >
-                          Archive v{pin.version}
-                        </button>
-                      )}
-                    </li>
-                  ))}
+                        {pin.isDefault ? (
+                          // Archiving a workflow's chosen default would leave it
+                          // pointing at a version that cannot run — a worse mess
+                          // than the image staying. Only the platform's UI
+                          // enforces that rule, so it has to be honoured here.
+                          <span className="shrink-0 text-[11px] text-muted-foreground">
+                            default version
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleArchive(pin)}
+                            disabled={archive.isPending}
+                            className="shrink-0 rounded-md border bg-background px-2 py-1 text-[11px] font-medium transition-colors hover:bg-muted disabled:opacity-50"
+                          >
+                            {archivesWorkflow ? 'Archive workflow' : `Archive v${String(pin.version)}`}
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
                 {archive.error !== null && (
                   <p className="text-xs text-destructive">{archive.error.message}</p>
                 )}
                 <p className="text-[11px] text-muted-foreground">
-                  Archiving one version leaves the rest of the workflow alone — the whole workflow
-                  does not have to go to reclaim an image. A version the workflow pins as its{' '}
+                  Archiving one version leaves the rest of the workflow alone — unless it is the
+                  only one left to run. A version the workflow pins as its{' '}
                   <strong>default</strong> cannot be archived that way: point its step at another
                   image, or make a different version the default first.
                 </p>

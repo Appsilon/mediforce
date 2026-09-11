@@ -94,4 +94,4 @@ appendix can capture what actually shipped vs the original decision body.
 | [0019](./0019-workspace-scoped-roles.md) | Process roles are workspace-scoped (partially supersedes [0002](./0002-firebase-auth-to-nextauth.md) §5) | Accepted |
 | [0020](./0020-built-in-roles-and-default-workflow-access.md) | Built-in roles carry their privilege as a default, not as an override (extends [0019](./0019-workspace-scoped-roles.md)) | Accepted |
 | [0021](./0021-workspace-join-links.md) | A join link authorizes membership; the mailbox still authorizes the session (amends [0002](./0002-firebase-auth-to-nextauth.md) §4a) | Accepted |
-| [0022](./0022-image-catalog.md) | The Image Catalog is an image the platform offers, keyed on its source | Proposed |
+| [0022](./0022-image-catalog.md) | The Image Catalog is an image the platform offers, keyed on its source | Accepted |

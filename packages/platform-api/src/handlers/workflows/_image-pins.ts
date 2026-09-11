@@ -1,5 +1,9 @@
 import { resolveStepImage } from '@mediforce/agent-runtime';
-import type { WorkflowDefinition, WorkflowDefinitionGroup } from '@mediforce/platform-core';
+import {
+  pickRunnableVersion,
+  type WorkflowDefinition,
+  type WorkflowDefinitionGroup,
+} from '@mediforce/platform-core';
 
 /**
  * Which workflow versions pin a given set of image tags.
@@ -24,8 +28,9 @@ export interface WorkflowImagePin {
   /** Needed by both callers to decide what a foreign reader may be told. */
   visibility: WorkflowDefinition['visibility'];
   /**
-   * A version a run can still start from: the workflow's default version if it
-   * sets one, otherwise its latest — and not archived.
+   * The version a run starts from — `pickRunnableVersion`, the rule every
+   * firing resolves through: the default version if it is live, otherwise the
+   * newest live one.
    *
    * The distinction is what makes a delete decidable. A live pin is a run that
    * will fail at container start, and the author can still re-point it. A
@@ -43,6 +48,13 @@ export interface WorkflowImagePin {
    */
   isDefault: boolean;
   archived: boolean;
+  /**
+   * The version runs would start from once this one is archived, or `null`
+   * when none would be left — archiving it then archives the whole workflow,
+   * which moves behind the catalog's "Archived workflows" until restored.
+   * Meaningful for a live pin; for any other it is simply the live version.
+   */
+  fallbackVersion: number | null;
   /** Step ids in this version that pin one of the images. */
   steps: string[];
   /** Which of the requested images this version uses, in the order asked —
@@ -83,9 +95,7 @@ export function findWorkflowImagePins(
   const pins: WorkflowImagePin[] = [];
 
   for (const group of groups) {
-    // The version a run starts from. `defaultVersion` wins over `latestVersion`
-    // because the newest may be a draft nobody runs.
-    const liveVersion = group.defaultVersion ?? group.latestVersion;
+    const liveVersion = pickRunnableVersion(group.versions, group.defaultVersion)?.version;
     for (const definition of group.versions) {
       const matchingSteps: string[] = [];
       const matched = new Set<string>();
@@ -104,9 +114,14 @@ export function findWorkflowImagePins(
         title: definition.title,
         version: definition.version,
         visibility: definition.visibility,
-        live: archived === false && definition.version === liveVersion,
+        live: definition.version === liveVersion,
         isDefault: group.defaultVersion === definition.version,
         archived,
+        fallbackVersion:
+          pickRunnableVersion(
+            group.versions.filter((other) => other.version !== definition.version),
+            group.defaultVersion,
+          )?.version ?? null,
         steps: matchingSteps,
         images: images.filter((image) => matched.has(image)),
       });
