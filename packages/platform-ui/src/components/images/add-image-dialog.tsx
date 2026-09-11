@@ -146,14 +146,11 @@ export function AddImageDialog({
                 required
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
-              <p className="text-xs text-muted-foreground">
-                Suggested from the repository. Rename it to what your team calls this image.
-              </p>
             </div>
 
             <div className="space-y-1.5">
               <label htmlFor="add-image-intent" className="text-sm font-medium">
-                Intent
+                Description
               </label>
               <textarea
                 id="add-image-intent"
@@ -164,11 +161,6 @@ export function AddImageDialog({
                 placeholder="R-based interactive exploration of ADaM datasets"
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
-              <p className="text-xs text-muted-foreground">
-                What the image is <em>for</em>, not what is inside it. Contents change with every
-                rebuild; intent survives them, which is why this is the one field you write and the
-                rest is derived.
-              </p>
             </div>
 
             {catalogue.error !== null && (

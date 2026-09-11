@@ -41,7 +41,7 @@ const COPY = {
     title: 'Describe this image',
     submit: 'Add to the catalog',
     pending: 'Probing the image…',
-    nameHint: 'Suggested from the repository. Rename it to what your team calls this image.',
+    nameHint: null,
   },
   edit: {
     title: 'Edit this image',
@@ -292,12 +292,12 @@ export function ImageDescriptionDialog({
                 required
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
-              <p className="text-xs text-muted-foreground">{copy.nameHint}</p>
+              {copy.nameHint !== null && <p className="text-xs text-muted-foreground">{copy.nameHint}</p>}
             </div>
 
             <div className="space-y-1.5">
               <label htmlFor="image-description-intent" className="text-sm font-medium">
-                Intent
+                Description
               </label>
               <textarea
                 id="image-description-intent"
@@ -308,11 +308,6 @@ export function ImageDescriptionDialog({
                 placeholder="R-based interactive exploration of ADaM datasets"
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
-              <p className="text-xs text-muted-foreground">
-                What the image is <em>for</em>, not what is inside it. Contents change with every
-                rebuild; intent survives them, which is why this is the one field you write and the
-                rest is derived.
-              </p>
             </div>
 
             {error !== null && (

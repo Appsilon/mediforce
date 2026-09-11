@@ -227,7 +227,7 @@ describe('ImagesPage', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('git@github.com:vedhav/cdisc-case-1.git · Dockerfile')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Name')).toHaveValue('cdisc-case-1');
-    expect(within(dialog).getByLabelText('Intent')).toHaveValue('');
+    expect(within(dialog).getByLabelText('Description')).toHaveValue('');
   });
 
   it('leaves a catalogued entry alone — no badge, no describe button', async () => {
@@ -416,7 +416,7 @@ describe('ImagesPage', () => {
 
     await userEvent.type(screen.getByLabelText('Repository'), 'Appsilon/tealflow');
     await userEvent.type(screen.getByLabelText(/Dockerfile/), 'container/Dockerfile');
-    await userEvent.type(screen.getByLabelText('Intent'), 'R-based exploration of ADaM datasets');
+    await userEvent.type(screen.getByLabelText('Description'), 'R-based exploration of ADaM datasets');
 
     // The name is suggested from the repository rather than left blank, the
     // same way a discovered entry arrives named.
@@ -438,7 +438,7 @@ describe('ImagesPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
     await userEvent.type(screen.getByLabelText('Repository'), 'Appsilon/tealflow');
-    await userEvent.type(screen.getByLabelText('Intent'), 'Whatever the default Dockerfile builds');
+    await userEvent.type(screen.getByLabelText('Description'), 'Whatever the default Dockerfile builds');
     await userEvent.click(screen.getByRole('button', { name: 'Add to the catalog' }));
 
     // `deriveBuildTag` folds in `dockerfile ?? ''`, so the entry keyed on the
@@ -448,6 +448,35 @@ describe('ImagesPage', () => {
       repo: 'Appsilon/tealflow',
       dockerfile: '',
     });
+  });
+
+  it('shows the Dockerfile and context paths the build will use, so a doubled prefix is visible', async () => {
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+    const preview = screen.getByTestId('add-image-build-paths');
+
+    // No context: the build runs from the Dockerfile's own directory.
+    await userEvent.type(screen.getByLabelText(/Dockerfile/), 'apps/golden-standard-workflow/container/Dockerfile');
+    expect(within(preview).getByText('/apps/golden-standard-workflow/container/Dockerfile')).toBeInTheDocument();
+    expect(within(preview).getByText('/apps/golden-standard-workflow/container')).toBeInTheDocument();
+
+    // A context: the Dockerfile path is read from it, so the repeated prefix shows.
+    await userEvent.type(screen.getByLabelText(/Build context/), 'apps/golden-standard-workflow');
+    expect(
+      within(preview).getByText('/apps/golden-standard-workflow/apps/golden-standard-workflow/container/Dockerfile'),
+    ).toBeInTheDocument();
+    expect(within(preview).getByText('/apps/golden-standard-workflow')).toBeInTheDocument();
+  });
+
+  it('says so when the paths climb out of the repository', async () => {
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+    await userEvent.type(screen.getByLabelText(/Build context/), '../..');
+
+    expect(within(screen.getByTestId('add-image-build-paths')).getByText(/outside the repository/))
+      .toBeInTheDocument();
   });
 
   it('keeps a name the author typed instead of overwriting it from the repository', async () => {
@@ -512,7 +541,7 @@ describe('ImagesPage', () => {
     expect(within(dialog).getByLabelText('Repository')).toHaveValue('Appsilon/tealflow');
     expect(within(dialog).getByLabelText(/Dockerfile/)).toHaveValue('container/Dockerfile');
     expect(within(dialog).getByLabelText('Name')).toHaveValue('TealFlow agent');
-    expect(within(dialog).getByLabelText('Intent')).toHaveValue(
+    expect(within(dialog).getByLabelText('Description')).toHaveValue(
       'R-based interactive exploration of ADaM datasets',
     );
   });
@@ -528,8 +557,8 @@ describe('ImagesPage', () => {
     const dialog = await screen.findByRole('dialog');
     await user.clear(within(dialog).getByLabelText('Name'));
     await user.type(within(dialog).getByLabelText('Name'), 'TealFlow explorer');
-    await user.clear(within(dialog).getByLabelText('Intent'));
-    await user.type(within(dialog).getByLabelText('Intent'), 'Exploring ADaM in a sandbox');
+    await user.clear(within(dialog).getByLabelText('Description'));
+    await user.type(within(dialog).getByLabelText('Description'), 'Exploring ADaM in a sandbox');
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
 
     expect(updateMock).toHaveBeenCalledWith({
@@ -552,7 +581,7 @@ describe('ImagesPage', () => {
     await user.click(within(card).getByRole('button', { name: 'Describe' }));
 
     const dialog = await screen.findByRole('dialog');
-    await user.type(within(dialog).getByLabelText('Intent'), 'Synthetic SDTM generation');
+    await user.type(within(dialog).getByLabelText('Description'), 'Synthetic SDTM generation');
     await user.click(within(dialog).getByRole('button', { name: 'Add to the catalog' }));
 
     // A discovered entry is derived on read, not stored, so there is nothing to
@@ -623,8 +652,8 @@ describe('ImagesPage', () => {
     await user.click(within(card).getByRole('button', { name: 'Edit' }));
 
     const dialog = await screen.findByRole('dialog');
-    await user.clear(within(dialog).getByLabelText('Intent'));
-    await user.type(within(dialog).getByLabelText('Intent'), 'Exploring ADaM in a sandbox');
+    await user.clear(within(dialog).getByLabelText('Description'));
+    await user.type(within(dialog).getByLabelText('Description'), 'Exploring ADaM in a sandbox');
     // No re-key, so no warning and no `source` on the wire: an edit to the
     // sentence stays an edit to the sentence.
     expect(within(dialog).queryByText(/keyed on its source/)).not.toBeInTheDocument();
