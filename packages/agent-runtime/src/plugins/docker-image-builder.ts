@@ -5,10 +5,11 @@
  * a git repo at a specific commit. Labels the image with the commit SHA so
  * subsequent runs can detect staleness and rebuild when the commit changes.
  */
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { BUILD_LABELS, buildProvenanceLabelArgs } from '@mediforce/platform-core';
 import { cloneRepoAtCommit } from './git-clone';
 
 export interface BuildImageOptions {
@@ -19,6 +20,10 @@ export interface BuildImageOptions {
   commit: string;
   dockerfile?: string;
   repoToken?: string;
+  /** Workflow definition whose step triggered this build. Recorded as a label. */
+  workflow?: string;
+  /** Namespace owning that definition. Recorded as a label. */
+  namespace?: string;
 }
 
 export interface EnsureImageOptions {
@@ -28,9 +33,11 @@ export interface EnsureImageOptions {
   commit?: string;
   dockerfile?: string;
   repoToken?: string;
+  workflow?: string;
+  namespace?: string;
 }
 
-const BUILD_COMMIT_LABEL = 'mediforce.build.commit';
+const BUILD_COMMIT_LABEL = BUILD_LABELS.commit;
 
 /** In-process mutex to avoid concurrent builds of the same image. */
 const buildLocks = new Map<string, Promise<void>>();
@@ -57,7 +64,7 @@ export async function getImageBuildCommit(image: string): Promise<string | null>
 }
 
 export async function buildImageFromRepo(options: BuildImageOptions): Promise<void> {
-  const { image, repoUrl, commit, dockerfile = 'Dockerfile', repoToken } = options;
+  const { image, repoUrl, commit, dockerfile = 'Dockerfile', repoToken, workflow, namespace } = options;
   const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-build-'));
 
   try {
@@ -68,8 +75,17 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
     const dockerfilePath = join(buildDir, dockerfile);
     const buildContext = dirname(dockerfilePath);
     console.log(`[docker-image-builder] Building image "${image}" from ${repoUrl}@${commit.slice(0, 8)}`);
-    execSync(
-      `docker build -t "${image}" --label "${BUILD_COMMIT_LABEL}=${commit}" -f "${dockerfilePath}" "${buildContext}"`,
+    // argv form, not a shell string: the label values carry a repo URL, a
+    // workflow name and a namespace, none of which are safe to interpolate.
+    execFileSync(
+      'docker',
+      [
+        'build',
+        '-t', image,
+        ...buildProvenanceLabelArgs({ repoUrl, commit, dockerfile, workflow, namespace, repoToken }),
+        '-f', dockerfilePath,
+        buildContext,
+      ],
       { stdio: 'pipe' },
     );
     console.log(`[docker-image-builder] Image "${image}" built successfully`);
@@ -79,7 +95,7 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
 }
 
 export async function ensureImage(options: EnsureImageOptions): Promise<void> {
-  const { image, repoUrl, repoRef, commit, dockerfile, repoToken } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile, repoToken, workflow, namespace } = options;
 
   // If repo+commit not provided, just check existence
   if (!repoUrl || !commit) {
@@ -110,7 +126,7 @@ export async function ensureImage(options: EnsureImageOptions): Promise<void> {
         console.log(`[docker-image-builder] Image "${image}" stale (${currentCommit?.slice(0, 8)} → ${commit.slice(0, 8)}), rebuilding`);
       }
 
-      await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, repoToken });
+      await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, repoToken, workflow, namespace });
     } finally {
       buildLocks.delete(image);
     }

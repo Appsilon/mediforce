@@ -97,6 +97,28 @@ exist locally or be pullable. Without either, the step fails unless
 `ALLOW_LOCAL_AGENTS=true` — a dev-only escape hatch that runs the step on the
 host with no isolation.
 
+## Build provenance
+
+The derived tag is a hash, so the image carries what the tag cannot say. Every
+build writes `mediforce.build.repo`, `.commit`, `.dockerfile`, `.workflow` and
+`.namespace`, plus `org.opencontainers.image.source` and `.revision`
+([`image-provenance.ts`](../../packages/platform-core/src/utils/image-provenance.ts),
+emitted by both the in-process and the `container-worker` builder). Overriding
+the two OCI keys is a correctness fix, not just interoperability: labels are
+inherited from the base image, so without our own values an image built on
+`rocker/tidyverse` reports *its* repository as the source.
+
+The daemon listing reads them back into the optional `build*` fields of
+`DockerImageInfoSchema`. `docker images` cannot emit labels, so this costs a
+second `docker image inspect` over the distinct ids; a failure leaves every row
+unannotated rather than failing the listing, and an image built before the
+labels existed simply carries none.
+
+`GET /api/workflow-definitions/by-image` recomputes the derived tag for
+build-mode steps, so a `mediforce-built:*` row still names the workflows and
+steps that use it — matching only the stored `image` string would be blind to
+exactly the steps that leave it unset.
+
 ## Where the container runs
 
 `getDockerSpawnStrategy()` picks one

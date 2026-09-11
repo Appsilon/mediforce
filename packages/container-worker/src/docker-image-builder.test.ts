@@ -42,7 +42,36 @@ function fetchCalls(): Parameters<typeof execFileSync>[] {
   );
 }
 
+/** Value of a `--label key=value` pair in the `docker build` arguments. */
+function buildLabel(key: string): string | undefined {
+  const call = execFileSyncMock.mock.calls.find(
+    ([command, args]) => command === 'docker' && args?.[0] === 'build',
+  );
+  return (call?.[1] as string[] | undefined)
+    ?.find((arg) => arg.startsWith(`${key}=`))
+    ?.slice(key.length + 1);
+}
+
 describe('container-worker buildImageFromRepo', () => {
+  it('writes the same build labels as the agent-runtime copy', async () => {
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'git@github.com:owner/repo.git',
+      commit: 'abc123',
+      dockerfile: 'container/Dockerfile',
+      workflow: 'sdtm-mapping',
+      namespace: 'acme',
+    });
+
+    expect(buildLabel('mediforce.build.repo')).toBe('git@github.com:owner/repo.git');
+    expect(buildLabel('mediforce.build.commit')).toBe('abc123');
+    expect(buildLabel('mediforce.build.dockerfile')).toBe('container/Dockerfile');
+    expect(buildLabel('mediforce.build.workflow')).toBe('sdtm-mapping');
+    expect(buildLabel('mediforce.build.namespace')).toBe('acme');
+    expect(buildLabel('org.opencontainers.image.source')).toBe('https://github.com/owner/repo');
+    expect(buildLabel('org.opencontainers.image.revision')).toBe('abc123');
+  });
+
   it('uses anonymous HTTPS for owner/repo shorthand without a deploy key', async () => {
     await buildImageFromRepo({
       image: 'test-image',

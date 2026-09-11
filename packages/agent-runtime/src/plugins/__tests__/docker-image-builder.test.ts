@@ -39,6 +39,21 @@ function fetchCalls(): Parameters<typeof execFileSync>[] {
   );
 }
 
+/** Argument list of the `docker build` invocation, or undefined if it never ran. */
+function buildArgs(): string[] | undefined {
+  const call = execFileSyncMock.mock.calls.find(
+    ([command, args]) => command === 'docker' && args?.[0] === 'build',
+  );
+  return call?.[1] as string[] | undefined;
+}
+
+/** Value of a `--label key=value` pair in the build arguments. */
+function buildLabel(args: string[] | undefined, key: string): string | undefined {
+  return args
+    ?.find((arg) => arg.startsWith(`${key}=`))
+    ?.slice(key.length + 1);
+}
+
 describe('imageExistsLocally', () => {
   it('returns true when docker image inspect succeeds', async () => {
     execSyncMock.mockReturnValueOnce(Buffer.from(''));
@@ -92,7 +107,6 @@ describe('buildImageFromRepo', () => {
       commit: 'abc123',
     });
 
-    const calls = execSyncMock.mock.calls.map(([cmd]) => String(cmd));
     const gitCalls = execFileSyncMock.mock.calls;
 
     // Should init, fetch the commit from the clone URL, and checkout without shell interpolation.
@@ -108,12 +122,10 @@ describe('buildImageFromRepo', () => {
       expect.anything(),
     ]);
 
-    // Should docker build with label
-    expect(calls.some((cmd) =>
-      cmd.includes('docker build') &&
-      cmd.includes('test-image') &&
-      cmd.includes('mediforce.build.commit=abc123'),
-    )).toBe(true);
+    // Should docker build with the commit label
+    const args = buildArgs();
+    expect(args).toContain('test-image');
+    expect(args).toContain('mediforce.build.commit=abc123');
 
     // Should cleanup temp dir
     expect(rmMock).toHaveBeenCalledWith('/tmp/mediforce-build-abc', { recursive: true, force: true });
@@ -129,10 +141,46 @@ describe('buildImageFromRepo', () => {
       dockerfile: 'container/Dockerfile',
     });
 
-    const calls = execSyncMock.mock.calls.map(([cmd]) => String(cmd));
-    expect(calls.some((cmd) =>
-      cmd.includes('docker build') && cmd.includes('container/Dockerfile'),
-    )).toBe(true);
+    const args = buildArgs();
+    expect(args).toContain('/tmp/mediforce-build-abc/container/Dockerfile');
+    expect(buildLabel(args, 'mediforce.build.dockerfile')).toBe('container/Dockerfile');
+  });
+
+  it('labels the image with repo, workflow, namespace and the OCI equivalents', async () => {
+    execSyncMock.mockReturnValue(Buffer.from(''));
+
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'git@github.com:owner/repo.git',
+      commit: 'abc123',
+      dockerfile: 'container/Dockerfile',
+      workflow: 'sdtm-mapping',
+      namespace: 'acme',
+    });
+
+    const args = buildArgs();
+    expect(buildLabel(args, 'mediforce.build.repo')).toBe('git@github.com:owner/repo.git');
+    expect(buildLabel(args, 'mediforce.build.commit')).toBe('abc123');
+    expect(buildLabel(args, 'mediforce.build.dockerfile')).toBe('container/Dockerfile');
+    expect(buildLabel(args, 'mediforce.build.workflow')).toBe('sdtm-mapping');
+    expect(buildLabel(args, 'mediforce.build.namespace')).toBe('acme');
+    // Overriding the inherited OCI labels — without this the image reports its
+    // base image's repository as its own source.
+    expect(buildLabel(args, 'org.opencontainers.image.source')).toBe('https://github.com/owner/repo');
+    expect(buildLabel(args, 'org.opencontainers.image.revision')).toBe('abc123');
+  });
+
+  it('keeps a clone token out of the repo label', async () => {
+    execSyncMock.mockReturnValue(Buffer.from(''));
+
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'https://x-access-token:SECRET@github.com/owner/private.git',
+      commit: 'abc123',
+      repoToken: 'SECRET',
+    });
+
+    expect(buildArgs()?.join(' ')).not.toContain('SECRET');
   });
 
   it('defaults to Dockerfile in repo root', async () => {
@@ -144,11 +192,10 @@ describe('buildImageFromRepo', () => {
       commit: 'abc123',
     });
 
-    const calls = execSyncMock.mock.calls.map(([cmd]) => String(cmd));
-    const buildCmd = calls.find((cmd) => cmd.includes('docker build'));
-    expect(buildCmd).toBeDefined();
+    const args = buildArgs();
+    expect(args).toBeDefined();
     // Should use Dockerfile (default) — the -f flag should reference repo root Dockerfile
-    expect(buildCmd).toMatch(/-f\s+\S*Dockerfile/);
+    expect(args?.[args.indexOf('-f') + 1]).toBe('/tmp/mediforce-build-abc/Dockerfile');
   });
 
   it('clones a public owner/repo ref over anonymous HTTPS without a deploy key', async () => {
@@ -245,9 +292,9 @@ describe('buildImageFromRepo', () => {
   });
 
   it('cleans up temp dir even on build failure', async () => {
-    execSyncMock.mockImplementation((command) => {
+    execFileSyncMock.mockImplementation((command, args) => {
       // Fail on docker build (after git commands succeed)
-      if (String(command).includes('docker build')) throw new Error('docker build failed');
+      if (command === 'docker' && args?.[0] === 'build') throw new Error('docker build failed');
       return Buffer.from('');
     });
 
@@ -294,8 +341,7 @@ describe('ensureImage', () => {
       commit: 'new-commit',
     });
 
-    const calls = execSyncMock.mock.calls.map(([cmd]) => String(cmd));
-    expect(calls.some((cmd) => cmd.includes('docker build'))).toBe(true);
+    expect(buildArgs()).toBeDefined();
   });
 
   it('builds when image does not exist and repo+commit provided', async () => {
@@ -312,8 +358,7 @@ describe('ensureImage', () => {
       commit: 'abc123',
     });
 
-    const calls = execSyncMock.mock.calls.map(([cmd]) => String(cmd));
-    expect(calls.some((cmd) => cmd.includes('docker build'))).toBe(true);
+    expect(buildArgs()).toBeDefined();
   });
 
   it('throws when image missing and no repo+commit', async () => {

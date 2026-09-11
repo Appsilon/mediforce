@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { formatExitInfo, deriveBuildTag, missingExecutableHint } from '../container-plugin';
+import {
+  formatExitInfo,
+  deriveBuildTag,
+  missingExecutableHint,
+  resolveStepImage,
+} from '../container-plugin';
 
 describe('formatExitInfo', () => {
   it('[DATA] reports the exit code when the process exited normally', () => {
@@ -60,6 +65,41 @@ describe('deriveBuildTag', () => {
     const withUndefined = deriveBuildTag('git@github.com:org/repo.git', 'abc1234', undefined);
     const withEmpty = deriveBuildTag('git@github.com:org/repo.git', 'abc1234', '');
     expect(withUndefined).toBe(withEmpty);
+  });
+});
+
+describe('resolveStepImage', () => {
+  const workflowRepo = { url: 'git@github.com:org/skills.git', commit: 'wf00000' };
+
+  it('[DATA] returns the explicit image when the step names one', () => {
+    expect(resolveStepImage({ image: 'my-agent:v3' })).toBe('my-agent:v3');
+  });
+
+  it('[DATA] derives the tag a build-mode step runs under when it omits image', () => {
+    expect(
+      resolveStepImage({ repo: 'git@github.com:org/repo.git', commit: 'abc1234', dockerfile: 'Dockerfile' }),
+    ).toBe(deriveBuildTag('git@github.com:org/repo.git', 'abc1234', 'Dockerfile'));
+  });
+
+  it('[DATA] normalizes an owner/repo shorthand the way the builder does', () => {
+    expect(resolveStepImage({ repo: 'org/repo', commit: 'abc1234' })).toBe(
+      deriveBuildTag('git@github.com:org/repo.git', 'abc1234', undefined),
+    );
+  });
+
+  it('[DATA] falls back to the workflow skills repo for a step naming only a dockerfile', () => {
+    expect(resolveStepImage({ dockerfile: 'container/Dockerfile' }, workflowRepo)).toBe(
+      deriveBuildTag('git@github.com:org/skills.git', 'wf00000', 'container/Dockerfile'),
+    );
+  });
+
+  it('[DATA] does not apply the workflow fallback when the workflow has no repo', () => {
+    expect(resolveStepImage({ dockerfile: 'container/Dockerfile' })).toBeUndefined();
+  });
+
+  it('[DATA] returns undefined for a step with no container config at all', () => {
+    expect(resolveStepImage(undefined)).toBeUndefined();
+    expect(resolveStepImage({})).toBeUndefined();
   });
 });
 
