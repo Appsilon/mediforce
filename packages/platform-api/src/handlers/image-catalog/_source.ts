@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
-import { normalizeRepoUrls, type ImageCatalogSource } from '@mediforce/platform-core';
+import {
+  catalogDockerfileKey,
+  normalizeRepoUrls,
+  type ImageCatalogSource,
+} from '@mediforce/platform-core';
 
 /**
  * Canonicalise a source before it becomes a key.
@@ -11,19 +15,29 @@ import { normalizeRepoUrls, type ImageCatalogSource } from '@mediforce/platform-
  * the images actually on the daemon.
  */
 export function canonicalizeSource(source: ImageCatalogSource): ImageCatalogSource {
-  return source.kind === 'built'
-    ? {
-        kind: 'built',
-        repo: normalizeRepoUrls(source.repo).gitUrl,
-        dockerfile: source.dockerfile,
-      }
-    : source;
+  if (source.kind === 'referenced') return source;
+  // An empty context is no context, and only one of the two may be stored or
+  // two equal sources would read back differently.
+  const context = source.context === undefined || source.context === '' ? {} : { context: source.context };
+  return {
+    kind: 'built',
+    repo: normalizeRepoUrls(source.repo).gitUrl,
+    dockerfile: source.dockerfile,
+    ...context,
+  };
 }
 
-/** The exact bytes the id hashes, mirroring `deriveBuildTag`'s NUL joining. */
+/**
+ * The exact bytes the id hashes, mirroring `deriveBuildTag`'s NUL joining.
+ *
+ * The Dockerfile half is the file, not the recipe: `catalogDockerfileKey` is
+ * the path from the repo root once a context is named, and the context itself
+ * stays out — one Dockerfile built from two contexts is one entry. With no
+ * context the key is the dockerfile as written, so no existing id moves.
+ */
 function sourceFingerprint(source: ImageCatalogSource): string {
   return source.kind === 'built'
-    ? `built\0${source.repo}\0${source.dockerfile}`
+    ? `built\0${source.repo}\0${catalogDockerfileKey(source.dockerfile, source.context)}`
     : `referenced\0${source.reference}`;
 }
 

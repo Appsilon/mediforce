@@ -40,9 +40,9 @@ export const PATCH = createRouteAdapter<
   UpdateImageCatalogEntryInputApiSchema,
   async (req, ctx) => {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    // The path id wins over any `id` in the body. `source` is deliberately
-    // NOT stripped: the patch schema is strict, so a body that tries to
-    // re-key the entry gets a validation error rather than a silent no-op.
+    // The path id wins over any `id` in the body. A `source` in the body is
+    // passed through: it re-keys the entry, so the handler — which is the only
+    // thing that can derive the new id — decides what happens to it.
     const { id: _bodyId, ...rest } = body;
     return {
       ...rest,
@@ -60,9 +60,16 @@ export const DELETE = createRouteAdapter<
   RouteContext
 >(
   DeleteImageCatalogEntryInputSchema,
-  async (req, ctx) => ({
-    namespace: new URL(req.url).searchParams.get('namespace') ?? '',
-    id: (await ctx.params).id,
-  }),
+  async (req, ctx) => {
+    const params = new URL(req.url).searchParams;
+    return {
+      namespace: params.get('namespace') ?? '',
+      id: (await ctx.params).id,
+      // Only the literal string opts in. Anything else — absent, empty,
+      // "false", a typo — leaves the daemon alone, which is the safe reading of
+      // a destructive flag arriving as text.
+      withImages: params.get('withImages') === 'true',
+    };
+  },
   deleteImageCatalogEntry,
 );

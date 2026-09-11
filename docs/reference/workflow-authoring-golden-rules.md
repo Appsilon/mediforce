@@ -107,7 +107,10 @@ The step fields that select build mode:
 }
 ```
 
-Use `repoAuth` for private Docker build contexts.
+Use `repoAuth` for private Docker build contexts. The build context is the
+Dockerfile's own directory unless the step sets `context` (a directory from the
+repo root, which `dockerfile` is then read from) — set `"context": "."` when a
+`container/Dockerfile` copies `scripts/` from beside `container/`.
 
 ## 4. Wire Skills Explicitly
 

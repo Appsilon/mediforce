@@ -66,6 +66,40 @@ describe('deriveBuildTag', () => {
     const withEmpty = deriveBuildTag('git@github.com:org/repo.git', 'abc1234', '');
     expect(withUndefined).toBe(withEmpty);
   });
+
+  it('[DATA] a build with no context keeps the tag it had before contexts existed', () => {
+    // Pinned, not recomputed: every image already on a daemon and every step
+    // pin already registered names this exact tag.
+    expect(deriveBuildTag('git@github.com:org/repo.git', 'abc1234', 'container/Dockerfile')).toBe(
+      'mediforce-built:848270386ea0',
+    );
+    expect(
+      deriveBuildTag('git@github.com:org/repo.git', 'abc1234', 'container/Dockerfile', ''),
+    ).toBe('mediforce-built:848270386ea0');
+  });
+
+  it('[DATA] a different build context produces a different tag', () => {
+    // Same Dockerfile, different files handed to it — a different image, so a
+    // shared tag would serve one build's binary to the other from the cache.
+    const narrow = deriveBuildTag('git@github.com:org/repo.git', 'abc1234', 'container/Dockerfile');
+    const wide = deriveBuildTag('git@github.com:org/repo.git', 'abc1234', 'container/Dockerfile', '.');
+    expect(wide).not.toBe(narrow);
+    expect(wide).toMatch(/^mediforce-built:[0-9a-f]{12}$/);
+  });
+
+  it('[DATA] spellings of one build context share one tag', () => {
+    const repo = 'git@github.com:org/repo.git';
+    const root = deriveBuildTag(repo, 'abc1234', 'container/Dockerfile', '.');
+
+    // The same `docker build`, so the same cache slot — a step writing `./`
+    // must find the image an entry storing `.` built.
+    expect(deriveBuildTag(repo, 'abc1234', 'container/Dockerfile', './')).toBe(root);
+    expect(deriveBuildTag(repo, 'abc1234', 'container/Dockerfile', '/')).toBe(root);
+    expect(deriveBuildTag(repo, 'abc1234', './container/Dockerfile', '.')).toBe(root);
+    expect(deriveBuildTag(repo, 'abc1234', 'Dockerfile', 'container')).toBe(
+      deriveBuildTag(repo, 'abc1234', '', 'container/'),
+    );
+  });
 });
 
 describe('resolveStepImage', () => {
@@ -91,6 +125,20 @@ describe('resolveStepImage', () => {
     expect(resolveStepImage({ dockerfile: 'container/Dockerfile' }, workflowRepo)).toBe(
       deriveBuildTag('git@github.com:org/skills.git', 'wf00000', 'container/Dockerfile'),
     );
+  });
+
+  it('[DATA] folds the build context into the tag a build-mode step runs under', () => {
+    expect(
+      resolveStepImage({
+        repo: 'git@github.com:org/repo.git',
+        commit: 'abc1234',
+        dockerfile: 'container/Dockerfile',
+        context: '.',
+      }),
+    ).toBe(deriveBuildTag('git@github.com:org/repo.git', 'abc1234', 'container/Dockerfile', '.'));
+    expect(
+      resolveStepImage({ dockerfile: 'container/Dockerfile', context: '.' }, workflowRepo),
+    ).toBe(deriveBuildTag('git@github.com:org/skills.git', 'wf00000', 'container/Dockerfile', '.'));
   });
 
   it('[DATA] does not apply the workflow fallback when the workflow has no repo', () => {

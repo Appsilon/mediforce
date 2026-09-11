@@ -136,7 +136,8 @@ test.describe('Image Catalog UI journey', () => {
       await page.getByLabel('Search images').fill('');
 
       // Expand: version history, and the layer summary named for what it is.
-      await derivedCard.getByRole('button').click();
+      // The expand toggle, not the card's Edit / Delete actions.
+      await derivedCard.getByRole('button', { expanded: false }).click();
       await expect(derivedCard.getByText(`${derivedReference}:v1`)).toBeVisible({
         timeout: 60_000,
       });
@@ -168,6 +169,155 @@ test.describe('Image Catalog UI journey', () => {
         { headers: AUTH },
       );
       docker('rmi', `${derivedReference}:v1`, `${baseReference}:v1`);
+    }
+  });
+
+  test('an author catalogues a repository, then edits what the entry says', async ({
+    page,
+    request,
+  }) => {
+    // One catalog read per navigation, each shelling out to Docker.
+    test.setTimeout(120_000);
+    trackPageErrors(page);
+
+    const stamp = Date.now();
+    // A repo the platform has never built from: the entry it creates has no
+    // image behind it, which is the state this flow exists for and the one
+    // **Describe** can never reach — that one only ever names a source some
+    // build already recorded.
+    const repo = `Appsilon/e2e-added-${stamp}`;
+    const intent = `Catalogued from the Images view ${stamp}, never built here.`;
+    let entryId = '';
+
+    try {
+      await page.goto(`/${TEST_ORG_HANDLE}/images`);
+      await page.getByRole('button', { name: /Add image/ }).click();
+
+      // Scoped to the dialog and exact: `getByLabel` matches substrings, and
+      // the page behind it carries labels of its own.
+      const dialog = page.getByRole('dialog');
+      await dialog.getByLabel('Repository', { exact: true }).fill(repo);
+      await dialog.getByLabel(/Dockerfile/).fill('container/Dockerfile');
+      await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue(`e2e-added-${stamp}`);
+      await dialog.getByLabel('Description', { exact: true }).fill(intent);
+      await dialog.getByRole('button', { name: 'Add to the catalog' }).click();
+
+      // The dialog closes only once the write resolved, so this is the gate
+      // that keeps the assertions below from racing the request.
+      await expect(dialog).toBeHidden({ timeout: 60_000 });
+
+      // The row renders from a catalog read, so seeing it means the entry was
+      // persisted and read back rather than merely POSTed.
+      await expect(page.getByText(intent)).toBeVisible({ timeout: 60_000 });
+
+      const listRes = await request.get(`/api/image-catalog?namespace=${TEST_ORG_HANDLE}`, {
+        headers: AUTH,
+      });
+      const { entries } = (await listRes.json()) as {
+        entries: { id: string; source: { repo?: string }; availability: string }[];
+      };
+      const added = entries.find((entry) => entry.source.repo?.includes(`e2e-added-${stamp}`));
+      expect(added, 'the added entry is not in the catalog').toBeDefined();
+      entryId = added?.id ?? '';
+      // Stored in one canonical form, so the entry matches images built from
+      // it however a step author wrote the reference.
+      expect(added?.source.repo).toBe(`git@github.com:${repo}.git`);
+      // Nothing built it, and the entry says so rather than hiding.
+      expect(added?.availability).toBe('absent');
+
+      // A registered entry is not frozen: the name and the sentence are the
+      // fields a human owns, and **Edit** is where they are changed.
+      const revisedName = `e2e-renamed-${stamp}`;
+      const revisedIntent = `Revised from the Images view ${stamp}.`;
+      const card = page.getByTestId(`image-entry-${entryId}`);
+      await expect(card).toBeVisible({ timeout: 60_000 });
+      await card.getByRole('button', { name: 'Edit' }).click();
+
+      const editDialog = page.getByRole('dialog');
+      // Prefilled with what the entry says today rather than blank — an edit
+      // form that starts empty is a retype, not an edit.
+      await expect(editDialog.getByLabel('Description', { exact: true })).toHaveValue(intent);
+      await editDialog.getByLabel('Name', { exact: true }).fill(revisedName);
+      await editDialog.getByLabel('Description', { exact: true }).fill(revisedIntent);
+      await editDialog.getByRole('button', { name: 'Save changes' }).click();
+      await expect(editDialog).toBeHidden({ timeout: 60_000 });
+
+      // Rendered from a catalog read, so seeing it means the patch persisted.
+      await expect(page.getByText(revisedIntent)).toBeVisible({ timeout: 60_000 });
+
+      const afterEdit = await request.get(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: AUTH },
+      );
+      const edited = (await afterEdit.json()) as {
+        entry: { id: string; name: string; intent: string; source: { repo?: string } };
+      };
+      expect(edited.entry.name).toBe(revisedName);
+      expect(edited.entry.intent).toBe(revisedIntent);
+      // An edit that leaves the source alone leaves the key alone: one entry
+      // changed, not a second one forked beside it.
+      expect(edited.entry.id).toBe(entryId);
+      expect(edited.entry.source.repo).toBe(`git@github.com:${repo}.git`);
+
+      // Correcting the source is the other half. The id derives from it, so the
+      // entry moves rather than being stuck with the typo it was created with.
+      const rekeyedFrom = entryId;
+      const staleCard = page.getByTestId(`image-entry-${rekeyedFrom}`);
+      await staleCard.getByRole('button', { name: 'Edit' }).click();
+
+      const sourceDialog = page.getByRole('dialog');
+      await expect(sourceDialog.getByLabel('Repository', { exact: true })).toHaveValue(
+        `git@github.com:${repo}.git`,
+      );
+      await sourceDialog.getByLabel(/Dockerfile/).fill('container/Dockerfile.gpu');
+      // The move is stated before the click, not discovered after it.
+      await expect(sourceDialog.getByText(/keyed on its source, so this moves it/)).toBeVisible();
+      await sourceDialog.getByRole('button', { name: 'Save changes' }).click();
+      await expect(sourceDialog).toBeHidden({ timeout: 60_000 });
+
+      const afterRekey = await request.get(`/api/image-catalog?namespace=${TEST_ORG_HANDLE}`, {
+        headers: AUTH,
+      });
+      const { entries: afterEntries } = (await afterRekey.json()) as {
+        entries: { id: string; source: { repo?: string; dockerfile?: string } }[];
+      };
+      const moved = afterEntries.find(
+        (candidate) => candidate.source.dockerfile === 'container/Dockerfile.gpu',
+      );
+      expect(moved, 'the re-keyed entry is not in the catalog').toBeDefined();
+      entryId = moved?.id ?? '';
+      expect(entryId).not.toBe(rekeyedFrom);
+      // One entry, corrected — not the mistake sitting beside its fix.
+      expect(afterEntries.map((candidate) => candidate.id)).not.toContain(rekeyedFrom);
+      const movedCard = page.getByTestId(`image-entry-${entryId}`);
+      await expect(movedCard).toBeVisible({ timeout: 60_000 });
+
+      // And withdrawing it entirely. Nothing was ever built from this repo, so
+      // the daemon holds no image for the entry and the delete is the record
+      // alone — the case the dialog has to name rather than promising to
+      // destroy something that is not there.
+      await movedCard.getByRole('button', { name: 'Delete' }).click();
+      const deleteDialog = page.getByRole('dialog');
+      await expect(deleteDialog.getByText(/removes the record and nothing else/)).toBeVisible();
+      await deleteDialog.getByRole('button', { name: 'Delete entry' }).click();
+      await expect(deleteDialog).toBeHidden({ timeout: 60_000 });
+
+      // Gone from the view it was listed in, and gone from the read behind it.
+      await expect(page.getByTestId(`image-entry-${entryId}`)).toHaveCount(0, {
+        timeout: 60_000,
+      });
+      const afterDelete = await request.get(`/api/image-catalog?namespace=${TEST_ORG_HANDLE}`, {
+        headers: AUTH,
+      });
+      const { entries: remaining } = (await afterDelete.json()) as { entries: { id: string }[] };
+      expect(remaining.map((candidate) => candidate.id)).not.toContain(entryId);
+      entryId = '';
+    } finally {
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: AUTH,
+        });
+      }
     }
   });
 });

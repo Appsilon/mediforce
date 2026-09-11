@@ -53,6 +53,48 @@ describe('image catalog source keys', () => {
     expect(empty).not.toBe(named);
   });
 
+  it('keys the Dockerfile, not the context it is built from', () => {
+    const repo = 'Appsilon/tealflow';
+    const narrow = deriveImageCatalogEntryId({ kind: 'built', repo, dockerfile: 'container/Dockerfile' });
+
+    // One file, three recipes: the context is how it is built, so every build
+    // lands as a version of the one entry.
+    expect(
+      deriveImageCatalogEntryId({ kind: 'built', repo, dockerfile: 'container/Dockerfile', context: '.' }),
+    ).toBe(narrow);
+    expect(
+      deriveImageCatalogEntryId({ kind: 'built', repo, dockerfile: 'Dockerfile', context: 'container' }),
+    ).toBe(narrow);
+  });
+
+  it('keys the same dockerfile string under another context as another file', () => {
+    const repo = 'Appsilon/tealflow';
+
+    // `dockerfile` is read from the context, so `Dockerfile` under `container`
+    // is container/Dockerfile — not the one at the repo root.
+    expect(
+      deriveImageCatalogEntryId({ kind: 'built', repo, dockerfile: 'Dockerfile', context: 'container' }),
+    ).not.toBe(deriveImageCatalogEntryId({ kind: 'built', repo, dockerfile: 'Dockerfile' }));
+  });
+
+  it('keeps a context through canonicalisation and drops an empty one', () => {
+    expect(
+      canonicalizeSource({ kind: 'built', repo: 'Appsilon/tealflow', dockerfile: 'Dockerfile', context: '.' }),
+    ).toEqual({
+      kind: 'built',
+      repo: 'git@github.com:Appsilon/tealflow.git',
+      dockerfile: 'Dockerfile',
+      context: '.',
+    });
+    expect(
+      canonicalizeSource({ kind: 'built', repo: 'Appsilon/tealflow', dockerfile: 'Dockerfile', context: '' }),
+    ).toEqual({
+      kind: 'built',
+      repo: 'git@github.com:Appsilon/tealflow.git',
+      dockerfile: 'Dockerfile',
+    });
+  });
+
   it('leads the id with a readable slug of the source', () => {
     expect(
       deriveImageCatalogEntryId({

@@ -1,4 +1,4 @@
-import { OCI_LABELS, githubPermalink } from '@mediforce/platform-core';
+import { OCI_LABELS, catalogDockerfileKey, githubPermalink } from '@mediforce/platform-core';
 import type {
   ImageCatalogEntryView,
   ImageCatalogVersion,
@@ -88,7 +88,8 @@ export function resolveVersionSource(
       'The platform built this image, so its Dockerfile is pinned at the commit it was built from.',
       entry.source.repo,
       version.commit,
-      entry.source.dockerfile,
+      // From the repo root: with a context, `dockerfile` is read from it.
+      catalogDockerfileKey(entry.source.dockerfile, entry.source.context),
     );
   }
 

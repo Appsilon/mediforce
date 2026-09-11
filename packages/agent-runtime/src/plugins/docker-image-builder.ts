@@ -6,10 +6,15 @@
  * subsequent runs can detect staleness and rebuild when the commit changes.
  */
 import { execFileSync, execSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
-import { BUILD_LABELS, buildProvenanceLabelArgs } from '@mediforce/platform-core';
+import {
+  BUILD_LABELS,
+  buildProvenanceLabelArgs,
+  resolveDockerBuildPaths,
+} from '@mediforce/platform-core';
 import { cloneRepoAtCommit } from './git-clone';
 
 export interface BuildImageOptions {
@@ -19,6 +24,8 @@ export interface BuildImageOptions {
   repoRef?: string;
   commit: string;
   dockerfile?: string;
+  /** Build context from the repo root; `dockerfile` is then read from it. */
+  context?: string;
   repoToken?: string;
   /** Workflow definition whose step triggered this build. Recorded as a label. */
   workflow?: string;
@@ -32,6 +39,7 @@ export interface EnsureImageOptions {
   repoRef?: string;
   commit?: string;
   dockerfile?: string;
+  context?: string;
   repoToken?: string;
   workflow?: string;
   namespace?: string;
@@ -63,23 +71,41 @@ export async function getImageBuildCommit(image: string): Promise<string | null>
   }
 }
 
+/**
+ * Refuse a build path the checkout resolves outside the clone.
+ * `resolveDockerBuildPaths` already refused `..` in the strings; this catches a
+ * symlink committed to the repo, which `docker build` follows — a context of
+ * `ctx -> /` would otherwise send the build host's filesystem, deploy key
+ * included, to the daemon and into an image.
+ */
+export function assertInsideClone(cloneDir: string, relativePath: string): void {
+  const root = realpathSync(cloneDir);
+  let resolved: string;
+  try {
+    resolved = realpathSync(join(cloneDir, relativePath));
+  } catch {
+    // Missing: there is nothing to escape through, and `docker build` names
+    // the missing path itself.
+    return;
+  }
+  if (resolved !== root && resolved.startsWith(`${root}${sep}`) === false) {
+    throw new Error(`Build path "${relativePath}" resolves outside the repository.`);
+  }
+}
+
 export async function buildImageFromRepo(options: BuildImageOptions): Promise<void> {
-  const { image, repoUrl, commit, repoToken, workflow, namespace } = options;
-  // `-f` needs a concrete path, but the label must record what `deriveBuildTag`
-  // actually hashed — `dockerfile ?? ''`. Labelling the resolved default would
-  // make the image claim a Dockerfile its own tag never saw, so an Image
-  // Catalog entry keyed on `(repo, dockerfile)` could not match it
-  // (ADR-0022 decision 1).
-  const dockerfile = options.dockerfile ?? 'Dockerfile';
+  const { image, repoUrl, commit, context, repoToken, workflow, namespace } = options;
+  // Resolved for `-f` and the context; the labels keep the inputs as named,
+  // which is what `deriveBuildTag` hashed (see `resolveDockerBuildPaths`).
+  const paths = resolveDockerBuildPaths(options.dockerfile, context);
   const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-build-'));
 
   try {
     // Clone repo at specific commit (sparse — fetch only what we need)
     cloneRepoAtCommit(buildDir, options.repoRef ?? repoUrl, commit, repoToken);
+    assertInsideClone(buildDir, paths.context);
+    assertInsideClone(buildDir, paths.dockerfile);
 
-    // Build image — use the Dockerfile's directory as build context so COPY paths work naturally
-    const dockerfilePath = join(buildDir, dockerfile);
-    const buildContext = dirname(dockerfilePath);
     console.log(`[docker-image-builder] Building image "${image}" from ${repoUrl}@${commit.slice(0, 8)}`);
     // argv form, not a shell string: the label values carry a repo URL, a
     // workflow name and a namespace, none of which are safe to interpolate.
@@ -88,9 +114,9 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
       [
         'build',
         '-t', image,
-        ...buildProvenanceLabelArgs({ repoUrl, commit, dockerfile: options.dockerfile ?? '', workflow, namespace, repoToken }),
-        '-f', dockerfilePath,
-        buildContext,
+        ...buildProvenanceLabelArgs({ repoUrl, commit, dockerfile: options.dockerfile ?? '', context, workflow, namespace, repoToken }),
+        '-f', join(buildDir, paths.dockerfile),
+        join(buildDir, paths.context),
       ],
       { stdio: 'pipe' },
     );
@@ -101,7 +127,7 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
 }
 
 export async function ensureImage(options: EnsureImageOptions): Promise<void> {
-  const { image, repoUrl, repoRef, commit, dockerfile, repoToken, workflow, namespace } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile, context, repoToken, workflow, namespace } = options;
 
   // If repo+commit not provided, just check existence
   if (!repoUrl || !commit) {
@@ -132,7 +158,7 @@ export async function ensureImage(options: EnsureImageOptions): Promise<void> {
         console.log(`[docker-image-builder] Image "${image}" stale (${currentCommit?.slice(0, 8)} → ${commit.slice(0, 8)}), rebuilding`);
       }
 
-      await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, repoToken, workflow, namespace });
+      await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, context, repoToken, workflow, namespace });
     } finally {
       buildLocks.delete(image);
     }

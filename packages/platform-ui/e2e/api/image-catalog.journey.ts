@@ -1,4 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
@@ -6,7 +9,10 @@ import {
   setupMultiNamespaceCallers,
   TEST_ORG_HANDLE,
   type MultiNamespaceFixture,
+  type UserCaller,
 } from '../helpers/multi-namespace';
+import { createTestUser, signInAndGetSessionCookie } from '../helpers/emulator';
+import { seedPostgresWorkspaceMember } from '../helpers/postgres-seed';
 
 /**
  * L3 API journey for the Image Catalog (ADR-0022, issue #1294). Runs against
@@ -35,7 +41,7 @@ interface EntryView {
   id: string;
   name: string;
   intent: string;
-  source: { kind: string; repo?: string; dockerfile?: string; reference?: string };
+  source: { kind: string; repo?: string; dockerfile?: string; context?: string; reference?: string };
   origin: 'catalogued' | 'discovered';
   versions: VersionView[];
   availability: 'present' | 'absent' | 'unknown';
@@ -104,6 +110,47 @@ function labelAsBuilt(
   }
 }
 
+/**
+ * A throwaway git repo with a one-line Dockerfile, returned with its commit.
+ *
+ * A real repo rather than a stub: the build path clones and checks out, so a
+ * fixture that skipped git would test everything except the part that runs in
+ * production. A bare absolute path keeps it off the network and is the local
+ * form `resolveRepoCloneTargets` accepts — `file://` is not, and is rewritten
+ * into a GitHub SSH reference. `_discovered.ts` drops local paths, but nothing
+ * about *versions* does, and this exercise is a catalogued entry gaining one.
+ */
+function createBuildFixtureRepo(
+  files: Record<string, string> = {
+    Dockerfile: `FROM ${PROBE_BASE_IMAGE}\nRUN touch /built-on-demand\n`,
+  },
+): { repoUrl: string; commit: string; dir: string } {
+  const dir = mkdtempSync(join(tmpdir(), 'mediforce-e2e-buildsrc-'));
+  for (const [path, content] of Object.entries(files)) {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), content);
+  }
+  const git = (...args: string[]): void => {
+    execFileSync('git', ['-C', dir, ...args], {
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'e2e',
+        GIT_AUTHOR_EMAIL: 'e2e@example.com',
+        GIT_COMMITTER_NAME: 'e2e',
+        GIT_COMMITTER_EMAIL: 'e2e@example.com',
+      },
+    });
+  };
+  git('init', '--initial-branch=main');
+  git('add', '.');
+  git('commit', '-m', 'fixture');
+  const commit = execFileSync('git', ['-C', dir, 'rev-parse', 'HEAD'], { stdio: 'pipe' })
+    .toString()
+    .trim();
+  return { repoUrl: dir, commit, dir };
+}
+
 function dockerAvailable(): boolean {
   try {
     docker('info');
@@ -138,9 +185,31 @@ test.describe.configure({ mode: 'default' });
 
 test.describe('image catalog API journey', () => {
   let callers: MultiNamespaceFixture;
+  /**
+   * A caller with `member` role in the test workspace.
+   *
+   * `callers.member` will not do for a role gate: the shared fixture seeds that
+   * user as the workspace **owner**, so it passes every admin assert. Seeded
+   * here rather than added to the shared fixture, whose outsider is load-bearing
+   * for other journeys' 404 anti-enumeration probes.
+   */
+  let plainMember: UserCaller;
 
   test.beforeAll(async () => {
     callers = await setupMultiNamespaceCallers();
+    const uid = await createTestUser(
+      'image-catalog-member@mediforce.dev',
+      'imagecatalog123456',
+      'Image Catalog Member',
+    );
+    await seedPostgresWorkspaceMember(TEST_ORG_HANDLE, uid, 'member', 'Image Catalog Member');
+    plainMember = {
+      uid,
+      sessionCookie: await signInAndGetSessionCookie(
+        'image-catalog-member@mediforce.dev',
+        'imagecatalog123456',
+      ),
+    };
   });
 
   test.beforeEach(() => {
@@ -451,26 +520,494 @@ test.describe('image catalog API journey', () => {
     });
   });
 
-  test('the source is the key and cannot be re-pointed by a PATCH', async ({ request }) => {
+  test('the source is the key, so a PATCH that changes it re-keys the entry', async ({
+    request,
+  }) => {
     const payload = entryPayload(`rekey-${Date.now()}`);
     const createRes = await request.post(catalogUrl(), {
       headers: apiKeyHeaders(),
       data: payload,
     });
     const { entry } = (await createRes.json()) as { entry: EntryView };
+    let liveId = entry.id;
 
-    const res = await request.patch(
-      `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
-      {
+    try {
+      // A second Dockerfile in the same repository is a different image, so it
+      // is a different key — this is the mistyped-source correction path.
+      const res = await request.patch(
+        `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
+        {
+          headers: apiKeyHeaders(),
+          data: {
+            source: {
+              kind: 'built',
+              repo: payload.source.repo,
+              dockerfile: 'container/Dockerfile.gpu',
+            },
+          },
+        },
+      );
+      expect(res.ok(), await res.text()).toBe(true);
+      const moved = ((await res.json()) as { entry: EntryView }).entry;
+      liveId = moved.id;
+
+      expect(moved.id).not.toBe(entry.id);
+      expect(moved.source.dockerfile).toBe('container/Dockerfile.gpu');
+      // Carried across, so this is one entry moved rather than a fresh row the
+      // caller has to describe again.
+      expect(moved.name).toBe(payload.name);
+      expect(moved.intent).toBe(payload.intent);
+
+      // The old key is gone: the catalog cannot show the corrected entry beside
+      // the mistake it replaced.
+      const oldRead = await request.get(
+        `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(oldRead.status()).toBe(404);
+
+      const listRes = await request.get(catalogUrl(), { headers: apiKeyHeaders() });
+      const ids = ((await listRes.json()) as { entries: EntryView[] }).entries.map(
+        (candidate) => candidate.id,
+      );
+      expect(ids).toContain(moved.id);
+      expect(ids).not.toContain(entry.id);
+    } finally {
+      await request.delete(`/api/image-catalog/${liveId}?namespace=${TEST_ORG_HANDLE}`, {
         headers: apiKeyHeaders(),
-        data: { source: { kind: 'referenced', reference: 'postgres' } },
-      },
-    );
-    expect(res.status(), await res.text()).toBe(400);
+      });
+    }
+  });
 
-    await request.delete(`/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`, {
+  test('a plain member cannot delete an entry at all', async ({ request }) => {
+    const payload = entryPayload(`rmi-gate-${Date.now()}`);
+    const createRes = await request.post(catalogUrl(), {
       headers: apiKeyHeaders(),
+      data: payload,
     });
+    const { entry } = (await createRes.json()) as { entry: EntryView };
+
+    try {
+      // Deleting takes the images with it, and the daemon is deployment-wide —
+      // so the whole act carries the workspace's admin gate, not only its
+      // image half. Members may still create an entry.
+      for (const url of [
+        `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
+      ]) {
+        const refused = await request.delete(url, {
+          headers: sessionCookieHeaders(plainMember),
+        });
+        expect(refused.status(), await refused.text()).toBe(403);
+      }
+
+      const stillThere = await request.get(
+        `/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(stillThere.ok(), await stillThere.text()).toBe(true);
+    } finally {
+      await request.delete(`/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`, {
+        headers: apiKeyHeaders(),
+      });
+    }
+  });
+
+  test('a delete stays blocked until no runnable version pins the image', async ({ request }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    const stamp = Date.now();
+    const reference = `mediforce-e2e-pinned-${stamp}`;
+    const tag = `${reference}:v1`;
+    const workflowName = `e2e-pin-${stamp}`;
+    let entryId = '';
+
+    try {
+      docker('image', 'inspect', PROBE_BASE_IMAGE);
+    } catch {
+      docker('pull', PROBE_BASE_IMAGE);
+    }
+    deriveImage(tag, PROBE_BASE_IMAGE, 'mkdir /e2e-pin-marker');
+
+    try {
+      const createRes = await request.post(catalogUrl(), {
+        headers: apiKeyHeaders(),
+        data: {
+          name: `E2E pinned ${stamp}`,
+          intent: 'Proves a live pin blocks the composite delete.',
+          source: { kind: 'referenced', reference },
+        },
+      });
+      expect(createRes.status(), await createRes.text()).toBe(201);
+      entryId = ((await createRes.json()) as { entry: EntryView }).entry.id;
+
+      // Two versions, both on the image: archiving the head hands runs back to
+      // v1, so only archiving both clears the way.
+      for (let registered = 0; registered < 2; registered += 1) {
+        const workflowRes = await request.post(
+          `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
+          {
+            headers: apiKeyHeaders(),
+            data: {
+              name: workflowName,
+              title: `E2E Pin ${stamp}`,
+              steps: [
+                {
+                  id: 'analyse',
+                  name: 'Analyse',
+                  type: 'creation',
+                  executor: 'agent',
+                  autonomyLevel: 'L2',
+                  agent: { image: tag },
+                },
+                { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+              ],
+              transitions: [{ from: 'analyse', to: 'done' }],
+            },
+          },
+        );
+        expect(workflowRes.status(), await workflowRes.text()).toBe(201);
+      }
+
+      const blocked = await request.delete(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        { headers: apiKeyHeaders() },
+      );
+      // 409 and named, so the message is actionable rather than a bare refusal.
+      expect(blocked.status(), await blocked.text()).toBe(409);
+      expect(await blocked.text()).toContain(workflowName);
+
+      // Nothing destroyed: the image is still on the daemon and the entry with it.
+      docker('image', 'inspect', tag);
+
+      const archiveVersion = async (version: number) => {
+        const archived = await request.post(
+          `/api/workflow-definitions/${workflowName}/versions/${String(version)}/archive?namespace=${TEST_ORG_HANDLE}`,
+          { headers: apiKeyHeaders(), data: { archived: true } },
+        );
+        expect(archived.ok(), await archived.text()).toBe(true);
+      };
+
+      // Archiving the head is not enough: runs fall back to v1, which pins the
+      // same image, so deleting it would still break the next run.
+      await archiveVersion(2);
+      const stillBlocked = await request.delete(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(stillBlocked.status(), await stillBlocked.text()).toBe(409);
+
+      await archiveVersion(1);
+      const allowed = await request.delete(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(allowed.ok(), await allowed.text()).toBe(true);
+      expect(((await allowed.json()) as { deletedImages: string[] }).deletedImages).toEqual([tag]);
+      entryId = '';
+      expect(() => docker('image', 'inspect', tag)).toThrow();
+
+      // With every version archived the workflow is archived, not gone: the
+      // catalog still lists it — marked archived — so it can be restored.
+      const listRes = await request.get(
+        `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}&includeArchived=true`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(listRes.ok(), await listRes.text()).toBe(true);
+      const listed = (
+        (await listRes.json()) as {
+          definitions: { name: string; definition: { archived?: boolean } | null }[];
+        }
+      ).definitions.find((group) => group.name === workflowName);
+      expect(listed?.definition?.archived).toBe(true);
+    } finally {
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+      await request.delete(
+        `/api/workflow-definitions/${workflowName}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders() },
+      );
+      try {
+        docker('rmi', '-f', tag);
+      } catch {
+        /* the delete under test removed it */
+      }
+    }
+  });
+
+  test('deleting with the images removes them from the daemon', async ({ request }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    // A `docker commit` of its own, never a shared tag: this test destroys the
+    // image it names, and a neighbour reading the same tag would lose it.
+    const stamp = Date.now();
+    const reference = `mediforce-e2e-rmi-${stamp}`;
+    const tag = `${reference}:v1`;
+    let entryId = '';
+
+    try {
+      docker('image', 'inspect', PROBE_BASE_IMAGE);
+    } catch {
+      docker('pull', PROBE_BASE_IMAGE);
+    }
+    deriveImage(tag, PROBE_BASE_IMAGE, 'mkdir /e2e-rmi-marker');
+
+    try {
+      const createRes = await request.post(catalogUrl(), {
+        headers: apiKeyHeaders(),
+        data: {
+          name: `E2E rmi ${stamp}`,
+          intent: 'Proves the composite delete reaches the daemon.',
+          source: { kind: 'referenced', reference },
+        },
+      });
+      expect(createRes.status(), await createRes.text()).toBe(201);
+      entryId = ((await createRes.json()) as { entry: EntryView }).entry.id;
+
+      const res = await request.delete(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(res.ok(), await res.text()).toBe(true);
+      // By tag, which is what the entry offered — not by image id, which a
+      // second tag could still be pointing at.
+      expect(((await res.json()) as { deletedImages: string[] }).deletedImages).toEqual([tag]);
+      entryId = '';
+
+      // The daemon is the assertion, not the response: `docker rmi` either ran
+      // or it did not.
+      expect(() => docker('image', 'inspect', tag)).toThrow();
+
+      const listRes = await request.get(catalogUrl(), { headers: apiKeyHeaders() });
+      const ids = ((await listRes.json()) as { entries: EntryView[] }).entries.map(
+        (candidate) => candidate.id,
+      );
+      expect(ids).not.toContain(entryId);
+    } finally {
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+      // Already gone when the test passed; this is for the paths where it is not.
+      try {
+        docker('rmi', '-f', tag);
+      } catch {
+        /* the delete under test removed it */
+      }
+    }
+  });
+
+  test('a re-key onto a source another entry already describes is refused', async ({
+    request,
+  }) => {
+    const stamp = Date.now();
+    const mine = entryPayload(`rekey-mine-${stamp}`);
+    const theirs = entryPayload(`rekey-theirs-${stamp}`);
+    const created = await Promise.all(
+      [mine, theirs].map(async (data) => {
+        const res = await request.post(catalogUrl(), { headers: apiKeyHeaders(), data });
+        expect(res.status(), await res.text()).toBe(201);
+        return ((await res.json()) as { entry: EntryView }).entry;
+      }),
+    );
+
+    try {
+      const res = await request.patch(
+        `/api/image-catalog/${created[0].id}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders(), data: { source: theirs.source } },
+      );
+      // 409, not a silent upsert: that would overwrite the occupant's own
+      // sentence and delete the row being edited — two entries lost to one
+      // edit.
+      expect(res.status(), await res.text()).toBe(409);
+
+      // Both rows survive, each still describing its own source.
+      for (const existing of created) {
+        const read = await request.get(
+          `/api/image-catalog/${existing.id}?namespace=${TEST_ORG_HANDLE}`,
+          { headers: apiKeyHeaders() },
+        );
+        expect(read.ok(), await read.text()).toBe(true);
+        expect(((await read.json()) as { entry: EntryView }).entry.name).toBe(existing.name);
+      }
+    } finally {
+      for (const existing of created) {
+        await request.delete(`/api/image-catalog/${existing.id}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+    }
+  });
+
+  test('a member builds a version on demand and it lands under the entry', async ({ request }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    // A clone plus a real `docker build`, on a daemon shared with every other
+    // test in this file.
+    test.setTimeout(300_000);
+
+    const fixture = createBuildFixtureRepo();
+    let entryId = '';
+    let builtTag = '';
+    try {
+      // Catalogue the source first, so the assertion is that the build lands as
+      // a *version of an entry an author already chose* — the property that
+      // makes a rebuild an update rather than a new row (ADR-0022 decision 1).
+      const createRes = await request.post(catalogUrl(), {
+        headers: apiKeyHeaders(),
+        data: {
+          name: 'E2E on-demand build',
+          intent: 'Proves a build with no workflow run lands in the catalog.',
+          source: { kind: 'built', repo: fixture.repoUrl, dockerfile: 'Dockerfile' },
+        },
+      });
+      expect(createRes.status(), await createRes.text()).toBe(201);
+      entryId = ((await createRes.json()) as { entry: EntryView }).entry.id;
+
+      // A plain member, not an admin: the build gate matches the create gate.
+      const buildRes = await request.post(`/api/image-catalog/build?namespace=${TEST_ORG_HANDLE}`, {
+        headers: sessionCookieHeaders(callers.member),
+        data: { repo: fixture.repoUrl, commit: fixture.commit, dockerfile: 'Dockerfile' },
+      });
+      expect(buildRes.status(), await buildRes.text()).toBe(200);
+      const built = (await buildRes.json()) as { imageTag: string; entryId: string };
+      builtTag = built.imageTag;
+
+      // The tag is the one a build-mode step pinning this commit would resolve
+      // to, so that step finds this image cached instead of rebuilding it.
+      expect(built.imageTag).toMatch(/^mediforce-built:[0-9a-f]{12}$/);
+      expect(built.entryId).toBe(entryId);
+
+      const getRes = await request.get(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(getRes.ok(), await getRes.text()).toBe(true);
+      const { entry } = (await getRes.json()) as { entry: EntryView };
+      expect(entry.availability).toBe('present');
+      const version = entry.versions.find((candidate) => candidate.imageTag === built.imageTag);
+      expect(version, `no version for ${built.imageTag}`).toBeDefined();
+      // Provenance the *build* wrote, read back by the catalog with no help:
+      // this is what makes the on-demand path indistinguishable from a step's.
+      expect(version?.lineage.ownLabels['mediforce.build.commit']).toBe(fixture.commit);
+    } finally {
+      if (builtTag !== '') {
+        try {
+          docker('rmi', '-f', builtTag);
+        } catch {
+          // The build may not have produced it; the assertions already said so.
+        }
+      }
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+      rmSync(fixture.dir, { recursive: true, force: true });
+    }
+  });
+
+  test('a Dockerfile in a subdirectory builds from a context that reaches its siblings', async ({
+    request,
+  }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    test.setTimeout(300_000);
+
+    // container/Dockerfile copies from scripts/ — outside its own directory, so
+    // it only builds when the context is the repo root.
+    const fixture = createBuildFixtureRepo({
+      'container/Dockerfile': `FROM ${PROBE_BASE_IMAGE}\nCOPY scripts/hello.sh /hello.sh\n`,
+      'scripts/hello.sh': 'echo hello\n',
+    });
+    let entryId = '';
+    let builtTag = '';
+    try {
+      const createRes = await request.post(catalogUrl(), {
+        headers: apiKeyHeaders(),
+        data: {
+          name: 'E2E context build',
+          intent: 'Proves a subdirectory Dockerfile builds from a wider context.',
+          source: { kind: 'built', repo: fixture.repoUrl, dockerfile: 'container/Dockerfile', context: '.' },
+        },
+      });
+      expect(createRes.status(), await createRes.text()).toBe(201);
+      const created = ((await createRes.json()) as { entry: EntryView }).entry;
+      entryId = created.id;
+      expect(created.source.context).toBe('.');
+
+      const buildRes = await request.post(`/api/image-catalog/build?namespace=${TEST_ORG_HANDLE}`, {
+        headers: apiKeyHeaders(),
+        data: {
+          repo: fixture.repoUrl,
+          commit: fixture.commit,
+          dockerfile: 'container/Dockerfile',
+          context: '.',
+        },
+      });
+      expect(buildRes.status(), await buildRes.text()).toBe(200);
+      const built = (await buildRes.json()) as { imageTag: string; entryId: string };
+      builtTag = built.imageTag;
+      expect(built.entryId).toBe(entryId);
+
+      const getRes = await request.get(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders() },
+      );
+      const { entry } = (await getRes.json()) as { entry: EntryView };
+      const version = entry.versions.find((candidate) => candidate.imageTag === built.imageTag);
+      expect(version, `no version for ${built.imageTag}`).toBeDefined();
+      expect(version?.lineage.ownLabels['mediforce.build.context']).toBe('.');
+    } finally {
+      if (builtTag !== '') {
+        try {
+          docker('rmi', '-f', builtTag);
+        } catch {
+          // The build may not have produced it; the assertions already said so.
+        }
+      }
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+      rmSync(fixture.dir, { recursive: true, force: true });
+    }
+  });
+
+  test('a build context or Dockerfile outside the repository is refused by the contract', async ({
+    request,
+  }) => {
+    const contextRes = await request.post(`/api/image-catalog/build?namespace=${TEST_ORG_HANDLE}`, {
+      headers: apiKeyHeaders(),
+      data: { repo: 'Appsilon/nope', commit: 'abc1234', dockerfile: 'Dockerfile', context: '../..' },
+    });
+    expect(contextRes.status(), await contextRes.text()).toBe(400);
+
+    // A 400, not a 500 from a build that failed on it.
+    const dockerfileRes = await request.post(`/api/image-catalog/build?namespace=${TEST_ORG_HANDLE}`, {
+      headers: apiKeyHeaders(),
+      data: { repo: 'Appsilon/nope', commit: 'abc1234', dockerfile: '../../Dockerfile', context: 'app' },
+    });
+    expect(dockerfileRes.status(), await dockerfileRes.text()).toBe(400);
+
+    const createRes = await request.post(catalogUrl(), {
+      headers: apiKeyHeaders(),
+      data: {
+        name: 'E2E escaping source',
+        intent: 'Must never be stored.',
+        source: { kind: 'built', repo: 'Appsilon/nope', dockerfile: '../../Dockerfile', context: 'app' },
+      },
+    });
+    expect(createRes.status(), await createRes.text()).toBe(400);
+  });
+
+  test('a caller from another namespace cannot build', async ({ request }) => {
+    const buildRes = await request.post(`/api/image-catalog/build?namespace=${TEST_ORG_HANDLE}`, {
+      headers: sessionCookieHeaders(callers.outsider),
+      data: { repo: 'Appsilon/nope', commit: 'abc1234', dockerfile: 'Dockerfile' },
+    });
+    expect(buildRes.status()).toBe(403);
   });
 
   test('a caller from another namespace cannot see or write the catalog', async ({ request }) => {

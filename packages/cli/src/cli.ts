@@ -57,6 +57,7 @@ import {
   imagesCreateCommand,
   imagesUpdateCommand,
   imagesDeleteCommand,
+  imagesBuildCommand,
 } from './commands/images';
 import { emailStatusCommand } from './commands/email-status';
 import { systemCreditsCommand } from './commands/system-credits';
@@ -282,8 +283,15 @@ export const TREE: Record<string, BranchEntry> = {
       list: { description: 'List the entries a namespace offers', fn: imagesListCommand },
       show: { description: 'Show one entry and its versions on the daemon', fn: imagesShowCommand },
       create: { description: 'Catalogue an image (--repo or --reference, plus --intent)', fn: imagesCreateCommand },
-      update: { description: "Change an entry's name or intent", fn: imagesUpdateCommand },
-      delete: { description: 'Remove an entry', fn: imagesDeleteCommand },
+      update: {
+        description: "Change an entry's name, intent or source (source re-keys it)",
+        fn: imagesUpdateCommand,
+      },
+      delete: {
+        description: 'Delete an entry and its images (admin/owner; blocked by live pins)',
+        fn: imagesDeleteCommand,
+      },
+      build: { description: 'Build a version from --repo/--commit, no workflow run', fn: imagesBuildCommand },
     },
   },
   email: {

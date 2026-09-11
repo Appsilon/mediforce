@@ -36,14 +36,18 @@ means a duplicated audit trail.
 **Host-daemon HTTP routes carry the shared secret.** The info server's reads
 (`/health`, `/images`, `/disk`, `GET /images/:image/history`) are open, but
 anything that acts on the daemon — `DELETE /images/:id`,
-`GET /images/:image/capabilities`, which starts a probe container — requires
+`GET /images/:image/capabilities`, which starts a probe container, and
+`POST /images/build`, which clones a repo and runs a Dockerfile — requires
 `X-Worker-Secret` once `CONTAINER_WORKER_SECRET` is set, and the platform sends
 the same value. History is on the open side deliberately: it reads metadata the
 daemon already holds and starts nothing.
 
 **Payload schemas are a cross-process contract.** The enqueuing platform and the
 worker are deployed separately and can briefly run different versions. Change
-`src/schemas.ts` additively.
+`src/schemas.ts` additively. The build route's body is the exception that proves
+it: `BuildImageRequestSchema` lives in `platform-core` because the platform
+builds in two places — in-process when the daemon is local, over this route when
+it is not — and one shape is what stops the two drifting on a field.
 
 ## Testing
 

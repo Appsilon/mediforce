@@ -21,6 +21,8 @@ export interface ImageBuildMeta {
   repoRef: string;
   commit: string;
   dockerfile?: string;
+  /** Build context from the repo root; `dockerfile` is then read from it. */
+  context?: string;
   /** Resolved token for authenticated HTTPS clones; SSH refs without a token use the deploy key. */
   repoToken?: string;
   /** Workflow definition whose step triggered the build. Recorded as an image

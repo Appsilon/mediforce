@@ -1,5 +1,6 @@
 import { defineCommand } from '../define-command';
 import { printJson } from '../output';
+import { builtSourceLine } from '@mediforce/platform-core';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 
 /**
@@ -33,9 +34,12 @@ function indentFor(entry: ImageCatalogEntryView, byId: Map<string, ImageCatalogE
 
 function describeSource(entry: ImageCatalogEntryView): string {
   return entry.source.kind === 'built'
-    ? `${entry.source.repo}${entry.source.dockerfile === '' ? '' : ` · ${entry.source.dockerfile}`}`
+    ? builtSourceLine(entry.source.repo, entry.source.dockerfile, entry.source.context)
     : entry.source.reference;
 }
+
+const CONTEXT_FLAG_DESCRIPTION =
+  'Build context directory inside --repo, e.g. "." for the repo root. When set, --dockerfile is read from it; when absent, the context is the Dockerfile\'s own directory';
 
 export const imagesListCommand = defineCommand({
   name: 'mediforce images list',
@@ -158,6 +162,7 @@ export const imagesCreateCommand = defineCommand({
     },
     repo: { type: 'string', description: 'Git repo the image is built from (built source)' },
     dockerfile: { type: 'string', description: 'Dockerfile path inside --repo' },
+    context: { type: 'string', description: CONTEXT_FLAG_DESCRIPTION },
     reference: {
       type: 'string',
       description: 'Untagged image reference, e.g. mediforce-golden-image (referenced source)',
@@ -173,7 +178,12 @@ export const imagesCreateCommand = defineCommand({
     }
     const source =
       args.repo !== undefined
-        ? ({ kind: 'built', repo: args.repo, dockerfile: args.dockerfile ?? '' } as const)
+        ? ({
+            kind: 'built',
+            repo: args.repo,
+            dockerfile: args.dockerfile ?? '',
+            context: args.context,
+          } as const)
         : ({ kind: 'referenced', reference: args.reference as string } as const);
 
     const declaredSource = {
@@ -203,7 +213,7 @@ export const imagesCreateCommand = defineCommand({
 export const imagesUpdateCommand = defineCommand({
   name: 'mediforce images update',
   description:
-    "Change an entry's name or intent. The source is the entry's key and cannot be edited.",
+    "Change an entry's name, intent or source. Changing the source re-keys the entry: the id derives from it, so the entry moves and prints its new id.",
   args: {
     entryId: {
       type: 'positional',
@@ -213,10 +223,48 @@ export const imagesUpdateCommand = defineCommand({
     namespace: { type: 'string', required: true, description: 'Namespace handle' },
     name: { type: 'string', description: 'New human handle' },
     intent: { type: 'string', description: 'New one-sentence intent' },
+    repo: {
+      type: 'string',
+      description:
+        'New git repo (built source). Replaces the whole source, so pass --dockerfile and --context with it — either one left out resets to its default. Re-keys the entry when the Dockerfile it names changes',
+    },
+    dockerfile: {
+      type: 'string',
+      description: 'New Dockerfile path inside --repo. Empty means the default',
+    },
+    context: { type: 'string', description: CONTEXT_FLAG_DESCRIPTION },
+    reference: { type: 'string', description: 'New untagged image reference (referenced source)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
-    if (args.name === undefined && args.intent === undefined) {
-      output.stderr('Nothing to update: supply --name and/or --intent.');
+    if (args.repo !== undefined && args.reference !== undefined) {
+      output.stderr('Supply at most one of --repo (built) or --reference (referenced).');
+      return 2;
+    }
+    // The source is a pair, and the entry is keyed on both halves, so a
+    // Dockerfile with no repo cannot be resolved into a key without reading
+    // the entry back first — which is a race the CLI has no reason to run.
+    if (args.dockerfile !== undefined && args.repo === undefined) {
+      output.stderr('--dockerfile changes the source, so pass --repo with it.');
+      return 2;
+    }
+    if (args.context !== undefined && args.repo === undefined) {
+      output.stderr('--context changes the source, so pass --repo with it.');
+      return 2;
+    }
+    const source =
+      args.repo !== undefined
+        ? ({
+            kind: 'built',
+            repo: args.repo,
+            dockerfile: args.dockerfile ?? '',
+            context: args.context,
+          } as const)
+        : args.reference !== undefined
+          ? ({ kind: 'referenced', reference: args.reference } as const)
+          : undefined;
+
+    if (args.name === undefined && args.intent === undefined && source === undefined) {
+      output.stderr('Nothing to update: supply --name, --intent, --repo and/or --reference.');
       return 2;
     }
     const result = await mediforce.imageCatalog.update({
@@ -224,12 +272,19 @@ export const imagesUpdateCommand = defineCommand({
       id: args.entryId,
       ...(args.name !== undefined ? { name: args.name } : {}),
       ...(args.intent !== undefined ? { intent: args.intent } : {}),
+      ...(source !== undefined ? { source } : {}),
     });
     if (jsonMode) {
       printJson(output, result);
       return 0;
     }
-    output.stdout(`Updated ${result.entry.id}.`);
+    // The id is the one thing a re-key changes that a caller cannot predict,
+    // so say it moved rather than reporting a no-op success on the old id.
+    output.stdout(
+      result.entry.id === args.entryId
+        ? `Updated ${result.entry.id}.`
+        : `Updated ${args.entryId} — its source changed, so it is now ${result.entry.id}.`,
+    );
     return 0;
   },
 });
@@ -237,7 +292,7 @@ export const imagesUpdateCommand = defineCommand({
 export const imagesDeleteCommand = defineCommand({
   name: 'mediforce images delete',
   description:
-    'Remove an entry. Removes an offer, never a capability — no workflow points at an entry.',
+    "Delete an entry and the images behind it. Admin/owner only. Refused while a live workflow version still pins one of them — superseded and archived versions do not block.",
   args: {
     entryId: {
       type: 'positional',
@@ -245,17 +300,66 @@ export const imagesDeleteCommand = defineCommand({
       description: 'Entry id (from `images list`)',
     },
     namespace: { type: 'string', required: true, description: 'Namespace handle' },
+    'keep-images': {
+      type: 'boolean',
+      description:
+        'Remove only the catalog record, leaving the images on the daemon. Rarely what you want: anything this namespace built is re-derived on the next read as an undescribed entry',
+    },
   },
   async run({ args, output, mediforce, jsonMode }) {
+    const withImages = args['keep-images'] !== true;
     const result = await mediforce.imageCatalog.delete({
       namespace: args.namespace,
       id: args.entryId,
+      ...(withImages ? { withImages: true } : {}),
     });
     if (jsonMode) {
       printJson(output, result);
       return 0;
     }
     output.stdout(`Deleted ${args.entryId} from "${args.namespace}".`);
+    // Named, not counted: these are gone from the daemon deployment-wide, and
+    // the tags are what a reader needs to know went.
+    for (const tag of result.deletedImages) {
+      output.stdout(`  Removed ${tag} from the daemon.`);
+    }
+    if (withImages && result.deletedImages.length === 0) {
+      output.stdout('  No image for this entry was on the daemon.');
+    }
+    return 0;
+  },
+});
+
+export const imagesBuildCommand = defineCommand({
+  name: 'mediforce images build',
+  description:
+    'Build one version of a built source on the deployment, without running a workflow.',
+  args: {
+    namespace: { type: 'string', required: true, description: 'Namespace handle' },
+    repo: { type: 'string', required: true, description: 'Git repo to build from' },
+    commit: { type: 'string', required: true, description: 'Commit to check out and build' },
+    dockerfile: { type: 'string', description: 'Dockerfile path inside --repo' },
+    context: { type: 'string', description: CONTEXT_FLAG_DESCRIPTION },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    if (jsonMode === false) {
+      // A clone plus a Dockerfile takes minutes and the command shows nothing
+      // until it lands, so say so rather than looking hung.
+      output.stdout(`Building ${args.repo}@${args.commit.slice(0, 8)} — this takes a few minutes...`);
+    }
+    const result = await mediforce.imageCatalog.build({
+      namespace: args.namespace,
+      repo: args.repo,
+      commit: args.commit,
+      dockerfile: args.dockerfile ?? '',
+      context: args.context,
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    output.stdout(`Built ${result.imageTag} for entry ${result.entryId}.`);
+    output.stdout('It is offered in the catalog — `mediforce images list` to see it.');
     return 0;
   },
 });

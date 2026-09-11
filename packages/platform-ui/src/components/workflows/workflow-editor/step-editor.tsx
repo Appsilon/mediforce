@@ -43,7 +43,7 @@ function friendlyFieldError(message: string): string {
 }
 
 export function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: WorkflowStep['executor']): Partial<WorkflowStep> {
-  const SHARED_CONTAINER_KEYS = ['image', 'dockerfile', 'repo', 'commit', 'repoAuth'] as const;
+  const SHARED_CONTAINER_KEYS = ['image', 'dockerfile', 'context', 'repo', 'commit', 'repoAuth'] as const;
   const base: Partial<WorkflowStep> = { executor: targetExecutor };
 
   if (targetExecutor === 'human') {
@@ -178,7 +178,8 @@ const TIP = {
   agentAllowedTools:       'Tools the agent may call, comma-separated. Leave empty to allow all available tools.',
   agentPrompt:             'Additional instructions appended to the agent\'s system prompt for this step only.',
   agentImage:              'Docker image for the agent container (e.g. python:3.11-slim). Required for deployed execution.',
-  agentDockerfile:         'Path to a Dockerfile in agent.repo. When set, the container is built from this file instead of agent.image.',
+  agentDockerfile:         'Path to a Dockerfile in agent.repo — from the repo root, or from agent.context when set. When set, the container is built from this file instead of agent.image.',
+  agentContext:            'Build context directory in agent.repo, e.g. "." for the repo root. Leave empty to build from the Dockerfile\'s own directory, where everything it COPYs must sit beside it.',
   agentRepo:               'Git repository URL to clone into the container before running the agent.',
   agentCommit:             'Commit SHA or branch to check out from agent.repo. Defaults to the repo\'s default branch.',
   agentRepoAuth:           'Name of a workflow secret holding the auth token for cloning a private repository.',
@@ -186,7 +187,8 @@ const TIP = {
   scriptRuntime:           'Language runtime for the inline script: javascript, python, r, or bash.',
   scriptCommand:           'Shell command to run in the container, typically to invoke a file from script.repo.',
   scriptImage:             'Docker base image for the container (e.g. python:3.11-slim).',
-  scriptDockerfile:        'Path to a Dockerfile in script.repo. When set, the container is built from this file instead of script.image.',
+  scriptDockerfile:        'Path to a Dockerfile in script.repo — from the repo root, or from script.context when set. When set, the container is built from this file instead of script.image.',
+  scriptContext:           'Build context directory in script.repo, e.g. "." for the repo root. Leave empty to build from the Dockerfile\'s own directory, where everything it COPYs must sit beside it.',
   scriptRepo:              'Git repository URL to clone into the container before running the command.',
   scriptCommit:            'Commit SHA or branch to check out from script.repo. Defaults to the repo\'s default branch.',
   scriptRepoAuth:          'Name of a workflow secret holding the auth token for cloning a private repository.',
@@ -945,6 +947,14 @@ export function StepEditor({
             />
           </FieldRow>
 
+          <FieldRow label="agent.context" tooltip={TIP.agentContext}>
+            <input
+              value={step.agent?.context ?? ''}
+              onChange={(e) => updateAgent({ context: e.target.value || undefined })}
+              className={riMono}
+            />
+          </FieldRow>
+
           <FieldRow label="agent.repo" tooltip={TIP.agentRepo}>
             <input
               value={step.agent?.repo ?? ''}
@@ -1130,6 +1140,14 @@ export function StepEditor({
               <input
                 value={step.script?.dockerfile ?? ''}
                 onChange={(e) => updateScript({ dockerfile: e.target.value || undefined })}
+                className={riMono}
+              />
+            </FieldRow>
+
+            <FieldRow label="script.context" tooltip={TIP.scriptContext}>
+              <input
+                value={step.script?.context ?? ''}
+                onChange={(e) => updateScript({ context: e.target.value || undefined })}
                 className={riMono}
               />
             </FieldRow>

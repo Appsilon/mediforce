@@ -682,6 +682,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         repo: stepAgent.repo,
         commit: stepAgent.commit,
         dockerfile: stepAgent.dockerfile,
+        context: stepAgent.context,
         mcpServers: stepAgent.mcpServers,
         allowedTools: stepAgent.allowedTools,
       };
