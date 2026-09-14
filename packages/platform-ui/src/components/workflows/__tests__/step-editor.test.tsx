@@ -1204,3 +1204,216 @@ describe('StepEditor', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// The fields that turn a block preset into a runnable step. `action` config is
+// required when the executor is `action`, so an unconfigured spawn or wait step
+// does not merely look unfinished — the whole workflow refuses to save.
+// ---------------------------------------------------------------------------
+
+function ControlledEditor({ initial }: { initial: WorkflowStep }) {
+  const [step, setStep] = React.useState(initial);
+  return (
+    <StepEditor
+      step={step}
+      allSteps={[step, buildStep({ id: 'done', name: 'Done', type: 'terminal' })]}
+      onChange={(patch) => setStep((current) => ({ ...current, ...patch }))}
+    />
+  );
+}
+
+describe('StepEditor — spawn config', () => {
+  const spawnStep = (targets: unknown) => buildStep({
+    executor: 'action',
+    action: { kind: 'spawn', config: { targets, continueOnSpawnError: true } },
+  } as Partial<WorkflowStep>);
+
+  it('names the workflow a spawn step starts', () => {
+    render(<ControlledEditor initial={spawnStep({ definitionName: '' })} />);
+    expandCard('Action');
+    const nameInput = screen.getByPlaceholderText('workflow-name');
+    fireEvent.change(nameInput, { target: { value: 'child-workflow' } });
+    expect(screen.getByDisplayValue('child-workflow')).toBe(nameInput);
+  });
+
+  it('writes a bare object for one target, so a hand-authored definition round-trips', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={spawnStep({ definitionName: 'child' })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+    expandCard('Action');
+    fireEvent.change(screen.getByPlaceholderText('workflow-name'), { target: { value: 'other' } });
+    const written = onChange.mock.calls[0]?.[0] as { action?: { config?: { targets?: unknown } } };
+    expect(Array.isArray(written.action?.config?.targets)).toBe(false);
+  });
+
+  it('writes a list once there is more than one target', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={spawnStep([{ definitionName: 'a' }, { definitionName: 'b' }])}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+    expandCard('Action');
+    fireEvent.change(screen.getAllByPlaceholderText('workflow-name')[0], { target: { value: 'a2' } });
+    const written = onChange.mock.calls[0]?.[0] as { action?: { config?: { targets?: unknown } } };
+    expect(Array.isArray(written.action?.config?.targets)).toBe(true);
+  });
+
+  it('takes a forEach path for fan-out', () => {
+    render(<ControlledEditor initial={spawnStep({ definitionName: 'child' })} />);
+    expandCard('Action');
+    const forEach = screen.getByPlaceholderText('${steps.split.items}');
+    fireEvent.change(forEach, { target: { value: '${steps.split.rows}' } });
+    expect(screen.getByDisplayValue('${steps.split.rows}')).toBe(forEach);
+  });
+});
+
+describe('StepEditor — wait config', () => {
+  const waitStep = buildStep({
+    executor: 'action',
+    action: { kind: 'wait', config: { duration: { minutes: 5 } } },
+  } as Partial<WorkflowStep>);
+
+  it('changes the duration the preset hardcoded', () => {
+    const onChange = vi.fn();
+    render(<StepEditor step={waitStep} allSteps={[]} onChange={onChange} />);
+    expandCard('Action');
+    fireEvent.change(screen.getByDisplayValue('5'), { target: { value: '30' } });
+    const written = onChange.mock.calls[0]?.[0] as { action?: { config?: { duration?: Record<string, number> } } };
+    expect(written.action?.config?.duration?.minutes).toBe(30);
+  });
+
+  it('takes a deadline and a condition', () => {
+    render(<ControlledEditor initial={waitStep} />);
+    expandCard('Action');
+    const deadline = screen.getByPlaceholderText('2026-01-01T00:00:00Z');
+    fireEvent.change(deadline, { target: { value: '${steps.poll.dueAt}' } });
+    expect(screen.getByDisplayValue('${steps.poll.dueAt}')).toBe(deadline);
+
+    const condition = screen.getByPlaceholderText('steps.poll.ready == true');
+    fireEvent.change(condition, { target: { value: 'steps.poll.done == true' } });
+    expect(screen.getByDisplayValue('steps.poll.done == true')).toBe(condition);
+  });
+});
+
+describe('StepEditor — verdict presentation and conditional params', () => {
+  it('writes the verdict label, intent and comment requirement', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={buildStep({ type: 'decision', verdicts: { approve: { target: 'done' } } })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+    expandCard('Routing');
+
+    // The label input is empty and placeheld with the default the server fills.
+    fireEvent.change(screen.getByPlaceholderText('Approve'), { target: { value: 'Sign off' } });
+    expect((onChange.mock.calls[0]?.[0] as { verdicts?: Record<string, { label?: string }> })
+      .verdicts?.approve?.label).toBe('Sign off');
+
+    onChange.mockClear();
+    fireEvent.click(screen.getByRole('checkbox', { name: /comment/i }));
+    expect((onChange.mock.calls[0]?.[0] as { verdicts?: Record<string, { requiresComment?: boolean }> })
+      .verdicts?.approve?.requiresComment).toBe(true);
+  });
+
+  it('marks a param required only for the verdicts the step defines', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={buildStep({
+          type: 'decision',
+          verdicts: { approve: { target: 'done' }, reject: { target: 'done' } },
+          params: [{ name: 'reason', type: 'string' }],
+        })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+    expandCard('Task setup');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'reject' }));
+    expect((onChange.mock.calls[0]?.[0] as { params?: { requiredForVerdicts?: string[] }[] })
+      .params?.[0]?.requiredForVerdicts).toEqual(['reject']);
+  });
+});
+
+// Skills used to be a repo path typed by hand, which is why uploading one had
+// nowhere to land. A skill the workflow carries is picked here instead, and
+// picking it fills in the directory the runtime reads it from.
+describe('StepEditor — skills the workflow carries', () => {
+  beforeEach(() => {
+    pluginState.plugins = [];
+    agentState.response = { agents: [] };
+    modelState.models = [];
+    rolesState.workspaceRoles = {
+      roles: [], workflowNames: [], heldRoles: null, loading: false, error: null,
+    };
+    rolesState.members = [];
+  });
+
+  const agentStep = (agent: Record<string, unknown> = {}): WorkflowStep =>
+    buildStep({ id: 'interpret', name: 'Interpret', executor: 'agent', agent });
+
+  it('offers each carried skill, and sets both fields when one is picked', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={agentStep()}
+        allSteps={[agentStep()]}
+        onChange={onChange}
+        workflowArtifacts={[
+          { path: 'skills/data-validator/SKILL.md', contents: '# Validator' },
+          { path: 'plugins/lz/skills/router/SKILL.md', contents: '# Router' },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Prompt & model'));
+    const picker = screen.getByLabelText('Skill') as HTMLSelectElement;
+    expect([...picker.options].map((option) => option.textContent)).toEqual([
+      'None',
+      'router (plugins/lz/skills)',
+      'data-validator',
+    ]);
+
+    fireEvent.change(picker, { target: { value: 'skills/data-validator' } });
+    // Both fields, because a skill name alone does not tell the runtime where
+    // to read it from — that pair is what this replaces typing by hand.
+    expect(onChange).toHaveBeenLastCalledWith({
+      agent: expect.objectContaining({ skill: 'data-validator', skillsDir: 'skills' }),
+    });
+  });
+
+  it('clears both fields when the skill is set back to none', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={agentStep({ skill: 'data-validator', skillsDir: 'skills' })}
+        allSteps={[agentStep()]}
+        onChange={onChange}
+        workflowArtifacts={[{ path: 'skills/data-validator/SKILL.md', contents: '' }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Prompt & model'));
+    fireEvent.change(screen.getByLabelText('Skill'), { target: { value: '' } });
+    expect(onChange).toHaveBeenLastCalledWith({
+      agent: expect.objectContaining({ skill: undefined, skillsDir: undefined }),
+    });
+  });
+
+  it('stays a text field when the workflow carries no skills, so a repo path can still be typed', () => {
+    render(<StepEditor step={agentStep()} allSteps={[agentStep()]} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByText('Prompt & model'));
+    expect(screen.queryByLabelText('Skill')).toBeNull();
+  });
+});

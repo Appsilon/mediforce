@@ -59,10 +59,16 @@ See [create-workflow.md](../guides/create-workflow.md#import-from-git) and
 
 ## 2. Pin Runtime Sources
 
-MUST (once you build a custom image or pin sources):
+MUST (once you build a custom image or pin sources **from a repository**):
 
 - Pin `externalSkillsRepo.commit`.
 - Pin step Docker build `repo` + `commit` + `dockerfile`.
+
+A workflow that carries its own files pins nothing: the Dockerfile, the scripts
+and the skills live on the definition, version with it, and the image tag is
+derived from their content. `repo` + `commit` describe a repository that
+actually exists — a placeholder SHA (all zeros) or an invented URL is refused at
+registration, because it names a build that can never run.
 - Avoid `latest` image tags outside local development.
 - Register/import a new workflow version for every released change.
 
@@ -113,7 +119,10 @@ Use `repoAuth` for private Docker build contexts.
 
 Workflow-specific skills SHOULD live in the workflow package: pin
 `externalSkillsRepo` at workflow level, and point the step at `agent.skill` plus
-`agent.skillsDir` (the skills folder's path inside that repo). Use a separate
+`agent.skillsDir` (the skills folder's path inside that repo). A workflow can
+also carry its skills itself — `artifacts` with a file at
+`<skillsDir>/<skill>/SKILL.md`, which needs no repository and no checkout, and
+takes precedence over `externalSkillsRepo` for the directory it holds. Use a separate
 skills repo only when the skills are shared products with their own release
 process.
 
@@ -198,8 +207,14 @@ Example: [`06-env-secrets-databricks.wd.json`](../workflow-examples/06-env-secre
 Installing an MCP executable in Docker makes it runnable. It does not make it
 visible, reviewable, scoped, or auditable in Mediforce.
 
-`MANUAL`: a workflow can reference `agentId` and `mcpRestrictions`, but Tool
-Catalog entries and Agent Definition MCP bindings are platform setup.
+`MANUAL` for the `/design-workflow` skill: a package it generates can reference
+`agentId` and `mcpRestrictions`, but the Tool Catalog entry and the Agent
+Definition binding are platform setup a person does. The in-app **AI Assistant**
+does both itself, as the person asking: it lists the catalog, lists the agents
+with the servers each is bound to, reuses one or creates an agent bound to the
+entry, and points the step at it with `agentId`. Adding a Tool Catalog entry is
+admin-only, so a member is told who can add the server rather than being given a
+workflow that quietly has no MCP.
 
 MUST for governable MCPs:
 

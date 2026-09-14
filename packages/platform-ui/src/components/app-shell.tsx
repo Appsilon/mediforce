@@ -12,7 +12,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { ThemeToggle } from './theme-toggle';
-import { CommandPaletteTrigger } from './command-palette';
+import { NewTicketTrigger } from './command-palette';
 import { cn } from '@/lib/utils';
 import { workspaceSwitchHref } from '@/lib/workspace-switch';
 import { useNamespace } from '@/hooks/use-namespace';
@@ -81,7 +81,7 @@ function ActionItem({ href, label, icon: Icon }: { href: string; label: string; 
 
 type Crumb = { label: string; href: string | null };
 
-function buildBreadcrumbs(pathname: string, handle: string, prefix: string): Crumb[] {
+export function buildBreadcrumbs(pathname: string, handle: string, prefix: string): Crumb[] {
   const rest = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : pathname;
   const segments = rest.split('/').filter(Boolean);
   const [s0, s1, s2, s3, s4, s5] = segments;
@@ -122,7 +122,7 @@ function buildBreadcrumbs(pathname: string, handle: string, prefix: string): Cru
       const runHref = `${prefix}/workflows/${s1}/runs/${s3}`;
       const run: Crumb = { label: `Run`, href: runHref };
       if (s4 === 'steps' && s5) {
-        return [workflows, workflow, run, { label: decodeURIComponent(s5).replace(/-/g, ' '), href: null }];
+        return [workflows, workflow, run, { label: formatStepName(decodeURIComponent(s5)), href: null }];
       }
       return [workflows, workflow, { ...run, href: null }];
     }
@@ -428,7 +428,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
-            <CommandPaletteTrigger />
+            <NewTicketTrigger />
             <ThemeToggle />
             {user && (
               <>

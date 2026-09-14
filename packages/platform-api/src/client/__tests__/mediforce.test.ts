@@ -567,6 +567,43 @@ describe('Mediforce', () => {
     });
   });
 
+  describe('assistant.ask (halting a turn)', () => {
+    it('passes the abort signal to fetch, so a halted turn stops the request', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ reply: 'Done.' }));
+      const controller = new AbortController();
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.assistant.ask(
+        {
+          messages: [{ role: 'user', content: 'Build me a workflow.' }],
+          workflowDefinition: { steps: [], transitions: [] },
+        },
+        { namespace: 'acme', signal: controller.signal },
+      );
+
+      expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+    });
+
+    it('sends no signal when the caller passes none', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ reply: 'Done.' }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.assistant.ask(
+        {
+          messages: [{ role: 'user', content: 'Build me a workflow.' }],
+          workflowDefinition: { steps: [], transitions: [] },
+        },
+        { namespace: 'acme' },
+      );
+
+      expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBeUndefined();
+    });
+  });
+
   describe('tasks.claim', () => {
     it('POSTs to /api/tasks/:taskId/claim and parses the entity envelope', async () => {
       const task = buildHumanTask({

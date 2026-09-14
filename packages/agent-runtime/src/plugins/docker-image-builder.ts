@@ -1,9 +1,12 @@
 /**
  * Lazy Docker image builder.
  *
- * Checks whether a Docker image exists locally and, if not, builds it from
- * a git repo at a specific commit. Labels the image with the commit SHA so
- * subsequent runs can detect staleness and rebuild when the commit changes.
+ * Two build sources. A git repo at a commit: cloned into a temp dir, labelled
+ * with the SHA so a later run detects staleness and rebuilds. Or a directory
+ * that already exists on the host — the materialized files a workflow carries,
+ * written for the `/artifacts` mount — which needs no clone, and whose tag is
+ * derived from the files' content so an existing image with that tag was built
+ * from exactly those files.
  */
 import { execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -28,9 +31,13 @@ export interface EnsureImageOptions {
   commit?: string;
   dockerfile?: string;
   repoToken?: string;
+  /** Host directory to build from, instead of a clone. The files a workflow
+   *  carries, already materialized for the `/artifacts` mount. */
+  contextDir?: string;
 }
 
 const BUILD_COMMIT_LABEL = 'mediforce.build.commit';
+
 
 /** In-process mutex to avoid concurrent builds of the same image. */
 const buildLocks = new Map<string, Promise<void>>();
@@ -78,8 +85,53 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
   }
 }
 
+/**
+ * Build from a directory that is already on the host. The build context is the
+ * whole directory rather than the Dockerfile's own, so `COPY scripts/ /scripts/`
+ * from a `container/Dockerfile` works the way it does in a repository.
+ */
+export async function buildImageFromDirectory(options: {
+  image: string;
+  contextDir: string;
+  dockerfile?: string;
+}): Promise<void> {
+  const { image, contextDir, dockerfile = 'Dockerfile' } = options;
+  const dockerfilePath = join(contextDir, dockerfile);
+  console.log(`[docker-image-builder] Building image "${image}" from ${contextDir}`);
+  execSync(
+    `docker build -t "${image}" -f "${dockerfilePath}" "${contextDir}"`,
+    { stdio: 'pipe' },
+  );
+  console.log(`[docker-image-builder] Image "${image}" built successfully`);
+}
+
 export async function ensureImage(options: EnsureImageOptions): Promise<void> {
-  const { image, repoUrl, repoRef, commit, dockerfile, repoToken } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile, repoToken, contextDir } = options;
+
+  // A directory the caller already has: the tag is derived from the content of
+  // the files in it, so an image that exists under this tag was built from
+  // exactly them and there is no staleness question to ask.
+  if (contextDir !== undefined) {
+    const existingLock = buildLocks.get(image);
+    if (existingLock) {
+      await existingLock;
+      return;
+    }
+    const buildPromise = (async () => {
+      try {
+        if (await imageExistsLocally(image)) {
+          console.log(`[docker-image-builder] Image "${image}" already built from these files`);
+          return;
+        }
+        await buildImageFromDirectory({ image, contextDir, dockerfile });
+      } finally {
+        buildLocks.delete(image);
+      }
+    })();
+    buildLocks.set(image, buildPromise);
+    await buildPromise;
+    return;
+  }
 
   // If repo+commit not provided, just check existence
   if (!repoUrl || !commit) {

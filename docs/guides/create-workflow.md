@@ -14,9 +14,8 @@ workflow MUST satisfy, see
 ## Pick an authoring path
 
 The product states this same fork: **Ways to author**, in the Workflow Designer
-toolbar, names each path with a reason to pick it and the first move it takes —
-including the clone and the `/design-workflow` invocation, which are useless as
-a name alone. It is the summary of the sections below, worded in
+toolbar, names each path with a reason to pick it and the first move it takes.
+It is the summary of the sections below, worded in
 [`authoring-paths.ts`](../../packages/platform-ui/src/lib/authoring-paths.ts);
 change one, change the other. Its footer opens this file on GitHub
 (`CREATE_WORKFLOW_URL` in
@@ -37,58 +36,56 @@ placing and wiring blocks by hand.
   assistant calls a model via OpenRouter. Without it the pane reports the missing
   key. Pick the model in the pane's settings (only tool-capable, sufficiently
   large-context models are offered).
-- **What it can change.** Steps only: it adds, updates, and removes steps (and
-  their transitions/verdicts) on the canvas. It does not edit triggers, secrets,
-  or other workspace state — set those yourself (triggers are attached after
-  registration; see below).
+- **What it can change.** The whole definition: it adds, updates and removes
+  steps (with their transitions and verdicts), sets conditional routing on an
+  edge, writes the workflow-level fields — `triggerInput`, `preamble`, `env`,
+  `notifications`, `workspace`, `externalSkillsRepo`, `url` — and writes the
+  files the workflow carries (a script, a Dockerfile, a SKILL.md), one file per
+  call. Files appear in the **Files** panel, where you can edit them, upload
+  more from disk (a folder keeps its structure, so a `skills/` directory
+  uploads whole) or drop them in, and a run reads them from `/artifacts`. A
+  skill among those files is offered by name on an agent step, which fills in
+  the directory it lives in — no repository path to type. It does not edit secrets or other workspace
+  state, except the parts it can now set up for you: it can list the workspace's
+  secret **keys** (never their values), list and create **agents** a step points
+  at, and list the **Tool Catalog** servers an agent binds to. Those calls run
+  as you, with your permissions — when one is refused it says so and names what
+  an admin has to do, rather than working around it. A secret's *value* is never
+  asked for in the chat, because anything typed there reaches the model: it
+  tells you which key to set, and you set it in the Secrets tab (triggers are
+  attached after registration; see below).
+- **It plans before it builds.** Sending a message runs a short planning turn
+  first: the assistant says what it is about to do in two or three lines, and
+  asks only what it genuinely cannot infer — each question carrying the answer
+  it would otherwise have used, so agreeing is one click. Nothing to ask means
+  it says the plan and starts. While it builds, the pane shows the phases that
+  planning turn named for *this* workflow, with the time elapsed, and a stop
+  button beside them ends the turn — the request is aborted, and nothing is applied,
+  since the canvas only changes when a turn returns.
 - **Validation & retry.** Every proposed change is validated against the same
   graph, reference, and schema gates as registration before it is applied; if the
   result would be invalid the assistant is told why and retries, so it does not
-  hand you a workflow that cannot be saved.
+  hand you a workflow that cannot be saved. When it runs out of retries it asks
+  you rather than failing — one or two questions with the answer it would take —
+  and answering runs the build again from where it stopped.
 - **You still save.** The assistant edits the *unsaved* canvas. Nothing is
   persisted until you **Save** (or **Save & Start Run** / **Save & Dry Run**) —
   review the diagram, then save a version like any other edit.
 
 ### Agent — the `/design-workflow` skill
 
-Run the [`design-workflow`](../../skills/design-workflow/SKILL.md) skill. It is the
-agent form of Workflow Designer: same intelligence, driven against the
-checked-out source instead of a live UI. Invoke it with `/design-workflow` (or
-just ask an agent to "design a workflow" / "author a workflow"), then follow the
-interview.
+Deprecated for authoring. The skill exists for one reason: the canvas could not
+author the *package* — the scripts a step runs, the Dockerfile its image is
+built from, the skills its agents read — so anything past an inline script meant
+a git checkout, a second tool and a CLI hand-off.
 
-What the skill does for you:
-
-1. **Loads the authority first.** It reads the capability map, `CONTEXT.md`
-   glossary, the golden rules, and the `docs/workflow-examples/` files before
-   proposing structure — so it authors from the source of truth, not from
-   memory.
-2. **Picks a mode.** `create-new` from an idea, or `edit-existing` when you
-   point it at a folder that already contains a `src/*.wd.json` (it recaps the
-   current workflow before touching it).
-3. **Interviews and challenges.** One question at a time, it steers the design
-   toward the golden standards — pushing back when a step should be a `script`
-   or `action` rather than an `agent`, when the whole thing needs no workflow at
-   all, and when substantial script code should move from inline to a pinned
-   command. It ends with a written spec recap you confirm before any files are
-   generated.
-4. **Generates the package.** The `.wd.json` plus `README.md`, `workflows-index.json`,
-   and
-   only the `Dockerfile` / `scripts/` / `skills/` / `setup/` the design actually
-   needs, in the canonical repo layout. It is honest about three tiers:
-   schema-validated (`.wd.json`), templated-but-not-runtime-verified (infra),
-   and MANUAL platform setup (Tool Catalog, Agent Definitions, secrets).
-5. **Validates against this checkout.** Runs the `register --dry-run` schema
-   check, verifies the Dockerfile build context, syntax-checks every generated
-   script, and runs a behavior test per non-trivial script (persisting tests
-   under `tests/`).
-6. **Pins runtime sources and hands off.** Fills each `commit` with an all-zeros
-   sentinel until you commit once and give it the real SHA, which it edits in —
-   then reports the files written, the MANUAL setup left, and the register /
-   import / UI commands filled in with your values.
-
-The skill does **not** run `git commit` / `push` for you and never targets
-production — you own the commit and the SHA.
+A workflow carries those files itself now
+([container-steps.md](../reference/container-steps.md)), the **Files** panel
+edits and uploads them, and the AI Assistant writes them, challenges the design
+and sets up the agents and Tool Catalog entries a workflow needs. Reach for the
+skill only for what still lives in a repository: generating a whole package into
+the canonical layout, running the behaviour tests it writes under `tests/`, and
+pinning `commit` SHAs. It is no longer listed in **Ways to author**.
 
 ### By hand — blocks on the canvas
 
@@ -129,8 +126,9 @@ For an end-to-end production-style package, read
 
 ## Define the input contract
 
-Declare the workflow's complete external input under `triggerInput` in the
-`.wd.json`. It is a strict, trigger-agnostic contract: manual forms, webhook
+Declare the workflow's complete external input under `triggerInput` — in the
+editor's **Settings** panel, by asking the AI Assistant, or in the `.wd.json`.
+It is a strict, trigger-agnostic contract: manual forms, webhook
 bodies, cron payloads, and spawned child runs all validate against it. Steps read
 validated values as `${triggerPayload.<field>}` regardless of how the Run was
 started.

@@ -137,6 +137,27 @@ export async function buildImageFromRepo(options: {
   }
 }
 
+/**
+ * Build from a directory that is already on the host, with the whole directory
+ * as the context so `COPY scripts/ /scripts/` from a `container/Dockerfile`
+ * behaves as it does in a repository. Mirrors
+ * `buildImageFromDirectory` in agent-runtime.
+ */
+export async function buildImageFromDirectory(options: {
+  image: string;
+  contextDir: string;
+  dockerfile?: string;
+}): Promise<void> {
+  const { image, contextDir, dockerfile = 'Dockerfile' } = options;
+  const dockerfilePath = join(contextDir, dockerfile);
+  console.log(`[docker-image-builder] Building image "${image}" from ${contextDir}`);
+  execSync(
+    `docker build -t "${image}" -f "${dockerfilePath}" "${contextDir}"`,
+    { stdio: 'pipe' },
+  );
+  console.log(`[docker-image-builder] Image "${image}" built successfully`);
+}
+
 export async function ensureImage(options: {
   image: string;
   repoUrl?: string;
@@ -144,8 +165,20 @@ export async function ensureImage(options: {
   commit?: string;
   dockerfile?: string;
   repoToken?: string;
+  contextDir?: string;
 }): Promise<void> {
-  const { image, repoUrl, repoRef, commit, dockerfile, repoToken } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile, repoToken, contextDir } = options;
+
+  // The tag is derived from the content of the files in the directory, so an
+  // image that exists under it was built from exactly them.
+  if (contextDir !== undefined) {
+    if (await imageExistsLocally(image)) {
+      console.log(`[docker-image-builder] Image "${image}" already built from these files`);
+      return;
+    }
+    await buildImageFromDirectory({ image, contextDir, dockerfile });
+    return;
+  }
 
   if (!repoUrl || !commit) {
     const exists = await imageExistsLocally(image);

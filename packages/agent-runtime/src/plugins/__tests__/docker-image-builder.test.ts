@@ -337,3 +337,67 @@ describe('ensureImage', () => {
     expect(execSyncMock).toHaveBeenCalledTimes(1);
   });
 });
+
+// A workflow that carries its own Dockerfile has a build context on disk
+// already — the files were materialized for the /artifacts mount — so the
+// builder must not clone anything to find one.
+describe('ensureImage — building from a directory the workflow carries', () => {
+  it('builds from the given directory, with no clone at all', async () => {
+    execSyncMock.mockImplementationOnce(() => { throw new Error('No such image'); }); // inspect
+    execSyncMock.mockReturnValueOnce(Buffer.from('')); // build
+
+    await ensureImage({
+      image: 'mediforce-artifacts:abc123',
+      contextDir: '/tmp/mediforce-artifacts/abc123',
+      dockerfile: 'Dockerfile',
+    });
+
+    expect(fetchCalls()).toHaveLength(0);
+    expect(mkdtempMock).not.toHaveBeenCalled();
+    const build = execSyncMock.mock.calls.find(([cmd]) => String(cmd).startsWith('docker build'));
+    expect(build?.[0]).toContain('-f "/tmp/mediforce-artifacts/abc123/Dockerfile"');
+    expect(build?.[0]).toContain('"/tmp/mediforce-artifacts/abc123"');
+  });
+
+  it('honours a Dockerfile in a subdirectory, keeping the whole set as context', async () => {
+    // The build context stays the artifact root rather than the Dockerfile's
+    // own directory, so `COPY scripts/ /scripts/` works from a
+    // `container/Dockerfile` the way it does in a repository.
+    execSyncMock.mockImplementationOnce(() => { throw new Error('No such image'); });
+    execSyncMock.mockReturnValueOnce(Buffer.from(''));
+
+    await ensureImage({
+      image: 'mediforce-artifacts:abc123',
+      contextDir: '/tmp/mediforce-artifacts/abc123',
+      dockerfile: 'container/Dockerfile',
+    });
+
+    const build = execSyncMock.mock.calls.find(([cmd]) => String(cmd).startsWith('docker build'));
+    expect(build?.[0]).toContain('-f "/tmp/mediforce-artifacts/abc123/container/Dockerfile"');
+    expect(build?.[0]).toContain('"/tmp/mediforce-artifacts/abc123"');
+  });
+
+  it('does not rebuild an image that is already there', async () => {
+    // The tag is derived from the files' content, so an existing image with
+    // this tag was built from exactly these files — there is no staleness
+    // question to ask.
+    execSyncMock.mockReturnValueOnce(Buffer.from('')); // inspect succeeds
+
+    await ensureImage({
+      image: 'mediforce-artifacts:abc123',
+      contextDir: '/tmp/mediforce-artifacts/abc123',
+    });
+
+    expect(execSyncMock.mock.calls.some(([cmd]) => String(cmd).startsWith('docker build'))).toBe(false);
+  });
+
+  it('defaults to a Dockerfile at the root of the set', async () => {
+    execSyncMock.mockImplementationOnce(() => { throw new Error('No such image'); });
+    execSyncMock.mockReturnValueOnce(Buffer.from(''));
+
+    await ensureImage({ image: 'mediforce-artifacts:abc123', contextDir: '/ctx' });
+
+    const build = execSyncMock.mock.calls.find(([cmd]) => String(cmd).startsWith('docker build'));
+    expect(build?.[0]).toContain('-f "/ctx/Dockerfile"');
+  });
+});

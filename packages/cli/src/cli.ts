@@ -54,6 +54,8 @@ import {
 import { emailStatusCommand } from './commands/email-status';
 import { systemCreditsCommand } from './commands/system-credits';
 import { agentListCommand } from './commands/agent-list';
+import { toolCatalogListCommand } from './commands/tool-catalog-list';
+import { toolCatalogAddCommand } from './commands/tool-catalog-add';
 import { agentGetCommand } from './commands/agent-get';
 import { agentDeleteCommand } from './commands/agent-delete';
 import { agentSetVisibilityCommand } from './commands/agent-set-visibility';
@@ -195,6 +197,13 @@ export const TREE: Record<string, BranchEntry> = {
       create: { description: 'Create an agent from a JSON file', fn: agentCreateCommand },
       delete: { description: 'Delete an agent definition', fn: agentDeleteCommand },
       'set-visibility': { description: 'Set agent visibility (public|private)', fn: agentSetVisibilityCommand },
+    },
+  },
+  'tool-catalog': {
+    description: 'MCP servers an agent can bind to (list, add)',
+    leaves: {
+      list: { description: 'List a workspace Tool Catalog', fn: toolCatalogListCommand },
+      add: { description: 'Add an MCP server from a JSON file (admin)', fn: toolCatalogAddCommand },
     },
   },
   'agent-run': {

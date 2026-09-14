@@ -3,6 +3,7 @@ import type {
   CompleteHumanTaskPayload,
   Attachment,
 } from '@mediforce/platform-core';
+import { FileUploadUiConfigSchema } from '@mediforce/platform-core';
 import { CompleteHumanTaskValidationError } from './errors';
 
 // Pure helpers backing engine.completeHumanTask. Split out so per-variant
@@ -196,12 +197,14 @@ export function validateUploadPayload(
   task: HumanTask,
   payload: Extract<CompleteHumanTaskPayload, { kind: 'upload' }>,
 ): void {
-  const uiConfig = task.ui?.config as Record<string, unknown> | undefined;
-  if (!uiConfig) return;
+  if (!task.ui?.config) return;
+  // safeParse so a config predating the typed shape still validates uploads on
+  // the keys it does carry, rather than throwing on completion.
+  const uiConfig = FileUploadUiConfigSchema.safeParse(task.ui.config).data ?? {};
 
   const attachments = payload.attachments;
-  const minFiles = (uiConfig.minFiles as number) ?? 0;
-  const maxFiles = (uiConfig.maxFiles as number) ?? Infinity;
+  const minFiles = uiConfig.minFiles ?? 0;
+  const maxFiles = uiConfig.maxFiles ?? Infinity;
 
   if (attachments.length < minFiles || attachments.length > maxFiles) {
     throw new CompleteHumanTaskValidationError(
@@ -210,7 +213,7 @@ export function validateUploadPayload(
     );
   }
 
-  const acceptedTypes = uiConfig.acceptedTypes as string[] | undefined;
+  const acceptedTypes = uiConfig.acceptedTypes;
   if (acceptedTypes && acceptedTypes.length > 0) {
     for (const attachment of attachments) {
       if (!isAcceptedType(attachment.type, attachment.name, acceptedTypes)) {

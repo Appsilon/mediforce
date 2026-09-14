@@ -15,55 +15,20 @@ import type { TaskBodyProps } from './task-body-registry';
 // `static` columns are read-only display; the others are per-cell editors whose
 // values land in the output keyed by column id.
 
-export interface SelectOption {
-  id: string;
-  label: string;
-  kind?: 'human' | 'agent';
-  badge?: string;
-}
-
-export interface StaticColumn {
-  id: string;
-  kind: 'static';
-  label: string;
-  field: string;
-  link?: boolean;
-}
-
-export interface SingleSelectColumn {
-  id: string;
-  kind: 'single-select';
-  label: string;
-  options: SelectOption[];
-  default?: string;
-  allowEmpty?: boolean;
-}
-
-export interface MultiSelectColumn {
-  id: string;
-  kind: 'multi-select';
-  label: string;
-  options: SelectOption[];
-  default?: string[];
-}
-
-export interface TextColumn {
-  id: string;
-  kind: 'text';
-  label: string;
-  placeholder?: string;
-}
-
-export interface AvatarColumn {
-  id: string;
-  kind: 'avatar';
-  label: string;
-  field: string;
-  size?: number;
-  fallbackField?: string;
-}
-
-export type ColumnSpec = StaticColumn | SingleSelectColumn | MultiSelectColumn | TextColumn | AvatarColumn;
+// The column shapes live in platform-core so the step editor can author them
+// from the same schema this view renders. Re-exported here for the callers that
+// already import them from this module.
+export type {
+  SelectOption,
+  ColumnSpec,
+  StaticColumn,
+  SingleSelectColumn,
+  MultiSelectColumn,
+  TextColumn,
+  AvatarColumn,
+} from '@mediforce/platform-core';
+import { TableEditorUiConfigSchema } from '@mediforce/platform-core';
+import type { ColumnSpec, SelectOption, StaticColumn, AvatarColumn } from '@mediforce/platform-core';
 
 export interface ItemRow {
   id: string;
@@ -100,11 +65,15 @@ export function TableEditorView({ task }: TaskBodyProps) {
 }
 
 function TableEditorTaskForm({ task }: { task: TaskBodyProps['task'] }) {
-  const config = (task.ui?.config ?? {}) as Record<string, unknown>;
-  const columns = (config.columns as ColumnSpec[] | undefined) ?? [];
+  // safeParse, not parse: a deployment may hold a config written before this
+  // shape was typed, and refusing to render a live task would be worse than
+  // falling back to the defaults this view always applied.
+  const config = TableEditorUiConfigSchema.safeParse(task.ui?.config ?? {}).data
+    ?? { columns: [] as ColumnSpec[] };
+  const columns = config.columns;
   const items = (task.options ?? []) as unknown as ItemRow[];
-  const submitLabel = (config.submitLabel as string | undefined) ?? 'Submit';
-  const emptyMessage = (config.emptyMessage as string | undefined) ?? 'No items';
+  const submitLabel = config.submitLabel ?? 'Submit';
+  const emptyMessage = config.emptyMessage ?? 'No items';
 
   const onSubmit = React.useCallback<TableEditorSubmit>(
     async (rows) => {

@@ -64,6 +64,26 @@ export class StepExecutor {
       nextStepId = verdictConfig.target;
       routingResult = { next: nextStepId, reason: `Verdict: ${verdictKey}` };
     } else {
+      if (
+        (currentStep.type === 'review' || currentStep.type === 'decision') &&
+        currentStep.verdicts !== undefined &&
+        Object.keys(currentStep.verdicts).length > 0
+      ) {
+        const expected = Object.keys(currentStep.verdicts).join(', ');
+        const produced = Object.keys(stepOutput);
+        const error = new RoutingError(
+          currentStepId,
+          `Step '${currentStepId}' is a ${currentStep.type} routing on its verdicts (${expected}), ` +
+            `but its output carried no \`verdict\` field — it returned ` +
+            `${produced.length === 0 ? 'nothing' : produced.join(', ')}. ` +
+            `The step has to write one of those verdict names as \`verdict\`.`,
+        );
+        await this.pauseOnRoutingError(
+          instance, currentStepId, stepOutput, actor, definition.version, error,
+        );
+        throw error;
+      }
+
       const outgoing = definition.transitions.filter(
         (t) => t.from === currentStepId,
       );

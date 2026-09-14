@@ -7,7 +7,11 @@ import { cn } from '@/lib/utils';
 interface SaveVersionDialogProps {
   open: boolean;
   nextVersion: number;
+  editingVersion?: number;
   confirmLabel?: string;
+  /** Prefills the field — a pasted definition's own `title`, so a field the
+   *  document supplied is not retyped. Still editable before confirming. */
+  suggestedTitle?: string;
   onClose: () => void;
   onConfirm: (title: string, setAsDefault: boolean) => void;
 }
@@ -15,7 +19,9 @@ interface SaveVersionDialogProps {
 export function SaveVersionDialog({
   open,
   nextVersion,
+  editingVersion,
   confirmLabel = 'Confirm',
+  suggestedTitle,
   onClose,
   onConfirm,
 }: SaveVersionDialogProps) {
@@ -25,12 +31,12 @@ export function SaveVersionDialog({
 
   useEffect(() => {
     if (open) {
-      setTitle('');
+      setTitle(suggestedTitle ?? '');
       setSetAsDefault(false);
       // Defer focus so the dialog is mounted before we focus
       setTimeout(() => inputRef.current?.focus(), 30);
     }
-  }, [open]);
+  }, [open, suggestedTitle]);
 
   if (!open) return null;
 
@@ -99,6 +105,13 @@ export function SaveVersionDialog({
             )
           }
         </p>
+
+        {editingVersion !== undefined && editingVersion < nextVersion - 1 && (
+          <p className="text-xs leading-relaxed text-amber-600 dark:text-amber-500">
+            You are editing v{editingVersion} and the newest is v{nextVersion - 1}, so this saves as
+            {' '}v{nextVersion} rather than replacing v{editingVersion}.
+          </p>
+        )}
 
         <label className="flex items-center gap-2 cursor-pointer select-none">
           <input

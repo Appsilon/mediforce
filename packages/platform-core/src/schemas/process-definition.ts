@@ -64,10 +64,21 @@ export const TransitionSchema = z.object({
 
 /** A git commit SHA: 7–40 lowercase hex chars. Shared by every field that pins
  *  an immutable commit (RepoSchema, externalSkillsRepo, container build source,
- *  imported-workflow provenance) so the validation lives in one place. */
+ *  imported-workflow provenance) so the validation lives in one place.
+ *
+ *  All zeros is refused. It is the placeholder the `/design-workflow` skill
+ *  writes while a package waits for its first real SHA — format-valid on
+ *  purpose, so a dry run passes there — which is exactly why it reaches a
+ *  registration and then names a build that can never run: no repository has
+ *  that commit. Anything that authors a definition here has a real SHA or
+ *  carries its files instead. */
 export const CommitShaSchema = z
   .string()
-  .regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)');
+  .regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)')
+  .refine(
+    (value) => /^0+$/.test(value) === false,
+    'commit is a placeholder (all zeros), not a real SHA — pin the commit the build context actually lives at, or carry the files on the workflow instead',
+  );
 
 export const RepoSchema = z.object({
   url: z.string().url(),

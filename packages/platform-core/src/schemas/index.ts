@@ -178,6 +178,9 @@ export {
   WorkflowTemplateSchema,
   InputForNextRunEntrySchema,
   TriggerInputFieldSchema,
+  WorkflowArtifactSchema,
+  WORKFLOW_ARTIFACT_MAX_BYTES,
+  WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES,
   HttpMethodSchema,
   HttpActionConfigSchema,
   ReshapeActionConfigSchema,
@@ -189,6 +192,7 @@ export {
   validateInputForNextRun,
   validateSteps,
   validateTriggerInput,
+  validateArtifacts,
   scriptConfigKeyForPlugin,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
@@ -212,6 +216,7 @@ export {
   type WorkflowTemplate,
   type InputForNextRunEntry,
   type TriggerInputField,
+  type WorkflowArtifact,
   type HttpMethod,
   type HttpActionConfig,
   type ReshapeActionConfig,
@@ -258,12 +263,36 @@ export {
   type ListModelsTool,
   type WorkflowAssistantToolName,
   type WorkflowAssistantToolCall,
+  UpdateWorkflowToolSchema,
+  SetTransitionConditionToolSchema,
+  type UpdateWorkflowTool,
+  type SetTransitionConditionTool,
 } from './workflow-assistant-tools';
+
+export {
+  ListSecretsToolSchema,
+  ListAgentsToolSchema,
+  ListToolCatalogToolSchema,
+  CreateAgentToolSchema,
+  CreateToolCatalogEntryToolSchema,
+  WORKFLOW_ASSISTANT_PLATFORM_TOOLS,
+  isPlatformToolName,
+  type CreateAgentTool,
+  type CreateToolCatalogEntryTool,
+  type WorkflowAssistantPlatformToolName,
+} from './workflow-assistant-platform-tools';
+
+export {
+  pruneWorkflowSettings,
+  type WorkflowSettingsDraft,
+  type RegisterableWorkflowSettings,
+} from './workflow-settings';
 
 export {
   applyWorkflowAssistantToolCalls,
   type ToolCallOutcome,
   type ApplyToolCallsResult,
+  type WorkflowSettings,
 } from './workflow-assistant-apply';
 
 export {
@@ -387,3 +416,28 @@ export {
   type ValidationResult,
   type WorkflowGraphValidation,
 } from './graph-validator';
+
+export {
+  SelectOptionSchema,
+  AssigneeOptionSchema,
+  ColumnSpecSchema,
+  COLUMN_KINDS,
+  FileUploadUiConfigSchema,
+  TableEditorUiConfigSchema,
+  AssignmentTableUiConfigSchema,
+  STEP_UI_CONFIG_SCHEMAS,
+  STEP_UI_COMPONENTS,
+  isKnownStepUiComponent,
+  type SelectOption,
+  type AssigneeOption,
+  type ColumnSpec,
+  type StaticColumn,
+  type SingleSelectColumn,
+  type MultiSelectColumn,
+  type TextColumn,
+  type AvatarColumn,
+  type FileUploadUiConfig,
+  type TableEditorUiConfig,
+  type AssignmentTableUiConfig,
+  type StepUiComponent,
+} from './step-ui-config';

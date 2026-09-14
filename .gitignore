@@ -39,6 +39,9 @@ CLAUDE.local.md
 .codex/worktrees/
 
 # env
+# `.env` is the file docker compose substitutes from in the compose dir
+# (= repo root on a deployed checkout), so it holds real secrets there.
+.env
 .env.local
 .env*.local
 

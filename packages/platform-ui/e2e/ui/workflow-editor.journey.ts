@@ -3,6 +3,11 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { allowPageErrors, trackPageErrors } from '../helpers/page-errors';
 
 const SUPPLY_CHAIN_DEFINITION_URL = `/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`;
+/** The workflow the two saving tests cut versions of. `Supply Chain Review`'s
+ *  agent steps carry no `plugin`, which `validateSteps` refuses before a request
+ *  is made, so a save of it can never succeed from this page. */
+const SAVEABLE_WORKFLOW = 'Editor Save Test';
+const SAVEABLE_DEFINITION_URL = `/${TEST_ORG_HANDLE}/workflows/${encodeURIComponent(SAVEABLE_WORKFLOW)}/definitions/1`;
 
 /**
  * Serialized Zod issues as they arrive in the ADR-0005 error envelope's
@@ -459,6 +464,203 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByRole('button', { name: /apply json/i })).toBeVisible();
   });
 
+  // The workflow-level fields had no surface at all, so this covers what L1
+  // cannot: the round trip from the panel through prune and the register body.
+  // Clearing a field is the half that was silently a no-op — `buildRegisterBody`
+  // spreads the loaded definition first, so an absent key means "keep".
+  //
+  // The input contract is edited on the Triggers tab instead
+  // (trigger-input-editor.journey.ts); this panel holds the preamble.
+  test('the preamble saves, reopens showing what was set, and can be cleared', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SAVEABLE_DEFINITION_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    const openAdvanced = async () => {
+      await page.getByRole('button', { name: /^advanced$/i }).click();
+      await expect(page.getByRole('heading', { name: /^advanced$/i })).toBeVisible();
+    };
+    // Escape rather than hunting a close control: the panel is a modal and the
+    // keyboard path is the one every other panel test uses.
+    const closeAdvanced = async () => {
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('heading', { name: /^advanced$/i })).toBeHidden();
+    };
+    const saveVersion = async (title: string) => {
+      await page.getByRole('button', { name: /^save$/i }).click();
+      await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({
+        timeout: 10_000,
+      });
+      await page.getByPlaceholder('e.g. Added AI review step').fill(title);
+      await page.getByRole('button', { name: /save new version/i }).click();
+    };
+    // Both saving tests in this file cut versions of the same workflow, and the
+    // workers run in parallel, so "the latest version" is whichever test saved
+    // last. Read the version by the title this test gave it instead.
+    const readVersionTitled = async (title: string) => page.evaluate(async ([workflow, wanted]) => {
+      const base = `/api/workflow-definitions/${encodeURIComponent(workflow)}`;
+      const list = await fetch(`${base}/versions?namespace=test`);
+      const { versions } = (await list.json()) as { versions: { version: number; title?: string }[] };
+      const match = versions.find((entry) => entry.title === wanted);
+      if (match === undefined) return null;
+      const response = await fetch(`${base}?namespace=test&version=${String(match.version)}`);
+      const body = (await response.json()) as { definition: { preamble?: string; title?: string } };
+      return { version: match.version, definition: body.definition };
+    }, [SAVEABLE_WORKFLOW, title] as const);
+
+    // ── Set ──────────────────────────────────────────────────────────────
+    await openAdvanced();
+    await page.getByPlaceholder(/house rules for every agent step/i).fill('Study CDISCPILOT01 house rules.');
+    await closeAdvanced();
+    await saveVersion('with settings');
+
+    // The version the dialog asked for exists under that name, which is also
+    // what proves the dialog's title reaches the register body rather than the
+    // previous version's.
+    await expect(async () => {
+      const pending = await readVersionTitled('with settings');
+      expect(pending?.definition.preamble).toBe('Study CDISCPILOT01 house rules.');
+    }).toPass({ timeout: 20_000 });
+    const saved = await readVersionTitled('with settings');
+
+    // ── Reopen: the panel shows what the version carries ─────────────────
+    // The save appended a version, so what carries the preamble is that one and
+    // not the version this page was opened on.
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/${encodeURIComponent(SAVEABLE_WORKFLOW)}/definitions/${String(saved?.version ?? 0)}`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+    await openAdvanced();
+    await expect(page.getByPlaceholder(/house rules for every agent step/i))
+      .toHaveValue('Study CDISCPILOT01 house rules.');
+
+    // ── Clear: the half that was a silent no-op ──────────────────────────
+    // `buildRegisterBody` spreads the loaded definition first, so an absent key
+    // means "keep". Clearing has to register an explicit unset, or the old
+    // preamble stays prepended to every agent prompt.
+    await page.getByPlaceholder(/house rules for every agent step/i).fill('');
+    await closeAdvanced();
+    await saveVersion('cleared preamble');
+
+    await expect(async () => {
+      const cleared = await readVersionTitled('cleared preamble');
+      expect(cleared).not.toBeNull();
+      expect(cleared?.definition.preamble ?? '').toBe('');
+    }).toPass({ timeout: 20_000 });
+  });
+
+  // A definition copied out of a registered version used to be un-pasteable:
+  // the panel compared every non-graph field against page state and refused.
+  // This is the path that proves a pasted field survives all the way to the
+  // registered version, which is where the merge order got it wrong.
+  test('a pasted definition applies its non-graph fields and they reach the saved version', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SAVEABLE_DEFINITION_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
+
+    // Take the definition the panel is showing and paste it back with a
+    // `preamble` added: a field the canvas does not own and the form has no
+    // input for, so only the paste can have supplied it.
+    const pasted = await page.evaluate(async (workflow) => {
+      const response = await fetch(
+        `/api/workflow-definitions/${encodeURIComponent(workflow)}?namespace=test&version=1`,
+      );
+      const body = (await response.json()) as { definition: Record<string, unknown> };
+      return JSON.stringify({ ...body.definition, preamble: 'Pasted house rules.' }, null, 2);
+    }, SAVEABLE_WORKFLOW);
+
+    // Select the whole document and replace it in one input event: typing 4KB
+    // of JSON key by key is too slow to be worth it, and CodeMirror's view is
+    // not reachable from the DOM node to dispatch against.
+    await page.locator('.cm-content').click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText(pasted);
+
+    await page.getByRole('button', { name: /apply json/i }).click();
+
+    // The apply is accepted: the old refusal rendered an error instead.
+    await expect(page.getByText(/applies steps, transitions/i)).toHaveCount(0);
+
+    // Applying closes the panel, which is also what makes the header's Save
+    // reachable: the source panel is a modal over the toolbar.
+    await expect(page.getByRole('heading', { name: /workflow source code/i })).toBeHidden();
+
+    await page.getByRole('button', { name: /^save$/i }).click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByPlaceholder('e.g. Added AI review step').fill('paste round-trip');
+    await page.getByRole('button', { name: /save new version/i }).click();
+
+    // Read the version this save produced, by the title it was given: the other
+    // saving test in this file cuts versions of the same workflow in parallel,
+    // so "the latest version" is not necessarily this one.
+    await expect(async () => {
+      const saved = await page.evaluate(async (workflow) => {
+        const base = `/api/workflow-definitions/${encodeURIComponent(workflow)}`;
+        const list = await fetch(`${base}/versions?namespace=test`);
+        const { versions } = (await list.json()) as { versions: { version: number; title?: string }[] };
+        const match = versions.find((entry) => entry.title === 'paste round-trip');
+        if (match === undefined) return null;
+        const response = await fetch(`${base}?namespace=test&version=${String(match.version)}`);
+        const body = (await response.json()) as { definition: { preamble?: string } };
+        return body.definition;
+      }, SAVEABLE_WORKFLOW);
+      expect(saved?.preamble).toBe('Pasted house rules.');
+    }).toPass({ timeout: 15_000 });
+  });
+
+  // A pasted definition carries both an id and a title. The page's name field
+  // is the workflow's display name, so it is the title that belongs in it.
+  test('a paste on the create page names the workflow by its title, not its id', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    const stamp = String(Date.now());
+    const pasted = JSON.stringify(
+      {
+        name: `landing-zone-CDISCPILOT01-${stamp}`,
+        title: `Landing Zone — CDISCPILOT01 ${stamp}`,
+        description: 'Pasted from a registered version',
+        steps: [
+          { id: 'poll', name: 'Poll SFTP', type: 'creation', executor: 'human' },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'poll', to: 'done' }],
+      },
+      null,
+      2,
+    );
+
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
+    await page.locator('.cm-content').click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText(pasted);
+    await page.getByRole('button', { name: /apply json/i }).click();
+
+    // The id filled this field before, so the workflow was saved calling itself
+    // `landing-zone-CDISCPILOT01` while its version was named correctly.
+    await expect(page.getByPlaceholder('Add a Workflow Name…')).toHaveValue(
+      `Landing Zone — CDISCPILOT01 ${stamp}`,
+    );
+    await expect(page.getByPlaceholder('Add a workflow description…')).toHaveValue(
+      'Pasted from a registered version',
+    );
+
+    // And it is the name the saved workflow shows, rather than its id.
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
+    await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('v1');
+    await page.getByRole('button', { name: /publish workflow/i }).click();
+
+    await expect(
+      page.getByRole('heading', { name: `Landing Zone — CDISCPILOT01 ${stamp}` }),
+    ).toBeVisible({ timeout: 20_000 });
+  });
+
   // ── Authoring paths are stated where the workflow is created (#1185) ──────
 
   test('ways to author names every path and its import entry opens the importer', async ({ page }) => {
@@ -473,14 +675,14 @@ test.describe('Workflow Editor Journey', () => {
     const canvas = page.getByTestId('authoring-path-canvas');
     await expect(canvas).toContainText('Exact control over one block');
     await expect(page.getByTestId('authoring-path-assistant')).toContainText('OPENROUTER_API_KEY');
-    // The path a reader without a checkout cannot otherwise discover, with the
-    // clone it needs rather than the skill name alone.
-    await expect(page.getByTestId('authoring-path-agent')).toContainText(
-      'git clone https://github.com/Appsilon/mediforce',
-    );
+    await expect(page.getByTestId('authoring-path-agent')).toHaveCount(0);
+
+    await page.mouse.click(60, 400);
+    await expect(page.getByTestId('authoring-path-canvas')).toBeHidden();
 
     // Import is a click, not an instruction: the importer lives on the
     // workspace home, so the entry navigates there with the dialog open.
+    await page.getByRole('button', { name: /ways to author/i }).click();
     await page.getByTestId('authoring-path-import').getByRole('link').click();
     await page.waitForURL(new RegExp(`/${TEST_ORG_HANDLE}\\?import=source`), { timeout: 15_000 });
     await expect(page.getByRole('dialog').getByLabel('Repository URL')).toBeVisible({ timeout: 15_000 });
@@ -547,12 +749,17 @@ test.describe('Workflow Editor Journey', () => {
     await page.getByRole('button', { name: /workflow source code/i }).click();
     await expect(page.getByText(/unapplied changes/i)).not.toBeVisible();
 
-    // Clicking Apply after an edit clears the warning without needing a close.
+    // Applying is the end of the edit, so the panel closes on its own: no
+    // warning left to clear, and no second click to get back to the canvas.
     await page.locator('.cm-content').click();
     await page.keyboard.press('End');
     await page.keyboard.type(' ');
     await expect(page.getByText(/unapplied changes/i)).toBeVisible({ timeout: 5_000 });
     await page.getByRole('button', { name: /apply json/i }).click();
+    await expect(page.locator('.cm-editor')).not.toBeVisible();
+
+    // Reopening shows the applied source, with nothing outstanding.
+    await page.getByRole('button', { name: /workflow source code/i }).click();
     await expect(page.getByText(/unapplied changes/i)).not.toBeVisible();
   });
 
@@ -633,6 +840,82 @@ test.describe('Workflow Editor Journey', () => {
     await page.waitForURL(new RegExp(`/workflows/${unique}/?$`), { timeout: 20_000 });
     await expect(page.getByRole('tab', { name: /runs/i })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/not found|could not find|cannot find/i)).toHaveCount(0);
+  });
+
+  // A package's `name` is its id, so filling the create page's name field with
+  // it put "landing-zone-CDISCPILOT01" where "Landing Zone — CDISCPILOT01"
+  // belongs, and the workflow was listed under the id from then on.
+  test('a pasted definition names the workflow after its title, not its id', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    const stamp = String(Date.now());
+    const pasted = JSON.stringify(
+      {
+        name: `landing-zone-CDISCPILOT01-${stamp}`,
+        namespace: 'somebody-elses-workspace',
+        title: `Landing Zone ${stamp}`,
+        description: 'Auto-ingest clinical trial data deliveries for study CDISCPILOT01.',
+        steps: [
+          { id: 'poll', name: 'Poll SFTP', type: 'creation', executor: 'human' },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'poll', to: 'done' }],
+      },
+      null,
+      2,
+    );
+
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+    await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
+    await page.locator('.cm-content').click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText(pasted);
+    await page.getByRole('button', { name: /apply json/i }).click();
+
+    // Both the id and the workspace are this page's to decide, so the paste is
+    // told they were not used.
+    // `.first()`: the toast renders its text twice, once for screen readers.
+    await expect(page.getByText(/name, namespace are decided here/i).first())
+      .toBeVisible({ timeout: 10_000 });
+
+    // Applying closes the panel on its own.
+    await expect(page.getByRole('heading', { name: /workflow source code/i })).toBeHidden();
+
+    // The name field holds the person-facing title, and the description came
+    // across with it.
+    await expect(page.getByPlaceholder('Add a Workflow Name…')).toHaveValue(`Landing Zone ${stamp}`);
+    await expect(page.getByPlaceholder('Add a workflow description…'))
+      .toHaveValue('Auto-ingest clinical trial data deliveries for study CDISCPILOT01.');
+
+    // Saving registers the slug of that name, in this workspace, with the name
+    // as its display name. The version title is the dialog's, even though the
+    // paste carried one.
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
+    await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('typed in the dialog');
+    await page.getByRole('button', { name: /publish workflow/i }).click();
+
+    const slug = `landing-zone-${stamp}`;
+    await page.waitForURL(new RegExp(`/${TEST_ORG_HANDLE}/workflows/${slug}/?$`), { timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: `Landing Zone ${stamp}` })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    const saved = await page.evaluate(async ([workflow, namespace]) => {
+      const response = await fetch(
+        `/api/workflow-definitions/${encodeURIComponent(workflow)}?namespace=${namespace}`,
+      );
+      const body = (await response.json()) as {
+        definition: { name: string; namespace: string; title?: string; metadata?: Record<string, unknown> };
+      };
+      return body.definition;
+    }, [slug, TEST_ORG_HANDLE] as const);
+    expect(saved.name).toBe(slug);
+    expect(saved.namespace).toBe(TEST_ORG_HANDLE);
+    expect(saved.title).toBe('typed in the dialog');
+    expect(saved.metadata?.displayName).toBe(`Landing Zone ${stamp}`);
   });
 
   test('Save & Dry Run starts the run in the workspace the save targeted', async ({ page }) => {

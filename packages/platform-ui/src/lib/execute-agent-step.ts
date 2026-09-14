@@ -10,6 +10,7 @@ import {
   OAuthTokenUnavailableError,
   PluginNotFoundError,
   MockAgentPlugin,
+  ensureStepImageBuilt,
   type StepExecutorPlugin,
   type ResolvedOAuthBinding,
   type WorkflowAgentContext,
@@ -95,6 +96,13 @@ export async function executeAgentStep(
     // Dry run: mock every agent/script step so testing a workflow never runs a
     // real agent, spawns a container, or calls an external service — regardless
     // of the step's plugin (claude / opencode / script-container / databricks-job).
+    //
+    // The image is built for real first, when the step has one to build. It is
+    // the one part of a container step a mock can say nothing about, and the
+    // part that takes minutes and fails, so a dry run that skipped it would
+    // report a workflow as fine that cannot start. A build failure fails the
+    // step, which is the answer the person asked for by running this.
+    await ensureStepImageBuilt(workflowStep, workflowDefinition);
     plugin = new MockAgentPlugin();
   } else {
     try {

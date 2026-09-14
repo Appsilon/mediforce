@@ -16,7 +16,12 @@ describe('validateResultingGraph', () => {
     const calls: WorkflowAssistantToolCall[] = [
       { tool: 'add_step', arguments: { type: 'creation', executor: 'human', name: 'Review', insertAfterId: 'start', insertBeforeId: 'done' } },
     ];
-    expect(validateResultingGraph(base, calls, 'team-alpha')).toEqual({ valid: true });
+    // The applied graph comes back with the verdict: the loop needs the real
+    // ids to tell the model what to reconnect.
+    const result = validateResultingGraph(base, calls, 'team-alpha');
+    expect(result.valid).toBe(true);
+    expect(result.steps.map((step) => step.id)).toEqual(['start', 'review', 'done']);
+    expect(result.transitions).toEqual([{ from: 'start', to: 'review' }, { from: 'review', to: 'done' }]);
   });
 
   // #2 — a reducer-rejected call must fail the gate even though the *unchanged*
@@ -53,5 +58,83 @@ describe('validateResultingGraph', () => {
     if (!result.valid) {
       expect(result.errors.join(' ')).toMatch(/duration|deadline|wait/i);
     }
+  });
+
+  // The guide promises the assistant's edits pass "the same schema gates as
+  // registration". That was true of the graph and false of the workflow level,
+  // so a bad url passed the gate and failed the whole save at register.
+  it('rejects a workflow-level value the register schema would refuse', () => {
+    const result = validateResultingGraph(
+      {
+        steps: [
+          { id: 'draft', name: 'Draft', type: 'creation', executor: 'human' },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'draft', to: 'done' }],
+      },
+      [{ tool: 'update_workflow', arguments: { url: 'not-a-url' } }],
+      'test',
+    );
+    expect(result.valid).toBe(false);
+  });
+
+  it('accepts a valid workflow-level edit', () => {
+    const result = validateResultingGraph(
+      {
+        steps: [
+          { id: 'draft', name: 'Draft', type: 'creation', executor: 'human' },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'draft', to: 'done' }],
+      },
+      [{ tool: 'update_workflow', arguments: { preamble: 'House rules.' } }],
+      'test',
+    );
+    expect(result.valid).toBe(true);
+  });
+});
+
+describe('validateResultingGraph — a defect the canvas already had', () => {
+  const brokenSteps: WorkflowStep[] = [
+    { id: 'start', name: 'Start', type: 'creation', executor: 'human' },
+    {
+      id: 'check', name: 'Check', type: 'decision', executor: 'human',
+      verdicts: { pass: { target: 'done' }, fail: { target: 'fix' } },
+    },
+    { id: 'fix', name: 'Fix', type: 'creation', executor: 'human' },
+    { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+  ];
+  const brokenTransitions: WorkflowDefinition['transitions'] = [
+    { from: 'start', to: 'check' },
+    { from: 'check', to: 'done' },
+    { from: 'check', to: 'fix', when: 'verdict == "fail"' },
+    { from: 'fix', to: 'done' },
+  ];
+  const broken = { steps: brokenSteps, transitions: brokenTransitions };
+
+  it('lets an unrelated edit through, rather than refusing to touch the workflow', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'update_workflow', arguments: { preamble: 'House rules.' } },
+    ];
+    const result = validateResultingGraph(broken, calls, 'team-alpha');
+    expect(result.valid).toBe(true);
+    expect(result.inheritedErrors.join(' ')).toMatch(/"check"/);
+  });
+
+  it('still refuses an error this turn introduced', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'remove_step', arguments: { stepId: 'nonexistent' } },
+    ];
+    const result = validateResultingGraph(broken, calls, 'team-alpha');
+    expect(result.valid).toBe(false);
+  });
+
+  it('reports nothing inherited when the canvas was sound', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'update_workflow', arguments: { preamble: 'House rules.' } },
+    ];
+    const result = validateResultingGraph(base, calls, 'team-alpha');
+    expect(result.valid).toBe(true);
+    expect(result.inheritedErrors).toEqual([]);
   });
 });

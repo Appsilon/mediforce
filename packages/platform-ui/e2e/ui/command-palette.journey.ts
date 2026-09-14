@@ -18,8 +18,15 @@ test.describe('Command Palette Journey', () => {
     await page.goto(`/${TEST_ORG_HANDLE}`);
     await expect(page.getByRole('heading', { name: 'Workflows' })).toBeVisible({ timeout: 15_000 });
 
-    // Header badge is visible
-    await expect(page.getByTestId('command-palette-trigger')).toBeVisible();
+    // The header button opens the ticket form directly, and its back arrow
+    // still leads to the full command list.
+    await expect(page.getByTestId('new-ticket-trigger')).toBeVisible();
+    await page.getByTestId('new-ticket-trigger').click();
+    await expect(page.getByTestId('new-ticket-form')).toBeVisible();
+    await page.getByTestId('command-back').click();
+    await expect(page.getByTestId('command-palette-input')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('command-palette')).toHaveCount(0);
 
     // Open palette via keyboard shortcut (Ctrl+K works on every OS in Playwright)
     await page.keyboard.press('Control+KeyK');
