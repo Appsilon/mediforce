@@ -584,6 +584,7 @@ export {
   BuildImageRequestSchema,
   BuildUploadedImageRequestSchema,
   buildProvenanceLabelArgs,
+  carriedImageLabelArgs,
   imageInspectArgs,
   imageTagTakenMessage,
   parseImageInspect,

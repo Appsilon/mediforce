@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildProvenanceLabelArgs,
+  carriedImageLabelArgs,
   readProvenanceLabels,
   uploadedImageLabelArgs,
 } from '../image-provenance';
@@ -9,6 +10,23 @@ import {
 function label(args: string[], key: string): string | undefined {
   return args.find((arg) => arg.startsWith(`${key}=`))?.slice(key.length + 1);
 }
+
+describe('carriedImageLabelArgs', () => {
+  it('records the content the image was built from, and blanks the repo labels it would inherit', () => {
+    const args = carriedImageLabelArgs({ artifactsHash: 'abc123def456', workflow: 'wf', namespace: 'acme' });
+
+    expect(label(args, 'mediforce.build.artifacts')).toBe('abc123def456');
+    expect(label(args, 'mediforce.build.workflow')).toBe('wf');
+    expect(label(args, 'mediforce.build.namespace')).toBe('acme');
+    // A carried Dockerfile `FROM` a repo-built image would otherwise carry that
+    // repo and commit, and be offered as a version of it.
+    expect(label(args, 'mediforce.build.repo')).toBe('');
+    expect(label(args, 'mediforce.build.commit')).toBe('');
+    expect(label(args, 'mediforce.build.dockerfile')).toBe('');
+    expect(label(args, 'mediforce.build.context')).toBe('');
+    expect(label(args, 'org.opencontainers.image.source')).toBe('');
+  });
+});
 
 describe('uploadedImageLabelArgs', () => {
   it('blanks every build label it inherits, so an upload never reads as a platform build', () => {
@@ -56,8 +74,8 @@ describe('buildProvenanceLabelArgs', () => {
     expect(label(args, 'mediforce.build.namespace')).toBe('acme');
     expect(label(args, 'org.opencontainers.image.source')).toBe('https://github.com/owner/repo');
     expect(label(args, 'org.opencontainers.image.revision')).toBe('abc123');
-    // The seven facts, plus the context label every build writes.
-    expect(args.filter((arg) => arg === '--label')).toHaveLength(8);
+    // The seven facts, plus the context and artifacts labels every build writes.
+    expect(args.filter((arg) => arg === '--label')).toHaveLength(9);
   });
 
   it('omits the facts a build outside a workflow does not have', () => {

@@ -232,6 +232,18 @@ describe('resolveImageBuild — a Dockerfile the workflow carries', () => {
     expect(build?.contextDir).toBe(artifactsDir(artifacts));
   });
 
+  it('hands the builder the content hash, so an image the step named is rebuilt after an edit', () => {
+    // A named tag says nothing about the files, unlike the derived one; the
+    // builder compares this hash with the one labelled on the image.
+    const derived = resolveImageBuild(undefined, { dockerfile: 'Dockerfile' }, contextFor());
+    const named = resolveImageBuild('my-registry/mine:v2', { dockerfile: 'Dockerfile' }, contextFor());
+    const edited = resolveImageBuild('my-registry/mine:v2', { dockerfile: 'Dockerfile' }, contextFor({
+      artifacts: [{ path: 'Dockerfile', contents: 'FROM python:3.13-slim\n' }],
+    }));
+    expect(named?.artifactsHash).toBe(derived?.image.replace('mediforce-artifacts:', ''));
+    expect(edited?.artifactsHash).not.toBe(named?.artifactsHash);
+  });
+
   it('leaves an explicit repo and commit in charge', () => {
     // A step that names its own build source said something specific; the
     // carried files are the fallback, not an override.

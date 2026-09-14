@@ -37,15 +37,20 @@ export function artifactsDir(artifacts: WorkflowArtifact[]): string {
 /**
  * Image tag for a Dockerfile the workflow carries. Derived from the files, so
  * an edit builds a new image and a rerun of unchanged files finds the one that
- * is already there — the staleness question a commit label answers for a repo
- * build has no equivalent here, because the tag *is* the content.
+ * is already there — the tag *is* the content. A tag the step names itself is
+ * not, which is what the labelled {@link artifactsBuildHash} answers.
  */
 export function artifactsBuildTag(artifacts: WorkflowArtifact[], dockerfile: string): string {
-  const hash = createHash('sha256')
+  return `mediforce-artifacts:${artifactsBuildHash(artifacts, dockerfile)}`;
+}
+
+/** The content half of {@link artifactsBuildTag}, labelled on the image so a
+ *  tag the step named itself can be checked against the files too. */
+export function artifactsBuildHash(artifacts: WorkflowArtifact[], dockerfile: string): string {
+  return createHash('sha256')
     .update(`${artifactsDir(artifacts)}\0${dockerfile}`)
     .digest('hex')
     .slice(0, 12);
-  return `mediforce-artifacts:${hash}`;
 }
 
 /** The same rule `WorkflowArtifactSchema` applies, enforced again at the point
