@@ -63,6 +63,7 @@ import {
   catalogDockerfileKey,
   normalizeBuildContext,
   normalizeRepoUrls,
+  DEFAULT_AGENT_IMAGE,
   DOCKER_IMAGE_SETUP_URL,
 } from '@mediforce/platform-core';
 import { artifactsBuildHash, artifactsBuildTag, artifactsDir } from './workflow-artifacts';
@@ -171,6 +172,19 @@ export function resolveBuildSource(
 }
 
 /**
+ * The tag a step with a build source builds under, when it names one: never the
+ * shared golden image. Registration used to write that onto a step whose
+ * Dockerfile came from `externalSkillsRepo`, and a registered version cannot be
+ * edited, so the build would replace the golden image on the host for every
+ * workflow using it. Such a step builds under its derived tag instead, as does
+ * one whose `image` is empty.
+ */
+function buildTarget(image: string | undefined): string | undefined {
+  const isGolden = image === DEFAULT_AGENT_IMAGE || image === `${DEFAULT_AGENT_IMAGE}:latest`;
+  return isGolden || image === '' ? undefined : image;
+}
+
+/**
  * The image tag a container config runs under: its explicit `image`, or the
  * tag derived from its build inputs when it leaves `image` unset.
  * `undefined` when the config names neither.
@@ -180,11 +194,10 @@ export function resolveStepImage(
   workflowRepo?: { url?: string; commit?: string },
 ): string | undefined {
   if (!buildConfig) return undefined;
-  if (buildConfig.image) return buildConfig.image;
   const source = resolveBuildSource(buildConfig, workflowRepo);
-  return source
-    ? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile, source.context)
-    : undefined;
+  if (source === undefined) return buildConfig.image || undefined;
+  return buildTarget(buildConfig.image)
+    ?? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile, source.context);
 }
 
 export function resolveImageBuild(
@@ -204,7 +217,7 @@ export function resolveImageBuild(
   const stepNamesRepoAndCommit = repo !== undefined && repo !== '' && commit !== undefined && commit !== '';
   if (stepNamesRepoAndCommit === false && dockerfile && artifacts?.some((artifact) => artifact.path === dockerfile) === true) {
     return {
-      image: image ?? artifactsBuildTag(artifacts, dockerfile),
+      image: buildTarget(image) ?? artifactsBuildTag(artifacts, dockerfile),
       contextDir: artifactsDir(artifacts),
       artifactsHash: artifactsBuildHash(artifacts, dockerfile),
       dockerfile,
@@ -218,7 +231,7 @@ export function resolveImageBuild(
 
   return {
     ...source,
-    image: image ?? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile, source.context),
+    image: buildTarget(image) ?? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile, source.context),
     repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
     workflow: workflowDefinition?.name,
     namespace: workflowDefinition?.namespace,

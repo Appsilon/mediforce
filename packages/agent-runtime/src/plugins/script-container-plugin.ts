@@ -175,8 +175,9 @@ export class ScriptContainerPlugin extends ContainerPlugin {
     const nsKeys = isWorkflowAgentContext(context) ? context.namespaceSecretKeys : undefined;
     this.resolveEnvironment(definitionEnv, stepEnv, workflowSecrets, nsKeys);
     this.imageBuild = resolveImageBuild(scriptConfig.image, scriptConfig, context, this.resolvedEnv.vars);
-    // In build mode the actual image tag is derived by resolveImageBuild — use it.
-    if (this.imageBuild && !scriptConfig.image) {
+    // In build mode resolveImageBuild decides the tag: derived when the step names
+    // none, and never the golden image a build would overwrite.
+    if (this.imageBuild) {
       this.image = this.imageBuild.image;
     }
   }

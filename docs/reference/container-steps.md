@@ -129,7 +129,10 @@ Both live in
 With `dockerfile` + `repo` + `commit` set, the image is built lazily on first
 use and tagged `mediforce-built:<hash>`, keyed on the build inputs — `context`
 folds in only when set, so a step without one keeps the tag it always had; a rebuild
-happens only when the pinned commit moves. With `image` alone, it must already
+happens only when the pinned commit moves. A step that names only `dockerfile`
+builds from the workflow's `externalSkillsRepo` the same way. No build lands on
+the golden image: a step with a build source that names `mediforce-golden-image`
+builds and runs under its derived tag. With `image` alone, it must already
 exist locally or be pullable. Without either, the step fails unless
 `ALLOW_LOCAL_AGENTS=true` — a dev-only escape hatch that runs the step on the
 host with no isolation.

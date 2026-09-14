@@ -393,6 +393,12 @@ describe('runPreflightChecks — files the workflow references but does not carr
       commit: 'a'.repeat(40),
     };
     expect(runPreflightChecks(fromRepo, ctx).filter((w) => w.category === 'missing-file')).toEqual([]);
+
+    const fromSkillsRepo = buildWorkflowDefinition({ name: 'test-wf' });
+    fromSkillsRepo.steps[0].executor = 'agent';
+    fromSkillsRepo.steps[0].agent = { dockerfile: 'Dockerfile' };
+    fromSkillsRepo.externalSkillsRepo = { url: 'https://github.com/org/skills.git', commit: 'b'.repeat(40) };
+    expect(runPreflightChecks(fromSkillsRepo, ctx).filter((w) => w.category === 'missing-file')).toEqual([]);
   });
 
   it('says nothing about a skills directory, which may live in the checkout', () => {

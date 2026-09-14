@@ -188,6 +188,40 @@ describe('missingExecutableHint', () => {
   });
 });
 
+// Registration used to write the golden image onto a step whose Dockerfile
+// came from `externalSkillsRepo`. Those versions are immutable, so the runtime
+// must not let their build land on the shared tag.
+describe('resolveImageBuild — the golden image is never a build target', () => {
+  const skillsRepo = { url: 'https://github.com/org/skills.git', commit: 'b'.repeat(40) };
+  const context = {
+    workflowDefinition: { externalSkillsRepo: skillsRepo },
+    step: { id: 's1' },
+  } as unknown as WorkflowAgentContext;
+
+  it.each(['mediforce-golden-image', 'mediforce-golden-image:latest'])('builds %s steps under their derived tag', (golden) => {
+    const build = resolveImageBuild(golden, { dockerfile: 'container/Dockerfile' }, context);
+    expect(build?.image).toMatch(/^mediforce-built:[a-f0-9]{12}$/);
+    expect(resolveStepImage({ image: golden, dockerfile: 'container/Dockerfile' }, skillsRepo)).toBe(build?.image);
+  });
+
+  it('builds a step with an empty image under its derived tag', () => {
+    expect(resolveImageBuild('', { dockerfile: 'container/Dockerfile' }, context)?.image).toMatch(/^mediforce-built:[a-f0-9]{12}$/);
+  });
+
+  it('builds a golden-stamped carried Dockerfile under its content tag', () => {
+    const carried = {
+      workflowDefinition: { artifacts: [{ path: 'Dockerfile', contents: 'FROM python:3.12-slim\n' }] },
+      step: { id: 's1' },
+    } as unknown as WorkflowAgentContext;
+    expect(resolveImageBuild('mediforce-golden-image', { dockerfile: 'Dockerfile' }, carried)?.image)
+      .toMatch(/^mediforce-artifacts:[a-f0-9]{12}$/);
+  });
+
+  it('keeps any other image the step named', () => {
+    expect(resolveImageBuild('acme/agent:v1', { dockerfile: 'container/Dockerfile' }, context)?.image).toBe('acme/agent:v1');
+  });
+});
+
 // Building an image from a Dockerfile the workflow carries, with no repository
 // anywhere in the picture. This is what lets "it needs pandas and R" be
 // answered in the app instead of by a checkout.
