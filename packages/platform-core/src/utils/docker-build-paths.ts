@@ -34,7 +34,7 @@ function hasContext(context: string | undefined): context is string {
  * repo root. A leading `/` is the repo root, as joining it onto the clone
  * directory always made it.
  */
-function normalizeRepoPath(path: string): string | null {
+export function normalizeRepoPath(path: string): string | null {
   const segments: string[] = [];
   for (const segment of path.split('/')) {
     if (segment === '' || segment === '.') continue;

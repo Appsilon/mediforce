@@ -5,7 +5,10 @@ import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 import { NICE_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
-import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
+import type {
+  ImageCatalogEntryView,
+  UploadImageCatalogVersionInput,
+} from '@mediforce/platform-api/contract';
 
 /**
  * The namespace's catalog, grouped by base and roots-first — the order the
@@ -190,6 +193,23 @@ export function useBuildImageVersion(namespace: string) {
   return useMutation({
     mutationFn: (input: { repo: string; commit: string; dockerfile: string; context?: string }) =>
       mediforce.imageCatalog.build({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entryId),
+      });
+    },
+  });
+}
+
+/** Build an image from a picked folder and catalogue it (#1345). Long-running
+ *  like `useBuildImageVersion`; the first upload creates the entry, so the
+ *  list is invalidated as well. */
+export function useUploadImageVersion(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<UploadImageCatalogVersionInput, 'namespace'>) =>
+      mediforce.imageCatalog.upload({ namespace, ...input }),
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
       void queryClient.invalidateQueries({

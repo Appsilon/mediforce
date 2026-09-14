@@ -206,6 +206,8 @@ import {
   UpdateImageCatalogEntryOutputSchema,
   BuildImageCatalogVersionInputSchema,
   BuildImageCatalogVersionOutputSchema,
+  UploadImageCatalogVersionInputSchema,
+  UploadImageCatalogVersionOutputSchema,
   DeleteImageCatalogEntryInputSchema,
   DeleteImageCatalogEntryOutputSchema,
   ListNamespaceMembersInputSchema,
@@ -305,6 +307,8 @@ import {
   type UpdateImageCatalogEntryOutput,
   type BuildImageCatalogVersionInput,
   type BuildImageCatalogVersionOutput,
+  type UploadImageCatalogVersionInput,
+  type UploadImageCatalogVersionOutput,
   type DeleteImageCatalogEntryInput,
   type DeleteImageCatalogEntryOutput,
   type ListTasksInput,
@@ -518,6 +522,7 @@ import {
   type RevokeJoinLinkInput,
   type RevokeJoinLinkOutput,
 } from '../contract/index';
+import { BUILD_CONTEXT_MEDIA_TYPE } from '@mediforce/platform-core';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
 // Server-side handlers throw `HandlerError` (or subclasses) imported from
@@ -831,6 +836,10 @@ export class Mediforce {
     /** Build one version of a built source. Long-running: it clones and runs a
      *  Dockerfile on the deployment's daemon before resolving. */
     build: (input: BuildImageCatalogVersionInput) => Promise<BuildImageCatalogVersionOutput>;
+    /** Build an image from an uploaded context and catalogue it (#1345).
+     *  `context` is a tar archive — `packBuildContextArchive` writes one.
+     *  Long-running, like `build`. */
+    upload: (input: UploadImageCatalogVersionInput) => Promise<UploadImageCatalogVersionOutput>;
   };
 
   readonly users: {
@@ -2150,6 +2159,20 @@ export class Mediforce {
         });
         const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.build');
         return BuildImageCatalogVersionOutputSchema.parse(body);
+      },
+      upload: async (input) => {
+        const { namespace, context, ...fields } = UploadImageCatalogVersionInputSchema.parse(input);
+        // multipart/form-data — let fetch set the boundary Content-Type. The
+        // archive rides as a file; everything else is the contract as JSON.
+        const form = new FormData();
+        form.append('input', JSON.stringify(fields));
+        form.append('context', new Blob([context], { type: BUILD_CONTEXT_MEDIA_TYPE }), 'context.tar');
+        const res = await this.request(
+          `/api/image-catalog/upload${toSearchParams({ namespace })}`,
+          { method: 'POST', body: form },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.upload');
+        return UploadImageCatalogVersionOutputSchema.parse(body);
       },
     };
 

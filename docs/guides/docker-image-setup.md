@@ -12,7 +12,7 @@ Mediforce image registry: the platform never pushes, holds no registry URL, and
 manages no registry credentials. "Available to the platform" always means
 "present on that daemon", which is what `mediforce system images` lists.
 
-There are three ways an image gets there.
+There are four ways an image gets there.
 
 ## 1. Build from a repo (the self-service path)
 
@@ -32,7 +32,9 @@ a repo. Both mint the tag a step pinning that commit resolves to, so the step
 then finds the image already built instead of rebuilding it. Any workspace
 member can do this; a build takes minutes and the command waits for it.
 
-This is the only route that needs no host access and no registry, so prefer it
+It needs no host access and no registry, and — unlike an
+[upload](#2-upload-a-local-folder-no-repo-needed) — the platform keeps the inputs, so it
+can rebuild the image and link each version to its Dockerfile at a commit. Prefer it
 whenever the Dockerfile lives in a repo the deployment can clone. It also feeds
 the Image Catalog for free — see [below](#images-the-platform-built-are-offered-on-their-own).
 
@@ -80,7 +82,66 @@ built.
 The same field is **Build context** in **Add image** and **Edit**, and
 `--context` on `mediforce images create`, `update` and `build`.
 
-## 2. A public image reference
+## 2. Upload a local folder (no repo needed)
+
+For a Dockerfile in no repository the deployment can clone — no repo at all, or
+one the platform cannot reach — upload the folder it builds from:
+
+```bash
+mediforce images build --namespace <handle> --reference <handle>/<name> --context ./my-agent \
+  [--dockerfile container/Dockerfile] [--tag v1] --intent "What this image is for"
+```
+
+**Workspace → Images → Add image → Local folder** does the same from the
+browser, and **Upload version** on the entry adds the next one.
+
+- **The folder is the build context**, as `docker build ./my-agent` reads it:
+  `--dockerfile` is a path from the folder's root (default `Dockerfile`), and
+  everything it `COPY`s must be inside the folder.
+- **What its `.dockerignore` excludes is never uploaded**, and the rest must fit
+  in **100 MiB**. The file is read as `docker build` reads it — a
+  `<Dockerfile>.dockerignore` beside the Dockerfile wins over the folder's root
+  one — and the Dockerfile and the ignore file always go up. A folder over the
+  limit is refused naming its largest entries: list the ones the build does not
+  `COPY` in the `.dockerignore`. For a Dockerfile that copies only `scripts/`:
+
+  ```
+  *
+  !scripts
+  ```
+
+- **Local folder** shows what will go up as a tree. What the `.dockerignore`
+  excludes starts unchecked and stays so — the build would drop it anyway — and
+  anything else can be unchecked for this upload.
+  Chrome and Edge read the folder through their directory picker. Firefox and
+  Safari only offer a file input, which counts every file in the folder, excluded
+  ones included, and asks whether to upload that many. The excluded files still
+  never go up.
+- **The name starts with your workspace** — `<handle>/<name>`. Every workspace
+  builds on one shared daemon, and the prefix is what stops one tagging over
+  another's image.
+- **A version is a tag, and a tag is never replaced.** `--tag` defaults to the
+  upload time; a tag already on the daemon is refused, because a workflow pinning
+  it would start running something else.
+- **It is catalogued as it builds**, as a `referenced` entry — the first upload
+  of a name needs `--intent`. The platform deletes the folder once built, so it
+  can **never rebuild** the image and never claims to know where it came from:
+  `--declared-repo` / `--declared-commit` / `--declared-dockerfile` (or *Where it
+  came from* in the browser) record what you say, shown as **declared, not
+  derived**.
+- **The first upload describes the entry; later ones only add versions.** Its
+  name, description and declared source are set once — a later upload may repeat
+  them unchanged but is refused if they differ. Change them with **Edit** on the
+  entry, or `mediforce images update`.
+- **The browser cannot read file permissions**, so every file uploaded from
+  **Local folder** arrives non-executable. A script the Dockerfile runs directly
+  needs a `RUN chmod +x` — or upload it with the CLI, which keeps the bit.
+
+A context that cannot build — too large, not an archive, a path that is absolute,
+climbs out of the folder or runs through a symlink, no Dockerfile where you said —
+is refused with the reason before it reaches the daemon.
+
+## 3. A public image reference
 
 Name a pullable reference in the step's `image` field:
 
@@ -97,11 +158,11 @@ Note that the step editor's amber "image not found" warning checks the daemon
 listing, so it persists until something actually pulls or builds the image onto
 the host. Pushing to a registry does not clear it.
 
-## 3. Built or loaded on the host
+## 4. Loaded on the host
 
-Anything else — an image built from a local Dockerfile with no repo behind it,
-or moved across with `docker save` / `docker load` — requires shell access to
-the deployment host. Ask an administrator.
+Anything else — an image moved across with `docker save` / `docker load`, or
+one built with build secrets the platform cannot supply — requires shell access
+to the deployment host. Ask an administrator.
 
 ## Verifying
 
@@ -130,6 +191,7 @@ Minimal base images (`alpine`, `scratch`, distroless) ship none of this. `alpine
 
 - **`"/<path>": not found` on a `COPY`, for a path that exists in the repository** — with no `context` set, the build context is the Dockerfile's own directory, so it cannot reach files above it. Set `context`; see [Choosing the build context](#choosing-the-build-context).
 - **`exec: "<binary>": executable file not found in $PATH`** — the image has no such executable. The container started and immediately exited 127. Point the step at an image that ships the tooling (see [Choosing a base image](#choosing-a-base-image)), or add it in a Dockerfile that builds `FROM` the minimal image.
+- **`permission denied` running a script copied from an uploaded folder** — the browser cannot read file permissions, so **Local folder** uploads every file non-executable. Add `RUN chmod +x <script>` to the Dockerfile, or upload with `mediforce images build --context`, which keeps the bit.
 - **The image still shows as missing** — check `mediforce system images`. The warning tracks what is on the daemon, not what exists in a registry, so it clears only once the image has actually been pulled or built onto the host. If the reference is private, an administrator must `docker login` on the host.
 - **`not found locally and no repo+commit configured for auto-build`** — a build-mode step reached a tag that is not on the daemon and carries no build inputs to make it. Set `repo` and `commit` on the step, or use an image that is already present.
 - **Prefer the auto-build path** — set `repo` and `commit` on the step and the platform builds it before the run, with no host access and no registry involved.

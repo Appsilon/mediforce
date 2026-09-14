@@ -28,6 +28,7 @@ import { AddImageDialog } from '@/components/images/add-image-dialog';
 import { BuildImageDialog } from '@/components/images/build-image-dialog';
 import { DeleteImageEntryDialog } from '@/components/images/delete-image-entry-dialog';
 import { ImageDescriptionDialog } from '@/components/images/image-description-dialog';
+import { UploadImageDialog } from '@/components/images/upload-image-dialog';
 import { useWorkflowsByImage, type WorkflowImageMatch } from '@/hooks/use-workflows-by-image';
 import {
   groupByBase,
@@ -361,11 +362,18 @@ function EntryCard({
   const shown = detail.entry ?? entry;
   const [writingDescription, setWritingDescription] = useState(false);
   const [building, setBuilding] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const discovered = shown.origin === 'discovered';
   // Only a built source carries the recipe a build needs. A `referenced` entry
   // names an image the platform holds no inputs for, so it has nothing to build.
   const buildable = shown.source.kind === 'built';
+  // A referenced entry under this workspace's name takes a new upload instead
+  // — never a rebuild (#1345, ADR-0022).
+  const uploadReference =
+    shown.source.kind === 'referenced' && shown.source.reference.startsWith(`${handle}/`)
+      ? shown.source.reference
+      : null;
   const versions = shown.versions;
   const newest = versions[0];
 
@@ -441,6 +449,15 @@ function EntryCard({
                 Build
               </button>
             )}
+            {uploadReference !== null && (
+              <button
+                type="button"
+                onClick={() => setUploading(true)}
+                className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
+              >
+                Upload version
+              </button>
+            )}
             {/* Every entry carries the same human-written fields, so every
                 entry can be edited — any member, the gate the entry was
                 created under (ADR-0022 decision 3). A discovered entry has no
@@ -481,6 +498,14 @@ function EntryCard({
             handle={handle}
             open={building}
             onOpenChange={setBuilding}
+          />
+        )}
+        {uploading && uploadReference !== null && (
+          <UploadImageDialog
+            reference={uploadReference}
+            handle={handle}
+            open={uploading}
+            onOpenChange={setUploading}
           />
         )}
         {deleting && (
@@ -588,6 +613,11 @@ export default function ImagesPage() {
                 Dockerfile and commit, and the sentence is the one thing no build can write.
                 Describing it is what registers the entry and probes what is inside.
               </p>
+              <p>
+                An image built from an uploaded folder is keyed on its name instead, and its
+                versions are tags. The platform keeps none of the folder, so it can never rebuild
+                one — each version is its own upload.
+              </p>
             </ConceptPopover>
           </div>
           <p className="mt-0.5 text-sm text-muted-foreground">
@@ -659,7 +689,7 @@ export default function ImagesPage() {
           </div>
           <p className="text-sm text-muted-foreground">
             {query.trim() === ''
-              ? 'No images catalogued yet, and no workflow here has built one. Add image registers the repository and Dockerfile yours are built from.'
+              ? 'No images catalogued yet, and no workflow here has built one. Add image registers the repository and Dockerfile yours are built from, or builds one from a folder you upload.'
               : 'No images match your search.'}
           </p>
         </div>

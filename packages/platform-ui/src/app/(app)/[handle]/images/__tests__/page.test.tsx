@@ -1,7 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
+import { listBuildContextArchive } from '@mediforce/platform-core';
 import { createQueryWrapper } from '@/test/react-query';
 
 const listMock = vi.fn();
@@ -11,6 +12,7 @@ const updateMock = vi.fn();
 const deleteMock = vi.fn();
 const archiveVersionMock = vi.fn();
 const buildMock = vi.fn();
+const uploadMock = vi.fn();
 const apiFetchMock = vi.fn();
 const searchParams = new URLSearchParams();
 
@@ -39,6 +41,7 @@ vi.mock('@/lib/mediforce', () => ({
       update: (...args: unknown[]) => updateMock(...args),
       delete: (...args: unknown[]) => deleteMock(...args),
       build: (...args: unknown[]) => buildMock(...args),
+      upload: (...args: unknown[]) => uploadMock(...args),
     },
   },
 }));
@@ -151,6 +154,38 @@ const DISCOVERED: ImageCatalogEntryView = {
     },
   ],
 };
+
+/** An image a member here built from an uploaded folder. */
+const UPLOADED: ImageCatalogEntryView = {
+  id: 'agent-9f8e7d6c',
+  name: 'Local agent',
+  intent: 'Runs the ADaM checks for studies with no repository',
+  source: { kind: 'referenced', reference: 'acme/agent' },
+  declaredSource: { repo: 'https://gitlab.example.com/team/agent', commit: 'bf0353b' },
+  capabilities: {},
+  origin: 'catalogued',
+  availability: 'present',
+  baseEntryId: null,
+  versions: [
+    {
+      imageTag: 'acme/agent:20260911-120000',
+      imageId: 'sha256:uploaded',
+      created: '1 hour ago',
+      size: '40MB',
+      capabilities: { status: 'unknown' },
+      lineage: { base: null, ownLabels: {} },
+    },
+  ],
+};
+
+/** Files as `<input webkitdirectory>` hands them over for a folder `my-agent`. */
+function pickedFolder(files: Record<string, string>): File[] {
+  return Object.entries(files).map(([path, content]) => {
+    const file = new File([content], path.split('/').pop() ?? path);
+    Object.defineProperty(file, 'webkitRelativePath', { value: `my-agent/${path}` });
+    return file;
+  });
+}
 
 function renderPage() {
   const { wrapper: Wrapper } = createQueryWrapper();
@@ -966,5 +1001,183 @@ describe('ImagesPage', () => {
 
     expect(await within(dialog).findByText(/image is being used/)).toBeInTheDocument();
     expect(within(dialog).getByText(/Nothing was removed/)).toBeInTheDocument();
+  });
+
+  it('uploads a whole folder as the build context and catalogues it under the workspace name', async () => {
+    uploadMock.mockResolvedValue({ imageTag: 'acme/my-agent:v1', entryId: 'my-agent-1234abcd' });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /Add image/ }));
+    await user.click(screen.getByRole('tab', { name: 'Local folder' }));
+    await user.upload(
+      screen.getByLabelText('Folder'),
+      pickedFolder({ Dockerfile: 'FROM alpine\nCOPY scripts /s\n', 'scripts/run.sh': 'echo hi\n' }),
+    );
+
+    // Named from the folder, under the workspace — the daemon is shared.
+    expect(screen.getByLabelText('Dockerfile')).toHaveValue('Dockerfile');
+    expect(screen.getByLabelText('Image name')).toHaveValue('my-agent');
+    await user.type(screen.getByLabelText('Tag (optional)'), 'v1');
+    await user.type(screen.getByLabelText('Description'), 'Runs the ADaM checks for studies with no repository');
+    await user.click(screen.getByRole('button', { name: 'Upload and build' }));
+
+    await waitFor(() => expect(uploadMock).toHaveBeenCalled());
+    const sent = uploadMock.mock.calls[0][0];
+    expect(sent).toMatchObject({
+      namespace: 'acme',
+      reference: 'acme/my-agent',
+      tag: 'v1',
+      dockerfile: 'Dockerfile',
+      name: 'my-agent',
+      intent: 'Runs the ADaM checks for studies with no repository',
+    });
+    // The folder, not just the Dockerfile: `COPY scripts` needs its siblings.
+    expect(listBuildContextArchive(sent.context).map((entry: { path: string }) => entry.path)).toEqual([
+      'Dockerfile',
+      'scripts/run.sh',
+    ]);
+  });
+
+  it('leaves out what the folder .dockerignore excludes and what the member unchecks', async () => {
+    uploadMock.mockResolvedValue({ imageTag: 'acme/my-agent:v1', entryId: 'my-agent-1234abcd' });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /Add image/ }));
+    await user.click(screen.getByRole('tab', { name: 'Local folder' }));
+    await user.upload(
+      screen.getByLabelText('Folder'),
+      pickedFolder({
+        '.dockerignore': 'sample-data\n',
+        Dockerfile: 'FROM alpine\nCOPY scripts /s\n',
+        'sample-data/dm.xpt': 'rows',
+        'docs/notes.md': 'notes',
+        'scripts/run.sh': 'echo hi\n',
+      }),
+    );
+
+    // Excluded by the ignore file: unchecked, and not offered — the build host
+    // applies the same file. The Dockerfile always goes up.
+    const sampleData = await screen.findByRole('checkbox', { name: 'Upload sample-data' });
+    expect(sampleData).not.toBeChecked();
+    expect(sampleData).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Upload Dockerfile' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Upload Dockerfile' })).toBeDisabled();
+    expect(screen.getByText(/1 left out by \.dockerignore/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Upload docs' }));
+    expect(screen.getByText(/Uploading 3 of 5 files/)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Description'), 'Runs the ADaM checks for studies with no repository');
+    await user.click(screen.getByRole('button', { name: 'Upload and build' }));
+
+    await waitFor(() => expect(uploadMock).toHaveBeenCalled());
+    expect(listBuildContextArchive(uploadMock.mock.calls[0][0].context).map((entry: { path: string }) => entry.path)).toEqual([
+      '.dockerignore',
+      'Dockerfile',
+      'scripts/run.sh',
+    ]);
+  });
+
+  it('walks the folder through the directory picker where the browser has one, so it never asks about a file count', async () => {
+    const file = (name: string, content: string) => ({ kind: 'file' as const, name, getFile: async () => new File([content], name) });
+    const directory = (name: string, entries: unknown[]) => ({
+      kind: 'directory' as const,
+      name,
+      async *values() {
+        yield* entries;
+      },
+    });
+    const showDirectoryPicker = vi.fn().mockResolvedValue(
+      directory('landing-zone', [
+        file('.dockerignore', '*\n!scripts\n'),
+        directory('container', [file('Dockerfile', 'FROM alpine\nCOPY scripts /s\n')]),
+        directory('sample-data', [file('dm.xpt', 'rows'), file('ae.xpt', 'rows')]),
+        directory('scripts', [file('run.sh', 'echo hi\n')]),
+      ]),
+    );
+    Object.defineProperty(window, 'showDirectoryPicker', { value: showDirectoryPicker, configurable: true });
+    try {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole('button', { name: /Add image/ }));
+      await user.click(screen.getByRole('tab', { name: 'Local folder' }));
+      const chooser = screen.getByLabelText('Folder');
+      expect(chooser).toHaveTextContent('Choose folder');
+      await user.click(chooser);
+
+      expect(showDirectoryPicker).toHaveBeenCalledWith({ mode: 'read' });
+      expect(await screen.findByDisplayValue('container/Dockerfile')).toBeInTheDocument();
+      expect(screen.getByText(/Uploading 3 of 5 files/)).toBeInTheDocument();
+      expect(screen.getByText(/2 left out by \.dockerignore/)).toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(window, 'showDirectoryPicker');
+    }
+  });
+
+  it('says which Dockerfile the folder is missing before anything is uploaded', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /Add image/ }));
+    await user.click(screen.getByRole('tab', { name: 'Local folder' }));
+    await user.upload(screen.getByLabelText('Folder'), pickedFolder({ 'scripts/run.sh': 'echo hi\n' }));
+
+    expect(screen.getByText('No Dockerfile at "Dockerfile" in the build context.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload and build' })).toBeDisabled();
+  });
+
+  it('says so when the picked folder had no files, which browsers leave out', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /Add image/ }));
+    await user.click(screen.getByRole('tab', { name: 'Local folder' }));
+    // user-event skips an empty pick; the browser still fires `change`.
+    fireEvent.change(screen.getByLabelText('Folder'), { target: { files: [] } });
+
+    expect(screen.getByText(/No files were picked/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload and build' })).toBeDisabled();
+  });
+
+  it('adds a version to an uploaded image without offering to rebuild one', async () => {
+    listMock.mockResolvedValue({ entries: [GOLDEN, UPLOADED] });
+    uploadMock.mockResolvedValue({ imageTag: 'acme/agent:v2', entryId: UPLOADED.id });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId(`image-entry-${UPLOADED.id}`);
+    // The platform kept nothing to rebuild from: a new version is a new upload.
+    expect(within(card).queryByRole('button', { name: 'Build' })).not.toBeInTheDocument();
+    // Not this workspace's name to tag, so nothing to upload to either.
+    const golden = screen.getByTestId('image-entry-golden');
+    expect(within(golden).queryByRole('button', { name: 'Upload version' })).not.toBeInTheDocument();
+
+    await user.click(within(card).getByRole('button', { name: 'Upload version' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.upload(within(dialog).getByLabelText('Folder'), pickedFolder({ Dockerfile: 'FROM alpine\n' }));
+    // The entry already says what the image is for, and where it came from.
+    expect(within(dialog).queryByLabelText('Description')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: /Where it came from/ })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Upload and build' }));
+
+    await waitFor(() => expect(uploadMock).toHaveBeenCalled());
+    expect(uploadMock.mock.calls[0][0]).toMatchObject({ namespace: 'acme', reference: 'acme/agent' });
+    expect(uploadMock.mock.calls[0][0]).not.toHaveProperty('intent');
+  });
+
+  it('shows a declared source on an uploaded image as declared, not derived', async () => {
+    listMock.mockResolvedValue({ entries: [UPLOADED] });
+    getMock.mockResolvedValue({ entry: UPLOADED });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId(`image-entry-${UPLOADED.id}`);
+    await user.click(within(card).getByRole('button', { name: /Local agent/ }));
+
+    expect(await within(card).findByText('Declared by a member')).toBeInTheDocument();
+    expect(within(card).getByText(/declared, not derived/)).toBeInTheDocument();
   });
 });

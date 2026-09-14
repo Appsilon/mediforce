@@ -3,8 +3,10 @@
 
 import { z } from 'zod';
 import { execFile } from 'node:child_process';
+import { Readable } from 'node:stream';
 import { promisify } from 'node:util';
 import {
+  BUILD_CONTEXT_MEDIA_TYPE,
   imageCapabilityProbeArgs,
   imageHistoryArgs,
   imageInspectArgs,
@@ -20,6 +22,7 @@ import {
   shortImageId,
   unknownImageCapabilities,
   type BuildImageRequest,
+  type BuildUploadedImageRequest,
   type ImageBuildStep,
   type ImageCapabilities,
   type InspectedImage,
@@ -28,6 +31,7 @@ import {
   DockerDiskInfoSchema,
   DockerImageInfoSchema,
 } from '../../contract/system';
+import { ConflictError } from '../../errors';
 import type {
   DockerDiskInfo,
   DockerImageInfo,
@@ -177,28 +181,45 @@ export async function buildLocalImage(request: BuildImageRequest): Promise<void>
   await buildImageFromRepo(request);
 }
 
-/** Build on the worker's host daemon. Carries the same secret every route that
- *  acts on the daemon does; an estate that sets none is unaffected. */
-export async function buildImageViaContainerWorker(
-  request: BuildImageRequest,
-  options: BuildImageOptions = {},
+/**
+ * `POST /images/build` on the worker. Carries the same secret every route that
+ * acts on the daemon does; an estate that sets none is unaffected. A 409 is an
+ * upload whose tag was taken while it built.
+ */
+async function postBuildToContainerWorker(
+  query: string,
+  body: { contentType: string; content: BodyInit },
+  options: BuildImageOptions,
 ): Promise<void> {
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const baseUrl = options.baseUrl ?? process.env.CONTAINER_WORKER_URL ?? DEFAULT_CONTAINER_WORKER_URL;
   const workerSecret = options.workerSecret ?? process.env.CONTAINER_WORKER_SECRET ?? '';
-  const response = await fetchImpl(`${baseUrl}/images/build`, {
+  const response = await fetchImpl(`${baseUrl}/images/build${query}`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': body.contentType,
       ...(workerSecret === '' ? {} : { 'X-Worker-Secret': workerSecret }),
     },
-    body: JSON.stringify(request),
+    body: body.content,
     signal: AbortSignal.timeout(IMAGE_BUILD_TIMEOUT_MS),
   });
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `Image build failed with status ${String(response.status)}`);
+    const parsed = (await response.json().catch(() => ({}))) as { error?: string };
+    const message = parsed.error ?? `Image build failed with status ${String(response.status)}`;
+    throw response.status === 409 ? new ConflictError(message) : new Error(message);
   }
+}
+
+/** Build on the worker's host daemon. */
+export async function buildImageViaContainerWorker(
+  request: BuildImageRequest,
+  options: BuildImageOptions = {},
+): Promise<void> {
+  await postBuildToContainerWorker(
+    '',
+    { contentType: 'application/json', content: JSON.stringify(request) },
+    options,
+  );
 }
 
 /**
@@ -214,6 +235,54 @@ export async function buildImage(request: BuildImageRequest): Promise<void> {
   return isLocalAgentMode()
     ? buildLocalImage(request)
     : buildImageViaContainerWorker(request);
+}
+
+/** An uploaded context on the daemon this process reaches directly — the
+ *  worker's own builder, loaded on demand for the reason `buildLocalImage` is. */
+async function buildLocalUploadedImage(
+  request: BuildUploadedImageRequest,
+  archive: Uint8Array<ArrayBuffer>,
+): Promise<void> {
+  const { buildImageFromUpload, ImageTagTakenError } = await import('@mediforce/container-worker');
+  try {
+    await buildImageFromUpload(
+      request,
+      Readable.from([Buffer.from(archive.buffer, archive.byteOffset, archive.byteLength)]),
+    );
+  } catch (error) {
+    throw error instanceof ImageTagTakenError ? new ConflictError(error.message) : error;
+  }
+}
+
+/** An uploaded context on the worker's host daemon: the archive is the body
+ *  and the rest the query, so a large context is never re-encoded into JSON. */
+export async function buildUploadedImageViaContainerWorker(
+  request: BuildUploadedImageRequest,
+  archive: Uint8Array<ArrayBuffer>,
+  options: BuildImageOptions = {},
+): Promise<void> {
+  const query = new URLSearchParams({
+    image: request.image,
+    dockerfile: request.dockerfile,
+    namespace: request.namespace,
+  });
+  await postBuildToContainerWorker(
+    `?${query.toString()}`,
+    { contentType: BUILD_CONTEXT_MEDIA_TYPE, content: archive },
+    options,
+  );
+}
+
+/** Build an uploaded context on whichever daemon this deployment uses. Fails
+ *  loudly, like `buildImage`, for the same reason; a taken tag is a
+ *  `ConflictError`. */
+export async function buildUploadedImage(
+  request: BuildUploadedImageRequest,
+  archive: Uint8Array<ArrayBuffer>,
+): Promise<void> {
+  return isLocalAgentMode()
+    ? buildLocalUploadedImage(request, archive)
+    : buildUploadedImageViaContainerWorker(request, archive);
 }
 
 export interface FetchImageHistoryOptions {

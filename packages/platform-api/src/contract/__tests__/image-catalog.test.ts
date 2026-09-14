@@ -3,6 +3,7 @@ import {
   BuildImageCatalogVersionInputSchema,
   CreateImageCatalogEntryInputApiSchema,
   UpdateImageCatalogEntryInputApiSchema,
+  UploadImageCatalogVersionInputSchema,
 } from '../image-catalog';
 
 const build = { namespace: 'alpha', repo: 'Appsilon/tealflow', commit: 'abc1234' };
@@ -65,5 +66,45 @@ describe('image catalog entry source input', () => {
         source: { kind: 'referenced', reference: 'mediforce-golden-image' },
       }).success,
     ).toBe(true);
+  });
+});
+
+describe('UploadImageCatalogVersionInputSchema', () => {
+  const upload = {
+    namespace: 'alpha',
+    reference: 'alpha/agent',
+    context: new Uint8Array([0]),
+  };
+
+  it('accepts a reference under the namespace, with the tag and Dockerfile optional', () => {
+    const parsed = UploadImageCatalogVersionInputSchema.parse(upload);
+
+    expect(parsed.tag).toBeUndefined();
+    expect(parsed.dockerfile).toBe('');
+  });
+
+  it('refuses a reference outside the namespace, which could tag over another workspace\'s image', () => {
+    for (const reference of ['agent', 'beta/agent', 'alphabet/agent', 'postgres']) {
+      const result = UploadImageCatalogVersionInputSchema.safeParse({ ...upload, reference });
+      expect(result.success, reference).toBe(false);
+      expect(result.error?.issues[0]?.message).toContain('alpha/');
+    }
+  });
+
+  it('refuses what Docker would refuse as a name or a tag', () => {
+    expect(UploadImageCatalogVersionInputSchema.safeParse({ ...upload, reference: 'alpha/Agent' }).success).toBe(false);
+    expect(UploadImageCatalogVersionInputSchema.safeParse({ ...upload, reference: 'alpha/agent:v1' }).success).toBe(false);
+    expect(UploadImageCatalogVersionInputSchema.safeParse({ ...upload, tag: '-v1' }).success).toBe(false);
+    expect(UploadImageCatalogVersionInputSchema.safeParse({ ...upload, tag: 'v1.2_rc-3' }).success).toBe(true);
+  });
+
+  it('refuses a Dockerfile outside the uploaded context', () => {
+    expect(
+      UploadImageCatalogVersionInputSchema.safeParse({ ...upload, dockerfile: '../Dockerfile' }).success,
+    ).toBe(false);
+  });
+
+  it('needs the context to be the archive bytes', () => {
+    expect(UploadImageCatalogVersionInputSchema.safeParse({ ...upload, context: 'Dockerfile' }).success).toBe(false);
   });
 });

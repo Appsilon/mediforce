@@ -4,17 +4,25 @@
  * Lightweight copy of agent-runtime/plugins/docker-image-builder.ts.
  * Duplicated to avoid pulling agent-runtime into container-worker.
  */
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync, execSync, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { chmodSync, copyFileSync, existsSync, mkdtempSync, realpathSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
+import { Transform, type Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import {
+  BUILD_CONTEXT_MAX_BYTES,
   BUILD_LABELS,
   buildProvenanceLabelArgs,
+  imageTagTakenMessage,
   redactRepoCredentials,
   resolveDockerBuildPaths,
   resolveRepoCloneTargets,
+  uploadedImageLabelArgs,
+  type BuildUploadedImageRequest,
+  type DockerBuildPaths,
 } from '@mediforce/platform-core';
 
 const BUILD_COMMIT_LABEL = BUILD_LABELS.commit;
@@ -161,24 +169,13 @@ export async function buildImageFromRepo(options: {
 
   try {
     cloneRepoAtCommit(buildDir, options.repoRef ?? repoUrl, commit, repoToken);
-    assertInsideClone(buildDir, paths.context);
-    assertInsideClone(buildDir, paths.dockerfile);
-
     console.log(`[docker-image-builder] Building image "${image}" from ${repoUrl}@${commit.slice(0, 8)}`);
-    // argv form, not a shell string: the label values carry a repo URL, a
-    // workflow name and a namespace, none of which are safe to interpolate.
-    execFileSync(
-      'docker',
-      [
-        'build',
-        '-t', image,
-        ...buildProvenanceLabelArgs({ repoUrl, commit, dockerfile: options.dockerfile ?? '', context, workflow, namespace, repoToken }),
-        '-f', join(buildDir, paths.dockerfile),
-        join(buildDir, paths.context),
-      ],
-      { stdio: 'pipe' },
+    buildDirectory(
+      buildDir,
+      paths,
+      image,
+      buildProvenanceLabelArgs({ repoUrl, commit, dockerfile: options.dockerfile ?? '', context, workflow, namespace, repoToken }),
     );
-    console.log(`[docker-image-builder] Image "${image}" built successfully`);
   } finally {
     await rm(buildDir, { recursive: true, force: true });
   }
@@ -203,6 +200,128 @@ export async function buildImageFromDirectory(options: {
     { stdio: 'pipe' },
   );
   console.log(`[docker-image-builder] Image "${image}" built successfully`);
+}
+
+/**
+ * `docker build` of a context already on disk — a checkout or an extracted
+ * upload. Refuses a path reached through a symlink first, then builds.
+ */
+function buildDirectory(buildDir: string, paths: DockerBuildPaths, image: string, labelArgs: string[]): void {
+  assertInsideClone(buildDir, paths.context);
+  assertInsideClone(buildDir, paths.dockerfile);
+  // argv form, not a shell string: the label values carry a repo URL, a
+  // workflow name and a namespace, none of which are safe to interpolate.
+  execFileSync(
+    'docker',
+    ['build', '-t', image, ...labelArgs, '-f', join(buildDir, paths.dockerfile), join(buildDir, paths.context)],
+    { stdio: 'pipe' },
+  );
+  console.log(`[docker-image-builder] Image "${image}" built successfully`);
+}
+
+/** An uploaded context over the size limit. The platform refuses one before
+ *  it gets here; the worker counts again for a caller that skipped it. */
+export class BuildContextTooLargeError extends Error {
+  constructor(maxBytes: number) {
+    super(`The uploaded build context is over the ${String(maxBytes)}-byte limit.`);
+    this.name = 'BuildContextTooLargeError';
+  }
+}
+
+function limitBytes(maxBytes: number): Transform {
+  let seen = 0;
+  return new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      seen += chunk.length;
+      callback(seen > maxBytes ? new BuildContextTooLargeError(maxBytes) : null, chunk);
+    },
+  });
+}
+
+/** Unpack an uploaded context with the host's own `tar` — the second line of
+ *  defence after `checkBuildContextArchive`, `assertInsideClone` the third. */
+async function extractArchive(archive: Readable, targetDir: string, maxBytes: number): Promise<void> {
+  const child = spawn('tar', ['-x', '--no-same-owner', '-f', '-', '-C', targetDir], {
+    stdio: ['pipe', 'ignore', 'pipe'],
+  });
+  const stderr: Buffer[] = [];
+  child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+  const exited = new Promise<number | null>((resolve, reject) => {
+    child.on('error', reject);
+    child.on('close', resolve);
+  });
+
+  // Both settle before either is judged: `tar` giving up mid-stream breaks the
+  // pipe, and its own message is the one worth reporting — unless the stream
+  // was cut for size, which is what made `tar` give up.
+  const [piped, exitCode] = await Promise.allSettled([pipeline(archive, limitBytes(maxBytes), child.stdin), exited]);
+  if (piped.status === 'rejected' && piped.reason instanceof BuildContextTooLargeError) throw piped.reason;
+  if (exitCode.status === 'rejected' || exitCode.value !== 0) {
+    const reason = Buffer.concat(stderr).toString('utf8').trim();
+    throw new Error(`Could not unpack the uploaded build context${reason === '' ? '.' : `: ${reason}`}`);
+  }
+  if (piped.status === 'rejected') throw piped.reason;
+}
+
+/** An upload aimed at a tag the daemon already has. */
+export class ImageTagTakenError extends Error {
+  constructor(image: string) {
+    super(imageTagTakenMessage(image));
+    this.name = 'ImageTagTakenError';
+  }
+}
+
+/** Whether the daemon has `image`. A daemon that cannot answer throws: it
+ *  cannot promise the tag is free. */
+function daemonHasImage(image: string): boolean {
+  try {
+    execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', image], { stdio: 'pipe' });
+    return true;
+  } catch (error) {
+    const stderr = error instanceof Error && 'stderr' in error ? String(error.stderr) : '';
+    if (/no such image/i.test(stderr)) return false;
+    throw error;
+  }
+}
+
+/**
+ * Build an uploaded context (#1345): extracted, not piped to `docker build -`,
+ * and built under a throwaway tag that is moved onto `request.image` only if
+ * that tag is still free once the build is done (ADR-0022).
+ */
+export async function buildImageFromUpload(
+  request: BuildUploadedImageRequest,
+  archive: Readable,
+  maxBytes: number = BUILD_CONTEXT_MAX_BYTES,
+): Promise<void> {
+  const paths = resolveDockerBuildPaths(request.dockerfile, '.');
+  const staging = `mediforce-upload-staging:${randomUUID()}`;
+  const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-upload-'));
+
+  try {
+    await extractArchive(archive, buildDir, maxBytes);
+    console.log(`[docker-image-builder] Building image "${request.image}" from an uploaded context`);
+    buildDirectory(buildDir, paths, staging, uploadedImageLabelArgs(request.namespace));
+  } finally {
+    await rm(buildDir, { recursive: true, force: true });
+  }
+
+  try {
+    if (daemonHasImage(request.image)) throw new ImageTagTakenError(request.image);
+    execFileSync('docker', ['tag', staging, request.image], { stdio: 'pipe' });
+  } finally {
+    removeStagingTag(staging);
+  }
+}
+
+/** Only the tag goes: once retagged, the image itself stays. A failure is
+ *  logged, never thrown over the error that brought the build here. */
+function removeStagingTag(staging: string): void {
+  try {
+    execFileSync('docker', ['image', 'rm', staging], { stdio: 'pipe' });
+  } catch (error) {
+    console.warn(`[docker-image-builder] Could not remove "${staging}":`, error);
+  }
 }
 
 export async function ensureImage(options: {

@@ -1,12 +1,13 @@
 'use client';
 
 import * as Dialog from '@radix-ui/react-dialog';
-import { ChevronDown, ChevronRight, Loader2, X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { useState } from 'react';
 import { builtSourceLine } from '@mediforce/platform-core';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { useBuildImageVersion } from '@/hooks/use-image-catalog';
 import { describeBuildFailure } from './build-error';
+import { BuildFailureNotice } from './build-failure-notice';
 
 /**
  * Build one more version of an entry the workspace already offers.
@@ -28,7 +29,6 @@ export function BuildImageDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [commit, setCommit] = useState('');
-  const [showFullError, setShowFullError] = useState(false);
   const build = useBuildImageVersion(handle);
   const context = entry.source.kind === 'built' ? entry.source.context : undefined;
   const failure = build.error === null ? null : describeBuildFailure(build.error.message, context);
@@ -128,31 +128,7 @@ export function BuildImageDialog({
               )}
             </div>
 
-            {failure !== null && (
-              <div className="space-y-2 rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                <p className={failure.explained ? '' : 'break-all font-mono text-xs'}>
-                  {failure.summary}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowFullError((current) => !current)}
-                  aria-expanded={showFullError}
-                  className="inline-flex items-center gap-1 text-xs font-medium underline-offset-2 hover:underline"
-                >
-                  {showFullError ? (
-                    <ChevronDown className="h-3 w-3" />
-                  ) : (
-                    <ChevronRight className="h-3 w-3" />
-                  )}
-                  {showFullError ? 'Hide full error' : 'Show full error'}
-                </button>
-                {showFullError && (
-                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-background/60 p-2 font-mono text-[11px] leading-relaxed">
-                    {failure.detail}
-                  </pre>
-                )}
-              </div>
-            )}
+            {failure !== null && <BuildFailureNotice failure={failure} />}
 
             <div className="flex justify-end gap-2">
               <button

@@ -1,7 +1,8 @@
 import { defineCommand } from '../define-command';
 import { printJson } from '../output';
-import { builtSourceLine } from '@mediforce/platform-core';
+import { builtSourceLine, checkBuildContextArchive, formatBytes } from '@mediforce/platform-core';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
+import { packContextDirectory } from '../build-context';
 
 /**
  * `mediforce images *` — the Image Catalog (ADR-0022): the images a workspace
@@ -330,27 +331,118 @@ export const imagesDeleteCommand = defineCommand({
   },
 });
 
+/** Flags that only mean something for an uploaded context. */
+const UPLOAD_ONLY_FLAGS = ['tag', 'name', 'intent', 'declared-repo', 'declared-commit', 'declared-dockerfile'] as const;
+
 export const imagesBuildCommand = defineCommand({
   name: 'mediforce images build',
   description:
-    'Build one version of a built source on the deployment, without running a workflow.',
+    'Build one version of an image on the deployment, without running a workflow — from a git repo at a commit (--repo, --commit), or from a local directory uploaded as the build context (--reference, --context).',
   args: {
     namespace: { type: 'string', required: true, description: 'Namespace handle' },
-    repo: { type: 'string', required: true, description: 'Git repo to build from' },
-    commit: { type: 'string', required: true, description: 'Commit to check out and build' },
-    dockerfile: { type: 'string', description: 'Dockerfile path inside --repo' },
-    context: { type: 'string', description: CONTEXT_FLAG_DESCRIPTION },
+    repo: { type: 'string', description: 'Git repo to build from' },
+    commit: { type: 'string', description: 'Commit to check out and build (with --repo)' },
+    dockerfile: {
+      type: 'string',
+      description: 'Dockerfile path inside --repo, or from the root of a local --context',
+    },
+    context: {
+      type: 'string',
+      description: `With --repo: ${CONTEXT_FLAG_DESCRIPTION}. With --reference: the local directory to upload as the build context — all of it but what its .dockerignore excludes, which is never uploaded`,
+    },
+    reference: {
+      type: 'string',
+      description:
+        'Untagged image name to build a local --context under, starting with "<namespace>/". Catalogued as a referenced entry — the platform keeps no inputs, so it cannot rebuild it',
+    },
+    tag: {
+      type: 'string',
+      description: 'Tag for an uploaded build. Defaults to the upload time; a tag already on the daemon is refused',
+    },
+    name: { type: 'string', description: 'Entry name, set by the first upload of a --reference' },
+    intent: {
+      type: 'string',
+      description: 'One sentence: what this image is FOR. Required by the first upload of a --reference',
+    },
+    'declared-repo': { type: 'string', description: 'Declared source repo, set by the first upload (not derived)' },
+    'declared-commit': { type: 'string', description: 'Declared source commit, set by the first upload (not derived)' },
+    'declared-dockerfile': { type: 'string', description: 'Declared Dockerfile, set by the first upload (not derived)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
+    if ((args.repo === undefined) === (args.reference === undefined)) {
+      output.stderr(
+        'Supply exactly one of --repo (a git repo at --commit) or --reference (a local --context uploaded as the build context).',
+      );
+      return 2;
+    }
+
+    if (args.reference !== undefined) {
+      if (args.context === undefined) {
+        output.stderr('--reference builds a local directory: pass it as --context.');
+        return 2;
+      }
+      if (args.commit !== undefined) {
+        output.stderr('--commit applies to --repo. An uploaded context has no commit — declare one with --declared-commit.');
+        return 2;
+      }
+      // Checked here as well as by the platform, so a context that cannot build
+      // fails before it is uploaded rather than after.
+      const dockerfile = args.dockerfile ?? '';
+      const { archive, ignoreFile } = await packContextDirectory(args.context, dockerfile);
+      const check = checkBuildContextArchive(archive, dockerfile);
+      if (check.ok === false) throw new Error(check.message);
+
+      const declaredSource = {
+        ...(args['declared-repo'] !== undefined ? { repo: args['declared-repo'] } : {}),
+        ...(args['declared-commit'] !== undefined ? { commit: args['declared-commit'] } : {}),
+        ...(args['declared-dockerfile'] !== undefined ? { dockerfile: args['declared-dockerfile'] } : {}),
+      };
+      if (jsonMode === false) {
+        const ignored = ignoreFile === null ? '' : `, ${ignoreFile} applied`;
+        output.stdout(
+          `Uploading ${args.context} (${formatBytes(archive.length)}${ignored}) and building ${args.reference} — this takes a few minutes...`,
+        );
+      }
+      const result = await mediforce.imageCatalog.upload({
+        namespace: args.namespace,
+        reference: args.reference,
+        dockerfile,
+        context: archive,
+        ...(args.tag !== undefined ? { tag: args.tag } : {}),
+        ...(args.name !== undefined ? { name: args.name } : {}),
+        ...(args.intent !== undefined ? { intent: args.intent } : {}),
+        ...(Object.keys(declaredSource).length > 0 ? { declaredSource } : {}),
+      });
+      if (jsonMode) {
+        printJson(output, result);
+        return 0;
+      }
+      output.stdout(`Built ${result.imageTag} for entry ${result.entryId}.`);
+      output.stdout('It is offered in the catalog — `mediforce images list` to see it.');
+      return 0;
+    }
+
+    const { repo, commit } = args;
+    if (repo === undefined || commit === undefined) {
+      output.stderr('--repo builds a commit: pass it as --commit.');
+      return 2;
+    }
+    const uploadOnly = UPLOAD_ONLY_FLAGS.filter((flag) => args[flag] !== undefined);
+    if (uploadOnly.length > 0) {
+      output.stderr(
+        `${uploadOnly.map((flag) => `--${flag}`).join(', ')} apply to an uploaded context (--reference), not to --repo.`,
+      );
+      return 2;
+    }
     if (jsonMode === false) {
       // A clone plus a Dockerfile takes minutes and the command shows nothing
       // until it lands, so say so rather than looking hung.
-      output.stdout(`Building ${args.repo}@${args.commit.slice(0, 8)} — this takes a few minutes...`);
+      output.stdout(`Building ${repo}@${commit.slice(0, 8)} — this takes a few minutes...`);
     }
     const result = await mediforce.imageCatalog.build({
       namespace: args.namespace,
-      repo: args.repo,
-      commit: args.commit,
+      repo,
+      commit,
       dockerfile: args.dockerfile ?? '',
       context: args.context,
     });

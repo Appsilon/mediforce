@@ -1,4 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
@@ -169,6 +172,97 @@ test.describe('Image Catalog UI journey', () => {
         { headers: AUTH },
       );
       docker('rmi', `${derivedReference}:v1`, `${baseReference}:v1`);
+    }
+  });
+
+  test('an author with no repo uploads a folder and gets an image the catalog offers', async ({
+    page,
+    request,
+  }) => {
+    // A real upload and a real `docker build`, then a catalog read.
+    test.setTimeout(300_000);
+    trackPageErrors(page);
+
+    const stamp = Date.now();
+    const imageName = `e2e-upload-${stamp}`;
+    const intent = `Uploaded from the Images view ${stamp}, with no repository behind it.`;
+    // A Dockerfile in a subdirectory copying a sibling: only the whole folder
+    // as the build context can build it.
+    const folder = join(mkdtempSync(join(tmpdir(), 'mediforce-e2e-upload-')), imageName);
+    mkdirSync(join(folder, 'container'), { recursive: true });
+    mkdirSync(join(folder, 'scripts'));
+    writeFileSync(join(folder, 'container', 'Dockerfile'), `FROM ${BASE_IMAGE}\nCOPY scripts/hello.sh /hello.sh\n`);
+    writeFileSync(join(folder, 'scripts', 'hello.sh'), 'echo hello\n');
+    // Data the build never copies, kept out by the folder's own .dockerignore.
+    mkdirSync(join(folder, 'sample-data'));
+    writeFileSync(join(folder, 'sample-data', 'dm.xpt'), 'rows\n');
+    writeFileSync(join(folder, '.dockerignore'), 'sample-data\n');
+    let entryId = '';
+    let imageTag = '';
+
+    try {
+      // Playwright cannot drive Chromium's native directory picker, so the
+      // form falls back to `<input webkitdirectory>`, which it can fill; the
+      // picker's own walk is covered by the page test.
+      await page.addInitScript(() => {
+        Reflect.deleteProperty(window, 'showDirectoryPicker');
+      });
+      await page.goto(`/${TEST_ORG_HANDLE}/images`);
+      await page.getByRole('button', { name: /Add image/ }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('tab', { name: 'Local folder' }).click();
+      await dialog.getByLabel('Folder', { exact: true }).setInputFiles(folder);
+
+      // The only Dockerfile in the folder is offered, and the image is named
+      // after the folder, under the workspace.
+      await expect(dialog.getByLabel('Dockerfile', { exact: true })).toHaveValue('container/Dockerfile');
+      await expect(dialog.getByLabel('Image name', { exact: true })).toHaveValue(imageName);
+      // What the .dockerignore excludes starts unchecked and stays so; the
+      // Dockerfile always goes up.
+      const sampleData = dialog.getByRole('checkbox', { name: 'Upload sample-data' });
+      await expect(sampleData).not.toBeChecked();
+      await expect(sampleData).toBeDisabled();
+      await expect(dialog.getByRole('checkbox', { name: 'Upload container' })).toBeChecked();
+      await expect(dialog.getByText(/Uploading 3 of 4 files.*1 left out by \.dockerignore/)).toBeVisible();
+      await dialog.getByLabel('Tag (optional)', { exact: true }).fill('v1');
+      await dialog.getByLabel('Description', { exact: true }).fill(intent);
+      await dialog.getByRole('button', { name: 'Upload and build' }).click();
+
+      // Closes only once the build landed and the entry was written.
+      await expect(dialog).toBeHidden({ timeout: 240_000 });
+      await expect(page.getByText(intent)).toBeVisible({ timeout: 60_000 });
+
+      const listRes = await request.get(`/api/image-catalog?namespace=${TEST_ORG_HANDLE}`, {
+        headers: AUTH,
+      });
+      const { entries } = (await listRes.json()) as {
+        entries: { id: string; source: { kind: string; reference?: string }; versions: { imageTag: string }[] }[];
+      };
+      const uploaded = entries.find((entry) => entry.source.reference === `${TEST_ORG_HANDLE}/${imageName}`);
+      expect(uploaded, 'the uploaded image is not in the catalog').toBeDefined();
+      entryId = uploaded?.id ?? '';
+      imageTag = `${TEST_ORG_HANDLE}/${imageName}:v1`;
+      expect(uploaded?.source.kind).toBe('referenced');
+      expect(uploaded?.versions.map((version) => version.imageTag)).toContain(imageTag);
+
+      // Nothing to rebuild from, so the card offers a new upload, never Build.
+      const card = page.getByTestId(`image-entry-${entryId}`);
+      await expect(card.getByRole('button', { name: 'Upload version' })).toBeVisible();
+      await expect(card.getByRole('button', { name: 'Build' })).toHaveCount(0);
+    } finally {
+      if (imageTag !== '') {
+        try {
+          docker('rmi', '-f', imageTag);
+        } catch {
+          // The build may not have produced it; the assertions already said so.
+        }
+      }
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: AUTH,
+        });
+      }
+      rmSync(join(folder, '..'), { recursive: true, force: true });
     }
   });
 
