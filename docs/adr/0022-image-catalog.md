@@ -36,6 +36,82 @@ have removed the convenient path and not the capability. Whether host-side
 builds should be privileged at all is a question about build-mode steps, and
 this ADR does not answer it.
 
+**An uploaded build context lands in a `referenced` entry** (#1345). The
+on-demand build does nothing for a Dockerfile in no repo the deployment can
+clone, so `mediforce images build --reference --context` and **Add image → Local
+folder** upload the folder as a tar and build it through the worker's same
+`POST /images/build`. Neither of the two structural options the schema offered
+was loosened: discovery keys on a build repo and an upload has none, and the
+`built` arm requires one — so the upload catalogues itself, and as `referenced`,
+which is the honest kind: the context is deleted once built, so the platform
+holds no inputs, cannot rebuild or verify the image, and its versions are tags.
+`declaredSource` is where the uploader states provenance, which is the case
+decision 2 carved it out for. The build blanks every inherited
+`mediforce.build.*` label except the namespace, so an upload `FROM` a platform
+build is never offered as a version of it. Two rules are new, both because the
+daemon is deployment-wide while the catalog is not an isolation boundary
+(decision 3): the reference **must start with the workspace handle**
+(`acme/agent`), or one workspace could tag over another's image or over
+`postgres`; and **a tag already on the daemon is refused, never replaced**, since
+a step pinning it would silently start running something else — the change the
+delete flow refuses a live pin to prevent. A daemon that cannot say whether the
+tag is free refuses the upload rather than assuming it is. Uploading is a
+member's right, as a repo build is: the same member can already run any
+Dockerfile on the host through a build-mode step pointed at a repo of their own.
+
+The tag is checked twice, because a build takes minutes: by the handler before
+building, so a taken tag costs nothing, and by the worker once built. The build
+runs under a throwaway `mediforce-upload-staging:<uuid>` tag that is moved onto
+the requested one only if that tag is still free, so two uploads racing for one
+tag during a minutes-long build cannot overwrite each other. The check and
+`docker tag` run synchronously back to back, so within one build host nothing
+lands between them; what is left is a second process tagging on the same daemon
+in those milliseconds. The worker also counts the archive as it unpacks it and
+stops past the limit, for a caller that skipped the platform's check. **The first upload of a reference creates its entry**, and it is
+audited as `image_catalog_entry.created`, like **Add image**. Its `name`,
+`intent` and `declaredSource` belong to the entry, not to a version, so a later
+upload may repeat them but never change them. Otherwise one version's declared
+commit would silently become every version's. Editing the entry is how they
+change.
+
+**The upload is a tar, packed by the platform and extracted by the worker.** A
+tar is what a build context already is, and it carries what a plain file upload
+cannot: the executable bit a copied entrypoint needs, and symlinks.
+`platform-core` writes and lists the archive itself (ustar with PAX long names,
+browser-safe), so the Images view, the CLI and the handler share one codec. It is
+written here rather than taken from a library because the check is the point:
+it needs every entry's link target and its PAX/GNU long name applied to refuse a
+hard link out of the context or a path under a symlink, and the CLI must write
+symlinks. `nanotar`, the browser-safe library, reports neither a link target nor
+an applied long name and cannot write a symlink; the complete ones (`tar-stream`,
+`tar`) need Node streams. The
+CLI packs with it rather than with the system `tar`, whose macOS build adds `._*`
+files that a `COPY .` would carry into the image. The same
+`checkBuildContextArchive` runs before the upload and again in the handler. It
+refuses a context over 100 MiB (under Next's 110 MiB body cap, which truncates
+a larger body before any handler can say why). It also refuses an entry path
+that is absolute or climbs out, an entry under a symlink, a hard link outside
+the context, and anything that is not a file, directory or symlink. The worker
+extracts the archive into a temp dir with the host's `tar` and builds that
+directory the way it builds a checkout. It does not pipe the archive to `docker
+build -`, which applies no `.dockerignore` inside a piped archive.
+
+**The clients apply the `.dockerignore` before packing, and the build host
+applies it again.** Uploading what the file excludes only to have Docker drop it
+made a folder holding test data unbuildable: `apps/landing-zone` is 337 MB of
+sample data around a Dockerfile that copies 80 KB of scripts. `platform-core`
+ports Docker's own matcher (moby/patternmatcher, with `ignorefile`'s line
+cleaning and BuildKit's `<Dockerfile>.dockerignore` precedence) rather than a
+`.gitignore` library, whose rules differ, and rather than `@balena/dockerignore`,
+which needs `node:path` and predates Docker's parent-directory rule. Docker
+applying the file again is what makes a client's port safe to be wrong: a pattern
+read differently can only drop a file Docker would have kept, which fails loud
+as a `COPY` that cannot find it, and never puts into the image something the
+file excludes. The Dockerfile and the ignore file always travel, as Docker
+always sends them. The Images view also lets a member uncheck anything else for
+one upload. What the ignore file excludes cannot be checked back, since the
+build would drop it anyway.
+
 **A built source may name a build context, and the key leaves it out.** With
 the context always the Dockerfile's own directory, a `container/Dockerfile` that
 `COPY`s `scripts/` could not be built at all. `context` is a directory from the
@@ -201,7 +277,8 @@ An entry's key is the **source**, in one of two forms:
 - **referenced** — an image reference with no tag, e.g. `mediforce-golden-image`
   or `registry.example.com/my-agent`. Its versions are tags or digests. This is
   the form for `mediforce-golden-image` itself and for anything hand-built and
-  pushed, where the platform holds no build inputs at all.
+  pushed, where the platform holds no build inputs at all — including an image
+  built from an uploaded context (see the amendment above).
 
 Both are one table, keyed per namespace by an id derived deterministically from
 the source — the same shape `tool_catalog_entries` uses, where the composite

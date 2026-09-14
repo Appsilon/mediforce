@@ -83,6 +83,28 @@ export const BuildImageRequestSchema = z
 export type BuildImageRequest = z.infer<typeof BuildImageRequestSchema>;
 
 /**
+ * A build from an uploaded context rather than a clone (#1345). The archive
+ * itself is the request body; this is what travels beside it.
+ */
+export const BuildUploadedImageRequestSchema = z
+  .object({
+    /** `reference:tag`, as the uploader named it. */
+    image: z.string().min(1),
+    /** Path from the context root; empty is the default `Dockerfile`. */
+    dockerfile: z.string().default(''),
+    /** Namespace that uploaded it. Recorded as a label. */
+    namespace: z.string().min(1),
+  })
+  .strict();
+
+export type BuildUploadedImageRequest = z.infer<typeof BuildUploadedImageRequestSchema>;
+
+/** Why an upload may not land on `image`: a version is never replaced (ADR-0022). */
+export function imageTagTakenMessage(image: string): string {
+  return `"${image}" is already on the daemon. A version is never replaced — a workflow pinning it would start running something else — so upload under another tag.`;
+}
+
+/**
  * `--label` arguments for `docker build`, one flag pair per known fact.
  *
  * Labels are immutable and travel with the image, so the repo URL is redacted
@@ -116,6 +138,23 @@ export function buildProvenanceLabelArgs(provenance: ImageProvenance): string[] 
     ),
     '--label',
     `${BUILD_LABELS.context}=${provenance.context ?? ''}`,
+  ];
+}
+
+/** `--label` arguments for an uploaded context: every build label but the
+ *  namespace written empty, so none is inherited (ADR-0022). */
+export function uploadedImageLabelArgs(namespace: string): string[] {
+  const blanked = [
+    BUILD_LABELS.repo,
+    BUILD_LABELS.commit,
+    BUILD_LABELS.dockerfile,
+    BUILD_LABELS.context,
+    BUILD_LABELS.workflow,
+  ];
+  return [
+    ...blanked.flatMap((key) => ['--label', `${key}=`]),
+    '--label',
+    `${BUILD_LABELS.namespace}=${namespace}`,
   ];
 }
 

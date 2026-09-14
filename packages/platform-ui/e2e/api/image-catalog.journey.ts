@@ -2,6 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import type { APIRequestContext } from '@playwright/test';
+import { packBuildContextArchive } from '@mediforce/platform-core';
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
@@ -42,6 +44,7 @@ interface EntryView {
   name: string;
   intent: string;
   source: { kind: string; repo?: string; dockerfile?: string; context?: string; reference?: string };
+  declaredSource?: { repo?: string; commit?: string; dockerfile?: string };
   origin: 'catalogued' | 'discovered';
   versions: VersionView[];
   availability: 'present' | 'absent' | 'unknown';
@@ -158,6 +161,40 @@ function dockerAvailable(): boolean {
   } catch {
     return false;
   }
+}
+
+/** A build context as the CLI and the Images view upload it: a tar archive of
+ *  a folder, here a Dockerfile in `container/` that copies from `scripts/`. */
+function uploadFixtureArchive(): Buffer {
+  const encoder = new TextEncoder();
+  return Buffer.from(
+    packBuildContextArchive([
+      {
+        kind: 'file',
+        path: 'container/Dockerfile',
+        content: encoder.encode(`FROM ${PROBE_BASE_IMAGE}\nCOPY scripts/hello.sh /hello.sh\n`),
+      },
+      { kind: 'file', path: 'scripts/hello.sh', content: encoder.encode('echo hello\n'), executable: true },
+    ]),
+  );
+}
+
+/** `POST /api/image-catalog/upload` — the archive as a file, the rest as JSON.
+ *  The shared helpers' JSON `Content-Type` is dropped so Playwright can set the
+ *  multipart one, boundary included. */
+function uploadContext(
+  request: APIRequestContext,
+  headers: Record<string, string>,
+  input: Record<string, unknown>,
+  archive: Buffer = uploadFixtureArchive(),
+) {
+  return request.post(`/api/image-catalog/upload?namespace=${TEST_ORG_HANDLE}`, {
+    headers: Object.fromEntries(Object.entries(headers).filter(([name]) => name !== 'Content-Type')),
+    multipart: {
+      input: JSON.stringify(input),
+      context: { name: 'context.tar', mimeType: 'application/x-tar', buffer: archive },
+    },
+  });
 }
 
 function catalogUrl(namespace: string = TEST_ORG_HANDLE): string {
@@ -973,6 +1010,118 @@ test.describe('image catalog API journey', () => {
       }
       rmSync(fixture.dir, { recursive: true, force: true });
     }
+  });
+
+  test('a member uploads a local build context and it lands as a referenced entry', async ({ request }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    test.setTimeout(300_000);
+
+    const reference = `${TEST_ORG_HANDLE}/e2e-upload-${Date.now()}`;
+    let entryId = '';
+    let builtTag = '';
+    try {
+      // A plain member, and no entry beforehand: the upload catalogues itself,
+      // since discovery keys on a build repo an upload does not have.
+      const uploadRes = await uploadContext(request, sessionCookieHeaders(plainMember), {
+        reference,
+        tag: 'v1',
+        dockerfile: 'container/Dockerfile',
+        intent: 'Proves a Dockerfile in no reachable repo can reach the catalog.',
+        declaredSource: { repo: 'https://gitlab.example.com/team/agent', commit: 'bf0353b' },
+      });
+      expect(uploadRes.status(), await uploadRes.text()).toBe(200);
+      const uploaded = (await uploadRes.json()) as { imageTag: string; entryId: string };
+      builtTag = uploaded.imageTag;
+      entryId = uploaded.entryId;
+      expect(uploaded.imageTag).toBe(`${reference}:v1`);
+
+      const getRes = await request.get(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+        headers: apiKeyHeaders(),
+      });
+      expect(getRes.ok(), await getRes.text()).toBe(true);
+      const { entry } = (await getRes.json()) as { entry: EntryView };
+      // Referenced, with the provenance the uploader claimed and nothing derived.
+      expect(entry.origin).toBe('catalogued');
+      expect(entry.source).toEqual({ kind: 'referenced', reference });
+      expect(entry.declaredSource).toEqual({ repo: 'https://gitlab.example.com/team/agent', commit: 'bf0353b' });
+      const version = entry.versions.find((candidate) => candidate.imageTag === uploaded.imageTag);
+      expect(version, `no version for ${uploaded.imageTag}`).toBeDefined();
+      expect(version?.lineage.ownLabels['mediforce.build.namespace']).toBe(TEST_ORG_HANDLE);
+      // Blanked, never inherited: an upload is not a platform build of any repo.
+      expect(version?.lineage.ownLabels['mediforce.build.repo']).toBe('');
+
+      // The siblings of the Dockerfile made it in, so the whole folder did.
+      const hello = execFileSync('docker', ['run', '--rm', uploaded.imageTag, 'sh', '/hello.sh'], {
+        stdio: 'pipe',
+      })
+        .toString()
+        .trim();
+      expect(hello).toBe('hello');
+
+      // A version is never replaced: a step pinning it would change silently.
+      const again = await uploadContext(request, sessionCookieHeaders(plainMember), {
+        reference,
+        tag: 'v1',
+        dockerfile: 'container/Dockerfile',
+      });
+      expect(again.status(), await again.text()).toBe(409);
+    } finally {
+      if (builtTag !== '') {
+        try {
+          docker('rmi', '-f', builtTag);
+        } catch {
+          // The build may not have produced it; the assertions already said so.
+        }
+      }
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+    }
+  });
+
+  test('an upload that cannot build is refused before it reaches the daemon', async ({ request }) => {
+    const reference = `${TEST_ORG_HANDLE}/e2e-refused-${Date.now()}`;
+
+    // Outside the workspace's name: the daemon is shared by every workspace.
+    const outside = await uploadContext(request, apiKeyHeaders(), {
+      reference: 'postgres',
+      dockerfile: 'container/Dockerfile',
+      intent: 'Must never be built.',
+    });
+    expect(outside.status(), await outside.text()).toBe(400);
+
+    // No Dockerfile where it was said to be — named, not a failed build.
+    const missing = await uploadContext(request, apiKeyHeaders(), {
+      reference,
+      dockerfile: 'Dockerfile',
+      intent: 'Must never be built.',
+    });
+    expect(missing.status(), await missing.text()).toBe(400);
+    const refusal = (await missing.json()) as { error: { message: string } };
+    expect(refusal.error.message).toContain('No Dockerfile at "Dockerfile"');
+
+    // Not multipart at all: said so, rather than blamed on the size limit.
+    const json = await request.post(`/api/image-catalog/upload?namespace=${TEST_ORG_HANDLE}`, {
+      headers: apiKeyHeaders(),
+      data: { reference, dockerfile: 'Dockerfile' },
+    });
+    expect(json.status(), await json.text()).toBe(400);
+
+    // Not an archive at all.
+    const garbage = await uploadContext(
+      request,
+      apiKeyHeaders(),
+      { reference, dockerfile: 'Dockerfile', intent: 'Must never be built.' },
+      Buffer.from('FROM alpine\n'),
+    );
+    expect(garbage.status(), await garbage.text()).toBe(400);
+
+    // Nothing was catalogued by any of them.
+    const listRes = await request.get(catalogUrl(), { headers: apiKeyHeaders() });
+    const { entries } = (await listRes.json()) as { entries: EntryView[] };
+    expect(entries.some((entry) => entry.source.reference === reference)).toBe(false);
   });
 
   test('a build context or Dockerfile outside the repository is refused by the contract', async ({

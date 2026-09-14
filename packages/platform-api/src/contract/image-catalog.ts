@@ -127,10 +127,8 @@ export const GetImageCatalogEntryOutputSchema = z.object({
  *  just in a form — an entry whose sentence is optional is a row nobody can
  *  read (ADR-0022 decision 2). */
 export const CreateImageCatalogEntryInputApiSchema = NamespaceQuery.extend({
-  name: z.string().min(1),
-  intent: z
-    .string()
-    .min(1, 'intent is required: one sentence saying what this image is for'),
+  name: ImageCatalogEntrySchema.shape.name,
+  intent: ImageCatalogEntrySchema.shape.intent,
   source: ImageCatalogSourceInputSchema,
   declaredSource: ImageCatalogDeclaredSourceSchema.optional(),
 }).strict();
@@ -152,11 +150,8 @@ export const CreateImageCatalogEntryOutputSchema = z.object({
  */
 export const UpdateImageCatalogEntryInputApiSchema = NamespaceQuery.extend({
   id: z.string().min(1),
-  name: z.string().min(1).optional(),
-  intent: z
-    .string()
-    .min(1, 'intent is required: one sentence saying what this image is for')
-    .optional(),
+  name: ImageCatalogEntrySchema.shape.name.optional(),
+  intent: ImageCatalogEntrySchema.shape.intent.optional(),
   source: ImageCatalogSourceInputSchema.optional(),
   declaredSource: ImageCatalogDeclaredSourceSchema.optional(),
 }).strict();
@@ -195,6 +190,59 @@ export const BuildImageCatalogVersionOutputSchema = z.object({
   /** The entry this build belongs to — catalogued or discovered, same id. */
   entryId: z.string(),
 });
+
+/** Docker's own grammar for a repository path and a tag, so a name the daemon
+ *  would refuse is a 400 here rather than a failed build. */
+const DOCKER_REPOSITORY_PATTERN =
+  /^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*$/;
+const DOCKER_TAG_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
+
+/**
+ * POST input for a build from an uploaded context (#1345), sent as
+ * `multipart/form-data`: `context` is the archive, `input` the rest as JSON.
+ * Lands in a `referenced` entry; `name`, `intent` and `declaredSource` describe
+ * the entry the first upload creates (ADR-0022).
+ */
+export const UploadImageCatalogVersionInputSchema = NamespaceQuery.extend({
+  reference: z
+    .string()
+    .regex(DOCKER_REPOSITORY_PATTERN, 'reference must be a lowercase Docker image name with no tag'),
+  tag: z
+    .string()
+    .regex(DOCKER_TAG_PATTERN, 'tag must be letters, digits, "_", "." or "-", not starting with "." or "-"')
+    .optional(),
+  /** Path from the context root. Empty is the default, `Dockerfile`. */
+  dockerfile: z.string().default(''),
+  name: ImageCatalogEntrySchema.shape.name.optional(),
+  intent: ImageCatalogEntrySchema.shape.intent.optional(),
+  declaredSource: ImageCatalogDeclaredSourceSchema.optional(),
+  /** The context archive (see `packBuildContextArchive`). A `z.custom` so this
+   *  module stays importable in the browser, which has no `Buffer`. */
+  context: z.custom<Uint8Array<ArrayBuffer>>(
+    (value) => value instanceof Uint8Array,
+    'context must be the build context archive',
+  ),
+})
+  .strict()
+  .superRefine((input, ctx) => {
+    if (input.reference.startsWith(`${input.namespace}/`) === false) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['reference'],
+        message: `reference must start with "${input.namespace}/": the daemon is shared by every workspace`,
+      });
+    }
+    if (buildPathsStayInRepo(input.dockerfile, '.') === false) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['dockerfile'],
+        message: 'dockerfile must stay inside the build context',
+      });
+    }
+  });
+
+/** The same answer a repo build gives: the tag it landed under, and the entry. */
+export const UploadImageCatalogVersionOutputSchema = BuildImageCatalogVersionOutputSchema;
 
 /**
  * DELETE input: id from URL.
@@ -240,5 +288,7 @@ export type UpdateImageCatalogEntryInputApi = z.infer<
 export type UpdateImageCatalogEntryOutput = z.infer<typeof UpdateImageCatalogEntryOutputSchema>;
 export type BuildImageCatalogVersionInput = z.infer<typeof BuildImageCatalogVersionInputSchema>;
 export type BuildImageCatalogVersionOutput = z.infer<typeof BuildImageCatalogVersionOutputSchema>;
+export type UploadImageCatalogVersionInput = z.infer<typeof UploadImageCatalogVersionInputSchema>;
+export type UploadImageCatalogVersionOutput = z.infer<typeof UploadImageCatalogVersionOutputSchema>;
 export type DeleteImageCatalogEntryInput = z.infer<typeof DeleteImageCatalogEntryInputSchema>;
 export type DeleteImageCatalogEntryOutput = z.infer<typeof DeleteImageCatalogEntryOutputSchema>;

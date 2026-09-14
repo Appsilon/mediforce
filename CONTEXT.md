@@ -249,7 +249,9 @@ restricts one — a Step may still name any image string.
 
 **Image Catalog Entry**:
 One image the platform offers, identified by its **source**: either `built`
-`(repo, dockerfile)` or `referenced` (an untagged image reference). Deliberately
+`(repo, dockerfile)` or `referenced` (an untagged image reference — also what an
+image built from an **uploaded build context** lands in, named
+`<workspace>/<name>`, since the platform keeps none of its inputs). Deliberately
 **not** keyed on the commit, so a rebuild is another **Version** of a row the
 author already chose rather than a new row — nor on the **build context** a
 `built` source may name, which is how the Dockerfile is built rather than which

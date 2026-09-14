@@ -1,10 +1,43 @@
 import { describe, it, expect } from 'vitest';
-import { buildProvenanceLabelArgs, readProvenanceLabels } from '../image-provenance';
+import {
+  buildProvenanceLabelArgs,
+  readProvenanceLabels,
+  uploadedImageLabelArgs,
+} from '../image-provenance';
 
 /** Value of a `--label key=value` pair in an argument list. */
 function label(args: string[], key: string): string | undefined {
   return args.find((arg) => arg.startsWith(`${key}=`))?.slice(key.length + 1);
 }
+
+describe('uploadedImageLabelArgs', () => {
+  it('blanks every build label it inherits, so an upload never reads as a platform build', () => {
+    const args = uploadedImageLabelArgs('acme');
+    const labels = Object.fromEntries(
+      args
+        .filter((arg) => arg !== '--label')
+        .map((arg) => [arg.slice(0, arg.indexOf('=')), arg.slice(arg.indexOf('=') + 1)]),
+    );
+
+    // Written empty rather than omitted: an upload `FROM` a built image would
+    // otherwise carry its repo and commit and be offered as a version of it.
+    expect(labels).toMatchObject({
+      'mediforce.build.repo': '',
+      'mediforce.build.commit': '',
+      'mediforce.build.dockerfile': '',
+      'mediforce.build.context': '',
+      'mediforce.build.workflow': '',
+    });
+    expect(readProvenanceLabels(labels)).toEqual({
+      buildRepo: undefined,
+      buildCommit: undefined,
+      buildDockerfile: undefined,
+      buildContext: undefined,
+      buildWorkflow: undefined,
+      buildNamespace: 'acme',
+    });
+  });
+});
 
 describe('buildProvenanceLabelArgs', () => {
   it('emits every known fact plus the OCI equivalents', () => {

@@ -6,8 +6,17 @@ import {
   probeImageCapabilities,
   removeImage,
 } from './docker-info';
-import { BuildImageRequestSchema } from '@mediforce/platform-core';
-import { buildImageFromRepo } from './docker-image-builder';
+import {
+  BUILD_CONTEXT_MEDIA_TYPE,
+  BuildImageRequestSchema,
+  BuildUploadedImageRequestSchema,
+} from '@mediforce/platform-core';
+import {
+  buildImageFromRepo,
+  buildImageFromUpload,
+  BuildContextTooLargeError,
+  ImageTagTakenError,
+} from './docker-image-builder';
 
 const WORKER_HTTP_PORT = process.env.WORKER_HTTP_PORT !== undefined
   ? Number(process.env.WORKER_HTTP_PORT)
@@ -60,6 +69,19 @@ export function startHttpServer(): Server {
     if (req.method === 'POST' && url.pathname === '/images/build') {
       if (!requireSecret(req, res)) return;
       try {
+        // An uploaded context (#1345) is the body, streamed to the builder;
+        // what travels beside it is the query.
+        const mediaType = req.headers['content-type']?.split(';')[0]?.trim().toLowerCase();
+        if (mediaType === BUILD_CONTEXT_MEDIA_TYPE) {
+          const upload = BuildUploadedImageRequestSchema.safeParse(Object.fromEntries(url.searchParams));
+          if (upload.success === false) {
+            jsonResponse(res, 400, { error: upload.error.issues[0]?.message ?? 'Invalid query' });
+            return;
+          }
+          await buildImageFromUpload(upload.data, req);
+          jsonResponse(res, 200, { image: upload.data.image });
+          return;
+        }
         const parsed = BuildImageRequestSchema.safeParse(await readJsonBody(req));
         if (!parsed.success) {
           jsonResponse(res, 400, { error: parsed.error.issues[0]?.message ?? 'Invalid body' });
@@ -68,7 +90,8 @@ export function startHttpServer(): Server {
         await buildImageFromRepo(parsed.data);
         jsonResponse(res, 200, { image: parsed.data.image });
       } catch (err) {
-        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+        const status = err instanceof ImageTagTakenError ? 409 : err instanceof BuildContextTooLargeError ? 413 : 500;
+        jsonResponse(res, status, { error: err instanceof Error ? err.message : String(err) });
       }
       return;
     }
