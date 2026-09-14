@@ -116,7 +116,7 @@ function collectMissingFiles(
 
     const dockerfile = config?.dockerfile;
     if (typeof dockerfile === 'string' && dockerfile.length > 0
-      && stepHasBuildSource(config, definition.artifacts) === false) {
+      && stepHasBuildSource(config, definition) === false) {
       note(dockerfile, step.name);
     }
   }
@@ -159,7 +159,7 @@ export function runPreflightChecks(
       // step's `image` is ever looked up.
       if (
         typeof image === 'string' && image.length > 0 &&
-        stepHasBuildSource(containerConfig, definition.artifacts) === false
+        stepHasBuildSource(containerConfig, definition) === false
       ) {
         const [repo, tag = 'latest'] = image.split(':');
         const found = options.dockerImages.some((img) => img.repository === repo && img.tag === tag);
@@ -354,7 +354,7 @@ export function findSkippedChecks(
     const image = containerConfig?.image;
     if (
       typeof image === 'string' && image.length > 0 &&
-      stepHasBuildSource(containerConfig, definition.artifacts) === false
+      stepHasBuildSource(containerConfig, definition) === false
     ) {
       needsImageLookup = true;
     }

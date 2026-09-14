@@ -260,6 +260,25 @@ describe('registerWorkflow handler', () => {
     expect(stored?.steps.find((s) => s.id === 'analyze')?.agent?.image).toBeUndefined();
   });
 
+  it('leaves a step alone when the workflow\'s skills repo provides the Dockerfile it names', async () => {
+    const scope = buildScope();
+    const body = buildWorkflowDefinition({
+      name: 'skills-repo-dockerfile-flow',
+      namespace: 'team-alpha',
+      externalSkillsRepo: { url: 'https://github.com/org/skills.git', commit: 'b'.repeat(40) },
+      steps: [
+        { id: 'analyze', name: 'AI Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', dockerfile: 'container/Dockerfile' } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'analyze', to: 'done' }],
+    });
+    const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
+
+    await registerWorkflow({ ...input, namespace: 'team-alpha' }, scope);
+    const stored = await processRepo.getWorkflowDefinition('team-alpha', 'skills-repo-dockerfile-flow', 1);
+    expect(stored?.steps.find((s) => s.id === 'analyze')?.agent?.image).toBeUndefined();
+  });
+
   it('still defaults the golden image when the named Dockerfile is not carried', async () => {
     const scope = buildScope();
     const body = buildWorkflowDefinition({
