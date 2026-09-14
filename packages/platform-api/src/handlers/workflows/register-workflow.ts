@@ -1,4 +1,4 @@
-import { parseWorkflowDefinitionForCreation, DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
+import { parseWorkflowDefinitionForCreation, stepHasBuildSource, DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import { validateWorkflowGraphAndReferences } from '@mediforce/workflow-engine';
 import type {
   RegisterWorkflowInput,
@@ -67,9 +67,7 @@ export async function registerWorkflow(
     if (step.executor !== 'agent') continue;
     const cfg = step.agent;
     const hasImage = typeof cfg?.image === 'string' && cfg.image.length > 0;
-    const hasBuildSource = typeof cfg?.repo === 'string' && cfg.repo.length > 0
-      && typeof cfg?.commit === 'string' && cfg.commit.length > 0;
-    if (hasImage || hasBuildSource) continue;
+    if (hasImage || stepHasBuildSource(cfg, parsed.data.artifacts)) continue;
     step.agent = { ...cfg, image: DEFAULT_AGENT_IMAGE };
   }
 
@@ -151,9 +149,7 @@ export async function registerWorkflow(
           const cfg = step.executor === 'script' ? step.script : step.agent;
           const image = cfg?.image;
           if (typeof image !== 'string' || image.length === 0) continue;
-          const hasBuildSource = typeof cfg?.repo === 'string' && cfg.repo.length > 0
-            && typeof cfg?.commit === 'string' && cfg.commit.length > 0;
-          if (hasBuildSource) continue;
+          if (stepHasBuildSource(cfg, definition.artifacts)) continue;
           const [repo, tag = 'latest'] = image.split(':');
           const found = dockerInfo.images.some(
             (img) => img.repository === repo && img.tag === tag,

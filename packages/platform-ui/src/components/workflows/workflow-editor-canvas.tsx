@@ -1,13 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, Check, AlertTriangle } from 'lucide-react';
-import { EditorState } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
-import { basicSetup } from 'codemirror';
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
-import { json as jsonLang } from '@codemirror/lang-json';
-import { tags } from '@lezer/highlight';
+import { X, HelpCircle, Save, KeyRound, Code2, FileCode, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle, Square } from 'lucide-react';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import {
@@ -28,90 +22,31 @@ import { StepEditor } from './workflow-editor/step-editor';
 import { ModelPicker } from './workflow-editor/model-picker';
 import { selectBase } from './workflow-editor/step-editor-fields';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
+import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
+import { WorkflowSettingsPanel } from './workflow-settings-panel';
+import { WorkflowNotificationsPanel } from './workflow-notifications-panel';
+import { pruneWorkflowSettings } from './workflow-settings-utils';
+import type { WorkflowSettingsDraft } from './workflow-settings-utils';
+import { unheldStepRoles } from './workflow-editor-utils';
 import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
-import { mediforce, ApiError } from '@/lib/mediforce';
+import { mediforce, mediforceSilent, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { applyWorkflowAssistantToolCalls, type WorkflowAssistantToolCall } from '@mediforce/platform-core';
+import { CodeEditor } from './workflow-editor/code-editor';
+import { WorkflowFilesPanel } from './workflow-files-panel';
+import { AssistantPlan, answersMessage } from './assistant-plan';
+import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import type { PlanWorkflowBuildOutput } from '@mediforce/platform-api/contract';
+import { messagesForModel, type AssistantMessage } from '@/lib/assistant-conversation';
+import { formatDuration } from '@/lib/format';
 
-interface AssistantMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  changes?: string;
-}
 
 // Rotating status shown while the assistant works — the request is a single
 // non-streaming call, so these are indicative phases, not live server progress.
 const ASSISTANT_PHASES = ['Thinking…', 'Planning the workflow…', 'Building steps…', 'Wiring transitions…', 'Validating…'] as const;
-
-function JsonCodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<EditorView | null>(null);
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-  const externalUpdateRef = useRef(false);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const state = EditorState.create({
-      doc: value,
-      extensions: [
-        basicSetup,
-        jsonLang(),
-        EditorView.updateListener.of((update) => {
-          if (update.docChanged && !externalUpdateRef.current) {
-            onChangeRef.current(update.state.doc.toString());
-          }
-        }),
-        EditorView.theme({
-          '&': { fontSize: '11px', height: 'auto' },
-          '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', overflow: 'visible' },
-          '.cm-content': { padding: '8px 0' },
-          '.cm-gutters': { borderRight: '1px solid var(--border)', background: 'transparent', color: 'hsl(var(--muted-foreground))', fontSize: '10px' },
-          '.cm-activeLineGutter': { background: 'transparent' },
-          '.cm-tok-key':     { color: 'hsl(var(--primary))', fontWeight: '500' },
-          '.cm-tok-string':  { color: 'hsl(var(--color-status-warn))' },
-          '.cm-tok-number':  { color: 'hsl(38 75% 45%)' },
-          '.cm-tok-bool':    { color: 'hsl(var(--color-status-ok))' },
-          '.cm-tok-null':    { color: 'hsl(var(--muted-foreground))' },
-          '.cm-tok-comment': { color: 'hsl(var(--muted-foreground))', fontStyle: 'italic' },
-          '.cm-tok-punct':   { color: 'hsl(var(--muted-foreground) / 0.6)' },
-        }),
-        syntaxHighlighting(HighlightStyle.define([
-          { tag: tags.propertyName,              class: 'cm-tok-key' },
-          { tag: tags.string,                    class: 'cm-tok-string' },
-          { tag: tags.number,                    class: 'cm-tok-number' },
-          { tag: [tags.bool, tags.atom],         class: 'cm-tok-bool' },
-          { tag: tags.null,                      class: 'cm-tok-null' },
-          { tag: tags.comment,                   class: 'cm-tok-comment' },
-          { tag: [tags.separator, tags.bracket], class: 'cm-tok-punct' },
-        ])),
-      ],
-    });
-
-    const view = new EditorView({ state, parent: containerRef.current });
-    viewRef.current = view;
-    return () => { view.destroy(); viewRef.current = null; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view || view.state.doc.toString() === value) return;
-    externalUpdateRef.current = true;
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
-    externalUpdateRef.current = false;
-  }, [value]);
-
-  return (
-    <div
-      ref={containerRef}
-      className="rounded-lg border overflow-hidden [&_.cm-editor]:outline-none [&_.cm-editor.cm-focused]:outline-none"
-    />
-  );
-}
 
 export interface WorkflowEditorCanvasProps {
   initialSteps: WorkflowStep[];
@@ -121,6 +56,10 @@ export interface WorkflowEditorCanvasProps {
   /** Applied when a pasted document carries fields outside the graph, so the
    *  source panel can round-trip a whole definition instead of refusing it. */
   onNonGraphFieldsChange?: (fields: Record<string, unknown>) => void;
+  /** The workflow-level fields the settings panel edits. Owned by the page,
+   *  which is what registers them. */
+  settingsDraft?: WorkflowSettingsDraft;
+  onSettingsChange?: (draft: WorkflowSettingsDraft) => void;
   workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
   workflowName?: string;
   namespace?: string;
@@ -159,6 +98,8 @@ export function WorkflowEditorCanvas({
   initialInputForNextRun,
   wdJsonFields,
   onNonGraphFieldsChange,
+  settingsDraft,
+  onSettingsChange,
   workflowExternalSkillsRepo,
   workflowName,
   namespace,
@@ -168,7 +109,7 @@ export function WorkflowEditorCanvas({
   stepErrors,
 }: WorkflowEditorCanvasProps) {
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
-  const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'add-block' | null>(null);
+  const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'settings' | 'notifications' | 'files' | 'add-block' | null>(null);
   const [addBlockContext, setAddBlockContext] = useState<{ fromId: string; toId: string } | null>(null);
   const [aiPaneOpen, setAiPaneOpen] = useState(false);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
@@ -253,6 +194,17 @@ export function WorkflowEditorCanvas({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape closes the Advanced, Notifications and Files panels, including
+      // from inside their own fields, which is where a person editing them is.
+      // The JSON panel is left out on purpose: closing it asks about unapplied
+      // changes first, so it cannot be dismissed by a keystroke.
+      if (
+        e.key === 'Escape' &&
+        (rightPanelView === 'settings' || rightPanelView === 'notifications' || rightPanelView === 'files')
+      ) {
+        setRightPanelView(null);
+        return;
+      }
       // Don't hijack native undo/redo while the user is typing in a form field
       // or the JSON/code editor — this shortcut is only for the diagram's own
       // edit history.
@@ -276,7 +228,7 @@ export function WorkflowEditorCanvas({
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [undoEdit, redoEdit]);
+  }, [undoEdit, redoEdit, rightPanelView]);
 
   useEffect(() => {
     onChange?.(editedSteps, editedTransitions, editedInputForNextRun);
@@ -488,8 +440,35 @@ export function WorkflowEditorCanvas({
   const [assistantModel, setAssistantModel] = useState<string | undefined>(undefined);
   const [assistantSettingsOpen, setAssistantSettingsOpen] = useState(false);
   const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantPlanning, setAssistantPlanning] = useState(false);
   const [assistantPhase, setAssistantPhase] = useState(0);
+  /** What this turn said it would do, and what it asked first. Written by the
+   *  planning call, cleared when the build starts. */
+  const [assistantPlan, setAssistantPlan] = useState<PlanWorkflowBuildOutput | null>(null);
+  const [assistantAnswers, setAssistantAnswers] = useState<Record<string, string>>({});
+  /** Phases for the build now running, written for this workflow rather than
+   *  the generic list they replace. Empty falls back to that list. */
+  const [assistantPhases, setAssistantPhases] = useState<readonly string[]>(ASSISTANT_PHASES);
+  const [assistantElapsed, setAssistantElapsed] = useState(0);
+  /** Something arrived while the pane was collapsed. Cleared on opening it. */
+  const [assistantUnread, setAssistantUnread] = useState(false);
+  // Whether this workspace holds the key every assistant turn needs.
+  const [assistantKeyMissing, setAssistantKeyMissing] = useState(false);
+  // The turn in flight, so the halt button can stop it.
+  const assistantAbortRef = useRef<AbortController | null>(null);
+  const heldRolesRef = useRef<string[] | null>(null);
+  const assistantScrollRef = useRef<HTMLDivElement>(null);
   const assistantInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!aiPaneOpen || !namespace) return;
+    let cancelled = false;
+    // `mediforceSilent`: a probe that fails is not the person's problem, and a toast about it would be the third one this pane has learned not to raise.
+    void mediforceSilent.secrets.list({ namespace })
+      .then(({ keys }) => { if (!cancelled) setAssistantKeyMissing(keys.includes('OPENROUTER_API_KEY') === false); })
+      .catch(() => { if (!cancelled) setAssistantKeyMissing(false); });
+    return () => { cancelled = true; };
+  }, [aiPaneOpen, namespace]);
 
   useEffect(() => {
     const el = assistantInputRef.current;
@@ -503,20 +482,62 @@ export function WorkflowEditorCanvas({
   useEffect(() => {
     if (!assistantLoading) return;
     setAssistantPhase(0);
+    setAssistantElapsed(0);
+    const started = Date.now();
     const timer = setInterval(() => {
-      setAssistantPhase((p) => Math.min(p + 1, ASSISTANT_PHASES.length - 1));
+      setAssistantElapsed(Math.round((Date.now() - started) / 1000));
+      setAssistantPhase((p) => Math.min(p + 1, assistantPhases.length - 1));
     }, 2500);
     return () => clearInterval(timer);
-  }, [assistantLoading]);
+  }, [assistantLoading, assistantPhases]);
+
+  // A reply is only useful if it is seen. The thread scrolls to the newest
+  // message, and when the pane is collapsed the toggle carries a mark instead —
+  // an answer nobody notices is the same as no answer.
+  useEffect(() => {
+    if (assistantMessages.length === 0 && assistantPlan === null) return;
+    if (!aiPaneOpen) {
+      setAssistantUnread(true);
+      return;
+    }
+    const el = assistantScrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [assistantMessages, assistantPlan, aiPaneOpen]);
+
+  // Seeds the notifications role pick-list. Fetched here rather than threaded
+  // through the pages: the canvas already knows the handle, and that panel is
+  // the only consumer.
+  const { roles: workspaceRoles, heldRoles } = useWorkspaceRoles(namespace ?? '', {
+    // Also while the assistant pane is open: a step it writes can name a role nobody holds, and the person reading the reply never opens the panel where that warning already lives.
+    enabled: rightPanelView === 'notifications' || aiPaneOpen,
+    workflowName,
+  });
 
   // Applies the whole batch through the shared reducer in one atomic state
   // update. Returns a success summary and any tool-call errors separately so the
   // UI never presents a failure as a confirmed change.
-  const applyAssistantToolCalls = useCallback((toolCalls: WorkflowAssistantToolCall[]): { summary: string; error: string | null } => {
-    const result = applyWorkflowAssistantToolCalls(editedStepsRef.current, editedTransitionsRef.current, toolCalls);
+
+  const settingsDraftRef = useRef(settingsDraft);
+  settingsDraftRef.current = settingsDraft;
+  heldRolesRef.current = heldRoles;
+
+  const applyAssistantToolCalls = useCallback((toolCalls: WorkflowAssistantToolCall[]): { summary: string; error: string | null; steps: WorkflowStep[] } => {
+    const result = applyWorkflowAssistantToolCalls(
+      editedStepsRef.current,
+      editedTransitionsRef.current,
+      toolCalls,
+      settingsDraftRef.current,
+      editedInputForNextRunRef.current,
+    );
     saveSnapshot();
     setEditedSteps(result.steps);
     setEditedTransitions(result.transitions);
+    // Carry-over names steps, so it lands with them rather than through the
+    // page's settings draft.
+    setEditedInputForNextRun(result.inputForNextRun);
+    // The page owns the workflow-level fields, so the reducer's settings go
+    // back the same way the settings panel's edits do.
+    onSettingsChange?.(result.settings);
     const lastAdded = result.addedStepIds[result.addedStepIds.length - 1];
     if (lastAdded) setSelectedStepId(lastAdded);
 
@@ -529,56 +550,200 @@ export function WorkflowEditorCanvas({
     if (counts.add_step) parts.push(`added ${String(counts.add_step)} step${counts.add_step > 1 ? 's' : ''}`);
     if (counts.update_step) parts.push(`updated ${String(counts.update_step)} step${counts.update_step > 1 ? 's' : ''}`);
     if (counts.remove_step) parts.push(`removed ${String(counts.remove_step)} step${counts.remove_step > 1 ? 's' : ''}`);
+    if (counts.update_workflow) {
+      const fields = result.outcomes.filter((o) => o.tool === 'update_workflow').map((o) => o.stepId).join(', ');
+      parts.push(`set ${fields}`);
+    }
+    if (counts.set_transition_condition) {
+      parts.push(`set ${String(counts.set_transition_condition)} routing condition${counts.set_transition_condition > 1 ? 's' : ''}`);
+    }
+    // Named rather than counted: a file the assistant wrote is something to go
+    // and read, and the Files panel is where it landed.
+    if (counts.write_workflow_file) {
+      const paths = result.outcomes.filter((o) => o.tool === 'write_workflow_file').map((o) => o.stepId).join(', ');
+      parts.push(`wrote ${paths}`);
+    }
+    if (counts.remove_workflow_file) {
+      const paths = result.outcomes.filter((o) => o.tool === 'remove_workflow_file').map((o) => o.stepId).join(', ');
+      parts.push(`removed ${paths}`);
+    }
     return {
-      summary: parts.length > 0 ? `Updated the workflow — ${parts.join(', ')}.` : '',
+      // The graph the reducer produced, so a caller checking whether it can be saved reads what just landed rather than waiting for the state to commit and the mirror refs to catch up a macrotask later.
+      steps: result.steps,
+      summary: parts.length > 0 ? `Updated the workflow: ${parts.join(', ')}.` : '',
       error: errors.length > 0 ? errors.join(' ') : null,
     };
-  }, [saveSnapshot]);
+  }, [saveSnapshot, onSettingsChange]);
 
-  const sendAssistantMessage = useCallback(async () => {
-    const content = assistantInput.trim();
-    if (!content || assistantLoading || !namespace) return;
+  /** The canvas as the assistant sees it, for both calls. */
+  const assistantWorkflowDefinition = useCallback(() => ({
+    steps: editedStepsRef.current,
+    transitions: editedTransitionsRef.current,
+    // Carry-over goes with the workflow level so the assistant can read
+    // what is set before patching it, the same as every other field.
+    settings: {
+      ...pruneWorkflowSettings(settingsDraftRef.current ?? {}),
+      ...(editedInputForNextRunRef.current === undefined
+        ? {}
+        : { inputForNextRun: editedInputForNextRunRef.current }),
+    },
+  }), []);
 
-    const nextMessages: AssistantMessage[] = [...assistantMessages, { role: 'user', content }];
-    setAssistantMessages(nextMessages);
-    setAssistantInput('');
+  // Stop the turn in flight.
+  const haltAssistant = useCallback(() => {
+    assistantAbortRef.current?.abort();
+  }, []);
+
+  /**
+   * The build itself. Split from sending a message so the plan can sit between
+   * them: answers to the plan's questions are appended as one message, which is
+   * how the build hears them without a second round of asking.
+   */
+  const runAssistantBuild = useCallback(async (extra?: string, base?: AssistantMessage[]) => {
+    if (assistantLoading || !namespace) return;
+    // `base` is the thread as the caller knows it.
+    const thread = base ?? assistantMessages;
+    const answered = extra === undefined || extra === ''
+      ? thread
+      : [...thread, { role: 'user' as const, content: extra }];
+    if (extra !== undefined && extra !== '') setAssistantMessages(answered);
+    setAssistantPlan(null);
+    setAssistantAnswers({});
     setAssistantLoading(true);
+    const controller = new AbortController();
+    assistantAbortRef.current = controller;
 
     try {
-      const result = await mediforce.assistant.ask(
+      const result = await mediforceSilent.assistant.ask(
         {
-          messages: nextMessages,
+          messages: messagesForModel(answered),
           model: assistantModel,
-          workflowDefinition: { steps: editedSteps, transitions: editedTransitions },
+          workflowDefinition: assistantWorkflowDefinition(),
+          // A trigger attaches to a saved workflow, so the assistant needs to know whether this canvas is a version of one.
+          ...(workflowName === undefined ? {} : { workflowName }),
         },
-        { namespace },
+        { namespace, signal: controller.signal },
       );
-      const applied = result.toolCalls ? applyAssistantToolCalls(result.toolCalls) : { summary: '', error: null };
+      const applied = result.toolCalls
+        ? applyAssistantToolCalls(result.toolCalls)
+        : { summary: '', error: null, steps: null };
       const replyText = result.reply || (applied.summary ? 'Done.' : '');
       setAssistantMessages((prev) => [...prev, {
         role: 'assistant',
         content: replyText,
         ...(applied.summary ? { changes: applied.summary } : {}),
       }]);
-      if (applied.error) {
-        toast({ variant: 'error', title: "Couldn't apply every change", description: applied.error });
+      // A build that could not finish comes back asking. Rendered as the same
+      // card the plan uses, because answering is the way out of it — a toast
+      // would say the turn is over and leave nothing to act on.
+      if (result.questions !== undefined && result.questions.length > 0) {
+        setAssistantPlan({ plan: [], questions: result.questions, phases: [] });
       }
-      if (result.toolCalls) {
-        // editedStepsRef only settles one macrotask after the state update commits.
-        setTimeout(() => {
-          const issue = validateSteps(editedStepsRef.current);
-          if (issue) {
-            setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `Heads up — this won't save yet: ${issue}` }]);
-          }
-        }, 0);
+      if (applied.error) {
+        setAssistantMessages((prev) => [...prev, {
+          role: 'assistant',
+          content: `Not everything landed: ${applied.error}`,
+          narration: true,
+          tone: 'warning',
+        }]);
+      }
+      if (applied.steps !== null) {
+        const issue = validateSteps(applied.steps);
+        if (issue) {
+          setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `This will not save yet: ${issue}`, narration: true, tone: 'warning' }]);
+        }
+        // A role nobody holds is a task nobody can claim.
+        const unheld = unheldStepRoles(applied.steps, heldRolesRef.current);
+        if (unheld.length > 0) {
+          setAssistantMessages((prev) => [...prev, {
+            role: 'assistant',
+            content: `Heads up: nobody holds ${unheld.map((role) => `"${role}"`).join(', ')} in this workspace, so ${unheld.length === 1 ? 'that step' : 'those steps'} will wait until someone is granted ${unheld.length === 1 ? 'it' : 'them'} in Settings → Members.`,
+            narration: true,
+            tone: 'warning',
+          }]);
+        }
       }
     } catch (err) {
-      const description = err instanceof ApiError || err instanceof Error ? err.message : 'Failed to reach the assistant';
-      toast({ variant: 'error', title: 'Assistant error', description });
+      // Halted on purpose: said in the thread rather than as an error, because it is the outcome the person asked for.
+      if (controller.signal.aborted) {
+        setAssistantMessages((prev) => [...prev, {
+          role: 'assistant',
+          content: 'Stopped. Nothing was changed on the canvas.',
+          narration: true,
+        }]);
+      } else {
+        const description = err instanceof ApiError || err instanceof Error ? err.message : 'Failed to reach the assistant';
+        toast({ variant: 'error', title: 'Assistant error', description });
+      }
     } finally {
+      assistantAbortRef.current = null;
       setAssistantLoading(false);
     }
-  }, [assistantInput, assistantLoading, assistantMessages, assistantModel, namespace, editedSteps, editedTransitions, applyAssistantToolCalls, toast]);
+  }, [assistantMessages, assistantLoading, assistantModel, namespace, assistantWorkflowDefinition, applyAssistantToolCalls, toast]);
+
+  /**
+   * Sending a message plans first, then builds. The plan is one short call: it
+   * says what it is about to do and asks only what it cannot infer, so a wrong
+   * assumption costs a sentence rather than a minute of building. When it has
+   * nothing to ask, the build starts straight away and the plan is just the
+   * status the pane shows while it runs.
+   */
+  const sendAssistantMessage = useCallback(async () => {
+    const content = assistantInput.trim();
+    if (!content || assistantLoading || assistantPlanning || !namespace) return;
+
+    const nextMessages: AssistantMessage[] = [...assistantMessages, { role: 'user', content }];
+    setAssistantMessages(nextMessages);
+    setAssistantInput('');
+    setAssistantPlanning(true);
+    const controller = new AbortController();
+    assistantAbortRef.current = controller;
+
+    let planned: PlanWorkflowBuildOutput | null = null;
+    let refusal: ApiError | null = null;
+    try {
+      planned = await mediforceSilent.assistant.plan(
+        { messages: messagesForModel(nextMessages), model: assistantModel, workflowDefinition: assistantWorkflowDefinition() },
+        { namespace, signal: controller.signal },
+      );
+    } catch (err) {
+      // The plan is an aid, not the work, so a plan this pane merely could not read costs nobody their turn.
+      if (err instanceof ApiError) refusal = err;
+      planned = null;
+    } finally {
+      assistantAbortRef.current = null;
+      setAssistantPlanning(false);
+    }
+
+    // The server refused the request, and the build is the same request with a longer prompt.
+    if (refusal !== null) {
+      toast({ variant: 'error', title: 'Assistant error', description: refusal.message });
+      return;
+    }
+
+    if (controller.signal.aborted) {
+      setAssistantMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: 'Stopped. Nothing was changed on the canvas.',
+        narration: true,
+      }]);
+      return;
+    }
+
+    setAssistantPhases(planned !== null && planned.phases.length > 0 ? planned.phases : ASSISTANT_PHASES);
+    if (planned !== null && planned.questions.length > 0) {
+      setAssistantPlan(planned);
+      return;
+    }
+    if (planned !== null && planned.plan.length > 0) {
+      setAssistantMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: planned.plan.map((line) => `- ${line}`).join('\n'),
+        narration: true,
+      }]);
+    }
+    await runAssistantBuild(undefined, nextMessages);
+  }, [assistantMessages, assistantInput, assistantLoading, assistantPlanning, assistantModel, namespace, assistantWorkflowDefinition, runAssistantBuild, toast]);
 
   const moveStep = useCallback((stepId: string, direction: 'up' | 'down') => {
     saveSnapshot();
@@ -737,8 +902,8 @@ export function WorkflowEditorCanvas({
       if (split.ignored.length > 0) {
         toast({
           variant: 'warning',
-          title: 'Some fields come from the platform',
-          description: `${split.ignored.join(', ')} ${split.ignored.length === 1 ? 'is' : 'are'} assigned when a version registers, so the pasted value was not used. Everything else was applied.`,
+          title: 'Some fields are not the file\u2019s to set',
+          description: `${split.ignored.join(', ')} ${split.ignored.length === 1 ? 'is' : 'are'} decided here rather than in the pasted definition, so ${split.ignored.length === 1 ? 'that value' : 'those values'} ${split.ignored.length === 1 ? 'was' : 'were'} not used. Everything else was applied.`,
         });
       }
     } catch (err) {
@@ -776,12 +941,39 @@ export function WorkflowEditorCanvas({
           <AuthoringPathsPopover />
 
           <button
+            onClick={() => setRightPanelView('notifications')}
+            aria-label="Notifications"
+            title="Who is told when a task is assigned or an agent escalates"
+            className="inline-flex items-center rounded-md border p-1.5 text-foreground transition-colors hover:bg-muted"
+          >
+            <Bell className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            onClick={() => setRightPanelView('settings')}
+            aria-label="Advanced"
+            title="Advanced: the preamble every agent step in this workflow gets"
+            className="inline-flex items-center rounded-md border p-1.5 text-foreground transition-colors hover:bg-muted"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            onClick={() => setRightPanelView('files')}
+            aria-label="Files"
+            title="Files: the scripts, Dockerfile and skills this workflow carries"
+            className="inline-flex items-center rounded-md border p-1.5 text-foreground transition-colors hover:bg-muted"
+          >
+            <FileCode className="h-3.5 w-3.5" />
+          </button>
+
+          <button
             onClick={() => setRightPanelView('secrets')}
-            title="Workflow secrets"
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground"
+            aria-label="Secrets"
+            title="Secrets: the values this workflow reads at run time"
+            className="inline-flex items-center rounded-md border p-1.5 text-foreground transition-colors hover:bg-muted"
           >
             <KeyRound className="h-3.5 w-3.5" />
-            Secrets
           </button>
 
           <span className="group relative inline-flex">
@@ -842,6 +1034,7 @@ export function WorkflowEditorCanvas({
               errors={stepErrors?.[selectedStep.id]}
               imageWarning={warningStepIds?.get(selectedStep.id)}
               dockerImages={dockerImages}
+              workflowArtifacts={settingsDraft?.artifacts}
               workflowExternalSkillsRepo={workflowExternalSkillsRepo}
             />
           </div>
@@ -865,6 +1058,18 @@ export function WorkflowEditorCanvas({
                 <span className="text-sm font-semibold shrink-0">AI Assistant</span>
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                {assistantKeyMissing && (
+                  // Pulsing, because it is the difference between the pane working and every message failing, and it sits next to controls a person is about to reach for anyway.
+                  <InstantTooltip label="OPENROUTER_API_KEY is missing from this workspace">
+                    <span
+                      tabIndex={0}
+                      className="rounded-md p-1 text-amber-600 dark:text-amber-500 animate-pulse cursor-help"
+                      aria-label="The assistant needs a key: OPENROUTER_API_KEY is not set in this workspace"
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                    </span>
+                  </InstantTooltip>
+                )}
                 <button
                   onClick={() => setAssistantSettingsOpen((prev) => !prev)}
                   className={cn(
@@ -877,7 +1082,7 @@ export function WorkflowEditorCanvas({
                   <Settings className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => setAiPaneOpen(false)}
+                  onClick={() => { setAiPaneOpen(false); setAssistantUnread(false); }}
                   className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   title="Collapse AI Assistant"
                   aria-label="Collapse AI Assistant"
@@ -899,13 +1104,13 @@ export function WorkflowEditorCanvas({
                 />
               </div>
             )}
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            <div ref={assistantScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
               {assistantMessages.length === 0 ? (
                 <div className="text-sm text-muted-foreground text-center py-6 space-y-3">
                   <p>Describe the workflow you want to build, or ask a question.</p>
                   <p className="text-xs">
-                    Working in a checkout? <span className="font-mono">/design-workflow</span> authors the
-                    whole package — scripts, Dockerfile, tests — not just the canvas.
+                    It writes the steps, the routing, and the files the workflow needs —
+                    a script, a Dockerfile, a skill.
                   </p>
                 </div>
               ) : (
@@ -925,12 +1130,25 @@ export function WorkflowEditorCanvas({
                     <div className="flex flex-col gap-1 max-w-[85%] min-w-0">
                       {message.content && (
                         <div
+                          data-tone={message.tone}
                           className={cn(
-                            'rounded-lg px-3 py-2 whitespace-pre-wrap break-words',
-                            message.role === 'user' ? 'bg-primary/10' : 'bg-muted',
+                            'rounded-lg px-3 py-2 break-words',
+                            message.role === 'user'
+                              ? 'bg-primary/10 whitespace-pre-wrap'
+                              : 'cm-assistant-reply bg-muted',
+                            // A warning is not another reply: same thread, its own colour, so it is not read past.
+                            message.tone === 'warning'
+                              && 'bg-amber-50 dark:bg-amber-950/40 border border-amber-500/40 text-amber-900 dark:text-amber-200',
                           )}
                         >
-                          {message.content}
+                          {/* The model writes markdown, so the pane renders it:
+                              printed raw, a reply with a list or `code` reached
+                              the reader as asterisks and backticks. What the
+                              person typed is left alone, since their newlines
+                              are all the structure it has. */}
+                          {message.role === 'user'
+                            ? message.content
+                            : <MarkdownPresentation content={message.content} />}
                         </div>
                       )}
                       {message.changes && (
@@ -943,11 +1161,41 @@ export function WorkflowEditorCanvas({
                   </div>
                 ))
               )}
-              {assistantLoading && (
+              {(assistantPlanning || assistantLoading) && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  {ASSISTANT_PHASES[assistantPhase]}
+                  {/* The phrase rotates and the counter grows a digit, so both
+                      are kept off the button: it stays put at the end of the
+                      row instead of sliding about while the turn runs. */}
+                  <span className="min-w-0 flex-1 truncate">
+                    {assistantPlanning
+                      ? 'Reading what you asked for…'
+                      : assistantPhases[assistantPhase] ?? assistantPhases[0]}
+                  </span>
+                  {assistantLoading && assistantElapsed > 0 && (
+                    <span className="shrink-0 tabular-nums text-xs text-muted-foreground/70">
+                      {formatDuration(assistantElapsed * 1000)}
+                    </span>
+                  )}
+                  <button
+                    onClick={haltAssistant}
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border hover:bg-muted hover:text-foreground transition-colors"
+                    title="Stop the assistant"
+                    aria-label="Stop the assistant"
+                  >
+                    <Square className="h-2 w-2 fill-current" />
+                  </button>
                 </div>
+              )}
+
+              {assistantPlan !== null && !assistantLoading && (
+                <AssistantPlan
+                  plan={assistantPlan}
+                  answers={assistantAnswers}
+                  onAnswer={(id: string, value: string) => setAssistantAnswers((prev) => ({ ...prev, [id]: value }))}
+                  onBuild={() => void runAssistantBuild(answersMessage(assistantPlan, assistantAnswers))}
+                  onCancel={() => { setAssistantPlan(null); setAssistantAnswers({}); }}
+                />
               )}
             </div>
             <div className="shrink-0 border-t p-3">
@@ -963,13 +1211,13 @@ export function WorkflowEditorCanvas({
                     }
                   }}
                   rows={1}
-                  disabled={assistantLoading || !namespace}
+                  disabled={assistantLoading || assistantPlanning || !namespace}
                   placeholder={namespace ? 'Ask AI to build your workflow…' : 'Save the workflow first'}
                   className="flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed max-h-48 overflow-y-auto leading-relaxed"
                 />
                 <button
                   onClick={() => void sendAssistantMessage()}
-                  disabled={assistantLoading || !namespace || assistantInput.trim().length === 0}
+                  disabled={assistantLoading || assistantPlanning || !namespace || assistantInput.trim().length === 0}
                   className="shrink-0 pb-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   aria-label="Send message to the assistant"
                 >
@@ -980,16 +1228,30 @@ export function WorkflowEditorCanvas({
           </div>
         ) : (
           <button
-            onClick={() => setAiPaneOpen(true)}
-            className="w-10 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col items-center justify-between py-4 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Expand AI Assistant"
-            aria-label="Expand AI Assistant"
+            onClick={() => { setAiPaneOpen(true); setAssistantUnread(false); }}
+            className={cn(
+              'w-10 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col items-center justify-between py-4 transition-colors',
+              assistantUnread
+                ? 'border-primary/40 text-primary hover:bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+            )}
+            title={assistantUnread ? 'The AI Assistant has something for you' : 'Expand AI Assistant'}
+            aria-label={assistantUnread ? 'Expand AI Assistant — it has something for you' : 'Expand AI Assistant'}
           >
-            <Sparkles className="h-4 w-4 shrink-0" />
+            <span className="relative inline-flex shrink-0">
+              <Sparkles className="h-4 w-4" />
+              {assistantUnread && (
+                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-white dark:ring-background" />
+              )}
+            </span>
             <span className="text-[11px] font-semibold tracking-wide [writing-mode:vertical-rl] rotate-180 select-none">
               AI Assistant
             </span>
-            <ChevronLeft className="h-4 w-4 shrink-0" />
+            {assistantLoading || assistantPlanning ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+            ) : (
+              <ChevronLeft className="h-4 w-4 shrink-0" />
+            )}
           </button>
         )}
 
@@ -1023,6 +1285,90 @@ export function WorkflowEditorCanvas({
         </div>
       )}
 
+      {rightPanelView === 'settings' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
+          <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-lg mx-4 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">Advanced</h2>
+              </div>
+              <button
+                onClick={() => setRightPanelView(null)}
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This applies to the whole workflow, not a single step, and saves with the next version.
+            </p>
+            <WorkflowSettingsPanel
+              draft={settingsDraft ?? {}}
+              onChange={(patch) => onSettingsChange?.({ ...settingsDraft, ...patch })}
+            />
+          </div>
+        </div>
+      )}
+
+      {rightPanelView === 'notifications' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
+          <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-lg mx-4 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Bell className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">Notifications</h2>
+              </div>
+              <button
+                onClick={() => setRightPanelView(null)}
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <WorkflowNotificationsPanel
+              draft={settingsDraft ?? {}}
+              onChange={(patch) => onSettingsChange?.({ ...settingsDraft, ...patch })}
+              workspaceRoles={workspaceRoles}
+            />
+          </div>
+        </div>
+      )}
+
+      {rightPanelView === 'files' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
+          <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-4xl mx-4 space-y-4 h-[85vh] flex flex-col">
+            <div className="shrink-0 flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <FileCode className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-semibold">Files</h2>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Scripts, a Dockerfile, skills — whatever this workflow needs to run.
+                  They save with the next version, and a run reads them from{' '}
+                  <code className="font-mono">/artifacts</code>. No repository required.
+                </p>
+              </div>
+              <button
+                onClick={() => setRightPanelView(null)}
+                aria-label="Close files"
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <WorkflowFilesPanel
+              artifacts={settingsDraft?.artifacts ?? []}
+              onChange={(artifacts) => onSettingsChange?.({ ...settingsDraft, artifacts })}
+            />
+          </div>
+        </div>
+      )}
+
       {rightPanelView === 'json' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={closeJsonPanel} />
@@ -1041,7 +1387,7 @@ export function WorkflowEditorCanvas({
               </button>
             </div>
             <div className="flex-1 overflow-y-auto space-y-4">
-              <JsonCodeEditor
+              <CodeEditor
                 value={jsonDraft}
                 onChange={(v) => { setJsonDraft(v); setJsonError(null); }}
               />

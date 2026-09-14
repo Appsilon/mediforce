@@ -348,8 +348,19 @@ describe('splitPastedDefinition', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
     });
     expect(result.error).toBeNull();
-    expect(result.ignored.sort()).toEqual(['createdAt', 'namespace', 'version']);
-    expect(result.nonGraph).toEqual({ name: 'kept' });
+    expect(result.ignored.sort()).toEqual(['createdAt', 'name', 'namespace', 'version']);
+    expect(result.nonGraph).toEqual({});
+  });
+
+  it('overwrites the pasted name, which the page and the route own', () => {
+    // A package's `name` is its id, and where a definition registers is decided
+    // by the route (an existing workflow's editor) or the name field (the create
+    // page). Applying it registered the paste under the *pasted* name, which in
+    // an existing workflow's editor silently forked a second workflow, and on
+    // the create page put an id where a person's name for it belongs.
+    const result = splitPastedDefinition({ ...graph, name: 'landing-zone-CDISCPILOT01' });
+    expect(result.nonGraph.name).toBeUndefined();
+    expect(result.ignored).toEqual(['name']);
   });
 
   it('reports nothing ignored when the document carries only authorable fields', () => {
@@ -369,7 +380,7 @@ describe('splitPastedDefinition', () => {
       deleted: false,
     });
     expect(result.error).toBeNull();
-    expect(result.nonGraph).toEqual({ name: 'kept' });
+    expect(result.nonGraph).toEqual({});
   });
 
   it('separates the graph the canvas owns from everything else', () => {
@@ -419,7 +430,15 @@ describe('splitPastedDefinition — round-trips the packages we ship', () => {
 });
 
 describe('pastedWorkflowName', () => {
-  it('takes the title, which is what a person calls the workflow', () => {
+  it('takes the display name, which is what the workflow is called', () => {
+    expect(pastedWorkflowName({
+      name: 'tealflow',
+      title: 'Change from path to logic',
+      metadata: { displayName: 'Tealflow' },
+    })).toBe('Tealflow');
+  });
+
+  it('falls back to the title when no display name was carried', () => {
     // The failure this replaces: a definition carrying
     // `name: 'landing-zone-CDISCPILOT01'` and
     // `title: 'Landing Zone — CDISCPILOT01'` filled the name field with the id,
@@ -431,12 +450,13 @@ describe('pastedWorkflowName', () => {
     })).toBe('Landing Zone — CDISCPILOT01');
   });
 
-  it('falls back to the id when the paste carries no title', () => {
-    expect(pastedWorkflowName({ name: 'landing-zone' })).toBe('landing-zone');
+  it('title-cases the id when the paste carries neither', () => {
+    expect(pastedWorkflowName({ name: 'landing-zone-CDISCPILOT01' })).toBe('Landing Zone CDISCPILOT01');
   });
 
-  it('ignores a blank title', () => {
-    expect(pastedWorkflowName({ name: 'landing-zone', title: '   ' })).toBe('landing-zone');
+  it('ignores a blank display name and a blank title', () => {
+    expect(pastedWorkflowName({ name: 'landing-zone', title: '   ', metadata: { displayName: ' ' } }))
+      .toBe('Landing Zone');
   });
 
   it('returns null when the paste names the workflow neither way', () => {

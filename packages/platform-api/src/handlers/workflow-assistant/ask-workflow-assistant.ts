@@ -5,6 +5,8 @@ import {
   RemoveStepToolSchema,
   ListModelsToolSchema,
   WORKFLOW_ASSISTANT_TOOLS,
+  WORKFLOW_ASSISTANT_PLATFORM_TOOLS,
+  isPlatformToolName,
   WORKFLOW_ASSISTANT_DEFAULT_MODEL,
   toProcessDefinition,
   mergeVerdictTransitions,
@@ -13,6 +15,7 @@ import {
   parseWorkflowTemplate,
   applyWorkflowAssistantToolCalls,
   type WorkflowAssistantToolName,
+  type WorkflowSettings,
   type WorkflowStep,
   type WorkflowDefinition,
 } from '@mediforce/platform-core';
@@ -26,7 +29,10 @@ import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller } from '../_helpers';
 import { HandlerError, ValidationError } from '../../errors';
 import { callOpenRouter, type OpenRouterChatMessage, type OpenRouterToolDefinition } from '../../services/openrouter-client';
+import { PlanQuestionSchema } from '../../contract/workflow-assistant';
 import { buildWorkflowAssistantSystemPrompt } from './_lib/system-prompt';
+import { runPlatformTool } from './_lib/run-platform-tool';
+import { parseModelJson } from './_lib/parse-model-json';
 
 interface AskScopedInput extends AskWorkflowAssistantInput {
   namespace: string;
@@ -46,15 +52,25 @@ const MAX_TOOL_LOOP_ITERATIONS = 12;
 // recoverable, so this is a throughput knob, not a correctness one.
 const ASSISTANT_MAX_OUTPUT_TOKENS = 8000;
 
-function buildToolDefinitions(): OpenRouterToolDefinition[] {
+function buildToolDefinitions(options: { canSchedule: boolean }): OpenRouterToolDefinition[] {
   const mutationTools = (
     Object.entries(WORKFLOW_ASSISTANT_TOOLS) as [WorkflowAssistantToolName, z.ZodType][]
   ).map(([name, schema]) => ({
     type: 'function',
     function: { name, parameters: z.toJSONSchema(schema, { io: 'input' }) },
   }));
+  // Platform tools run here, as the caller, and their results come back into
+  // this same conversation — unlike the canvas tools, which the browser applies.
+  const platformTools = Object.entries(WORKFLOW_ASSISTANT_PLATFORM_TOOLS)
+    // A schedule attaches to a saved workflow, so on a canvas that has never been saved the tool is not offered at all.
+    .filter(([name]) => name !== 'create_cron_trigger' || options.canSchedule)
+    .map(([name, schema]) => ({
+    type: 'function',
+    function: { name, parameters: z.toJSONSchema(schema as z.ZodType, { io: 'input' }) },
+  }));
   return [
     ...mutationTools,
+    ...platformTools,
     {
       type: 'function',
       function: {
@@ -96,12 +112,18 @@ function getValueAtPath(input: unknown, path: readonly PropertyKey[]): unknown {
 }
 
 export function parseMutationToolCall(toolName: string, parsedArguments: unknown): ParsedMutationCall {
-  const schema = toolName === 'add_step' ? AddStepToolSchema
-    : toolName === 'update_step' ? UpdateStepToolSchema
-    : toolName === 'remove_step' ? RemoveStepToolSchema
-    : null;
-  if (!schema) {
-    return { ok: false, error: `Unknown tool '${toolName}'. Valid tools: add_step, update_step, remove_step, list_models.` };
+  // Driven off the registry that `buildToolDefinitions` advertises to the
+  // model. A hand-written ladder here meant a tool could be offered and then
+  // rejected on arrival — and because the completeness gate requires every
+  // resolved call to be a mutation, a rejected one discarded the whole batch.
+  const schema: z.ZodType | undefined = WORKFLOW_ASSISTANT_TOOLS[toolName as WorkflowAssistantToolName];
+  if (schema === undefined) {
+    const valid = [
+      ...Object.keys(WORKFLOW_ASSISTANT_TOOLS),
+      ...Object.keys(WORKFLOW_ASSISTANT_PLATFORM_TOOLS),
+      'list_models',
+    ].join(', ');
+    return { ok: false, error: `Unknown tool '${toolName}'. Valid tools: ${valid}.` };
   }
   const result = schema.safeParse(parsedArguments);
   if (!result.success) {
@@ -133,15 +155,72 @@ export function parseMutationToolCall(toolName: string, parsedArguments: unknown
 
 type Transitions = WorkflowDefinition['transitions'];
 
+type ValidatedGraph =
+  | { valid: true; steps: WorkflowStep[]; transitions: Transitions; inheritedErrors: string[] }
+  | { valid: false; errors: string[]; steps: WorkflowStep[]; transitions: Transitions; inheritedErrors: string[] };
+
+/**
+ * The canvas as it stands after the calls so far, in the terms the model needs
+ * to fix it: every step's real id, and every edge.
+ *
+ * Without this a retry was unanswerable. The canvas state in the conversation
+ * is the one sent at the start; a step added this turn carries an id the
+ * reducer assigned, which the model has never seen; and the `clientId` it used
+ * is dead by the next response. So "reconnect the disconnected step" named
+ * something it could not name, every guess came back as an unknown step, and
+ * the loop ran to its cap.
+ */
+function describeGraph(steps: WorkflowStep[], transitions: Transitions): string {
+  const stepList = steps.map((step) => `${step.id} (${step.name})`).join(', ');
+  const edgeList = transitions.length > 0
+    ? transitions.map((t) => `${t.from} → ${t.to}`).join(', ')
+    : 'none';
+  return `The canvas now holds these steps, by id: ${stepList}. Transitions: ${edgeList}.`;
+}
+
+// The graph and reference errors a definition already carries, so the gate can tell a defect this turn introduced from one it inherited.
+function collectGraphErrors(
+  steps: WorkflowStep[],
+  transitions: Transitions,
+  namespace: string,
+): string[] {
+  const merged = mergeVerdictTransitions(steps, transitions);
+  const ordered = ensureEntryStepFirst(steps, merged);
+  const graph = validateStepGraph(toProcessDefinition({
+    name: 'simulated',
+    version: 1,
+    namespace,
+    visibility: 'private',
+    steps: ordered,
+    transitions: merged,
+  }));
+  return [
+    ...(graph.valid ? [] : graph.errors),
+    ...validateStepReferences(steps, merged).filter((i) => i.severity === 'error').map((i) => i.message),
+  ];
+}
+
+// What to tell the model about defects the canvas arrived with.
+function inheritedNote(inheritedErrors: string[]): string {
+  if (inheritedErrors.length === 0) return '';
+  return `\n\nSeparately, this workflow already had ${inheritedErrors.length === 1 ? 'a problem' : 'problems'} before you touched it: ${inheritedErrors.join('; ')}. Do not silently fix ${inheritedErrors.length === 1 ? 'it' : 'them'} unless that is what was asked — mention ${inheritedErrors.length === 1 ? 'it' : 'them'} in your reply and offer to.`;
+}
+
 export function validateResultingGraph(
-  currentDefinition: { steps: WorkflowStep[]; transitions: Transitions },
+  currentDefinition: {
+    steps: WorkflowStep[];
+    transitions: Transitions;
+    settings?: WorkflowSettings & { inputForNextRun?: WorkflowDefinition['inputForNextRun'] };
+  },
   toolCalls: WorkflowAssistantToolCall[],
   namespace: string,
-): { valid: true } | { valid: false; errors: string[] } {
+): ValidatedGraph {
   const applied = applyWorkflowAssistantToolCalls(
     currentDefinition.steps,
     currentDefinition.transitions,
     toolCalls,
+    currentDefinition.settings ?? {},
+    currentDefinition.settings?.inputForNextRun,
   );
   const mergedTransitions = mergeVerdictTransitions(applied.steps, applied.transitions);
   const orderedSteps = ensureEntryStepFirst(applied.steps, mergedTransitions);
@@ -164,18 +243,77 @@ export function validateResultingGraph(
   // Canonical cross-field validation (same gate register uses): catches rules the
   // graph/reference checks don't — e.g. an `action` executor with no action config,
   // a wait action with neither duration nor deadline. Templates carry no namespace.
+  // The workflow-level fields go through the same parse, so a model writing
+  // `url: 'not-a-url'` is told at the gate rather than failing the whole save
+  // later at register — which is what the guide promises this gate does.
   const templateParse = parseWorkflowTemplate({
     name: 'simulated',
+    ...applied.settings,
     steps: orderedSteps,
     transitions: mergedTransitions,
+    // An entry naming a step that does not exist is refused here, which is the
+    // only check carry-over gets before a save.
+    ...(applied.inputForNextRun === undefined ? {} : { inputForNextRun: applied.inputForNextRun }),
   });
   const schemaErrors = templateParse.success
     ? []
     : templateParse.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`);
-  if (graphErrors.length === 0 && referenceErrors.length === 0 && outcomeErrors.length === 0 && schemaErrors.length === 0) {
-    return { valid: true };
+  const applied_ = { steps: orderedSteps, transitions: mergedTransitions };
+
+  // What the canvas was already wrong about before this turn touched it.
+  const inheritedErrors = collectGraphErrors(
+    currentDefinition.steps,
+    currentDefinition.transitions,
+    namespace,
+  );
+  const introduced = (error: string): boolean => inheritedErrors.includes(error) === false;
+  const errors = [...graphErrors, ...referenceErrors, ...outcomeErrors, ...schemaErrors].filter(introduced);
+  if (errors.length === 0) {
+    return { valid: true, ...applied_, inheritedErrors };
   }
-  return { valid: false, errors: [...graphErrors, ...referenceErrors, ...outcomeErrors, ...schemaErrors] };
+  return { valid: false, errors, ...applied_, inheritedErrors };
+}
+
+/** What the assistant says when it could not finish: the reply the person
+ *  reads, and at most a few questions with the answer it would take. */
+const StuckReplySchema = z.object({
+  reply: z.string().min(1).max(1000),
+  questions: z.array(PlanQuestionSchema).max(3),
+});
+
+/**
+ * The turn after a build that could not finish.
+ *
+ * Throwing here is what the pane turned into an error toast: the person's turn
+ * was gone and there was nothing to act on, while the model knew exactly what
+ * it had been unable to resolve. One more short call turns that into a question
+ * with a recommended answer, which is the same shape the planning turn returns
+ * and the same card renders. Returns null when even this fails — then an error
+ * is the honest answer.
+ */
+async function askWhatItCouldNotResolve(
+  model: string,
+  apiKey: string,
+  messages: OpenRouterChatMessage[],
+  errors: string[],
+): Promise<z.infer<typeof StuckReplySchema> | null> {
+  try {
+    const response = await callOpenRouter({
+      model,
+      apiKey,
+      maxTokens: 500,
+      messages: [
+        ...messages,
+        {
+          role: 'user',
+          content: `You could not finish this build. What stopped you: ${errors.join('; ')}.\n\nDo not try again. Answer with a single JSON object and nothing else: {"reply": "one or two sentences saying plainly what you could not do", "questions": [{"id": "...", "question": "...", "recommended": "..."}]}. Ask at most two questions, only ones whose answer would let you finish, each with the answer you would take if the person simply agreed. If nothing they could tell you would help, return an empty questions array and say what is wrong instead.`,
+        },
+      ],
+    });
+    return parseModelJson(response.content, StuckReplySchema);
+  } catch {
+    return null;
+  }
 }
 
 export async function askWorkflowAssistant(
@@ -212,7 +350,7 @@ export async function askWorkflowAssistant(
     console.error('[workflow-assistant] failed to write prompt audit entry (non-fatal):', err);
   }
 
-  const tools = buildToolDefinitions();
+  const tools = buildToolDefinitions({ canSchedule: input.workflowName !== undefined });
   const messages: OpenRouterChatMessage[] = [
     { role: 'system', content: buildWorkflowAssistantSystemPrompt() },
     {
@@ -249,6 +387,15 @@ export async function askWorkflowAssistant(
           continue;
         }
       }
+      if (accumulatedToolCalls.length > 0 && response.content === '') {
+        lastErrors = ['The model finished a structurally valid workflow but never wrote a text reply.'];
+        console.error(`[workflow-assistant] model finished with a valid graph but empty content (iteration ${String(iteration + 1)}/${String(MAX_TOOL_LOOP_ITERATIONS)}) — requesting the missing reply`);
+        messages.push({
+          role: 'user',
+          content: `Those changes were applied and the workflow is complete — but you didn't write a reply. Write one now: one or two sentences in plain language summarizing what you built, exactly as if you were saying it to the user for the first time (see "Conversational style").`,
+        });
+        continue;
+      }
       return accumulatedToolCalls.length > 0
         ? { reply: response.content, toolCalls: accumulatedToolCalls }
         : { reply: response.content };
@@ -263,6 +410,9 @@ export async function askWorkflowAssistant(
         parsedArguments = JSON.parse(call.function.arguments);
       } catch {
         return { call, kind: 'error' as const, error: `Malformed JSON arguments for '${call.function.name}'.` };
+      }
+      if (isPlatformToolName(call.function.name)) {
+        return { call, kind: 'platform' as const, toolName: call.function.name, arguments: parsedArguments };
       }
       const parsed = parseMutationToolCall(call.function.name, parsedArguments);
       return parsed.ok
@@ -301,18 +451,15 @@ export async function askWorkflowAssistant(
 
       const graphCheck = validateResultingGraph(input.workflowDefinition, accumulatedToolCalls, input.namespace);
       if (graphCheck.valid) {
-        if (response.content) {
-          return { toolCalls: accumulatedToolCalls, reply: response.content };
-        }
-        lastErrors = ['The model completed a structurally valid workflow but never wrote a text reply.'];
-        console.error(`[workflow-assistant] model finished with a valid graph but empty content (iteration ${String(iteration + 1)}/${String(MAX_TOOL_LOOP_ITERATIONS)}) — requesting the missing reply`);
+        // A batch that leaves the graph valid is not evidence the request is done: a model that opens with `update_workflow` and a sentence announcing the build leaves the starter graph exactly as valid as it found it.
+        lastErrors = [];
         messages.push({ role: 'assistant', content: response.content, tool_calls: response.toolCalls });
         for (const r of resolved) {
           messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify({ applied: true }) });
         }
         messages.push({
           role: 'user',
-          content: `Those changes were applied and the workflow is complete — but you didn't write a reply. Write one now: one or two sentences in plain language summarizing what you built, exactly as if you were saying it to the user for the first time (see "Conversational style").`,
+          content: `Those changes were applied.\n\n${describeGraph(graphCheck.steps, graphCheck.transitions)}\n\nIf anything the request asked for is still missing — a step, a file, a condition, a workflow-level field — continue with more tool calls, using the ids above (the clientIds from your previous response no longer resolve) and without repeating what is already applied. If it is all there, reply with no tool calls: one or two sentences in plain language summarizing what you built.${inheritedNote(graphCheck.inheritedErrors)}`,
         });
         continue;
       }
@@ -325,7 +472,7 @@ export async function askWorkflowAssistant(
       }
       messages.push({
         role: 'user',
-        content: `Those changes were applied, but the resulting workflow graph is incomplete: ${graphCheck.errors.join('; ')}. Fix this before finishing — use update_step's insertAfterId/insertBeforeId to connect a disconnected step (referencing it by its real id from canvas state, or by the clientId you assigned it earlier in this response if it's a step you just added) or add_step if a step is genuinely missing. Then write a short reply summarizing what you built, same as any other turn.`,
+        content: `Those changes were applied, but the resulting workflow graph is incomplete: ${graphCheck.errors.join('; ')}.\n\n${describeGraph(graphCheck.steps, graphCheck.transitions)}\n\nFix it with those ids — update_step's insertAfterId/insertBeforeId connects a step that exists, add_step adds one that is genuinely missing. The clientIds from your previous response no longer resolve; use the ids above. Then write a short reply summarizing what you built, same as any other turn.`,
       });
       continue;
     }
@@ -339,6 +486,9 @@ export async function askWorkflowAssistant(
       if (r.kind === 'list_models') {
         const result = await runListModelsTool(scope);
         messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify(result) });
+      } else if (r.kind === 'platform') {
+        const result = await runPlatformTool(r.toolName, r.arguments, scope, input.namespace, input.workflowName);
+        messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify(result) });
       } else if (r.kind === 'error') {
         messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify({ error: r.error }) });
       } else {
@@ -349,6 +499,13 @@ export async function askWorkflowAssistant(
         });
       }
     }
+  }
+
+  const stuck = await askWhatItCouldNotResolve(model, apiKey, messages, lastErrors);
+  if (stuck !== null) {
+    return stuck.questions.length > 0
+      ? { reply: stuck.reply, questions: stuck.questions }
+      : { reply: stuck.reply };
   }
 
   throw new HandlerError(

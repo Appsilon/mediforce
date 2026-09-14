@@ -9,8 +9,9 @@ import { z } from 'zod';
  */
 export const DockerJobDataSchema = z.object({
   /** Discriminator so the worker can handle future job types. */
-  jobType: z.enum(['agent-container', 'script-container']),
-  /** Full `docker run` argument list (everything after `docker`). */
+  jobType: z.enum(['agent-container', 'script-container', 'build-image']),
+  /** Full `docker run` argument list (everything after `docker`). Empty for a
+   *  `build-image` job, which builds and runs nothing. */
   dockerArgs: z.array(z.string()),
   /** Prompt piped to container stdin (null = no stdin). */
   stdinPayload: z.string().nullable(),
@@ -30,15 +31,19 @@ export const DockerJobDataSchema = z.object({
    *  content (see file-payload.ts). Sent through Redis when caller and worker
    *  don't share a filesystem (e.g. Vercel → VPS). */
   inputFiles: z.record(z.string(), z.string()).optional(),
-  /** Image build metadata — when present, worker ensures image exists before docker run. */
+  /** Image build metadata — when present, worker ensures image exists before
+   *  docker run. Either a repo at a commit, or `contextDir`: a host directory
+   *  that already holds the build context (the files a workflow carries,
+   *  materialized under the shared temp dir both processes see). */
   imageBuild: z.object({
     image: z.string(),
-    repoUrl: z.string(),
+    repoUrl: z.string().optional(),
     /** Pre-normalization repo reference used to pick the clone transport; falls back to `repoUrl`. */
     repoRef: z.string().optional(),
-    commit: z.string(),
+    commit: z.string().optional(),
     dockerfile: z.string().optional(),
     repoToken: z.string().optional(),
+    contextDir: z.string().optional(),
   }).optional(),
 });
 

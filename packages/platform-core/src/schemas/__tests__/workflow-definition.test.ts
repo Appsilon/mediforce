@@ -509,3 +509,56 @@ describe('WorkflowDefinitionSchema — assignedTo', () => {
     }
   });
 });
+
+// A commit that is 40 zeros is the placeholder the /design-workflow skill writes
+// while a package waits for its first real SHA. It is format-valid, which is the
+// point there — and exactly why it reaches a save here and then names a build
+// that can never run.
+describe('WorkflowDefinitionSchema — placeholder commits', () => {
+  const withStep = (agent: Record<string, unknown>) => ({
+    ...baseWd,
+    steps: [
+      { id: 'work', name: 'Work', type: 'creation' as const, executor: 'agent' as const, agent },
+      { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
+    ],
+    transitions: [{ from: 'work', to: 'done' }],
+  });
+
+  const ZEROS = '0'.repeat(40);
+  const REAL = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2';
+
+  it('refuses an all-zeros build commit', () => {
+    const result = WorkflowDefinitionSchema.safeParse(withStep({
+      dockerfile: 'Dockerfile',
+      repo: 'https://github.com/org/thing.git',
+      commit: ZEROS,
+    }));
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toMatch(/placeholder/i);
+  });
+
+  it('refuses an all-zeros externalSkillsRepo commit', () => {
+    const result = WorkflowDefinitionSchema.safeParse({
+      ...baseWd,
+      externalSkillsRepo: { url: 'https://github.com/org/skills.git', commit: ZEROS },
+    });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toMatch(/placeholder/i);
+  });
+
+  it('accepts a real commit', () => {
+    expect(WorkflowDefinitionSchema.safeParse(withStep({
+      dockerfile: 'Dockerfile',
+      repo: 'https://github.com/org/thing.git',
+      commit: REAL,
+    })).success).toBe(true);
+  });
+
+  it('still refuses anything that is not a 40-character sha', () => {
+    expect(WorkflowDefinitionSchema.safeParse(withStep({
+      dockerfile: 'Dockerfile',
+      repo: 'https://github.com/org/thing.git',
+      commit: 'main',
+    })).success).toBe(false);
+  });
+});

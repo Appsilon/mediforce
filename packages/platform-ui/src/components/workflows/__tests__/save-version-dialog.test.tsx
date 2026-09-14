@@ -23,4 +23,25 @@ describe('SaveVersionDialog', () => {
     expect(screen.queryByText('Schema validation')).not.toBeInTheDocument();
     expect(screen.queryByText('Workflow readiness check')).not.toBeInTheDocument();
   });
+  it('[RENDER] says the save lands after the newest version, not after the one being edited', () => {
+    render(
+      <SaveVersionDialog
+        open
+        nextVersion={4}
+        editingVersion={2}
+        onClose={() => {}}
+        onConfirm={() => {}}
+      />,
+    );
+    const note = screen.getByText(/editing v2/i);
+    expect(note.textContent).toMatch(/newest is v3/i);
+    expect(note.textContent).toMatch(/saves as\s*v4/i);
+  });
+
+  it('[RENDER] says nothing extra when the version being edited is the newest', () => {
+    render(
+      <SaveVersionDialog open nextVersion={4} editingVersion={3} onClose={() => {}} onConfirm={() => {}} />,
+    );
+    expect(screen.queryByText(/editing v/i)).toBeNull();
+  });
 });
