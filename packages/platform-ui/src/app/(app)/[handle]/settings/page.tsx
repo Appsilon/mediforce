@@ -113,7 +113,11 @@ export default function WorkspaceConfigPage() {
             workspace is one person's own space, and strangers joining it is not
             a shape we want to have to reason about. */}
         {!isPersonal && (
-          <JoinLinksPanel handle={handle} canManageMembers={canManageMembers} />
+          <JoinLinksPanel
+            handle={handle}
+            workspaceName={namespace.displayName}
+            canManageMembers={canManageMembers}
+          />
         )}
 
         {/* Roles sit under Members and read the same roster: a role is held by

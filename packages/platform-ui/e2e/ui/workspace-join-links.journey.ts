@@ -100,6 +100,24 @@ test.describe('Workspace join links journey', () => {
     const token = mintedUrl.split('/join/')[1];
     expect(token).toBeTruthy();
 
+    // The QR code is the same one-time handover in a form a room can scan, so
+    // it shares the card's lifetime: present, presentable full-screen with the
+    // same URL, and downloadable for a slide.
+    await expect(page.getByRole('img', { name: 'Join link QR code', exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Present' }).click();
+    const presentation = page.getByRole('dialog', { name: `Join ${WORKSPACE_NAME}` });
+    await expect(presentation).toBeVisible();
+    await expect(presentation.getByRole('img', { name: /QR code/ })).toBeVisible();
+    await expect(presentation.getByText(mintedUrl)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(presentation).toBeHidden();
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download PNG' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe(`join-${HANDLE}.png`);
+
     const joinLinks = page.getByRole('table', { name: 'Join links' });
     const row = joinLinks.getByRole('row').filter({ hasText: 'Active' });
     await expect(row).toBeVisible({ timeout: 15_000 });
