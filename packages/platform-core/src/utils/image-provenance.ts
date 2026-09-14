@@ -20,6 +20,8 @@ export const BUILD_LABELS = {
   context: 'mediforce.build.context',
   workflow: 'mediforce.build.workflow',
   namespace: 'mediforce.build.namespace',
+  /** Content hash of the files a workflow carries, for an image built from them. */
+  artifacts: 'mediforce.build.artifacts',
 } as const;
 
 /**
@@ -138,6 +140,8 @@ export function buildProvenanceLabelArgs(provenance: ImageProvenance): string[] 
     ),
     '--label',
     `${BUILD_LABELS.context}=${provenance.context ?? ''}`,
+    '--label',
+    `${BUILD_LABELS.artifacts}=`,
   ];
 }
 
@@ -150,12 +154,39 @@ export function uploadedImageLabelArgs(namespace: string): string[] {
     BUILD_LABELS.dockerfile,
     BUILD_LABELS.context,
     BUILD_LABELS.workflow,
+    BUILD_LABELS.artifacts,
+    OCI_LABELS.source,
+    OCI_LABELS.revision,
   ];
   return [
     ...blanked.flatMap((key) => ['--label', `${key}=`]),
     '--label',
     `${BUILD_LABELS.namespace}=${namespace}`,
   ];
+}
+
+/**
+ * `--label` arguments for a Dockerfile a workflow carries. The content hash is
+ * what tells a step-named tag whether it still holds these files; the repo
+ * labels are written empty, as for an upload, so none is inherited.
+ */
+export function carriedImageLabelArgs(provenance: {
+  artifactsHash: string;
+  workflow?: string;
+  namespace?: string;
+}): string[] {
+  const labels: Array<[string, string]> = [
+    [BUILD_LABELS.repo, ''],
+    [BUILD_LABELS.commit, ''],
+    [BUILD_LABELS.dockerfile, ''],
+    [BUILD_LABELS.context, ''],
+    [OCI_LABELS.source, ''],
+    [OCI_LABELS.revision, ''],
+    [BUILD_LABELS.workflow, provenance.workflow ?? ''],
+    [BUILD_LABELS.namespace, provenance.namespace ?? ''],
+    [BUILD_LABELS.artifacts, provenance.artifactsHash],
+  ];
+  return labels.flatMap(([key, value]) => ['--label', `${key}=${value}`]);
 }
 
 /**

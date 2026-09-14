@@ -65,7 +65,7 @@ import {
   normalizeRepoUrls,
   DOCKER_IMAGE_SETUP_URL,
 } from '@mediforce/platform-core';
-import { artifactsBuildTag, artifactsDir } from './workflow-artifacts';
+import { artifactsBuildHash, artifactsBuildTag, artifactsDir } from './workflow-artifacts';
 import { cloneRepoAtCommit } from './git-clone';
 import { writeFile } from 'node:fs/promises';
 import type { GitMetadata } from '@mediforce/platform-core';
@@ -206,6 +206,7 @@ export function resolveImageBuild(
     return {
       image: image ?? artifactsBuildTag(artifacts, dockerfile),
       contextDir: artifactsDir(artifacts),
+      artifactsHash: artifactsBuildHash(artifacts, dockerfile),
       dockerfile,
       workflow: workflowDefinition?.name,
       namespace: workflowDefinition?.namespace,
