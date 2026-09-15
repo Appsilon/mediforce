@@ -15,6 +15,22 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     }
   });
 
+  it('defaults input to the first step, and names the only cases where triggerInput applies', () => {
+    // The assistant used to be told to prefer `triggerInput` for "an input the
+    // workflow receives", so it declared the contract *and* wrote a first step
+    // asking for the same fields — a required one then refuses the run with
+    // "Invalid payload" before anybody reaches that step.
+    expect(prompt).toMatch(/Input belongs to the first step/);
+    expect(prompt).toMatch(/Leave `triggerInput` empty/);
+    for (const startedBy of ['schedule', 'webhook', 'child']) {
+      expect(prompt).toContain(startedBy);
+    }
+  });
+
+  it('no longer tells the assistant to prefer a trigger input over a step param', () => {
+    expect(prompt).not.toMatch(/set `triggerInput` rather than inventing a step param/);
+  });
+
   it('does not reference any engine-only concepts from the deprecated full-artifact designer', () => {
     expect(prompt).not.toMatch(/update_artifact/);
     expect(prompt).not.toMatch(/render_workflow_diagram/);
@@ -131,8 +147,9 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
   });
 
   it('never asks for the same field twice, as a trigger input and as an entry-step param', () => {
-    expect(prompt).toMatch(/never both/i);
-    expect(prompt).toMatch(/Invalid payload/);
+    expect(prompt).toMatch(/never a copy of what a step already asks for/i);
+    expect(prompt).toMatch(/asked for it twice/i);
+    expect(prompt).toMatch(/The build gate refuses this/);
   });
 
   it('declines an unschedulable request in one sentence rather than explaining the workaround', () => {
