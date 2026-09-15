@@ -57,6 +57,10 @@ vi.mock('@/hooks/use-docker-images', () => ({
   isImageAvailable: () => true,
 }));
 
+vi.mock('@/hooks/use-image-catalog', () => ({
+  useImageCapabilities: () => ({}),
+}));
+
 vi.mock('../workflow-editor/step-editor', () => ({
   StepEditor: () => <div data-testid="step-editor" />,
 }));

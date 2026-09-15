@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
 import { DEFAULT_AGENT_IMAGE, defaultVerdictLabel, uniqueName, uniqueSlug } from '@mediforce/platform-core';
-import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
+import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig, ImageCapabilities } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
@@ -83,15 +83,27 @@ function pickerImageValue(image: string): string {
 }
 
 /**
- * Agent images sorted with the golden image first — it is the one image
- * guaranteed to carry an agent CLI, and every other discovered image (a bare
- * `alpine`, a language runtime) fails at container start for an agent step.
+ * Agent images with the ones a probe found agent-capable first. An image the
+ * probe answered for is judged by that answer — a bare `alpine` or a language
+ * runtime carries no agent CLI and fails at container start, so it is dropped
+ * rather than offered. An image with no answer (uncatalogued, or a daemon that
+ * could not be reached) stays offered, and the golden image keeps the star it
+ * has always carried: it is the one image the platform ships an agent CLI in.
  */
-function agentImageOptions(images: DockerImageInfo[]): Array<{ img: DockerImageInfo; label: string }> {
+function agentImageOptions(
+  images: DockerImageInfo[],
+  capabilitiesByImageId: Record<string, ImageCapabilities>,
+): Array<{ img: DockerImageInfo; label: string }> {
   return images
+    .filter((img) => {
+      const capabilities = capabilitiesByImageId[img.id];
+      return capabilities?.status !== 'known' || capabilities.agentCapable;
+    })
     .map((img) => {
-      const value = pickerImageValue(imageRef(img));
-      const recommended = value === DEFAULT_AGENT_IMAGE;
+      const capabilities = capabilitiesByImageId[img.id];
+      const recommended = capabilities?.status === 'known'
+        ? capabilities.agentCapable
+        : pickerImageValue(imageRef(img)) === DEFAULT_AGENT_IMAGE;
       return { img, recommended, label: recommended ? `★ ${imageRef(img)}` : imageRef(img) };
     })
     .sort((a, b) => Number(b.recommended) - Number(a.recommended));
@@ -253,6 +265,7 @@ export function StepEditor({
   errors,
   imageWarning,
   dockerImages,
+  imageCapabilities = {},
   workflowExternalSkillsRepo,
   workflowArtifacts,
 }: {
@@ -264,6 +277,7 @@ export function StepEditor({
   errors?: Record<string, string>;
   imageWarning?: string;
   dockerImages?: DockerImageInfo[];
+  imageCapabilities?: Record<string, ImageCapabilities>;
   workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
   /** The files this workflow carries. Skills among them are offered here, so a
    *  skill uploaded in the Files panel is picked rather than typed as a path. */
@@ -883,11 +897,11 @@ export function StepEditor({
                   className={rs}
                 >
                   <option value="">{agentBlankOptionLabel}</option>
-                  {agentImageOptions(dockerImages).map(({ img, label }) => (
+                  {agentImageOptions(dockerImages, imageCapabilities).map(({ img, label }) => (
                     <option key={img.id} value={pickerImageValue(imageRef(img))}>{label}</option>
                   ))}
-                  {step.agent?.image && !dockerImages.some(
-                    (img) => pickerImageValue(imageRef(img)) === pickerImageValue(step.agent?.image ?? ''),
+                  {step.agent?.image && !agentImageOptions(dockerImages, imageCapabilities).some(
+                    ({ img }) => pickerImageValue(imageRef(img)) === pickerImageValue(step.agent?.image ?? ''),
                   ) && (
                     <option value={step.agent.image}>{step.agent.image}</option>
                   )}

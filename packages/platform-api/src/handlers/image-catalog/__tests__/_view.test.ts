@@ -14,6 +14,7 @@ const ENTRY: ImageCatalogEntry = {
   name: 'TealFlow agent',
   intent: 'R-based interactive exploration of ADaM datasets',
   source: { kind: 'built', repo: TEALFLOW_REPO_URL, dockerfile: 'container/Dockerfile' },
+  capabilities: {},
 };
 
 describe('toEntryViews', () => {
@@ -26,6 +27,10 @@ describe('toEntryViews', () => {
     expect(view.versions.map((v) => v.imageTag)).toEqual([
       'mediforce-built:newer',
       'mediforce-built:older',
+    ]);
+    expect(view.versions.map((v) => v.capabilities)).toEqual([
+      { status: 'unknown' },
+      { status: 'unknown' },
     ]);
     expect(view.intent).toBe(ENTRY.intent);
   });
