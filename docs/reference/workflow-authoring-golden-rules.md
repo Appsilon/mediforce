@@ -239,10 +239,10 @@ Tool Catalog entries. Do not put MCP definitions inside workflow step `agent` or
 
 | Channel | Use for |
 |---------|---------|
-| `triggerInput` | The workflow's **total input contract** — every trigger (manual form, webhook body, cron row payload) validates against it; a field's `default` is filled in for any firing that omitted it |
+| `triggerInput` | The workflow's **total input contract**, for a run started by a schedule, a webhook or a parent workflow — every trigger validates against it; a field's `default` is filled in for any firing that omitted it. A workflow a person starts collects on its first step instead, and declares none |
 | `triggerPayload` | The validated input at runtime: `${triggerPayload.<field>}`, identical whichever trigger fired |
 | `triggerContext` | Transport-only escape hatch (webhook headers/query/method/path, cron firedAt/schedule) — never declared input |
-| human `params` | Data collected from a human step |
+| human `params` | Data collected from a human step — **the default for anything a person supplies**, including the input a hand-started workflow needs. Never duplicate a required `triggerInput` field here: the run is refused before the step is reached |
 | `/output/input.json` | Runtime input snapshot for containers |
 | `/output/result.json` | Structured step output |
 | `/output/*` | Preserved run output files |

@@ -124,14 +124,33 @@ anti-patterns). They are deliberately small and are **not** production packages.
 For an end-to-end production-style package, read
 [`apps/golden-standard-workflow`](../../apps/golden-standard-workflow).
 
+## Decide where the input is collected
+
+Most workflows are started by a person, and what they need is collected on the
+**first step** as human `params`. That is the default: it puts the question
+where somebody is standing, it keeps the field editable while the run is going,
+and a Dry Run can start without anyone filling a form first. A workflow whose
+input arrives this way declares no `triggerInput` at all.
+
+Declare `triggerInput` when the run is started by something with nobody present
+to type: a **schedule**, a **webhook**, or a **parent workflow spawning this one
+as a child**. Then the input has to be part of the start itself, because there
+is no first step to ask on.
+
+A field belongs to one of the two, never both. `triggerInput` is validated
+*before* the run starts, so a required field there that the first step also asks for means the person
+answers it twice: once in the Start Run dialog, which renders the contract as a
+form, and again on the step. If a field genuinely
+belongs in both places, make it optional in `triggerInput`.
+
 ## Define the input contract
 
-Declare the workflow's complete external input under `triggerInput` — in the
-editor's **Settings** panel, by asking the AI Assistant, or in the `.wd.json`.
-It is a strict, trigger-agnostic contract: manual forms, webhook
-bodies, cron payloads, and spawned child runs all validate against it. Steps read
-validated values as `${triggerPayload.<field>}` regardless of how the Run was
-started.
+Where you do declare it, `triggerInput` is the workflow's complete external
+input — set in the editor's **Settings** panel, by asking the AI Assistant, or
+in the `.wd.json`. It is a strict, trigger-agnostic contract: manual forms,
+webhook bodies, cron payloads, and spawned child runs all validate against it.
+Steps read validated values as `${triggerPayload.<field>}` regardless of how the
+Run was started.
 
 For webhooks, the JSON body's top-level keys must be the declared field names;
 undeclared, missing, or mistyped fields are rejected with `400`. Use an
