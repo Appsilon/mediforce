@@ -178,39 +178,11 @@ function describeGraph(steps: WorkflowStep[], transitions: Transitions): string 
   return `The canvas now holds these steps, by id: ${stepList}. Transitions: ${edgeList}.`;
 }
 
-/**
- * A field declared in `triggerInput` that the entry step also collects.
- *
- * The person is then asked for it twice: once in the Start Run dialog, which
- * renders the contract as a form, and again on the first step. Prompt wording
- * alone did not stop the model doing this, so it is a gate error the build is
- * told about and retries against.
- */
-function duplicateInputErrors(
-  triggerInput: WorkflowDefinition['triggerInput'],
-  entryStep: WorkflowStep | undefined,
-): string[] {
-  const contract = triggerInput ?? [];
-  if (contract.length === 0 || entryStep === undefined) return [];
-  const collected = new Set((entryStep.params ?? []).map((param) => param.name));
-  const both = contract.map((field) => field.name).filter((name) => collected.has(name));
-  if (both.length === 0) return [];
-  const isOne = both.length === 1;
-  return [
-    `${both.join(', ')} ${isOne ? 'is' : 'are'} declared in triggerInput and also collected by step `
-    + `'${entryStep.id}', so whoever starts a run is asked for ${isOne ? 'it' : 'them'} twice. `
-    + `A field is collected in one place: drop ${isOne ? 'it' : 'them'} from triggerInput when a person `
-    + `types ${isOne ? 'it' : 'them'} on the first step, or remove the step param when a schedule, a `
-    + `webhook or a parent workflow supplies ${isOne ? 'it' : 'them'}.`,
-  ];
-}
-
 // The graph and reference errors a definition already carries, so the gate can tell a defect this turn introduced from one it inherited.
 function collectGraphErrors(
   steps: WorkflowStep[],
   transitions: Transitions,
   namespace: string,
-  triggerInput?: WorkflowDefinition['triggerInput'],
 ): string[] {
   const merged = mergeVerdictTransitions(steps, transitions);
   const ordered = ensureEntryStepFirst(steps, merged);
@@ -225,7 +197,6 @@ function collectGraphErrors(
   return [
     ...(graph.valid ? [] : graph.errors),
     ...validateStepReferences(steps, merged).filter((i) => i.severity === 'error').map((i) => i.message),
-    ...duplicateInputErrors(triggerInput, ordered[0]),
   ];
 }
 
@@ -294,12 +265,9 @@ export function validateResultingGraph(
     currentDefinition.steps,
     currentDefinition.transitions,
     namespace,
-    currentDefinition.settings?.triggerInput,
   );
   const introduced = (error: string): boolean => inheritedErrors.includes(error) === false;
-  const duplicateInput = duplicateInputErrors(applied.settings.triggerInput, orderedSteps[0]);
-  const errors = [...graphErrors, ...referenceErrors, ...outcomeErrors, ...schemaErrors, ...duplicateInput]
-    .filter(introduced);
+  const errors = [...graphErrors, ...referenceErrors, ...outcomeErrors, ...schemaErrors].filter(introduced);
   if (errors.length === 0) {
     return { valid: true, ...applied_, inheritedErrors };
   }
