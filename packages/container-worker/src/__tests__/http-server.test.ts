@@ -8,6 +8,24 @@ vi.mock('../docker-info', () => ({
   probeImageCapabilities: vi.fn(),
 }));
 
+const uploads = vi.hoisted(() => ({
+  calls: [] as Array<{ request: unknown; body: Buffer }>,
+  taken: false,
+}));
+vi.mock('../docker-image-builder', async (importOriginal) => {
+  const { ImageTagTakenError } = await importOriginal<typeof import('../docker-image-builder')>();
+  return {
+    ImageTagTakenError,
+    buildImageFromRepo: vi.fn(),
+    buildImageFromUpload: async (request: { image: string }, archive: AsyncIterable<Buffer>) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of archive) chunks.push(chunk);
+      if (uploads.taken) throw new ImageTagTakenError(request.image);
+      uploads.calls.push({ request, body: Buffer.concat(chunks) });
+    },
+  };
+});
+
 import { listImages, getDiskUsage, getImageHistory, probeImageCapabilities } from '../docker-info';
 const mockListImages = vi.mocked(listImages);
 const mockGetDiskUsage = vi.mocked(getDiskUsage);
@@ -33,8 +51,92 @@ afterEach(() => {
     server = null;
   }
   delete process.env.CONTAINER_WORKER_SECRET;
+  uploads.calls = [];
+  uploads.taken = false;
   vi.clearAllMocks();
   vi.resetModules();
+});
+
+describe('POST /images/build with an uploaded context', () => {
+  const archive = Buffer.from('pretend this is a tar archive');
+  const query = new URLSearchParams({ image: 'acme/agent:v1', dockerfile: 'container/Dockerfile', namespace: 'acme' });
+
+  it('streams the body to the upload builder, with the rest read from the query', async () => {
+    const { port } = await getServer();
+    const res = await fetch(`http://localhost:${port}/images/build?${query.toString()}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-tar' },
+      body: archive,
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ image: 'acme/agent:v1' });
+    expect(uploads.calls).toHaveLength(1);
+    expect(uploads.calls[0]?.request).toEqual({
+      image: 'acme/agent:v1',
+      dockerfile: 'container/Dockerfile',
+      namespace: 'acme',
+    });
+    expect(uploads.calls[0]?.body.equals(archive)).toBe(true);
+  });
+
+  it('takes an upload whose content type carries parameters', async () => {
+    const { port } = await getServer();
+    const res = await fetch(`http://localhost:${port}/images/build?${query.toString()}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-tar; charset=binary' },
+      body: archive,
+    });
+
+    expect(res.status).toBe(200);
+    expect(uploads.calls).toHaveLength(1);
+  });
+
+  it('answers 400 for an upload that names no image', async () => {
+    const { port } = await getServer();
+    const res = await fetch(`http://localhost:${port}/images/build?namespace=acme`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-tar' },
+      body: archive,
+    });
+
+    expect(res.status).toBe(400);
+    expect(uploads.calls).toHaveLength(0);
+  });
+
+  it('answers 409 when the tag was taken while it built', async () => {
+    uploads.taken = true;
+    const { port } = await getServer();
+    const res = await fetch(`http://localhost:${port}/images/build?${query.toString()}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-tar' },
+      body: archive,
+    });
+
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toContain('already on the daemon');
+  });
+
+  it('needs the worker secret once one is set, like a repo build', async () => {
+    process.env.CONTAINER_WORKER_SECRET = 'worker-secret';
+    const { port } = await getServer();
+    const url = `http://localhost:${port}/images/build?${query.toString()}`;
+
+    const unauthorized = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-tar' },
+      body: archive,
+    });
+    expect(unauthorized.status).toBe(401);
+    expect(uploads.calls).toHaveLength(0);
+
+    const authorized = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-tar', 'X-Worker-Secret': 'worker-secret' },
+      body: archive,
+    });
+    expect(authorized.status).toBe(200);
+  });
 });
 
 describe('HTTP info server', () => {

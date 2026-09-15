@@ -579,14 +579,18 @@ export {
   OCI_LABELS,
   IMAGE_INSPECT_FORMAT,
   BuildImageRequestSchema,
+  BuildUploadedImageRequestSchema,
   buildProvenanceLabelArgs,
   imageInspectArgs,
+  imageTagTakenMessage,
   parseImageInspect,
   readProvenanceLabels,
   shortImageId,
+  uploadedImageLabelArgs,
 } from './utils/image-provenance';
 export type {
   BuildImageRequest,
+  BuildUploadedImageRequest,
   ImageProvenance,
   InspectedImage,
   ReadImageProvenance,
@@ -600,6 +604,18 @@ export {
   resolveDockerBuildPaths,
 } from './utils/docker-build-paths';
 export type { DockerBuildPaths } from './utils/docker-build-paths';
+export {
+  BUILD_CONTEXT_MAX_BYTES,
+  BUILD_CONTEXT_MEDIA_TYPE,
+  buildContextDockerfileProblem,
+  checkBuildContextArchive,
+  checkBuildContextSize,
+  listBuildContextArchive,
+  packBuildContextArchive,
+} from './utils/build-context-archive';
+export type { BuildContextArchiveEntry } from './utils/build-context-archive';
+export { buildContextFilter, dockerignoreCandidates } from './utils/dockerignore';
+export type { BuildContextFilter } from './utils/dockerignore';
 export { getWorkflowStatus, type WorkflowStatus } from './utils/workflow-status';
 export { toSlug, uniqueName, uniqueSlug } from './utils/slug';
 

@@ -52,4 +52,14 @@ describe('describeBuildFailure', () => {
   it('falls back to the message when nothing in it looks like a failure line', () => {
     expect(describeBuildFailure('something went wrong').summary).toBe('something went wrong');
   });
+
+  it('explains a script refused as not executable when the folder came through a browser', () => {
+    const message = '#6 [3/3] RUN ./scripts/run.sh\n#6 0.2 /bin/sh: ./scripts/run.sh: Permission denied\nERROR: failed to solve: exit code: 126';
+
+    const failure = describeBuildFailure(message, 'my-agent', { browserUpload: true });
+
+    expect(failure.explained).toBe(true);
+    expect(failure.summary).toMatch(/chmod \+x/);
+    expect(describeBuildFailure(message).explained).toBe(false);
+  });
 });

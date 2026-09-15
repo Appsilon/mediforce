@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useProcessRunMap, type RunLocation } from '@/hooks/use-agent-runs';
 import { useUserDisplayNames } from '@/hooks/use-users';
 import { cn } from '@/lib/utils';
+import { IndeterminateCheckbox } from '@/components/ui/indeterminate-checkbox';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { queryKeys } from '@/lib/query-keys';
@@ -87,30 +88,6 @@ function getStatusInfo(item: ActionItem): { label: string; className: string } {
     default:
       return { label: item.data.status, className: 'bg-muted text-muted-foreground' };
   }
-}
-
-function IndeterminateCheckbox({
-  checked,
-  indeterminate,
-  onChange,
-}: {
-  checked: boolean;
-  indeterminate: boolean;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}) {
-  const ref = React.useRef<HTMLInputElement>(null);
-  React.useEffect(() => {
-    if (ref.current) ref.current.indeterminate = indeterminate;
-  }, [indeterminate]);
-  return (
-    <input
-      ref={ref}
-      type="checkbox"
-      checked={checked}
-      onChange={onChange}
-      className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
-    />
-  );
 }
 
 function TH({ children, className }: { children?: React.ReactNode; className?: string }) {

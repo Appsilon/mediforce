@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { BuildImageRequestSchema } from '@mediforce/platform-core';
+import { BuildImageRequestSchema, BuildUploadedImageRequestSchema } from '@mediforce/platform-core';
+import { ConflictError } from '../../../errors';
 import {
   buildImageViaContainerWorker,
+  buildUploadedImageViaContainerWorker,
   fetchContainerWorkerImageHistory,
   fetchFromContainerWorker,
   fetchFromLocalDocker,
@@ -440,5 +442,63 @@ describe('image builds', () => {
     });
 
     expect(BuildImageRequestSchema.parse(sent)).toEqual(request);
+  });
+
+  it('sends an uploaded context as the body of the same route, the rest in the query', async () => {
+    const archive = new Uint8Array([1, 2, 3, 4]);
+    let sentUrl = '';
+    let sentInit: RequestInit | undefined;
+    await buildUploadedImageViaContainerWorker(
+      { image: 'acme/agent:v1', dockerfile: 'container/Dockerfile', namespace: 'acme' },
+      archive,
+      {
+        baseUrl: 'http://worker.test',
+        workerSecret: 'worker-secret',
+        fetch: async (url, init) => {
+          sentUrl = String(url);
+          sentInit = init;
+          return new Response(JSON.stringify({ image: 'acme/agent:v1' }));
+        },
+      },
+    );
+
+    const url = new URL(sentUrl);
+    expect(url.pathname).toBe('/images/build');
+    expect(BuildUploadedImageRequestSchema.parse(Object.fromEntries(url.searchParams))).toEqual({
+      image: 'acme/agent:v1',
+      dockerfile: 'container/Dockerfile',
+      namespace: 'acme',
+    });
+    expect(new Headers(sentInit?.headers).get('Content-Type')).toBe('application/x-tar');
+    expect(new Headers(sentInit?.headers).get('X-Worker-Secret')).toBe('worker-secret');
+    expect(sentInit?.body).toBe(archive);
+  });
+
+  it('surfaces a failed upload build instead of reporting success', async () => {
+    await expect(
+      buildUploadedImageViaContainerWorker(
+        { image: 'acme/agent:v1', dockerfile: '', namespace: 'acme' },
+        new Uint8Array(),
+        {
+          baseUrl: 'http://worker.test',
+          fetch: async () =>
+            new Response(JSON.stringify({ error: 'Could not unpack the uploaded build context' }), { status: 500 }),
+        },
+      ),
+    ).rejects.toThrow('Could not unpack');
+  });
+
+  it('reports a tag taken while the upload built as a conflict, not a failed build', async () => {
+    await expect(
+      buildUploadedImageViaContainerWorker(
+        { image: 'acme/agent:v1', dockerfile: '', namespace: 'acme' },
+        new Uint8Array(),
+        {
+          baseUrl: 'http://worker.test',
+          fetch: async () =>
+            new Response(JSON.stringify({ error: '"acme/agent:v1" is already on the daemon.' }), { status: 409 }),
+        },
+      ),
+    ).rejects.toThrow(ConflictError);
   });
 });

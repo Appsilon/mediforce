@@ -65,6 +65,20 @@ lazily: it mints the same tag a build-mode step pinning that commit resolves
 to, so that step finds the image cached rather than rebuilding it. It holds the
 connection for the whole build — minutes, not the sub-second every other
 command takes.
+`images build --reference <handle>/<name> --context <dir> [--dockerfile] [--tag]`
+is the same command for a Dockerfile in no repo the deployment can clone: it
+packs the local directory into a tar (`src/build-context.ts`, with
+`platform-core`'s packer rather than the system `tar`, whose macOS build adds
+`._*` files a `COPY .` would carry into the image), leaving out what its
+`.dockerignore` excludes — read by `platform-core`'s `buildContextFilter` the
+way `docker build` reads it, `<Dockerfile>.dockerignore` first. The walk only
+stats, skips an excluded directory whole, and refuses a context over the limit
+naming its largest entries before reading a byte. It then checks the archive with
+`checkBuildContextArchive` before uploading, and the platform builds and
+catalogues it as a `referenced` entry. `--intent` is required the first time a
+reference is uploaded; `--declared-*` record where it came from, as declared.
+`--name`, `--intent` and `--declared-*` describe the entry the first upload
+creates: a later upload may repeat them unchanged, and is refused if they differ.
 
 ## Rules
 

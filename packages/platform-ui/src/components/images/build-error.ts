@@ -29,6 +29,17 @@ function namedContextHint(context: string): string {
   );
 }
 
+/**
+ * A browser cannot read a file's permissions, so a folder uploaded from the
+ * Images view arrives with no file marked executable, and a Dockerfile that
+ * runs a script directly fails on it. Said here, where it bites, rather than
+ * up front to everyone.
+ */
+const NOT_EXECUTABLE_HINT =
+  'A script in the folder could not run because it lost its "executable" mark: browsers cannot ' +
+  'upload that mark. Add RUN chmod +x <script> to the Dockerfile before it runs, or upload with ' +
+  'mediforce images build --context, which keeps it.';
+
 /** BuildKit's wording when a `COPY` source is outside the context. */
 function looksLikeContextMismatch(message: string): boolean {
   return (
@@ -57,9 +68,17 @@ export interface BuildFailure {
   explained: boolean;
 }
 
-/** `context` is the one the failed build used; absent when it named none. */
-export function describeBuildFailure(message: string, context?: string): BuildFailure {
+/** `context` is the one the failed build used; absent when it named none.
+ *  `browserUpload` is a folder uploaded from the Images view. */
+export function describeBuildFailure(
+  message: string,
+  context?: string,
+  options: { browserUpload?: boolean } = {},
+): BuildFailure {
   const detail = message.trim();
+  if (options.browserUpload === true && /permission denied/i.test(detail)) {
+    return { summary: NOT_EXECUTABLE_HINT, detail, explained: true };
+  }
   if (looksLikeContextMismatch(detail)) {
     const summary =
       context === undefined || context === '' ? CONTEXT_MISMATCH_HINT : namedContextHint(context);
