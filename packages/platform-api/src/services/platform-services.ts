@@ -8,6 +8,7 @@ import {
   PostgresNamespaceSecretsRepository,
   PostgresWorkflowSecretsRepository,
   PostgresToolCatalogRepository,
+  PostgresImageCatalogRepository,
   PostgresNamespaceRepository,
   PostgresAuditRepository,
   PostgresOAuthProviderRepository,
@@ -53,6 +54,7 @@ import type {
   ProcessInstanceRepository,
   ProcessRepository,
   SendEmailFn,
+  ImageCatalogRepository,
   ToolCatalogRepository,
   UserDirectoryService,
   UserProfileRepository,
@@ -135,6 +137,7 @@ export interface PlatformServices {
   coworkSessionRepo: CoworkSessionRepository;
   triggerRepo: TriggerRepository;
   toolCatalogRepo: ToolCatalogRepository;
+  imageCatalogRepo: ImageCatalogRepository;
   namespaceRepo: NamespaceRepository;
   userProfileRepo: UserProfileRepository;
   credentialsRepo: CredentialsRepository;
@@ -262,6 +265,7 @@ export function getPlatformServices(): PlatformServices {
     new PostgresCoworkSessionRepository(pg, instanceRepo);
   const triggerRepo: TriggerRepository = new PostgresTriggerRepository(pg);
   const toolCatalogRepo: ToolCatalogRepository = new PostgresToolCatalogRepository(pg);
+  const imageCatalogRepo: ImageCatalogRepository = new PostgresImageCatalogRepository(pg);
   const namespaceRepo: NamespaceRepository = new PostgresNamespaceRepository(pg);
   const userProfileRepo: UserProfileRepository = new PostgresUserProfileRepository(pg);
   const credentialsRepo: CredentialsRepository = new PostgresCredentialsRepository(pg);
@@ -429,6 +433,7 @@ export function getPlatformServices(): PlatformServices {
     coworkSessionRepo,
     triggerRepo,
     toolCatalogRepo,
+    imageCatalogRepo,
     namespaceRepo,
     userProfileRepo,
     credentialsRepo,
