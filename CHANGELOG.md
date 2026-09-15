@@ -11,9 +11,6 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
-### Fixed
-- The AI Assistant declared a workflow's input as `triggerInput` *and* collected it on the first step, so a run asked for the same fields twice. Input now belongs to the first step; `triggerInput` is for a schedule, a webhook, or a spawned child. The build gate refuses the duplicate.
-
 ### Added
 - A join link can be handed to a room as a QR code. The one-time "Join link created" card in **Workspace settings → Join links** now shows a QR code next to the URL, with **Present** (a full-screen black-on-white view with the workspace name, code and URL, for a projector) and **Download PNG** (for a slide). The code is generated in the browser, not by a hosted QR image service, because the URL contains the plaintext token. Like the URL, it can only be shown while the card is open: a lost code means making a new link. [#1354](https://github.com/Appsilon/mediforce/pull/1354)
 - The AI Assistant plans before it builds. Sending a message now runs a short planning turn first (`POST /api/workflow-assistant/plan`): it states what it is about to do in the user's terms, asks only what it genuinely cannot infer — each question prefilled with the answer it would otherwise have invented, so agreeing is one click — and names the phases this particular build will go through. A build was previously one long request whose result appeared all at once, so a wrong assumption cost a minute of building and a question could only be asked after the work. Nothing to ask is the common case for an edit: the plan is said in the conversation and the build starts. While it runs the pane shows those phases with the seconds elapsed, instead of five hardcoded phrases that had nothing to do with the workflow. A planning call that fails costs nothing — the build runs exactly as it did before.

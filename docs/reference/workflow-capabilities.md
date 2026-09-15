@@ -296,12 +296,7 @@ router, do not author it):
 
 `triggerInput` (`TriggerInputFieldSchema`) is the contract every trigger
 validates against, and doubles as the manual-start form. Spawned child runs use
-the same contract. It is for a run nobody is present to start by hand — a
-schedule, a webhook, a parent workflow. A workflow a person starts collects what
-it needs on its first step as human `params` instead and declares none: a
-required `triggerInput` field is checked before the run starts, so one the first
-step also asks for is answered twice — in the Start Run dialog and again on the
-step. Each field has a `type` of `string` / `number` / `boolean` /
+the same contract. Each field has a `type` of `string` / `number` / `boolean` /
 `date` / `datetime` / `select` / `multiselect` / `textarea` / `object`, plus
 `options` / `default` / `required` (it extends `StepParamSchema`). `object`
 holds an opaque JSON object the definition does not enumerate — the way a
