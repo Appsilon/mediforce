@@ -67,6 +67,11 @@ Minimal base images (`alpine`, `scratch`, distroless) ship none of this. `alpine
 
 ## See also
 
+- **Workspace → Images** (`/<handle>/images`) — the same catalog in the browser,
+  open to any workspace member: entries grouped under the image each was built
+  on, searchable across intent and capability, with each version's commit, size,
+  layer summary, "used by" workflows and a permalink to its Dockerfile on GitHub
+  where the repository reference supports one.
 - `mediforce images list` — the **Image Catalog**: the images your namespace
   offers for steps, one row per source, each with a sentence saying what it is
   for and a cached probe of each version's runtimes and agent suitability
