@@ -44,6 +44,10 @@ export const DockerJobDataSchema = z.object({
     dockerfile: z.string().optional(),
     repoToken: z.string().optional(),
     contextDir: z.string().optional(),
+    /** Workflow definition whose step triggered the build; written as an image label. */
+    workflow: z.string().optional(),
+    /** Namespace owning that definition; written as an image label. */
+    namespace: z.string().optional(),
   }).optional(),
 });
 

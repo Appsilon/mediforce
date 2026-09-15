@@ -32,6 +32,11 @@ export interface ImageBuildMeta {
    *  well as the orchestrator: it lives under the shared temp directory, the
    *  same assumption the skills cache and the `/artifacts` mount already make. */
   contextDir?: string;
+  /** Workflow definition whose step triggered the build. Recorded as an image
+   *  label so a derived `mediforce-built:<hash>` tag can name what it is for. */
+  workflow?: string;
+  /** Namespace owning that definition. Recorded as an image label. */
+  namespace?: string;
 }
 
 /** A first image build is minutes of `docker build`, not seconds of container
