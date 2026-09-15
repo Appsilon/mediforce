@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ExternalLink,
   Layers,
+  Plus,
   Search,
   Server,
 } from 'lucide-react';
@@ -20,9 +21,13 @@ import { shortImageId } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
 import { ConceptPopover } from '@/components/ui/concept-intro';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useImageCatalogEntries, useImageCatalogEntry } from '@/hooks/use-image-catalog';
-import { DescribeImageDialog } from '@/components/images/describe-image-dialog';
+import { AddImageDialog } from '@/components/images/add-image-dialog';
+import { BuildImageDialog } from '@/components/images/build-image-dialog';
+import { DeleteImageEntryDialog } from '@/components/images/delete-image-entry-dialog';
+import { ImageDescriptionDialog } from '@/components/images/image-description-dialog';
 import { useWorkflowsByImage, type WorkflowImageMatch } from '@/hooks/use-workflows-by-image';
 import {
   groupByBase,
@@ -51,12 +56,22 @@ const AVAILABILITY: Record<
 
 function Chip({ children, title }: { children: ReactNode; title?: string }) {
   return (
-    <span
-      title={title}
-      className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
-    >
-      {children}
-    </span>
+    <InstantTooltip label={title}>
+      <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+        {children}
+      </span>
+    </InstantTooltip>
+  );
+}
+
+/** A cryptic value on a version row, explained on hover. */
+function ExplainedValue({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <InstantTooltip label={label}>
+      <span className="cursor-help font-mono text-muted-foreground underline decoration-dotted underline-offset-2">
+        {children}
+      </span>
+    </InstantTooltip>
   );
 }
 
@@ -215,7 +230,10 @@ function UsedBy({
   return (
     <ul className="space-y-1">
       {workflows.map((workflow) => (
-        <li key={`${workflow.namespace}:${workflow.name}`} className="text-xs">
+        <li
+          key={`${workflow.namespace}:${workflow.name}:${workflow.version}`}
+          className="text-xs"
+        >
           {workflow.namespace === handle ? (
             <Link
               href={routes.workflow(workflow.namespace, workflow.name)}
@@ -270,14 +288,28 @@ function VersionRow({
   return (
     <li className="space-y-1.5 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="font-mono">{version.imageTag}</span>
+        <InstantTooltip label="Image tag — what a workflow step pins to run this version">
+          <span className="cursor-help font-mono">{version.imageTag}</span>
+        </InstantTooltip>
         {version.commit !== undefined && (
-          <span className="font-mono text-muted-foreground">{shortCommit(version.commit)}</span>
+          <ExplainedValue label={`Git commit the image was built from: ${version.commit}`}>
+            {shortCommit(version.commit)}
+          </ExplainedValue>
         )}
         <span className="text-muted-foreground">{version.created}</span>
         <span className="text-muted-foreground">{version.size}</span>
-        <span className="font-mono text-muted-foreground">{shortImageId(version.imageId)}</span>
-        {index === 0 ? <Chip>current</Chip> : <Chip>superseded</Chip>}
+        <ExplainedValue
+          label={`Docker image ID: ${version.imageId} — identifies the image contents; two tags with the same ID are the same image`}
+        >
+          {shortImageId(version.imageId)}
+        </ExplainedValue>
+        {index === 0 ? (
+          <Chip title="The newest build of this entry — what a new pin picks">current</Chip>
+        ) : (
+          <Chip title="An older build, replaced by a newer one — workflows pinning it keep running it">
+            superseded
+          </Chip>
+        )}
         {usedTags !== null && !usedTags.has(version.imageTag) && (
           <Chip title="No workflow step pins this version">unused</Chip>
         )}
@@ -311,6 +343,7 @@ function EntryCard({
   depth,
   baseName,
   handle,
+  canAdmin,
   expanded,
   onToggle,
 }: {
@@ -318,6 +351,7 @@ function EntryCard({
   depth: number;
   baseName: string | null;
   handle: string;
+  canAdmin: boolean;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -325,8 +359,13 @@ function EntryCard({
   // expanded card reads the entry on its own to get it.
   const detail = useImageCatalogEntry(handle, entry.id, expanded);
   const shown = detail.entry ?? entry;
-  const [describing, setDescribing] = useState(false);
+  const [writingDescription, setWritingDescription] = useState(false);
+  const [building, setBuilding] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const discovered = shown.origin === 'discovered';
+  // Only a built source carries the recipe a build needs. A `referenced` entry
+  // names an image the platform holds no inputs for, so it has nothing to build.
+  const buildable = shown.source.kind === 'built';
   const versions = shown.versions;
   const newest = versions[0];
 
@@ -392,24 +431,64 @@ function EntryCard({
               {versions.length} version{versions.length === 1 ? '' : 's'}
             </span>
           </button>
-          {discovered && (
-            <div className="shrink-0 py-3 pr-4">
+          <div className="flex shrink-0 gap-2 py-3 pr-4">
+            {buildable && (
               <button
                 type="button"
-                onClick={() => setDescribing(true)}
+                onClick={() => setBuilding(true)}
                 className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
               >
-                Describe
+                Build
               </button>
-            </div>
-          )}
+            )}
+            {/* Every entry carries the same human-written fields, so every
+                entry can be edited — any member, the gate the entry was
+                created under (ADR-0022 decision 3). A discovered entry has no
+                stored row yet, so the same form describes it into one. */}
+            <button
+              type="button"
+              onClick={() => setWritingDescription(true)}
+              className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
+            >
+              {discovered ? 'Describe' : 'Edit'}
+            </button>
+            {/* Admin only. Delete takes the entry's images with it, and the
+                daemon is deployment-wide — one tag can back steps in
+                workspaces this reader cannot see. A member can still add an
+                entry; retiring one is an admin's call. */}
+            {canAdmin && (
+              <button
+                type="button"
+                onClick={() => setDeleting(true)}
+                className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                Delete
+              </button>
+            )}
+          </div>
         </div>
-        {describing && (
-          <DescribeImageDialog
+        {writingDescription && (
+          <ImageDescriptionDialog
             entry={shown}
             handle={handle}
-            open={describing}
-            onOpenChange={setDescribing}
+            open={writingDescription}
+            onOpenChange={setWritingDescription}
+          />
+        )}
+        {building && (
+          <BuildImageDialog
+            entry={shown}
+            handle={handle}
+            open={building}
+            onOpenChange={setBuilding}
+          />
+        )}
+        {deleting && (
+          <DeleteImageEntryDialog
+            entry={shown}
+            handle={handle}
+            open={deleting}
+            onOpenChange={setDeleting}
           />
         )}
 
@@ -474,6 +553,7 @@ export default function ImagesPage() {
   const [query, setQuery] = useState('');
   // `?entry=` is how Infrastructure crosses over to a specific entry.
   const [expandedId, setExpandedId] = useState<string | null>(search.get('entry'));
+  const [adding, setAdding] = useState(false);
 
   const grouped = useMemo(
     () => groupByBase(entries.filter((entry) => matchesImageQuery(entry, query))),
@@ -514,16 +594,31 @@ export default function ImagesPage() {
             Images @{handle} offers for workflow steps, grouped by what each was built on.
           </p>
         </div>
-        {canAdmin && (
-          <Link
-            href={routes.adminInfrastructure(handle)}
-            className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+        <div className="flex items-center gap-2">
+          {canAdmin && (
+            <Link
+              href={routes.adminInfrastructure(handle)}
+              className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              <Server className="h-3.5 w-3.5" />
+              Raw daemon inventory
+            </Link>
+          )}
+          {/* Any member, matching the write gate on the entry itself — an entry
+              executes nothing and names an image string a step author can
+              already type (ADR-0022 decision 3). */}
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            <Server className="h-3.5 w-3.5" />
-            Raw daemon inventory
-          </Link>
-        )}
+            <Plus className="h-3.5 w-3.5" />
+            Add image
+          </button>
+        </div>
       </div>
+
+      {adding && <AddImageDialog handle={handle} open={adding} onOpenChange={setAdding} />}
 
       <div className="relative mb-6">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -564,7 +659,7 @@ export default function ImagesPage() {
           </div>
           <p className="text-sm text-muted-foreground">
             {query.trim() === ''
-              ? 'No images catalogued yet, and no workflow here has built one. Register one with `mediforce images create`.'
+              ? 'No images catalogued yet, and no workflow here has built one. Add image registers the repository and Dockerfile yours are built from.'
               : 'No images match your search.'}
           </p>
         </div>
@@ -577,6 +672,7 @@ export default function ImagesPage() {
               depth={depth}
               baseName={baseName}
               handle={handle}
+              canAdmin={canAdmin}
               expanded={expandedId === entry.id}
               onToggle={() => setExpandedId((current) => (current === entry.id ? null : entry.id))}
             />

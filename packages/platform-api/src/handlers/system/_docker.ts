@@ -19,6 +19,7 @@ import {
   resolveImageLineage,
   shortImageId,
   unknownImageCapabilities,
+  type BuildImageRequest,
   type ImageBuildStep,
   type ImageCapabilities,
   type InspectedImage,
@@ -141,6 +142,78 @@ export async function probeImageCapabilities(image: string): Promise<ImageCapabi
   return isLocalAgentMode()
     ? probeLocalImageCapabilities(image)
     : probeContainerWorkerImageCapabilities(image);
+}
+
+/** A build clones and runs a Dockerfile, so it is bounded far wider than the
+ *  capability probe — but still bounded, so a wedged build cannot hold a
+ *  request open forever. */
+const IMAGE_BUILD_TIMEOUT_MS = 30 * 60 * 1000;
+
+export interface BuildImageOptions {
+  readonly fetch?: typeof globalThis.fetch;
+  readonly baseUrl?: string;
+  readonly workerSecret?: string;
+}
+
+/**
+ * Build on the daemon this process can reach directly.
+ *
+ * Delegates to the worker's builder rather than re-cloning here. Resolving a
+ * repo reference is not a `git clone`: `Appsilon/tealflow` and
+ * `git@github.com:Appsilon/tealflow.git` are the forms a step author actually
+ * writes, and turning either into a working fetch means the SSH-then-HTTPS
+ * ladder, the deploy key and the credential redaction that
+ * `cloneRepoAtCommit` already implements. A second, simpler clone here would
+ * work for the fixtures and fail on the real inputs.
+ *
+ * Dynamically imported, like `removeStaleContainer` in
+ * `LocalDockerSpawnStrategy`, so nothing loads the worker's Docker plumbing on
+ * a deployment that never builds locally. It blocks while it runs — the
+ * builder is `execFileSync` — which is what a local build-mode step already
+ * does on this path today.
+ */
+export async function buildLocalImage(request: BuildImageRequest): Promise<void> {
+  const { buildImageFromRepo } = await import('@mediforce/container-worker');
+  await buildImageFromRepo(request);
+}
+
+/** Build on the worker's host daemon. Carries the same secret every route that
+ *  acts on the daemon does; an estate that sets none is unaffected. */
+export async function buildImageViaContainerWorker(
+  request: BuildImageRequest,
+  options: BuildImageOptions = {},
+): Promise<void> {
+  const fetchImpl = options.fetch ?? globalThis.fetch;
+  const baseUrl = options.baseUrl ?? process.env.CONTAINER_WORKER_URL ?? DEFAULT_CONTAINER_WORKER_URL;
+  const workerSecret = options.workerSecret ?? process.env.CONTAINER_WORKER_SECRET ?? '';
+  const response = await fetchImpl(`${baseUrl}/images/build`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(workerSecret === '' ? {} : { 'X-Worker-Secret': workerSecret }),
+    },
+    body: JSON.stringify(request),
+    signal: AbortSignal.timeout(IMAGE_BUILD_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `Image build failed with status ${String(response.status)}`);
+  }
+}
+
+/**
+ * Build an image on whichever daemon this deployment uses.
+ *
+ * Unlike the probe and the history read, a failure is not degraded to
+ * `unknown`: those answer "what is in this image", where not knowing is a
+ * legitimate state, while this one is asked to *produce* the image. A build
+ * that failed and reported success would leave the caller waiting for an
+ * image that is never coming.
+ */
+export async function buildImage(request: BuildImageRequest): Promise<void> {
+  return isLocalAgentMode()
+    ? buildLocalImage(request)
+    : buildImageViaContainerWorker(request);
 }
 
 export interface FetchImageHistoryOptions {

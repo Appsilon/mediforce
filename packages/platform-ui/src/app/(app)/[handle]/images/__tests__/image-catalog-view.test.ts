@@ -49,6 +49,18 @@ describe('resolveVersionSource', () => {
     );
   });
 
+  it('[DATA] rung 1 links the Dockerfile from the repo root when the entry names a context', () => {
+    // `dockerfile` is read from the context, so linking it raw would point at
+    // a Dockerfile at the repo root that this entry does not build.
+    const withContext = entry({
+      source: { kind: 'built', repo: 'Appsilon/tealflow', dockerfile: 'Dockerfile', context: 'container' },
+    });
+    const source = resolveVersionSource(withContext, version({ commit: 'c0ffee' }));
+
+    expect(source.url).toBe('https://github.com/Appsilon/tealflow/blob/c0ffee/container/Dockerfile');
+    expect(source.dockerfile).toBe('container/Dockerfile');
+  });
+
   it('[DATA] rung 1 renders no link for a local-path repo rather than a broken one', () => {
     const local = entry({
       source: { kind: 'built', repo: '/srv/git/tealflow.git', dockerfile: 'Dockerfile' },

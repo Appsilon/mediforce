@@ -271,6 +271,9 @@ importers:
       '@mediforce/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@mediforce/container-worker':
+        specifier: workspace:*
+        version: link:../container-worker
       '@mediforce/core-actions':
         specifier: workspace:*
         version: link:../core-actions

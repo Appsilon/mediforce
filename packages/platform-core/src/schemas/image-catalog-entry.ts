@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ImageCapabilityCacheSchema } from './image-capabilities';
+import { BuildContextSchema } from '../utils/docker-build-paths';
 
 /**
  * Where an entry's image comes from. This is the entry's key (ADR-0022
@@ -18,6 +19,14 @@ export const ImageCatalogSourceSchema = z.discriminatedUnion('kind', [
        * none, so two entries differing only in it are two images.
        */
       dockerfile: z.string().default(''),
+      /**
+       * Build context directory from the repo root, which makes `dockerfile`
+       * a path from the context. **Not part of the key**: the key is the
+       * Dockerfile's path from the repo root (`catalogDockerfileKey`), so one
+       * file built from two contexts is one entry with versions of both, and
+       * this is the context the entry's Build action uses.
+       */
+      context: BuildContextSchema.optional(),
     })
     .strict(),
   z

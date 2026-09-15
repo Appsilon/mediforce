@@ -1,7 +1,7 @@
 ---
-status: finalized
+status: accepted
 audience: engineers
-last_reviewed: 2026-09-08
+last_reviewed: 2026-09-11
 ---
 
 # ADR-0022: The Image Catalog is an image the platform offers, keyed on its source
@@ -23,6 +23,99 @@ where decision 5 stops being a claim about a future control and starts being the
 behaviour of the one authors use. Decision 7 landed after the first workspace
 ran a build-mode workflow and found the image it had just built missing from
 its own catalog.
+
+#1344 later added a way to *produce* a version — `mediforce images build` and a
+**Build** action — without changing any of the seven decisions: it reuses
+`deriveBuildTag`, the existing builder and the existing provenance labels, so a
+build it triggers is indistinguishable from a step's and is picked up by
+decisions 1 and 7 with no code of its own. It does extend decision 3's write
+gate from "any member may describe an entry" to "any member may also build one
+of its versions", on the ground that the same member can already trigger the
+same build on the same host by running a build-mode step — so the gate would
+have removed the convenient path and not the capability. Whether host-side
+builds should be privileged at all is a question about build-mode steps, and
+this ADR does not answer it.
+
+**A built source may name a build context, and the key leaves it out.** With
+the context always the Dockerfile's own directory, a `container/Dockerfile` that
+`COPY`s `scripts/` could not be built at all. `context` is a directory from the
+repo root, and once it is set `dockerfile` is read from it — docker-compose's
+contract. It extends decision 1 without moving any existing key: the Dockerfile
+half of the key is `catalogDockerfileKey`, the Dockerfile's path from the repo
+root, which for a source with no context is `dockerfile` exactly as written, so
+no id minted before contexts existed changes. The context stays out of the key
+because it is how the file is built, not which file it is: one Dockerfile built
+from two contexts is one entry with versions of both, and the context stored on
+the entry is the one its **Build** action uses. Because `dockerfile` is read
+from the context, a change that makes the same path name a different file does
+re-key the entry. `deriveBuildTag` does fold the context in — only when set,
+and normalised, so no existing tag moves either — because two builds of one
+Dockerfile at one commit from different contexts are different images and must
+not share a cache slot. The `mediforce.build.context` label is written on every
+build, empty when none was named, so an image cannot inherit its base's. A path
+that climbs out of the repository is refused by the contract, and one the
+checkout reaches through a symlink is refused by the builders after cloning.
+
+An entry's **source became editable** after the Images view shipped without any
+way to change one: an entry added through **Add image** was final, so a mistyped
+repository was permanent. This does not weaken decision 1 — it follows from
+it. The id still derives from the source, so `PATCH`ing a source **re-keys** the
+entry: the row is written under the id the new source derives and the old row is
+removed, and a source that only spells the same key differently canonicalises to
+the same id and stays put. What makes this safe is the same property that makes
+deleting safe, stated under decision 3: no Workflow Definition references an
+entry. Re-keying onto a source another entry already describes is refused rather
+than upserted, since that would overwrite the occupant's sentence and delete the
+row being edited. A re-key audits against both ids — it is the one update that
+leaves an id with no row.
+
+**Deleting an entry takes its images with it, and needs admin of the
+workspace.** This narrows decision 3's write gate, and the reason the original
+formulation does not survive is decision 7. "Removing an entry removes an offer"
+is true of the *row*, but for a source this namespace built the row is
+re-derived on the next read: deleting the record alone loses the sentence
+somebody wrote, leaves the image on the daemon, keeps it in the step-editor
+picker, and brings the entry back marked *needs a description*. A delete that
+achieves that is not a lesser act deserving a lighter gate; it is a worse one.
+So the entry and its images are one act — and when the daemon holds no image
+for the entry, that act is just the record. Creating stays a member's right, so
+a member can add an entry they cannot remove; that asymmetry is accepted, on
+the ground that adding an offer is reversible by an admin while destroying a
+deployment-wide artifact is not reversible by anyone.
+
+The gate is `assertCallerIsNamespaceAdmin`, not
+`assertCallerCanAdminDockerImages`, whose own comment calls it a loose
+approximation until #376 — owner or admin of *any* namespace, which nearly
+every user satisfies through a personal workspace. That looser gate still
+applies underneath via `deleteDockerImage`, so **Admin → Infrastructure** is
+unchanged.
+
+**A live workflow version blocks the delete; a superseded one does not.** Live
+means the version a run starts from, by the same `pickRunnableVersion` rule
+every firing uses: the default version when it is itself live, otherwise the
+newest non-archived one. Archiving the head therefore hands the pin to the
+version runs fall back to, which blocks in turn. The asymmetry is forced by
+immutability: a registered version cannot be edited, so a historical pin can
+never be moved off the image, and refusing on its account would mean an image
+pinned once could never be reclaimed. A live pin *can* be re-pointed, so it is
+refused with a 409 that names the workflow, version and steps, and the UI offers
+to archive that one version rather than the whole workflow — naming it
+**Archive workflow** when it is the only runnable version left, since archiving
+it then archives the workflow, which stays restorable from the workspace
+catalog's *Display → Archived workflows*. A version pinned as
+the workflow's default is excluded from that remedy: archiving it would leave
+the workflow pointing at something that cannot run — a rule only the definitions
+UI enforced, and which this flow must therefore honour itself.
+
+The judgement is deployment-wide because the daemon is, so a step in a namespace
+the caller cannot read blocks the delete just the same. The *disclosure* is not:
+the 409 names only what that caller may already see and counts the rest. The
+deliberately unfiltered read behind it is `listGroupsForImageAudit`, which says
+so in its own comment; every other read stays namespace-filtered.
+Images are deleted by tag rather than by image id, so an artifact a second tag
+still references survives instead of needing a force that would destroy a
+version another entry offers; and they go before the row, all or nothing, since
+the entry is the only handle anyone has on a version left behind.
 
 Decision 7 is dated 2026-09-08 and revises one line of the original
 consequences — *"a new row appears only when someone catalogues a source nobody
@@ -102,7 +195,9 @@ An entry's key is the **source**, in one of two forms:
   of each version is what `deriveBuildTag` already produces, so entries
   reconcile against the daemon listing with no second source of truth. An
   absent `dockerfile` is part of the key as the empty value, exactly as
-  `deriveBuildTag` folds `dockerfile ?? ''` today.
+  `deriveBuildTag` folds `dockerfile ?? ''` today. A source may also name a
+  build context, which is not part of the key — see the amendment on build
+  contexts at the top of this ADR.
 - **referenced** — an image reference with no tag, e.g. `mediforce-golden-image`
   or `registry.example.com/my-agent`. Its versions are tags or digests. This is
   the form for `mediforce-golden-image` itself and for anything hand-built and
@@ -446,8 +541,11 @@ User-visible changes, each a §12 gate in the issue that made it:
 - **Layer-level diffing between two arbitrary images.** The delta of an entry
   against its own base is in scope (#1296); a general diff tool is not.
 - **Garbage collection of superseded versions.** Marking a version superseded
-  and unused is in scope; deleting an image stays Infrastructure's admin-gated
-  job.
+  and unused is in scope; picking one version off an entry and deleting it is
+  not — a delete is all of an entry's versions or none. Deleting an entry's
+  images *together with the entry* is in scope and needs admin of the
+  workspace, so the catalog never becomes a second, looser way to destroy an
+  image.
 - **Any write path to git.** The catalog reads Dockerfiles; it never proposes
   changes to them.
 - **Run-time enforcement of catalog membership** (decision 5).

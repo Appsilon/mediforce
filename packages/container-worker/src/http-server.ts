@@ -6,6 +6,8 @@ import {
   probeImageCapabilities,
   removeImage,
 } from './docker-info';
+import { BuildImageRequestSchema } from '@mediforce/platform-core';
+import { buildImageFromRepo } from './docker-image-builder';
 
 const WORKER_HTTP_PORT = process.env.WORKER_HTTP_PORT !== undefined
   ? Number(process.env.WORKER_HTTP_PORT)
@@ -26,6 +28,13 @@ function requireSecret(req: import('node:http').IncomingMessage, res: import('no
   return false;
 }
 
+/** The only route with a request body, so parsing is local to it. */
+async function readJsonBody(req: import('node:http').IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(chunk as Buffer);
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
 export function startHttpServer(): Server {
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://localhost:${WORKER_HTTP_PORT}`);
@@ -40,6 +49,24 @@ export function startHttpServer(): Server {
       try {
         const output = await removeImage(imageId);
         jsonResponse(res, 200, { deleted: imageId, output });
+      } catch (err) {
+        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      }
+      return;
+    }
+
+    // Builds a step would otherwise build lazily at run time, so it acts on
+    // the daemon and carries the secret every acting route does.
+    if (req.method === 'POST' && url.pathname === '/images/build') {
+      if (!requireSecret(req, res)) return;
+      try {
+        const parsed = BuildImageRequestSchema.safeParse(await readJsonBody(req));
+        if (!parsed.success) {
+          jsonResponse(res, 400, { error: parsed.error.issues[0]?.message ?? 'Invalid body' });
+          return;
+        }
+        await buildImageFromRepo(parsed.data);
+        jsonResponse(res, 200, { image: parsed.data.image });
       } catch (err) {
         jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
       }

@@ -578,6 +578,7 @@ export {
   BUILD_LABELS,
   OCI_LABELS,
   IMAGE_INSPECT_FORMAT,
+  BuildImageRequestSchema,
   buildProvenanceLabelArgs,
   imageInspectArgs,
   parseImageInspect,
@@ -585,10 +586,20 @@ export {
   shortImageId,
 } from './utils/image-provenance';
 export type {
+  BuildImageRequest,
   ImageProvenance,
   InspectedImage,
   ReadImageProvenance,
 } from './utils/image-provenance';
+export {
+  BuildContextSchema,
+  buildPathsStayInRepo,
+  builtSourceLine,
+  catalogDockerfileKey,
+  normalizeBuildContext,
+  resolveDockerBuildPaths,
+} from './utils/docker-build-paths';
+export type { DockerBuildPaths } from './utils/docker-build-paths';
 export { getWorkflowStatus, type WorkflowStatus } from './utils/workflow-status';
 export { toSlug, uniqueName, uniqueSlug } from './utils/slug';
 

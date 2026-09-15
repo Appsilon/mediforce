@@ -11,7 +11,14 @@ vi.mock('node:fs/promises', () => ({
   rm: vi.fn(),
 }));
 
+// The clone is never on disk here, so every path resolves to itself.
+vi.mock('node:fs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs')>()),
+  realpathSync: vi.fn((path: string) => path),
+}));
+
 import { execFileSync, execSync, spawn } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import {
   imageExistsLocally,
@@ -24,9 +31,11 @@ const execSyncMock = vi.mocked(execSync);
 const execFileSyncMock = vi.mocked(execFileSync);
 const mkdtempMock = vi.mocked(mkdtemp);
 const rmMock = vi.mocked(rm);
+const realpathSyncMock = vi.mocked(realpathSync);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  realpathSyncMock.mockImplementation((path) => String(path));
   mkdtempMock.mockResolvedValue('/tmp/mediforce-build-abc');
   rmMock.mockResolvedValue(undefined);
   execFileSyncMock.mockReturnValue(Buffer.from(''));
@@ -215,6 +224,68 @@ describe('buildImageFromRepo', () => {
     expect(args).toBeDefined();
     // Should use Dockerfile (default) — the -f flag should reference repo root Dockerfile
     expect(args?.[args.indexOf('-f') + 1]).toBe('/tmp/mediforce-build-abc/Dockerfile');
+  });
+
+  it('builds from the Dockerfile\'s own directory when no context is named', async () => {
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: '/tmp/test-repo.git',
+      commit: 'abc123',
+      dockerfile: 'container/Dockerfile',
+    });
+
+    expect(buildArgs()?.at(-1)).toBe('/tmp/mediforce-build-abc/container');
+  });
+
+  it('builds from the named context, resolving the Dockerfile from it', async () => {
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: '/tmp/test-repo.git',
+      commit: 'abc123',
+      dockerfile: 'container/Dockerfile',
+      context: '.',
+    });
+
+    const args = buildArgs();
+    expect(args?.[(args?.indexOf('-f') ?? 0) + 1]).toBe('/tmp/mediforce-build-abc/container/Dockerfile');
+    // The repo root — so `COPY scripts/` in container/Dockerfile resolves.
+    expect(args?.at(-1)).toBe('/tmp/mediforce-build-abc');
+    expect(buildLabel(args, 'mediforce.build.context')).toBe('.');
+    expect(buildLabel(args, 'mediforce.build.dockerfile')).toBe('container/Dockerfile');
+  });
+
+  it('refuses a context the checkout symlinks outside the clone, before building', async () => {
+    realpathSyncMock.mockImplementation((path) =>
+      String(path) === '/tmp/mediforce-build-abc/ctx' ? '/' : String(path),
+    );
+
+    await expect(
+      buildImageFromRepo({
+        image: 'test-image',
+        repoUrl: '/tmp/test-repo.git',
+        commit: 'abc123',
+        dockerfile: '../Dockerfile',
+        context: 'ctx',
+      }),
+    ).rejects.toThrow(/outside the repository/);
+
+    expect(buildArgs()).toBeUndefined();
+    expect(rmMock).toHaveBeenCalledWith('/tmp/mediforce-build-abc', { recursive: true, force: true });
+  });
+
+  it('refuses a context outside the clone before cloning anything', async () => {
+    await expect(
+      buildImageFromRepo({
+        image: 'test-image',
+        repoUrl: '/tmp/test-repo.git',
+        commit: 'abc123',
+        dockerfile: 'Dockerfile',
+        context: '../../..',
+      }),
+    ).rejects.toThrow(/outside the repository/);
+
+    expect(fetchCalls()).toHaveLength(0);
+    expect(buildArgs()).toBeUndefined();
   });
 
   it('clones a public owner/repo ref over anonymous HTTPS without a deploy key', async () => {

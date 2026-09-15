@@ -79,18 +79,24 @@ export function useImageCatalogEntry(
 }
 
 /**
- * Describe a discovered entry — the sentence the platform cannot derive.
+ * Register an entry against a source.
  *
- * A plain create: a discovered entry is not a row, so writing the sentence is
- * what registers it, and the id is derived from the source it already carries,
- * so the entry keeps the identity the listing showed. The response is a probed
- * view — `createImageCatalogEntry` probes capabilities in the same request —
- * which is why this is the moment the card stops saying "not probed".
+ * Both callers are the same `POST`, because both are the same act. Describing
+ * a discovered entry writes the sentence for a source the platform already
+ * built from, and the id derives from that source, so the row lands at the
+ * identity the listing was already showing rather than beside it. Adding an
+ * entry by hand names a source nobody has built here yet, and gets a row with
+ * no versions until something builds one.
  *
- * No optimistic update. The probe is the point: guessing the answer locally
- * and correcting it a second later is worse than a pending button.
+ * The response is a probed view — `createImageCatalogEntry` probes capabilities
+ * in the same request — which is why this is the moment a card stops saying
+ * "not probed". No optimistic update: the probe is the point, and guessing the
+ * answer locally to correct it a second later is worse than a pending button.
+ *
+ * Once the row is stored, changing it is `useUpdateImageEntry`: a second `POST`
+ * against the same source conflicts on the id that source derives.
  */
-export function useDescribeImage(namespace: string) {
+export function useCatalogueImage(namespace: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { name: string; intent: string; source: ImageCatalogEntryView['source'] }) =>
@@ -99,6 +105,95 @@ export function useDescribeImage(namespace: string) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.imageCatalogEntry(namespace, data.entry.id),
+      });
+    },
+  });
+}
+
+/**
+ * Change a stored entry's source, name or sentence — everything a human wrote.
+ *
+ * `source` is optional and **re-keys** the entry when it changes: the id derives
+ * from the source (ADR-0022 decision 1), so the handler writes the row at the
+ * new id and drops the old one. `data.entry.id` is therefore the id to
+ * invalidate, not the one that was sent. Everything else on the row is derived
+ * from the image on every read, so these three fields are the whole editable
+ * surface.
+ *
+ * Only for a `catalogued` entry. A `discovered` one is computed per read rather
+ * than stored, so there is no row to patch until `useCatalogueImage` writes it.
+ *
+ * The response is a re-probed view — the handler refreshes capabilities in the
+ * same request — so both reads are invalidated rather than patched locally.
+ */
+export function useUpdateImageEntry(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      name: string;
+      intent: string;
+      source?: ImageCatalogEntryView['source'];
+    }) => mediforce.imageCatalog.update({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entry.id),
+      });
+    },
+  });
+}
+
+/**
+ * Remove an entry, and — only if asked — the images behind it.
+ *
+ * Two acts under two gates, which is why `withImages` is a separate flag and
+ * not the default. Removing the entry removes an offer: no Workflow Definition
+ * references one, so nothing that runs today changes (ADR-0022 decision 3).
+ * Removing the images acts on the **deployment-wide** daemon, where a tag can
+ * back steps in namespaces the caller cannot even see, so the handler puts it
+ * behind Infrastructure's admin gate and audits it under `_system`.
+ *
+ * Both reads are invalidated rather than patched: with the entry gone the list
+ * is what says so, and if its images went too, every other entry's lineage and
+ * `unused` marks were computed against images that no longer exist.
+ */
+export function useDeleteImageEntry(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; withImages: boolean }) =>
+      mediforce.imageCatalog.delete({
+        namespace,
+        id: input.id,
+        ...(input.withImages ? { withImages: true } : {}),
+      }),
+    onSuccess: (_data, input) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, input.id),
+      });
+    },
+  });
+}
+
+/**
+ * Build one version of a built entry, without running a workflow.
+ *
+ * The request stays open for the whole build — minutes, not the sub-second the
+ * other mutations take — so the caller must keep its pending state visible
+ * rather than treating this as a click that settles. On success both reads are
+ * invalidated: the new version is on the daemon, and every version fact is
+ * recomputed per read, so an invalidate is the whole update (#1344).
+ */
+export function useBuildImageVersion(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { repo: string; commit: string; dockerfile: string; context?: string }) =>
+      mediforce.imageCatalog.build({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entryId),
       });
     },
   });

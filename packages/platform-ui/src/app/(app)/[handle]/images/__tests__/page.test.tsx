@@ -1,22 +1,44 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { createQueryWrapper } from '@/test/react-query';
 
 const listMock = vi.fn();
 const getMock = vi.fn();
+const createMock = vi.fn();
+const updateMock = vi.fn();
+const deleteMock = vi.fn();
+const archiveVersionMock = vi.fn();
+const buildMock = vi.fn();
 const apiFetchMock = vi.fn();
 const searchParams = new URLSearchParams();
+
+// Radix positions an open tooltip with ResizeObserver, which jsdom lacks.
+vi.stubGlobal(
+  'ResizeObserver',
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+);
 
 vi.mock('@/lib/mediforce', () => ({
   ApiError: class ApiError extends Error {
     status = 500;
   },
   mediforce: {
+    workflows: {
+      archiveVersion: (...args: unknown[]) => archiveVersionMock(...args),
+    },
     imageCatalog: {
       list: (...args: unknown[]) => listMock(...args),
       get: (...args: unknown[]) => getMock(...args),
+      create: (...args: unknown[]) => createMock(...args),
+      update: (...args: unknown[]) => updateMock(...args),
+      delete: (...args: unknown[]) => deleteMock(...args),
+      build: (...args: unknown[]) => buildMock(...args),
     },
   },
 }));
@@ -25,8 +47,11 @@ vi.mock('@/lib/api-fetch', () => ({
   apiFetch: (...args: unknown[]) => apiFetchMock(...args),
 }));
 
+// Switchable, because the delete dialog offers the image half only to an
+// admin — the gate is behaviour under test, not scenery.
+const role = { value: { role: 'member', canAdmin: false, loading: false } };
 vi.mock('@/hooks/use-namespace-role', () => ({
-  useNamespaceRole: () => ({ role: 'member', canAdmin: false, loading: false }),
+  useNamespaceRole: () => role.value,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -138,6 +163,8 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  role.value = { role: 'member', canAdmin: false, loading: false };
+  deleteMock.mockResolvedValue({ success: true, deletedImages: [] });
   listMock.mockResolvedValue({ entries: [GOLDEN, TEALFLOW] });
   getMock.mockResolvedValue({
     entry: {
@@ -163,22 +190,27 @@ beforeEach(() => {
       ],
     },
   });
-  apiFetchMock.mockResolvedValue({
-    ok: true,
-    json: async () => ({
-      workflows: [
-        {
-          name: 'sdtm-qc',
-          namespace: 'acme',
-          title: 'SDTM QC',
-          version: 4,
-          steps: ['analyse'],
-          images: ['mediforce-built:aaaa1111'],
-        },
-      ],
-    }),
-  });
+  archiveVersionMock.mockResolvedValue({ success: true, name: 'sdtm-qc', version: 4 });
+  apiFetchMock.mockResolvedValue(pinScan([LIVE_PIN]));
 });
+
+/** v4 of a workflow with an older v3 to fall back to, pinning one image. */
+const LIVE_PIN = {
+  name: 'sdtm-qc',
+  namespace: 'acme',
+  title: 'SDTM QC',
+  version: 4,
+  live: true,
+  isDefault: false,
+  archived: false,
+  fallbackVersion: 3 as number | null,
+  steps: ['analyse'],
+  images: ['mediforce-built:aaaa1111'],
+};
+
+function pinScan(workflows: (typeof LIVE_PIN)[]) {
+  return { ok: true, json: async () => ({ workflows }) };
+}
 
 describe('ImagesPage', () => {
   it('shows an image this workspace built and nobody described, with what to do about it', async () => {
@@ -205,7 +237,7 @@ describe('ImagesPage', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('git@github.com:vedhav/cdisc-case-1.git · Dockerfile')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Name')).toHaveValue('cdisc-case-1');
-    expect(within(dialog).getByLabelText('Intent')).toHaveValue('');
+    expect(within(dialog).getByLabelText('Description')).toHaveValue('');
   });
 
   it('leaves a catalogued entry alone — no badge, no describe button', async () => {
@@ -249,7 +281,7 @@ describe('ImagesPage', () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
 
     const link = await screen.findByRole('link', {
@@ -261,11 +293,34 @@ describe('ImagesPage', () => {
     );
   });
 
+  it('explains which hash on a version is the commit and which is the image id', async () => {
+    renderPage();
+
+    await userEvent.click(
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
+    );
+
+    const current = (await screen.findByText('mediforce-built:aaaa1111')).closest('li') as HTMLElement;
+
+    await userEvent.hover(within(current).getByText('c0ffee1'));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Git commit the image was built from: c0ffee1234567',
+    );
+
+    await userEvent.hover(within(current).getByText('teal-new'));
+    expect(await screen.findByRole('tooltip', { name: /Docker image ID/ })).toHaveTextContent(
+      'Docker image ID: sha256:teal-new',
+    );
+
+    await userEvent.hover(within(current).getByText('current'));
+    expect(await screen.findByRole('tooltip', { name: /newest build/ })).toBeInTheDocument();
+  });
+
   it('calls the layer delta layer commands, never the Dockerfile', async () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
 
     expect(
@@ -281,7 +336,7 @@ describe('ImagesPage', () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
 
     const derived = screen.getByTestId('image-entry-tealflow');
@@ -294,7 +349,7 @@ describe('ImagesPage', () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
 
     expect(await screen.findByRole('link', { name: 'SDTM QC' })).toHaveAttribute(
@@ -308,7 +363,7 @@ describe('ImagesPage', () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
     await screen.findByText(/2 layer commands added over/);
 
@@ -346,7 +401,7 @@ describe('ImagesPage', () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
 
     expect(await screen.findByText('Shared QC')).toBeInTheDocument();
@@ -379,10 +434,537 @@ describe('ImagesPage', () => {
     renderPage();
 
     await userEvent.click(
-      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button'),
+      within(await screen.findByTestId('image-entry-tealflow')).getByRole('button', { expanded: false }),
     );
 
     expect(await screen.findByText(/is not a GitHub repository/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /^Open / })).not.toBeInTheDocument();
+  });
+
+  it('catalogues a source nobody has built here, from the repository and Dockerfile', async () => {
+    createMock.mockResolvedValue({ entry: { ...TEALFLOW, id: 'added' } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+
+    await userEvent.type(screen.getByLabelText('Repository'), 'Appsilon/tealflow');
+    await userEvent.type(screen.getByLabelText(/Dockerfile/), 'container/Dockerfile');
+    await userEvent.type(screen.getByLabelText('Description'), 'R-based exploration of ADaM datasets');
+
+    // The name is suggested from the repository rather than left blank, the
+    // same way a discovered entry arrives named.
+    expect(screen.getByLabelText('Name')).toHaveValue('tealflow');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add to the catalog' }));
+
+    expect(createMock).toHaveBeenCalledWith({
+      namespace: 'acme',
+      name: 'tealflow',
+      intent: 'R-based exploration of ADaM datasets',
+      source: { kind: 'built', repo: 'Appsilon/tealflow', dockerfile: 'container/Dockerfile' },
+    });
+  });
+
+  it('sends the empty Dockerfile as the value it is, not as an absence', async () => {
+    createMock.mockResolvedValue({ entry: { ...TEALFLOW, id: 'added' } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+    await userEvent.type(screen.getByLabelText('Repository'), 'Appsilon/tealflow');
+    await userEvent.type(screen.getByLabelText('Description'), 'Whatever the default Dockerfile builds');
+    await userEvent.click(screen.getByRole('button', { name: 'Add to the catalog' }));
+
+    // `deriveBuildTag` folds in `dockerfile ?? ''`, so the entry keyed on the
+    // empty string is the one an image built without a Dockerfile matches.
+    expect(createMock.mock.calls[0][0].source).toEqual({
+      kind: 'built',
+      repo: 'Appsilon/tealflow',
+      dockerfile: '',
+    });
+  });
+
+  it('shows the Dockerfile and context paths the build will use, so a doubled prefix is visible', async () => {
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+    const preview = screen.getByTestId('add-image-build-paths');
+
+    // No context: the build runs from the Dockerfile's own directory.
+    await userEvent.type(screen.getByLabelText(/Dockerfile/), 'apps/golden-standard-workflow/container/Dockerfile');
+    expect(within(preview).getByText('/apps/golden-standard-workflow/container/Dockerfile')).toBeInTheDocument();
+    expect(within(preview).getByText('/apps/golden-standard-workflow/container')).toBeInTheDocument();
+
+    // A context: the Dockerfile path is read from it, so the repeated prefix shows.
+    await userEvent.type(screen.getByLabelText(/Build context/), 'apps/golden-standard-workflow');
+    expect(
+      within(preview).getByText('/apps/golden-standard-workflow/apps/golden-standard-workflow/container/Dockerfile'),
+    ).toBeInTheDocument();
+    expect(within(preview).getByText('/apps/golden-standard-workflow')).toBeInTheDocument();
+  });
+
+  it('says so when the paths climb out of the repository', async () => {
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+    await userEvent.type(screen.getByLabelText(/Build context/), '../..');
+
+    expect(within(screen.getByTestId('add-image-build-paths')).getByText(/outside the repository/))
+      .toBeInTheDocument();
+  });
+
+  it('keeps a name the author typed instead of overwriting it from the repository', async () => {
+    createMock.mockResolvedValue({ entry: { ...TEALFLOW, id: 'added' } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+    await userEvent.type(screen.getByLabelText('Name'), 'TealFlow agent');
+    await userEvent.type(screen.getByLabelText('Repository'), 'Appsilon/tealflow');
+
+    expect(screen.getByLabelText('Name')).toHaveValue('TealFlow agent');
+  });
+
+  it('leads a failed build with the cause and keeps the output behind a disclosure', async () => {
+    buildMock.mockRejectedValue(
+      new Error(
+        'Building "mediforce-built:d999" failed: Command failed: docker build …\n' +
+          '#7 [5/6] COPY mcp/ /opt/golden-standard/mcp/\n' +
+          'ERROR: failed to build: failed to solve: failed to compute cache key: ' +
+          'failed to calculate checksum of ref abc::def: "/mcp": not found',
+      ),
+    );
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await userEvent.click(within(card).getByRole('button', { name: 'Build' }));
+    await userEvent.type(screen.getByLabelText('Commit'), 'e56cba94021b4385');
+    await userEvent.click(screen.getByRole('button', { name: 'Build' }));
+
+    // The rule, not the raw output: the copied path exists in the repository,
+    // so the unexplained failure reads as a platform bug.
+    expect(await screen.findByText(/build context is the directory holding the Dockerfile/i))
+      .toBeInTheDocument();
+    expect(screen.queryByText(/failed to compute cache key/)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Show full error/ }));
+
+    expect(screen.getByText(/failed to compute cache key/)).toBeInTheDocument();
+  });
+
+  it('states the build-context rule before a build is attempted', async () => {
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await userEvent.click(within(card).getByRole('button', { name: 'Build' }));
+
+    expect(
+      screen.getByText(/Everything the Dockerfile/),
+    ).toBeInTheDocument();
+  });
+
+  it('offers Edit on a catalogued entry, prefilled with what the entry says today', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog');
+    // Every field a human wrote, seeded from the entry — including the source,
+    // which is what makes a mistyped repository fixable rather than permanent.
+    expect(within(dialog).getByLabelText('Repository')).toHaveValue('Appsilon/tealflow');
+    expect(within(dialog).getByLabelText(/Dockerfile/)).toHaveValue('container/Dockerfile');
+    expect(within(dialog).getByLabelText('Name')).toHaveValue('TealFlow agent');
+    expect(within(dialog).getByLabelText('Description')).toHaveValue(
+      'R-based interactive exploration of ADaM datasets',
+    );
+  });
+
+  it('patches the entry it was opened on, leaving the source out of the write', async () => {
+    updateMock.mockResolvedValue({ entry: { ...TEALFLOW, name: 'TealFlow explorer' } });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.clear(within(dialog).getByLabelText('Name'));
+    await user.type(within(dialog).getByLabelText('Name'), 'TealFlow explorer');
+    await user.clear(within(dialog).getByLabelText('Description'));
+    await user.type(within(dialog).getByLabelText('Description'), 'Exploring ADaM in a sandbox');
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    expect(updateMock).toHaveBeenCalledWith({
+      namespace: 'acme',
+      id: 'tealflow',
+      name: 'TealFlow explorer',
+      intent: 'Exploring ADaM in a sandbox',
+    });
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('describes an undescribed entry instead of patching it — there is no row yet', async () => {
+    listMock.mockResolvedValue({ entries: [GOLDEN, DISCOVERED] });
+    createMock.mockResolvedValue({ entry: { ...DISCOVERED, origin: 'catalogued' } });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-cdisc-case-1-1a2b3c4d');
+    expect(within(card).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    await user.click(within(card).getByRole('button', { name: 'Describe' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Description'), 'Synthetic SDTM generation');
+    await user.click(within(dialog).getByRole('button', { name: 'Add to the catalog' }));
+
+    // A discovered entry is derived on read, not stored, so there is nothing to
+    // PATCH. The id derives from the source, so the create lands at the
+    // identity the listing was already showing (ADR-0022 decision 7).
+    expect(createMock).toHaveBeenCalledWith({
+      namespace: 'acme',
+      name: 'cdisc-case-1',
+      intent: 'Synthetic SDTM generation',
+      source: DISCOVERED.source,
+    });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('re-points a mistyped repository, sending the corrected source', async () => {
+    updateMock.mockResolvedValue({ entry: { ...TEALFLOW, id: 'tealflow-corrected' } });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.clear(within(dialog).getByLabelText('Repository'));
+    await user.type(within(dialog).getByLabelText('Repository'), 'Appsilon/tealflow-gpu');
+
+    // The entry is keyed on its source, so the save moves it — said before the
+    // click, not discovered afterwards.
+    expect(within(dialog).getByText(/keyed on its source, so this moves it/)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    expect(updateMock).toHaveBeenCalledWith({
+      namespace: 'acme',
+      id: 'tealflow',
+      name: 'TealFlow agent',
+      intent: 'R-based interactive exploration of ADaM datasets',
+      source: { kind: 'built', repo: 'Appsilon/tealflow-gpu', dockerfile: 'container/Dockerfile' },
+    });
+  });
+
+  it('edits the Dockerfile path on its own, keeping the repository', async () => {
+    updateMock.mockResolvedValue({ entry: TEALFLOW });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.clear(within(dialog).getByLabelText(/Dockerfile/));
+    await user.type(within(dialog).getByLabelText(/Dockerfile/), 'container/Dockerfile.gpu');
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    expect(updateMock.mock.calls[0][0].source).toEqual({
+      kind: 'built',
+      repo: 'Appsilon/tealflow',
+      dockerfile: 'container/Dockerfile.gpu',
+    });
+  });
+
+  it('leaves the source out of a patch that only touches the sentence', async () => {
+    updateMock.mockResolvedValue({ entry: TEALFLOW });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.clear(within(dialog).getByLabelText('Description'));
+    await user.type(within(dialog).getByLabelText('Description'), 'Exploring ADaM in a sandbox');
+    // No re-key, so no warning and no `source` on the wire: an edit to the
+    // sentence stays an edit to the sentence.
+    expect(within(dialog).queryByText(/keyed on its source/)).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    expect(updateMock.mock.calls[0][0]).not.toHaveProperty('source');
+  });
+
+  it('offers the reference, not a repository, for an entry the platform never built', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-golden');
+    await user.click(within(card).getByRole('button', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Image reference')).toHaveValue('mediforce-golden-image');
+    // There are no build inputs for a referenced source, so there is no
+    // repository to name and offering one would invent a field.
+    expect(within(dialog).queryByLabelText('Repository')).not.toBeInTheDocument();
+  });
+
+  it('shows a discovered entry its recorded source without offering to re-point it', async () => {
+    listMock.mockResolvedValue({ entries: [GOLDEN, DISCOVERED] });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-cdisc-case-1-1a2b3c4d');
+    await user.click(within(card).getByRole('button', { name: 'Describe' }));
+
+    const dialog = await screen.findByRole('dialog');
+    // A build recorded this source. Re-pointing it here would describe some
+    // other source and leave this one still undescribed.
+    expect(
+      within(dialog).getByText('git@github.com:vedhav/cdisc-case-1.git \u00b7 Dockerfile'),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText('Repository')).not.toBeInTheDocument();
+  });
+
+  it('offers no Delete to a member — retiring an entry takes its images', async () => {
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    // A member may still add an entry; deleting one destroys artifacts on a
+    // daemon every workspace shares.
+    expect(within(card).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+  });
+
+  it('refuses to delete while a live workflow version pins one of the images', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByTestId('delete-blocked')).toBeInTheDocument();
+    expect(within(dialog).getByText(/acme\/sdtm-qc v4/)).toBeInTheDocument();
+    // Blocked, not warned: the author can still re-point that step, so nobody
+    // has to choose to break it.
+    expect(
+      within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }),
+    ).toBeDisabled();
+    expect(deleteMock).not.toHaveBeenCalled();
+  });
+
+  it('archives the blocking version in place, rather than the whole workflow', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByTestId('delete-blocked');
+
+    // Archiving v4 changes what runs, so the dialog says what that is.
+    expect(within(dialog).getByText(/runs fall back to v3/)).toBeInTheDocument();
+    apiFetchMock.mockResolvedValue(pinScan([{ ...LIVE_PIN, live: false, archived: true }]));
+    await user.click(within(dialog).getByRole('button', { name: 'Archive v4' }));
+
+    expect(archiveVersionMock).toHaveBeenCalledWith(
+      { name: 'sdtm-qc', version: 4, archived: true },
+      { namespace: 'acme' },
+    );
+    // The rescan says nothing live pins it any more, so the delete unblocks
+    // without a reload.
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }),
+      ).toBeEnabled(),
+    );
+  });
+
+  it('stays blocked when the version runs fall back to pins the image too', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByTestId('delete-blocked');
+
+    apiFetchMock.mockResolvedValue(
+      pinScan([
+        { ...LIVE_PIN, live: false, archived: true },
+        { ...LIVE_PIN, version: 3, fallbackVersion: null },
+      ]),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Archive v4' }));
+
+    // Archiving v4 handed runs to v3, which pins the same image — only the
+    // fresh answer knows that, so the button never enables in between.
+    expect(await within(dialog).findByText(/acme\/sdtm-qc v3/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }),
+    ).toBeDisabled();
+  });
+
+  it('names archiving a workflow\'s only runnable version for what it is', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    apiFetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        workflows: [
+          {
+            name: 'sdtm-qc',
+            namespace: 'acme',
+            title: 'SDTM QC',
+            version: 1,
+            live: true,
+            isDefault: false,
+            archived: false,
+            fallbackVersion: null,
+            steps: ['analyse'],
+            images: ['mediforce-built:aaaa1111'],
+          },
+        ],
+      }),
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByTestId('delete-blocked');
+
+    // Nothing is left to run once v1 goes, so the workflow goes with it — the
+    // button says so, and where to get it back.
+    expect(within(dialog).queryByRole('button', { name: 'Archive v1' })).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/Archived workflows/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Archive workflow' }));
+
+    expect(archiveVersionMock).toHaveBeenCalledWith(
+      { name: 'sdtm-qc', version: 1, archived: true },
+      { namespace: 'acme' },
+    );
+  });
+
+  it('will not archive a version the workflow pins as its default', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    apiFetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        workflows: [
+          {
+            name: 'sdtm-qc',
+            namespace: 'acme',
+            title: 'SDTM QC',
+            version: 4,
+            live: true,
+            isDefault: true,
+            archived: false,
+            steps: ['analyse'],
+            images: ['mediforce-built:aaaa1111'],
+          },
+        ],
+      }),
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByTestId('delete-blocked');
+
+    // Archiving a chosen default leaves the workflow pointing at something
+    // that cannot run — a worse outcome than the image staying.
+    expect(within(dialog).queryByRole('button', { name: /Archive v/ })).not.toBeInTheDocument();
+    expect(within(dialog).getByText('default version')).toBeInTheDocument();
+  });
+
+  it('deletes entry and images when only a superseded version pins them', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    apiFetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        workflows: [
+          {
+            name: 'sdtm-qc',
+            namespace: 'acme',
+            title: 'SDTM QC',
+            version: 2,
+            live: false,
+            isDefault: false,
+            archived: false,
+            steps: ['analyse'],
+            images: ['mediforce-built:aaaa1111'],
+          },
+        ],
+      }),
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+
+    // Listed, so the loss is seen — but not blocking, because a registered
+    // version is immutable and could never be re-pointed.
+    expect(await within(dialog).findByText(/superseded version/)).toBeInTheDocument();
+    expect(within(dialog).queryByTestId('delete-blocked')).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }));
+
+    expect(deleteMock).toHaveBeenCalledWith({
+      namespace: 'acme',
+      id: 'tealflow',
+      withImages: true,
+    });
+  });
+
+  it('removes only the record when the daemon holds no image for the entry', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    listMock.mockResolvedValue({
+      entries: [{ ...TEALFLOW, availability: 'absent', versions: [] }],
+    });
+    getMock.mockResolvedValue({
+      entry: { ...TEALFLOW, availability: 'absent', versions: [] },
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/removes the record and nothing else/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Delete entry' }));
+
+    // No `withImages`: there is nothing on the daemon to remove, so the
+    // destructive half is not claimed.
+    expect(deleteMock).toHaveBeenCalledWith({ namespace: 'acme', id: 'tealflow' });
+  });
+
+  it('keeps the dialog open and explains a refusal from the daemon', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    apiFetchMock.mockResolvedValue({ ok: true, json: async () => ({ workflows: [] }) });
+    deleteMock.mockRejectedValue(
+      new Error('conflict: unable to delete (must be forced) - image is being used'),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(
+      await within(dialog).findByRole('button', { name: 'Delete entry and 2 images' }),
+    );
+
+    expect(await within(dialog).findByText(/image is being used/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Nothing was removed/)).toBeInTheDocument();
   });
 });
