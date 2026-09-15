@@ -255,6 +255,16 @@ author already chose rather than a new row. Every fact on it is derived from
 the Docker daemon; the one thing a human writes is its **Intent**. Any Workspace
 member may create, edit and delete one — an entry executes nothing.
 
+**Discovered Entry** *(of an Image Catalog)*:
+An Image Catalog Entry the platform derived from an image this namespace built
+and nobody has described yet — keyed on the `(repo, dockerfile)` the build
+labelled, carrying every derived fact and an empty **Intent**. Not a stored row:
+it is recomputed from the daemon on every read, and describing it is what
+registers it, at the same id ([ADR-0022](docs/adr/0022-image-catalog.md)
+decision 7). A **Catalogued Entry** is the opposite — one somebody wrote a
+sentence for. The only difference in what the platform derives is where the
+probe result is kept: a memo in the API process rather than a stored column.
+
 **Version** *(of an Image Catalog Entry)*:
 One built artifact of an entry's source: a commit for a `built` entry, a tag for
 a `referenced` one, carrying the image tag that names it on the daemon. Versions
@@ -264,7 +274,9 @@ are derived on read from the daemon's build labels, never stored.
 The derived set of `claude`, `opencode`, `bash`, `python3`, `Rscript`, and
 `node` binaries that a bounded, network-isolated probe found. It is cached by
 daemon image ID when the entry is registered, so rendering a catalog or picker
-never starts a container. A Version is **agent-capable** only when it has
+never starts a container. A **Discovered Entry** has no row to cache into, so
+its probe results are memoised in the API process by image id instead — filled
+on the same single-entry read, lost on restart, never a stored fact. A Version is **agent-capable** only when it has
 `bash` and either agent CLI; an unavailable daemon or timed-out probe is
 explicitly `unknown`, which remains selectable without a suitability claim.
 
@@ -289,7 +301,9 @@ multi-stage.
 **Intent** *(of an Image Catalog Entry)*:
 The single required human sentence: what the image is *for* — "R-based
 interactive exploration of ADaM datasets". Not a description of its contents;
-contents go stale on the next pin bump, intent does not.
+contents go stale on the next pin bump, intent does not. Required on every
+stored entry, and empty on exactly one thing: a **Discovered Entry**, which no
+build can write it for.
 
 ### Identity / auth
 

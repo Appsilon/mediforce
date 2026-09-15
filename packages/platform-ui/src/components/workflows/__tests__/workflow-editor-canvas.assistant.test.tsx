@@ -58,7 +58,7 @@ vi.mock('@/hooks/use-docker-images', () => ({
 }));
 
 vi.mock('@/hooks/use-image-catalog', () => ({
-  useImageCapabilities: () => ({}),
+  useImageCatalogEntries: () => ({ entries: [], loading: false, error: null }),
 }));
 
 vi.mock('../workflow-editor/step-editor', () => ({

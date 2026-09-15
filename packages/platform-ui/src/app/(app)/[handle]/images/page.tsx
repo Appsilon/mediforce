@@ -22,6 +22,7 @@ import { routes } from '@/lib/routes';
 import { ConceptPopover } from '@/components/ui/concept-intro';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useImageCatalogEntries, useImageCatalogEntry } from '@/hooks/use-image-catalog';
+import { DescribeImageDialog } from '@/components/images/describe-image-dialog';
 import { useWorkflowsByImage, type WorkflowImageMatch } from '@/hooks/use-workflows-by-image';
 import {
   groupByBase,
@@ -64,7 +65,11 @@ function Chip({ children, title }: { children: ReactNode; title?: string }) {
 function CapabilityChips({ version }: { version: ImageCatalogVersion | undefined }) {
   if (version === undefined) return null;
   if (version.capabilities.status !== 'known') {
-    return <Chip title="Nobody has probed this image yet">Capabilities not probed</Chip>;
+    return (
+      <Chip title="Nobody has probed this image yet. Expanding the entry runs the probe — a listing would start a container per version on every poll.">
+        Capabilities not probed
+      </Chip>
+    );
   }
   const { runtimes, agentCapable } = version.capabilities;
   return (
@@ -320,6 +325,8 @@ function EntryCard({
   // expanded card reads the entry on its own to get it.
   const detail = useImageCatalogEntry(handle, entry.id, expanded);
   const shown = detail.entry ?? entry;
+  const [describing, setDescribing] = useState(false);
+  const discovered = shown.origin === 'discovered';
   const versions = shown.versions;
   const newest = versions[0];
 
@@ -338,41 +345,73 @@ function EntryCard({
   return (
     <div style={{ marginLeft: depth * 24 }} data-testid={`image-entry-${entry.id}`}>
       <div className="rounded-lg border bg-card shadow-sm">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={expanded}
-          className="flex w-full items-start gap-3 px-4 py-3 text-left"
-        >
-          {expanded ? (
-            <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-semibold">{shown.name}</h3>
-              <span
-                className={cn(
-                  'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                  availability.className,
+        <div className="flex items-start">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            className="flex min-w-0 flex-1 items-start gap-3 px-4 py-3 text-left"
+          >
+            {expanded ? (
+              <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold">{shown.name}</h3>
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                    availability.className,
+                  )}
+                >
+                  {availability.label}
+                </span>
+                {discovered && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    Needs a description
+                  </span>
                 )}
+                {baseName !== null && (
+                  <span className="text-xs text-muted-foreground">Built on {baseName}</span>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {discovered ? (
+                  <em>@{handle} built this image. Nobody has said what it is for yet.</em>
+                ) : (
+                  shown.intent
+                )}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <CapabilityChips version={newest} />
+              </div>
+            </div>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {versions.length} version{versions.length === 1 ? '' : 's'}
+            </span>
+          </button>
+          {discovered && (
+            <div className="shrink-0 py-3 pr-4">
+              <button
+                type="button"
+                onClick={() => setDescribing(true)}
+                className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
               >
-                {availability.label}
-              </span>
-              {baseName !== null && (
-                <span className="text-xs text-muted-foreground">Built on {baseName}</span>
-              )}
+                Describe
+              </button>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">{shown.intent}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <CapabilityChips version={newest} />
-            </div>
-          </div>
-          <span className="shrink-0 text-xs text-muted-foreground">
-            {versions.length} version{versions.length === 1 ? '' : 's'}
-          </span>
-        </button>
+          )}
+        </div>
+        {describing && (
+          <DescribeImageDialog
+            entry={shown}
+            handle={handle}
+            open={describing}
+            onOpenChange={setDescribing}
+          />
+        )}
 
         {expanded && (
           <div className="space-y-4 border-t px-4 py-3">
@@ -463,6 +502,12 @@ export default function ImagesPage() {
                 capabilities are probed, versions and lineage are recomputed from the daemon on
                 every read. Admin → Infrastructure stays the raw daemon inventory.
               </p>
+              <p>
+                An image a workflow here built shows up on its own, marked{' '}
+                <strong>Needs a description</strong> — the build recorded its repository,
+                Dockerfile and commit, and the sentence is the one thing no build can write.
+                Describing it is what registers the entry and probes what is inside.
+              </p>
             </ConceptPopover>
           </div>
           <p className="mt-0.5 text-sm text-muted-foreground">
@@ -519,7 +564,7 @@ export default function ImagesPage() {
           </div>
           <p className="text-sm text-muted-foreground">
             {query.trim() === ''
-              ? 'No images catalogued yet. Register one with `mediforce images create`.'
+              ? 'No images catalogued yet, and no workflow here has built one. Register one with `mediforce images create`.'
               : 'No images match your search.'}
           </p>
         </div>

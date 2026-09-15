@@ -1,7 +1,7 @@
 ---
-status: proposed
+status: finalized
 audience: engineers
-last_reviewed: 2026-09-02
+last_reviewed: 2026-09-08
 ---
 
 # ADR-0022: The Image Catalog is an image the platform offers, keyed on its source
@@ -10,8 +10,7 @@ last_reviewed: 2026-09-02
 **Deciders:** Krystian Zieliński
 **Epic:** [#1292](https://github.com/Appsilon/mediforce/issues/1292) — Step Image Catalog
 
-**Built so far: decisions 1, 2 and 4, apart from rendering a Dockerfile's
-contents inside the platform.** #1294 landed `image_catalog_entries`, the
+**All seven decisions are built.** #1294 landed `image_catalog_entries`, the
 source-derived key, the required `intent`, `unknown` as a state, the
 workspace-member write gate, the handlers, the contract, the route adapters and
 `mediforce images`; #1295 landed probed capabilities; #1296 landed lineage — the
@@ -19,24 +18,33 @@ base computed from `RootFS.Layers` prefix containment, the layer delta cut at
 that boundary, and the label delta; #1297 landed the **Images** view at
 `/[handle]/images`, non-admin, grouped by base, searchable across intent and
 capabilities, with the source ladder and the cross-link from Admin →
-Infrastructure. A version's Dockerfile is reached by permalink, not rendered
-inline: that needs #1286, which is still open, so the view states which rung of
-the ladder it reached instead of pretending to the one below it. Still paper:
-the step-editor picker (#1298), which reads the Docker daemon exactly as it does
-today. Read the decisions below as the six those PRs may not relitigate.
-This ADR becomes `finalized` in the PR closing the last issue of the epic.
+Infrastructure; #1298 pointed the step-editor picker at the catalog, which is
+where decision 5 stops being a claim about a future control and starts being the
+behaviour of the one authors use. Decision 7 landed after the first workspace
+ran a build-mode workflow and found the image it had just built missing from
+its own catalog.
+
+Decision 7 is dated 2026-09-08 and revises one line of the original
+consequences — *"a new row appears only when someone catalogues a source nobody
+has catalogued before"*. That stays true of **rows**; it is no longer true of
+what the catalog shows.
+
+One piece of decision 4 is deliberately absent: a version's Dockerfile is
+reached by permalink, never rendered inline. That needs #1286, which is still
+open, so the view states which rung of the source ladder it reached instead of
+pretending to the one below it.
 
 ## Context
 
-Mediforce has no object meaning *"an image the platform offers for steps"*. It
-has only the one meaning *"an image the daemon happens to have"*, and that is
-what the step editor shows an author:
-[`agentImageOptions`](../../packages/platform-ui/src/components/workflows/workflow-editor/step-editor.tsx)
-maps `docker images` into a `<select>`. Every daemon row is an option —
+Mediforce had no object meaning *"an image the platform offers for steps"*. It
+had only the one meaning *"an image the daemon happens to have"*, and that was
+what the step editor showed an author: an `agentImageOptions` helper in
+[step-editor.tsx](../../packages/platform-ui/src/components/workflows/workflow-editor/step-editor.tsx)
+mapped `docker images` into a `<select>`. Every daemon row was an option —
 `postgres`, `redis`, dangling `<none>` layers, whatever ops pulled last week.
-The only intelligence in the list is a string compare against
+The only intelligence in the list was a string compare against
 [`DEFAULT_AGENT_IMAGE`](../../packages/platform-core/src/utils/container-defaults.ts)
-that puts a `★` on `mediforce-golden-image`.
+that put a `★` on `mediforce-golden-image`. #1298 deleted both.
 
 Three consequences. The first two are user reports; the third is in the source.
 
@@ -272,8 +280,77 @@ What replaces enforcement is a better offer: the picker lists only entries that
 suit the step, and the existing preflight `missing-image` warning keeps telling
 an author when the image they named is not there. **Filtering an offer is not
 the same as refusing a value**, and only the first is safe to add to a control
-authors already depend on. Concretely, #1298 keeps the free-text field and the
-branch that appends an unrecognised pinned value as its own option.
+authors already depend on. Concretely, #1298 kept the free-text field beside the
+select and the branch that appends an unrecognised pinned value as its own
+option, so every string that saved before still saves and round-trips.
+
+### 7. A source the platform built appears in the catalog undescribed
+
+*Added 2026-09-08.*
+
+The catalog offers every source **this namespace built** and nobody has
+described — one **discovered entry** per `(repo, dockerfile)`, derived on read
+from the `mediforce.build.*` labels the builders already write. Everything on it
+is as derived as a stored entry's: the source key, the versions, the commits,
+the workflow that triggered the build, the lineage. The one field missing is
+`intent`, which is empty, and the view says so and offers the form that fills
+it. Describing one is an ordinary `POST`; because the id is derived from the
+source (decision 1), the row lands at the id the discovered entry already had.
+
+**The problem this fixes.** Decisions 1-6 shipped a catalog with exactly two
+write paths — `mediforce images create` and the API — and a build path that
+writes neither. So a workspace that ran a build-mode workflow got an image on
+the daemon labelled with its repo, commit, Dockerfile and workflow, and a
+catalog that had never heard of it. That image was not one click away in the
+picker (decision 5), was not in the Images view, and had no affordance anywhere
+saying it could be. Nothing was broken; nothing surfaced it either, and the
+enrolment step lived in an operator's terminal.
+
+**Why derived on read rather than written at build time.** They retrieve the
+same facts — the builder writes them onto the image, and the daemon listing
+reads them all back — so the write buys nothing and costs a Postgres or API
+dependency inside `container-worker` and `agent-runtime`, on the path where a
+run is starting. Derivation also works backwards: every image built before this
+decision appears too, which a write-at-build-time rule could never do.
+
+**Why not persisted with a nullable intent.** A discovered entry holds nothing a
+human wrote, so a row would only have to be garbage-collected when its image
+goes. Storing it would also make `intent` optional in the schema, the contract,
+the CLI and the picker — weakening decision 2's invariant everywhere in order to
+represent an absence that not being a row already represents. Discovery costs
+one filter over the daemon listing the entry views fetch anyway: no extra daemon
+call, no probe, no write, on a listing polled every 30 seconds.
+
+**Capabilities are probed on the single-entry read, into a memo rather than a
+row.** A discovered entry has nowhere to store one, and a probe is a container
+start — so probing it on every 30-second poll of an open card is the behaviour
+`refreshEntryCapabilities`' `unattemptedOnly` exists to prevent. The memo is
+keyed on the daemon's immutable image id, which is why it needs no TTL and no
+invalidation: an answer for that id cannot go stale, since a rebuild mints a
+different id. So a discovered entry fills in its capabilities exactly where a
+stored one does — the user-initiated, one-at-a-time read — and the listing
+starts no probe for either kind, while showing what an earlier read already
+paid for. Losing the memo on restart costs one probe per image.
+
+Making this the one derived fact a discovered entry never filled in was the
+first shape of decision 7, and it was wrong: an entry where everything is
+derived except the sentence has to derive everything except the sentence, and
+`Capabilities not probed` on a card with no way to change it reads as a defect
+rather than a design.
+
+**Three images are not offered, and the rule does the excluding.** An image
+built for another namespace (the build recorded which one), an image the
+platform did not build (`postgres`, `redis`, a dangling layer — no build labels
+at all), and a build from a local filesystem path, which nothing can rebuild and
+which is test residue. Only the last needs a written rule; the first two fall
+out of "built here".
+
+**This does not make the catalog a view over the daemon.** It offers sources
+this deployment's own builder produced *for this namespace*, which is a strictly
+smaller set than `docker images` and carries the platform's own provenance.
+Admin → Infrastructure remains the raw inventory (decision 3), and a pulled or
+hand-built image is still catalogued by hand — there is nothing to derive its
+source from.
 
 ### 6. The vocabulary, fixed before the code
 
@@ -297,6 +374,11 @@ it, so the glossary never defines a thing a reader cannot go and find:
 - **Lineage** — the ancestry relation between images, computed from
   `RootFS.Layers` prefix containment, not parsed from `FROM`.
 - **Base** — an entry's nearest ancestor in the catalog, or `none` for a root.
+- **Discovered entry** — an entry derived from an image this namespace built
+  that nobody has described (decision 7). Not a stored row, and the only entry
+  whose **Intent** is empty; every derived fact on it, capabilities included, is
+  filled in the way a stored entry's is. Its opposite is a **catalogued** entry;
+  `origin` is the field that says which.
 
 **Golden image**, pinned to one meaning: the deployment's own agent-capable base
 image — built from
@@ -304,18 +386,21 @@ image — built from
 by `DEFAULT_AGENT_IMAGE`, and the image an agent step falls back to at
 registration when it names none. It is **not** a quality tier and confers no
 standing: a curated entry is not "golden", and the golden image is not
-"approved". Today the word is a magic string plus a hardcoded compare in the
-picker; after #1295 its standing in the picker is a probed fact
-(agent-capable) and a computed one (the root most lineage hangs off), and the
-compare is deleted.
+"approved". The word used to be a magic string plus a hardcoded compare in the
+picker; since #1298 its standing there is a probed fact (agent-capable) and a
+computed one (the root most lineage hangs off). It survives in the picker in
+exactly one place — the blank option, which names the image registration fills
+in when a step pins none, because that is a fact about the runtime rather than a
+claim about suitability.
 
 ## Consequences
 
 Binding:
 
 - **Two builds of the same source at different commits produce one entry with
-  two versions.** A new row appears only when someone catalogues a source nobody
-  has catalogued before.
+  two versions.** A new *row* appears only when someone describes a source
+  nobody has described before — but the catalog *shows* every source this
+  namespace built, described or not (decision 7).
 - **Every field except intent and the optional declared source reference is
   recomputable.** A catalog dropped and rebuilt from the daemon loses only the
   sentences, which is the property that keeps it from becoming a second source
@@ -325,20 +410,33 @@ Binding:
 - **The absence of an entry is never a denial.** Not for a step naming the image,
   and not for a namespace that has not described it.
 - **A fact that cannot be computed is `unknown`, never an error.**
+- **A discovered entry keeps its id when it is described.** The id is derived
+  from the source, so describing one replaces it in place rather than adding a
+  second row beside it.
 
-User-visible changes, all deferred to the issues that make them and each a §12
-gate there rather than here:
+User-visible changes, each a §12 gate in the issue that made it:
 
-- **The step-editor picker stops listing every daemon row** (#1298). This is the
-  only change in the epic that can break authoring, which is why it ships last,
-  keeps the free-text escape hatch, and keeps the branch that preserves an
-  unrecognised pinned value.
+- **The step-editor picker stopped listing every daemon row** (#1298). The only
+  change in the epic that could break authoring, which is why it shipped last,
+  kept the free-text escape hatch, and kept the branch that preserves an
+  unrecognised pinned value. Two consequences a reader should expect: an image
+  on the daemon that no entry describes is no longer one click away — it is
+  typed, not picked — and a catalog that covers images but suits *this* step
+  with none of them offers none, rather than falling back to the daemon list it
+  was built to replace.
 - **Admin → Infrastructure keeps showing raw daemon truth**, `postgres` and
   dangling layers included — an admin hunting 40 GB needs exactly that, and
   curating it would destroy its purpose. Its only change, shipped in #1297, is a
   cross-link on a row some catalog entry describes.
-- **The `★` on `mediforce-golden-image` disappears**, replaced by the probed
-  `agent-capable` property and lineage grouping.
+- **The `★` on `mediforce-golden-image` is gone** (#1298), replaced by the
+  probed `agent-capable` property and lineage grouping.
+- **An image a workflow here built is offered by the picker before anyone
+  describes it** (decision 7), labelled `not described yet · not probed`. It is
+  additive: nothing that was offered stopped being offered.
+- **A deployment with no catalog authors exactly as it did before.** An empty
+  catalog, or a daemon nobody can reach, degrades the picker to the daemon
+  listing it always showed — unranked, since without a probe nothing has been
+  measured (AGENTS.md §13).
 
 ## Out of scope
 
