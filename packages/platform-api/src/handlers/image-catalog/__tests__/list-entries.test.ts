@@ -76,6 +76,38 @@ describe('listImageCatalogEntries handler', () => {
     ]);
   });
 
+  it('groups a derived entry under the entry it was built on, roots first', async () => {
+    const scope = scopeFor('u-member', ['alpha']);
+    // Catalogued in the order that reads worst — the derivative first.
+    await createImageCatalogEntry({ namespace: 'alpha', ...TEALFLOW }, scope);
+    await createImageCatalogEntry(
+      {
+        namespace: 'alpha',
+        name: 'Golden image',
+        intent: 'The deployment agent-capable base image',
+        source: { kind: 'referenced', reference: 'mediforce-golden-image' },
+      },
+      scope,
+    );
+    daemon.value = daemonWith([
+      builtImage({ baseImageId: 'sha-g' }),
+      builtImage({
+        repository: 'mediforce-golden-image',
+        tag: 'latest',
+        id: 'sha-g',
+        buildRepo: undefined,
+        buildDockerfile: undefined,
+      }),
+    ]);
+
+    const { entries } = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+
+    expect(entries.map((entry) => entry.name)).toEqual(['Golden image', 'TealFlow agent']);
+    expect(entries[0].baseEntryId).toBeNull();
+    expect(entries[1].baseEntryId).toBe(entries[0].id);
+    expect(entries[1].versions[0].lineage.base?.imageTag).toBe('mediforce-golden-image:latest');
+  });
+
   it('keeps one namespace catalog out of another', async () => {
     const alpha = scopeFor('u-alpha', ['alpha']);
     const both = scopeFor('u-both', ['alpha', 'beta']);
