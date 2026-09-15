@@ -9,6 +9,7 @@ import {
 import type { CreateJoinLinkOutput, JoinLinkView } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { useJoinLinks } from '@/hooks/use-join-links';
+import { JoinLinkQr } from './join-link-qr';
 
 /**
  * Join links in workspace settings (ADR-0021 §2) — the "onboard a room" half of
@@ -23,9 +24,11 @@ import { useJoinLinks } from '@/hooks/use-join-links';
  */
 export function JoinLinksPanel({
   handle,
+  workspaceName,
   canManageMembers,
 }: {
   handle: string;
+  workspaceName: string;
   canManageMembers: boolean;
 }) {
   const { links, loading, error: listError, refresh } = useJoinLinks(handle, canManageMembers);
@@ -133,9 +136,10 @@ export function JoinLinksPanel({
                   {copied ? 'Copied' : 'Copy'}
                 </button>
               </div>
+              <JoinLinkQr url={minted.url} handle={handle} workspaceName={workspaceName} />
               <p className="text-xs text-green-700 dark:text-green-300">
-                Only a hash is stored, so this link cannot be shown again. Lost it? Create another
-                and revoke this one.
+                Only a hash is stored, so this link and its QR code cannot be shown again. Lost it?
+                Create another and revoke this one.
               </p>
             </div>
             <button

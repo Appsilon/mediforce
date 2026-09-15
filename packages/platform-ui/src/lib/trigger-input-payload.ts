@@ -70,3 +70,49 @@ export function buildTriggerPayload(
   }
   return payload;
 }
+
+/**
+ * The first reason this set of fields would not register, phrased for the person
+ * editing it, or `null` when it is fine to save.
+ *
+ * Two of the three checks are the form's job rather than the schema's: a
+ * duplicate name is valid Zod but shadows the earlier field, because the payload
+ * is a JSON object keyed by name, and a `select` with no options gives the
+ * person starting a run nothing to pick.
+ */
+export function triggerInputIssue(fields: TriggerInputField[]): string | null {
+  const seen = new Set<string>();
+  for (const [index, field] of fields.entries()) {
+    const name = field.name.trim();
+    if (name === '') return `Input ${String(index + 1)} needs a name.`;
+    if (seen.has(name)) return `Two inputs are named ${name}. Each name has to be different.`;
+    seen.add(name);
+    if (
+      (field.type === 'select' || field.type === 'multiselect') &&
+      (field.options ?? []).length === 0
+    ) {
+      return `${name} is a choice list, so it needs at least one option.`;
+    }
+  }
+  return null;
+}
+
+/**
+ * What registers, given what the form holds. Names are trimmed because steps
+ * read a value as `${triggerPayload.<name>}`, which cannot name a field with a
+ * space in it, and an empty description or option list is dropped rather than
+ * stored as a blank.
+ */
+export function normalizeTriggerInput(fields: TriggerInputField[]): TriggerInputField[] {
+  return fields.map((field) => {
+    const { description, options, ...rest } = field;
+    const keptDescription = description?.trim();
+    const keptOptions = options?.filter((option) => option.trim() !== '');
+    return {
+      ...rest,
+      name: field.name.trim(),
+      ...(keptDescription === undefined || keptDescription === '' ? {} : { description: keptDescription }),
+      ...(keptOptions === undefined || keptOptions.length === 0 ? {} : { options: keptOptions }),
+    };
+  });
+}

@@ -6,9 +6,13 @@ import {
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
   AskWorkflowAssistantInputSchema,
+  PlanWorkflowBuildInputSchema,
+  PlanWorkflowBuildOutputSchema,
   AskWorkflowAssistantOutputSchema,
   type AskWorkflowAssistantInput,
   type AskWorkflowAssistantOutput,
+  type PlanWorkflowBuildInput,
+  type PlanWorkflowBuildOutput,
   ValidateWorkflowOutputSchema,
   GetWorkflowSchemaOutputSchema,
   ListWorkflowsInputSchema,
@@ -633,10 +637,16 @@ export class Mediforce {
   };
 
   readonly assistant: {
+    // `signal` aborts the request: an assistant turn is the one call long enough that a person will want to stop it.
     ask: (
       input: AskWorkflowAssistantInput,
-      options: { namespace: string },
+      options: { namespace: string; signal?: AbortSignal },
     ) => Promise<AskWorkflowAssistantOutput>;
+    /** The turn before the build: intent, questions, and the phases to show. */
+    plan: (
+      input: PlanWorkflowBuildInput,
+      options: { namespace: string; signal?: AbortSignal },
+    ) => Promise<PlanWorkflowBuildOutput>;
   };
 
   readonly workflows: {
@@ -1121,6 +1131,25 @@ export class Mediforce {
           { ...validatedInput } as Record<string, unknown>,
           AskWorkflowAssistantOutputSchema,
           'mediforce.assistant.ask',
+          options.signal,
+        );
+      },
+      plan: async (input, options) => {
+        const validatedInput = PlanWorkflowBuildInputSchema.parse(input);
+        const namespace = options.namespace;
+        if (typeof namespace !== 'string' || namespace.length === 0) {
+          throw new Error(
+            'mediforce.assistant.plan: `namespace` is required (passed as an HTTP query parameter).',
+          );
+        }
+        const qs = toSearchParams({ namespace });
+        return this.sendJson(
+          'POST',
+          `/api/workflow-assistant/plan${qs}`,
+          { ...validatedInput } as Record<string, unknown>,
+          PlanWorkflowBuildOutputSchema,
+          'mediforce.assistant.plan',
+          options.signal,
         );
       },
     };
@@ -2280,8 +2309,10 @@ export class Mediforce {
     body: unknown,
     outputSchema: { parse: (b: unknown) => TOut },
     ctx: string,
+    signal?: AbortSignal,
   ): Promise<TOut> {
     const init: RequestInit = { method };
+    if (signal !== undefined) init.signal = signal;
     if (body !== undefined) {
       init.headers = { 'Content-Type': 'application/json' };
       init.body = JSON.stringify(body);

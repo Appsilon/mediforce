@@ -142,11 +142,17 @@ describe('AddStepToolSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('omits only machine-managed fields (id/plugin/metadata/stepParams)', () => {
+  it('omits only machine-managed fields (id/plugin/metadata)', () => {
     const shape = AddStepToolFieldsSchema.shape;
-    for (const field of ['plugin', 'metadata', 'stepParams'] as const) {
+    for (const field of ['plugin', 'metadata'] as const) {
       expect(field in shape).toBe(false);
     }
+  });
+
+  it('exposes stepParams, which is read at runtime rather than legacy', () => {
+    // `execute-agent-step` merges it into the agent's input context under
+    // `appContext`, so hiding it left a live field nothing could author.
+    expect('stepParams' in AddStepToolFieldsSchema.shape).toBe(true);
   });
 
   it('exposes the user-authorable fields the assistant previously lacked, for parity with hand-editing', () => {
@@ -226,8 +232,20 @@ describe('RemoveStepToolSchema', () => {
 });
 
 describe('WORKFLOW_ASSISTANT_TOOLS', () => {
-  it('exposes exactly the three canvas-mutation tools', () => {
-    expect(Object.keys(WORKFLOW_ASSISTANT_TOOLS).sort()).toEqual(['add_step', 'remove_step', 'update_step']);
+  it('exposes the step tools, the workflow-level ones, and the files it carries', () => {
+    // The three step tools were the whole surface, which is why no phrasing of
+    // "make the study ID a required input" could land — and why "write the
+    // script that polls the SFTP server" had nowhere to go either.
+    expect(Object.keys(WORKFLOW_ASSISTANT_TOOLS).sort()).toEqual([
+      'add_step',
+      'remove_step',
+      'remove_transition',
+      'remove_workflow_file',
+      'set_transition_condition',
+      'update_step',
+      'update_workflow',
+      'write_workflow_file',
+    ]);
   });
 });
 
@@ -287,5 +305,48 @@ describe('add_step presetId', () => {
   it('still accepts a hand-built step with no presetId', () => {
     const result = AddStepToolSchema.safeParse({ type: 'creation', executor: 'agent', name: 'Draft' });
     expect(result.success).toBe(true);
+  });
+});
+
+// The assistant carries its files; a repository build context is the user's to
+// set in the step editor. Leaving the fields on the tool meant the model kept
+// writing a plausible URL and a placeholder SHA, which the schema then refused —
+// turning a bad save into a retry loop that ended the turn with an error.
+describe('AddStepToolSchema — build fields the assistant does not author', () => {
+  const base = { type: 'creation' as const, executor: 'script' as const, name: 'Validate' };
+
+  it('drops a repository build context from a script step', () => {
+    const parsed = AddStepToolSchema.parse({
+      ...base,
+      script: {
+        command: 'python3 /artifacts/scripts/validate.py',
+        dockerfile: 'container/Dockerfile',
+        repo: 'https://github.com/user/cdisc-workflow.git',
+        commit: '0'.repeat(40),
+      },
+    });
+    expect(parsed.script).toMatchObject({ command: 'python3 /artifacts/scripts/validate.py', dockerfile: 'container/Dockerfile' });
+    expect(parsed.script).not.toHaveProperty('repo');
+    expect(parsed.script).not.toHaveProperty('commit');
+  });
+
+  it('drops it from an agent step too', () => {
+    const parsed = AddStepToolSchema.parse({
+      ...base,
+      executor: 'agent',
+      agent: { prompt: 'Read the findings', repo: 'https://github.com/user/x.git', commit: 'a'.repeat(40), repoAuth: 'GITHUB_TOKEN' },
+    });
+    expect(parsed.agent).not.toHaveProperty('repo');
+    expect(parsed.agent).not.toHaveProperty('commit');
+    expect(parsed.agent).not.toHaveProperty('repoAuth');
+  });
+
+  it('keeps the fields it does author', () => {
+    // `dockerfile` stays: the workflow carries one, and that is how it is named.
+    const parsed = AddStepToolSchema.parse({
+      ...base,
+      script: { command: 'python3 /artifacts/run.py', dockerfile: 'Dockerfile', image: 'python:3.12-slim' },
+    });
+    expect(parsed.script).toMatchObject({ dockerfile: 'Dockerfile', image: 'python:3.12-slim' });
   });
 });

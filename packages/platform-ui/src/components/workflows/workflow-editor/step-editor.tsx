@@ -8,6 +8,7 @@ import { useNamespaceMembers } from '@/hooks/use-namespace-members';
 import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
+import { carriedSkills } from '@/lib/carried-skills';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
@@ -131,8 +132,8 @@ const TIP = {
   pluginScript:            'Plugin that runs the script (usually script-container). Must be registered in the platform.',
   agentId:                 'Saved agent definition used by this step. Its system prompt, model and MCP server bindings are loaded for the run.',
   agentModel:              'LLM model for this step. Leave blank to use the agent definition\'s model. Use provider/model format.',
-  agentSkill:              'Skill file name to load at runtime. Skills provide specialised instructions and tools for a specific task.',
-  agentSkillsDir:          'Repo-relative path to the directory containing skill files. Overrides the agent definition\'s setting.',
+  agentSkill:              'The skill this step loads: a SKILL.md holding specialised instructions for one task. Skills the workflow carries in its Files are offered here; upload a skills folder there to add one.',
+  agentSkillsDir:          'Where that skill lives. Filled in for you when you pick a carried skill. Otherwise a path inside the workflow\'s externalSkillsRepo, or inside the repository on the host.',
   agentTimeoutMinutes:     'Maximum minutes the agent may run before the step is escalated.',
   agentTimeoutMs:          'Maximum run time in milliseconds. Takes precedence over timeoutMinutes if both are set.',
   agentConfidence:         'Minimum confidence (0–1) the agent must self-report before output is accepted. Below this, the step escalates.',
@@ -253,6 +254,7 @@ export function StepEditor({
   imageWarning,
   dockerImages,
   workflowExternalSkillsRepo,
+  workflowArtifacts,
 }: {
   step: WorkflowStep;
   allSteps: WorkflowStep[];
@@ -263,8 +265,12 @@ export function StepEditor({
   imageWarning?: string;
   dockerImages?: DockerImageInfo[];
   workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
+  /** The files this workflow carries. Skills among them are offered here, so a
+   *  skill uploaded in the Files panel is picked rather than typed as a path. */
+  workflowArtifacts?: WorkflowDefinition['artifacts'];
 }) {
   const isNewStep = step.id.startsWith('new-step-');
+  const skillsOnHand = carriedSkills(workflowArtifacts);
   const { plugins } = usePlugins();
   const selectedPluginMetadata = plugins.find((p) => p.name === step.plugin)?.metadata;
   const selectedPluginDefaultModel = selectedPluginMetadata?.foundationModel;
@@ -756,16 +762,50 @@ export function StepEditor({
           </FieldRow>
 
           <FieldRow label="agent.skill" tooltip={TIP.agentSkill}>
-            <input
-              value={step.agent?.skill ?? ''}
-              onChange={(e) => updateAgent({ skill: e.target.value || undefined })}
-              className={riMono}
-            />
+            {skillsOnHand.length > 0 ? (
+              <select
+                value={
+                  skillsOnHand.some((carried) =>
+                    carried.skill === step.agent?.skill && carried.skillsDir === step.agent?.skillsDir)
+                    ? `${step.agent?.skillsDir ?? ''}/${step.agent?.skill ?? ''}`
+                    : ''
+                }
+                aria-label="Skill"
+                onChange={(e) => {
+                  // The value is the skill's own path, so it splits back into
+                  // the pair the runtime reads: the directory it lives in and
+                  // its name.
+                  const at = e.target.value.lastIndexOf('/');
+                  updateAgent(at === -1
+                    ? { skill: undefined, skillsDir: undefined }
+                    : { skillsDir: e.target.value.slice(0, at), skill: e.target.value.slice(at + 1) });
+                }}
+                className={rs}
+              >
+                <option value="">None</option>
+                {skillsOnHand.map((carried) => (
+                  <option
+                    key={`${carried.skillsDir}/${carried.skill}`}
+                    value={`${carried.skillsDir}/${carried.skill}`}
+                  >
+                    {carried.skill}
+                    {carried.skillsDir === 'skills' ? '' : ` (${carried.skillsDir})`}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                value={step.agent?.skill ?? ''}
+                onChange={(e) => updateAgent({ skill: e.target.value || undefined })}
+                className={riMono}
+              />
+            )}
           </FieldRow>
 
           <FieldRow label="agent.skillsDir" tooltip={TIP.agentSkillsDir}>
             <input
               value={step.agent?.skillsDir ?? ''}
+              aria-label="Skills directory"
               onChange={(e) => updateAgent({ skillsDir: e.target.value || undefined })}
               className={riMono}
             />

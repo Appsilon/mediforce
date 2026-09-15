@@ -237,6 +237,48 @@ describe('registerWorkflow handler', () => {
     expect(analyzeStep?.agent?.image).toBe('mediforce-golden-image');
   });
 
+  it('leaves a step alone when the workflow carries the Dockerfile it names', async () => {
+    // A carried Dockerfile is a build source. Handing the step the golden image
+    // instead would tag the built image as the golden one — clobbering the
+    // shared image with this workflow's build.
+    const scope = buildScope();
+    const body = buildWorkflowDefinition({
+      name: 'carried-dockerfile-flow',
+      namespace: 'team-alpha',
+      artifacts: [{ path: 'Dockerfile', contents: 'FROM python:3.12-slim\n' }],
+      steps: [
+        { id: 'analyze', name: 'AI Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', dockerfile: 'Dockerfile' } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'analyze', to: 'done' }],
+    });
+    const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
+
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
+      .resolves.toMatchObject({ success: true, name: 'carried-dockerfile-flow' });
+    const stored = await processRepo.getWorkflowDefinition('team-alpha', 'carried-dockerfile-flow', 1);
+    expect(stored?.steps.find((s) => s.id === 'analyze')?.agent?.image).toBeUndefined();
+  });
+
+  it('still defaults the golden image when the named Dockerfile is not carried', async () => {
+    const scope = buildScope();
+    const body = buildWorkflowDefinition({
+      name: 'missing-dockerfile-flow',
+      namespace: 'team-alpha',
+      artifacts: [{ path: 'scripts/poll.py', contents: 'print(1)\n' }],
+      steps: [
+        { id: 'analyze', name: 'AI Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', dockerfile: 'Dockerfile' } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'analyze', to: 'done' }],
+    });
+    const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
+
+    await registerWorkflow({ ...input, namespace: 'team-alpha' }, scope);
+    const stored = await processRepo.getWorkflowDefinition('team-alpha', 'missing-dockerfile-flow', 1);
+    expect(stored?.steps.find((s) => s.id === 'analyze')?.agent?.image).toBe('mediforce-golden-image');
+  });
+
   it('defaults the golden image even in local agent mode (the saved definition must stay deployable)', async () => {
     vi.mocked(isLocalAgentMode).mockReturnValueOnce(true);
     const scope = buildScope();

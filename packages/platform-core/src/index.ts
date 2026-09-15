@@ -85,6 +85,9 @@ export {
   WorkflowTemplateSchema,
   InputForNextRunEntrySchema,
   TriggerInputFieldSchema,
+  WorkflowArtifactSchema,
+  WORKFLOW_ARTIFACT_MAX_BYTES,
+  WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES,
   HttpMethodSchema,
   WebhookTriggerConfigSchema,
   HttpActionConfigSchema,
@@ -97,6 +100,7 @@ export {
   validateInputForNextRun,
   validateSteps,
   validateTriggerInput,
+  validateArtifacts,
   scriptConfigKeyForPlugin,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
@@ -224,6 +228,7 @@ export type {
   WorkflowDefinition,
   WorkflowTemplate,
   TriggerInputField,
+  WorkflowArtifact,
   HttpMethod,
   WebhookTriggerConfig,
   HttpActionConfig,
@@ -284,17 +289,29 @@ export {
   RemoveStepToolSchema,
   ListModelsToolSchema,
   WORKFLOW_ASSISTANT_TOOLS,
+  WORKFLOW_ASSISTANT_PLATFORM_TOOLS,
+  isPlatformToolName,
   WORKFLOW_ASSISTANT_DEFAULT_MODEL,
   WorkflowAssistantToolCallSchema,
   applyWorkflowAssistantToolCalls,
+  pruneWorkflowSettings,
+  type WorkflowSettingsDraft,
+  type RegisterableWorkflowSettings,
   type AddStepTool,
   type UpdateStepTool,
   type RemoveStepTool,
   type ListModelsTool,
   type WorkflowAssistantToolName,
+  type WorkflowAssistantPlatformToolName,
+  type CreateAgentTool,
   type WorkflowAssistantToolCall,
+  UpdateWorkflowToolSchema,
+  SetTransitionConditionToolSchema,
+  type UpdateWorkflowTool,
+  type SetTransitionConditionTool,
   type ToolCallOutcome,
   type ApplyToolCallsResult,
+  type WorkflowSettings,
 } from './schemas/index';
 
 // Interfaces (repository and service contracts)
@@ -479,6 +496,8 @@ export type {
   VersionCandidate,
   WorkflowVersionSource,
 } from './workflows/resolve-runnable-version';
+export { stepHasBuildSource } from './workflows/build-source';
+export { resolveStepAssignee, type ResolvedStepAssignee } from './workflows/step-assignee';
 
 // MCP resolver (pure; wires AgentDefinition + step restrictions + catalog)
 export {

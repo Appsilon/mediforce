@@ -66,16 +66,14 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/continueOnError/);
   });
 
-  it('tells the model it cannot create triggers and to direct schedule/webhook requests to the Triggers tab', () => {
-    expect(prompt).toMatch(/can't create triggers/i);
-    expect(prompt).toMatch(/Triggers\*\* tab|Triggers tab|trigger-add/);
-    expect(prompt).toMatch(/\$\{triggerPayload\./);
+  it('declines webhooks the same way, and still reads trigger inputs in steps', () => {
+    expect(prompt).toMatch(/covers webhooks, which you cannot create at any time/);
+    expect(prompt).toMatch(/\$\{triggerPayload\.<field>\}/);
   });
 
-  it('warns that the inline script runtime is stdlib-only and to prefer an agent step for third-party packages', () => {
-    expect(prompt).toMatch(/standard-library-only/i);
+  it('warns that the inline script runtime carries no third-party packages', () => {
+    expect(prompt).toMatch(/the standard library and nothing else/i);
     expect(prompt).toMatch(/ModuleNotFoundError/);
-    expect(prompt).toMatch(/Prefer an `agent` step for anything needing third-party packages/);
   });
 
   it('tells the model a large build may span several turns and cut-off steps are kept', () => {
@@ -104,6 +102,58 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
   it('requires secrets to be referenced with {{SECRET_NAME}} in a step env, not ${secrets.X}', () => {
     expect(prompt).toMatch(/referenced with `\{\{SECRET_NAME\}\}` in a step's `env` map — never `\$\{secrets\.NAME\}`/);
     expect(prompt).toMatch(/"HARVEST_API_KEY": "\{\{HARVEST_API_KEY\}\}"/);
+  });
+
+  it('never sends the reader to a terminal: no CLI, no git, no repo paths', () => {
+    expect(prompt).toMatch(/never name a command for them to run/i);
+    expect(prompt).toMatch(/never quote their instructions back/i);
+  });
+
+  it('sends any third-party package to a carried file plus a Dockerfile, in every language', () => {
+    expect(prompt).toMatch(/standard library/i);
+    expect(prompt).toMatch(/write_workflow_file/);
+    expect(prompt).toMatch(/pandas/);
+    expect(prompt).not.toMatch(/pip", "install"/);
+    expect(prompt).toMatch(/python:3\.12-slim/);
+    expect(prompt).toMatch(/rocker\/r-ver/);
+    expect(prompt).toMatch(/externally managed/i);
+    expect(prompt).toMatch(/venv/);
+  });
+
+  it('says how a file crosses from one step to the next, since /output does not survive', () => {
+    expect(prompt).toMatch(/\/workspace\/\.mediforce\/output\//);
+    expect(prompt).toMatch(/wiped|deleted|does not survive/i);
+  });
+
+  it('names the tool that removes an edge, and says a stale defect is not yours to hide', () => {
+    expect(prompt).toMatch(/remove_transition/);
+    expect(prompt).toMatch(/already had|arrived with/i);
+  });
+
+  it('never asks for the same field twice, as a trigger input and as an entry-step param', () => {
+    expect(prompt).toMatch(/never both/i);
+    expect(prompt).toMatch(/Invalid payload/);
+  });
+
+  it('declines an unschedulable request in one sentence rather than explaining the workaround', () => {
+    expect(prompt).toMatch(/create_cron_trigger/);
+    expect(prompt).toMatch(/the whole answer is one sentence/i);
+    expect(prompt).toMatch(/Do not describe the Triggers tab/);
+    expect(prompt).toMatch(/never a command/);
+  });
+
+  it('checks a role exists before leaning on it, and points at Settings for granting one', () => {
+    expect(prompt).toMatch(/list_roles/);
+    expect(prompt).toMatch(/Settings → Members/);
+    expect(prompt).toMatch(/nobody holds it yet/i);
+    expect(prompt).toMatch(/Access\*\* tab/);
+  });
+
+  it('states the only route an MCP server has to a step: a saved agent the step names with agentId', () => {
+    expect(prompt).toMatch(/`agentId`/);
+    expect(prompt).toMatch(/no MCP at all|reaches no MCP|gets no MCP/i);
+    expect(prompt).toMatch(/list_tool_catalog/);
+    expect(prompt).toMatch(/mcpRestrictions/);
   });
 
   it('documents that update_step can connect an already-existing step, and that every response is graph-checked before finishing', () => {
@@ -137,13 +187,106 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/don't pretend an empty result is impossible/);
   });
 
-  it('appends the embedded capability & authoring reference (all three docs) and scopes out package-only authoring', () => {
+  it('appends the embedded capability & authoring reference (all three docs) and scopes out what is genuinely out of reach', () => {
     expect(prompt).toMatch(/# Capability & authoring reference/);
-    expect(prompt).toMatch(/out of scope for you/);
-    expect(prompt).toMatch(/`command`-mode scripts/);
+    // The definition is in reach (update_workflow, set_transition_condition)
+    // and so are the files it carries (write_workflow_file). What is left is
+    // the platform setup around it.
+    expect(prompt).toMatch(/write_workflow_file/);
+    expect(prompt).toMatch(/\/artifacts\//);
+    expect(prompt).toMatch(/list_secrets/);
+    expect(prompt).toMatch(/never values/);
+    expect(prompt).toMatch(/runs as the person you are helping/);
+    expect(prompt).toMatch(/an admin can do it/);
+    expect(prompt).toMatch(/update_workflow/);
+    expect(prompt).toMatch(/set_transition_condition/);
     expect(prompt).toMatch(/Pick an authoring path/); // how-to-create-workflow.md
     expect(prompt).toMatch(/this is where fan-out lives/); // workflow-capabilities.md
     expect(prompt).toMatch(/Do \*\*not\*\* create new CM1\/L2/); // workflow-authoring-golden-rules.md
   });
 
+});
+
+// The authoring judgment the /design-workflow skill applies, in the assistant
+// that replaces it: pushing back on the shape, not just building it correctly.
+describe('buildWorkflowAssistantSystemPrompt — challenging the design', () => {
+  const prompt = buildWorkflowAssistantSystemPrompt();
+
+  it('says a workflow may be the wrong shape for the job', () => {
+    expect(prompt).toMatch(/Does this need a workflow at all/);
+    expect(prompt).toMatch(/one script step on a cron trigger/);
+  });
+
+  it('routes deterministic work away from agent steps, and side effects to actions', () => {
+    // The most expensive authoring mistake: a model doing what a parser does,
+    // once per run, forever.
+    expect(prompt).toMatch(/Is that really an agent step/);
+    expect(prompt).toMatch(/Deterministic parsing, validation, format conversion/);
+    expect(prompt).toMatch(/judgment, synthesis, planning and language understanding/);
+  });
+
+  it('states where code lives, and what a Dockerfile costs', () => {
+    expect(prompt).toMatch(/inline script .* is the default/);
+    expect(prompt).toMatch(/minutes of build on the first run/);
+  });
+
+  it('lists what a finished design has to resolve', () => {
+    expect(prompt).toMatch(/Cover the whole design/);
+    expect(prompt).toMatch(/inputForNextRun/);
+    expect(prompt).toMatch(/list_secrets.*list_agents.*list_tool_catalog.* are there to be called/);
+  });
+
+  it('forbids inventing a repository or a commit, which the older references still describe', () => {
+    // The reference docs below the prompt taught the pinned-repo shape as the
+    // only way to run a script file. A model following them writes a
+    // github.com/user/... URL and forty zeros, and the workflow can never run.
+    expect(prompt).toMatch(/Never invent a repository or a commit/);
+    expect(prompt).toMatch(/placeholder SHA \(forty zeros\)/);
+    expect(prompt).toMatch(/When a step needs a file, write the file/);
+  });
+
+  it('asks for a plan first on a large build, rather than a form', () => {
+    expect(prompt).toMatch(/more than about five steps/);
+    expect(prompt).toMatch(/Not a form to fill in/);
+  });
+});
+
+// "A data manager reviews the report" produced `assignedTo:
+// "data-manager@company.com"`, which resolves to no user: the task was created
+// assigned to that literal string, the UI showed it claimed by someone who does
+// not exist, and nobody — owner included — could complete the run.
+describe('buildWorkflowAssistantSystemPrompt — who does a human step', () => {
+  const prompt = buildWorkflowAssistantSystemPrompt();
+
+  it('sends a job title to allowedRoles, not assignedTo', () => {
+    expect(prompt).toMatch(/is a role, not a person/);
+    expect(prompt).toMatch(/allowedRoles: \["data-manager"\]/);
+  });
+
+  it('says what assignedTo actually takes, and what happens when it is not that', () => {
+    expect(prompt).toMatch(/pre-assigns to one specific \*user id\*/);
+    expect(prompt).toMatch(/leaves such a task unassigned and records that the value named nobody/);
+  });
+
+  it('keeps assignedTo for an identity the run genuinely knows', () => {
+    expect(prompt).toMatch(/triggerPayload\.userId/);
+    expect(prompt).toMatch(/set the role and say which role you used/);
+  });
+});
+
+describe('buildWorkflowAssistantSystemPrompt — conditions and splicing', () => {
+  const prompt = buildWorkflowAssistantSystemPrompt();
+
+  it('says inserting a step replaces the edge that joined the two', () => {
+    expect(prompt).toMatch(/replaces the edge that joined them/);
+  });
+
+  it('says naming the old edge is fine when the step has one way out', () => {
+    expect(prompt).toMatch(/fine when the step you condition has one way out/);
+    expect(prompt).toMatch(/refused only when the step branches/);
+  });
+
+  it('tells it never to re-add an edge it just split', () => {
+    expect(prompt).toMatch(/that splits the graph again/);
+  });
 });
