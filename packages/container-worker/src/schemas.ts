@@ -47,6 +47,8 @@ export const DockerJobDataSchema = z.object({
     context: BuildContextSchema.optional(),
     repoToken: z.string().optional(),
     contextDir: z.string().optional(),
+    /** Content hash of the files in `contextDir`; compared with the image's label on reuse. */
+    artifactsHash: z.string().optional(),
     /** Workflow definition whose step triggered the build; written as an image label. */
     workflow: z.string().optional(),
     /** Namespace owning that definition; written as an image label. */

@@ -20,6 +20,7 @@ import {
   readProvenanceLabels,
 } from '@mediforce/platform-core';
 import { createTestRepo, addCommitToTestRepo, type TestRepo } from './helpers/create-test-repo';
+import { artifactsBuildHash, materializeArtifacts } from '../workflow-artifacts';
 
 function dockerAvailable(): boolean {
   try {
@@ -234,4 +235,24 @@ describe.skipIf(!dockerAvailable())('docker-image-builder integration', () => {
       ensureImage({ image: 'mediforce-nonexistent-image-xyz' }),
     ).rejects.toThrow(/not found locally.*no repo\+commit/i);
   });
+
+  it('rebuilds a tag the step named once a file its carried Dockerfile copies is edited', async () => {
+    const image = testImageName('carried-pinned');
+    const dockerfile = { path: 'container/Dockerfile', contents: 'FROM alpine:3.21\nCOPY scripts/greet.sh /greet.sh\n' };
+    const ensureFrom = async (greeting: string): Promise<string> => {
+      const artifacts = [dockerfile, { path: 'scripts/greet.sh', contents: `echo ${greeting}\n` }];
+      const contextDir = await materializeArtifacts(artifacts);
+      if (contextDir === null) throw new Error('artifacts were not materialized');
+      await ensureImage({
+        image,
+        contextDir,
+        dockerfile: dockerfile.path,
+        artifactsHash: artifactsBuildHash(artifacts, dockerfile.path),
+      });
+      return execFileSync('docker', ['run', '--rm', image, 'cat', '/greet.sh']).toString();
+    };
+
+    expect(await ensureFrom('first')).toBe('echo first\n');
+    expect(await ensureFrom('second')).toBe('echo second\n');
+  }, 120_000);
 });

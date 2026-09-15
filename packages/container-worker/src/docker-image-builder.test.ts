@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 vi.mock('node:child_process', () => ({
-  execSync: vi.fn(),
   execFileSync: vi.fn(),
 }));
 
@@ -19,12 +18,11 @@ vi.mock('node:fs', async (importOriginal) => ({
   realpathSync: vi.fn((path: string) => path),
 }));
 
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { buildImageFromRepo } from './docker-image-builder';
+import { buildImageFromRepo, ensureImage } from './docker-image-builder';
 
-const execSyncMock = vi.mocked(execSync);
 const execFileSyncMock = vi.mocked(execFileSync);
 const mkdtempMock = vi.mocked(mkdtemp);
 const rmMock = vi.mocked(rm);
@@ -36,7 +34,6 @@ beforeEach(() => {
   delete process.env.DEPLOY_KEY_PATH;
   mkdtempMock.mockResolvedValue('/tmp/mediforce-worker-build-abc');
   rmMock.mockResolvedValue(undefined);
-  execSyncMock.mockReturnValue(Buffer.from(''));
   execFileSyncMock.mockReturnValue(Buffer.from(''));
 });
 
@@ -249,5 +246,35 @@ describe('container-worker buildImageFromRepo', () => {
     } finally {
       rmSync(deployKeyDirectory, { recursive: true, force: true });
     }
+  });
+});
+
+// Mirrors the agent-runtime copy: a step that names its own tag for a carried
+// Dockerfile is rebuilt when the files behind it change.
+describe('container-worker ensureImage — a Dockerfile the workflow carries', () => {
+  it('does not rebuild an image already built from these files', async () => {
+    execFileSyncMock.mockReturnValueOnce(Buffer.from('')); // inspect succeeds
+    execFileSyncMock.mockReturnValueOnce(Buffer.from('abc123\n')); // artifacts label
+
+    await ensureImage({ image: 'my-registry/mine:v2', contextDir: '/ctx', artifactsHash: 'abc123' });
+
+    expect(execFileSyncMock.mock.calls.some(([command, args]) => command === 'docker' && args?.[0] === 'build')).toBe(false);
+  });
+
+  it('rebuilds an image the step named once the files it was built from change', async () => {
+    execFileSyncMock.mockReturnValueOnce(Buffer.from('')); // inspect succeeds
+    execFileSyncMock.mockReturnValueOnce(Buffer.from('old000hash00\n')); // artifacts label
+
+    await ensureImage({
+      image: 'my-registry/mine:v2',
+      contextDir: '/ctx',
+      artifactsHash: 'new111hash11',
+      workflow: 'wf',
+      namespace: 'acme',
+    });
+
+    expect(buildLabel('mediforce.build.artifacts')).toBe('new111hash11');
+    expect(buildLabel('mediforce.build.namespace')).toBe('acme');
+    expect(buildLabel('mediforce.build.repo')).toBe('');
   });
 });
