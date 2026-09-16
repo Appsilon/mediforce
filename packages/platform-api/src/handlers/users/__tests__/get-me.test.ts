@@ -28,7 +28,11 @@ describe('getMe handler', () => {
 
   it('rejects apiKey caller without an explicit uid (no identity to attribute)', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo });
-    await expect(getMe({}, scope)).rejects.toBeInstanceOf(ValidationError);
+    const error = await getMe({}, scope).catch((reason) => reason);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as ValidationError).message).toBe(
+      'apiKey caller must pass `uid` to GET /api/users/me — there is no implicit identity for system actors',
+    );
   });
 
   it('apiKey caller may target a uid explicitly (admin / CLI escape hatch)', async () => {

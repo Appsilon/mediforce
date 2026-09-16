@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  WORKFLOW_ASSISTANT_INSTRUCTIONS_MAX_CHARS,
   WorkflowStepSchema,
   TransitionSchema,
   WorkflowAssistantToolCallSchema,
@@ -97,3 +98,33 @@ export const AskWorkflowAssistantOutputSchema = z.object({
   questions: z.array(PlanQuestionSchema).max(3).optional(),
 });
 export type AskWorkflowAssistantOutput = z.infer<typeof AskWorkflowAssistantOutputSchema>;
+
+/**
+ * A person's standing instructions for the assistant in one workspace: the
+ * extra system prompt that says how *they* want workflows built.
+ *
+ * `uid` follows the `users.me` convention — a session caller must omit it (or
+ * name itself), and an apiKey caller must pass it, because a system actor has
+ * no implicit identity. That is what lets the CLI push a file on someone's
+ * behalf without inventing one.
+ */
+export const GetAssistantInstructionsInputSchema = z.object({
+  namespace: z.string().min(1).max(200),
+  uid: z.string().min(1).max(200).optional(),
+});
+export const GetAssistantInstructionsOutputSchema = z.object({
+  /** `''` when this person has saved nothing here. */
+  instructions: z.string(),
+});
+export const SetAssistantInstructionsInputSchema = z.object({
+  namespace: z.string().min(1).max(200),
+  uid: z.string().min(1).max(200).optional(),
+  /** `''` clears them. */
+  instructions: z.string().max(WORKFLOW_ASSISTANT_INSTRUCTIONS_MAX_CHARS),
+});
+export const SetAssistantInstructionsOutputSchema = z.object({ ok: z.literal(true) });
+
+export type GetAssistantInstructionsInput = z.infer<typeof GetAssistantInstructionsInputSchema>;
+export type GetAssistantInstructionsOutput = z.infer<typeof GetAssistantInstructionsOutputSchema>;
+export type SetAssistantInstructionsInput = z.infer<typeof SetAssistantInstructionsInputSchema>;
+export type SetAssistantInstructionsOutput = z.infer<typeof SetAssistantInstructionsOutputSchema>;

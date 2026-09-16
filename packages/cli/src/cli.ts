@@ -13,6 +13,8 @@
  */
 
 import { assistantAskCommand } from './commands/assistant-ask';
+import { assistantInstructionsGetCommand } from './commands/assistant-instructions-get';
+import { assistantInstructionsSetCommand } from './commands/assistant-instructions-set';
 import { workflowRegisterCommand } from './commands/workflow-register';
 import { workflowValidateCommand } from './commands/workflow-validate';
 import { workflowSchemaCommand } from './commands/workflow-schema';
@@ -121,6 +123,14 @@ export const TREE: Record<string, BranchEntry> = {
     description: "Canvas-first workflow designer's AI Assistant (ADR-0011)",
     leaves: {
       ask: { description: 'Ask the assistant a question given the current canvas state', fn: assistantAskCommand },
+      'instructions-get': {
+        description: 'Show the standing instructions the assistant reads in a workspace',
+        fn: assistantInstructionsGetCommand,
+      },
+      'instructions-set': {
+        description: 'Replace them, usually from a file (--file)',
+        fn: assistantInstructionsSetCommand,
+      },
     },
   },
   workflow: {

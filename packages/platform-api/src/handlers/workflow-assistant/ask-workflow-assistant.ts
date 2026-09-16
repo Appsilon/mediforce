@@ -31,6 +31,7 @@ import { HandlerError, ValidationError } from '../../errors';
 import { callOpenRouter, type OpenRouterChatMessage, type OpenRouterToolDefinition } from '../../services/openrouter-client';
 import { PlanQuestionSchema } from '../../contract/workflow-assistant';
 import { buildWorkflowAssistantSystemPrompt } from './_lib/system-prompt';
+import { callerInstructionMessages } from './_lib/caller-instructions';
 import { runPlatformTool } from './_lib/run-platform-tool';
 import { parseModelJson } from './_lib/parse-model-json';
 
@@ -353,6 +354,7 @@ export async function askWorkflowAssistant(
   const tools = buildToolDefinitions({ canSchedule: input.workflowName !== undefined });
   const messages: OpenRouterChatMessage[] = [
     { role: 'system', content: buildWorkflowAssistantSystemPrompt() },
+    ...(await callerInstructionMessages(scope, input.namespace)),
     {
       role: 'system',
       content: `Current canvas state:\n${JSON.stringify(input.workflowDefinition, null, 2)}`,
