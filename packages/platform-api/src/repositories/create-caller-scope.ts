@@ -23,6 +23,7 @@ import type {
   TriggerRepository,
   UserDirectoryService,
   UserProfileRepository,
+  WorkflowAssistantInstructionsRepository,
   WorkflowSecretsRepository,
   AutoJoinRule,
 } from '@mediforce/platform-core';
@@ -53,6 +54,7 @@ import { AuthorizedTriggerRepository } from './authorized-trigger-repository';
 import { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository';
 import { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository';
 import { AuthorizedWorkflowSecretRepository } from './authorized-workflow-secret-repository';
+import { AuthorizedWorkflowAssistantInstructionsRepository } from './authorized-workflow-assistant-instructions-repository';
 import { AuthorizedWorkspaceSecretRepository } from './authorized-workspace-secret-repository';
 
 /**
@@ -76,6 +78,7 @@ export interface CallerScopeServices {
   readonly toolCatalogRepo: ToolCatalogRepository;
   readonly namespaceRepo: NamespaceRepository;
   readonly userProfileRepo: UserProfileRepository;
+  readonly assistantInstructionsRepo: WorkflowAssistantInstructionsRepository;
   readonly credentialsRepo: CredentialsRepository;
   readonly oauthProviderRepo: OAuthProviderRepository;
   readonly agentOAuthTokenRepo: AgentOAuthTokenRepository;
@@ -146,6 +149,10 @@ export function createCallerScope(
       services.secretsRepo,
     ),
     workflowSecrets: new AuthorizedWorkflowSecretRepository(caller, services.secretsRepo),
+    assistantInstructions: new AuthorizedWorkflowAssistantInstructionsRepository(
+      caller,
+      services.assistantInstructionsRepo,
+    ),
     triggers: new AuthorizedTriggerRepository(caller, services.triggerRepo),
 
     models: services.modelRegistryRepo,

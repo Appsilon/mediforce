@@ -68,6 +68,7 @@ export { PostgresModelRegistryRepository } from './postgres/repositories/model-r
 export { PostgresNamespaceSecretsRepository } from './postgres/repositories/namespace-secrets-repository';
 export { PostgresWorkflowSecretsRepository } from './postgres/repositories/workflow-secrets-repository';
 export { PostgresUserProfileRepository } from './postgres/repositories/user-profile-repository';
+export { PostgresWorkflowAssistantInstructionsRepository } from './postgres/repositories/workflow-assistant-instructions-repository';
 export { PostgresCredentialsRepository } from './postgres/repositories/credentials-repository';
 export { PostgresPlatformSettingsRepository } from './postgres/repositories/platform-settings-repository';
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client';

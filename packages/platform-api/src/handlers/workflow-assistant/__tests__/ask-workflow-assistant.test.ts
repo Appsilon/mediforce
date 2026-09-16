@@ -4,6 +4,7 @@ import {
   InMemoryAgentDefinitionRepository,
   InMemoryAuditRepository,
   InMemoryProcessInstanceRepository,
+  InMemoryWorkflowAssistantInstructionsRepository,
 } from '@mediforce/platform-core/testing';
 import { askWorkflowAssistant } from '../ask-workflow-assistant';
 import { ForbiddenError, HandlerError, ValidationError } from '../../../errors';
@@ -1158,5 +1159,130 @@ describe('askWorkflowAssistant — naming the steps it just created', () => {
 
     const retry = secondRequestMessages(fetchSpy).at(-1);
     expect(retry?.content).not.toContain('clientId you assigned it earlier');
+  });
+});
+
+describe('askWorkflowAssistant — per-user workspace instructions', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  afterEach(() => {
+    fetchSpy?.mockRestore();
+  });
+
+  function requestMessages(
+    spy: ReturnType<typeof vi.spyOn>,
+    callIndex: number,
+  ): { role: string; content?: string }[] {
+    const init = spy.mock.calls[callIndex]?.[1] as { body?: string } | undefined;
+    return (JSON.parse(init?.body ?? '{}') as { messages?: { role: string; content?: string }[] }).messages ?? [];
+  }
+
+  function mockAddStepThenReply() {
+    return vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: '',
+            tool_calls: [{
+              id: 'call_1',
+              type: 'function',
+              function: { name: 'add_step', arguments: JSON.stringify({ type: 'creation', executor: 'human', name: 'Przeglad', insertAfterId: 'review', insertBeforeId: 'done' }) },
+            }],
+          },
+        }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{ message: { content: 'Dodalem krok.', tool_calls: [] } }],
+      }), { status: 200 }));
+  }
+
+  it('sends what this user saved for this workspace as its own system message, between the static prompt and the canvas', async () => {
+    // Order is the point: the static prompt is ~47KB and identical every turn,
+    // so anything variable has to come after it or prompt caching never hits.
+    fetchSpy = mockOpenRouterResponse({
+      choices: [{ message: { content: 'ok', tool_calls: [] } }],
+    });
+    const assistantInstructionsRepo = new InMemoryWorkflowAssistantInstructionsRepository();
+    await assistantInstructionsRepo.set('team-alpha', 'u-1', 'Name every step in Polish.');
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+      assistantInstructionsRepo,
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    const systemMessages = requestMessages(fetchSpy, 0).filter((m) => m.role === 'system');
+    expect(systemMessages).toHaveLength(3);
+    expect(systemMessages[1]?.content).toContain('Name every step in Polish.');
+    expect(systemMessages[2]?.content).toContain('Current canvas state');
+  });
+
+  it('sends only the two base system messages when this user saved nothing here', async () => {
+    fetchSpy = mockOpenRouterResponse({
+      choices: [{ message: { content: 'ok', tool_calls: [] } }],
+    });
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+      assistantInstructionsRepo: new InMemoryWorkflowAssistantInstructionsRepository(),
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    expect(requestMessages(fetchSpy, 0).filter((m) => m.role === 'system')).toHaveLength(2);
+  });
+
+  it('never picks up another user’s instructions for the same workspace', async () => {
+    fetchSpy = mockOpenRouterResponse({
+      choices: [{ message: { content: 'ok', tool_calls: [] } }],
+    });
+    const assistantInstructionsRepo = new InMemoryWorkflowAssistantInstructionsRepository();
+    await assistantInstructionsRepo.set('team-alpha', 'u-2', 'Use the Acme house style.');
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+      assistantInstructionsRepo,
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    const systemMessages = requestMessages(fetchSpy, 0).filter((m) => m.role === 'system');
+    expect(systemMessages).toHaveLength(2);
+    expect(JSON.stringify(systemMessages)).not.toContain('Acme house style');
+  });
+
+  it('carries the same instructions into every later turn of a build, not just the first', async () => {
+    // The whole message array is rebuilt per request, so a turn that drops them
+    // is a build that changes its mind halfway through.
+    fetchSpy = mockAddStepThenReply();
+    const assistantInstructionsRepo = new InMemoryWorkflowAssistantInstructionsRepository();
+    await assistantInstructionsRepo.set('team-alpha', 'u-1', 'Name every step in Polish.');
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+      assistantInstructionsRepo,
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    const second = requestMessages(fetchSpy, 1).filter((m) => m.role === 'system');
+    expect(second[1]?.content).toContain('Name every step in Polish.');
+  });
+
+  it('sends nothing extra for an apiKey caller, which has no user to read them for', async () => {
+    fetchSpy = mockOpenRouterResponse({
+      choices: [{ message: { content: 'ok', tool_calls: [] } }],
+    });
+    const assistantInstructionsRepo = new InMemoryWorkflowAssistantInstructionsRepository();
+    await assistantInstructionsRepo.set('team-alpha', 'u-1', 'Name every step in Polish.');
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      assistantInstructionsRepo,
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    expect(requestMessages(fetchSpy, 0).filter((m) => m.role === 'system')).toHaveLength(2);
   });
 });

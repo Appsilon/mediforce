@@ -1,6 +1,6 @@
 import { WORKFLOW_MANAGER_ROLE, autoJoinHandlesForEmail } from '@mediforce/platform-core';
 import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
-import { ForbiddenError, ValidationError } from '../../errors';
+import { resolveTargetUid } from '../_helpers';
 import type { CallerScope } from '../../repositories/index';
 import type { GetMeInput, GetMeOutput, MeNamespace } from '../../contract/users';
 
@@ -26,7 +26,7 @@ const PERSONAL_HANDLE_FALLBACK = 'user';
  * apiKey callers are rejected — there's no uid to attribute the response to.
  */
 export async function getMe(input: GetMeInput, scope: CallerScope): Promise<GetMeOutput> {
-  const uid = resolveUid(input, scope);
+  const uid = resolveTargetUid(input, scope, '`me` view', 'GET /api/users/me');
 
   const directory = scope.system.userDirectory;
   const [metadata, profile, passwordHash] = await Promise.all([
@@ -217,21 +217,6 @@ async function ensurePersonalNamespace(
   });
 
   return namespace;
-}
-
-function resolveUid(input: GetMeInput, scope: CallerScope): string {
-  if (scope.caller.kind === 'user') {
-    if (input.uid !== undefined && input.uid !== scope.caller.uid) {
-      throw new ForbiddenError('Cannot request another user’s `me` view');
-    }
-    return scope.caller.uid;
-  }
-  if (input.uid === undefined) {
-    throw new ValidationError(
-      'apiKey caller must pass `uid` to GET /api/users/me — there is no implicit identity for system actors',
-    );
-  }
-  return input.uid;
 }
 
 function generateHandle(seed: string): string {

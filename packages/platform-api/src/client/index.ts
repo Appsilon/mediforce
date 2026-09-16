@@ -13,6 +13,14 @@ import {
   type AskWorkflowAssistantOutput,
   type PlanWorkflowBuildInput,
   type PlanWorkflowBuildOutput,
+  GetAssistantInstructionsInputSchema,
+  GetAssistantInstructionsOutputSchema,
+  SetAssistantInstructionsInputSchema,
+  SetAssistantInstructionsOutputSchema,
+  type GetAssistantInstructionsInput,
+  type GetAssistantInstructionsOutput,
+  type SetAssistantInstructionsInput,
+  type SetAssistantInstructionsOutput,
   ValidateWorkflowOutputSchema,
   GetWorkflowSchemaOutputSchema,
   ListWorkflowsInputSchema,
@@ -647,6 +655,14 @@ export class Mediforce {
       input: PlanWorkflowBuildInput,
       options: { namespace: string; signal?: AbortSignal },
     ) => Promise<PlanWorkflowBuildOutput>;
+    /** The caller's standing instructions for one workspace — the extra system prompt every turn there reads. */
+    getInstructions: (
+      input: GetAssistantInstructionsInput,
+    ) => Promise<GetAssistantInstructionsOutput>;
+    /** Replace them; `instructions: ''` clears them. */
+    setInstructions: (
+      input: SetAssistantInstructionsInput,
+    ) => Promise<SetAssistantInstructionsOutput>;
   };
 
   readonly workflows: {
@@ -1150,6 +1166,23 @@ export class Mediforce {
           PlanWorkflowBuildOutputSchema,
           'mediforce.assistant.plan',
           options.signal,
+        );
+      },
+      getInstructions: async (input) => {
+        const validated = GetAssistantInstructionsInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace, uid: validated.uid });
+        const res = await this.request(`/api/workflow-assistant/instructions${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.assistant.getInstructions');
+        return GetAssistantInstructionsOutputSchema.parse(body);
+      },
+      setInstructions: async (input) => {
+        const validated = SetAssistantInstructionsInputSchema.parse(input);
+        return this.sendJson(
+          'PUT',
+          '/api/workflow-assistant/instructions',
+          { ...validated } as Record<string, unknown>,
+          SetAssistantInstructionsOutputSchema,
+          'mediforce.assistant.setInstructions',
         );
       },
     };

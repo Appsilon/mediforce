@@ -1,5 +1,5 @@
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { NotFoundError } from '../errors';
+import { ForbiddenError, NotFoundError, ValidationError } from '../errors';
 import { PLATFORM_BASE_URL_SETTING_KEY, normalizeBaseUrl } from '../contract/config';
 import type { CallerScope } from '../repositories/index';
 
@@ -85,4 +85,35 @@ export async function loadPinnedDefinition(
   const version = Number.parseInt(run.definitionVersion, 10);
   if (!Number.isFinite(version)) return null;
   return scope.workflowDefinitions.get(run.namespace ?? '', run.definitionName, version);
+}
+
+/**
+ * Which user a call about per-user data is for.
+ *
+ * A session caller is always itself and may not name anyone else. A system
+ * actor has no implicit identity, so it must say who it is acting for — that
+ * is what lets an apiKey CLI read or write a named person's row.
+ *
+ * `subject` names the thing being asked for, so the refusal reads as its own
+ * sentence rather than a generic one ("another user's `me` view", "another
+ * user's assistant instructions").
+ */
+export function resolveTargetUid(
+  input: { readonly uid?: string },
+  scope: CallerScope,
+  subject: string,
+  apiKeyOperation = `read or write ${subject}`,
+): string {
+  if (scope.caller.kind === 'user') {
+    if (input.uid !== undefined && input.uid !== scope.caller.uid) {
+      throw new ForbiddenError(`Cannot request another user’s ${subject}`);
+    }
+    return scope.caller.uid;
+  }
+  if (input.uid === undefined) {
+    throw new ValidationError(
+      `apiKey caller must pass \`uid\` to ${apiKeyOperation} — there is no implicit identity for system actors`,
+    );
+  }
+  return input.uid;
 }

@@ -23,3 +23,4 @@ export * from './auth-session';
 export * from './auth-verification-token';
 export * from './user-role';
 export * from './workflow-access';
+export * from './workflow-assistant-instructions';

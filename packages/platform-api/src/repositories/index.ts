@@ -19,4 +19,5 @@ export { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repos
 export { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
 export { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository';
 export { AuthorizedWorkspaceSecretRepository } from './authorized-workspace-secret-repository';
+export { AuthorizedWorkflowAssistantInstructionsRepository } from './authorized-workflow-assistant-instructions-repository';
 export { AuthorizedWorkflowSecretRepository } from './authorized-workflow-secret-repository';
