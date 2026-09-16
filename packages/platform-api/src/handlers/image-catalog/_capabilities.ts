@@ -34,7 +34,7 @@ export async function refreshEntryCapabilities(
   const docker = daemon ?? (await fetchDaemonImages());
   if (!docker.available) return entry;
 
-  const versions = resolveEntryVersions(entry.source, docker.images);
+  const versions = resolveEntryVersions(namespace, entry.source, docker.images);
   const deadline = Date.now() + CAPABILITY_REFRESH_BUDGET_MS;
   const probed: ImageCapabilityCache = {};
 
@@ -105,11 +105,12 @@ function memoise(imageId: string, capabilities: ImageCapabilities): void {
  * poll; but showing an answer somebody's earlier read already paid for is free.
  */
 export function memoisedCapabilities(
+  namespace: string,
   entry: ImageCatalogEntry,
   images: readonly DockerImageInfo[],
 ): ImageCapabilityCache {
   const cache: ImageCapabilityCache = {};
-  for (const version of resolveEntryVersions(entry.source, images)) {
+  for (const version of resolveEntryVersions(namespace, entry.source, images)) {
     const memoised = discoveredProbes.get(version.imageId);
     if (memoised !== undefined) cache[version.imageId] = memoised;
   }
@@ -127,16 +128,17 @@ export function memoisedCapabilities(
  * its own derived facts, which is the opposite of what makes it derived.
  */
 export async function probeDiscoveredCapabilities(
+  namespace: string,
   entry: ImageCatalogEntry,
   images: readonly DockerImageInfo[],
 ): Promise<ImageCapabilityCache> {
   const deadline = Date.now() + CAPABILITY_REFRESH_BUDGET_MS;
 
-  for (const version of resolveEntryVersions(entry.source, images)) {
+  for (const version of resolveEntryVersions(namespace, entry.source, images)) {
     if (discoveredProbes.has(version.imageId)) continue;
     if (Date.now() >= deadline) break;
     memoise(version.imageId, await probeImageCapabilities(version.imageTag));
   }
 
-  return memoisedCapabilities(entry, images);
+  return memoisedCapabilities(namespace, entry, images);
 }

@@ -90,6 +90,30 @@ export function resolveDockerBuildPaths(
   return { dockerfile: resolvedDockerfile, context: resolvedContext };
 }
 
+/**
+ * Where a build reads a Dockerfile a workflow carries, from the root of the
+ * carried files.
+ *
+ * Deliberately not a repository's rule. A carried file is named by its path
+ * from that root everywhere else — a step runs `/artifacts/scripts/poll.py`,
+ * and the preflight check looks the `dockerfile` up by that path — so
+ * `dockerfile` stays that path whether or not a context is named. The context
+ * is the whole carried set unless a step narrows it, which is how a carried
+ * Dockerfile in `container/` has always been able to `COPY scripts/`, and what
+ * an uploaded folder does too.
+ *
+ * `null` when either path climbs out of the carried files.
+ */
+export function resolveCarriedBuildPaths(
+  dockerfile: string,
+  context: string | undefined,
+): DockerBuildPaths | null {
+  const resolvedDockerfile = normalizeRepoPath(dockerfile);
+  const resolvedContext = hasContext(context) ? normalizeRepoPath(context) : '';
+  if (resolvedDockerfile === null || resolvedDockerfile === '' || resolvedContext === null) return null;
+  return { dockerfile: resolvedDockerfile, context: resolvedContext };
+}
+
 /** Whether `resolveDockerBuildPaths` would accept these paths — for a contract
  *  to refuse an escaping path as bad input rather than let a build fail on it. */
 export function buildPathsStayInRepo(dockerfile: string | undefined, context: string | undefined): boolean {
@@ -134,6 +158,29 @@ export function builtSourceLine(repo: string, dockerfile: string, context: strin
   const dockerfilePart = dockerfile === '' ? '' : ` · ${dockerfile}`;
   const contextPart = hasContext(context) ? ` · context ${context}` : '';
   return `${repo}${dockerfilePart}${contextPart}`;
+}
+
+/** `workflow intake · container/Dockerfile` — how a carried source reads, in
+ *  the CLI and the Images view alike. */
+export function carriedSourceLine(workflow: string, dockerfile: string): string {
+  return `workflow ${workflow} · ${dockerfile}`;
+}
+
+/** The one line an Image Catalog source reads as, whichever kind it is. */
+export function imageSourceLine(
+  source:
+    | { kind: 'built'; repo: string; dockerfile: string; context?: string }
+    | { kind: 'referenced'; reference: string }
+    | { kind: 'carried'; workflow: string; dockerfile: string },
+): string {
+  switch (source.kind) {
+    case 'built':
+      return builtSourceLine(source.repo, source.dockerfile, source.context);
+    case 'referenced':
+      return source.reference;
+    case 'carried':
+      return carriedSourceLine(source.workflow, source.dockerfile);
+  }
 }
 
 /** A build context as a step or an entry names it: a directory in the repo. */

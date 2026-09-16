@@ -1,5 +1,6 @@
 import {
   catalogDockerfileKey,
+  normalizeRepoPath,
   normalizeRepoUrls,
   unknownImageCapabilities,
   type ImageCapabilityCache,
@@ -38,6 +39,26 @@ function matchesBuilt(image: DockerImageInfo, repo: string, dockerfileKey: strin
   );
 }
 
+/** A daemon row belongs to a carried entry when it was built from that
+ *  workflow's carried files, for this namespace, from the same Dockerfile.
+ *
+ *  The context is not folded into the Dockerfile here as it is for a repo: a
+ *  carried `dockerfile` is a path from the root of the carried files whether or
+ *  not the step named a context (`resolveCarriedBuildPaths`).
+ *
+ *  The namespace is compared here and not for a built entry: a repo names the
+ *  same files wherever it is built, while a workflow name is unique only inside
+ *  its namespace, so without it two workspaces' `intake` workflows would offer —
+ *  and could delete — each other's images. */
+function matchesCarried(image: DockerImageInfo, namespace: string, workflow: string, dockerfile: string): boolean {
+  if (image.buildArtifacts === undefined || image.buildDockerfile === undefined) return false;
+  return (
+    image.buildNamespace === namespace &&
+    image.buildWorkflow === workflow &&
+    (normalizeRepoPath(image.buildDockerfile) ?? image.buildDockerfile) === dockerfile
+  );
+}
+
 /**
  * The versions of an entry, recomputed from the daemon listing.
  *
@@ -51,16 +72,21 @@ function matchesBuilt(image: DockerImageInfo, repo: string, dockerfileKey: strin
  * than passing through the one the daemon already sorted.
  */
 export function resolveEntryVersions(
+  namespace: string,
   source: ImageCatalogSource,
   images: readonly DockerImageInfo[],
   capabilities: ImageCapabilityCache = {},
 ): ResolvedVersion[] {
-  const matched =
-    source.kind === 'built'
-      ? images.filter((image) =>
-          matchesBuilt(image, source.repo, catalogDockerfileKey(source.dockerfile, source.context)),
-        )
-      : images.filter((image) => image.repository === source.reference);
+  const matched = images.filter((image) => {
+    switch (source.kind) {
+      case 'built':
+        return matchesBuilt(image, source.repo, catalogDockerfileKey(source.dockerfile, source.context));
+      case 'referenced':
+        return image.repository === source.reference;
+      case 'carried':
+        return matchesCarried(image, namespace, source.workflow, source.dockerfile);
+    }
+  });
 
   return matched.map((image) => ({
     imageTag: `${image.repository}:${image.tag}`,
@@ -68,6 +94,7 @@ export function resolveEntryVersions(
     created: image.created,
     size: image.size,
     ...(image.buildCommit !== undefined ? { commit: image.buildCommit } : {}),
+    ...(image.buildArtifacts !== undefined ? { contentHash: image.buildArtifacts } : {}),
     ...(image.buildWorkflow !== undefined ? { workflow: image.buildWorkflow } : {}),
     ...(image.buildNamespace !== undefined ? { namespace: image.buildNamespace } : {}),
     capabilities: capabilities[image.id] ?? unknownImageCapabilities(),

@@ -453,3 +453,54 @@ describe('runPreflightChecks — an input contract the first step asks for again
     expect(runPreflightChecks(wd, ctx).filter((w) => w.category === 'contract-collected-twice')).toEqual([]);
   });
 });
+
+describe('runPreflightChecks — a step that names an image and carries a Dockerfile', () => {
+  function carriedDefinition(image?: string) {
+    const wd = buildWorkflowDefinition({ name: 'test-artifacts' });
+    wd.namespace = 'db';
+    wd.artifacts = [{ path: 'container/Dockerfile', contents: 'FROM alpine:3.21\n' }];
+    wd.steps[0].executor = 'script';
+    wd.steps[0].script = {
+      command: 'python3 /artifacts/scripts/run.py',
+      dockerfile: 'container/Dockerfile',
+      ...(image === undefined ? {} : { image }),
+    };
+    return wd;
+  }
+
+  it('says which of the two wins, because the pinned image is not the one that runs', () => {
+    const result = runPreflightChecks(carriedDefinition('db/test-artifacts:test-publish-as-image'), {
+      ...BASE_CTX,
+      dockerImages: IMAGES,
+      dockerAvailable: true,
+      secretKeys: [],
+    });
+
+    const warning = result.find((entry) => entry.category === 'image-and-dockerfile');
+    expect(warning?.resource).toBe('db/test-artifacts:test-publish-as-image');
+    expect(warning?.message).toContain('carried Dockerfile wins');
+    expect(warning?.stepNames).toEqual([carriedDefinition().steps[0].name]);
+  });
+
+  it('is silent when the step names only one of them', () => {
+    const categories = runPreflightChecks(carriedDefinition(), {
+      ...BASE_CTX,
+      dockerImages: IMAGES,
+      dockerAvailable: true,
+      secretKeys: [],
+    }).map((entry) => entry.category);
+
+    expect(categories).not.toContain('image-and-dockerfile');
+  });
+
+  it('does not warn about the pinned image being absent from the daemon, which the build explains', () => {
+    const categories = runPreflightChecks(carriedDefinition('db/test-artifacts:test-publish-as-image'), {
+      ...BASE_CTX,
+      dockerImages: IMAGES,
+      dockerAvailable: true,
+      secretKeys: [],
+    }).map((entry) => entry.category);
+
+    expect(categories).not.toContain('missing-image');
+  });
+});

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   catalogDockerfileKey,
+  normalizeRepoPath,
   normalizeRepoUrls,
   type ImageCatalogSource,
 } from '@mediforce/platform-core';
@@ -16,6 +17,12 @@ import {
  */
 export function canonicalizeSource(source: ImageCatalogSource): ImageCatalogSource {
   if (source.kind === 'referenced') return source;
+  if (source.kind === 'carried') {
+    // `./container/Dockerfile` names the file the builder resolves as
+    // `container/Dockerfile`, and only the second is what images are labelled
+    // with once their context is folded in.
+    return { ...source, dockerfile: normalizeRepoPath(source.dockerfile) ?? source.dockerfile };
+  }
   // An empty context is no context, and only one of the two may be stored or
   // two equal sources would read back differently.
   const context = source.context === undefined || source.context === '' ? {} : { context: source.context };
@@ -36,9 +43,26 @@ export function canonicalizeSource(source: ImageCatalogSource): ImageCatalogSour
  * context the key is the dockerfile as written, so no existing id moves.
  */
 function sourceFingerprint(source: ImageCatalogSource): string {
-  return source.kind === 'built'
-    ? `built\0${source.repo}\0${catalogDockerfileKey(source.dockerfile, source.context)}`
-    : `referenced\0${source.reference}`;
+  switch (source.kind) {
+    case 'built':
+      return `built\0${source.repo}\0${catalogDockerfileKey(source.dockerfile, source.context)}`;
+    case 'referenced':
+      return `referenced\0${source.reference}`;
+    case 'carried':
+      return `carried\0${source.workflow}\0${source.dockerfile}`;
+  }
+}
+
+/** What the readable half of an id is made from. */
+function slugSource(source: ImageCatalogSource): string {
+  switch (source.kind) {
+    case 'built':
+      return source.repo;
+    case 'referenced':
+      return source.reference;
+    case 'carried':
+      return source.workflow;
+  }
 }
 
 /** Last path segment, lowercased, non-alphanumeric runs collapsed to '-'. */
@@ -69,8 +93,6 @@ export function deriveImageCatalogEntryId(source: ImageCatalogSource): string {
     .update(sourceFingerprint(canonical))
     .digest('hex')
     .slice(0, 8);
-  const slug = slugify(
-    canonical.kind === 'built' ? canonical.repo : canonical.reference,
-  );
+  const slug = slugify(slugSource(canonical));
   return slug.length > 0 ? `${slug}-${hash}` : hash;
 }

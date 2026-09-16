@@ -12,8 +12,8 @@ function label(args: string[], key: string): string | undefined {
 }
 
 describe('carriedImageLabelArgs', () => {
-  it('records the content the image was built from, and blanks the repo labels it would inherit', () => {
-    const args = carriedImageLabelArgs({ artifactsHash: 'abc123def456', workflow: 'wf', namespace: 'acme' });
+  it('records the content, workflow and Dockerfile the image was built from, and blanks the repo labels it would inherit', () => {
+    const args = carriedImageLabelArgs({ artifactsHash: 'abc123def456', dockerfile: 'container/Dockerfile', workflow: 'wf', namespace: 'acme' });
 
     expect(label(args, 'mediforce.build.artifacts')).toBe('abc123def456');
     expect(label(args, 'mediforce.build.workflow')).toBe('wf');
@@ -22,9 +22,16 @@ describe('carriedImageLabelArgs', () => {
     // repo and commit, and be offered as a version of it.
     expect(label(args, 'mediforce.build.repo')).toBe('');
     expect(label(args, 'mediforce.build.commit')).toBe('');
-    expect(label(args, 'mediforce.build.dockerfile')).toBe('');
-    expect(label(args, 'mediforce.build.context')).toBe('');
     expect(label(args, 'org.opencontainers.image.source')).toBe('');
+    // What the Image Catalog keys a carried entry on, beside the workflow.
+    expect(label(args, 'mediforce.build.dockerfile')).toBe('container/Dockerfile');
+    // Written empty when the step named none, so a base's is never inherited.
+    expect(label(args, 'mediforce.build.context')).toBe('');
+  });
+
+  it('reads the content hash back off the image', () => {
+    expect(readProvenanceLabels({ 'mediforce.build.artifacts': 'abc123def456' }).buildArtifacts).toBe('abc123def456');
+    expect(readProvenanceLabels({ 'mediforce.build.artifacts': '' }).buildArtifacts).toBeUndefined();
   });
 });
 

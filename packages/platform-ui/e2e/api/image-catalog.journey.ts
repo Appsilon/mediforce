@@ -3,7 +3,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { APIRequestContext } from '@playwright/test';
-import { packBuildContextArchive } from '@mediforce/platform-core';
+import { carriedBuildPaths, packBuildContextArchive, WorkflowDefinitionSchema } from '@mediforce/platform-core';
+// The builder and the content hash a run uses. The `builds` sub-path, not the
+// package index, which pulls in a plugin whose `import.meta` Playwright's
+// loader cannot parse.
+import {
+  artifactsBuildHash,
+  artifactsBuildTag,
+  ensureImage,
+  materializeArtifacts,
+} from '@mediforce/agent-runtime/builds';
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
@@ -29,6 +38,7 @@ import { seedPostgresWorkspaceMember } from '../helpers/postgres-seed';
 interface VersionView {
   imageId: string;
   imageTag: string;
+  contentHash?: string;
   capabilities:
     | { status: 'unknown' }
     | { status: 'known'; agentCapable: boolean; runtimes: string[] };
@@ -43,7 +53,14 @@ interface EntryView {
   id: string;
   name: string;
   intent: string;
-  source: { kind: string; repo?: string; dockerfile?: string; context?: string; reference?: string };
+  source: {
+    kind: string;
+    repo?: string;
+    dockerfile?: string;
+    context?: string;
+    reference?: string;
+    workflow?: string;
+  };
   declaredSource?: { repo?: string; commit?: string; dockerfile?: string };
   origin: 'catalogued' | 'discovered';
   versions: VersionView[];
@@ -1077,6 +1094,139 @@ test.describe('image catalog API journey', () => {
         await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
           headers: apiKeyHeaders(),
         });
+      }
+    }
+  });
+
+  test("a workflow's carried Dockerfile is offered, protected by its pin, and publishable", async ({ request }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    test.setTimeout(300_000);
+
+    const stamp = Date.now();
+    const workflowName = `e2e-carried-${stamp}`;
+    const reference = `${TEST_ORG_HANDLE}/e2e-carried-${stamp}`;
+    const cleanupTags: string[] = [];
+    let publishedEntryId = '';
+    try {
+      const registerRes = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+        headers: apiKeyHeaders(),
+        data: {
+          name: workflowName,
+          title: `E2E Carried ${stamp}`,
+          // The Dockerfile copies from a directory beside its own, which works
+          // because the whole carried set is the context — as it is for an
+          // uploaded folder.
+          artifacts: [
+            { path: 'container/Dockerfile', contents: `FROM ${PROBE_BASE_IMAGE}\nCOPY scripts/hello.sh /hello.sh\n` },
+            { path: 'scripts/hello.sh', contents: 'echo carried\n' },
+          ],
+          steps: [
+            {
+              id: 'hello',
+              name: 'Hello',
+              type: 'creation',
+              executor: 'script',
+              plugin: 'script-container',
+              script: { dockerfile: 'container/Dockerfile', command: 'sh /hello.sh' },
+            },
+            { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+          ],
+          transitions: [{ from: 'hello', to: 'done' }],
+        },
+      });
+      expect(registerRes.status(), await registerRes.text()).toBe(201);
+
+      // Built by the platform's own builder, from the registered definition and
+      // under the tag a run derives — nobody catalogues anything.
+      const definitionRes = await request.get(
+        `/api/workflow-definitions/${workflowName}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(definitionRes.ok(), await definitionRes.text()).toBe(true);
+      const definition = WorkflowDefinitionSchema.parse(((await definitionRes.json()) as { definition: unknown }).definition);
+      const config = definition.steps[0].script;
+      const paths = carriedBuildPaths(config, definition.artifacts);
+      if (config === undefined || paths === null || definition.artifacts === undefined) {
+        throw new Error('the registered step does not build from its carried Dockerfile');
+      }
+      const build = { paths, workflow: definition.name, namespace: definition.namespace };
+      const carriedTag = artifactsBuildTag(definition.artifacts, build);
+      const contentHash = artifactsBuildHash(definition.artifacts, build);
+      cleanupTags.push(carriedTag);
+      const contextDir = await materializeArtifacts(definition.artifacts);
+      await ensureImage({
+        image: carriedTag,
+        contextDir: contextDir ?? '',
+        dockerfile: config.dockerfile,
+        context: config.context,
+        artifactsHash: contentHash,
+        workflow: definition.name,
+        namespace: definition.namespace,
+      });
+
+      const listRes = await request.get(catalogUrl(), { headers: apiKeyHeaders() });
+      const { entries } = (await listRes.json()) as { entries: EntryView[] };
+      const carried = entries.find((entry) => entry.source.workflow === workflowName);
+      expect(carried, 'the image the workflow built is offered').toBeDefined();
+      expect(carried?.origin).toBe('discovered');
+      expect(carried?.source).toEqual({ kind: 'carried', workflow: workflowName, dockerfile: 'container/Dockerfile' });
+      expect(carried?.versions.map((version) => version.imageTag)).toEqual([carriedTag]);
+      expect(carried?.versions[0].contentHash).toBe(contentHash);
+
+      // The live version pins the carried tag, so its images cannot be deleted
+      // from under it.
+      const blocked = await request.delete(
+        `/api/image-catalog/${carried?.id}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(blocked.status(), await blocked.text()).toBe(409);
+      expect(await blocked.text()).toContain(workflowName);
+
+      // Published by a plain member, as an upload is.
+      const publishRes = await request.post(
+        `/api/image-catalog/${carried?.id}/publish?namespace=${TEST_ORG_HANDLE}`,
+        {
+          headers: sessionCookieHeaders(plainMember),
+          data: {
+            imageTag: carriedTag,
+            reference,
+            tag: 'v1',
+            intent: 'Proves a carried image can outlive the workflow that built it.',
+          },
+        },
+      );
+      expect(publishRes.status(), await publishRes.text()).toBe(200);
+      const published = (await publishRes.json()) as { imageTag: string; entryId: string };
+      publishedEntryId = published.entryId;
+      cleanupTags.push(published.imageTag);
+      expect(published.imageTag).toBe(`${reference}:v1`);
+      const hello = execFileSync('docker', ['run', '--rm', published.imageTag, 'sh', '/hello.sh'], { stdio: 'pipe' })
+        .toString()
+        .trim();
+      expect(hello).toBe('carried');
+
+      const afterRes = await request.get(catalogUrl(), { headers: apiKeyHeaders() });
+      const after = ((await afterRes.json()) as { entries: EntryView[] }).entries;
+      expect(after.find((entry) => entry.id === published.entryId)?.source).toEqual({ kind: 'referenced', reference });
+      // Its labels were blanked, so it is not also a version of the carried entry.
+      expect(
+        after.find((entry) => entry.id === carried?.id)?.versions.map((version) => version.imageTag),
+      ).toEqual([carriedTag]);
+    } finally {
+      if (publishedEntryId !== '') {
+        await request.delete(`/api/image-catalog/${publishedEntryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+      await request.delete(`/api/workflow-definitions/${workflowName}?namespace=${TEST_ORG_HANDLE}`, {
+        headers: apiKeyHeaders(),
+      });
+      for (const tag of cleanupTags) {
+        try {
+          docker('rmi', '-f', tag);
+        } catch {
+          // Never built; the assertions already said so.
+        }
       }
     }
   });

@@ -68,16 +68,15 @@ export function normalizeImageRef(ref: string): string {
   return ref.includes(':') ? ref : `${ref}:latest`;
 }
 
-/** Every image one version's steps resolve to, agent and script alike. A
- *  build-mode step carries no `image`, so its tag is derived the way the
- *  runtime derives it — otherwise the scan is blind to exactly the
- *  `mediforce-built:*` rows that need naming. */
+/** Every image one version's steps resolve to, agent and script alike, by the
+ *  rule the runtime resolves them with. A build-mode step carries no `image`,
+ *  so its tag is derived — otherwise the scan is blind to exactly the
+ *  `mediforce-built:*` and `mediforce-artifacts:*` rows that need naming. */
 function stepImages(definition: WorkflowDefinition): { stepId: string; image: string }[] {
-  const workflowRepo = definition.externalSkillsRepo;
   const resolved: { stepId: string; image: string }[] = [];
   for (const step of definition.steps) {
     const image =
-      resolveStepImage(step.agent, workflowRepo) ?? resolveStepImage(step.script, workflowRepo);
+      resolveStepImage(step.agent, definition) ?? resolveStepImage(step.script, definition);
     if (typeof image !== 'string') continue;
     resolved.push({ stepId: step.id, image });
   }

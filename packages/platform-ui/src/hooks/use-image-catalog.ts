@@ -7,6 +7,7 @@ import { stopRetryOn4xx } from '@/lib/retry';
 import { NICE_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
 import type {
   ImageCatalogEntryView,
+  PublishImageCatalogVersionInput,
   UploadImageCatalogVersionInput,
 } from '@mediforce/platform-api/contract';
 
@@ -210,6 +211,23 @@ export function useUploadImageVersion(namespace: string) {
   return useMutation({
     mutationFn: (input: Omit<UploadImageCatalogVersionInput, 'namespace'>) =>
       mediforce.imageCatalog.upload({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entryId),
+      });
+    },
+  });
+}
+
+/** Publish one version of a carried entry as a referenced image of its own,
+ *  rebuilt from the workflow's files through the upload path. Long-running like
+ *  `useUploadImageVersion`, and like it the first publish creates the entry. */
+export function usePublishImageVersion(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<PublishImageCatalogVersionInput, 'namespace'>) =>
+      mediforce.imageCatalog.publish({ namespace, ...input }),
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
       void queryClient.invalidateQueries({

@@ -23,6 +23,9 @@ const ImageCatalogSourceInputSchema = ImageCatalogSourceSchema.superRefine((sour
   if (source.kind === 'built' && buildPathsStayInRepo(source.dockerfile, source.context) === false) {
     ctx.addIssue({ code: 'custom', path: ['dockerfile'], message: ESCAPING_DOCKERFILE });
   }
+  if (source.kind === 'carried' && buildPathsStayInRepo(source.dockerfile, undefined) === false) {
+    ctx.addIssue({ code: 'custom', path: ['dockerfile'], message: 'dockerfile must stay inside the workflow files' });
+  }
 });
 
 /** The catalog entry a version was built on, resolved by layer containment. */
@@ -66,6 +69,9 @@ export const ImageCatalogVersionSchema = z.object({
   imageId: z.string(),
   /** Commit the build context was checked out at, from the build labels. */
   commit: z.string().optional(),
+  /** For a carried entry, the hash of the workflow's files it was built from
+   *  (`mediforce.build.artifacts`) — what a commit is to a built entry. */
+  contentHash: z.string().optional(),
   /** The daemon's own relative age string, e.g. "2 days ago". */
   created: z.string(),
   /** The daemon's own human size string, e.g. "1.24GB". */
@@ -197,6 +203,25 @@ const DOCKER_REPOSITORY_PATTERN =
   /^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*$/;
 const DOCKER_TAG_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
 
+const ImageReferenceSchema = z
+  .string()
+  .regex(DOCKER_REPOSITORY_PATTERN, 'reference must be a lowercase Docker image name with no tag');
+const ImageTagSchema = z
+  .string()
+  .regex(DOCKER_TAG_PATTERN, 'tag must be letters, digits, "_", "." or "-", not starting with "." or "-"');
+
+/** The daemon is deployment-wide, so a reference a workspace builds under must
+ *  be its own (ADR-0022, #1345). */
+function refineReferenceInNamespace(input: { namespace: string; reference: string }, ctx: z.RefinementCtx): void {
+  if (input.reference.startsWith(`${input.namespace}/`) === false) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['reference'],
+      message: `reference must start with "${input.namespace}/": the daemon is shared by every workspace`,
+    });
+  }
+}
+
 /**
  * POST input for a build from an uploaded context (#1345), sent as
  * `multipart/form-data`: `context` is the archive, `input` the rest as JSON.
@@ -204,13 +229,8 @@ const DOCKER_TAG_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
  * the entry the first upload creates (ADR-0022).
  */
 export const UploadImageCatalogVersionInputSchema = NamespaceQuery.extend({
-  reference: z
-    .string()
-    .regex(DOCKER_REPOSITORY_PATTERN, 'reference must be a lowercase Docker image name with no tag'),
-  tag: z
-    .string()
-    .regex(DOCKER_TAG_PATTERN, 'tag must be letters, digits, "_", "." or "-", not starting with "." or "-"')
-    .optional(),
+  reference: ImageReferenceSchema,
+  tag: ImageTagSchema.optional(),
   /** Path from the context root. Empty is the default, `Dockerfile`. */
   dockerfile: z.string().default(''),
   name: ImageCatalogEntrySchema.shape.name.optional(),
@@ -225,13 +245,7 @@ export const UploadImageCatalogVersionInputSchema = NamespaceQuery.extend({
 })
   .strict()
   .superRefine((input, ctx) => {
-    if (input.reference.startsWith(`${input.namespace}/`) === false) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['reference'],
-        message: `reference must start with "${input.namespace}/": the daemon is shared by every workspace`,
-      });
-    }
+    refineReferenceInNamespace(input, ctx);
     if (buildPathsStayInRepo(input.dockerfile, '.') === false) {
       ctx.addIssue({
         code: 'custom',
@@ -243,6 +257,31 @@ export const UploadImageCatalogVersionInputSchema = NamespaceQuery.extend({
 
 /** The same answer a repo build gives: the tag it landed under, and the entry. */
 export const UploadImageCatalogVersionOutputSchema = BuildImageCatalogVersionOutputSchema;
+
+/**
+ * POST input to publish one version of a carried entry as an image of its own.
+ *
+ * A carried image lives only as long as the workflow carries its files. This
+ * copies the build context that version was built from into a `referenced`
+ * entry through the upload path, so it outlives the workflow and follows every
+ * upload rule: a reference in the workspace, a tag never replaced, and no build
+ * label inherited — it is not also a version of the carried entry.
+ */
+export const PublishImageCatalogVersionInputSchema = NamespaceQuery.extend({
+  /** The carried entry — catalogued or discovered, same id. */
+  id: z.string().min(1),
+  /** The version to publish, as its `imageTag`. */
+  imageTag: z.string().min(1),
+  reference: ImageReferenceSchema,
+  tag: ImageTagSchema.optional(),
+  name: ImageCatalogEntrySchema.shape.name.optional(),
+  intent: ImageCatalogEntrySchema.shape.intent.optional(),
+  declaredSource: ImageCatalogDeclaredSourceSchema.optional(),
+})
+  .strict()
+  .superRefine(refineReferenceInNamespace);
+
+export const PublishImageCatalogVersionOutputSchema = BuildImageCatalogVersionOutputSchema;
 
 /**
  * DELETE input: id from URL.
@@ -290,5 +329,7 @@ export type BuildImageCatalogVersionInput = z.infer<typeof BuildImageCatalogVers
 export type BuildImageCatalogVersionOutput = z.infer<typeof BuildImageCatalogVersionOutputSchema>;
 export type UploadImageCatalogVersionInput = z.infer<typeof UploadImageCatalogVersionInputSchema>;
 export type UploadImageCatalogVersionOutput = z.infer<typeof UploadImageCatalogVersionOutputSchema>;
+export type PublishImageCatalogVersionInput = z.infer<typeof PublishImageCatalogVersionInputSchema>;
+export type PublishImageCatalogVersionOutput = z.infer<typeof PublishImageCatalogVersionOutputSchema>;
 export type DeleteImageCatalogEntryInput = z.infer<typeof DeleteImageCatalogEntryInputSchema>;
 export type DeleteImageCatalogEntryOutput = z.infer<typeof DeleteImageCatalogEntryOutputSchema>;

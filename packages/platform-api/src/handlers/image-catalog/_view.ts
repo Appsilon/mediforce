@@ -16,6 +16,7 @@ import { resolveCatalogLineage } from './_lineage';
  * ADR-0022 decision 2).
  */
 export async function toEntryViews(
+  namespace: string,
   entries: readonly ImageCatalogEntry[],
   catalog: readonly ImageCatalogEntry[] = entries,
   daemon?: DaemonImageListing,
@@ -28,7 +29,7 @@ export async function toEntryViews(
   // the whole namespace's catalog once every entry has its versions.
   return resolveCatalogLineage(
     entries.map((entry) => {
-      const versions = resolveEntryVersions(entry.source, images, entry.capabilities);
+      const versions = resolveEntryVersions(namespace, entry.source, images, entry.capabilities);
       return {
         ...entry,
         origin,
@@ -39,7 +40,7 @@ export async function toEntryViews(
     images,
     catalog.map((entry) => ({
       id: entry.id,
-      versions: resolveEntryVersions(entry.source, images),
+      versions: resolveEntryVersions(namespace, entry.source, images),
     })),
   );
 }
@@ -62,6 +63,6 @@ export async function toEntryView(
   daemon?: DaemonImageListing,
 ): Promise<ImageCatalogEntryView> {
   const catalog = await scope.imageCatalog.list(namespace);
-  const [view] = await toEntryViews([entry], catalog, daemon);
+  const [view] = await toEntryViews(namespace, [entry], catalog, daemon);
   return view;
 }

@@ -17,7 +17,7 @@ import type {
   ImageCatalogEntryView,
   ImageCatalogVersion,
 } from '@mediforce/platform-api/contract';
-import { shortImageId } from '@mediforce/platform-core';
+import { carriedSourceLine, shortImageId } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
 import { ConceptPopover } from '@/components/ui/concept-intro';
@@ -28,6 +28,7 @@ import { AddImageDialog } from '@/components/images/add-image-dialog';
 import { BuildImageDialog } from '@/components/images/build-image-dialog';
 import { DeleteImageEntryDialog } from '@/components/images/delete-image-entry-dialog';
 import { ImageDescriptionDialog } from '@/components/images/image-description-dialog';
+import { PublishImageDialog } from '@/components/images/publish-image-dialog';
 import { UploadImageDialog } from '@/components/images/upload-image-dialog';
 import { useWorkflowsByImage, type WorkflowImageMatch } from '@/hooks/use-workflows-by-image';
 import {
@@ -114,13 +115,21 @@ function shortCommit(commit: string | undefined): string {
 
 /** The rung the source ladder reached, and the link if it reached one. Rungs
  *  are never presented as equivalent: the label names which one answered. */
-function SourceLine({ source }: { source: ImageVersionSource }) {
+function SourceLine({ source, handle }: { source: ImageVersionSource; handle: string }) {
   return (
     <div className="space-y-1">
       <p className="text-xs">
         <span className="font-medium text-foreground">{source.label}</span>
         <span className="text-muted-foreground"> — {source.detail}</span>
       </p>
+      {source.workflow !== undefined && (
+        <Link
+          href={routes.workflow(handle, source.workflow)}
+          className="inline-flex items-center gap-1 font-mono text-xs font-medium text-primary hover:underline"
+        >
+          {carriedSourceLine(source.workflow, source.dockerfile ?? '')}
+        </Link>
+      )}
       {source.url !== null && (
         <a
           href={source.url}
@@ -274,17 +283,23 @@ function VersionRow({
   entry,
   version,
   index,
+  handle,
   usedTags,
   detailLoading,
 }: {
   entry: ImageCatalogEntryView;
   version: ImageCatalogVersion;
   index: number;
+  handle: string;
   usedTags: ReadonlySet<string> | null;
   detailLoading: boolean;
 }) {
   const source = resolveVersionSource(entry, version);
   const [layersOpen, setLayersOpen] = useState(index === 0);
+  const [publishing, setPublishing] = useState(false);
+  // A carried version builds only when a step runs, so publishing is how it
+  // outlives the workflow — never a Build (ADR-0022).
+  const publishable = entry.source.kind === 'carried';
   const baseTag = version.lineage.base?.imageTag ?? null;
   return (
     <li className="space-y-1.5 px-3 py-2">
@@ -295,6 +310,13 @@ function VersionRow({
         {version.commit !== undefined && (
           <ExplainedValue label={`Git commit the image was built from: ${version.commit}`}>
             {shortCommit(version.commit)}
+          </ExplainedValue>
+        )}
+        {version.contentHash !== undefined && (
+          <ExplainedValue
+            label={`Hash of the workflow's carried files the image was built from: ${version.contentHash} — what a commit is to an image built from a repository`}
+          >
+            {version.contentHash}
           </ExplainedValue>
         )}
         <span className="text-muted-foreground">{version.created}</span>
@@ -314,8 +336,26 @@ function VersionRow({
         {usedTags !== null && !usedTags.has(version.imageTag) && (
           <Chip title="No workflow step pins this version">unused</Chip>
         )}
+        {publishable && (
+          <button
+            type="button"
+            onClick={() => setPublishing(true)}
+            className="ml-auto rounded-md border bg-background px-2 py-0.5 text-[11px] font-medium transition-colors hover:bg-muted"
+          >
+            Publish as image
+          </button>
+        )}
       </div>
-      <SourceLine source={source} />
+      {publishing && (
+        <PublishImageDialog
+          entry={entry}
+          version={version}
+          handle={handle}
+          open={publishing}
+          onOpenChange={setPublishing}
+        />
+      )}
+      <SourceLine source={source} handle={handle} />
       <button
         type="button"
         onClick={() => setLayersOpen((current) => !current)}
@@ -422,6 +462,11 @@ function EntryCard({
                 )}
                 {baseName !== null && (
                   <span className="text-xs text-muted-foreground">Built on {baseName}</span>
+                )}
+                {shown.source.kind === 'carried' && (
+                  <span className="text-xs text-muted-foreground">
+                    From workflow {shown.source.workflow}
+                  </span>
                 )}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -541,6 +586,7 @@ function EntryCard({
                       entry={shown}
                       version={version}
                       index={index}
+                      handle={handle}
                       usedTags={usedTags}
                       detailLoading={detail.loading}
                     />
@@ -617,6 +663,12 @@ export default function ImagesPage() {
                 An image built from an uploaded folder is keyed on its name instead, and its
                 versions are tags. The platform keeps none of the folder, so it can never rebuild
                 one — each version is its own upload.
+              </p>
+              <p>
+                An image a step built from a Dockerfile its workflow carries is keyed on that
+                workflow and Dockerfile, and its versions are hashes of the carried files. It
+                builds when the step runs, so it has no Build — <strong>Publish as image</strong>{' '}
+                copies a version into an image of its own that outlives the workflow.
               </p>
             </ConceptPopover>
           </div>

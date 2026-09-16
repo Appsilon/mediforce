@@ -62,7 +62,7 @@ export async function deleteImageCatalogEntry(
       return { success: true, deletedImages };
     }
 
-    const versions = resolveEntryVersions(source, daemon.images);
+    const versions = resolveEntryVersions(input.namespace, source, daemon.images);
     // By tag, not by image id. A tag names exactly what this entry offered, so
     // an image a second tag still references survives — where `docker rmi` on
     // a shared id refuses outright and forcing it would delete a version some

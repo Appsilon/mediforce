@@ -422,6 +422,10 @@ export function StartRunButton({
                     title="Unknown models"
                     warnings={warnings.filter((w) => w.category === 'unknown-model')}
                   />
+                  <WarningGroup
+                    title="Ambiguous image"
+                    warnings={warnings.filter((w) => w.category === 'image-and-dockerfile')}
+                  />
                 </div>
               </>
               )}

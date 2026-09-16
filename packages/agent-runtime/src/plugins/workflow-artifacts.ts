@@ -3,7 +3,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { WorkflowArtifact } from '@mediforce/platform-core';
+import { carriedContextFiles, type DockerBuildPaths, type WorkflowArtifact } from '@mediforce/platform-core';
 
 /** Where a workflow's own files appear inside a container, read-only. Steps
  *  name them from here: `python3 /artifacts/scripts/poll.py`. */
@@ -25,7 +25,7 @@ const COMPLETE_MARKER = '.mediforce-artifacts-complete';
  * worker bind-mount it, which is what makes a host path resolve to the same
  * bytes inside a container.
  */
-export function artifactsDir(artifacts: WorkflowArtifact[]): string {
+export function artifactsDir(artifacts: readonly WorkflowArtifact[]): string {
   const canonical = [...artifacts]
     .sort((a, b) => a.path.localeCompare(b.path))
     .map((artifact) => `${artifact.path}\0${artifact.contents}`)
@@ -34,21 +34,50 @@ export function artifactsDir(artifacts: WorkflowArtifact[]): string {
   return join(ARTIFACTS_CACHE_DIR, hash);
 }
 
+/** What a carried build is: the Dockerfile and context from the root of the
+ *  carried files (`carriedBuildPaths`), and the workflow they belong to. */
+export interface CarriedBuild {
+  paths: DockerBuildPaths;
+  workflow?: string;
+  namespace?: string;
+}
+
 /**
  * Image tag for a Dockerfile the workflow carries. Derived from the files, so
  * an edit builds a new image and a rerun of unchanged files finds the one that
  * is already there — the tag *is* the content. A tag the step names itself is
  * not, which is what the labelled {@link artifactsBuildHash} answers.
  */
-export function artifactsBuildTag(artifacts: WorkflowArtifact[], dockerfile: string): string {
-  return `mediforce-artifacts:${artifactsBuildHash(artifacts, dockerfile)}`;
+export function artifactsBuildTag(artifacts: readonly WorkflowArtifact[], build: CarriedBuild): string {
+  return `mediforce-artifacts:${artifactsBuildHash(artifacts, build)}`;
 }
 
-/** The content half of {@link artifactsBuildTag}, labelled on the image so a
- *  tag the step named itself can be checked against the files too. */
-export function artifactsBuildHash(artifacts: WorkflowArtifact[], dockerfile: string): string {
+/**
+ * The content half of {@link artifactsBuildTag}, labelled on the image so a tag
+ * the step named itself can be checked against the files too.
+ *
+ * Only the files inside the context, since those are all Docker is sent: a
+ * script read from `/artifacts` at run time and kept outside it does not
+ * rebuild the image. The Dockerfile counts wherever it sits. The workflow and
+ * namespace count too, so two workflows carrying identical files build two
+ * images, each labelled truthfully with the workflow the catalog offers it
+ * under (ADR-0022).
+ */
+export function artifactsBuildHash(artifacts: readonly WorkflowArtifact[], build: CarriedBuild): string {
+  const dockerfile = artifacts.find((artifact) => artifact.path === build.paths.dockerfile);
+  const files = carriedContextFiles(artifacts, build.paths)
+    .sort((a, b) => a.path.localeCompare(b.path))
+    .map((artifact) => `${artifact.path}\0${artifact.contents}`)
+    .join('\0\0');
   return createHash('sha256')
-    .update(`${artifactsDir(artifacts)}\0${dockerfile}`)
+    .update([
+      build.namespace ?? '',
+      build.workflow ?? '',
+      build.paths.dockerfile,
+      build.paths.context,
+      dockerfile?.contents ?? '',
+      files,
+    ].join('\0\0\0'))
     .digest('hex')
     .slice(0, 12);
 }

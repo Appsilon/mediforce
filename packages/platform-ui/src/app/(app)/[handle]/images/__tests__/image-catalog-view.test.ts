@@ -166,6 +166,18 @@ describe('resolveVersionSource', () => {
   it('[DATA] a built entry whose version carries no commit falls through to rung 4', () => {
     expect(resolveVersionSource(entry(), version()).rung).toBe('none');
   });
+
+  it('[DATA] a carried entry names the workflow holding its Dockerfile, with no GitHub link', () => {
+    const carried = entry({ source: { kind: 'carried', workflow: 'intake', dockerfile: 'container/Dockerfile' } });
+
+    const source = resolveVersionSource(carried, version({ contentHash: 'a1b2c3d4e5f6a7b8' }));
+
+    expect(source.rung).toBe('carried');
+    expect(source.workflow).toBe('intake');
+    expect(source.dockerfile).toBe('container/Dockerfile');
+    expect(source.url).toBeNull();
+    expect(source.detail).toMatch(/hash of those files rather than a commit/);
+  });
 });
 
 describe('matchesImageQuery', () => {
@@ -189,6 +201,13 @@ describe('matchesImageQuery', () => {
         'postgres',
       ),
     ).toBe(true);
+  });
+
+  it('[DATA] matches the workflow and Dockerfile behind a carried entry', () => {
+    const carried = entry({ source: { kind: 'carried', workflow: 'intake', dockerfile: 'container/Dockerfile' } });
+
+    expect(matchesImageQuery(carried, 'intake')).toBe(true);
+    expect(matchesImageQuery(carried, 'container/Dockerfile')).toBe(true);
   });
 
   it('[DATA] an empty query matches everything', () => {

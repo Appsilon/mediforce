@@ -1,5 +1,5 @@
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
-import { type WorkflowDefinition, normaliseModelId, stepHasBuildSource, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
+import { type WorkflowDefinition, carriedBuildPaths, normaliseModelId, stepHasBuildSource, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
 
 export interface PreflightAction {
   label: string;
@@ -13,7 +13,8 @@ export interface PreflightWarning {
     | 'missing-file'
     | 'low-credits'
     | 'unknown-model'
-    | 'contract-collected-twice';
+    | 'contract-collected-twice'
+    | 'image-and-dockerfile';
   resource: string;
   stepNames: string[];
   message: string;
@@ -197,6 +198,36 @@ export function runPreflightChecks(
       stepNames,
       message: `Image '${image}' not found on platform`,
       actions,
+    });
+  }
+
+  // A step that names an `image` *and* builds from a carried Dockerfile says two
+  // things at once, and the runtime resolves it one way: the carried files win,
+  // and the build lands under their own tag whenever the name belongs to this
+  // workspace's catalog. The image the author pinned is then never the one that
+  // runs, which is worth saying before the run rather than after it.
+  const ambiguous = steps
+    .filter((step) => step.executor === 'agent' || step.executor === 'script')
+    .map((step) => {
+      const config = step.executor === 'script' ? step.script : step.agent;
+      const image = config?.image;
+      return typeof image === 'string' && image.length > 0 && carriedBuildPaths(config, definition.artifacts) !== null
+        ? { stepName: step.name, image, dockerfile: config?.dockerfile ?? '' }
+        : null;
+    })
+    .filter((entry) => entry !== null);
+  for (const entry of ambiguous) {
+    warnings.push({
+      category: 'image-and-dockerfile',
+      resource: entry.image,
+      stepNames: [entry.stepName],
+      message: `'${entry.stepName}' names the image '${entry.image}' and also builds '${entry.dockerfile}', which the workflow carries. The carried Dockerfile wins, so the run uses the image built from it. Remove the Dockerfile to run '${entry.image}', or remove the image to build from the carried files.`,
+      actions: [{
+        label: 'Edit step',
+        href: options.version !== undefined
+          ? `/${options.handle}/workflows/${encodedName}/definitions/${options.version}`
+          : `/${options.handle}/workflows/${encodedName}`,
+      }],
     });
   }
 

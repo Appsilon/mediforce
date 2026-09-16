@@ -72,6 +72,33 @@ describe('what a discovered entry reads as', () => {
   });
 });
 
+describe('what a carried entry reads as', () => {
+  it('names the workflow whose files it was built from, before the probe caveat', () => {
+    const carried = entry({
+      id: 'intake-1a2b3c4d',
+      name: 'Intake agent',
+      intent: 'runs the intake checks',
+      source: { kind: 'carried', workflow: 'intake', dockerfile: 'container/Dockerfile' },
+      versions: [version('mediforce-artifacts:a1b2c3d4e5f6', unprobed)],
+    });
+
+    const [group] = buildCatalogImageGroups([carried], 'agent');
+
+    expect(group.options).toEqual([{
+      value: 'mediforce-artifacts:a1b2c3d4e5f6',
+      label: 'Intake agent — runs the intake checks · from workflow intake · not probed',
+    }]);
+  });
+
+  it('adds no workflow to an entry that is not carried', () => {
+    const [group] = buildCatalogImageGroups(
+      [entry({ id: 'golden', name: 'Golden image', intent: 'the default', versions: [version('golden:1', agentCapable)] })],
+      'agent',
+    );
+    expect(group.options[0].label).toBe('Golden image — the default');
+  });
+});
+
 describe('image picker options — issue #1298', () => {
   describe('what an agent step is offered', () => {
     const catalog = [
@@ -275,5 +302,37 @@ describe('image picker options — issue #1298', () => {
       expect(buildDaemonImageGroups([{ repository: 'scratch', tag: '<none>', id: 's1', size: '0B', created: '1d ago' }])[0].options)
         .toEqual([{ value: 'scratch', label: 'scratch' }]);
     });
+  });
+});
+
+describe('buildCatalogImageGroups — one image offered once', () => {
+  it('offers a tag two entries both claim only once, named by the first', () => {
+    // A carried image published under a name of its own is described by two
+    // entries until one of them is cleaned up; the tag that would land in the
+    // definition is the same string, so a second option is a duplicate row —
+    // and a duplicate React key on the `<option>`.
+    const tag = 'db/test-artifacts:test-publish-as-image';
+    const published = entry({
+      id: 'test-artifacts-ca12150b',
+      name: 'Test artifacts',
+      source: { kind: 'referenced', reference: 'db/test-artifacts' },
+      versions: [version(tag, { status: 'known', agentCapable: true, runtimes: ['claude', 'bash'] })],
+    });
+    const carried = entry({
+      id: 'test-artifacts-1aa07d4c',
+      name: 'test-artifacts',
+      source: { kind: 'carried', workflow: 'test-artifacts', dockerfile: 'container/Dockerfile' },
+      versions: [
+        version(tag, { status: 'known', agentCapable: true, runtimes: ['claude', 'bash'] }),
+        version('mediforce-artifacts:f90e59c3ff8c', { status: 'known', agentCapable: true, runtimes: ['claude', 'bash'] }),
+      ],
+    });
+
+    const values = buildCatalogImageGroups([published, carried], 'agent').flatMap((group) =>
+      group.options.map((option) => option.value),
+    );
+
+    expect(values).toEqual([tag, 'mediforce-artifacts:f90e59c3ff8c']);
+    expect(new Set(values).size).toBe(values.length);
   });
 });

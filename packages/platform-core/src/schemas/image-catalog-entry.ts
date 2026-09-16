@@ -41,6 +41,23 @@ export const ImageCatalogSourceSchema = z.discriminatedUnion('kind', [
       reference: z.string().min(1),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal('carried'),
+      /**
+       * Workflow whose carried files hold the Dockerfile. With the namespace
+       * the row lives in, it names the files — a workflow name is unique only
+       * within its namespace. Its versions are content hashes, not commits.
+       */
+      workflow: z.string().min(1),
+      /**
+       * Dockerfile path from the root of the carried files. The key is the
+       * file, not how a step builds it, so the context a step names is not
+       * part of it — the same rule `catalogDockerfileKey` applies to a repo.
+       */
+      dockerfile: z.string().min(1),
+    })
+    .strict(),
 ]);
 
 /**

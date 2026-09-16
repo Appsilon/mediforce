@@ -1,6 +1,6 @@
 import { defineCommand } from '../define-command';
 import { printJson } from '../output';
-import { builtSourceLine, checkBuildContextArchive, formatBytes } from '@mediforce/platform-core';
+import { checkBuildContextArchive, formatBytes, imageSourceLine } from '@mediforce/platform-core';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { packContextDirectory } from '../build-context';
 
@@ -31,12 +31,6 @@ function indentFor(entry: ImageCatalogEntryView, byId: Map<string, ImageCatalogE
     current = byId.get(current)?.baseEntryId ?? null;
   }
   return '  '.repeat(depth);
-}
-
-function describeSource(entry: ImageCatalogEntryView): string {
-  return entry.source.kind === 'built'
-    ? builtSourceLine(entry.source.repo, entry.source.dockerfile, entry.source.context)
-    : entry.source.reference;
 }
 
 const CONTEXT_FLAG_DESCRIPTION =
@@ -73,7 +67,7 @@ export const imagesListCommand = defineCommand({
           : `${indent}    ${entry.intent}`,
       );
       output.stdout(
-        `${indent}    ${describeSource(entry)}  ·  ${String(entry.versions.length)} version(s)${AVAILABILITY_NOTE[entry.availability]}`,
+        `${indent}    ${imageSourceLine(entry.source)}  ·  ${String(entry.versions.length)} version(s)${AVAILABILITY_NOTE[entry.availability]}`,
       );
     }
     return 0;
@@ -107,7 +101,7 @@ export const imagesShowCommand = defineCommand({
         ? '  Intent:  not described yet — this image was built here and nobody has said what it is for'
         : `  Intent:  ${entry.intent}`,
     );
-    output.stdout(`  Source:  ${describeSource(entry)}  [${entry.source.kind}]`);
+    output.stdout(`  Source:  ${imageSourceLine(entry.source)}  [${entry.source.kind}]`);
     if (entry.declaredSource !== undefined) {
       const declared = [
         entry.declaredSource.repo,
@@ -129,7 +123,7 @@ export const imagesShowCommand = defineCommand({
     output.stdout(`  Versions (${String(entry.versions.length)}):`);
     for (const version of entry.versions) {
       output.stdout(
-        `    ${version.imageTag}  ${version.commit ?? '—'}  ${version.size}  ${version.created}`,
+        `    ${version.imageTag}  ${version.commit ?? version.contentHash ?? '—'}  ${version.size}  ${version.created}`,
       );
       const { base, addedSteps } = version.lineage;
       output.stdout(`      Base:  ${base === null ? 'none (root)' : base.imageTag}`);
@@ -152,7 +146,7 @@ export const imagesShowCommand = defineCommand({
 export const imagesCreateCommand = defineCommand({
   name: 'mediforce images create',
   description:
-    'Catalogue an image. Either --repo (a source the platform builds) or --reference (a pushed image).',
+    'Catalogue an image. One of --repo (a source the platform builds), --reference (a pushed image) or --workflow (a Dockerfile that workflow carries).',
   args: {
     namespace: { type: 'string', required: true, description: 'Namespace handle' },
     name: { type: 'string', required: true, description: 'Human handle, e.g. "TealFlow agent"' },
@@ -162,19 +156,31 @@ export const imagesCreateCommand = defineCommand({
       description: 'One sentence: what this image is FOR (not what is inside it)',
     },
     repo: { type: 'string', description: 'Git repo the image is built from (built source)' },
-    dockerfile: { type: 'string', description: 'Dockerfile path inside --repo' },
+    dockerfile: {
+      type: 'string',
+      description: 'Dockerfile path inside --repo, or from the root of the files --workflow carries',
+    },
     context: { type: 'string', description: CONTEXT_FLAG_DESCRIPTION },
     reference: {
       type: 'string',
       description: 'Untagged image reference, e.g. mediforce-golden-image (referenced source)',
+    },
+    workflow: {
+      type: 'string',
+      description: 'Workflow whose carried files hold --dockerfile (carried source)',
     },
     'declared-repo': { type: 'string', description: 'Declared source repo (not derived)' },
     'declared-commit': { type: 'string', description: 'Declared source commit (not derived)' },
     'declared-dockerfile': { type: 'string', description: 'Declared Dockerfile (not derived)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
-    if ((args.repo === undefined) === (args.reference === undefined)) {
-      output.stderr('Supply exactly one of --repo (built) or --reference (referenced).');
+    const kinds = [args.repo, args.reference, args.workflow].filter((value) => value !== undefined);
+    if (kinds.length !== 1) {
+      output.stderr('Supply exactly one of --repo (built), --reference (referenced) or --workflow (carried).');
+      return 2;
+    }
+    if (args.workflow !== undefined && args.dockerfile === undefined) {
+      output.stderr('--workflow names the files; pass the Dockerfile among them as --dockerfile.');
       return 2;
     }
     const source =
@@ -185,7 +191,9 @@ export const imagesCreateCommand = defineCommand({
             dockerfile: args.dockerfile ?? '',
             context: args.context,
           } as const)
-        : ({ kind: 'referenced', reference: args.reference as string } as const);
+        : args.workflow !== undefined
+          ? ({ kind: 'carried', workflow: args.workflow, dockerfile: args.dockerfile ?? '' } as const)
+          : ({ kind: 'referenced', reference: args.reference ?? '' } as const);
 
     const declaredSource = {
       ...(args['declared-repo'] !== undefined ? { repo: args['declared-repo'] } : {}),
@@ -451,6 +459,69 @@ export const imagesBuildCommand = defineCommand({
       return 0;
     }
     output.stdout(`Built ${result.imageTag} for entry ${result.entryId}.`);
+    output.stdout('It is offered in the catalog — `mediforce images list` to see it.');
+    return 0;
+  },
+});
+
+export const imagesPublishCommand = defineCommand({
+  name: 'mediforce images publish',
+  description:
+    "Publish one version of an image a workflow builds from its carried files as an image of its own, so it outlives the workflow. Rebuilt from the same files under --reference and catalogued as a referenced entry.",
+  args: {
+    entryId: {
+      type: 'positional',
+      required: true,
+      description: 'Carried entry id (from `images list`)',
+    },
+    namespace: { type: 'string', required: true, description: 'Namespace handle' },
+    version: {
+      type: 'string',
+      required: true,
+      description: 'Image tag of the version to publish (from `images show`)',
+    },
+    reference: {
+      type: 'string',
+      required: true,
+      description: 'Untagged image name to publish under, starting with "<namespace>/"',
+    },
+    tag: {
+      type: 'string',
+      description: 'Tag to publish under. Defaults to the publish time; a tag already on the daemon is refused',
+    },
+    name: { type: 'string', description: 'Entry name, set by the first publish or upload of a --reference' },
+    intent: {
+      type: 'string',
+      description: 'One sentence: what this image is FOR. Required by the first publish or upload of a --reference',
+    },
+    'declared-repo': { type: 'string', description: 'Declared source repo, set by the first upload (not derived)' },
+    'declared-commit': { type: 'string', description: 'Declared source commit, set by the first upload (not derived)' },
+    'declared-dockerfile': { type: 'string', description: 'Declared Dockerfile, set by the first upload (not derived)' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const declaredSource = {
+      ...(args['declared-repo'] !== undefined ? { repo: args['declared-repo'] } : {}),
+      ...(args['declared-commit'] !== undefined ? { commit: args['declared-commit'] } : {}),
+      ...(args['declared-dockerfile'] !== undefined ? { dockerfile: args['declared-dockerfile'] } : {}),
+    };
+    if (jsonMode === false) {
+      output.stdout(`Publishing ${args.version} as ${args.reference} — this takes a few minutes...`);
+    }
+    const result = await mediforce.imageCatalog.publish({
+      namespace: args.namespace,
+      id: args.entryId,
+      imageTag: args.version,
+      reference: args.reference,
+      ...(args.tag !== undefined ? { tag: args.tag } : {}),
+      ...(args.name !== undefined ? { name: args.name } : {}),
+      ...(args.intent !== undefined ? { intent: args.intent } : {}),
+      ...(Object.keys(declaredSource).length > 0 ? { declaredSource } : {}),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    output.stdout(`Published ${result.imageTag} for entry ${result.entryId}.`);
     output.stdout('It is offered in the catalog — `mediforce images list` to see it.');
     return 0;
   },

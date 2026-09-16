@@ -12,6 +12,8 @@ import type {
  * as a build record:
  *
  *   1. `built`    — our own build labels: the exact Dockerfile at a pinned commit.
+ *                   `carried` is the same rung for a Dockerfile a workflow
+ *                   carries: pinned by the hash of its files, not a commit.
  *   2. `labelled` — an OCI label the image sets *itself*. `lineage.ownLabels`
  *                   has the base's labels already subtracted (#1296), which is
  *                   the only reason this rung is safe at all: Docker inherits
@@ -22,7 +24,7 @@ import type {
  *   4. `none`     — nothing. The layer commands are what is left, and they are
  *                   layer commands, never "the Dockerfile".
  */
-export type ImageSourceRung = 'built' | 'labelled' | 'declared' | 'none';
+export type ImageSourceRung = 'built' | 'carried' | 'labelled' | 'declared' | 'none';
 
 export interface ImageVersionSource {
   rung: ImageSourceRung;
@@ -33,6 +35,8 @@ export interface ImageVersionSource {
   repo?: string;
   commit?: string;
   dockerfile?: string;
+  /** The workflow in this namespace whose carried files hold the Dockerfile. */
+  workflow?: string;
   /** GitHub permalink at the pinned commit, or `null` when none is honest. */
   url: string | null;
 }
@@ -93,6 +97,17 @@ export function resolveVersionSource(
     );
   }
 
+  if (entry.source.kind === 'carried') {
+    return {
+      rung: 'carried',
+      label: 'Carried by a workflow',
+      detail: `A step built this image from the Dockerfile workflow ${entry.source.workflow} carries in its definition, so it is pinned by the hash of those files rather than a commit.`,
+      workflow: entry.source.workflow,
+      dockerfile: entry.source.dockerfile,
+      url: null,
+    };
+  }
+
   const labelledRepo = version.lineage.ownLabels[OCI_LABELS.source];
   const labelledCommit = version.lineage.ownLabels[OCI_LABELS.revision];
   if (labelledRepo !== undefined && labelledCommit !== undefined) {
@@ -133,6 +148,17 @@ function capabilityText(version: ImageCatalogVersion): string {
   return version.capabilities.agentCapable ? `${runtimes} agent-capable` : runtimes;
 }
 
+function sourceText(source: ImageCatalogEntryView['source']): string {
+  switch (source.kind) {
+    case 'built':
+      return `${source.repo} ${source.dockerfile}`;
+    case 'referenced':
+      return source.reference;
+    case 'carried':
+      return `${source.workflow} ${source.dockerfile}`;
+  }
+}
+
 /**
  * Whether an entry matches the search box.
  *
@@ -148,8 +174,7 @@ export function matchesImageQuery(entry: ImageCatalogEntryView, query: string): 
   const haystack = [
     entry.name,
     entry.intent,
-    entry.source.kind === 'built' ? entry.source.repo : entry.source.reference,
-    entry.source.kind === 'built' ? entry.source.dockerfile : '',
+    sourceText(entry.source),
     ...entry.versions.map((version) => version.imageTag),
     ...entry.versions.map(capabilityText),
   ]

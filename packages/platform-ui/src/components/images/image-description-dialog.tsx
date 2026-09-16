@@ -3,7 +3,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle, Loader2, X } from 'lucide-react';
 import { useState } from 'react';
-import { builtSourceLine, catalogDockerfileKey } from '@mediforce/platform-core';
+import { catalogDockerfileKey, imageSourceLine } from '@mediforce/platform-core';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { useCatalogueImage, useUpdateImageEntry } from '@/hooks/use-image-catalog';
 import { DockerfileAndContextFields } from './build-source-fields';
@@ -34,6 +34,10 @@ type Source = ImageCatalogEntryView['source'];
  *   the old one. That is safe by the property that makes deleting safe — no
  *   Workflow Definition references an entry (decision 3) — and it is what
  *   makes a mistyped repository fixable rather than permanent.
+ *
+ * A **carried** source is never editable: the workflow that carries the
+ * Dockerfile names it, so correcting it here would only describe files no
+ * workflow holds.
  */
 
 const COPY = {
@@ -64,6 +68,9 @@ function sameSource(edited: Source, stored: Source): boolean {
   }
   if (edited.kind === 'referenced' && stored.kind === 'referenced') {
     return edited.reference === stored.reference;
+  }
+  if (edited.kind === 'carried' && stored.kind === 'carried') {
+    return edited.workflow === stored.workflow && edited.dockerfile === stored.dockerfile;
   }
   return false;
 }
@@ -104,6 +111,7 @@ export function ImageDescriptionDialog({
   // **Add image**'s job — an edit corrects a source, it does not change what
   // kind of thing the entry is.
   const built = entry.source.kind === 'built';
+  const carried = entry.source.kind === 'carried';
   const [repo, setRepo] = useState(entry.source.kind === 'built' ? entry.source.repo : '');
   const [dockerfile, setDockerfile] = useState(
     entry.source.kind === 'built' ? entry.source.dockerfile : '',
@@ -119,22 +127,22 @@ export function ImageDescriptionDialog({
   const isPending = catalogue.isPending || update.isPending;
   const error = catalogue.error ?? update.error;
 
-  const editedSource: Source = built
-    ? {
-        kind: 'built',
-        repo: repo.trim(),
-        dockerfile: dockerfile.trim(),
-        context: context.trim() === '' ? undefined : context.trim(),
-      }
-    : { kind: 'referenced', reference: reference.trim() };
+  const editedSource: Source =
+    entry.source.kind === 'built'
+      ? {
+          kind: 'built',
+          repo: repo.trim(),
+          dockerfile: dockerfile.trim(),
+          context: context.trim() === '' ? undefined : context.trim(),
+        }
+      : entry.source.kind === 'referenced'
+        ? { kind: 'referenced', reference: reference.trim() }
+        : entry.source;
   const sourceChanged = !describing && !sameSource(editedSource, entry.source);
   const rekeys = sourceChanged && !sameKey(editedSource, entry.source);
-  const sourceIncomplete = built ? repo.trim() === '' : reference.trim() === '';
+  const sourceIncomplete = carried ? false : built ? repo.trim() === '' : reference.trim() === '';
 
-  const storedSourceLine =
-    entry.source.kind === 'built'
-      ? builtSourceLine(entry.source.repo, entry.source.dockerfile, entry.source.context)
-      : entry.source.reference;
+  const storedSourceLine = imageSourceLine(entry.source);
 
   // `mutate`, not `mutateAsync`: an async submit handler whose promise rejects
   // has nothing to catch it, so a rejected write both renders below and escapes
@@ -179,6 +187,12 @@ export function ImageDescriptionDialog({
                     @{handle} built this image and nobody has said what it is for. Write that one
                     sentence and it joins the catalog — the platform derives the rest.
                   </>
+                ) : carried ? (
+                  <>
+                    The name and the sentence are what a human wrote here. The source is the
+                    workflow that carries the Dockerfile, and versions, capabilities and lineage
+                    are derived from the image on every read.
+                  </>
                 ) : (
                   <>
                     The source, the name and the sentence are what a human wrote here. Versions,
@@ -201,15 +215,24 @@ export function ImageDescriptionDialog({
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {describing ? (
+            {describing || carried ? (
               <div className="rounded-md border bg-muted/30 px-3 py-2">
                 <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   Source
                 </p>
                 <p className="mt-0.5 break-all font-mono text-xs">{storedSourceLine}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Recorded by the build that made this image, so it is not typed here. Once the
-                  entry exists, <strong>Edit</strong> can correct it.
+                  {carried ? (
+                    <>
+                      Named by the workflow that carries this Dockerfile, so it is not edited here.
+                      Change the workflow to change it.
+                    </>
+                  ) : (
+                    <>
+                      Recorded by the build that made this image, so it is not typed here. Once the
+                      entry exists, <strong>Edit</strong> can correct it.
+                    </>
+                  )}
                 </p>
               </div>
             ) : built ? (

@@ -58,8 +58,9 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
-import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
+import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata, WorkflowArtifact, DockerBuildPaths } from '@mediforce/platform-core';
 import {
+  carriedBuildPaths,
   catalogDockerfileKey,
   normalizeBuildContext,
   normalizeRepoUrls,
@@ -172,31 +173,90 @@ export function resolveBuildSource(
 }
 
 /**
- * The tag a step with a build source builds under, when it names one: never the
- * shared golden image. Registration used to write that onto a step whose
- * Dockerfile came from `externalSkillsRepo`, and a registered version cannot be
- * edited, so the build would replace the golden image on the host for every
- * workflow using it. Such a step builds under its derived tag instead, as does
- * one whose `image` is empty.
+ * A name the Image Catalog owns: `<this workspace>/<something>`.
+ *
+ * An entry published or uploaded from a workspace is named with its handle, and
+ * the upload path refuses to replace a tag that already exists, precisely so a
+ * step pinning it cannot start running something else (ADR-0022). A build that
+ * wrote onto that name would walk around the rule: it would replace an image
+ * the catalog offers, and hand one artifact to two entries at once.
  */
-function buildTarget(image: string | undefined): string | undefined {
+function isCatalogReference(image: string, namespace: string | undefined): boolean {
+  return namespace !== undefined && namespace !== '' && image.startsWith(`${namespace}/`);
+}
+
+/**
+ * The tag a step with a build source builds under, when it names one: never the
+ * shared golden image, and never a name this workspace's catalog owns.
+ *
+ * Registration used to write the golden image onto a step whose Dockerfile came
+ * from `externalSkillsRepo`, and a registered version cannot be edited, so the
+ * build would replace the golden image on the host for every workflow using it.
+ * Such a step builds under its derived tag instead, as does one whose `image` is
+ * empty and one naming an image the catalog published.
+ */
+function buildTarget(image: string | undefined, namespace?: string): string | undefined {
+  if (image === undefined || image === '') return undefined;
   const isGolden = image === DEFAULT_AGENT_IMAGE || image === `${DEFAULT_AGENT_IMAGE}:latest`;
-  return isGolden || image === '' ? undefined : image;
+  return isGolden || isCatalogReference(image, namespace) ? undefined : image;
+}
+
+/** The parts of a definition that decide where a step's image comes from. */
+export interface StepImageDefinition {
+  artifacts?: WorkflowArtifact[];
+  externalSkillsRepo?: { url?: string; commit?: string };
+  name?: string;
+  namespace?: string;
+}
+
+/**
+ * A build from a Dockerfile the workflow carries: the files are already on the
+ * host for the /artifacts mount, so the build reads that directory and no clone
+ * happens. The context is the Dockerfile's own directory unless the step names
+ * one, as for a repo. `undefined` for a step that builds from anything else.
+ */
+export function resolveCarriedBuild(
+  buildConfig: ContainerConfig,
+  definition: StepImageDefinition | undefined,
+): { tag: string; paths: DockerBuildPaths; meta: Omit<ImageBuildMeta, 'image'> } | undefined {
+  const artifacts = definition?.artifacts;
+  const paths = carriedBuildPaths(buildConfig, artifacts);
+  if (artifacts === undefined || paths === null) return undefined;
+  const build = { paths, workflow: definition?.name, namespace: definition?.namespace };
+  return {
+    tag: artifactsBuildTag(artifacts, build),
+    paths,
+    meta: {
+      contextDir: artifactsDir(artifacts),
+      artifactsHash: artifactsBuildHash(artifacts, build),
+      dockerfile: buildConfig.dockerfile,
+      context: buildConfig.context,
+      workflow: definition?.name,
+      namespace: definition?.namespace,
+    },
+  };
 }
 
 /**
  * The image tag a container config runs under: its explicit `image`, or the
  * tag derived from its build inputs when it leaves `image` unset.
  * `undefined` when the config names neither.
+ *
+ * Takes the definition rather than only its skills repo so the answer is the
+ * one `resolveImageBuild` gives at run time — a carried Dockerfile wins over
+ * `externalSkillsRepo` there, and a scan asking which images a version pins
+ * must not name a `mediforce-built:*` tag the runtime never builds.
  */
 export function resolveStepImage(
   buildConfig: ContainerConfig | undefined,
-  workflowRepo?: { url?: string; commit?: string },
+  definition?: StepImageDefinition,
 ): string | undefined {
   if (!buildConfig) return undefined;
-  const source = resolveBuildSource(buildConfig, workflowRepo);
+  const carried = resolveCarriedBuild(buildConfig, definition);
+  if (carried !== undefined) return buildTarget(buildConfig.image, definition?.namespace) ?? carried.tag;
+  const source = resolveBuildSource(buildConfig, definition?.externalSkillsRepo);
   if (source === undefined) return buildConfig.image || undefined;
-  return buildTarget(buildConfig.image)
+  return buildTarget(buildConfig.image, definition?.namespace)
     ?? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile, source.context);
 }
 
@@ -207,23 +267,12 @@ export function resolveImageBuild(
   resolvedEnv?: Record<string, string>,
 ): ImageBuildMeta | undefined {
   const workflowDefinition = isWorkflowAgentContext(context) ? context.workflowDefinition : undefined;
-  const { dockerfile, repo, commit } = buildConfig;
 
-  // A Dockerfile the workflow carries: the files are already on the host for
-  // the /artifacts mount, so the build context is that directory and no clone
-  // happens. Second to an explicit step-level repo+commit, which said something
+  // Second to an explicit step-level repo+commit, which said something
   // specific, and ahead of the externalSkillsRepo fallback.
-  const artifacts = workflowDefinition?.artifacts;
-  const stepNamesRepoAndCommit = repo !== undefined && repo !== '' && commit !== undefined && commit !== '';
-  if (stepNamesRepoAndCommit === false && dockerfile && artifacts?.some((artifact) => artifact.path === dockerfile) === true) {
-    return {
-      image: buildTarget(image) ?? artifactsBuildTag(artifacts, dockerfile),
-      contextDir: artifactsDir(artifacts),
-      artifactsHash: artifactsBuildHash(artifacts, dockerfile),
-      dockerfile,
-      workflow: workflowDefinition?.name,
-      namespace: workflowDefinition?.namespace,
-    };
+  const carried = resolveCarriedBuild(buildConfig, workflowDefinition);
+  if (carried !== undefined) {
+    return { ...carried.meta, image: buildTarget(image, workflowDefinition?.namespace) ?? carried.tag };
   }
 
   const source = resolveBuildSource(buildConfig, workflowDefinition?.externalSkillsRepo);
@@ -231,7 +280,7 @@ export function resolveImageBuild(
 
   return {
     ...source,
-    image: buildTarget(image) ?? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile, source.context),
+    image: buildTarget(image, workflowDefinition?.namespace) ?? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile, source.context),
     repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
     workflow: workflowDefinition?.name,
     namespace: workflowDefinition?.namespace,

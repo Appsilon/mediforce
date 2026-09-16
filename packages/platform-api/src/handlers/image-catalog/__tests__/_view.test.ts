@@ -26,7 +26,7 @@ describe('toEntryViews', () => {
   it('annotates a stored entry with the versions the daemon holds', async () => {
     daemon.value = daemonWith([builtImage({ tag: 'newer' }), builtImage({ tag: 'older', id: 'sha-2' })]);
 
-    const [view] = await toEntryViews([ENTRY]);
+    const [view] = await toEntryViews('alpha', [ENTRY]);
 
     expect(view.availability).toBe('present');
     expect(view.versions.map((v) => v.imageTag)).toEqual([
@@ -43,7 +43,7 @@ describe('toEntryViews', () => {
   it('marks an entry absent when the daemon answered and holds nothing for it', async () => {
     daemon.value = EMPTY_DAEMON;
 
-    const [view] = await toEntryViews([ENTRY]);
+    const [view] = await toEntryViews('alpha', [ENTRY]);
 
     expect(view.availability).toBe('absent');
     expect(view.versions).toEqual([]);
@@ -52,7 +52,7 @@ describe('toEntryViews', () => {
   it('marks every entry unknown when the daemon could not be reached', async () => {
     daemon.value = UNREACHABLE_DAEMON;
 
-    const views = await toEntryViews([ENTRY, { ...ENTRY, id: 'other' }]);
+    const views = await toEntryViews('alpha', [ENTRY, { ...ENTRY, id: 'other' }]);
 
     expect(views.map((v) => v.availability)).toEqual(['unknown', 'unknown']);
   });

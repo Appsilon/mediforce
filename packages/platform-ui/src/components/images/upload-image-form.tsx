@@ -26,6 +26,12 @@ import {
   toggleContextPath,
   type PickedFolder,
 } from './picked-folder';
+import {
+  ImageNameField,
+  ImageTagField,
+  NewEntryFields,
+  referencedEntryFor,
+} from './referenced-image-fields';
 
 /** Chromium's directory picker, missing from Firefox, Safari and the DOM lib. */
 type DirectoryPicker = (options: { mode: 'read' }) => Promise<PickableDirectory>;
@@ -89,9 +95,7 @@ export function UploadImageForm({
 
   const effectiveImageName = imageNameEdited ? imageName : toSlug(folder?.name ?? '');
   const reference = fixedReference ?? `${handle}/${effectiveImageName}`;
-  const existing = entries.find(
-    (entry) => entry.source.kind === 'referenced' && entry.source.reference === reference,
-  );
+  const existing = referencedEntryFor(entries, reference);
   const addsToEntry = fixedReference !== undefined || existing !== undefined;
   const effectiveName = nameEdited ? name : effectiveImageName;
 
@@ -318,34 +322,16 @@ export function UploadImageForm({
       )}
 
       {fixedReference === undefined ? (
-        <div className="space-y-1.5">
-          <label htmlFor="upload-image-reference" className="text-sm font-medium">
-            Image name
-          </label>
-          <div className="flex items-center rounded-md border bg-background focus-within:ring-2 focus-within:ring-ring">
-            <span className="select-none pl-3 font-mono text-sm text-muted-foreground">{handle}/</span>
-            <input
-              id="upload-image-reference"
-              value={effectiveImageName}
-              onChange={(event) => {
-                setImageNameEdited(true);
-                setImageName(event.target.value);
-              }}
-              required
-              placeholder="my-agent"
-              className="min-w-0 flex-1 bg-transparent py-2 pr-3 font-mono text-sm focus:outline-none"
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {existing !== undefined ? (
-              <>
-                Adds a version to <strong className="text-foreground">{existing.name}</strong>.
-              </>
-            ) : (
-              <>Starts with @{handle}: every workspace builds on one shared Docker daemon.</>
-            )}
-          </p>
-        </div>
+        <ImageNameField
+          idPrefix="upload-image"
+          handle={handle}
+          value={effectiveImageName}
+          onChange={(value) => {
+            setImageNameEdited(true);
+            setImageName(value);
+          }}
+          existing={existing}
+        />
       ) : (
         <div className="rounded-md border bg-muted/30 px-3 py-2">
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Image</p>
@@ -353,55 +339,20 @@ export function UploadImageForm({
         </div>
       )}
 
-      <div className="space-y-1.5">
-        <label htmlFor="upload-image-tag" className="text-sm font-medium">
-          Tag <span className="text-muted-foreground">(optional)</span>
-        </label>
-        <input
-          id="upload-image-tag"
-          value={tag}
-          onChange={(event) => setTag(event.target.value)}
-          placeholder="the upload time"
-          className={`${INPUT_CLASS} font-mono`}
-        />
-        <p className="text-xs text-muted-foreground">
-          A tag already on the daemon is refused — a workflow pinning it would start running
-          something else.
-        </p>
-      </div>
+      <ImageTagField idPrefix="upload-image" value={tag} onChange={setTag} placeholder="the upload time" />
 
       {addsToEntry === false && (
-        <>
-          <div className="space-y-1.5">
-            <label htmlFor="upload-image-name" className="text-sm font-medium">
-              Name
-            </label>
-            <input
-              id="upload-image-name"
-              value={effectiveName}
-              onChange={(event) => {
-                setNameEdited(true);
-                setName(event.target.value);
-              }}
-              required
-              className={INPUT_CLASS}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor="upload-image-intent" className="text-sm font-medium">
-              Description
-            </label>
-            <textarea
-              id="upload-image-intent"
-              value={intent}
-              onChange={(event) => setIntent(event.target.value)}
-              required
-              rows={2}
-              placeholder="Runs the ADaM checks for studies with no repository"
-              className={INPUT_CLASS}
-            />
-          </div>
-        </>
+        <NewEntryFields
+          idPrefix="upload-image"
+          name={effectiveName}
+          onNameChange={(value) => {
+            setNameEdited(true);
+            setName(value);
+          }}
+          intent={intent}
+          onIntentChange={setIntent}
+          intentPlaceholder="Runs the ADaM checks for studies with no repository"
+        />
       )}
 
       {addsToEntry === false && (

@@ -159,6 +159,7 @@ export { updateImageCatalogEntry } from './image-catalog/update-entry';
 export { deleteImageCatalogEntry } from './image-catalog/delete-entry';
 export { buildImageCatalogVersion } from './image-catalog/build-version';
 export { uploadImageCatalogVersion } from './image-catalog/upload-version';
+export { publishImageCatalogVersion } from './image-catalog/publish-version';
 
 export { listAgentRuns } from './agent-runs/list-agent-runs';
 export { getAgentRunCardStatusCounts } from './agent-runs/get-agent-run-card-status-counts';

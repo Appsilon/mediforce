@@ -35,6 +35,7 @@ describe('resolveEntryVersions', () => {
     ];
 
     const versions = resolveEntryVersions(
+      'alpha',
       { kind: 'built', repo: REPO, dockerfile: 'container/Dockerfile' },
       images,
     );
@@ -50,6 +51,7 @@ describe('resolveEntryVersions', () => {
 
     expect(
       resolveEntryVersions(
+        'alpha',
         { kind: 'built', repo: REPO, dockerfile: 'container/Dockerfile' },
         images,
       ),
@@ -59,7 +61,7 @@ describe('resolveEntryVersions', () => {
   it('matches an absent dockerfile label against the empty key value', () => {
     const images = [image({ buildRepo: REPO, buildCommit: 'abc1234' })];
 
-    const versions = resolveEntryVersions({ kind: 'built', repo: REPO, dockerfile: '' }, images);
+    const versions = resolveEntryVersions('alpha', { kind: 'built', repo: REPO, dockerfile: '' }, images);
 
     expect(versions).toHaveLength(1);
     expect(versions[0].commit).toBe('abc1234');
@@ -72,6 +74,7 @@ describe('resolveEntryVersions', () => {
     ];
 
     const versions = resolveEntryVersions(
+      'alpha',
       { kind: 'built', repo: REPO, dockerfile: 'container/Dockerfile' },
       images,
     );
@@ -83,7 +86,7 @@ describe('resolveEntryVersions', () => {
     const images = [image({ buildRepo: REPO, buildDockerfile: 'Dockerfile', buildContext: 'container' })];
 
     expect(
-      resolveEntryVersions({ kind: 'built', repo: REPO, dockerfile: 'Dockerfile' }, images),
+      resolveEntryVersions('alpha', { kind: 'built', repo: REPO, dockerfile: 'Dockerfile' }, images),
     ).toEqual([]);
   });
 
@@ -91,7 +94,7 @@ describe('resolveEntryVersions', () => {
     const images = [image({ repository: 'postgres', tag: '16' })];
 
     expect(
-      resolveEntryVersions({ kind: 'built', repo: REPO, dockerfile: '' }, images),
+      resolveEntryVersions('alpha', { kind: 'built', repo: REPO, dockerfile: '' }, images),
     ).toEqual([]);
   });
 
@@ -103,6 +106,7 @@ describe('resolveEntryVersions', () => {
     ];
 
     const versions = resolveEntryVersions(
+      'alpha',
       { kind: 'referenced', reference: 'mediforce-golden-image' },
       images,
     );
@@ -124,6 +128,7 @@ describe('resolveEntryVersions', () => {
     ];
 
     const [version] = resolveEntryVersions(
+      'alpha',
       { kind: 'built', repo: REPO, dockerfile: 'Dockerfile' },
       images,
     );
@@ -139,6 +144,7 @@ describe('resolveEntryVersions', () => {
     ];
 
     const versions = resolveEntryVersions(
+      'alpha',
       { kind: 'referenced', reference: 'mediforce-golden-image' },
       images,
       { known: { status: 'known', agentCapable: true, runtimes: ['claude', 'bash'] } },
@@ -148,6 +154,53 @@ describe('resolveEntryVersions', () => {
       { status: 'known', agentCapable: true, runtimes: ['claude', 'bash'] },
       { status: 'unknown' },
     ]);
+  });
+});
+
+describe('resolveEntryVersions — a carried source', () => {
+  const carried = (overrides: Partial<DockerImageInfo> = {}): DockerImageInfo =>
+    image({
+      repository: 'mediforce-artifacts',
+      buildArtifacts: 'hash1',
+      buildWorkflow: 'intake',
+      buildNamespace: 'alpha',
+      buildDockerfile: 'container/Dockerfile',
+      ...overrides,
+    });
+  const source = { kind: 'carried', workflow: 'intake', dockerfile: 'container/Dockerfile' } as const;
+
+  it('collects every build of the workflow Dockerfile, each named by its content hash', () => {
+    const versions = resolveEntryVersions('alpha', source, [
+      carried({ tag: 'new', id: 'sha-new', buildArtifacts: 'hash2' }),
+      carried({ tag: 'old', id: 'sha-old', buildArtifacts: 'hash1' }),
+    ]);
+
+    expect(versions.map((version) => version.contentHash)).toEqual(['hash2', 'hash1']);
+    expect(versions[0].commit).toBeUndefined();
+  });
+
+  it('claims a build of the same Dockerfile from a context the step narrowed', () => {
+    // The Dockerfile is named by its path from the carried root either way, so
+    // narrowing the context does not move the image to another entry.
+    expect(
+      resolveEntryVersions('alpha', source, [carried({ buildContext: 'container' })]),
+    ).toHaveLength(1);
+  });
+
+  it("does not claim another namespace's workflow of the same name", () => {
+    // A workflow name is unique only inside its namespace; claiming these would
+    // offer, and let an admin delete, another workspace's images.
+    expect(resolveEntryVersions('alpha', source, [carried({ buildNamespace: 'beta' })])).toEqual([]);
+  });
+
+  it('does not claim another workflow, another Dockerfile, or a repo build', () => {
+    expect(
+      resolveEntryVersions('alpha', source, [
+        carried({ buildWorkflow: 'other' }),
+        carried({ buildDockerfile: 'Dockerfile' }),
+        image({ buildRepo: REPO, buildDockerfile: 'container/Dockerfile', buildWorkflow: 'intake', buildNamespace: 'alpha' }),
+      ]),
+    ).toEqual([]);
   });
 });
 

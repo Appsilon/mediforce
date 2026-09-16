@@ -1,4 +1,5 @@
 import { uniqueSlug } from '../utils/slug';
+import { carriedBuildPaths } from '../workflows/build-source';
 import type { WorkflowStep, WorkflowDefinition } from './workflow-definition';
 import type { WorkflowAuthorableSchema } from './workflow-definition';
 import type { z } from 'zod';
@@ -50,7 +51,7 @@ function withoutUncarriedDockerfile(
   const config = step.executor === 'script' ? step.script : step.executor === 'agent' ? step.agent : undefined;
   const dockerfile = config?.dockerfile;
   if (config === undefined || typeof dockerfile !== 'string' || dockerfile === '') return step;
-  if (settings.artifacts?.some((artifact) => artifact.path === dockerfile) === true) return step;
+  if (carriedBuildPaths(config, settings.artifacts) !== null) return step;
   if (typeof config.repo === 'string' && typeof config.commit === 'string') return step;
   const repoFiles = settings.externalSkillsRepo;
   if (typeof repoFiles?.url === 'string' && typeof repoFiles.commit === 'string') return step;

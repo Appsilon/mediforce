@@ -208,6 +208,8 @@ import {
   BuildImageCatalogVersionOutputSchema,
   UploadImageCatalogVersionInputSchema,
   UploadImageCatalogVersionOutputSchema,
+  PublishImageCatalogVersionInputSchema,
+  PublishImageCatalogVersionOutputSchema,
   DeleteImageCatalogEntryInputSchema,
   DeleteImageCatalogEntryOutputSchema,
   ListNamespaceMembersInputSchema,
@@ -309,6 +311,8 @@ import {
   type BuildImageCatalogVersionOutput,
   type UploadImageCatalogVersionInput,
   type UploadImageCatalogVersionOutput,
+  type PublishImageCatalogVersionInput,
+  type PublishImageCatalogVersionOutput,
   type DeleteImageCatalogEntryInput,
   type DeleteImageCatalogEntryOutput,
   type ListTasksInput,
@@ -840,6 +844,9 @@ export class Mediforce {
      *  `context` is a tar archive — `packBuildContextArchive` writes one.
      *  Long-running, like `build`. */
     upload: (input: UploadImageCatalogVersionInput) => Promise<UploadImageCatalogVersionOutput>;
+    /** Publish one version of a carried entry as a `referenced` image, rebuilt
+     *  from the workflow files it came from. Long-running, like `build`. */
+    publish: (input: PublishImageCatalogVersionInput) => Promise<PublishImageCatalogVersionOutput>;
   };
 
   readonly users: {
@@ -2173,6 +2180,19 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.upload');
         return UploadImageCatalogVersionOutputSchema.parse(body);
+      },
+      publish: async (input) => {
+        const { namespace, id, ...publishBody } = PublishImageCatalogVersionInputSchema.parse(input);
+        const res = await this.request(
+          `/api/image-catalog/${encodeURIComponent(id)}/publish${toSearchParams({ namespace })}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(publishBody),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.publish');
+        return PublishImageCatalogVersionOutputSchema.parse(body);
       },
     };
 

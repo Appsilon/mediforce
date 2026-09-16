@@ -13,6 +13,7 @@ const deleteMock = vi.fn();
 const archiveVersionMock = vi.fn();
 const buildMock = vi.fn();
 const uploadMock = vi.fn();
+const publishMock = vi.fn();
 const apiFetchMock = vi.fn();
 const searchParams = new URLSearchParams();
 
@@ -42,6 +43,7 @@ vi.mock('@/lib/mediforce', () => ({
       delete: (...args: unknown[]) => deleteMock(...args),
       build: (...args: unknown[]) => buildMock(...args),
       upload: (...args: unknown[]) => uploadMock(...args),
+      publish: (...args: unknown[]) => publishMock(...args),
     },
   },
 }));
@@ -172,6 +174,31 @@ const UPLOADED: ImageCatalogEntryView = {
       imageId: 'sha256:uploaded',
       created: '1 hour ago',
       size: '40MB',
+      capabilities: { status: 'unknown' },
+      lineage: { base: null, ownLabels: {} },
+    },
+  ],
+};
+
+/** An image a step built from the Dockerfile its workflow carries. */
+const CARRIED: ImageCatalogEntryView = {
+  id: 'intake-qc-5e6f7a8b',
+  name: 'Intake QC agent',
+  intent: 'Checks intake forms against the protocol',
+  source: { kind: 'carried', workflow: 'Intake_QC', dockerfile: 'container/Dockerfile' },
+  capabilities: {},
+  origin: 'catalogued',
+  availability: 'present',
+  baseEntryId: null,
+  versions: [
+    {
+      imageTag: 'mediforce-artifacts:a1b2c3d4e5f6',
+      imageId: 'sha256:carried',
+      contentHash: 'a1b2c3d4e5f6',
+      workflow: 'Intake_QC',
+      namespace: 'acme',
+      created: '5 minutes ago',
+      size: '1.9GB',
       capabilities: { status: 'unknown' },
       lineage: { base: null, ownLabels: {} },
     },
@@ -1179,5 +1206,130 @@ describe('ImagesPage', () => {
 
     expect(await within(card).findByText('Declared by a member')).toBeInTheDocument();
     expect(within(card).getByText(/declared, not derived/)).toBeInTheDocument();
+  });
+
+  describe('an image built from a workflow\'s carried files', () => {
+    beforeEach(() => {
+      listMock.mockResolvedValue({ entries: [CARRIED, UPLOADED] });
+      getMock.mockResolvedValue({ entry: CARRIED });
+    });
+
+    async function expandCarried(user: ReturnType<typeof userEvent.setup>) {
+      const card = await screen.findByTestId(`image-entry-${CARRIED.id}`);
+      await user.click(within(card).getByRole('button', { name: /Intake QC agent/ }));
+      return card;
+    }
+
+    it('offers no Build — it builds when a step runs — and says which workflow it came from', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      const card = await expandCarried(user);
+
+      expect(within(card).queryByRole('button', { name: 'Build' })).not.toBeInTheDocument();
+      expect(within(card).queryByRole('button', { name: 'Upload version' })).not.toBeInTheDocument();
+      expect(within(card).getByText('From workflow Intake_QC')).toBeInTheDocument();
+      expect(await within(card).findByText('Carried by a workflow')).toBeInTheDocument();
+      expect(
+        within(card).getByRole('link', { name: 'workflow Intake_QC \u00b7 container/Dockerfile' }),
+      ).toHaveAttribute('href', '/acme/workflows/Intake_QC');
+    });
+
+    it('shows the content hash where a built version shows its commit, explained on hover', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      const card = await expandCarried(user);
+      const row = (await within(card).findByText('mediforce-artifacts:a1b2c3d4e5f6')).closest('li') as HTMLElement;
+
+      await user.hover(within(row).getByText('a1b2c3d4e5f6'));
+      expect(await screen.findByRole('tooltip', { name: /carried files/ })).toHaveTextContent(
+        "Hash of the workflow's carried files the image was built from: a1b2c3d4e5f6",
+      );
+    });
+
+    it('publishes a version as an image of its own under the workspace name', async () => {
+      publishMock.mockResolvedValue({ imageTag: 'acme/intake-qc:v1', entryId: 'intake-qc-9a8b7c6d' });
+      const user = userEvent.setup();
+      renderPage();
+
+      const card = await expandCarried(user);
+      await user.click(await within(card).findByRole('button', { name: 'Publish as image' }));
+      const dialog = await screen.findByRole('dialog');
+      // Docker names are lowercase, so the workflow name is slugged into one.
+      expect(within(dialog).getByLabelText('Image name')).toHaveValue('intake-qc');
+      expect(within(dialog).getByLabelText('Name')).toHaveValue('Intake QC agent');
+      await user.type(within(dialog).getByLabelText(/Tag/), 'v1');
+      await user.click(within(dialog).getByRole('button', { name: 'Publish' }));
+
+      await waitFor(() => expect(publishMock).toHaveBeenCalled());
+      expect(publishMock.mock.calls[0][0]).toEqual({
+        namespace: 'acme',
+        id: CARRIED.id,
+        imageTag: 'mediforce-artifacts:a1b2c3d4e5f6',
+        reference: 'acme/intake-qc',
+        tag: 'v1',
+        name: 'Intake QC agent',
+        intent: 'Checks intake forms against the protocol',
+      });
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(buildMock).not.toHaveBeenCalled();
+    });
+
+    it('asks for no sentence when the name already belongs to an uploaded image', async () => {
+      publishMock.mockResolvedValue({ imageTag: 'acme/agent:v2', entryId: UPLOADED.id });
+      const user = userEvent.setup();
+      renderPage();
+
+      const card = await expandCarried(user);
+      await user.click(await within(card).findByRole('button', { name: 'Publish as image' }));
+      const dialog = await screen.findByRole('dialog');
+      await user.clear(within(dialog).getByLabelText('Image name'));
+      await user.type(within(dialog).getByLabelText('Image name'), 'agent');
+
+      expect(within(dialog).getByText(/Adds a version to/)).toBeInTheDocument();
+      expect(within(dialog).queryByLabelText('Description')).not.toBeInTheDocument();
+      await user.click(within(dialog).getByRole('button', { name: 'Publish' }));
+
+      await waitFor(() => expect(publishMock).toHaveBeenCalled());
+      expect(publishMock.mock.calls[0][0]).toMatchObject({ reference: 'acme/agent' });
+      expect(publishMock.mock.calls[0][0]).not.toHaveProperty('intent');
+    });
+
+    it('keeps the dialog open and shows why a publish was refused', async () => {
+      publishMock.mockRejectedValue(new Error('Tag "acme/intake-qc:v1" is already on the daemon'));
+      const user = userEvent.setup();
+      renderPage();
+
+      const card = await expandCarried(user);
+      await user.click(await within(card).findByRole('button', { name: 'Publish as image' }));
+      const dialog = await screen.findByRole('dialog');
+      await user.click(within(dialog).getByRole('button', { name: 'Publish' }));
+
+      expect(await within(dialog).findByText('Tag "acme/intake-qc:v1" is already on the daemon')).toBeInTheDocument();
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('edits the name and sentence but shows the workflow source read-only', async () => {
+      updateMock.mockResolvedValue({ entry: { ...CARRIED, intent: 'Checks intake forms' } });
+      const user = userEvent.setup();
+      renderPage();
+
+      const card = await screen.findByTestId(`image-entry-${CARRIED.id}`);
+      await user.click(within(card).getByRole('button', { name: 'Edit' }));
+      const dialog = await screen.findByRole('dialog');
+
+      expect(within(dialog).getByText('workflow Intake_QC \u00b7 container/Dockerfile')).toBeInTheDocument();
+      expect(within(dialog).queryByLabelText('Repository')).not.toBeInTheDocument();
+      expect(within(dialog).queryByLabelText('Image reference')).not.toBeInTheDocument();
+
+      await user.clear(within(dialog).getByLabelText('Description'));
+      await user.type(within(dialog).getByLabelText('Description'), 'Checks intake forms');
+      await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+      await waitFor(() => expect(updateMock).toHaveBeenCalled());
+      expect(updateMock.mock.calls[0][0]).toMatchObject({ id: CARRIED.id, intent: 'Checks intake forms' });
+      expect(updateMock.mock.calls[0][0]).not.toHaveProperty('source');
+    });
   });
 });

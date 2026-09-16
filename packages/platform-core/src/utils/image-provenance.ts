@@ -167,21 +167,26 @@ export function uploadedImageLabelArgs(namespace: string): string[] {
 
 /**
  * `--label` arguments for a Dockerfile a workflow carries. The content hash is
- * what tells a step-named tag whether it still holds these files; the repo
- * labels are written empty, as for an upload, so none is inherited.
+ * what tells a step-named tag whether it still holds these files, and with the
+ * workflow, the Dockerfile and the namespace it is what the Image Catalog keys
+ * a carried entry on (ADR-0022). The repo labels are written empty, as for an
+ * upload, so none is inherited.
  */
 export function carriedImageLabelArgs(provenance: {
   artifactsHash: string;
+  /** As the step named it, like a repo build's label. */
+  dockerfile: string;
+  context?: string;
   workflow?: string;
   namespace?: string;
 }): string[] {
   const labels: Array<[string, string]> = [
     [BUILD_LABELS.repo, ''],
     [BUILD_LABELS.commit, ''],
-    [BUILD_LABELS.dockerfile, ''],
-    [BUILD_LABELS.context, ''],
     [OCI_LABELS.source, ''],
     [OCI_LABELS.revision, ''],
+    [BUILD_LABELS.dockerfile, provenance.dockerfile],
+    [BUILD_LABELS.context, provenance.context ?? ''],
     [BUILD_LABELS.workflow, provenance.workflow ?? ''],
     [BUILD_LABELS.namespace, provenance.namespace ?? ''],
     [BUILD_LABELS.artifacts, provenance.artifactsHash],
@@ -221,6 +226,7 @@ export interface ReadImageProvenance {
   buildContext?: string;
   buildWorkflow?: string;
   buildNamespace?: string;
+  buildArtifacts?: string;
 }
 
 /**
@@ -244,6 +250,7 @@ export function readProvenanceLabels(
     buildContext: pick(BUILD_LABELS.context),
     buildWorkflow: pick(BUILD_LABELS.workflow),
     buildNamespace: pick(BUILD_LABELS.namespace),
+    buildArtifacts: pick(BUILD_LABELS.artifacts),
   };
 }
 

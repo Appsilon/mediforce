@@ -31,7 +31,7 @@ export async function listImageCatalogEntries(
   // as unprobed just because its answer lives in a memo instead.
   const discovered = discoverEntries(input.namespace, images, stored).map((entry) => ({
     ...entry,
-    capabilities: memoisedCapabilities(entry, images),
+    capabilities: memoisedCapabilities(input.namespace, entry, images),
   }));
   const catalog = [...stored, ...discovered];
 
@@ -42,8 +42,8 @@ export async function listImageCatalogEntries(
   // under the image it was built on rather than in a lost-property section.
   return {
     entries: orderByLineage([
-      ...(await toEntryViews(stored, catalog, daemon)),
-      ...(await toEntryViews(discovered, catalog, daemon, 'discovered')),
+      ...(await toEntryViews(input.namespace, stored, catalog, daemon)),
+      ...(await toEntryViews(input.namespace, discovered, catalog, daemon, 'discovered')),
     ]),
   };
 }

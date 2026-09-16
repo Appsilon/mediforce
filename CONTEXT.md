@@ -248,10 +248,12 @@ selectable ([ADR-0022](docs/adr/0022-image-catalog.md)). Curating an image never
 restricts one — a Step may still name any image string.
 
 **Image Catalog Entry**:
-One image the platform offers, identified by its **source**: either `built`
-`(repo, dockerfile)` or `referenced` (an untagged image reference — also what an
+One image the platform offers, identified by its **source**: `built`
+`(repo, dockerfile)`, `referenced` (an untagged image reference — also what an
 image built from an **uploaded build context** lands in, named
-`<workspace>/<name>`, since the platform keeps none of its inputs). Deliberately
+`<workspace>/<name>`, since the platform keeps none of its inputs), or `carried`
+`(workflow, dockerfile)` for a Dockerfile a Workflow Definition carries in its
+files. Deliberately
 **not** keyed on the commit, so a rebuild is another **Version** of a row the
 author already chose rather than a new row — nor on the **build context** a
 `built` source may name, which is how the Dockerfile is built rather than which
@@ -262,8 +264,8 @@ Workspace admin.
 
 **Discovered Entry** *(of an Image Catalog)*:
 An Image Catalog Entry the platform derived from an image this namespace built
-and nobody has described yet — keyed on the `(repo, dockerfile)` the build
-labelled, carrying every derived fact and an empty **Intent**. Not a stored row:
+and nobody has described yet — keyed on the `(repo, dockerfile)` or, for a
+carried Dockerfile, the `(workflow, dockerfile)` the build labelled, carrying every derived fact and an empty **Intent**. Not a stored row:
 it is recomputed from the daemon on every read, and describing it is what
 registers it, at the same id ([ADR-0022](docs/adr/0022-image-catalog.md)
 decision 7). A **Catalogued Entry** is the opposite — one somebody wrote a
@@ -272,7 +274,7 @@ probe result is kept: a memo in the API process rather than a stored column.
 
 **Version** *(of an Image Catalog Entry)*:
 One built artifact of an entry's source: a commit for a `built` entry, a tag for
-a `referenced` one, carrying the image tag that names it on the daemon. Versions
+a `referenced` one, a content hash for a `carried` one, carrying the image tag that names it on the daemon. Versions
 are derived on read from the daemon's build labels, never stored.
 
 **Capability** *(of an Image Catalog Version)*:

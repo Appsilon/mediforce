@@ -34,8 +34,9 @@ export async function getImageCatalogEntry(
     // would otherwise hold: nothing about a discovered entry is meant to be
     // less derived than a catalogued one, and capabilities are the only fact
     // that costs a container rather than arithmetic.
-    const probed = { ...found, capabilities: await probeDiscoveredCapabilities(found, images) };
+    const probed = { ...found, capabilities: await probeDiscoveredCapabilities(input.namespace, found, images) };
     const [view] = await toEntryViews(
+      input.namespace,
       [probed],
       [...stored, ...discovered],
       daemon,

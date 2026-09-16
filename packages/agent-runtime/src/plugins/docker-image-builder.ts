@@ -16,6 +16,7 @@ import {
   BUILD_LABELS,
   buildProvenanceLabelArgs,
   carriedImageLabelArgs,
+  resolveCarriedBuildPaths,
   resolveDockerBuildPaths,
 } from '@mediforce/platform-core';
 import { cloneRepoAtCommit } from './git-clone';
@@ -143,20 +144,26 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
 }
 
 /**
- * Build from a directory that is already on the host. The build context is the
- * whole directory rather than the Dockerfile's own, so `COPY scripts/ /scripts/`
- * from a `container/Dockerfile` works the way it does in a repository.
+ * Build from the files a workflow carries, already on the host. `dockerfile` is
+ * a path from the root of those files and the context is all of them unless the
+ * step named one, so `COPY scripts/ /scripts/` from a `container/Dockerfile`
+ * works as it does in a repository (`resolveCarriedBuildPaths`).
  */
 export async function buildImageFromDirectory(options: {
   image: string;
   contextDir: string;
   dockerfile?: string;
+  context?: string;
   artifactsHash?: string;
   workflow?: string;
   namespace?: string;
 }): Promise<void> {
-  const { image, contextDir, dockerfile = 'Dockerfile', artifactsHash, workflow, namespace } = options;
-  console.log(`[docker-image-builder] Building image "${image}" from ${contextDir}`);
+  const { image, contextDir, dockerfile = 'Dockerfile', context, artifactsHash, workflow, namespace } = options;
+  const paths = resolveCarriedBuildPaths(dockerfile, context);
+  if (paths === null) {
+    throw new Error(`Dockerfile "${dockerfile}" or context "${context ?? ''}" is outside the workflow's files.`);
+  }
+  console.log(`[docker-image-builder] Building image "${image}" from ${join(contextDir, paths.context)}`);
   // argv form, not a shell string: the label values carry a workflow name and
   // a namespace, neither of which is safe to interpolate.
   execFileSync(
@@ -164,9 +171,9 @@ export async function buildImageFromDirectory(options: {
     [
       'build',
       '-t', image,
-      ...carriedImageLabelArgs({ artifactsHash: artifactsHash ?? '', workflow, namespace }),
-      '-f', join(contextDir, dockerfile),
-      contextDir,
+      ...carriedImageLabelArgs({ artifactsHash: artifactsHash ?? '', dockerfile, context, workflow, namespace }),
+      '-f', join(contextDir, paths.dockerfile),
+      join(contextDir, paths.context),
     ],
     { stdio: 'pipe' },
   );
@@ -197,7 +204,7 @@ export async function ensureImage(options: EnsureImageOptions): Promise<void> {
           }
           console.log(`[docker-image-builder] Image "${image}" built from other files, rebuilding`);
         }
-        await buildImageFromDirectory({ image, contextDir, dockerfile, artifactsHash, workflow, namespace });
+        await buildImageFromDirectory({ image, contextDir, dockerfile, context, artifactsHash, workflow, namespace });
       } finally {
         buildLocks.delete(image);
       }

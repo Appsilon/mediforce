@@ -493,10 +493,7 @@ describe('ensureImage — building from a directory the workflow carries', () =>
     expect(args?.at(-1)).toBe('/tmp/mediforce-artifacts/abc123');
   });
 
-  it('honours a Dockerfile in a subdirectory, keeping the whole set as context', async () => {
-    // The build context stays the artifact root rather than the Dockerfile's
-    // own directory, so `COPY scripts/ /scripts/` works from a
-    // `container/Dockerfile` the way it does in a repository.
+  it('keeps the whole carried set as the context, so `COPY scripts/` works from `container/Dockerfile`', async () => {
     execFileSyncMock.mockImplementationOnce(() => { throw new Error('No such image'); });
 
     await ensureImage({
@@ -509,6 +506,24 @@ describe('ensureImage — building from a directory the workflow carries', () =>
     const args = buildArgs();
     expect(args).toEqual(expect.arrayContaining(['-f', '/tmp/mediforce-artifacts/abc123/container/Dockerfile']));
     expect(args?.at(-1)).toBe('/tmp/mediforce-artifacts/abc123');
+  });
+
+  it('narrows the context to the directory a step names, keeping the Dockerfile path as written', async () => {
+    execFileSyncMock.mockImplementationOnce(() => { throw new Error('No such image'); });
+
+    await ensureImage({
+      image: 'mediforce-artifacts:abc123',
+      contextDir: '/tmp/mediforce-artifacts/abc123',
+      dockerfile: 'container/Dockerfile',
+      context: 'container',
+      artifactsHash: 'abc123',
+    });
+
+    const args = buildArgs();
+    expect(args).toEqual(expect.arrayContaining(['-f', '/tmp/mediforce-artifacts/abc123/container/Dockerfile']));
+    expect(args?.at(-1)).toBe('/tmp/mediforce-artifacts/abc123/container');
+    expect(buildLabel(args, 'mediforce.build.dockerfile')).toBe('container/Dockerfile');
+    expect(buildLabel(args, 'mediforce.build.context')).toBe('container');
   });
 
   it('labels the image with the content it was built from', async () => {

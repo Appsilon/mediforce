@@ -212,6 +212,26 @@ hand-built image — `python`, `rocker/r-ver`, anything pushed to a registry —
 carries no build labels, so nothing can derive its source and it is catalogued
 by hand.
 
+### A Dockerfile the workflow carries
+
+A step whose `dockerfile` names one of the workflow's own files builds on its
+first run or dry run, with no repository involved, and the image shows up here
+the same way, as **from workflow `<name>`**. Its versions are content hashes
+rather than commits: an edit to a file inside the build context builds a new
+version. All of the workflow's files are that context, so a `container/Dockerfile`
+can `COPY scripts/`; set `context` on the step to narrow it to one directory,
+after which a script kept outside it and run from `/artifacts` rebuilds nothing.
+It has no **Build** action, because a run is what builds it. A live workflow version that
+runs on it blocks deleting it, like any other pin.
+
+Such an image lasts as long as the workflow carries its files. **Publish as
+image** on one of its versions rebuilds that version's files under a name in
+your workspace (`<handle>/<name>:<tag>`) and catalogues it as an ordinary entry,
+which stays after the workflow moves on. `mediforce images publish <entry-id>
+--namespace <handle> --version <image-tag> --reference <handle>/<name>
+[--tag <tag>] [--intent "..."]` does the same. The rules match an upload: the
+tag must be new, and the first publish of a name needs the intent sentence.
+
 ## Cataloguing a repository nothing has built yet
 
 **Add image** on **Workspace → Images** registers the repository and Dockerfile

@@ -25,6 +25,9 @@ export const DockerImageInfoSchema = z.object({
   buildWorkflow: z.string().optional(),
   /** Namespace owning that definition (`mediforce.build.namespace`). */
   buildNamespace: z.string().optional(),
+  /** Content hash of the workflow's carried files it was built from
+   *  (`mediforce.build.artifacts`). Absent for any other build. */
+  buildArtifacts: z.string().optional(),
   /**
    * The image's nearest ancestor on this daemon, by `RootFS.Layers` prefix
    * containment — exact, and computed rather than parsed out of a `FROM`

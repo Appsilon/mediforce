@@ -74,7 +74,10 @@ function versionLabel(entry: ImageCatalogEntryView, imageTag: string, unvouched:
   // produced — but the slot the sentence would fill says why it is empty
   // rather than trailing a dash into nothing.
   const intent = entry.intent.length > 0 ? entry.intent : 'not described yet';
-  return `${entry.name}${tag} — ${intent}${caveat}`;
+  // A carried image lives only while its workflow carries the files, so the
+  // author pinning it from another step should see whose files those are.
+  const owner = entry.source.kind === 'carried' ? ` · from workflow ${entry.source.workflow}` : '';
+  return `${entry.name}${tag} — ${intent}${owner}${caveat}`;
 }
 
 function groupLabel(baseEntryId: string | null, nameById: ReadonlyMap<string, string>): string {
@@ -110,14 +113,24 @@ export function buildCatalogImageGroups(
 ): ImagePickerGroup[] {
   const nameById = new Map(entries.map((entry) => [entry.id, entry.name]));
   const groups = new Map<string, ImagePickerGroup>();
+  // One image, one option. Two entries can describe the same tag — an image a
+  // workflow carries that was also published under a name of its own, say — and
+  // the value that would land in the definition is the same string either way,
+  // so a second option offers no choice and only duplicates the row. The first
+  // entry to claim it names it, in the roots-first order the handler returns.
+  const offered = new Set<string>();
 
   for (const entry of entries) {
     const options = entry.versions
       .filter((version) => isOfferable(version.capabilities, executor, requiredRuntime))
-      .map((version) => ({
-        value: version.imageTag,
-        label: versionLabel(entry, version.imageTag, version.capabilities.status !== 'known'),
-      }));
+      .filter((version) => offered.has(version.imageTag) === false)
+      .map((version) => {
+        offered.add(version.imageTag);
+        return {
+          value: version.imageTag,
+          label: versionLabel(entry, version.imageTag, version.capabilities.status !== 'known'),
+        };
+      });
     if (options.length === 0) continue;
 
     const key = entry.baseEntryId ?? '';

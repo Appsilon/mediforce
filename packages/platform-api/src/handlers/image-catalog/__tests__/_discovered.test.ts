@@ -151,4 +151,69 @@ describe('discoverEntries', () => {
 
     expect(discoverEntries('alpha', [residue], [])).toEqual([]);
   });
+
+  it('offers a Dockerfile a workflow carries, keyed on the workflow and the Dockerfile', () => {
+    const carried = {
+      repository: 'mediforce-artifacts',
+      tag: 'aaaaaaaaaaaa',
+      id: 'sha-carried',
+      size: '80MB',
+      created: '1 hour ago',
+      buildArtifacts: 'aaaaaaaaaaaa',
+      buildWorkflow: 'intake',
+      buildNamespace: 'alpha',
+      buildDockerfile: 'container/Dockerfile',
+    };
+
+    const discovered = discoverEntries(
+      'alpha',
+      // Two builds of one file, one from the whole carried set and one from a
+      // context the step narrowed: the context is how it was built, not which
+      // file it is.
+      [carried, { ...carried, id: 'sha-older', buildArtifacts: 'bbbbbbbbbbbb', buildContext: 'container' }],
+      [],
+    );
+
+    expect(discovered).toHaveLength(1);
+    expect(discovered[0].source).toEqual({ kind: 'carried', workflow: 'intake', dockerfile: 'container/Dockerfile' });
+    expect(discovered[0].name).toBe('intake');
+    expect(discovered[0].id).toMatch(/^intake-[a-f0-9]{8}$/);
+  });
+
+  it('separates two carried Dockerfiles, which are two images', () => {
+    const carried = {
+      repository: 'mediforce-artifacts',
+      tag: 'aaaaaaaaaaaa',
+      id: 'sha-carried',
+      size: '80MB',
+      created: '1 hour ago',
+      buildArtifacts: 'aaaaaaaaaaaa',
+      buildWorkflow: 'intake',
+      buildNamespace: 'alpha',
+      buildDockerfile: 'container/Dockerfile',
+    };
+
+    const discovered = discoverEntries(
+      'alpha',
+      [carried, { ...carried, id: 'sha-gpu', buildDockerfile: 'container/Dockerfile.gpu' }],
+      [],
+    );
+
+    expect(discovered).toHaveLength(2);
+  });
+
+  it('skips a carried image built before the Dockerfile was labelled', () => {
+    const unlabelled = {
+      repository: 'mediforce-artifacts',
+      tag: 'cccccccccccc',
+      id: 'sha-old',
+      size: '80MB',
+      created: '3 days ago',
+      buildArtifacts: 'cccccccccccc',
+      buildWorkflow: 'intake',
+      buildNamespace: 'alpha',
+    };
+
+    expect(discoverEntries('alpha', [unlabelled], [])).toEqual([]);
+  });
 });

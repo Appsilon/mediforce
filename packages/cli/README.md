@@ -52,7 +52,15 @@ the source (decision 1), `--repo` / `--reference` re-key the entry, so the
 command prints the id it moved to rather than the one you passed. `--repo`
 replaces the whole built source, so pass `--dockerfile` and `--context` with it;
 either one left out resets to its default. `images create --repo` takes the
-same `--dockerfile` and `--context`.
+same `--dockerfile` and `--context`; `images create --workflow <name> --dockerfile
+<path>` describes a Dockerfile a workflow carries (a `carried` source), whose
+versions `images show` prints with their content hash where a built one prints
+its commit.
+`images publish <entry-id> --version <image-tag> --reference <handle>/<name>
+[--tag] [--intent]` copies one version of a carried entry into a `referenced`
+one, so the image outlives its workflow: the platform rebuilds that version's
+build context from the workflow version that carried it, through the same path
+as `images build --reference`, and under the same rules.
 `images delete` removes an entry **and** the images behind it — one act,
 because a record whose images stay is re-derived on the next read — which needs
 admin of that workspace, audits under `_system` since the daemon is

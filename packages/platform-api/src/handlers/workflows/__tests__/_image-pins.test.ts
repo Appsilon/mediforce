@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import type { WorkflowDefinitionGroup } from '@mediforce/platform-core';
-import { deriveBuildTag } from '@mediforce/agent-runtime';
+import { deriveBuildTag, resolveCarriedBuild } from '@mediforce/agent-runtime';
 import { findWorkflowImagePins } from '../_image-pins';
 
 /** One group, with the versions given and the liveness metadata a scan reads. */
@@ -221,5 +221,34 @@ describe('findWorkflowImagePins', () => {
     expect(pins).toHaveLength(1);
     expect(pins[0].steps).toEqual(['build']);
     expect(pins[0].live).toBe(true);
+  });
+
+  it('names the tag a carried Dockerfile builds under, even beside a skills repo', () => {
+    // The runtime builds a carried Dockerfile ahead of `externalSkillsRepo`, so
+    // the scan must too, or a live version pinning a `mediforce-artifacts:*`
+    // image would not block its delete.
+    const artifacts = [{ path: 'container/Dockerfile', contents: 'FROM alpine:3.21\n' }];
+    const definition = buildWorkflowDefinition({
+      name: 'intake',
+      namespace: 'acme',
+      version: 1,
+      artifacts,
+      externalSkillsRepo: { url: 'https://github.com/org/skills.git', commit: 'b'.repeat(40) },
+      steps: [
+        { id: 'build', name: 'Build', type: 'creation', executor: 'script', script: { dockerfile: 'container/Dockerfile', command: 'true' } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'build', to: 'done' }],
+    });
+    const tag = resolveCarriedBuild({ dockerfile: 'container/Dockerfile' }, definition)?.tag;
+    expect(tag).toMatch(/^mediforce-artifacts:/);
+
+    const pins = findWorkflowImagePins(
+      [{ namespace: 'acme', name: 'intake', versions: [definition], latestVersion: 1, defaultVersion: null }],
+      [tag ?? ''],
+    );
+
+    expect(pins).toHaveLength(1);
+    expect(pins[0]).toMatchObject({ live: true, steps: ['build'] });
   });
 });

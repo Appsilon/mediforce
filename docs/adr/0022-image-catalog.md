@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-09-11
+last_reviewed: 2026-09-14
 ---
 
 # ADR-0022: The Image Catalog is an image the platform offers, keyed on its source
@@ -131,6 +131,77 @@ not share a cache slot. The `mediforce.build.context` label is written on every
 build, empty when none was named, so an image cannot inherit its base's. A path
 that climbs out of the repository is refused by the contract, and one the
 checkout reaches through a symlink is refused by the builders after cloning.
+
+**A Dockerfile a workflow carries is a third kind of source, `carried`.** A
+step whose `dockerfile` names a file in the definition's `artifacts` builds from
+those files with no repository anywhere, under
+`mediforce-artifacts:<content hash>`. Those images were on the daemon and in no
+catalog: discovery keys on a build repo and a carried build has none, and the
+delete flow's pin scan recomputed only repo-derived tags. So an edited script
+minted a new image no view showed, and one a live version ran on could be
+deleted from under it. Neither `built` nor `referenced` fits: there is no repo
+to key on, and a reference would claim a name nobody chose.
+
+- **Key** — `(workflow, dockerfile)` in the row's namespace, the Dockerfile as a
+  path from the root of the carried files. As for a repo, the context is how the
+  file is built and stays out of the key. A workflow name is unique only inside
+  its namespace, so versions also match on the namespace label, which a `built`
+  source deliberately does not — two workspaces' `intake` workflows would
+  otherwise offer, and let an admin delete, each other's images.
+- **Versions** are content hashes (`mediforce.build.artifacts`), shown where a
+  built version shows its commit. The build now labels the Dockerfile and
+  context as the step named them, beside the workflow and namespace. An image
+  built before carries a blank Dockerfile label and is not discovered; the hash
+  changed shape, so the next run rebuilds and labels it. The context is not
+  folded into the key as a repo's is: the Dockerfile path already names the
+  file from the carried root.
+- **Discovery** is decision 7 unchanged: an image this namespace built from a
+  workflow's files is offered undescribed, and describing it lands at the id it
+  already had.
+- **The context is the whole carried set unless a step narrows it**, which is
+  what an uploaded folder does too, and `dockerfile` stays a path from the
+  carried root either way — a carried file is named by that path everywhere
+  else, and a registered version cannot be re-spelled. Making it the
+  Dockerfile's own directory, as a repo build does, was tried and reverted: a
+  `container/Dockerfile` that `COPY`s `scripts/` would stop building, and no
+  live version could add a `context` to fix it. Narrowing is now possible where
+  it was silently ignored before, and only the files inside the context are
+  hashed, so a step that narrows stops rebuilding for edits to a script it reads
+  from `/artifacts` at run time. The workflow and namespace are hashed too, so
+  identical files in two workflows build two images, each labelled truthfully.
+- **The pin scan resolves a step's image with the runtime's own function**
+  (`resolveStepImage` takes the definition), so a live version pinning a
+  carried tag blocks a delete. It previously ignored carried files and, beside an
+  `externalSkillsRepo`, named a `mediforce-built:*` tag the runtime never built.
+- **Publish** copies one version into a `referenced` entry, for an image that
+  should outlive its workflow. It finds the workflow version whose files hash to
+  that image, packs its context, and sends it through the upload path, so every
+  upload rule holds: a reference in the workspace, a tag never replaced, no build
+  label inherited. It rebuilds rather than re-tags. A re-tag would keep the
+  carried labels, making the published tag a version of both entries, and
+  deleting the carried entry with its images would take the published one too.
+  The layers are cached, so the rebuild is short. If no version still carries
+  the files, it is refused.
+
+There is no **Build** for a carried entry: nothing names a commit to build, and
+a run or dry run is what builds one.
+
+**No build lands on a name the catalog owns.** A step may name the `image` it
+builds under, which is how an author gives a carried build a readable tag. That
+tag is refused when it starts with the workspace handle — the shape an upload
+and a **Publish as image** create — and the build uses its derived tag instead.
+Without this a run rebuilt the published image from the workflow's carried
+files: the tag the upload path refuses to replace was replaced anyway, the
+catalog offered one artifact under two entries, and deleting the carried entry
+with its images would have taken the published one too. It is the rule that
+already protects the golden image, applied to the names this ADR mints. A step
+naming both an `image` and a carried `dockerfile` is also ambiguous — the
+carried files win, so the pinned image never runs — and preflight says so before
+the run rather than leaving it to be discovered afterwards. Two entries can
+still describe one artifact for as long as it takes to clean up an image built
+under the old rule, so the picker offers a tag once however many entries claim
+it: the value that lands in the definition is the same string, and a second
+option would offer no choice.
 
 An entry's **source became editable** after the Images view shipped without any
 way to change one: an entry added through **Add image** was final, so a mistyped
@@ -265,7 +336,8 @@ distinct build must keep a distinct tag or the local image cache stops working
 and a rebuild silently serves the previous commit's binary. What changes is
 what counts as a **row**.
 
-An entry's key is the **source**, in one of two forms:
+An entry's key is the **source**, in one of two forms (a third, `carried`, was
+added later — see the amendment at the top of this ADR):
 
 - **built** — `(repo, dockerfile)`. Its versions are commits, and the image tag
   of each version is what `deriveBuildTag` already produces, so entries
@@ -461,7 +533,8 @@ option, so every string that saved before still saves and round-trips.
 *Added 2026-09-08.*
 
 The catalog offers every source **this namespace built** and nobody has
-described — one **discovered entry** per `(repo, dockerfile)`, derived on read
+described — one **discovered entry** per `(repo, dockerfile)`, or per
+`(workflow, dockerfile)` for a Dockerfile a workflow carries, derived on read
 from the `mediforce.build.*` labels the builders already write. Everything on it
 is as derived as a stored entry's: the source key, the versions, the commits,
 the workflow that triggered the build, the lineage. The one field missing is
@@ -536,8 +609,8 @@ it, so the glossary never defines a thing a reader cannot go and find:
 - **Image Catalog Entry** — one image the platform offers, identified by its
   source (decision 1), carrying derived facts and one declared intent.
 - **Version** — one built artifact of an entry's source: a commit for a built
-  entry, a tag or digest for a referenced one, with the image tag that names it
-  on the daemon.
+  entry, a tag or digest for a referenced one, a content hash for a carried one,
+  with the image tag that names it on the daemon.
 - **Intent** — the single required human sentence: what this image is *for*.
   Not a description of its contents.
 - **Capability** — a derived, probed fact about a version: the runtimes it
