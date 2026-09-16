@@ -66,6 +66,13 @@ describe('AssistantInstructionsField', () => {
     expect(screen.getByRole('textbox', { name: 'Your instructions' })).toBeDisabled();
   });
 
+  it('marks the instructions file when saved instructions are present', () => {
+    state.instructions = 'Always use explicit step names.';
+    render(<AssistantInstructionsField namespace="alpha" />);
+
+    expect(screen.getByTestId('assistant-instructions-indicator')).toBeInTheDocument();
+  });
+
   it('resets its draft when the workspace changes', async () => {
     state.instructions = 'Alpha instructions';
     const { rerender } = render(<AssistantInstructionsField namespace="alpha" />);
