@@ -25,6 +25,8 @@ import { CoworkSection } from './cowork-section';
 import { StepUiConfigSection } from './step-ui-config-section';
 import { StepDataFlow } from './step-data-flow';
 import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
+import { ImageSourceFields } from './image-source-fields';
+import { identityImageValue, pickerImageValue } from './image-options';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
 import { AllowedRolesField, AssignedToField } from './step-editor-roles';
 import { CollapsibleCard } from './collapsible-card';
@@ -82,58 +84,6 @@ const ri = inputBase;
 const riMono = inputBaseMono;
 const rs = selectBase;
 const rt = textareaBase;
-
-/**
- * What the agent picker puts in the definition for a chosen image.
- *
- * `mediforce-golden-image:latest` collapses to the untagged form because that
- * is what registration persists; without it a step already carrying the
- * untagged default would match no option and be silently rewritten on save.
- */
-function pickerImageValue(image: string): string {
-  return image === `${DEFAULT_AGENT_IMAGE}:latest` ? DEFAULT_AGENT_IMAGE : image;
-}
-
-/** The script picker saves the reference as-is — the normalisation above is
- *  about the agent default, which script steps do not have. */
-function identityImageValue(image: string): string {
-  return image;
-}
-
-/** Whether the picker already offers this value, so the step's own image is
- *  only appended as an extra option when nothing else carries it. */
-function offersValue(
-  groups: ImagePickerGroup[],
-  value: string,
-  normalize: (ref: string) => string,
-): boolean {
-  return groups.some((group) =>
-    group.options.some((option) => normalize(option.value) === normalize(value)),
-  );
-}
-
-/** The catalog's groups as `<optgroup>`s. A group with no label is the daemon
- *  fallback, which has no base to group by, so its options sit flat. */
-function ImageOptions({
-  groups,
-  normalize,
-}: {
-  groups: ImagePickerGroup[];
-  normalize: (ref: string) => string;
-}) {
-  return (
-    <>
-      {groups.map((group) => {
-        const options = group.options.map((option) => (
-          <option key={option.value} value={normalize(option.value)}>{option.label}</option>
-        ));
-        return group.label === null
-          ? <React.Fragment key={group.key}>{options}</React.Fragment>
-          : <optgroup key={group.key} label={group.label}>{options}</optgroup>;
-      })}
-    </>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Executor / step-type icon maps (mirrors workflow-diagram.tsx)
@@ -421,20 +371,9 @@ export function StepEditor({
   const selMax = typeof step.selection === 'number' ? step.selection : step.selection?.max;
 
   // Leaving agent.image blank is not "unset" — registration fills in the golden
-  // image, unless the step builds its own from repo + commit. Say which, so the
-  // picker and the saved definition agree.
-  const agentBuildsOwnImage =
-    typeof step.agent?.repo === 'string' && step.agent.repo.length > 0
-    && typeof step.agent?.commit === 'string' && step.agent.commit.length > 0;
-  const agentBuildsFromWorkflowSource =
-    typeof step.agent?.dockerfile === 'string' && step.agent.dockerfile.length > 0
-    && typeof workflowExternalSkillsRepo?.url === 'string' && workflowExternalSkillsRepo.url.length > 0
-    && typeof workflowExternalSkillsRepo.commit === 'string' && workflowExternalSkillsRepo.commit.length > 0;
-  const agentBlankOptionLabel = agentBuildsOwnImage
-    ? 'Built from agent.repo'
-    : agentBuildsFromWorkflowSource
-      ? 'Built from workflow source'
-      : `Default — ${DEFAULT_AGENT_IMAGE}`;
+  // image. Only a step whose source is a ready image reaches the picker at all;
+  // one that builds its own never shows it, so the blank option has one meaning.
+  const agentBlankOptionLabel = `Default — ${DEFAULT_AGENT_IMAGE}`;
 
   // The picker's options come from the namespace's image catalog: name and
   // intent instead of a bare `repo:tag`, grouped by what each was built on, and
@@ -447,6 +386,14 @@ export function StepEditor({
   // A catalog with nothing to say — empty, or a daemon nobody could reach —
   // degrades to the daemon listing the picker offered before it existed, so an
   // author never faces an empty picker (AGENTS.md §13).
+  // What decides a step's image source: the files the workflow carries, the
+  // skills repo behind a bare `dockerfile`, and the handle whose catalog names
+  // a build must not land on.
+  const imageSourceDefinition = useMemo(
+    () => ({ artifacts: workflowArtifacts, namespace: handle, externalSkillsRepo: workflowExternalSkillsRepo }),
+    [workflowArtifacts, handle, workflowExternalSkillsRepo],
+  );
+
   const agentImagePicker = useMemo(
     () => buildImagePicker({ catalogEntries, dockerImages: dockerImages ?? [], executor: 'agent' }),
     [catalogEntries, dockerImages],
@@ -941,83 +888,19 @@ export function StepEditor({
         </FieldGroup>
 
         <FieldGroup>
-          <FieldRow label="agent.image" tooltip={TIP.agentImage}>
-            {agentImagePicker.hasSource ? (
-              <div className="grid gap-2 sm:grid-cols-2">
-                <select
-                  aria-label="Known Docker image"
-                  value={pickerImageValue(step.agent?.image ?? '')}
-                  onChange={(e) => updateAgent({ image: e.target.value || undefined })}
-                  className={rs}
-                >
-                  <option value="">{agentBlankOptionLabel}</option>
-                  <ImageOptions groups={agentImagePicker.groups} normalize={pickerImageValue} />
-                  {step.agent?.image && !offersValue(agentImagePicker.groups, step.agent.image, pickerImageValue) && (
-                    <option value={step.agent.image}>{step.agent.image}</option>
-                  )}
-                </select>
-                <input
-                  aria-label="Custom Docker image"
-                  value={step.agent?.image ?? ''}
-                  onChange={(e) => updateAgent({ image: e.target.value || undefined })}
-                  className={riMono}
-                />
-              </div>
-            ) : (
-              <input
-                aria-label="Custom Docker image"
-                value={step.agent?.image ?? ''}
-                onChange={(e) => updateAgent({ image: e.target.value || undefined })}
-                className={riMono}
-              />
-            )}
-          </FieldRow>
-          {imageWarning && (
-            <div className="flex items-center gap-1.5 px-3 -mt-1">
-              <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
-              <span className="text-[11px] text-amber-600 dark:text-amber-400">{imageWarning}</span>
-            </div>
-          )}
-
-          <FieldRow label="agent.dockerfile" tooltip={TIP.agentDockerfile}>
-            <input
-              value={step.agent?.dockerfile ?? ''}
-              onChange={(e) => updateAgent({ dockerfile: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
-          <FieldRow label="agent.context" tooltip={TIP.agentContext}>
-            <input
-              value={step.agent?.context ?? ''}
-              onChange={(e) => updateAgent({ context: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
-          <FieldRow label="agent.repo" tooltip={TIP.agentRepo}>
-            <input
-              value={step.agent?.repo ?? ''}
-              onChange={(e) => updateAgent({ repo: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
-          <FieldRow label="agent.commit" tooltip={TIP.agentCommit}>
-            <input
-              value={step.agent?.commit ?? ''}
-              onChange={(e) => updateAgent({ commit: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
-          <FieldRow label="agent.repoAuth" tooltip={TIP.agentRepoAuth}>
-            <input
-              value={step.agent?.repoAuth ?? ''}
-              onChange={(e) => updateAgent({ repoAuth: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
+          <ImageSourceFields
+            // Remounted per step, so a source chosen for one step is not still
+            // selected when another is opened in the same panel.
+            key={`agent-${step.id}`}
+            prefix="agent"
+            config={step.agent}
+            definition={imageSourceDefinition}
+            picker={agentImagePicker}
+            onChange={updateAgent}
+            blankOptionLabel={agentBlankOptionLabel}
+            imageWarning={imageWarning}
+            pickerValue={pickerImageValue}
+          />
         </FieldGroup>
       </>)}
 
@@ -1138,83 +1021,17 @@ export function StepEditor({
 
         {step.plugin !== 'databricks-job' && (
           <FieldGroup>
-            <FieldRow label="script.image" tooltip={TIP.scriptImage}>
-              {scriptImagePicker.hasSource ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <select
-                    aria-label="Known Docker image"
-                    value={step.script?.image ?? ''}
-                    onChange={(e) => updateScript({ image: e.target.value || undefined })}
-                    className={rs}
-                  >
-                    <option value="">Select image…</option>
-                    <ImageOptions groups={scriptImagePicker.groups} normalize={identityImageValue} />
-                    {step.script?.image && !offersValue(scriptImagePicker.groups, step.script.image, identityImageValue) && (
-                      <option value={step.script.image}>{step.script.image}</option>
-                    )}
-                  </select>
-                  <input
-                    aria-label="Custom Docker image"
-                    value={step.script?.image ?? ''}
-                    onChange={(e) => updateScript({ image: e.target.value || undefined })}
-                    className={riMono}
-                  />
-                </div>
-              ) : (
-                <input
-                  aria-label="Custom Docker image"
-                  value={step.script?.image ?? ''}
-                  onChange={(e) => updateScript({ image: e.target.value || undefined })}
-                  className={riMono}
-                />
-              )}
-            </FieldRow>
-            {imageWarning && (
-              <div className="flex items-center gap-1.5 px-3 -mt-1">
-                <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
-                <span className="text-[11px] text-amber-600 dark:text-amber-400">{imageWarning}</span>
-              </div>
-            )}
-
-            <FieldRow label="script.dockerfile" tooltip={TIP.scriptDockerfile}>
-              <input
-                value={step.script?.dockerfile ?? ''}
-                onChange={(e) => updateScript({ dockerfile: e.target.value || undefined })}
-                className={riMono}
-              />
-            </FieldRow>
-
-            <FieldRow label="script.context" tooltip={TIP.scriptContext}>
-              <input
-                value={step.script?.context ?? ''}
-                onChange={(e) => updateScript({ context: e.target.value || undefined })}
-                className={riMono}
-              />
-            </FieldRow>
-
-            <FieldRow label="script.repo" tooltip={TIP.scriptRepo}>
-              <input
-                value={step.script?.repo ?? ''}
-                onChange={(e) => updateScript({ repo: e.target.value || undefined })}
-                className={riMono}
-              />
-            </FieldRow>
-
-            <FieldRow label="script.commit" tooltip={TIP.scriptCommit}>
-              <input
-                value={step.script?.commit ?? ''}
-                onChange={(e) => updateScript({ commit: e.target.value || undefined })}
-                className={riMono}
-              />
-            </FieldRow>
-
-            <FieldRow label="script.repoAuth" tooltip={TIP.scriptRepoAuth}>
-              <input
-                value={step.script?.repoAuth ?? ''}
-                onChange={(e) => updateScript({ repoAuth: e.target.value || undefined })}
-                className={riMono}
-              />
-            </FieldRow>
+            <ImageSourceFields
+              key={`script-${step.id}`}
+              prefix="script"
+              config={step.script}
+              definition={imageSourceDefinition}
+              picker={scriptImagePicker}
+              onChange={updateScript}
+              blankOptionLabel="Select image…"
+              imageWarning={imageWarning}
+              pickerValue={identityImageValue}
+            />
           </FieldGroup>
         )}
       </>)}

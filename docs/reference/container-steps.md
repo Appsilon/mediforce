@@ -77,6 +77,16 @@ the fallback. The first build takes as long as a `docker build` does, which is
 minutes for a sizeable image. The image appears in the Image Catalog as a
 `carried` entry ([ADR-0022](../adr/0022-image-catalog.md)).
 
+In the step editor these are one choice, not six fields: **ready image**, **built
+from workflow files**, or **built from a git repo**. The mode is read back from
+the step with the same precedence the runtime applies, so the editor cannot
+offer a combination that resolves to something else, and switching clears the
+fields the new source does not use. A stored step that sets more than one
+source keeps them until an author clears them — the editor says which are
+ignored rather than dropping anyone's work on open. `image` is the one field
+that changes meaning: in the two build modes it is the tag to build under, and
+it is labelled as such.
+
 A step that names a file the workflow does not carry is flagged before the run
 (preflight, beside missing secrets and images): a command reading
 `/artifacts/<path>` with no such file, or a `dockerfile` with neither a carried

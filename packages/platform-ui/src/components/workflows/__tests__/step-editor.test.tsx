@@ -713,6 +713,10 @@ describe('StepEditor', () => {
     );
 
     expandCard('Prompt & model');
+    // Behind a toggle since the picker is the way in: an image worth running is
+    // one the catalog describes, and this is the escape hatch for one nobody
+    // has catalogued yet.
+    fireEvent.click(screen.getByText('Name an image the catalog does not list'));
     fireEvent.change(screen.getByLabelText('Custom Docker image'), {
       target: { value: 'python:3.11-slim' },
     });
@@ -843,21 +847,43 @@ describe('StepEditor', () => {
       expect(select.options[0].textContent).toContain('mediforce-golden-image');
     });
 
-    it('[RENDER] a build-mode step reports its build source instead of the default', () => {
-      const select = renderAgentStep({
-        agent: { repo: 'https://github.com/acme/wf.git', commit: 'abc1234', dockerfile: 'Dockerfile' },
-      });
-      expect(select.options[0].textContent).not.toContain('mediforce-golden-image');
-      expect(select.options[0].textContent).toContain('agent.repo');
+    it('[RENDER] a step that builds its own image is not offered a picker at all', () => {
+      // The three sources are mutually exclusive, so a build-mode step shows the
+      // build fields instead of an image list it would ignore.
+      render(
+        <StepEditor
+          step={buildStep({
+            executor: 'agent',
+            agent: { repo: 'https://github.com/acme/wf.git', commit: 'abc1234', dockerfile: 'Dockerfile' },
+          })}
+          allSteps={[]}
+          onChange={vi.fn()}
+          dockerImages={mixedImages}
+          catalogEntries={catalogEntries}
+        />,
+      );
+      expandCard('Prompt & model');
+
+      expect(screen.queryByLabelText('Known Docker image')).toBeNull();
+      expect(screen.getByText('Built from a git repo')).toBeTruthy();
     });
 
-    it('[RENDER] a workflow-level build source is reflected in the blank option', () => {
-      const select = renderAgentStep(
-        { agent: { dockerfile: 'Dockerfile' } },
-        { url: 'https://github.com/acme/wf.git', commit: 'abc1234' },
+    it('[RENDER] a bare Dockerfile behind the workflow skills repo reads as a repo build', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'agent', agent: { dockerfile: 'Dockerfile' } })}
+          allSteps={[]}
+          onChange={vi.fn()}
+          dockerImages={mixedImages}
+          catalogEntries={catalogEntries}
+          workflowExternalSkillsRepo={{ url: 'https://github.com/acme/wf.git', commit: 'abc1234' }}
+        />,
       );
-      expect(select.options[0].textContent).not.toContain(DEFAULT_AGENT_IMAGE);
-      expect(select.options[0].textContent).toContain('workflow');
+      expandCard('Prompt & model');
+
+      expect(screen.queryByLabelText('Known Docker image')).toBeNull();
+      // The repo it inherits is named, rather than left as two empty boxes.
+      expect(screen.getByText(/github.com\/acme\/wf.git/)).toBeTruthy();
     });
 
     it('[REGRESSION] treats the untagged persisted default as the discovered latest image', () => {
@@ -887,6 +913,7 @@ describe('StepEditor', () => {
         />,
       );
       expandCard('Prompt & model');
+      fireEvent.click(screen.getByText('Name an image the catalog does not list'));
       fireEvent.change(screen.getByLabelText('Custom Docker image'), {
         target: { value: 'ghcr.io/acme/private-agent:v9' },
       });
@@ -1586,5 +1613,99 @@ describe('StepEditor — skills the workflow carries', () => {
     render(<StepEditor step={agentStep()} allSteps={[agentStep()]} onChange={vi.fn()} />);
     fireEvent.click(screen.getByText('Prompt & model'));
     expect(screen.queryByLabelText('Skill')).toBeNull();
+  });
+});
+
+// Three sources, one choice. The editor used to show `image`, `dockerfile`,
+// `context`, `repo`, `commit` and `repoAuth` at once, with no way to tell which
+// the runtime would use.
+describe('StepEditor — where a step\'s image comes from', () => {
+  const CARRIED = [
+    { path: 'container/Dockerfile', contents: 'FROM alpine:3.21\n' },
+    { path: 'scripts/run.py', contents: 'print("run")\n' },
+  ];
+
+  function renderScriptStep(step: Partial<WorkflowStep>, onChange = vi.fn()) {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'script', ...step })}
+        allSteps={[]}
+        onChange={onChange}
+        dockerImages={dockerImages}
+        workflowArtifacts={CARRIED}
+      />,
+    );
+    expandCard('Script');
+    return onChange;
+  }
+
+  it('opens a carried step on its carried Dockerfile, picked from the files the workflow holds', () => {
+    renderScriptStep({ script: { command: 'run', dockerfile: 'container/Dockerfile' } });
+
+    const select = screen.getByLabelText('Carried Dockerfile') as HTMLSelectElement;
+    expect(select.value).toBe('container/Dockerfile');
+    // The workflow's other carried file is not a Dockerfile and is not offered.
+    expect(Array.from(select.options).map((option) => option.value)).toEqual(['', 'container/Dockerfile']);
+    expect(screen.queryByLabelText('Known Docker image')).toBeNull();
+  });
+
+  it('clears the build fields when the author switches to a ready image', () => {
+    const onChange = renderScriptStep({
+      script: { command: 'run', dockerfile: 'container/Dockerfile', context: '.' },
+    });
+
+    fireEvent.click(screen.getByText('Ready image'));
+
+    expect(onChange).toHaveBeenCalledWith({
+      script: expect.objectContaining({
+        image: undefined,
+        dockerfile: undefined,
+        context: undefined,
+        repo: undefined,
+        commit: undefined,
+        repoAuth: undefined,
+      }),
+    });
+  });
+
+  it('calls the image a build tag in a build mode, where that is what it means', () => {
+    renderScriptStep({ script: { command: 'run', dockerfile: 'container/Dockerfile' } });
+
+    expect(screen.getByLabelText('Build tag')).toBeTruthy();
+  });
+
+  it('says which fields the chosen source ignores, and clears them only when asked', () => {
+    const onChange = renderScriptStep({
+      script: { command: 'run', dockerfile: 'container/Dockerfile', repo: 'org/agent' },
+    });
+
+    expect(screen.getByText(/script.repo, which this source does not use/)).toBeTruthy();
+    // Opening the editor changes nothing by itself.
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText('Clear it'));
+    expect(onChange).toHaveBeenCalledWith({ script: expect.objectContaining({ repo: undefined }) });
+  });
+
+  it('switches to a git repo, which nothing in the step says yet', () => {
+    // The mode is read back from the fields, and a repo build starts with none
+    // of them filled in — so the selector has to remember the choice, or the
+    // click appears to do nothing at all.
+    renderScriptStep({ script: { command: 'run', dockerfile: 'container/Dockerfile' } });
+
+    fireEvent.click(screen.getByText('Built from a git repo'));
+
+    expect(screen.getByText('Script Repo')).toBeTruthy();
+    expect(screen.getByText('Script Commit')).toBeTruthy();
+    expect(screen.queryByLabelText('Carried Dockerfile')).toBeNull();
+  });
+
+  it('switches from a ready image to the workflow files', () => {
+    renderScriptStep({ script: { command: 'run', image: 'python:3.11-slim' } });
+
+    fireEvent.click(screen.getByText('Built from workflow files'));
+
+    expect(screen.getByLabelText('Carried Dockerfile')).toBeTruthy();
+    expect(screen.queryByLabelText('Known Docker image')).toBeNull();
   });
 });
