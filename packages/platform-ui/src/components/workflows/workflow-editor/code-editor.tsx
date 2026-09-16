@@ -19,12 +19,15 @@ export function CodeEditor({
   onChange,
   language = 'json',
   className,
+  readOnly = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   /** `json` highlights; `text` is for a workflow file, which can be anything. */
   language?: 'json' | 'text';
   className?: string;
+  /** Shows a file the workflow does not own, so it reads but cannot be typed into. */
+  readOnly?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -39,6 +42,10 @@ export function CodeEditor({
       doc: value,
       extensions: [
         basicSetup,
+        // Compartment-free: the panel remounts the editor when the file changes,
+        // so the facet is read once per document rather than reconfigured.
+        EditorState.readOnly.of(readOnly),
+        EditorView.editable.of(!readOnly),
         ...(language === 'json' ? [jsonLang()] : []),
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !externalUpdateRef.current) {
