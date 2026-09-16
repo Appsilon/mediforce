@@ -48,6 +48,9 @@ export function cloneRepoAtCommit(
   repoRef: string,
   commit: string,
   repoToken?: string,
+  /** Caps a fetch triggered by a request rather than by a run, where an
+   *  arbitrary repository could otherwise hold the caller open indefinitely. */
+  options?: { readonly timeoutMs?: number },
 ): void {
   const targets = resolveRepoCloneTargets(repoRef, repoToken);
   let lastError: unknown;
@@ -62,6 +65,7 @@ export function cloneRepoAtCommit(
       // the try so a broken key surfaces alongside the earlier transport's failure.
       const execOpts = {
         stdio: 'pipe' as const,
+        ...(options?.timeoutMs === undefined ? {} : { timeout: options.timeoutMs }),
         env: useSsh
           ? { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: getGitSshCommand() }
           : { ...process.env, GIT_TERMINAL_PROMPT: '0' },
