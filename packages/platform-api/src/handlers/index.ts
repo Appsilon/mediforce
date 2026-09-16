@@ -45,6 +45,7 @@ export { findWorkflowImagePins, type WorkflowImagePin } from './workflows/_image
 export { listWorkflows } from './workflows/list-workflows';
 export { listWorkflowVersions } from './workflows/list-workflow-versions';
 export { getWorkflow } from './workflows/get-workflow';
+export { previewRepoFiles } from './workflows/preview-repo-files';
 export { registerWorkflow } from './workflows/register-workflow';
 export { askWorkflowAssistant } from './workflow-assistant/ask-workflow-assistant';
 export { planWorkflowBuild } from './workflow-assistant/plan-workflow-build';

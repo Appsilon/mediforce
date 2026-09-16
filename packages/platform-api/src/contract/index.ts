@@ -137,6 +137,12 @@ export {
   type GetWorkflowAccessOutput,
   type SetWorkflowAccessInput,
   type SetWorkflowAccessOutput,
+  PreviewRepoFilesInputSchema,
+  PreviewRepoFilesOutputSchema,
+  RepoFilePreviewSchema,
+  type PreviewRepoFilesInput,
+  type PreviewRepoFilesOutput,
+  type RepoFilePreview,
 } from './workflows';
 
 export {
