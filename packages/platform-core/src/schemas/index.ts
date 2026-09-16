@@ -267,6 +267,7 @@ export {
   SetTransitionConditionToolSchema,
   type UpdateWorkflowTool,
   type SetTransitionConditionTool,
+  WORKFLOW_ASSISTANT_INSTRUCTIONS_MAX_CHARS,
 } from './workflow-assistant-tools';
 
 export {

@@ -203,3 +203,13 @@ export const WorkflowAssistantToolCallSchema = z.discriminatedUnion('tool', [
 export type WorkflowAssistantToolCall = z.infer<typeof WorkflowAssistantToolCallSchema>;
 
 export const WORKFLOW_ASSISTANT_DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
+
+/**
+ * Cap on a person's standing instructions for the assistant in one workspace.
+ *
+ * Generous for the conventions someone actually keeps — a page or two of house
+ * style — and small enough that prepending it to an already-large system prompt
+ * never crowds out the canvas. Shared by the contract, the CLI and the textarea
+ * so all three refuse the same input.
+ */
+export const WORKFLOW_ASSISTANT_INSTRUCTIONS_MAX_CHARS = 10_000;

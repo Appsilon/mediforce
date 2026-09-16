@@ -8,6 +8,7 @@ import type { CallerScope } from '../../repositories/index';
 import { HandlerError } from '../../errors';
 import { callOpenRouter } from '../../services/openrouter-client';
 import { buildPlanPrompt } from './_lib/plan-prompt';
+import { callerInstructionMessages } from './_lib/caller-instructions';
 import { parseModelJson } from './_lib/parse-model-json';
 
 interface PlanScopedInput extends PlanWorkflowBuildInput {
@@ -47,6 +48,10 @@ export async function planWorkflowBuild(
     maxTokens: PLAN_MAX_OUTPUT_TOKENS,
     messages: [
       { role: 'system', content: buildPlanPrompt() },
+      // The plan the person reads has to be the plan the build follows — a
+      // plan that ignored their conventions would be corrected by a build that
+      // honoured them, which reads as the assistant changing its mind.
+      ...(await callerInstructionMessages(scope, input.namespace)),
       { role: 'system', content: `Current canvas state:\n${JSON.stringify(input.workflowDefinition, null, 2)}` },
       ...input.messages.map((m) => ({ role: m.role, content: m.content })),
     ],

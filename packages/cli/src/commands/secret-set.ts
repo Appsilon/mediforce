@@ -1,14 +1,6 @@
 import { defineCommand } from '../define-command';
 import { printJson, printError } from '../output';
-
-function readStdinDefault(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    process.stdin.on('data', (chunk: Buffer) => chunks.push(chunk));
-    process.stdin.on('end', () => resolve(Buffer.concat(chunks).toString('utf8').trim()));
-    process.stdin.on('error', reject);
-  });
-}
+import { readStdin } from '../stdin';
 
 export const secretSetCommand = defineCommand({
   name: 'mediforce secret set',
@@ -39,8 +31,8 @@ export const secretSetCommand = defineCommand({
 
     let secretValue: string;
     if (hasStdin) {
-      const readStdin = typeof stdin === 'function' ? stdin : readStdinDefault;
-      secretValue = await readStdin();
+      const read = typeof stdin === 'function' ? stdin : readStdin;
+      secretValue = (await read()).trim();
       if (secretValue.length === 0) {
         printError(output, { error: 'stdin was empty — no value to set' }, jsonMode);
         return 1;

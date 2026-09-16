@@ -68,6 +68,24 @@ placing and wiring blocks by hand.
   hand you a workflow that cannot be saved. When it runs out of retries it asks
   you rather than failing — one or two questions with the answer it would take —
   and answering runs the build again from where it stopped.
+- **Your own standing instructions.** The gear in the pane holds a document
+  icon; select it to open the text box for how *you* want workflows built here
+  — naming, house defaults, the shapes you always reach for. Every turn in that
+  workspace reads it, including the
+  planning turn, so it holds for a whole session, survives a reload, and is
+  still there the next morning. It is per workspace and private to you from
+  every other signed-in person: two people on the same canvas each get their
+  own, and the same person keeps different conventions in different workspaces.
+  (A deployment API key can read and write any user's, which is what the CLI
+  below uses.) The assistant is told these refine choices and do not relax
+  rules — an instruction that could only be followed by producing a workflow
+  that fails the graph or schema gates should lose, and be named in the reply.
+  That is instruction, not enforcement: the gates still refuse an invalid
+  workflow either way, but whether it explains itself is the model's to honour.
+  Keep it in a file and push it with
+  `mediforce assistant instructions-set --namespace <handle> --file ./conventions.md`
+  (`instructions-get` reads it back, `--clear` removes it); an apiKey caller
+  passes `--uid` because a system actor has no identity of its own.
 - **You still save.** The assistant edits the *unsaved* canvas. Nothing is
   persisted until you **Save** (or **Save & Start Run** / **Save & Dry Run**) —
   review the diagram, then save a version like any other edit.

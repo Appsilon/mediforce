@@ -24,6 +24,7 @@ export {
   decodeAgentRunCursor,
 } from '../cursors/agent-run-cursor';
 export { InMemoryUserProfileRepository } from './in-memory-user-profile-repository';
+export { InMemoryWorkflowAssistantInstructionsRepository } from './in-memory-workflow-assistant-instructions-repository';
 export { InMemoryCredentialsRepository } from './in-memory-credentials-repository';
 export { InMemoryUserDirectoryService } from './in-memory-user-directory-service';
 export type { InMemoryDirectoryUser } from './in-memory-user-directory-service';

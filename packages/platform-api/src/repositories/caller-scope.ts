@@ -38,6 +38,7 @@ import type { AuthorizedTriggerRepository } from './authorized-trigger-repositor
 import type { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository';
 import type { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository';
 import type { AuthorizedWorkflowSecretRepository } from './authorized-workflow-secret-repository';
+import type { AuthorizedWorkflowAssistantInstructionsRepository } from './authorized-workflow-assistant-instructions-repository';
 import type { AuthorizedWorkspaceSecretRepository } from './authorized-workspace-secret-repository';
 
 /**
@@ -78,6 +79,8 @@ export interface CallerScope {
   readonly agentOAuthTokens: AuthorizedAgentOAuthTokenRepository;
   readonly workspaceSecrets: AuthorizedWorkspaceSecretRepository;
   readonly workflowSecrets: AuthorizedWorkflowSecretRepository;
+  /** The caller's own standing instructions for the workflow assistant, per workspace. Gated on `(workspace, uid)` — never another member's. */
+  readonly assistantInstructions: AuthorizedWorkflowAssistantInstructionsRepository;
   readonly triggers: AuthorizedTriggerRepository;
 
   // Deployment-global pass-throughs

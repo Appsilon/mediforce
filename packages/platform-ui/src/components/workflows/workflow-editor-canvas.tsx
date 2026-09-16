@@ -20,6 +20,7 @@ import { BlockPicker } from './block-picker';
 import { AuthoringPathsPopover } from './authoring-paths-popover';
 import { StepEditor } from './workflow-editor/step-editor';
 import { ModelPicker } from './workflow-editor/model-picker';
+import { AssistantInstructionsField } from './workflow-editor/assistant-instructions-field';
 import { selectBase } from './workflow-editor/step-editor-fields';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
 import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
@@ -1092,16 +1093,19 @@ export function WorkflowEditorCanvas({
               </div>
             </div>
             {assistantSettingsOpen && (
-              <div className="shrink-0 px-4 py-2 border-b space-y-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Model</span>
-                <ModelPicker
-                  value={assistantModel}
-                  onChange={setAssistantModel}
-                  defaultModel={WORKFLOW_ASSISTANT_DEFAULT_MODEL}
-                  requireToolSupport
-                  minContextTokens={32000}
-                  className={selectBase}
-                />
+              <div className="shrink-0 px-4 py-2 border-b space-y-3">
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Model</span>
+                  <ModelPicker
+                    value={assistantModel}
+                    onChange={setAssistantModel}
+                    defaultModel={WORKFLOW_ASSISTANT_DEFAULT_MODEL}
+                    requireToolSupport
+                    minContextTokens={32000}
+                    className={selectBase}
+                  />
+                </div>
+                {namespace !== undefined && namespace !== '' && <AssistantInstructionsField namespace={namespace} />}
               </div>
             )}
             <div ref={assistantScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">

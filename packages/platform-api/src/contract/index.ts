@@ -152,6 +152,14 @@ export {
   type PlanQuestion,
   type WorkflowAssistantToolCall,
   type AskWorkflowAssistantOutput,
+  GetAssistantInstructionsInputSchema,
+  GetAssistantInstructionsOutputSchema,
+  SetAssistantInstructionsInputSchema,
+  SetAssistantInstructionsOutputSchema,
+  type GetAssistantInstructionsInput,
+  type GetAssistantInstructionsOutput,
+  type SetAssistantInstructionsInput,
+  type SetAssistantInstructionsOutput,
 } from './workflow-assistant';
 
 export {

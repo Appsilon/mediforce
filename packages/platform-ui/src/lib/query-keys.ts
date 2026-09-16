@@ -135,6 +135,10 @@ export const queryKeys = {
   /** Join links of a workspace (ADR-0021). Owner/admin-only read, so it lives
    *  under its own key rather than riding the members list. */
   namespaceJoinLinks: (handle: string) => ['namespace-join-links', handle] as const,
+  /** One person's standing instructions for the workflow assistant in a
+   *  workspace. Keyed by workspace alone: the row is the caller's own, so the
+   *  uid is never a dimension the browser chooses. */
+  assistantInstructions: (handle: string) => ['assistant-instructions', handle] as const,
   agentRuns: {
     /** Prefix matcher — `['agent-runs']` invalidates every list slice. */
     all: () => ['agent-runs'] as const,

@@ -20,6 +20,7 @@ import {
   InMemoryAgentOAuthTokenRepository,
   InMemoryCredentialsRepository,
   InMemoryUserProfileRepository,
+  InMemoryWorkflowAssistantInstructionsRepository,
   InMemoryTaskAttachmentRepository,
   InMemoryBlobStore,
   buildProcessInstance,
@@ -39,6 +40,7 @@ import type {
   TaskAttachmentRepository,
   UserDirectoryService,
   UserProfileRepository,
+  WorkflowAssistantInstructionsRepository,
   CredentialsRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
@@ -200,6 +202,7 @@ export interface TestScopeOverrides {
   readonly namespaceRepo?: NamespaceRepository;
   readonly autoJoinWorkspaces?: readonly AutoJoinRule[];
   readonly userProfileRepo?: UserProfileRepository;
+  readonly assistantInstructionsRepo?: WorkflowAssistantInstructionsRepository;
   readonly credentialsRepo?: CredentialsRepository;
   readonly userDirectory?: UserDirectoryService | null;
   readonly platformSettingsRepo?: PlatformSettingsRepository;
@@ -243,6 +246,8 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     toolCatalogRepo: overrides.toolCatalogRepo ?? new InMemoryToolCatalogRepository(),
     namespaceRepo: overrides.namespaceRepo ?? stubNamespaceRepo,
     userProfileRepo: overrides.userProfileRepo ?? new InMemoryUserProfileRepository(),
+    assistantInstructionsRepo:
+      overrides.assistantInstructionsRepo ?? new InMemoryWorkflowAssistantInstructionsRepository(),
     credentialsRepo: overrides.credentialsRepo ?? new InMemoryCredentialsRepository(),
     oauthProviderRepo: overrides.oauthProviderRepo ?? new InMemoryOAuthProviderRepository(),
     agentOAuthTokenRepo: overrides.agentOAuthTokenRepo ?? new InMemoryAgentOAuthTokenRepository(),

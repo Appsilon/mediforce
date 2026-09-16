@@ -31,3 +31,7 @@ export type { NamespaceSecretsRepository } from './namespace-secrets-repository'
 export type { UserProfile, UserProfileRepository } from './user-profile-repository';
 export type { CredentialsRepository } from './credentials-repository';
 export type { WorkflowSecretsRepository } from './workflow-secrets-repository';
+export type {
+  WorkflowAssistantInstructions,
+  WorkflowAssistantInstructionsRepository,
+} from './workflow-assistant-instructions-repository';
