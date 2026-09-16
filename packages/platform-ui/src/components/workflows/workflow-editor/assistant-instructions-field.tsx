@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Check, FileText, Loader2 } from 'lucide-react';
 import { WORKFLOW_ASSISTANT_INSTRUCTIONS_MAX_CHARS } from '@mediforce/platform-core';
 import {
@@ -20,18 +20,24 @@ import { cn } from '@/lib/utils';
  */
 export function AssistantInstructionsField({ namespace }: { namespace: string }) {
   const { toast } = useToast();
-  const { instructions, loading } = useAssistantInstructions(namespace);
+  const { instructions, loading, error, retry } = useAssistantInstructions(namespace);
   const setInstructions = useSetAssistantInstructions(namespace);
   const [draft, setDraft] = useState(instructions);
   const [open, setOpen] = useState(false);
   const textareaId = useId();
+  const previousNamespace = useRef(namespace);
 
   // The server's answer is the starting text, and it arrives after the first
   // render. Adopting it only while the field is pristine keeps a late response
   // from overwriting something already being typed.
   useEffect(() => {
+    if (previousNamespace.current !== namespace) {
+      previousNamespace.current = namespace;
+      setDraft(loading ? '' : instructions);
+      return;
+    }
     setDraft((current) => (current === '' ? instructions : current));
-  }, [instructions]);
+  }, [instructions, loading, namespace]);
 
   const save = useCallback(() => {
     if (draft === instructions) return;
@@ -47,6 +53,7 @@ export function AssistantInstructionsField({ namespace }: { namespace: string })
   }, [draft, instructions, setInstructions, toast]);
 
   const remaining = WORKFLOW_ASSISTANT_INSTRUCTIONS_MAX_CHARS - draft.length;
+  const fieldDisabled = loading || error !== null || setInstructions.isPending;
 
   return (
     <div className="space-y-1">
@@ -72,13 +79,26 @@ export function AssistantInstructionsField({ namespace }: { namespace: string })
       </div>
       {open && (
         <>
+          {error !== null && (
+            <div role="alert" className="flex items-center justify-between gap-2 text-xs text-destructive">
+              <span>Could not load your instructions.</span>
+              <button
+                type="button"
+                onClick={retry}
+                aria-label="Retry loading your instructions"
+                className="rounded-md px-1.5 py-0.5 text-xs font-medium hover:bg-muted"
+              >
+                Retry
+              </button>
+            </div>
+          )}
           <label htmlFor={textareaId} className="text-xs font-medium text-muted-foreground">
             Your instructions
           </label>
           <textarea
             id={textareaId}
             value={draft}
-            disabled={loading}
+            disabled={fieldDisabled}
             maxLength={WORKFLOW_ASSISTANT_INSTRUCTIONS_MAX_CHARS}
             onChange={(event) => { setDraft(event.target.value); }}
             onBlur={save}

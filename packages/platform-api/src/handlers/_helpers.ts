@@ -102,6 +102,7 @@ export function resolveTargetUid(
   input: { readonly uid?: string },
   scope: CallerScope,
   subject: string,
+  apiKeyOperation = `read or write ${subject}`,
 ): string {
   if (scope.caller.kind === 'user') {
     if (input.uid !== undefined && input.uid !== scope.caller.uid) {
@@ -111,7 +112,7 @@ export function resolveTargetUid(
   }
   if (input.uid === undefined) {
     throw new ValidationError(
-      `apiKey caller must pass \`uid\` to read or write ${subject} — there is no implicit identity for system actors`,
+      `apiKey caller must pass \`uid\` to ${apiKeyOperation} — there is no implicit identity for system actors`,
     );
   }
   return input.uid;

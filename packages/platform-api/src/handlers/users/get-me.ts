@@ -26,7 +26,7 @@ const PERSONAL_HANDLE_FALLBACK = 'user';
  * apiKey callers are rejected — there's no uid to attribute the response to.
  */
 export async function getMe(input: GetMeInput, scope: CallerScope): Promise<GetMeOutput> {
-  const uid = resolveTargetUid(input, scope, '`me` view');
+  const uid = resolveTargetUid(input, scope, '`me` view', 'GET /api/users/me');
 
   const directory = scope.system.userDirectory;
   const [metadata, profile, passwordHash] = await Promise.all([

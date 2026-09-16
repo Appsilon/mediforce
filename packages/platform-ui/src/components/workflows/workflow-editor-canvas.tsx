@@ -1105,7 +1105,9 @@ export function WorkflowEditorCanvas({
                     className={selectBase}
                   />
                 </div>
-                {namespace !== undefined && namespace !== '' && <AssistantInstructionsField namespace={namespace} />}
+                {namespace !== undefined && namespace !== '' && (
+                  <AssistantInstructionsField key={namespace} namespace={namespace} />
+                )}
               </div>
             )}
             <div ref={assistantScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">

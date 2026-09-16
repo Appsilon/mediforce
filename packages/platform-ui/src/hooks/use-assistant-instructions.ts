@@ -5,12 +5,14 @@ import type { GetAssistantInstructionsOutput } from '@mediforce/platform-api/con
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
+import { useViewerIdentity } from '@/hooks/use-viewer-identity';
 
 export interface UseAssistantInstructionsResult {
   /** The saved text, or `''` — which is also what "saved nothing" looks like. */
   instructions: string;
   loading: boolean;
   error: Error | null;
+  retry: () => void;
 }
 
 /**
@@ -22,9 +24,13 @@ export interface UseAssistantInstructionsResult {
  * watch for, so no polling and no focus refetch.
  */
 export function useAssistantInstructions(namespace: string): UseAssistantInstructionsResult {
-  const enabled = namespace !== '';
+  const { uid } = useViewerIdentity();
+  const enabled = namespace !== '' && uid !== null;
   const query = useQuery({
-    queryKey: queryKeys.assistantInstructions(enabled ? namespace : '__noop__'),
+    queryKey: queryKeys.assistantInstructions(
+      enabled ? namespace : '__noop__',
+      uid ?? '__unauthenticated__',
+    ),
     queryFn: () => mediforce.assistant.getInstructions({ namespace }),
     enabled,
     retry: stopRetryOn4xx,
@@ -32,8 +38,9 @@ export function useAssistantInstructions(namespace: string): UseAssistantInstruc
 
   return {
     instructions: query.data?.instructions ?? '',
-    loading: query.isLoading,
+    loading: !enabled || query.isLoading || query.isFetching,
     error: (query.error as Error | null) ?? null,
+    retry: () => { void query.refetch(); },
   };
 }
 
@@ -46,6 +53,7 @@ export function useAssistantInstructions(namespace: string): UseAssistantInstruc
  */
 export function useSetAssistantInstructions(namespace: string) {
   const queryClient = useQueryClient();
+  const { uid } = useViewerIdentity();
   return useMutation<GetAssistantInstructionsOutput, Error, string>({
     mutationFn: async (instructions) => {
       await mediforce.assistant.setInstructions({ namespace, instructions });
@@ -53,7 +61,7 @@ export function useSetAssistantInstructions(namespace: string) {
     },
     onSuccess: (result) => {
       queryClient.setQueryData<GetAssistantInstructionsOutput>(
-        queryKeys.assistantInstructions(namespace),
+        queryKeys.assistantInstructions(namespace, uid ?? '__unauthenticated__'),
         result,
       );
     },
