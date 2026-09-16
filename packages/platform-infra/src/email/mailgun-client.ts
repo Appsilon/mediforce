@@ -14,6 +14,8 @@ export function createMailgunSender(
     const from = params.from ?? `${config.defaultSenderName} <${config.defaultFrom}>`;
     const formData = new URLSearchParams();
     formData.append('from', from);
+    formData.append('o:tracking-clicks', 'no');
+    formData.append('o:tracking-opens', 'no');
     for (const recipient of params.to) {
       formData.append('to', recipient);
     }
