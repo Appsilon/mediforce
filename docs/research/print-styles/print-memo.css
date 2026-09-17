@@ -1,0 +1,174 @@
+:root {
+  color-scheme: light;
+  --ink: #1a1a18;
+  --muted: #5f5b54;
+  --rule: #d9d1c3;
+  --panel: #f5efe4;
+  --accent: #8a5a2b;
+}
+
+@page {
+  size: A4;
+  margin: 22mm 18mm 20mm;
+}
+
+html {
+  font-size: 16px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body {
+  color: var(--ink);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 11.5pt;
+  line-height: 1.62;
+  margin: 0 auto;
+  max-width: 760px;
+  padding: 20px 8px 32px;
+}
+
+h1, h2, h3, h4 {
+  color: #111;
+  page-break-after: avoid;
+}
+
+h1 {
+  border-bottom: 2px solid var(--accent);
+  font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  font-size: 24pt;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.8rem;
+  padding-bottom: 0.45rem;
+}
+
+h2 {
+  border-top: 1px solid var(--rule);
+  font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  font-size: 17pt;
+  font-weight: 700;
+  margin: 2.6rem 0 0.8rem;
+  padding-top: 1.2rem;
+  page-break-before: always;
+}
+
+h2:first-of-type {
+  page-break-before: auto;
+}
+
+h3 {
+  font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  font-size: 12.5pt;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  margin: 1.7rem 0 0.5rem;
+}
+
+p:first-of-type strong:first-child {
+  letter-spacing: 0.01em;
+}
+
+p, li {
+  orphans: 3;
+  widows: 3;
+}
+
+a {
+  color: inherit;
+  text-decoration-color: #c6a47f;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 1.8rem 0;
+}
+
+blockquote {
+  background: var(--panel);
+  border-left: 4px solid var(--accent);
+  margin: 1.2rem 0 1.4rem;
+  padding: 0.9rem 1rem;
+}
+
+blockquote p {
+  margin: 0;
+}
+
+code {
+  background: #f0e7d8;
+  border-radius: 4px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  padding: 0.14em 0.32em;
+}
+
+pre {
+  background: #faf7f1;
+  border: 1px solid #e7ddce;
+  border-radius: 8px;
+  font-size: 0.88em;
+  line-height: 1.5;
+  padding: 1rem 1.1rem;
+  white-space: pre-wrap;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  border-collapse: collapse;
+  font-size: 0.93em;
+  margin: 1rem 0 1.3rem;
+  width: 100%;
+}
+
+th, td {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.55rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  border-top: 1px solid var(--rule);
+  font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.86em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+ul, ol {
+  padding-left: 1.35rem;
+}
+
+li {
+  margin: 0.2rem 0;
+}
+
+img, table, pre {
+  page-break-inside: avoid;
+}
+
+#TOC {
+  background: var(--panel);
+  border: 1px solid #e6dcca;
+  border-radius: 8px;
+  margin: 1.6rem 0 2rem;
+  padding: 1rem 1.2rem;
+}
+
+#TOC::before {
+  color: var(--accent);
+  content: "Review Map";
+  display: block;
+  font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.45rem;
+  text-transform: uppercase;
+}
