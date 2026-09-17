@@ -37,6 +37,12 @@ means a duplicated audit trail.
 worker are deployed separately and can briefly run different versions. Change
 `src/schemas.ts` additively.
 
+**Keep queue retention tight.** A remote job carries its workspace files as
+base64 in both its data and its return value, so one job can hold several MB.
+Kept completed/failed jobs and the BullMQ events stream (`streams.events.maxLen`)
+are sized in `src/queue-client.ts` to fit a 256 MiB Redis; raising them can push
+Redis into swap, where lock renewal fails and finished jobs lose their results.
+
 ## Testing
 
 Vitest covers the pieces with real logic — job processing, image builds,

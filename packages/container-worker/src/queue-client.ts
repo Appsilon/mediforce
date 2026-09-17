@@ -11,10 +11,14 @@ async function getQueue(): Promise<Queue> {
     const { Queue } = await import('bullmq');
     sharedQueue = new Queue(QUEUE_NAME, {
       connection: getRedisConnection(),
+      // Job data and return values carry workspace files as base64, so a single
+      // job can hold several MB. Retain only enough history to debug the last
+      // few runs — the default retention filled Redis past its memory limit.
       defaultJobOptions: {
-        removeOnComplete: { count: 100 },
-        removeOnFail: { count: 200 },
+        removeOnComplete: { count: 10, age: 3600 },
+        removeOnFail: { count: 20, age: 86_400 },
       },
+      streams: { events: { maxLen: 100 } },
     });
   }
   return sharedQueue;
