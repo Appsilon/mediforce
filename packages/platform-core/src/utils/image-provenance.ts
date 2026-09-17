@@ -10,6 +10,7 @@
 
 import { z } from 'zod';
 import { normalizeRepoUrls, redactRepoCredentials } from './repo-url';
+import { PULL_IMAGE_PATTERN } from './image-reference';
 import { BuildContextSchema } from './docker-build-paths';
 
 /** Label keys the platform writes on every image it builds. */
@@ -101,9 +102,24 @@ export const BuildUploadedImageRequestSchema = z
 
 export type BuildUploadedImageRequest = z.infer<typeof BuildUploadedImageRequestSchema>;
 
-/** Why an upload may not land on `image`: a version is never replaced (ADR-0022). */
-export function imageTagTakenMessage(image: string): string {
-  return `"${image}" is already on the daemon. A version is never replaced — a workflow pinning it would start running something else — so upload under another tag.`;
+/**
+ * A pull of a registry image onto the daemon. Shared for the reason
+ * `BuildImageRequestSchema` is: in-process and over the worker's route.
+ */
+export const PullImageRequestSchema = z
+  .object({
+    /** `reference:tag`, exactly as the daemon will list it. */
+    image: z.string().regex(PULL_IMAGE_PATTERN, 'image must be a registry image and tag, e.g. ghcr.io/acme/agent:v1'),
+  })
+  .strict();
+
+export type PullImageRequest = z.infer<typeof PullImageRequestSchema>;
+
+/** Why an upload or a pull may not land on `image`: a version is never
+ *  replaced (ADR-0022). */
+export function imageTagTakenMessage(image: string, act: 'upload' | 'pull'): string {
+  const remedy = act === 'upload' ? 'upload under another tag' : 'pull another tag';
+  return `"${image}" is already on the daemon. A version is never replaced — a workflow pinning it would start running something else — so ${remedy}.`;
 }
 
 /**

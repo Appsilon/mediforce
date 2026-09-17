@@ -7,7 +7,10 @@ import {
   ImageCatalogEntrySchema,
   ImageCatalogSourceSchema,
   ImageCapabilitiesSchema,
+  DOCKER_REPOSITORY_PATTERN,
+  DOCKER_TAG_PATTERN,
   isCatalogReference,
+  PULL_REFERENCE_PATTERN,
 } from '@mediforce/platform-core';
 
 const NamespaceQuery = z.object({ namespace: z.string().min(1) });
@@ -198,12 +201,8 @@ export const BuildImageCatalogVersionOutputSchema = z.object({
   entryId: z.string(),
 });
 
-/** Docker's own grammar for a repository path and a tag, so a name the daemon
- *  would refuse is a 400 here rather than a failed build. */
-const DOCKER_REPOSITORY_PATTERN =
-  /^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*$/;
-const DOCKER_TAG_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
-
+/* Docker's own grammar (`platform-core`'s `image-reference`), so a name the
+ * daemon would refuse is a 400 here rather than a failed build. */
 const ImageReferenceSchema = z
   .string()
   .regex(DOCKER_REPOSITORY_PATTERN, 'reference must be a lowercase Docker image name with no tag');
@@ -258,6 +257,30 @@ export const UploadImageCatalogVersionInputSchema = NamespaceQuery.extend({
 
 /** The same answer a repo build gives: the tag it landed under, and the entry. */
 export const UploadImageCatalogVersionOutputSchema = BuildImageCatalogVersionOutputSchema;
+
+/** A registry image as `docker pull` takes it, with no tag: an optional
+ *  registry host (a port allowed), then the repository path. */
+const PullReferenceSchema = z
+  .string()
+  .regex(
+    PULL_REFERENCE_PATTERN,
+    'reference must be a registry image name with no tag or digest, e.g. ghcr.io/acme/agent',
+  );
+
+/**
+ * POST input to pull a registry image onto the daemon and catalogue it as a
+ * version of a `referenced` entry — created by the reference's first pull, with
+ * `name` and `intent`, exactly as an upload's first version is (ADR-0022).
+ */
+export const PullImageCatalogVersionInputSchema = NamespaceQuery.extend({
+  reference: PullReferenceSchema,
+  /** Absent: `latest`, as `docker pull` reads a bare reference. */
+  tag: ImageTagSchema.optional(),
+  name: ImageCatalogEntrySchema.shape.name.optional(),
+  intent: ImageCatalogEntrySchema.shape.intent.optional(),
+}).strict();
+
+export const PullImageCatalogVersionOutputSchema = BuildImageCatalogVersionOutputSchema;
 
 /**
  * POST input to publish one version of a carried entry as an image of its own.
@@ -330,6 +353,8 @@ export type BuildImageCatalogVersionInput = z.infer<typeof BuildImageCatalogVers
 export type BuildImageCatalogVersionOutput = z.infer<typeof BuildImageCatalogVersionOutputSchema>;
 export type UploadImageCatalogVersionInput = z.infer<typeof UploadImageCatalogVersionInputSchema>;
 export type UploadImageCatalogVersionOutput = z.infer<typeof UploadImageCatalogVersionOutputSchema>;
+export type PullImageCatalogVersionInput = z.infer<typeof PullImageCatalogVersionInputSchema>;
+export type PullImageCatalogVersionOutput = z.infer<typeof PullImageCatalogVersionOutputSchema>;
 export type PublishImageCatalogVersionInput = z.infer<typeof PublishImageCatalogVersionInputSchema>;
 export type PublishImageCatalogVersionOutput = z.infer<typeof PublishImageCatalogVersionOutputSchema>;
 export type DeleteImageCatalogEntryInput = z.infer<typeof DeleteImageCatalogEntryInputSchema>;

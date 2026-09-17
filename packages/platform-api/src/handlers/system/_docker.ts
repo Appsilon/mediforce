@@ -24,6 +24,7 @@ import {
   type BuildImageRequest,
   type BuildUploadedImageRequest,
   type ImageBuildStep,
+  type PullImageRequest,
   type ImageCapabilities,
   type InspectedImage,
 } from '@mediforce/platform-core';
@@ -182,19 +183,20 @@ export async function buildLocalImage(request: BuildImageRequest): Promise<void>
 }
 
 /**
- * `POST /images/build` on the worker. Carries the same secret every route that
- * acts on the daemon does; an estate that sets none is unaffected. A 409 is an
- * upload whose tag was taken while it built.
+ * `POST` to a worker route that puts an image on the daemon — `/images/build`
+ * or `/images/pull`. Carries the same secret every route that acts on the
+ * daemon does; an estate that sets none is unaffected. A 409 is a tag already
+ * taken on the daemon.
  */
-async function postBuildToContainerWorker(
-  query: string,
+async function postImageToContainerWorker(
+  pathAndQuery: string,
   body: { contentType: string; content: BodyInit },
   options: BuildImageOptions,
 ): Promise<void> {
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const baseUrl = options.baseUrl ?? process.env.CONTAINER_WORKER_URL ?? DEFAULT_CONTAINER_WORKER_URL;
   const workerSecret = options.workerSecret ?? process.env.CONTAINER_WORKER_SECRET ?? '';
-  const response = await fetchImpl(`${baseUrl}/images/build${query}`, {
+  const response = await fetchImpl(`${baseUrl}${pathAndQuery}`, {
     method: 'POST',
     headers: {
       'Content-Type': body.contentType,
@@ -205,7 +207,7 @@ async function postBuildToContainerWorker(
   });
   if (!response.ok) {
     const parsed = (await response.json().catch(() => ({}))) as { error?: string };
-    const message = parsed.error ?? `Image build failed with status ${String(response.status)}`;
+    const message = parsed.error ?? `Worker ${pathAndQuery.split('?')[0] ?? pathAndQuery} failed with status ${String(response.status)}`;
     throw response.status === 409 ? new ConflictError(message) : new Error(message);
   }
 }
@@ -215,8 +217,8 @@ export async function buildImageViaContainerWorker(
   request: BuildImageRequest,
   options: BuildImageOptions = {},
 ): Promise<void> {
-  await postBuildToContainerWorker(
-    '',
+  await postImageToContainerWorker(
+    '/images/build',
     { contentType: 'application/json', content: JSON.stringify(request) },
     options,
   );
@@ -266,8 +268,8 @@ export async function buildUploadedImageViaContainerWorker(
     dockerfile: request.dockerfile,
     namespace: request.namespace,
   });
-  await postBuildToContainerWorker(
-    `?${query.toString()}`,
+  await postImageToContainerWorker(
+    `/images/build?${query.toString()}`,
     { contentType: BUILD_CONTEXT_MEDIA_TYPE, content: archive },
     options,
   );
@@ -283,6 +285,36 @@ export async function buildUploadedImage(
   return isLocalAgentMode()
     ? buildLocalUploadedImage(request, archive)
     : buildUploadedImageViaContainerWorker(request, archive);
+}
+
+/** A pull on the daemon this process reaches directly — the worker's own
+ *  implementation, loaded on demand for the reason `buildLocalImage` is. */
+async function pullLocalImage(request: PullImageRequest): Promise<void> {
+  const { pullImage: pullOnDaemon, ImageTagTakenError } = await import('@mediforce/container-worker');
+  try {
+    await pullOnDaemon(request.image);
+  } catch (error) {
+    throw error instanceof ImageTagTakenError ? new ConflictError(error.message) : error;
+  }
+}
+
+/** A pull on the worker's host daemon. */
+export async function pullImageViaContainerWorker(
+  request: PullImageRequest,
+  options: BuildImageOptions = {},
+): Promise<void> {
+  await postImageToContainerWorker(
+    '/images/pull',
+    { contentType: 'application/json', content: JSON.stringify(request) },
+    options,
+  );
+}
+
+/** Pull a registry image onto whichever daemon this deployment uses. Fails
+ *  loudly, like `buildImage`; a tag already on the daemon is a
+ *  `ConflictError`. */
+export async function pullImage(request: PullImageRequest): Promise<void> {
+  return isLocalAgentMode() ? pullLocalImage(request) : pullImageViaContainerWorker(request);
 }
 
 export interface FetchImageHistoryOptions {

@@ -10,12 +10,14 @@ import {
   BUILD_CONTEXT_MEDIA_TYPE,
   BuildImageRequestSchema,
   BuildUploadedImageRequestSchema,
+  PullImageRequestSchema,
 } from '@mediforce/platform-core';
 import {
   buildImageFromRepo,
   buildImageFromUpload,
   BuildContextTooLargeError,
   ImageTagTakenError,
+  pullImage,
 } from './docker-image-builder';
 
 const WORKER_HTTP_PORT = process.env.WORKER_HTTP_PORT !== undefined
@@ -37,7 +39,7 @@ function requireSecret(req: import('node:http').IncomingMessage, res: import('no
   return false;
 }
 
-/** The only route with a request body, so parsing is local to it. */
+/** A JSON request body, for the routes that take one. */
 async function readJsonBody(req: import('node:http').IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
@@ -92,6 +94,26 @@ export function startHttpServer(): Server {
       } catch (err) {
         const status = err instanceof ImageTagTakenError ? 409 : err instanceof BuildContextTooLargeError ? 413 : 500;
         jsonResponse(res, status, { error: err instanceof Error ? err.message : String(err) });
+      }
+      return;
+    }
+
+    // Puts an image on the daemon a step would otherwise pull at run time, so
+    // it carries the secret every acting route does.
+    if (req.method === 'POST' && url.pathname === '/images/pull') {
+      if (!requireSecret(req, res)) return;
+      try {
+        const parsed = PullImageRequestSchema.safeParse(await readJsonBody(req));
+        if (parsed.success === false) {
+          jsonResponse(res, 400, { error: parsed.error.issues[0]?.message ?? 'Invalid body' });
+          return;
+        }
+        await pullImage(parsed.data.image);
+        jsonResponse(res, 200, { image: parsed.data.image });
+      } catch (err) {
+        jsonResponse(res, err instanceof ImageTagTakenError ? 409 : 500, {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
       return;
     }

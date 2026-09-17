@@ -4,7 +4,7 @@
  * Lightweight copy of agent-runtime/plugins/docker-image-builder.ts.
  * Duplicated to avoid pulling agent-runtime into container-worker.
  */
-import { execFileSync, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { chmodSync, copyFileSync, existsSync, mkdtempSync, realpathSync, statSync } from 'node:fs';
@@ -12,6 +12,7 @@ import { join, sep } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { Transform, type Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { promisify } from 'node:util';
 import {
   BUILD_CONTEXT_MAX_BYTES,
   BUILD_LABELS,
@@ -287,10 +288,10 @@ async function extractArchive(archive: Readable, targetDir: string, maxBytes: nu
   if (piped.status === 'rejected') throw piped.reason;
 }
 
-/** An upload aimed at a tag the daemon already has. */
+/** An upload or a pull aimed at a tag the daemon already has. */
 export class ImageTagTakenError extends Error {
-  constructor(image: string) {
-    super(imageTagTakenMessage(image));
+  constructor(image: string, act: 'upload' | 'pull') {
+    super(imageTagTakenMessage(image, act));
     this.name = 'ImageTagTakenError';
   }
 }
@@ -331,10 +332,42 @@ export async function buildImageFromUpload(
   }
 
   try {
-    if (daemonHasImage(request.image)) throw new ImageTagTakenError(request.image);
+    if (daemonHasImage(request.image)) throw new ImageTagTakenError(request.image, 'upload');
     execFileSync('docker', ['tag', staging, request.image], { stdio: 'pipe' });
   } finally {
     removeStagingTag(staging);
+  }
+}
+
+/** A pull downloads whole images, so it is bounded as widely as a build. */
+const IMAGE_PULL_TIMEOUT_MS = 30 * 60 * 1000;
+/** `docker pull` prints a progress line per layer; a large image outgrows the
+ *  1 MiB default before it fails. */
+const IMAGE_PULL_OUTPUT_MAX_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Pull a registry image onto the daemon (ADR-0022).
+ *
+ * `docker pull` writes the tag directly — there is no staging tag to move the
+ * way an upload has — so the tag is checked right before pulling. Asynchronous,
+ * unlike the builds: a pull is mostly waiting on the network, and blocking the
+ * worker's event loop for that long would stall every other route.
+ */
+export async function pullImage(image: string): Promise<void> {
+  if (daemonHasImage(image)) throw new ImageTagTakenError(image, 'pull');
+  console.log(`[docker-image-builder] Pulling image "${image}"`);
+  try {
+    // `--` as well as the schema's pattern: an image is never read as a flag.
+    await promisify(execFile)('docker', ['pull', '--', image], {
+      timeout: IMAGE_PULL_TIMEOUT_MS,
+      maxBuffer: IMAGE_PULL_OUTPUT_MAX_BYTES,
+    });
+  } catch (error) {
+    if (error instanceof Error && 'killed' in error && error.killed === true) {
+      throw new Error(`Pulling "${image}" did not finish within ${String(IMAGE_PULL_TIMEOUT_MS / 60_000)} minutes.`);
+    }
+    const stderr = error instanceof Error && 'stderr' in error ? String(error.stderr).trim() : '';
+    throw new Error(stderr === '' ? `Could not pull "${image}".` : stderr);
   }
 }
 

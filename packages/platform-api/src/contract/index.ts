@@ -522,6 +522,8 @@ export {
   UploadImageCatalogVersionOutputSchema,
   PublishImageCatalogVersionInputSchema,
   PublishImageCatalogVersionOutputSchema,
+  PullImageCatalogVersionInputSchema,
+  PullImageCatalogVersionOutputSchema,
   type ImageCatalogVersion,
   type ImageCatalogAvailability,
   type ImageCatalogOrigin,
@@ -542,6 +544,8 @@ export {
   type UploadImageCatalogVersionOutput,
   type PublishImageCatalogVersionInput,
   type PublishImageCatalogVersionOutput,
+  type PullImageCatalogVersionInput,
+  type PullImageCatalogVersionOutput,
 } from './image-catalog';
 
 export {

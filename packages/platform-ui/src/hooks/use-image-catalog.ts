@@ -8,6 +8,7 @@ import { NICE_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
 import type {
   ImageCatalogEntryView,
   PublishImageCatalogVersionInput,
+  PullImageCatalogVersionInput,
   UploadImageCatalogVersionInput,
 } from '@mediforce/platform-api/contract';
 
@@ -228,6 +229,22 @@ export function usePublishImageVersion(namespace: string) {
   return useMutation({
     mutationFn: (input: Omit<PublishImageCatalogVersionInput, 'namespace'>) =>
       mediforce.imageCatalog.publish({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entryId),
+      });
+    },
+  });
+}
+
+/** Pull a registry image onto the daemon and catalogue it. Long-running like
+ *  `useUploadImageVersion`, and like it the first pull creates the entry. */
+export function usePullImageVersion(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<PullImageCatalogVersionInput, 'namespace'>) =>
+      mediforce.imageCatalog.pull({ namespace, ...input }),
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
       void queryClient.invalidateQueries({

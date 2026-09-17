@@ -526,3 +526,42 @@ export const imagesPublishCommand = defineCommand({
     return 0;
   },
 });
+
+export const imagesPullCommand = defineCommand({
+  name: 'mediforce images pull',
+  description:
+    'Pull a registry image onto the deployment and catalogue it. The first pull of a --reference creates a referenced entry and needs --intent; later tags add versions to it.',
+  args: {
+    namespace: { type: 'string', required: true, description: 'Namespace handle' },
+    reference: {
+      type: 'string',
+      required: true,
+      description: 'Registry image with no tag, e.g. ghcr.io/acme/agent or rocker/r-ver',
+    },
+    tag: { type: 'string', description: 'Tag to pull. Defaults to latest; a tag already on the daemon is refused' },
+    name: { type: 'string', description: 'Entry name, set by the first pull of a --reference' },
+    intent: {
+      type: 'string',
+      description: 'One sentence: what this image is FOR. Required by the first pull of a --reference',
+    },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    if (jsonMode === false) {
+      output.stdout(`Pulling ${args.reference}:${args.tag ?? 'latest'} — this can take a few minutes...`);
+    }
+    const result = await mediforce.imageCatalog.pull({
+      namespace: args.namespace,
+      reference: args.reference,
+      ...(args.tag !== undefined ? { tag: args.tag } : {}),
+      ...(args.name !== undefined ? { name: args.name } : {}),
+      ...(args.intent !== undefined ? { intent: args.intent } : {}),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    output.stdout(`Pulled ${result.imageTag} for entry ${result.entryId}.`);
+    output.stdout('It is offered in the catalog — `mediforce images list` to see it.');
+    return 0;
+  },
+});

@@ -210,6 +210,8 @@ import {
   UploadImageCatalogVersionOutputSchema,
   PublishImageCatalogVersionInputSchema,
   PublishImageCatalogVersionOutputSchema,
+  PullImageCatalogVersionInputSchema,
+  PullImageCatalogVersionOutputSchema,
   DeleteImageCatalogEntryInputSchema,
   DeleteImageCatalogEntryOutputSchema,
   ListNamespaceMembersInputSchema,
@@ -313,6 +315,8 @@ import {
   type UploadImageCatalogVersionOutput,
   type PublishImageCatalogVersionInput,
   type PublishImageCatalogVersionOutput,
+  type PullImageCatalogVersionInput,
+  type PullImageCatalogVersionOutput,
   type DeleteImageCatalogEntryInput,
   type DeleteImageCatalogEntryOutput,
   type ListTasksInput,
@@ -847,6 +851,9 @@ export class Mediforce {
     /** Publish one version of a carried entry as a `referenced` image, rebuilt
      *  from the workflow files it came from. Long-running, like `build`. */
     publish: (input: PublishImageCatalogVersionInput) => Promise<PublishImageCatalogVersionOutput>;
+    /** Pull a registry image onto the daemon and catalogue it as a `referenced`
+     *  version. Long-running, like `build`. */
+    pull: (input: PullImageCatalogVersionInput) => Promise<PullImageCatalogVersionOutput>;
   };
 
   readonly users: {
@@ -2193,6 +2200,16 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.publish');
         return PublishImageCatalogVersionOutputSchema.parse(body);
+      },
+      pull: async (input) => {
+        const { namespace, ...pullBody } = PullImageCatalogVersionInputSchema.parse(input);
+        const res = await this.request(`/api/image-catalog/pull${toSearchParams({ namespace })}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(pullBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.pull');
+        return PullImageCatalogVersionOutputSchema.parse(body);
       },
     };
 

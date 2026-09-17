@@ -1,0 +1,50 @@
+/**
+ * Docker image reference grammar, as the Image Catalog reads it (ADR-0022).
+ *
+ * One set of pieces, so the upload name, the pull reference and the image a
+ * worker pulls are three compositions of the same grammar rather than three
+ * regexes that can drift apart.
+ */
+
+/** One lowercase path component: `r-ver`, `sdtm_agent`. */
+const PATH_COMPONENT = '[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*';
+/** `acme/agent`, `rocker/r-ver` — no registry host, no tag. */
+const REPOSITORY_PATH = `${PATH_COMPONENT}(?:/${PATH_COMPONENT})*`;
+/** `ghcr.io`, `localhost:5000`. */
+const REGISTRY_HOST = '[a-zA-Z0-9.-]+(?::[0-9]+)?';
+const TAG = '[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}';
+
+/** A repository path with no host or tag — what an upload or publish names. */
+export const DOCKER_REPOSITORY_PATTERN = new RegExp(`^${REPOSITORY_PATH}$`);
+export const DOCKER_TAG_PATTERN = new RegExp(`^${TAG}$`);
+/** A registry image with no tag or digest — what a pull names. */
+export const PULL_REFERENCE_PATTERN = new RegExp(`^(?:${REGISTRY_HOST}/)?${REPOSITORY_PATH}$`);
+/** `reference:tag` — what the worker pulls. Never a leading `-`, so it can
+ *  never be read as a `docker pull` flag. */
+export const PULL_IMAGE_PATTERN = new RegExp(`^(?:${REGISTRY_HOST}/)?${REPOSITORY_PATH}:${TAG}$`);
+
+const DOCKER_HUB_HOSTS = ['docker.io/', 'index.docker.io/', 'registry-1.docker.io/'];
+
+/**
+ * Whether a reference's first path segment names a registry host rather than a
+ * user or an organization: it has a dot or a port, or is `localhost` — Docker's
+ * own rule. A workspace handle has none of these.
+ */
+export function isRegistryHost(segment: string): boolean {
+  return segment.includes('.') || segment.includes(':') || segment === 'localhost';
+}
+
+/**
+ * The repository name the daemon lists a pulled image under. Docker Hub's host
+ * and its `library/` prefix are dropped — `docker.io/library/python` and
+ * `library/python` are both listed as `python` — and a `referenced` entry
+ * resolves its versions by that listing, so any other spelling would leave the
+ * entry with none.
+ */
+export function daemonRepositoryName(reference: string): string {
+  const host = DOCKER_HUB_HOSTS.find((candidate) => reference.startsWith(candidate));
+  const path = host === undefined ? reference : reference.slice(host.length);
+  const [first] = path.split('/');
+  if (host === undefined && first !== undefined && isRegistryHost(first)) return reference;
+  return path.startsWith('library/') ? path.slice('library/'.length) : path;
+}

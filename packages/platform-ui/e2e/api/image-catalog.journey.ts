@@ -16,6 +16,7 @@ import {
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
+  OUTSIDER_NAMESPACE,
   sessionCookieHeaders,
   setupMultiNamespaceCallers,
   TEST_ORG_HANDLE,
@@ -1298,6 +1299,87 @@ test.describe('image catalog API journey', () => {
       },
     });
     expect(createRes.status(), await createRes.text()).toBe(400);
+  });
+
+  test('a member pulls a registry image and it lands as a referenced entry', async ({ request }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    test.setTimeout(300_000);
+
+    // A tag of the probe base, so the layers are already here and the pull is
+    // a manifest fetch. Written the long way to prove the name is stored the
+    // way the daemon lists it.
+    const pulledTag = 'alpine:3.22.0';
+    try {
+      docker('rmi', pulledTag);
+    } catch {
+      // Not on the daemon, which is the state this test needs.
+    }
+    let entryId = '';
+    try {
+      const pullRes = await request.post(`/api/image-catalog/pull?namespace=${TEST_ORG_HANDLE}`, {
+        headers: sessionCookieHeaders(plainMember),
+        data: {
+          reference: 'docker.io/library/alpine',
+          tag: '3.22.0',
+          intent: 'Proves a registry image reaches the catalog with no host shell.',
+        },
+      });
+      expect(pullRes.status(), await pullRes.text()).toBe(200);
+      const pulled = (await pullRes.json()) as { imageTag: string; entryId: string };
+      entryId = pulled.entryId;
+      expect(pulled.imageTag).toBe(pulledTag);
+      docker('image', 'inspect', pulledTag);
+
+      const getRes = await request.get(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+        headers: apiKeyHeaders(),
+      });
+      expect(getRes.ok(), await getRes.text()).toBe(true);
+      const { entry } = (await getRes.json()) as { entry: EntryView };
+      expect(entry.source).toEqual({ kind: 'referenced', reference: 'alpine' });
+      expect(entry.versions.map((version) => version.imageTag)).toContain(pulledTag);
+
+      // A version is never replaced, by a pull any more than by an upload.
+      const again = await request.post(`/api/image-catalog/pull?namespace=${TEST_ORG_HANDLE}`, {
+        headers: sessionCookieHeaders(plainMember),
+        data: { reference: 'alpine', tag: '3.22.0' },
+      });
+      expect(again.status(), await again.text()).toBe(409);
+    } finally {
+      try {
+        docker('rmi', pulledTag);
+      } catch {
+        // The pull may not have produced it; the assertions already said so.
+      }
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+    }
+  });
+
+  test("a pull cannot land on a name another workspace owns, or come from outside the workspace", async ({
+    request,
+  }) => {
+    const foreign = await request.post(`/api/image-catalog/pull?namespace=${TEST_ORG_HANDLE}`, {
+      headers: sessionCookieHeaders(plainMember),
+      data: { reference: `${OUTSIDER_NAMESPACE}/agent`, tag: 'v1', intent: 'Not ours to pull.' },
+    });
+    expect(foreign.status(), await foreign.text()).toBe(403);
+    const { error } = (await foreign.json()) as { error: { message: string } };
+    expect(error.message).toContain(`belongs to workspace "${OUTSIDER_NAMESPACE}"`);
+
+    const outsider = await request.post(`/api/image-catalog/pull?namespace=${TEST_ORG_HANDLE}`, {
+      headers: sessionCookieHeaders(callers.outsider),
+      data: { reference: 'alpine', tag: '3.22', intent: 'Not a member.' },
+    });
+    expect(outsider.status()).toBe(403);
+
+    const tagged = await request.post(`/api/image-catalog/pull?namespace=${TEST_ORG_HANDLE}`, {
+      headers: sessionCookieHeaders(plainMember),
+      data: { reference: 'alpine:3.22', intent: 'The tag goes in its own field.' },
+    });
+    expect(tagged.status()).toBe(400);
   });
 
   test('a caller from another namespace cannot build', async ({ request }) => {

@@ -3,7 +3,7 @@ export { removeStaleContainer } from './docker-cleanup';
 // The platform builds images in two places and this is the implementation both
 // use: the worker's own HTTP route calls it directly, and `platform-api` reaches
 // it here when the daemon is local (ADR-0022, #1344).
-export { buildImageFromRepo, buildImageFromUpload, ImageTagTakenError } from './docker-image-builder';
+export { buildImageFromRepo, buildImageFromUpload, ImageTagTakenError, pullImage } from './docker-image-builder';
 export { encodeFilePayload, decodeFilePayload, type FilePayload } from './file-payload';
 export { getRedisConnection, pingRedis } from './connection';
 export {

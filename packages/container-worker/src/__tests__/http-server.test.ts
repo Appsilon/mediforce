@@ -10,6 +10,7 @@ vi.mock('../docker-info', () => ({
 
 const uploads = vi.hoisted(() => ({
   calls: [] as Array<{ request: unknown; body: Buffer }>,
+  pulls: [] as string[],
   taken: false,
 }));
 vi.mock('../docker-image-builder', async (importOriginal) => {
@@ -17,10 +18,14 @@ vi.mock('../docker-image-builder', async (importOriginal) => {
   return {
     ImageTagTakenError,
     buildImageFromRepo: vi.fn(),
+    pullImage: async (image: string) => {
+      if (uploads.taken) throw new ImageTagTakenError(image, 'pull');
+      uploads.pulls.push(image);
+    },
     buildImageFromUpload: async (request: { image: string }, archive: AsyncIterable<Buffer>) => {
       const chunks: Buffer[] = [];
       for await (const chunk of archive) chunks.push(chunk);
-      if (uploads.taken) throw new ImageTagTakenError(request.image);
+      if (uploads.taken) throw new ImageTagTakenError(request.image, 'upload');
       uploads.calls.push({ request, body: Buffer.concat(chunks) });
     },
   };
@@ -52,6 +57,7 @@ afterEach(() => {
   }
   delete process.env.CONTAINER_WORKER_SECRET;
   uploads.calls = [];
+  uploads.pulls = [];
   uploads.taken = false;
   vi.clearAllMocks();
   vi.resetModules();
@@ -245,5 +251,50 @@ describe('HTTP info server', () => {
     const res = await fetch(`http://localhost:${port}/images`);
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: 'docker not found' });
+  });
+});
+
+describe('POST /images/pull', () => {
+  const pull = (port: number, body: unknown, headers: Record<string, string> = {}) =>
+    fetch(`http://localhost:${port}/images/pull`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    });
+
+  it('pulls the image the body names', async () => {
+    const { port } = await getServer();
+    const res = await pull(port, { image: 'ghcr.io/acme/agent:v1' });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ image: 'ghcr.io/acme/agent:v1' });
+    expect(uploads.pulls).toEqual(['ghcr.io/acme/agent:v1']);
+  });
+
+  it('answers 400 for a body that names no image, or something that is not an image and tag', async () => {
+    const { port } = await getServer();
+
+    for (const body of [{}, { image: '--all-tags' }, { image: 'ghcr.io/acme/agent' }]) {
+      expect((await pull(port, body)).status).toBe(400);
+    }
+    expect(uploads.pulls).toHaveLength(0);
+  });
+
+  it('answers 409 when the tag is already on the daemon', async () => {
+    uploads.taken = true;
+    const { port } = await getServer();
+    const res = await pull(port, { image: 'ghcr.io/acme/agent:v1' });
+
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toContain('pull another tag');
+  });
+
+  it('needs the worker secret once one is set, like a build', async () => {
+    process.env.CONTAINER_WORKER_SECRET = 'worker-secret';
+    const { port } = await getServer();
+
+    expect((await pull(port, { image: 'ghcr.io/acme/agent:v1' })).status).toBe(401);
+    expect(uploads.pulls).toHaveLength(0);
+    expect((await pull(port, { image: 'ghcr.io/acme/agent:v1' }, { 'X-Worker-Secret': 'worker-secret' })).status).toBe(200);
   });
 });

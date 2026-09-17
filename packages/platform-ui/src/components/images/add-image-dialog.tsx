@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useCatalogueImage } from '@/hooks/use-image-catalog';
 import { DockerfileAndContextFields } from './build-source-fields';
 import { CatalogueExistingImageForm } from './catalogue-existing-image-form';
+import { PullRegistryImageForm } from './pull-registry-image-form';
 import { suggestedName } from './referenced-image-fields';
 import { UploadImageForm } from './upload-image-form';
 
@@ -27,6 +28,7 @@ import { UploadImageForm } from './upload-image-form';
  * **Local folder** uploads a folder and builds it at once instead (#1345).
  * **Existing image** catalogues one the daemon already holds; Admin →
  * Infrastructure opens the dialog there, on the row it was opened from.
+ * **Registry image** pulls one onto the daemon first.
  */
 
 export function AddImageDialog({
@@ -39,7 +41,7 @@ export function AddImageDialog({
   handle: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialMode?: 'repository' | 'folder' | 'existing';
+  initialMode?: 'repository' | 'folder' | 'existing' | 'registry';
   /** The daemon repository the **Existing image** tab starts on. */
   initialRepository?: string;
 }) {
@@ -52,9 +54,9 @@ export function AddImageDialog({
   const [nameEdited, setNameEdited] = useState(false);
   const [intent, setIntent] = useState('');
   const [mode, setMode] = useState<string>(initialMode);
-  // Shared by the other two tabs, which submit through their own mutation
-  // rather than `catalogue` — this dialog's chrome only needs to know whether
-  // any of the three is mid-submit.
+  // Shared by the other tabs, which submit through their own mutation rather
+  // than `catalogue` — this dialog's chrome only needs to know whether any of
+  // them is mid-submit.
   const [otherTabPending, setOtherTabPending] = useState(false);
   const catalogue = useCatalogueImage(handle);
   const pending = catalogue.isPending || otherTabPending;
@@ -109,6 +111,11 @@ export function AddImageDialog({
                     Upload a folder with a Dockerfile and build it now — for an image whose
                     Dockerfile is in no repository the platform can reach.
                   </>
+                ) : mode === 'registry' ? (
+                  <>
+                    Pull an image from a registry onto the deployment and catalogue it — no host shell
+                    needed. A later tag of the same image adds a version.
+                  </>
                 ) : (
                   <>
                     Catalogue an image the daemon already holds — no build, for one that was pulled or
@@ -132,13 +139,14 @@ export function AddImageDialog({
           <Tabs.Root value={mode} onValueChange={setMode}>
             <Tabs.List
               aria-label="Build from"
-              className="mb-4 grid grid-cols-3 gap-1 rounded-md border bg-muted/30 p-1"
+              className="mb-4 grid grid-cols-2 gap-1 rounded-md border bg-muted/30 p-1 sm:grid-cols-4"
             >
               {(
                 [
                   ['repository', 'Git repository'],
                   ['folder', 'Local folder'],
                   ['existing', 'Existing image'],
+                  ['registry', 'Registry image'],
                 ] as const
               ).map(([value, label]) => (
                 <Tabs.Trigger
@@ -154,6 +162,15 @@ export function AddImageDialog({
 
             <Tabs.Content value="folder">
               <UploadImageForm
+                handle={handle}
+                onDone={() => onOpenChange(false)}
+                onCancel={() => onOpenChange(false)}
+                onPendingChange={setOtherTabPending}
+              />
+            </Tabs.Content>
+
+            <Tabs.Content value="registry">
+              <PullRegistryImageForm
                 handle={handle}
                 onDone={() => onOpenChange(false)}
                 onCancel={() => onOpenChange(false)}

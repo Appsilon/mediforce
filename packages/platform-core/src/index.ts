@@ -584,6 +584,7 @@ export {
   IMAGE_INSPECT_FORMAT,
   BuildImageRequestSchema,
   BuildUploadedImageRequestSchema,
+  PullImageRequestSchema,
   buildProvenanceLabelArgs,
   carriedImageLabelArgs,
   imageInspectArgs,
@@ -596,10 +597,19 @@ export {
 export type {
   BuildImageRequest,
   BuildUploadedImageRequest,
+  PullImageRequest,
   ImageProvenance,
   InspectedImage,
   ReadImageProvenance,
 } from './utils/image-provenance';
+export {
+  DOCKER_REPOSITORY_PATTERN,
+  DOCKER_TAG_PATTERN,
+  PULL_IMAGE_PATTERN,
+  PULL_REFERENCE_PATTERN,
+  daemonRepositoryName,
+  isRegistryHost,
+} from './utils/image-reference';
 export {
   BuildContextSchema,
   buildPathsStayInRepo,

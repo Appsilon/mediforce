@@ -14,6 +14,7 @@ const archiveVersionMock = vi.fn();
 const buildMock = vi.fn();
 const uploadMock = vi.fn();
 const publishMock = vi.fn();
+const pullMock = vi.fn();
 const apiFetchMock = vi.fn();
 const searchParams = new URLSearchParams();
 
@@ -44,6 +45,7 @@ vi.mock('@/lib/mediforce', () => ({
       build: (...args: unknown[]) => buildMock(...args),
       upload: (...args: unknown[]) => uploadMock(...args),
       publish: (...args: unknown[]) => publishMock(...args),
+      pull: (...args: unknown[]) => pullMock(...args),
     },
   },
 }));
@@ -699,6 +701,70 @@ describe('ImagesPage', () => {
     expect(within(picker).queryByText(/mediforce-built/)).not.toBeInTheDocument();
     expect(within(picker).queryByText(/mediforce-artifacts/)).not.toBeInTheDocument();
     expect(within(picker).getByText('acme/legacy:v2')).toBeInTheDocument();
+  });
+
+  it('pulls a registry image and catalogues it, named from the reference', async () => {
+    pullMock.mockResolvedValue({ imageTag: 'ghcr.io/acme/sdtm-agent:v1.0.0', entryId: 'sdtm-agent-1234abcd' });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /Add image/ }));
+    await user.click(screen.getByRole('tab', { name: 'Registry image' }));
+    await user.type(screen.getByLabelText('Image reference'), 'ghcr.io/acme/sdtm-agent');
+    await user.type(screen.getByLabelText('Tag (optional)'), 'v1.0.0');
+    expect(screen.getByLabelText('Name')).toHaveValue('sdtm-agent');
+    await user.type(screen.getByLabelText('Description'), 'Maps raw EDC exports to SDTM domains');
+    await user.click(screen.getByRole('button', { name: 'Pull and add' }));
+
+    await waitFor(() =>
+      expect(pullMock).toHaveBeenCalledWith({
+        namespace: 'acme',
+        reference: 'ghcr.io/acme/sdtm-agent',
+        tag: 'v1.0.0',
+        name: 'sdtm-agent',
+        intent: 'Maps raw EDC exports to SDTM domains',
+      }),
+    );
+  });
+
+  it('adds a pulled tag to the entry its reference already names, asking for nothing else', async () => {
+    pullMock.mockResolvedValue({ imageTag: 'mediforce-golden-image:v2', entryId: 'golden' });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /Add image/ }));
+    await user.click(screen.getByRole('tab', { name: 'Registry image' }));
+    await user.type(screen.getByLabelText('Image reference'), 'docker.io/library/mediforce-golden-image');
+    await user.type(screen.getByLabelText('Tag (optional)'), 'v2');
+
+    // Docker Hub's host and `library/` are how the daemon does not list it.
+    expect(screen.getByText(/Adds a version to/)).toHaveTextContent('Golden image');
+    expect(screen.queryByLabelText('Description')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Pull and add' }));
+
+    await waitFor(() =>
+      expect(pullMock).toHaveBeenCalledWith({
+        namespace: 'acme',
+        reference: 'docker.io/library/mediforce-golden-image',
+        tag: 'v2',
+      }),
+    );
+  });
+
+  it('shows why a pull failed and keeps the dialog open', async () => {
+    pullMock.mockRejectedValue(new Error('Pulling "ghcr.io/acme/private:v1" failed: unauthorized'));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /Add image/ }));
+    await user.click(screen.getByRole('tab', { name: 'Registry image' }));
+    await user.type(screen.getByLabelText('Image reference'), 'ghcr.io/acme/private');
+    await user.type(screen.getByLabelText('Tag (optional)'), 'v1');
+    await user.type(screen.getByLabelText('Description'), 'Private agent');
+    await user.click(screen.getByRole('button', { name: 'Pull and add' }));
+
+    expect(await screen.findByText(/unauthorized/)).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Registry image' })).toBeInTheDocument();
   });
 
   it('leads a failed build with the cause and keeps the output behind a disclosure', async () => {
