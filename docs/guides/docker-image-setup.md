@@ -1,10 +1,10 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-09-11
+last_reviewed: 2026-09-17
 ---
 
-# Getting a Docker image onto the platform
+# Creating and registering Docker images
 
 A step runs inside an image that must already be on the **deployment's Docker
 daemon** — the one the platform reaches over `/var/run/docker.sock`. There is no
@@ -12,9 +12,182 @@ Mediforce image registry: the platform never pushes, holds no registry URL, and
 manages no registry credentials. "Available to the platform" always means
 "present on that daemon", which is what `mediforce system images` lists.
 
-There are four ways an image gets there.
+Getting an image to a step takes two things:
 
-## 1. Build from a repo (the self-service path)
+1. **Create** it — get the image onto the daemon (build, upload, pull, load).
+2. **Register** it — catalogue it in your workspace's **Image Catalog**
+   (**Workspace → Images**, `mediforce images`), with one sentence saying what
+   it is *for*. That catalog is what the step editor's image picker offers
+   ([ADR-0022](../adr/0022-image-catalog.md)).
+
+Most paths below do both in one act. Every create and register action is open to
+any workspace member; only **Delete** needs workspace admin or owner.
+
+## Pick your path
+
+| You have… | Path | Platform can rebuild it? |
+|---|---|---|
+| A Dockerfile in a git repo the deployment can clone | [A. Git repository](#a-a-dockerfile-in-a-git-repository) | Yes, at any commit |
+| A Dockerfile you want to ship inside the workflow itself | [B. Workflow files](#b-a-dockerfile-the-workflow-carries) | Yes, on every file change |
+| A Dockerfile in a folder on your machine, no reachable repo | [C. Local folder](#c-a-local-folder) | No |
+| An image already on the daemon (pulled, loaded, built on the host) | [D. Existing image](#d-an-image-already-on-the-daemon) | No |
+| An image in a registry the deployment can pull (Docker Hub, `ghcr.io/…`) | [E. Registry image](#e-an-image-in-a-registry) | No — pull another tag |
+| An image moved with `docker save`/`load`, or a build needing secrets | [F. Host administrator](#f-anything-else-via-a-host-administrator) | No |
+| A deployment full of images nobody catalogued | [G. Backfill script](#g-backfilling-a-whole-deployment) | — |
+
+Prefer **A** whenever the Dockerfile can live in a clonable repo: the platform
+keeps the inputs, links each version to its Dockerfile at a commit, and needs no
+host access.
+
+Replace `<handle>` below with your workspace handle.
+
+### A. A Dockerfile in a git repository
+
+**In the browser**
+
+1. **Workspace → Images → Add image → Git repository.**
+2. Fill in the repository (`owner/repo`, or a full `git@…` / `https://…` URL),
+   the Dockerfile path if it is not `Dockerfile` at the root, and a **Build
+   context** if the Dockerfile `COPY`s files from outside its own directory
+   ([why](#choosing-the-build-context)).
+3. Give it a name and the **Description** — one sentence on what the image is
+   for. **Add to the catalog** creates the entry with no versions yet.
+4. **Build** on the new card, pick the commit, and wait a few minutes. The
+   version appears on the card.
+
+**From the CLI**
+
+```bash
+mediforce images create --namespace <handle> --name "My agent" \
+  --intent "Runs the SDTM mapping agent with pinned R packages" \
+  --repo acme/workflow-repo [--dockerfile container/Dockerfile] [--context apps/my-workflow]
+
+mediforce images build --namespace <handle> --repo acme/workflow-repo --commit <sha> \
+  [--dockerfile container/Dockerfile] [--context apps/my-workflow]
+```
+
+**Or skip registering first.** A step in **Built from a git repo** mode (below)
+builds the image lazily on its first run. That image then appears in **Workspace
+→ Images** as **Needs a description** within about 30 seconds — **Describe** on
+the card registers it ([details](#images-the-platform-built-are-offered-on-their-own)).
+
+### B. A Dockerfile the workflow carries
+
+1. In the workflow editor, add the Dockerfile and everything it `COPY`s to the
+   workflow's **Files** panel (upload a folder to keep its structure, e.g.
+   `container/Dockerfile` + `scripts/`).
+2. On the step, set **Image source → Built from workflow files** and pick the
+   Dockerfile. All carried files are the build context.
+3. Run or dry-run the workflow. The first run builds the image
+   (`mediforce-artifacts:<hash>`); any edit to a carried file builds a new version.
+4. **Workspace → Images** shows it as **from workflow `<name>`**, marked **Needs
+   a description** — **Describe** registers it. `mediforce images create
+   --namespace <handle> --workflow <workflow> --dockerfile container/Dockerfile
+   --name … --intent …` does the same.
+5. Optional: to keep the image after the workflow's files move on, **Publish as
+   image** on a version (or `mediforce images publish`) rebuilds it as
+   `<handle>/<name>:<tag>`, an ordinary entry any workflow can use
+   ([details](#a-dockerfile-the-workflow-carries)).
+
+### C. A local folder
+
+1. Make sure the folder is the build context: the Dockerfile and everything it
+   `COPY`s are inside it, and a `.dockerignore` excludes the rest — the upload
+   limit is 100 MiB.
+2. **Workspace → Images → Add image → Local folder**, pick the folder, review the
+   file tree, give it a name `<handle>/<name>`, a tag (optional) and the
+   **Description**.
+3. **Upload and build**, and wait a few minutes. Later versions: **Upload version**
+   on the entry.
+
+```bash
+mediforce images build --namespace <handle> --reference <handle>/my-agent --context ./my-agent \
+  [--dockerfile container/Dockerfile] [--tag v1] --intent "What this image is for"
+```
+
+Uploading from the browser drops executable bits — add `RUN chmod +x` or use the
+CLI ([details](#uploading-a-local-folder)).
+
+### D. An image already on the daemon
+
+1. **Workspace → Images → Add image → Existing image** (or the `+` on the image's
+   row in **Admin → Infrastructure**).
+2. Pick the repository, give it a name and the **Description**, then **Add to the
+   catalog**. Nothing is built; every tag of that repository becomes a version
+   of the entry.
+
+```bash
+mediforce images create --namespace <handle> --reference rocker/r-ver \
+  --name "R 4.4 base" --intent "Plain R runtime for script steps"
+```
+
+### E. An image in a registry
+
+**In the browser**
+
+1. **Workspace → Images → Add image → Registry image.**
+2. Type the **Image reference** with no tag (`rocker/r-ver`,
+   `ghcr.io/my-org/my-agent`) and a **Tag** (empty means `latest`).
+3. Give it a name and the **Description**, then **Pull and add**. The deployment
+   pulls the image and the entry appears with that tag as its first version.
+4. Later tags: the same tab with the same reference. It says **Adds a version
+   to …** and asks for nothing else.
+
+**From the CLI**
+
+```bash
+mediforce images pull --namespace <handle> --reference ghcr.io/my-org/my-agent --tag v1.0.0 \
+  --name "My agent" --intent "What this image is for"
+```
+
+A private registry needs an administrator to run `docker login` on the host
+first — the platform holds no registry credentials
+([details](#pulling-a-registry-image)).
+
+### F. Anything else, via a host administrator
+
+An image moved with `docker save` / `docker load`, or a build needing secrets
+the platform cannot supply, needs shell access to the host. Ask an administrator
+to put the image on the daemon, then register it with
+[D](#d-an-image-already-on-the-daemon).
+
+### G. Backfilling a whole deployment
+
+`scripts/migrations/adopt_daemon_images.py --draft` → fill in each intent →
+`--apply`. See [Backfilling an existing deployment](#backfilling-an-existing-deployment).
+
+## Using the image in a step
+
+In the workflow editor, each agent and script step has an **Image source**:
+
+| Mode | Use for path | Step fields it writes |
+|---|---|---|
+| **Ready image** | C, D, E, F, and images published from B | `image` — chosen from the catalog picker |
+| **Built from workflow files** | B | `dockerfile` (a carried file) |
+| **Built from a git repo** | A | `repo`, `commit`, `dockerfile`, `context` |
+
+The picker offers only catalogued images suited to the step — an agent step sees
+agent-capable images, an inline script sees images with its runtime. An image
+nobody has catalogued yet can still be typed in with **Name an image the catalog
+does not list**, but registering it is what makes it discoverable for the next
+author. See [Choosing
+a base image](#choosing-a-base-image) for what a step needs inside the image.
+
+## Check it worked
+
+```bash
+mediforce images list --namespace <handle>            # catalog entries and version counts
+mediforce images show <entry-id> --namespace <handle> # versions, base, layers
+mediforce system images                               # every image on the daemon
+mediforce system status                               # Docker daemon reachability
+```
+
+An entry reading `(no image on the daemon)` is registered but not created yet —
+build, upload or pull it.
+
+The sections below are the detail behind each path.
+
+## Building from a git repository
 
 Set `repo` + `commit` (and optionally `dockerfile` and `context`) on the step. The platform
 clones at that commit and builds before the run, tagging the result
@@ -33,7 +206,7 @@ then finds the image already built instead of rebuilding it. Any workspace
 member can do this; a build takes minutes and the command waits for it.
 
 It needs no host access and no registry, and — unlike an
-[upload](#2-upload-a-local-folder-no-repo-needed) — the platform keeps the inputs, so it
+[upload](#uploading-a-local-folder) — the platform keeps the inputs, so it
 can rebuild the image and link each version to its Dockerfile at a commit. Prefer it
 whenever the Dockerfile lives in a repo the deployment can clone. It also feeds
 the Image Catalog for free — see [below](#images-the-platform-built-are-offered-on-their-own).
@@ -82,7 +255,7 @@ built.
 The same field is **Build context** in **Add image** and **Edit**, and
 `--context` on `mediforce images create`, `update` and `build`.
 
-## 2. Upload a local folder (no repo needed)
+## Uploading a local folder
 
 For a Dockerfile in no repository the deployment can clone — no repo at all, or
 one the platform cannot reach — upload the folder it builds from:
@@ -141,38 +314,43 @@ A context that cannot build — too large, not an archive, a path that is absolu
 climbs out of the folder or runs through a symlink, no Dockerfile where you said —
 is refused with the reason before it reaches the daemon.
 
-## 3. A public image reference
+## Pulling a registry image
 
-Name a pullable reference in the step's `image` field:
+**Add image → Registry image** and `mediforce images pull` run `docker pull` on
+the deployment's daemon and catalogue the result as a `referenced` entry. The
+rules are an upload's:
 
-```
-ghcr.io/my-org/my-agent:v1.0.0
-```
+- **The first pull of a reference creates the entry** and needs the Description
+  (`--intent`). A later tag of the same reference only adds a version: its name
+  and Description belong to the entry, so change them with **Edit**.
+- **A tag already on the daemon is refused, never re-pulled.** A workflow pinning
+  it would start running something else. For a moving tag like `latest`, pull a
+  pinned tag instead — or, if the image is already there, catalogue it with
+  [Existing image](#cataloguing-an-image-already-on-the-daemon).
+- **The reference is stored the way the daemon lists it.** Docker Hub's host and
+  `library/` are dropped, so `docker.io/library/python` and `library/python` both
+  become `python`.
+- **Another workspace's name is refused.** A reference whose first segment is a
+  different workspace's handle (`acme/agent` from workspace `beta`) would land on
+  the shared daemon as that workspace's image. A registry host — anything with a
+  dot or a port, or `localhost`, like `ghcr.io/acme/agent` — is never mistaken
+  for one.
+- **A tag, not a digest.** A reference with `@sha256:…` is refused; pull the tag
+  that digest belongs to.
+- **A private registry needs `docker login` on the host**, performed by an
+  administrator. The pull fails with the registry's own error until then.
 
-`docker run` pulls it on first use if the daemon can reach it. This works
-without any platform configuration for a **public** image. A private one needs
-`docker login` performed on the host by an administrator — the platform cannot
-supply credentials on your behalf.
+A step can still name a pullable reference in its `image` field without
+cataloguing it — `docker run` pulls it on first use. The step editor's amber
+"image not found" warning checks the daemon listing, so it persists until
+something actually pulls or builds the image onto the host; pushing to a
+registry does not clear it.
 
-Note that the step editor's amber "image not found" warning checks the daemon
-listing, so it persists until something actually pulls or builds the image onto
-the host. Pushing to a registry does not clear it.
-
-## 4. Loaded on the host
+## Loading an image on the host
 
 Anything else — an image moved across with `docker save` / `docker load`, or
 one built with build secrets the platform cannot supply — requires shell access
 to the deployment host. Ask an administrator.
-
-## Verifying
-
-```bash
-mediforce images list --namespace <handle>   # the catalog, per namespace
-mediforce system images                      # every image on the daemon
-mediforce system status                      # Docker daemon reachability
-```
-
-Both report the daemon. Neither reports a registry, because there is none.
 
 ## Choosing a base image
 
@@ -192,7 +370,8 @@ Minimal base images (`alpine`, `scratch`, distroless) ship none of this. `alpine
 - **`"/<path>": not found` on a `COPY`, for a path that exists in the repository** — with no `context` set, the build context is the Dockerfile's own directory, so it cannot reach files above it. Set `context`; see [Choosing the build context](#choosing-the-build-context).
 - **`exec: "<binary>": executable file not found in $PATH`** — the image has no such executable. The container started and immediately exited 127. Point the step at an image that ships the tooling (see [Choosing a base image](#choosing-a-base-image)), or add it in a Dockerfile that builds `FROM` the minimal image.
 - **`permission denied` running a script copied from an uploaded folder** — the browser cannot read file permissions, so **Local folder** uploads every file non-executable. Add `RUN chmod +x <script>` to the Dockerfile, or upload with `mediforce images build --context`, which keeps the bit.
-- **The image still shows as missing** — check `mediforce system images`. The warning tracks what is on the daemon, not what exists in a registry, so it clears only once the image has actually been pulled or built onto the host. If the reference is private, an administrator must `docker login` on the host.
+- **The image still shows as missing** — check `mediforce system images`. The warning tracks what is on the daemon, not what exists in a registry, so it clears only once the image has actually been pulled or built onto the host — [pull it](#e-an-image-in-a-registry) to fix that now. If the reference is private, an administrator must `docker login` on the host.
+- **`is already on the daemon … so pull another tag`** — that tag is on the daemon already. Pull a different tag, or catalogue what is there with [Existing image](#d-an-image-already-on-the-daemon).
 - **`not found locally and no repo+commit configured for auto-build`** — a build-mode step reached a tag that is not on the daemon and carries no build inputs to make it. Set `repo` and `commit` on the step, or use an image that is already present.
 - **Prefer the auto-build path** — set `repo` and `commit` on the step and the platform builds it before the run, with no host access and no registry involved.
 

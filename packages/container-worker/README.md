@@ -36,9 +36,10 @@ means a duplicated audit trail.
 **Host-daemon HTTP routes carry the shared secret.** The info server's reads
 (`/health`, `/images`, `/disk`, `GET /images/:image/history`) are open, but
 anything that acts on the daemon — `DELETE /images/:id`,
-`GET /images/:image/capabilities`, which starts a probe container, and
+`GET /images/:image/capabilities`, which starts a probe container,
 `POST /images/build`, which clones a repo — or unpacks an uploaded build
-context, sent as an `application/x-tar` body — and runs a Dockerfile — requires
+context, sent as an `application/x-tar` body — and runs a Dockerfile, and
+`POST /images/pull`, which pulls a registry image onto the daemon — requires
 `X-Worker-Secret` once `CONTAINER_WORKER_SECRET` is set, and the platform sends
 the same value. History is on the open side deliberately: it reads metadata the
 daemon already holds and starts nothing.
@@ -49,7 +50,8 @@ worker are deployed separately and can briefly run different versions. Change
 it: `BuildImageRequestSchema` lives in `platform-core` because the platform
 builds in two places — in-process when the daemon is local, over this route when
 it is not — and one shape is what stops the two drifting on a field. An upload's
-query string is `BuildUploadedImageRequestSchema`, beside it, for the same reason.
+query string is `BuildUploadedImageRequestSchema`, and a pull's body
+`PullImageRequestSchema`, beside it, for the same reason.
 
 **An uploaded context is extracted, not piped.** `docker build -` reads a tar
 from stdin but applies no `.dockerignore` inside it, so `buildImageFromUpload`

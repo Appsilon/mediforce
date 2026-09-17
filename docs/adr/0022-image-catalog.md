@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-09-14
+last_reviewed: 2026-09-17
 ---
 
 # ADR-0022: The Image Catalog is an image the platform offers, keyed on its source
@@ -201,6 +201,34 @@ still describe one artifact for as long as it takes to clean up an image built
 under the old rule, so the picker offers a tag once however many entries claim
 it: the value that lands in the definition is the same string, and a second
 option would offer no choice.
+
+**A registry pull lands in a `referenced` entry, under the same rules as an
+upload.** A public image had no browser path onto the daemon: a step naming it
+pulled it on first run, but until then **Existing image** had nothing to offer
+and the catalog could only describe it through `mediforce images create
+--reference`, leaving an entry with no versions. `mediforce images pull` and
+**Add image → Registry image** run `docker pull` through the worker's
+`POST /images/pull` (or in-process when the daemon is local) and catalogue the
+result. It is the upload path with the build replaced by a pull —
+`addReferencedVersion` is the one implementation of both — so the entry rules are
+one set: the first pull of a reference creates its entry and needs the intent,
+a later tag only adds a version and may not rewrite the entry, and a tag already
+on the daemon is refused rather than replaced. Unlike an upload, `docker pull`
+writes the tag directly with no staging tag to move, so the worker checks the
+tag again immediately before pulling and a race in that gap is accepted. The
+reference is stored the way the daemon lists it — Docker Hub's host and
+`library/` dropped — since a `referenced` entry resolves its versions by that
+listing. The reference is not required to start with the workspace handle,
+because a registry image is somebody else's name; instead a reference whose
+first segment is **another** workspace's handle is refused, or a Docker Hub
+image named `acme/agent` would land on the daemon as a version of workspace
+`acme`'s uploaded entry. A first segment with a dot or a port, or `localhost`,
+is a registry host and never a handle. The check is the platform's: the
+worker's route takes any well-formed `reference:tag` and is protected by the
+worker secret, like every route that acts on the daemon. A digest is not
+accepted yet — a version of a `referenced` entry is a tag. Pulling is a member's right, as uploading is: a step
+naming the image already pulls it at run time. A private registry still needs
+`docker login` on the host — the platform holds no registry credentials.
 
 An entry's **source became editable** after the Images view shipped without any
 way to change one: an entry added through **Add image** was final, so a mistyped

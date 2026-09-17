@@ -251,7 +251,8 @@ restricts one — a Step may still name any image string.
 One image the platform offers, identified by its **source**: `built`
 `(repo, dockerfile)`, `referenced` (an untagged image reference — also what an
 image built from an **uploaded build context** lands in, named
-`<workspace>/<name>`, since the platform keeps none of its inputs), or `carried`
+`<workspace>/<name>`, and what an image **pulled from a registry** lands in,
+since the platform keeps none of their inputs), or `carried`
 `(workflow, dockerfile)` for a Dockerfile a Workflow Definition carries in its
 files. Deliberately
 **not** keyed on the commit, so a rebuild is another **Version** of a row the

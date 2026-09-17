@@ -87,6 +87,13 @@ catalogues it as a `referenced` entry. `--intent` is required the first time a
 reference is uploaded; `--declared-*` record where it came from, as declared.
 `--name`, `--intent` and `--declared-*` describe the entry the first upload
 creates: a later upload may repeat them unchanged, and is refused if they differ.
+`images pull --reference <registry image> [--tag] [--name] [--intent]` puts a
+registry image on the deployment's daemon with `docker pull` and catalogues it
+as a `referenced` entry, under the upload's rules: the first pull of a reference
+needs `--intent`, a later tag only adds a version, and a tag already on the
+daemon is refused. `--tag` defaults to `latest`; Docker Hub references are stored
+as the daemon lists them (`docker.io/library/python` → `python`), and a name
+under another workspace's handle is refused.
 
 ## Rules
 
