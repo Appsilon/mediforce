@@ -59,6 +59,15 @@ vi.mock('@/hooks/use-namespace-role', () => ({
   useNamespaceRole: () => role.value,
 }));
 
+// The real hook reads a context this page's test tree does not mount — the
+// "Existing image" tab's picker is what exercises it here.
+const dockerImages = {
+  value: { images: [] as { repository: string; tag: string; id: string; size: string; created: string }[], disk: null, isAvailable: true, isLoading: false, refresh: () => {} },
+};
+vi.mock('@/hooks/use-docker-images', () => ({
+  useDockerImages: () => dockerImages.value,
+}));
+
 vi.mock('next/navigation', () => ({
   useParams: () => ({ handle: 'acme' }),
   useSearchParams: () => searchParams,
@@ -226,6 +235,7 @@ function renderPage() {
 beforeEach(() => {
   vi.clearAllMocks();
   role.value = { role: 'member', canAdmin: false, loading: false };
+  dockerImages.value = { images: [], disk: null, isAvailable: true, isLoading: false, refresh: () => {} };
   deleteMock.mockResolvedValue({ success: true, deletedImages: [] });
   listMock.mockResolvedValue({ entries: [GOLDEN, TEALFLOW] });
   getMock.mockResolvedValue({
@@ -583,6 +593,86 @@ describe('ImagesPage', () => {
     await userEvent.type(screen.getByLabelText('Repository'), 'Appsilon/tealflow');
 
     expect(screen.getByLabelText('Name')).toHaveValue('TealFlow agent');
+  });
+
+  it('catalogues an image the daemon already holds, with no rebuild', async () => {
+    dockerImages.value = {
+      images: [
+        { repository: 'acme/legacy', tag: 'v2', id: 'sha256:legacy', size: '512MB', created: '2 months ago' },
+      ],
+      disk: null,
+      isAvailable: true,
+      isLoading: false,
+      refresh: () => {},
+    };
+    createMock.mockResolvedValue({ entry: { ...TEALFLOW, id: 'added' } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Existing image' }));
+
+    await userEvent.selectOptions(screen.getByLabelText('Image'), 'acme/legacy:v2');
+    expect(screen.getByLabelText('Name')).toHaveValue('legacy');
+    await userEvent.type(screen.getByLabelText('Description'), 'Pulled by hand, kept for the walkthrough');
+    await userEvent.click(screen.getByRole('button', { name: 'Add to the catalog' }));
+
+    expect(createMock).toHaveBeenCalledWith({
+      namespace: 'acme',
+      name: 'legacy',
+      intent: 'Pulled by hand, kept for the walkthrough',
+      source: { kind: 'referenced', reference: 'acme/legacy' },
+    });
+  });
+
+  it('groups the picker by repository, so two tags of one image offer one row', async () => {
+    dockerImages.value = {
+      images: [
+        { repository: 'acme/legacy', tag: 'v1', id: 'sha256:legacy-1', size: '500MB', created: '3 months ago' },
+        { repository: 'acme/legacy', tag: 'v2', id: 'sha256:legacy-2', size: '512MB', created: '2 months ago' },
+      ],
+      disk: null,
+      isAvailable: true,
+      isLoading: false,
+      refresh: () => {},
+    };
+    createMock.mockResolvedValue({ entry: { ...TEALFLOW, id: 'added' } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Existing image' }));
+
+    const picker = screen.getByLabelText('Image');
+    expect(within(picker).getAllByRole('option')).toHaveLength(2); // placeholder + one repository row
+    expect(within(picker).getByText('acme/legacy (2 tags)')).toBeInTheDocument();
+
+    await userEvent.selectOptions(picker, 'acme/legacy (2 tags)');
+    await userEvent.type(screen.getByLabelText('Description'), 'Both tags kept around');
+    await userEvent.click(screen.getByRole('button', { name: 'Add to the catalog' }));
+
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({ source: { kind: 'referenced', reference: 'acme/legacy' } }),
+    );
+  });
+
+  it('offers only daemon images no entry already describes', async () => {
+    dockerImages.value = {
+      images: [
+        { repository: 'mediforce-golden-image', tag: 'latest', id: 'sha256:golden', size: '2.1GB', created: '3 weeks ago' },
+        { repository: 'acme/legacy', tag: 'v2', id: 'sha256:legacy', size: '512MB', created: '2 months ago' },
+      ],
+      disk: null,
+      isAvailable: true,
+      isLoading: false,
+      refresh: () => {},
+    };
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Existing image' }));
+
+    const picker = screen.getByLabelText('Image');
+    expect(within(picker).queryByText('mediforce-golden-image:latest')).not.toBeInTheDocument();
+    expect(within(picker).getByText('acme/legacy:v2')).toBeInTheDocument();
   });
 
   it('leads a failed build with the cause and keeps the output behind a disclosure', async () => {

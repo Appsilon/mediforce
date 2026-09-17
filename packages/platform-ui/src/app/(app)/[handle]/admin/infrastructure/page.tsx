@@ -3,8 +3,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Server, HardDrive, Container, AlertTriangle, ArrowUpDown, Trash2, ChevronDown, ChevronRight, Layers, Loader2 } from 'lucide-react';
+import { ArrowLeft, Server, HardDrive, Container, AlertTriangle, ArrowUpDown, Trash2, ChevronDown, ChevronRight, Layers, Loader2, Plus } from 'lucide-react';
 import { mediforce, ApiError } from '@/lib/mediforce';
+import { CatalogueExistingImageDialog } from '@/components/images/catalogue-existing-image-dialog';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useImageCatalogEntries } from '@/hooks/use-image-catalog';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
@@ -66,6 +67,7 @@ export default function AdminInfrastructurePage() {
   const [sortField, setSortField] = useState<SortField>('size');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [cataloguingImage, setCataloguingImage] = useState<DockerImageInfo | null>(null);
 
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -207,6 +209,7 @@ export default function AdminInfrastructurePage() {
                         catalogEntry={catalogEntryByImageRef.get(`${img.repository}:${img.tag}`)}
                         deleting={deletingId === img.id}
                         onDelete={() => handleDeleteImage(img.id)}
+                        onCatalogue={() => setCataloguingImage(img)}
                       />
                     ))}
                   </tbody>
@@ -215,6 +218,17 @@ export default function AdminInfrastructurePage() {
             )}
           </div>
         </>
+      )}
+
+      {cataloguingImage !== null && (
+        <CatalogueExistingImageDialog
+          handle={handle}
+          image={cataloguingImage}
+          open={cataloguingImage !== null}
+          onOpenChange={(value) => {
+            if (!value) setCataloguingImage(null);
+          }}
+        />
       )}
     </div>
   );
@@ -269,12 +283,13 @@ function DiskCard({ icon, title, count, active, size }: {
   );
 }
 
-function ImageRow({ img, handle, catalogEntry, deleting, onDelete }: {
+function ImageRow({ img, handle, catalogEntry, deleting, onDelete, onCatalogue }: {
   img: DockerImageInfo;
   handle: string;
   catalogEntry: { id: string; name: string } | undefined;
   deleting: boolean;
   onDelete: () => void;
+  onCatalogue: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const imageRef = `${img.repository}:${img.tag}`;
@@ -307,15 +322,25 @@ function ImageRow({ img, handle, catalogEntry, deleting, onDelete }: {
         <td className="px-4 py-2 font-mono text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             {img.id}
-            {catalogEntry !== undefined && (
+            {catalogEntry !== undefined ? (
               <Link
                 href={routes.image(handle, catalogEntry.id)}
-                aria-label={`Open “${catalogEntry.name}” in the image catalog`}
-                title={`Open “${catalogEntry.name}” in the image catalog`}
+                aria-label={`Open "${catalogEntry.name}" in the image catalog`}
+                title={`Open "${catalogEntry.name}" in the image catalog`}
                 className="text-primary hover:text-primary/80 transition-colors"
               >
                 <Layers className="h-3.5 w-3.5" />
               </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={onCatalogue}
+                aria-label={`Add ${imageRef} to the image catalog`}
+                title={`Add ${imageRef} to the image catalog`}
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
             )}
           </span>
         </td>

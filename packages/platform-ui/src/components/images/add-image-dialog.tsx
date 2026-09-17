@@ -6,6 +6,7 @@ import { Loader2, X } from 'lucide-react';
 import { useState } from 'react';
 import { useCatalogueImage } from '@/hooks/use-image-catalog';
 import { DockerfileAndContextFields } from './build-source-fields';
+import { CatalogueExistingImageForm } from './catalogue-existing-image-form';
 import { UploadImageForm } from './upload-image-form';
 
 /**
@@ -51,9 +52,12 @@ export function AddImageDialog({
   const [nameEdited, setNameEdited] = useState(false);
   const [intent, setIntent] = useState('');
   const [mode, setMode] = useState('repository');
-  const [uploading, setUploading] = useState(false);
+  // Shared by the other two tabs, which submit through their own mutation
+  // rather than `catalogue` — this dialog's chrome only needs to know whether
+  // any of the three is mid-submit.
+  const [otherTabPending, setOtherTabPending] = useState(false);
   const catalogue = useCatalogueImage(handle);
-  const pending = catalogue.isPending || uploading;
+  const pending = catalogue.isPending || otherTabPending;
 
   const effectiveName = nameEdited ? name : suggestedName(repo);
 
@@ -100,10 +104,15 @@ export function AddImageDialog({
                     is built yet — the entry appears with no versions, and <strong>Build</strong> on
                     its card makes the first one.
                   </>
-                ) : (
+                ) : mode === 'folder' ? (
                   <>
                     Upload a folder with a Dockerfile and build it now — for an image whose
                     Dockerfile is in no repository the platform can reach.
+                  </>
+                ) : (
+                  <>
+                    Catalogue an image the daemon already holds — no build, for one that was pulled or
+                    built by hand and has no recipe the platform can rebuild it from.
                   </>
                 )}
               </Dialog.Description>
@@ -123,12 +132,13 @@ export function AddImageDialog({
           <Tabs.Root value={mode} onValueChange={setMode}>
             <Tabs.List
               aria-label="Build from"
-              className="mb-4 grid grid-cols-2 gap-1 rounded-md border bg-muted/30 p-1"
+              className="mb-4 grid grid-cols-3 gap-1 rounded-md border bg-muted/30 p-1"
             >
               {(
                 [
                   ['repository', 'Git repository'],
                   ['folder', 'Local folder'],
+                  ['existing', 'Existing image'],
                 ] as const
               ).map(([value, label]) => (
                 <Tabs.Trigger
@@ -147,7 +157,16 @@ export function AddImageDialog({
                 handle={handle}
                 onDone={() => onOpenChange(false)}
                 onCancel={() => onOpenChange(false)}
-                onPendingChange={setUploading}
+                onPendingChange={setOtherTabPending}
+              />
+            </Tabs.Content>
+
+            <Tabs.Content value="existing">
+              <CatalogueExistingImageForm
+                handle={handle}
+                onDone={() => onOpenChange(false)}
+                onCancel={() => onOpenChange(false)}
+                onPendingChange={setOtherTabPending}
               />
             </Tabs.Content>
 

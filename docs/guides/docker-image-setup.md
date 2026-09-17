@@ -209,8 +209,8 @@ still offered by the step-editor picker, labelled `not described yet`.
 
 This covers only what the platform built **for your namespace**. A pulled or
 hand-built image — `python`, `rocker/r-ver`, anything pushed to a registry —
-carries no build labels, so nothing can derive its source and it is catalogued
-by hand.
+carries no build labels, so nothing can derive its source; [cataloguing it is a
+few clicks](#cataloguing-an-image-already-on-the-daemon), not a terminal.
 
 ### A Dockerfile the workflow carries
 
@@ -246,6 +246,20 @@ write.
 The entry appears with **no versions**, which is the honest state: a catalog
 entry is an offer, and nothing has built the image yet. **Build** on the new
 card, or `mediforce images build`, gives it its first one.
+
+## Cataloguing an image already on the daemon
+
+For an image the daemon already holds with no build recipe behind it — pulled
+by hand, loaded, or built on the host outside the platform — **Workspace →
+Images → Add image → Existing image** picks it from every daemon repository no
+entry yet describes and asks only for the name and the intent sentence: no
+build, no upload, just a `referenced` entry naming the repository. Every tag it
+has — now or added later — resolves as one of its versions, the same as an
+uploaded image. **Admin → Infrastructure** offers the same action as a `+` on
+any row with no catalog match, next to the `Layers` icon a matched row links to
+its entry with; picking it from one tag's row still catalogues every tag of
+that repository. Both call the same write **Add image**'s other tabs and
+`mediforce images create --reference <repository>` do.
 
 ## Changing what an entry says
 
