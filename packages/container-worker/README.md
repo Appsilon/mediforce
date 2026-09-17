@@ -37,11 +37,14 @@ means a duplicated audit trail.
 worker are deployed separately and can briefly run different versions. Change
 `src/schemas.ts` additively.
 
-**Keep queue retention tight.** A remote job carries its workspace files as
-base64 in both its data and its return value, so one job can hold several MB.
-Kept completed/failed jobs and the BullMQ events stream (`streams.events.maxLen`)
-are sized in `src/queue-client.ts` to fit a 256 MiB Redis; raising them can push
-Redis into swap, where lock renewal fails and finished jobs lose their results.
+**Workspace files never ride inside a job.** A remote caller's files are base64
+and can run to many MB. BullMQ keeps job data in the job hash and a return value
+in both the hash and the `completed` event, retained by count (and the events
+stream trimmed by entry count, not bytes), so files there filled a 256 MiB Redis.
+`src/file-payload-store.ts` moves them to their own keys: the caller deletes them
+once the job settles, a TTL covers a caller that died. Keep new large fields out
+of job data and results the same way. Retention in `src/queue-client.ts` stays
+small anyway, since stdout/stderr still sit in every return value.
 
 ## Testing
 

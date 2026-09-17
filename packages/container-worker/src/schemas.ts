@@ -31,6 +31,9 @@ export const DockerJobDataSchema = z.object({
    *  content (see file-payload.ts). Sent through Redis when caller and worker
    *  don't share a filesystem (e.g. Vercel → VPS). */
   inputFiles: z.record(z.string(), z.string()).optional(),
+  /** Redis key holding `inputFiles` when they travel beside the job instead of
+   *  inside it (see file-payload-store.ts). */
+  inputFilesKey: z.string().optional(),
   /** Image build metadata — when present, worker ensures image exists before
    *  docker run. Either a repo at a commit, or `contextDir`: a host directory
    *  that already holds the build context (the files a workflow carries,
@@ -58,6 +61,8 @@ export const DockerJobResultSchema = z.object({
    *  POSIX relative path with base64-encoded content (see file-payload.ts).
    *  Returned through Redis so the caller can recreate them locally. */
   outputFiles: z.record(z.string(), z.string()).optional(),
+  /** Redis key holding `outputFiles` when the job's inputs came by key. */
+  outputFilesKey: z.string().optional(),
 });
 
 export type DockerJobResult = z.infer<typeof DockerJobResultSchema>;
