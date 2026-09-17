@@ -52,7 +52,7 @@
  * `/output/result.json`. A rename is a breaking change across all those and
  * belongs in its own PR.
  */
-import { existsSync, mkdirSync, cpSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, renameSync } from 'node:fs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
@@ -523,6 +523,11 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
    * Idempotent: a cache hit is a no-op. Stores nothing on instance state — the
    * cache path is derived on demand by {@link resolveSkillsDir} via
    * {@link skillsCacheDir}, so concurrent steps can't leak or clobber it.
+   *
+   * Populates via a staging dir + rename so a process kill mid-copy (OOM,
+   * step timeout, engine restart) can never leave a half-populated directory
+   * at `cacheDir` — `existsSync(cacheDir)` above would treat that as a
+   * permanent cache hit and every future run would fail to find the skill.
    */
   protected async fetchSkillsFromRepo(
     skillsDir: string,
@@ -538,9 +543,11 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
       return;
     }
 
-    // Cache miss — clone, copy, delete clone
+    // Cache miss — clone, copy into a staging dir, delete clone
     console.log(`[container-plugin] Fetching skills from ${repoRef}@${commit.slice(0, 8)} path=${skillsDir}`);
     const cloneDir = mkdtempSync(join(tmpdir(), 'mediforce-skills-clone-'));
+    mkdirSync(SKILLS_CACHE_DIR, { recursive: true });
+    const stagingDir = mkdtempSync(join(SKILLS_CACHE_DIR, '.staging-'));
 
     try {
       cloneRepoAtCommit(cloneDir, repoRef, commit, repoToken);
@@ -552,11 +559,22 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
         );
       }
 
-      mkdirSync(SKILLS_CACHE_DIR, { recursive: true });
-      cpSync(sourceDir, cacheDir, { recursive: true });
-      console.log(`[container-plugin] Skills cached at ${cacheDir}`);
+      const stagedSkills = join(stagingDir, 'skills');
+      cpSync(sourceDir, stagedSkills, { recursive: true });
+
+      try {
+        renameSync(stagedSkills, cacheDir);
+        console.log(`[container-plugin] Skills cached at ${cacheDir}`);
+      } catch (error) {
+        // A concurrent fetch for the same content-addressed key won the
+        // race and already populated cacheDir — its content is identical
+        // by construction, so this attempt is redundant, not a failure.
+        if (!existsSync(cacheDir)) throw error;
+        console.log(`[container-plugin] Skills cache populated concurrently for ${skillsDir} (${cacheDir})`);
+      }
     } finally {
       rmSync(cloneDir, { recursive: true, force: true });
+      rmSync(stagingDir, { recursive: true, force: true });
     }
   }
 
