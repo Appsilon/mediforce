@@ -66,9 +66,8 @@ MUST (once you build a custom image or pin sources **from a repository**):
 
 A workflow that carries its own files pins nothing: the Dockerfile, the scripts
 and the skills live on the definition, version with it, and the image tag is
-derived from their content. There the build context is all of the carried files
-unless the step sets `context` to narrow it, and `dockerfile` stays the carried
-file's own path either way. `repo` + `commit` describe a repository that
+derived from their content. There the build context is always all of the carried
+files, and `dockerfile` is the carried file's own path. `repo` + `commit` describe a repository that
 actually exists — a placeholder SHA (all zeros) or an invented URL is refused at
 registration, because it names a build that can never run.
 - Avoid `latest` image tags outside local development.

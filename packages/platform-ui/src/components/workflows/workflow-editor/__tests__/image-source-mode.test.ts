@@ -80,10 +80,12 @@ describe('clearForMode', () => {
     expect(clearForMode('repo')).toEqual({ image: undefined });
   });
 
-  it('keeps the Dockerfile and context when moving between build modes', () => {
+  it('keeps the Dockerfile when moving between build modes, and the context only for a repo', () => {
     expect(Object.keys(clearForMode('repo'))).not.toContain('dockerfile');
+    expect(Object.keys(clearForMode('repo'))).not.toContain('context');
     expect(Object.keys(clearForMode('carried'))).not.toContain('dockerfile');
-    expect(Object.keys(clearForMode('carried'))).not.toContain('context');
+    // A carried build always reads every carried file.
+    expect(Object.keys(clearForMode('carried'))).toContain('context');
   });
 });
 
@@ -91,6 +93,11 @@ describe('unusedFieldsForMode', () => {
   it('names the build fields a ready image ignores', () => {
     expect(unusedFieldsForMode('ready', { image: 'x', dockerfile: 'D', repo: 'r' }, CARRIED))
       .toEqual(['dockerfile', 'repo']);
+  });
+
+  it('names a context, which a carried build ignores', () => {
+    expect(unusedFieldsForMode('carried', { dockerfile: 'container/Dockerfile', context: 'container' }, CARRIED))
+      .toEqual(['context']);
   });
 
   it('names the repo fields a carried build ignores', () => {

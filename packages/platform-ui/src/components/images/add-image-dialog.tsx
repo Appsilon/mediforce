@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useCatalogueImage } from '@/hooks/use-image-catalog';
 import { DockerfileAndContextFields } from './build-source-fields';
 import { CatalogueExistingImageForm } from './catalogue-existing-image-form';
+import { suggestedName } from './referenced-image-fields';
 import { UploadImageForm } from './upload-image-form';
 
 /**
@@ -24,24 +25,23 @@ import { UploadImageForm } from './upload-image-form';
  * card is what gives it one.
  *
  * **Local folder** uploads a folder and builds it at once instead (#1345).
+ * **Existing image** catalogues one the daemon already holds; Admin →
+ * Infrastructure opens the dialog there, on the row it was opened from.
  */
-
-/** The repo's last path segment: `git@github.com:Appsilon/tealflow.git` →
- *  `tealflow`. The same suggestion a discovered entry arrives with, so an entry
- *  added by hand and one the platform found are named alike. */
-function suggestedName(repo: string): string {
-  const withoutTrailingSlash = repo.trim().replace(/\/+$/, '');
-  return (withoutTrailingSlash.split('/').pop() ?? withoutTrailingSlash).replace(/\.git$/, '');
-}
 
 export function AddImageDialog({
   handle,
   open,
   onOpenChange,
+  initialMode = 'repository',
+  initialRepository,
 }: {
   handle: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialMode?: 'repository' | 'folder' | 'existing';
+  /** The daemon repository the **Existing image** tab starts on. */
+  initialRepository?: string;
 }) {
   const [repo, setRepo] = useState('');
   const [dockerfile, setDockerfile] = useState('');
@@ -51,7 +51,7 @@ export function AddImageDialog({
   // that keeps reasserting itself is a field you cannot fill in.
   const [nameEdited, setNameEdited] = useState(false);
   const [intent, setIntent] = useState('');
-  const [mode, setMode] = useState('repository');
+  const [mode, setMode] = useState<string>(initialMode);
   // Shared by the other two tabs, which submit through their own mutation
   // rather than `catalogue` — this dialog's chrome only needs to know whether
   // any of the three is mid-submit.
@@ -87,7 +87,7 @@ export function AddImageDialog({
     <Dialog.Root
       open={open}
       onOpenChange={(value) => {
-        if (pending) return;
+        if (pending === true) return;
         onOpenChange(value);
       }}
     >
@@ -164,6 +164,7 @@ export function AddImageDialog({
             <Tabs.Content value="existing">
               <CatalogueExistingImageForm
                 handle={handle}
+                initialRepository={initialRepository}
                 onDone={() => onOpenChange(false)}
                 onCancel={() => onOpenChange(false)}
                 onPendingChange={setOtherTabPending}

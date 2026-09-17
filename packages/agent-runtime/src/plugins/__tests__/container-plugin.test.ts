@@ -364,9 +364,9 @@ describe('resolveImageBuild — an image the catalog published is never a build 
   });
 });
 
-// The whole carried set is the build context unless a step narrows it, which is
-// what lets a `container/Dockerfile` `COPY scripts/` and what an uploaded folder
-// does too. Only what Docker is sent counts towards the content hash.
+// The whole carried set is always the build context, which is what lets a
+// `container/Dockerfile` `COPY scripts/`, so every carried file counts towards
+// the content hash.
 describe('resolveImageBuild — the context of a carried Dockerfile', () => {
   const dockerfile = { path: 'container/Dockerfile', contents: 'FROM python:3.12-slim\nCOPY scripts/ /scripts/\n' };
   const entrypoint = { path: 'container/entrypoint.sh', contents: 'echo hi\n' };
@@ -380,10 +380,9 @@ describe('resolveImageBuild — the context of a carried Dockerfile', () => {
     step: { id: 's1' },
   } as unknown as WorkflowAgentContext);
 
-  it('hands the builder the Dockerfile and context as the step named them, labelled with the workflow', () => {
-    const build = buildFor([dockerfile, entrypoint, script], { dockerfile: dockerfile.path, context: 'container' });
+  it('hands the builder the Dockerfile as the step named it, labelled with the workflow', () => {
+    const build = buildFor([dockerfile, entrypoint, script]);
     expect(build?.dockerfile).toBe('container/Dockerfile');
-    expect(build?.context).toBe('container');
     expect(build?.contextDir).toBe(artifactsDir([dockerfile, entrypoint, script]));
     expect(build?.workflow).toBe('wf');
     expect(build?.namespace).toBe('acme');
@@ -395,26 +394,16 @@ describe('resolveImageBuild — the context of a carried Dockerfile', () => {
     expect(after?.artifactsHash).not.toBe(before?.artifactsHash);
   });
 
-  it('does not rebuild for an edit outside a context the step narrowed', () => {
-    const config = { dockerfile: dockerfile.path, context: 'container' };
-    const before = buildFor([dockerfile, entrypoint, script], config);
-    const after = buildFor([dockerfile, entrypoint, { ...script, contents: 'print("edited")\n' }], config);
-    expect(after?.artifactsHash).toBe(before?.artifactsHash);
-    expect(after?.image).toBe(before?.image);
-  });
-
-  it('rebuilds for an edit inside that context', () => {
-    const config = { dockerfile: dockerfile.path, context: 'container' };
-    const before = buildFor([dockerfile, entrypoint, script], config);
-    const after = buildFor([dockerfile, { ...entrypoint, contents: 'echo bye\n' }, script], config);
-    expect(after?.artifactsHash).not.toBe(before?.artifactsHash);
-  });
-
-  it('reads the Dockerfile by its own path whether or not a context is named', () => {
-    // A carried file is named by its path from the root everywhere else, so a
-    // step that narrows the context does not re-spell the Dockerfile.
-    expect(buildFor([dockerfile, entrypoint], { dockerfile: 'container/Dockerfile', context: 'container' })?.image)
-      .toMatch(/^mediforce-artifacts:/);
+  it('ignores a context the step names, building from every carried file as it always has', () => {
+    // A registered version cannot be edited, so one naming `context` next to a
+    // carried Dockerfile must keep building the way it did before carried
+    // images were catalogued.
+    const files = [dockerfile, entrypoint, script];
+    const plain = buildFor(files);
+    const named = buildFor(files, { dockerfile: dockerfile.path, context: 'container' });
+    expect(named?.context).toBeUndefined();
+    expect(named?.image).toBe(plain?.image);
+    expect(named?.artifactsHash).toBe(plain?.artifactsHash);
     expect(buildFor([dockerfile, entrypoint], { dockerfile: 'Dockerfile', context: 'container' })).toBeUndefined();
   });
 

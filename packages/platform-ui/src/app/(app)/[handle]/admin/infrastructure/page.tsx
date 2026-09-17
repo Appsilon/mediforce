@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Server, HardDrive, Container, AlertTriangle, ArrowUpDown, Trash2, ChevronDown, ChevronRight, Layers, Loader2, Plus } from 'lucide-react';
 import { mediforce, ApiError } from '@/lib/mediforce';
-import { CatalogueExistingImageDialog } from '@/components/images/catalogue-existing-image-dialog';
+import { AddImageDialog } from '@/components/images/add-image-dialog';
+import { isPlatformBuilt } from '@/components/images/catalogue-existing-image-form';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useImageCatalogEntries } from '@/hooks/use-image-catalog';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
@@ -221,12 +222,13 @@ export default function AdminInfrastructurePage() {
       )}
 
       {cataloguingImage !== null && (
-        <CatalogueExistingImageDialog
+        <AddImageDialog
           handle={handle}
-          image={cataloguingImage}
+          initialMode="existing"
+          initialRepository={cataloguingImage.repository}
           open={cataloguingImage !== null}
           onOpenChange={(value) => {
-            if (!value) setCataloguingImage(null);
+            if (value === false) setCataloguingImage(null);
           }}
         />
       )}
@@ -331,7 +333,7 @@ function ImageRow({ img, handle, catalogEntry, deleting, onDelete, onCatalogue }
               >
                 <Layers className="h-3.5 w-3.5" />
               </Link>
-            ) : (
+            ) : isPlatformBuilt(img) === false && (
               <button
                 type="button"
                 onClick={onCatalogue}

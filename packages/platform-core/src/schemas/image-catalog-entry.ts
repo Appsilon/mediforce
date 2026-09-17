@@ -103,6 +103,15 @@ export const ImageCatalogEntrySchema = z
   })
   .strict();
 
+/**
+ * A name the Image Catalog owns: `<workspace>/<something>`. The daemon is shared
+ * by every workspace, so a workspace publishes and uploads only under its own
+ * handle, and a build must never land on such a name (ADR-0022, #1345).
+ */
+export function isCatalogReference(image: string, namespace: string | undefined): boolean {
+  return typeof namespace === 'string' && namespace.length > 0 && image.startsWith(`${namespace}/`);
+}
+
 export type ImageCatalogSource = z.infer<typeof ImageCatalogSourceSchema>;
 export type ImageCatalogDeclaredSource = z.infer<typeof ImageCatalogDeclaredSourceSchema>;
 export type ImageCatalogEntry = z.infer<typeof ImageCatalogEntrySchema>;

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { APIRequestContext } from '@playwright/test';
-import { carriedBuildPaths, packBuildContextArchive, WorkflowDefinitionSchema } from '@mediforce/platform-core';
+import { carriedDockerfile, packBuildContextArchive, WorkflowDefinitionSchema } from '@mediforce/platform-core';
 // The builder and the content hash a run uses. The `builds` sub-path, not the
 // package index, which pulls in a plugin whose `import.meta` Playwright's
 // loader cannot parse.
@@ -1145,11 +1145,11 @@ test.describe('image catalog API journey', () => {
       expect(definitionRes.ok(), await definitionRes.text()).toBe(true);
       const definition = WorkflowDefinitionSchema.parse(((await definitionRes.json()) as { definition: unknown }).definition);
       const config = definition.steps[0].script;
-      const paths = carriedBuildPaths(config, definition.artifacts);
-      if (config === undefined || paths === null || definition.artifacts === undefined) {
+      const dockerfile = carriedDockerfile(config, definition.artifacts);
+      if (config === undefined || dockerfile === null || definition.artifacts === undefined) {
         throw new Error('the registered step does not build from its carried Dockerfile');
       }
-      const build = { paths, workflow: definition.name, namespace: definition.namespace };
+      const build = { dockerfile, workflow: definition.name, namespace: definition.namespace };
       const carriedTag = artifactsBuildTag(definition.artifacts, build);
       const contentHash = artifactsBuildHash(definition.artifacts, build);
       cleanupTags.push(carriedTag);
@@ -1158,7 +1158,6 @@ test.describe('image catalog API journey', () => {
         image: carriedTag,
         contextDir: contextDir ?? '',
         dockerfile: config.dockerfile,
-        context: config.context,
         artifactsHash: contentHash,
         workflow: definition.name,
         namespace: definition.namespace,

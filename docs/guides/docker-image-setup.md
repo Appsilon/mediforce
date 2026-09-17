@@ -217,11 +217,9 @@ few clicks](#cataloguing-an-image-already-on-the-daemon), not a terminal.
 A step whose `dockerfile` names one of the workflow's own files builds on its
 first run or dry run, with no repository involved, and the image shows up here
 the same way, as **from workflow `<name>`**. Its versions are content hashes
-rather than commits: an edit to a file inside the build context builds a new
-version. All of the workflow's files are that context, so a `container/Dockerfile`
-can `COPY scripts/`; set `context` on the step to narrow it to one directory,
-after which a script kept outside it and run from `/artifacts` rebuilds nothing.
-It has no **Build** action, because a run is what builds it. A live workflow version that
+rather than commits: an edit to any of the workflow's files builds a new
+version. All of those files are the build context, so a `container/Dockerfile`
+can `COPY scripts/`. It has no **Build** action, because a run is what builds it. A live workflow version that
 runs on it blocks deleting it, like any other pin.
 
 Such an image lasts as long as the workflow carries its files. **Publish as
@@ -255,11 +253,15 @@ Images → Add image → Existing image** picks it from every daemon repository 
 entry yet describes and asks only for the name and the intent sentence: no
 build, no upload, just a `referenced` entry naming the repository. Every tag it
 has — now or added later — resolves as one of its versions, the same as an
-uploaded image. **Admin → Infrastructure** offers the same action as a `+` on
-any row with no catalog match, next to the `Layers` icon a matched row links to
-its entry with; picking it from one tag's row still catalogues every tag of
-that repository. Both call the same write **Add image**'s other tabs and
-`mediforce images create --reference <repository>` do.
+uploaded image. A repository holding any image the platform built (a repo or
+carried build, `mediforce-built`, `mediforce-artifacts`) is not offered: those
+images are already offered as discovered entries, and the shared repositories
+hold every workspace's builds. **Admin → Infrastructure** offers the same
+action as a `+` on any other row with no catalog match, next to the `Layers`
+icon a matched row links to its entry with; it opens the same dialog on that
+row's repository, and still catalogues every tag of it. Both call the same
+write **Add image**'s other tabs and `mediforce images create --reference
+<repository>` do.
 
 ## Changing what an entry says
 

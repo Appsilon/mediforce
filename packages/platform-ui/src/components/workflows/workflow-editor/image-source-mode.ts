@@ -1,4 +1,10 @@
-import { carriedBuildPaths, type ContainerConfig, type WorkflowDefinition } from '@mediforce/platform-core';
+import {
+  carriedDockerfile,
+  isCatalogReference,
+  looksLikeDockerfile,
+  type ContainerConfig,
+  type WorkflowDefinition,
+} from '@mediforce/platform-core';
 
 /**
  * Where a step's container image comes from, as an author picks it.
@@ -38,7 +44,7 @@ export function deriveImageSourceMode(
 ): ImageSourceMode {
   if (config === undefined) return 'ready';
   if (isSet(config.repo) && isSet(config.commit)) return 'repo';
-  if (carriedBuildPaths(config, definition?.artifacts) !== null) return 'carried';
+  if (carriedDockerfile(config, definition?.artifacts) !== null) return 'carried';
   return isSet(config.dockerfile) ? 'repo' : 'ready';
 }
 
@@ -62,7 +68,7 @@ export function clearForMode(mode: ImageSourceMode): Partial<ContainerConfig> {
     };
   }
   if (mode === 'carried') {
-    return { image: undefined, repo: undefined, commit: undefined, repoAuth: undefined };
+    return { image: undefined, context: undefined, repo: undefined, commit: undefined, repoAuth: undefined };
   }
   // A repo build keeps the Dockerfile and context it already names: the path is
   // usually the same one inside the repository.
@@ -90,23 +96,17 @@ export function unusedFieldsForMode(
     return unused;
   }
   if (mode === 'carried') {
-    for (const field of ['repo', 'commit', 'repoAuth'] as const) {
+    // A carried build always reads every carried file, so a context is ignored.
+    for (const field of ['context', 'repo', 'commit', 'repoAuth'] as const) {
       if (isSet(config[field])) unused.push(field);
     }
   }
   // A build never lands on a name this workspace's catalog owns (ADR-0022), so
   // an `image` of that shape is not even the tag the build uses.
-  const namespace = definition?.namespace;
-  if (isSet(config.image) && isSet(namespace) && config.image.startsWith(`${namespace}/`)) {
+  if (isSet(config.image) && isCatalogReference(config.image, definition?.namespace)) {
     unused.push('image');
   }
   return unused;
-}
-
-/** Whether a carried file is plausibly a Dockerfile, by the name Docker itself
- *  looks for: `Dockerfile`, `Dockerfile.gpu`, `container/Dockerfile`. */
-function looksLikeDockerfile(path: string): boolean {
-  return (path.split('/').at(-1) ?? path).startsWith('Dockerfile');
 }
 
 /**

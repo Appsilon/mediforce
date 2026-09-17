@@ -43,8 +43,8 @@ function matchesBuilt(image: DockerImageInfo, repo: string, dockerfileKey: strin
  *  workflow's carried files, for this namespace, from the same Dockerfile.
  *
  *  The context is not folded into the Dockerfile here as it is for a repo: a
- *  carried `dockerfile` is a path from the root of the carried files whether or
- *  not the step named a context (`resolveCarriedBuildPaths`).
+ *  carried build always reads every carried file (`carriedDockerfile`), and a
+ *  context label on an image is ignored.
  *
  *  The namespace is compared here and not for a built entry: a repo names the
  *  same files wherever it is built, while a workflow name is unique only inside

@@ -1,6 +1,7 @@
 import {
   buildContextFilter,
   dockerignoreCandidates,
+  looksLikeDockerfile,
   packBuildContextArchive,
 } from '@mediforce/platform-core';
 
@@ -79,10 +80,6 @@ function isIgnoreFile(path: string): boolean {
 /** Files that look like a Dockerfile, the root one first — the choices to
  *  offer, since a folder usually holds one and the path is easy to mistype. */
 export function dockerfileCandidates(folder: PickedFolder): string[] {
-  const looksLikeDockerfile = (path: string): boolean => {
-    const base = (path.split('/').pop() ?? path).toLowerCase();
-    return (base.startsWith('dockerfile') || base.endsWith('.dockerfile')) && isIgnoreFile(base) === false;
-  };
   const candidates = folder.files.map((picked) => picked.path).filter(looksLikeDockerfile);
   return [...candidates.filter((path) => path === 'Dockerfile'), ...candidates.filter((path) => path !== 'Dockerfile')];
 }

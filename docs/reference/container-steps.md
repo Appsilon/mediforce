@@ -61,13 +61,10 @@ and the workflow carries a file at that path, the image is built from the
 materialized directory with no clone anywhere. `dockerfile` is a path from the
 root of the carried files and the whole set is the build context, so `COPY
 scripts/ /scripts/` from a `container/Dockerfile` works as it does in a
-repository; a step may set `context` to narrow it to one directory, and the
-Dockerfile keeps its own path either way. The tag is derived from the files
-inside that context, the Dockerfile, and the workflow and namespace
-(`mediforce-artifacts:<hash>`), so an edit to what Docker is sent builds a new
-image, a rerun of unchanged files finds the one already there, and — for a step
-that narrowed the context — a script kept outside it and read from `/artifacts`
-at run time rebuilds nothing. A
+repository; a `context` on such a step is ignored. The tag is derived from the
+carried files, the Dockerfile, and the workflow and namespace
+(`mediforce-artifacts:<hash>`), so an edit to any carried file builds a new
+image and a rerun of unchanged files finds the one already there. A
 step that also names its own `image` keeps that tag, which says nothing about
 the files, so the build labels the content hash (`mediforce.build.artifacts`)
 and an existing image is reused only when the label matches — otherwise it is

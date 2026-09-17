@@ -179,9 +179,9 @@ describe('resolveEntryVersions — a carried source', () => {
     expect(versions[0].commit).toBeUndefined();
   });
 
-  it('claims a build of the same Dockerfile from a context the step narrowed', () => {
-    // The Dockerfile is named by its path from the carried root either way, so
-    // narrowing the context does not move the image to another entry.
+  it('claims a build of the same Dockerfile whatever context label it carries', () => {
+    // A carried build ignores the context and names the Dockerfile by its path
+    // from the carried root, so a context label does not move the image.
     expect(
       resolveEntryVersions('alpha', source, [carried({ buildContext: 'container' })]),
     ).toHaveLength(1);

@@ -17,7 +17,7 @@ import type {
   ImageCatalogEntryView,
   ImageCatalogVersion,
 } from '@mediforce/platform-api/contract';
-import { carriedSourceLine, shortImageId } from '@mediforce/platform-core';
+import { carriedSourceLine, isCatalogReference, shortImageId } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
 import { ConceptPopover } from '@/components/ui/concept-intro';
@@ -411,7 +411,7 @@ function EntryCard({
   // A referenced entry under this workspace's name takes a new upload instead
   // — never a rebuild (#1345, ADR-0022).
   const uploadReference =
-    shown.source.kind === 'referenced' && shown.source.reference.startsWith(`${handle}/`)
+    shown.source.kind === 'referenced' && isCatalogReference(shown.source.reference, handle)
       ? shown.source.reference
       : null;
   const versions = shown.versions;

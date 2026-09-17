@@ -62,7 +62,7 @@ vi.mock('@/hooks/use-namespace-role', () => ({
 // The real hook reads a context this page's test tree does not mount — the
 // "Existing image" tab's picker is what exercises it here.
 const dockerImages = {
-  value: { images: [] as { repository: string; tag: string; id: string; size: string; created: string }[], disk: null, isAvailable: true, isLoading: false, refresh: () => {} },
+  value: { images: [] as { repository: string; tag: string; id: string; size: string; created: string; buildRepo?: string; buildArtifacts?: string }[], disk: null, isAvailable: true, isLoading: false, refresh: () => {} },
 };
 vi.mock('@/hooks/use-docker-images', () => ({
   useDockerImages: () => dockerImages.value,
@@ -672,6 +672,32 @@ describe('ImagesPage', () => {
 
     const picker = screen.getByLabelText('Image');
     expect(within(picker).queryByText('mediforce-golden-image:latest')).not.toBeInTheDocument();
+    expect(within(picker).getByText('acme/legacy:v2')).toBeInTheDocument();
+  });
+
+  it('does not offer a repository the platform builds into, which every workspace shares', async () => {
+    dockerImages.value = {
+      images: [
+        { repository: 'mediforce-built', tag: 'aaaaaaaaaaaa', id: 'sha256:built', size: '900MB', created: '1 day ago', buildRepo: 'git@github.com:acme/agent.git' },
+        { repository: 'mediforce-built', tag: 'bbbbbbbbbbbb', id: 'sha256:built-2', size: '900MB', created: '2 days ago' },
+        { repository: 'mediforce-artifacts', tag: 'cccccccccccc', id: 'sha256:carried', size: '80MB', created: '1 hour ago', buildArtifacts: 'cccccccccccc' },
+        { repository: 'acme/legacy', tag: 'v2', id: 'sha256:legacy', size: '512MB', created: '2 months ago' },
+      ],
+      disk: null,
+      isAvailable: true,
+      isLoading: false,
+      refresh: () => {},
+    };
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Existing image' }));
+
+    // Cataloguing `mediforce-built` as a reference would claim every tag in it,
+    // other workspaces' builds included — one unlabelled tag does not change that.
+    const picker = screen.getByLabelText('Image');
+    expect(within(picker).queryByText(/mediforce-built/)).not.toBeInTheDocument();
+    expect(within(picker).queryByText(/mediforce-artifacts/)).not.toBeInTheDocument();
     expect(within(picker).getByText('acme/legacy:v2')).toBeInTheDocument();
   });
 

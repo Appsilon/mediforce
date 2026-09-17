@@ -23,7 +23,7 @@ const MODE_OPTIONS: { value: ImageSourceMode; label: string; icon: React.Element
 
 const MODE_HINT: Record<ImageSourceMode, string> = {
   ready: 'An image the platform already offers. Images you build, upload or publish under Workspace → Images appear here.',
-  carried: "A Dockerfile this workflow carries in its files. It is built on the first run, and rebuilt whenever the files inside its context change — no repository involved.",
+  carried: "A Dockerfile this workflow carries in its files. It is built on the first run, and rebuilt whenever any of those files change — no repository involved.",
   repo: 'A Dockerfile in a git repository, built at the commit you pin.',
 };
 
@@ -33,14 +33,12 @@ const BUILD_TAG_TIP =
   'Tag the built image gets, e.g. "my-agent:latest". Leave empty for a tag derived from the build inputs. A name this workspace published (<workspace>/<name>) is refused: those belong to the Image Catalog and a build must not replace one.';
 
 const DOCKERFILE_TIP: Record<'carried' | 'repo', string> = {
-  carried: 'A Dockerfile among the files this workflow carries, by its path from their root.',
+  carried: 'A Dockerfile among the files this workflow carries, by its path from their root. It builds with every carried file as its context, so it can COPY any of them.',
   repo: 'Path to a Dockerfile in the repository — from its root, or from the context when one is set.',
 };
 
-const CONTEXT_TIP: Record<'carried' | 'repo', string> = {
-  carried: 'Directory to build from, from the root of the carried files. Empty means all of them, so a Dockerfile in a subdirectory can still COPY its siblings. Narrowing it means only those files rebuild the image.',
-  repo: 'Build context directory in the repository, e.g. "." for its root. Empty means the Dockerfile\'s own directory, where everything it COPYs must sit beside it.',
-};
+const CONTEXT_TIP =
+  'Build context directory in the repository, e.g. "." for its root. Empty means the Dockerfile\'s own directory, where everything it COPYs must sit beside it.';
 
 /**
  * The image half of a container step, as one choice instead of six fields.
@@ -192,15 +190,6 @@ export function ImageSourceFields({
             )}
           </FieldRow>
 
-          <FieldRow label={`${prefix}.context`} tooltip={CONTEXT_TIP.carried}>
-            <input
-              value={config?.context ?? ''}
-              onChange={(event) => { onChange({ context: event.target.value || undefined }); }}
-              placeholder="all carried files"
-              className={inputBaseMono}
-            />
-          </FieldRow>
-
           <BuildTagField prefix={prefix} config={config} onChange={onChange} />
         </>
       )}
@@ -215,7 +204,7 @@ export function ImageSourceFields({
             />
           </FieldRow>
 
-          <FieldRow label={`${prefix}.context`} tooltip={CONTEXT_TIP.repo}>
+          <FieldRow label={`${prefix}.context`} tooltip={CONTEXT_TIP}>
             <input
               value={config?.context ?? ''}
               onChange={(event) => { onChange({ context: event.target.value || undefined }); }}

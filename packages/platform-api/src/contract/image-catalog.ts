@@ -7,6 +7,7 @@ import {
   ImageCatalogEntrySchema,
   ImageCatalogSourceSchema,
   ImageCapabilitiesSchema,
+  isCatalogReference,
 } from '@mediforce/platform-core';
 
 const NamespaceQuery = z.object({ namespace: z.string().min(1) });
@@ -213,7 +214,7 @@ const ImageTagSchema = z
 /** The daemon is deployment-wide, so a reference a workspace builds under must
  *  be its own (ADR-0022, #1345). */
 function refineReferenceInNamespace(input: { namespace: string; reference: string }, ctx: z.RefinementCtx): void {
-  if (input.reference.startsWith(`${input.namespace}/`) === false) {
+  if (isCatalogReference(input.reference, input.namespace) === false) {
     ctx.addIssue({
       code: 'custom',
       path: ['reference'],

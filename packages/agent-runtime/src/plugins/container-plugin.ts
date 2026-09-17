@@ -58,9 +58,10 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
-import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata, WorkflowArtifact, DockerBuildPaths } from '@mediforce/platform-core';
+import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata, WorkflowArtifact } from '@mediforce/platform-core';
 import {
-  carriedBuildPaths,
+  carriedDockerfile,
+  isCatalogReference,
   catalogDockerfileKey,
   normalizeBuildContext,
   normalizeRepoUrls,
@@ -173,19 +174,6 @@ export function resolveBuildSource(
 }
 
 /**
- * A name the Image Catalog owns: `<this workspace>/<something>`.
- *
- * An entry published or uploaded from a workspace is named with its handle, and
- * the upload path refuses to replace a tag that already exists, precisely so a
- * step pinning it cannot start running something else (ADR-0022). A build that
- * wrote onto that name would walk around the rule: it would replace an image
- * the catalog offers, and hand one artifact to two entries at once.
- */
-function isCatalogReference(image: string, namespace: string | undefined): boolean {
-  return namespace !== undefined && namespace !== '' && image.startsWith(`${namespace}/`);
-}
-
-/**
  * The tag a step with a build source builds under, when it names one: never the
  * shared golden image, and never a name this workspace's catalog owns.
  *
@@ -212,25 +200,24 @@ export interface StepImageDefinition {
 /**
  * A build from a Dockerfile the workflow carries: the files are already on the
  * host for the /artifacts mount, so the build reads that directory and no clone
- * happens. The context is the Dockerfile's own directory unless the step names
- * one, as for a repo. `undefined` for a step that builds from anything else.
+ * happens. The context is always every carried file (`carriedDockerfile`).
+ * `undefined` for a step that builds from anything else.
  */
 export function resolveCarriedBuild(
   buildConfig: ContainerConfig,
   definition: StepImageDefinition | undefined,
-): { tag: string; paths: DockerBuildPaths; meta: Omit<ImageBuildMeta, 'image'> } | undefined {
+): { tag: string; dockerfile: string; meta: Omit<ImageBuildMeta, 'image'> } | undefined {
   const artifacts = definition?.artifacts;
-  const paths = carriedBuildPaths(buildConfig, artifacts);
-  if (artifacts === undefined || paths === null) return undefined;
-  const build = { paths, workflow: definition?.name, namespace: definition?.namespace };
+  const dockerfile = carriedDockerfile(buildConfig, artifacts);
+  if (artifacts === undefined || dockerfile === null) return undefined;
+  const build = { dockerfile, workflow: definition?.name, namespace: definition?.namespace };
   return {
     tag: artifactsBuildTag(artifacts, build),
-    paths,
+    dockerfile,
     meta: {
       contextDir: artifactsDir(artifacts),
       artifactsHash: artifactsBuildHash(artifacts, build),
       dockerfile: buildConfig.dockerfile,
-      context: buildConfig.context,
       workflow: definition?.name,
       namespace: definition?.namespace,
     },
@@ -569,7 +556,7 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
         // A concurrent fetch for the same content-addressed key won the
         // race and already populated cacheDir — its content is identical
         // by construction, so this attempt is redundant, not a failure.
-        if (!existsSync(cacheDir)) throw error;
+        if (existsSync(cacheDir) === false) throw error;
         console.log(`[container-plugin] Skills cache populated concurrently for ${skillsDir} (${cacheDir})`);
       }
     } finally {

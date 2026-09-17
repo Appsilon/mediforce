@@ -247,7 +247,7 @@ describe.skipIf(!dockerAvailable())('docker-image-builder integration', () => {
         image,
         contextDir,
         dockerfile: dockerfile.path,
-        artifactsHash: artifactsBuildHash(artifacts, { paths: { dockerfile: dockerfile.path, context: '' } }),
+        artifactsHash: artifactsBuildHash(artifacts, { dockerfile: dockerfile.path }),
       });
       return execFileSync('docker', ['run', '--rm', image, 'cat', '/greet.sh']).toString();
     };

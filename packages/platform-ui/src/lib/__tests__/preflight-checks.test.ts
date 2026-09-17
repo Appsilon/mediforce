@@ -468,7 +468,7 @@ describe('runPreflightChecks — a step that names an image and carries a Docker
     return wd;
   }
 
-  it('says which of the two wins, because the pinned image is not the one that runs', () => {
+  it('warns when the image is a catalog name, which the build never replaces, so it is not what runs', () => {
     const result = runPreflightChecks(carriedDefinition('db/test-artifacts:test-publish-as-image'), {
       ...BASE_CTX,
       dockerImages: IMAGES,
@@ -478,8 +478,19 @@ describe('runPreflightChecks — a step that names an image and carries a Docker
 
     const warning = result.find((entry) => entry.category === 'image-and-dockerfile');
     expect(warning?.resource).toBe('db/test-artifacts:test-publish-as-image');
-    expect(warning?.message).toContain('carried Dockerfile wins');
+    expect(warning?.message).toContain('not \'db/test-artifacts:test-publish-as-image\'');
     expect(warning?.stepNames).toEqual([carriedDefinition().steps[0].name]);
+  });
+
+  it('is silent for a build tag outside the catalog, which is the tag the build writes', () => {
+    const categories = runPreflightChecks(carriedDefinition('my-agent:v1'), {
+      ...BASE_CTX,
+      dockerImages: IMAGES,
+      dockerAvailable: true,
+      secretKeys: [],
+    }).map((entry) => entry.category);
+
+    expect(categories).not.toContain('image-and-dockerfile');
   });
 
   it('is silent when the step names only one of them', () => {

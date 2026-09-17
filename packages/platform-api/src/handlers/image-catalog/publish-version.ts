@@ -1,8 +1,6 @@
 import { resolveCarriedBuild } from '@mediforce/agent-runtime';
 import {
-  carriedContextFiles,
   packBuildContextArchive,
-  type DockerBuildPaths,
   type WorkflowArtifact,
   type WorkflowDefinition,
 } from '@mediforce/platform-core';
@@ -28,7 +26,7 @@ function findCarriedBuild(
   definitions: readonly WorkflowDefinition[],
   dockerfile: string,
   contentHash: string,
-): { definition: WorkflowDefinition; artifacts: WorkflowArtifact[]; paths: DockerBuildPaths } | null {
+): { definition: WorkflowDefinition; artifacts: WorkflowArtifact[] } | null {
   const newestFirst = [...definitions].sort((a, b) => b.version - a.version);
   for (const definition of newestFirst) {
     for (const step of definition.steps) {
@@ -36,8 +34,8 @@ function findCarriedBuild(
         if (config === undefined) continue;
         const build = resolveCarriedBuild(config, definition);
         if (build === undefined || definition.artifacts === undefined) continue;
-        if (build.paths.dockerfile === dockerfile && build.meta.artifactsHash === contentHash) {
-          return { definition, artifacts: definition.artifacts, paths: build.paths };
+        if (build.dockerfile === dockerfile && build.meta.artifactsHash === contentHash) {
+          return { definition, artifacts: definition.artifacts };
         }
       }
     }
@@ -104,20 +102,9 @@ export async function publishImageCatalogVersion(
     );
   }
 
-  const { paths } = build;
-  // Reachable, not dead: a step may narrow the context to a directory the
-  // Dockerfile sits outside of, which `docker build -f` allows and an uploaded
-  // context does not. This handler calls the upload handler directly, so the
-  // upload contract's own check never runs on it.
-  const prefix = paths.context === '' ? '' : `${paths.context}/`;
-  if (paths.dockerfile.startsWith(prefix) === false) {
-    throw new ValidationError(
-      `"${paths.dockerfile}" is outside its build context "${paths.context}", and a published image carries only its context.`,
-    );
-  }
   const encoder = new TextEncoder();
   const context = packBuildContextArchive(
-    carriedContextFiles(build.artifacts, paths).map((file) => ({
+    build.artifacts.map((file) => ({
       kind: 'file' as const,
       path: file.path,
       content: encoder.encode(file.contents),
@@ -131,7 +118,7 @@ export async function publishImageCatalogVersion(
       namespace,
       reference: input.reference,
       tag: input.tag,
-      dockerfile: paths.dockerfile.slice(prefix.length),
+      dockerfile,
       name: input.name,
       intent: input.intent,
       declaredSource: input.declaredSource,

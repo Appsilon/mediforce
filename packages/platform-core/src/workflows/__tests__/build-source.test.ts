@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { carriedBuildPaths, carriedContextFiles, stepHasBuildSource } from '../build-source';
+import { carriedDockerfile, stepHasBuildSource } from '../build-source';
 
 describe('stepHasBuildSource', () => {
   const dockerfile = { artifacts: [{ path: 'Dockerfile', contents: 'FROM python:3.12-slim\n' }] };
@@ -46,61 +46,35 @@ describe('stepHasBuildSource', () => {
   });
 });
 
-describe('carriedBuildPaths', () => {
+describe('carriedDockerfile', () => {
   const artifacts = [
     { path: 'container/Dockerfile', contents: 'FROM alpine:3.21\nCOPY scripts/ /scripts/\n' },
     { path: 'container/entrypoint.sh', contents: 'echo hi\n' },
     { path: 'scripts/poll.py', contents: 'print("poll")\n' },
   ];
 
-  it('builds a carried Dockerfile from the whole carried set, so it can COPY a sibling directory', () => {
-    expect(carriedBuildPaths({ dockerfile: 'container/Dockerfile' }, artifacts)).toEqual({
-      dockerfile: 'container/Dockerfile',
-      context: '',
-    });
+  it('names a carried Dockerfile by its path from the root of the carried files', () => {
+    expect(carriedDockerfile({ dockerfile: 'container/Dockerfile' }, artifacts)).toBe('container/Dockerfile');
+    expect(carriedDockerfile({ dockerfile: './container/Dockerfile' }, artifacts)).toBe('container/Dockerfile');
   });
 
-  it('narrows the context to the directory a step names, keeping the Dockerfile path as written', () => {
-    // Unlike a repository build, `dockerfile` is not re-read from the context:
-    // a carried file is named by its path from the root everywhere else.
-    expect(carriedBuildPaths({ dockerfile: 'container/Dockerfile', context: 'container' }, artifacts)).toEqual({
-      dockerfile: 'container/Dockerfile',
-      context: 'container',
-    });
-  });
-
-  it('treats "." and "" as the whole set, so equivalent spellings build one image', () => {
-    expect(carriedBuildPaths({ dockerfile: 'container/Dockerfile', context: '.' }, artifacts)?.context).toBe('');
-    expect(carriedBuildPaths({ dockerfile: './container/Dockerfile' }, artifacts)?.dockerfile).toBe('container/Dockerfile');
+  it('ignores a context the step names, since a carried build always reads every carried file', () => {
+    // Before carried steps were catalogued the builder never read `context`, and
+    // a registered version naming one cannot be edited to drop it.
+    expect(carriedDockerfile({ dockerfile: 'container/Dockerfile', context: 'container' }, artifacts)).toBe('container/Dockerfile');
+    expect(carriedDockerfile({ dockerfile: 'container/Dockerfile', context: '..' }, artifacts)).toBe('container/Dockerfile');
   });
 
   it('is null for a Dockerfile the workflow does not carry, or one that climbs out', () => {
-    expect(carriedBuildPaths({ dockerfile: 'Dockerfile' }, artifacts)).toBeNull();
-    expect(carriedBuildPaths({ dockerfile: '../Dockerfile' }, artifacts)).toBeNull();
-    expect(carriedBuildPaths({ dockerfile: 'container/Dockerfile', context: '..' }, artifacts)).toBeNull();
+    expect(carriedDockerfile({ dockerfile: 'Dockerfile' }, artifacts)).toBeNull();
+    expect(carriedDockerfile({ dockerfile: '../Dockerfile' }, artifacts)).toBeNull();
+    expect(carriedDockerfile({ dockerfile: '.' }, artifacts)).toBeNull();
   });
 
   it('is null when the step names its own repo and commit, which said something more specific', () => {
-    expect(carriedBuildPaths(
+    expect(carriedDockerfile(
       { dockerfile: 'container/Dockerfile', repo: 'org/agent', commit: 'a'.repeat(40) },
       artifacts,
     )).toBeNull();
-  });
-});
-
-describe('carriedContextFiles', () => {
-  const artifacts = [
-    { path: 'container/Dockerfile', contents: 'FROM alpine:3.21\n' },
-    { path: 'scripts/poll.py', contents: 'print("poll")\n' },
-  ];
-
-  it('sends every carried file when the context is the whole set', () => {
-    expect(carriedContextFiles(artifacts, { dockerfile: 'container/Dockerfile', context: '' })).toEqual(artifacts);
-  });
-
-  it('sends only what is inside a named context, with paths from its root', () => {
-    expect(carriedContextFiles(artifacts, { dockerfile: 'container/Dockerfile', context: 'container' })).toEqual([
-      { path: 'Dockerfile', contents: 'FROM alpine:3.21\n' },
-    ]);
   });
 });

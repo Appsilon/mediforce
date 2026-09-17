@@ -3,7 +3,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { carriedContextFiles, type DockerBuildPaths, type WorkflowArtifact } from '@mediforce/platform-core';
+import type { WorkflowArtifact } from '@mediforce/platform-core';
 
 /** Where a workflow's own files appear inside a container, read-only. Steps
  *  name them from here: `python3 /artifacts/scripts/poll.py`. */
@@ -34,10 +34,10 @@ export function artifactsDir(artifacts: readonly WorkflowArtifact[]): string {
   return join(ARTIFACTS_CACHE_DIR, hash);
 }
 
-/** What a carried build is: the Dockerfile and context from the root of the
- *  carried files (`carriedBuildPaths`), and the workflow they belong to. */
+/** What a carried build is: the Dockerfile, from the root of the carried files
+ *  (`carriedDockerfile`), and the workflow they belong to. */
 export interface CarriedBuild {
-  paths: DockerBuildPaths;
+  dockerfile: string;
   workflow?: string;
   namespace?: string;
 }
@@ -56,16 +56,13 @@ export function artifactsBuildTag(artifacts: readonly WorkflowArtifact[], build:
  * The content half of {@link artifactsBuildTag}, labelled on the image so a tag
  * the step named itself can be checked against the files too.
  *
- * Only the files inside the context, since those are all Docker is sent: a
- * script read from `/artifacts` at run time and kept outside it does not
- * rebuild the image. The Dockerfile counts wherever it sits. The workflow and
+ * Every carried file counts, since the context is all of them. The workflow and
  * namespace count too, so two workflows carrying identical files build two
  * images, each labelled truthfully with the workflow the catalog offers it
  * under (ADR-0022).
  */
 export function artifactsBuildHash(artifacts: readonly WorkflowArtifact[], build: CarriedBuild): string {
-  const dockerfile = artifacts.find((artifact) => artifact.path === build.paths.dockerfile);
-  const files = carriedContextFiles(artifacts, build.paths)
+  const files = [...artifacts]
     .sort((a, b) => a.path.localeCompare(b.path))
     .map((artifact) => `${artifact.path}\0${artifact.contents}`)
     .join('\0\0');
@@ -73,9 +70,7 @@ export function artifactsBuildHash(artifacts: readonly WorkflowArtifact[], build
     .update([
       build.namespace ?? '',
       build.workflow ?? '',
-      build.paths.dockerfile,
-      build.paths.context,
-      dockerfile?.contents ?? '',
+      build.dockerfile,
       files,
     ].join('\0\0\0'))
     .digest('hex')

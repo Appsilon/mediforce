@@ -1,5 +1,5 @@
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
-import { type WorkflowDefinition, carriedBuildPaths, normaliseModelId, stepHasBuildSource, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
+import { type WorkflowDefinition, carriedDockerfile, isCatalogReference, normaliseModelId, stepHasBuildSource, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
 
 export interface PreflightAction {
   label: string;
@@ -201,19 +201,18 @@ export function runPreflightChecks(
     });
   }
 
-  // A step that names an `image` *and* builds from a carried Dockerfile says two
-  // things at once, and the runtime resolves it one way: the carried files win,
-  // and the build lands under their own tag whenever the name belongs to this
-  // workspace's catalog. The image the author pinned is then never the one that
-  // runs, which is worth saying before the run rather than after it.
+  // A step that builds from a carried Dockerfile and names an image this
+  // workspace's catalog owns: a build never lands on such a name (ADR-0022), so
+  // the run uses the image built from the carried files and the pinned one is
+  // never what runs. Any other name is simply the tag the build writes.
   const ambiguous = steps
     .filter((step) => step.executor === 'agent' || step.executor === 'script')
     .map((step) => {
       const config = step.executor === 'script' ? step.script : step.agent;
       const image = config?.image;
-      return typeof image === 'string' && image.length > 0 && carriedBuildPaths(config, definition.artifacts) !== null
-        ? { stepName: step.name, image, dockerfile: config?.dockerfile ?? '' }
-        : null;
+      if (typeof image !== 'string' || isCatalogReference(image, definition.namespace) === false) return null;
+      const dockerfile = carriedDockerfile(config, definition.artifacts);
+      return dockerfile === null ? null : { stepName: step.name, image, dockerfile };
     })
     .filter((entry) => entry !== null);
   for (const entry of ambiguous) {
@@ -221,7 +220,7 @@ export function runPreflightChecks(
       category: 'image-and-dockerfile',
       resource: entry.image,
       stepNames: [entry.stepName],
-      message: `'${entry.stepName}' names the image '${entry.image}' and also builds '${entry.dockerfile}', which the workflow carries. The carried Dockerfile wins, so the run uses the image built from it. Remove the Dockerfile to run '${entry.image}', or remove the image to build from the carried files.`,
+      message: `'${entry.stepName}' builds '${entry.dockerfile}', which the workflow carries, and names '${entry.image}', an Image Catalog image. A build never replaces a catalog image, so the run uses the image built from the carried files, not '${entry.image}'. Switch the step to a ready image to run '${entry.image}', or clear the image to build from the carried files.`,
       actions: [{
         label: 'Edit step',
         href: options.version !== undefined

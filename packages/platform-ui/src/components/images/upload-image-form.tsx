@@ -27,6 +27,7 @@ import {
   type PickedFolder,
 } from './picked-folder';
 import {
+  INPUT_CLASS,
   ImageNameField,
   ImageTagField,
   NewEntryFields,
@@ -41,9 +42,6 @@ function directoryPicker(): DirectoryPicker | null {
   const picker = (window as Window & { showDirectoryPicker?: DirectoryPicker }).showDirectoryPicker;
   return typeof picker === 'function' ? picker.bind(window) : null;
 }
-
-const INPUT_CLASS =
-  'w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring';
 
 /**
  * Build an image from a folder on the member's machine, uploaded whole as the

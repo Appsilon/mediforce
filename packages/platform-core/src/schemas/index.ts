@@ -198,6 +198,7 @@ export {
   type ImageCatalogSource,
   type ImageCatalogDeclaredSource,
   type ImageCatalogEntry,
+  isCatalogReference,
 } from './image-catalog-entry';
 
 export {

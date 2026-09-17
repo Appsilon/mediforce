@@ -167,9 +167,8 @@ describe('discoverEntries', () => {
 
     const discovered = discoverEntries(
       'alpha',
-      // Two builds of one file, one from the whole carried set and one from a
-      // context the step narrowed: the context is how it was built, not which
-      // file it is.
+      // Two builds of one file, one labelled with a context: a carried build
+      // ignores the context, so the label says nothing about which file it is.
       [carried, { ...carried, id: 'sha-older', buildArtifacts: 'bbbbbbbbbbbb', buildContext: 'container' }],
       [],
     );

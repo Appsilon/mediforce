@@ -170,13 +170,13 @@ export function uploadedImageLabelArgs(namespace: string): string[] {
  * what tells a step-named tag whether it still holds these files, and with the
  * workflow, the Dockerfile and the namespace it is what the Image Catalog keys
  * a carried entry on (ADR-0022). The repo labels are written empty, as for an
- * upload, so none is inherited.
+ * upload, so none is inherited, and so is the context: a carried build always
+ * reads every carried file.
  */
 export function carriedImageLabelArgs(provenance: {
   artifactsHash: string;
   /** As the step named it, like a repo build's label. */
   dockerfile: string;
-  context?: string;
   workflow?: string;
   namespace?: string;
 }): string[] {
@@ -186,7 +186,7 @@ export function carriedImageLabelArgs(provenance: {
     [OCI_LABELS.source, ''],
     [OCI_LABELS.revision, ''],
     [BUILD_LABELS.dockerfile, provenance.dockerfile],
-    [BUILD_LABELS.context, provenance.context ?? ''],
+    [BUILD_LABELS.context, ''],
     [BUILD_LABELS.workflow, provenance.workflow ?? ''],
     [BUILD_LABELS.namespace, provenance.namespace ?? ''],
     [BUILD_LABELS.artifacts, provenance.artifactsHash],

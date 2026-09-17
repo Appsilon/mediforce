@@ -5,14 +5,17 @@ import { useEffect, useMemo, useState } from 'react';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { useCatalogueImage, useImageCatalogEntries } from '@/hooks/use-image-catalog';
 import { useDockerImages } from '@/hooks/use-docker-images';
-import { NewEntryFields } from './referenced-image-fields';
+import { INPUT_CLASS, NewEntryFields, suggestedName } from './referenced-image-fields';
 
-const INPUT_CLASS =
-  'w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring';
-
-/** The repo's last path segment, the same suggestion `AddImageDialog` offers. */
-function suggestedName(repository: string): string {
-  return repository.split('/').pop() ?? repository;
+/**
+ * Whether the platform built this image from a source it can describe — a repo
+ * or a workflow's carried files. Such an image is a version of a discovered
+ * entry already, and cataloguing its repository as `referenced` would claim
+ * every tag in it, `mediforce-built` and `mediforce-artifacts` included, which
+ * are shared by every workspace.
+ */
+export function isPlatformBuilt(image: DockerImageInfo): boolean {
+  return image.buildRepo !== undefined || image.buildArtifacts !== undefined;
 }
 
 /** One daemon repository, with every tag it currently carries. A `referenced`
@@ -25,8 +28,10 @@ interface RepositoryCandidate {
 }
 
 function groupByRepository(images: readonly DockerImageInfo[]): RepositoryCandidate[] {
+  const platformBuilt = new Set(images.filter(isPlatformBuilt).map((image) => image.repository));
   const byRepository = new Map<string, string[]>();
   for (const image of images) {
+    if (platformBuilt.has(image.repository)) continue;
     const tags = byRepository.get(image.repository) ?? [];
     tags.push(image.tag);
     byRepository.set(image.repository, tags);
@@ -42,19 +47,19 @@ function groupByRepository(images: readonly DockerImageInfo[]): RepositoryCandid
  * every tag the daemon has for it, including ones added later, resolves as
  * one of its versions.
  *
- * With `image` set (Admin → Infrastructure, one row with no catalog match),
- * the repository is fixed to that row's. Without it (Images tab), every
- * daemon repository no `referenced` entry already claims is offered.
+ * Every daemon repository no `referenced` entry already claims, and the
+ * platform did not build, is offered. `initialRepository` starts on one — Admin
+ * → Infrastructure's `+` on a row with no catalog match.
  */
 export function CatalogueExistingImageForm({
   handle,
-  image,
+  initialRepository,
   onDone,
   onCancel,
   onPendingChange,
 }: {
   handle: string;
-  image?: DockerImageInfo;
+  initialRepository?: string;
   onDone: () => void;
   onCancel: () => void;
   onPendingChange: (pending: boolean) => void;
@@ -66,25 +71,19 @@ export function CatalogueExistingImageForm({
   const referencedRepositories = useMemo(
     () =>
       new Set(
-        entries
-          .filter((entry) => entry.source.kind === 'referenced')
-          .map((entry) => (entry.source as { reference: string }).reference),
+        entries.flatMap((entry) => (entry.source.kind === 'referenced' ? [entry.source.reference] : [])),
       ),
     [entries],
   );
   const candidates = useMemo(
     () =>
-      image !== undefined
-        ? [{ repository: image.repository, tags: [image.tag] }]
-        : groupByRepository(images).filter(
-            (candidate) => referencedRepositories.has(candidate.repository) === false,
-          ),
-    [image, images, referencedRepositories],
+      groupByRepository(images).filter(
+        (candidate) => referencedRepositories.has(candidate.repository) === false,
+      ),
+    [images, referencedRepositories],
   );
 
-  const [selectedRepository, setSelectedRepository] = useState<string | null>(
-    image !== undefined ? image.repository : null,
-  );
+  const [selectedRepository, setSelectedRepository] = useState<string | null>(initialRepository ?? null);
   const selected = candidates.find((candidate) => candidate.repository === selectedRepository) ?? null;
 
   const [name, setName] = useState('');
@@ -92,7 +91,7 @@ export function CatalogueExistingImageForm({
   const [nameEdited, setNameEdited] = useState(false);
   const [intent, setIntent] = useState('');
 
-  const effectiveName = nameEdited ? name : selected !== null ? suggestedName(selected.repository) : '';
+  const effectiveName = nameEdited === true ? name : selected !== null ? suggestedName(selected.repository) : '';
   const pending = catalogue.isPending;
   useEffect(() => onPendingChange(pending), [pending, onPendingChange]);
 
@@ -111,7 +110,7 @@ export function CatalogueExistingImageForm({
     );
   }
 
-  if (image === undefined && isAvailable === false) {
+  if (isAvailable === false) {
     return (
       <p className="text-sm text-muted-foreground">
         Docker info unavailable — the container worker is not reachable, or local agent mode is not
@@ -120,53 +119,46 @@ export function CatalogueExistingImageForm({
     );
   }
 
-  if (image === undefined && imagesLoading === false && candidates.length === 0) {
-    return <p className="text-sm text-muted-foreground">Every image on the daemon already has a catalog entry.</p>;
+  if (imagesLoading === false && candidates.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Nothing to add: every image on the daemon is either catalogued by its repository already or built by the
+        platform, which offers it on its own.
+      </p>
+    );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {image !== undefined ? (
-        <div className="rounded-md border bg-muted/30 px-3 py-2">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Image</p>
-          <p className="mt-0.5 break-all font-mono text-xs">
-            {image.repository}:{image.tag}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Catalogues every tag <code>{image.repository}</code> has on the daemon, not just this one.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          <label htmlFor="catalogue-existing-image" className="text-sm font-medium">
-            Image
-          </label>
-          <select
-            id="catalogue-existing-image"
-            value={selectedRepository ?? ''}
-            onChange={(event) => {
-              setSelectedRepository(event.target.value === '' ? null : event.target.value);
-              setNameEdited(false);
-            }}
-            required
-            className={`${INPUT_CLASS} font-mono`}
-          >
-            <option value="" disabled>
-              {imagesLoading ? 'Loading…' : 'Choose an image'}
+      <div className="space-y-1.5">
+        <label htmlFor="catalogue-existing-image" className="text-sm font-medium">
+          Image
+        </label>
+        <select
+          id="catalogue-existing-image"
+          value={selectedRepository ?? ''}
+          onChange={(event) => {
+            setSelectedRepository(event.target.value === '' ? null : event.target.value);
+            setNameEdited(false);
+          }}
+          required
+          className={`${INPUT_CLASS} font-mono`}
+        >
+          <option value="" disabled>
+            {imagesLoading === true ? 'Loading…' : 'Choose an image'}
+          </option>
+          {candidates.map((candidate) => (
+            <option key={candidate.repository} value={candidate.repository}>
+              {candidate.repository}
+              {candidate.tags.length === 1 ? `:${candidate.tags[0]}` : ` (${candidate.tags.length} tags)`}
             </option>
-            {candidates.map((candidate) => (
-              <option key={candidate.repository} value={candidate.repository}>
-                {candidate.repository}
-                {candidate.tags.length === 1 ? `:${candidate.tags[0]}` : ` (${candidate.tags.length} tags)`}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-muted-foreground">
-            Every repository the daemon holds that no entry describes yet. Every tag it has becomes a
-            version.
-          </p>
-        </div>
-      )}
+          ))}
+        </select>
+        <p className="text-xs text-muted-foreground">
+          Every repository the daemon holds that no entry describes and the platform did not build.
+          Every tag it has becomes a version.
+        </p>
+      </div>
 
       <NewEntryFields
         idPrefix="catalogue-existing-image"

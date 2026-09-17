@@ -2,8 +2,17 @@
 
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 
-const INPUT_CLASS =
+export const INPUT_CLASS =
   'w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring';
+
+/** The last path segment of a repository: `git@github.com:Appsilon/tealflow.git`
+ *  or `registry.example.com/tealflow` → `tealflow`. The same suggestion a
+ *  discovered entry arrives with, so an entry added by hand and one the
+ *  platform found are named alike. */
+export function suggestedName(repository: string): string {
+  const withoutTrailingSlash = repository.trim().replace(/\/+$/, '');
+  return (withoutTrailingSlash.split('/').pop() ?? withoutTrailingSlash).replace(/\.git$/, '');
+}
 
 /**
  * The referenced entry a reference already names. A build under it adds a

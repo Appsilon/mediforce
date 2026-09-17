@@ -508,9 +508,10 @@ describe('ensureImage — building from a directory the workflow carries', () =>
     expect(args?.at(-1)).toBe('/tmp/mediforce-artifacts/abc123');
   });
 
-  it('narrows the context to the directory a step names, keeping the Dockerfile path as written', async () => {
+  it('builds from every carried file even when the job names a context, keeping the Dockerfile path as written', async () => {
     execFileSyncMock.mockImplementationOnce(() => { throw new Error('No such image'); });
 
+    // A job queued by an older engine may still carry the step's `context`.
     await ensureImage({
       image: 'mediforce-artifacts:abc123',
       contextDir: '/tmp/mediforce-artifacts/abc123',
@@ -521,9 +522,9 @@ describe('ensureImage — building from a directory the workflow carries', () =>
 
     const args = buildArgs();
     expect(args).toEqual(expect.arrayContaining(['-f', '/tmp/mediforce-artifacts/abc123/container/Dockerfile']));
-    expect(args?.at(-1)).toBe('/tmp/mediforce-artifacts/abc123/container');
+    expect(args?.at(-1)).toBe('/tmp/mediforce-artifacts/abc123');
     expect(buildLabel(args, 'mediforce.build.dockerfile')).toBe('container/Dockerfile');
-    expect(buildLabel(args, 'mediforce.build.context')).toBe('container');
+    expect(buildLabel(args, 'mediforce.build.context')).toBe('');
   });
 
   it('labels the image with the content it was built from', async () => {
