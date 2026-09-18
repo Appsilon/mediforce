@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
@@ -14,7 +14,7 @@ import { paramNameCounts } from '@/lib/workflow-save-utils';
 
 import { DEFAULT_AGENT_IMAGE, defaultVerdictLabel, uniqueName, uniqueSlug } from '@mediforce/platform-core';
 import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
-import type { DockerImageInfo } from '@mediforce/platform-api/contract';
+import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
   STEP_TYPE_LABELS,
@@ -25,9 +25,20 @@ import { CoworkSection } from './cowork-section';
 import { StepUiConfigSection } from './step-ui-config-section';
 import { StepDataFlow } from './step-data-flow';
 import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
+import { ImageSourceFields } from './image-source-fields';
+import { identityImageValue, pickerImageValue } from './image-options';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
 import { AllowedRolesField, AssignedToField } from './step-editor-roles';
 import { CollapsibleCard } from './collapsible-card';
+import {
+  buildImagePicker,
+  requiredRuntimeFor,
+  type ImagePickerGroup,
+} from './image-picker-options';
+
+/** Stable identity for "no catalog", so the picker memo is not defeated by a
+ *  fresh array on every render of a caller that passes none. */
+const NO_CATALOG_ENTRIES: ImageCatalogEntryView[] = [];
 
 function friendlyFieldError(message: string): string {
   if (/too small|>=1|at least 1/i.test(message)) return 'This field cannot be empty.';
@@ -35,7 +46,7 @@ function friendlyFieldError(message: string): string {
 }
 
 export function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: WorkflowStep['executor']): Partial<WorkflowStep> {
-  const SHARED_CONTAINER_KEYS = ['image', 'dockerfile', 'repo', 'commit', 'repoAuth'] as const;
+  const SHARED_CONTAINER_KEYS = ['image', 'dockerfile', 'context', 'repo', 'commit', 'repoAuth'] as const;
   const base: Partial<WorkflowStep> = { executor: targetExecutor };
 
   if (targetExecutor === 'human') {
@@ -73,29 +84,6 @@ const ri = inputBase;
 const riMono = inputBaseMono;
 const rs = selectBase;
 const rt = textareaBase;
-
-function imageRef(img: DockerImageInfo): string {
-  return img.tag && img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.repository;
-}
-
-function pickerImageValue(image: string): string {
-  return image === `${DEFAULT_AGENT_IMAGE}:latest` ? DEFAULT_AGENT_IMAGE : image;
-}
-
-/**
- * Agent images sorted with the golden image first — it is the one image
- * guaranteed to carry an agent CLI, and every other discovered image (a bare
- * `alpine`, a language runtime) fails at container start for an agent step.
- */
-function agentImageOptions(images: DockerImageInfo[]): Array<{ img: DockerImageInfo; label: string }> {
-  return images
-    .map((img) => {
-      const value = pickerImageValue(imageRef(img));
-      const recommended = value === DEFAULT_AGENT_IMAGE;
-      return { img, recommended, label: recommended ? `★ ${imageRef(img)}` : imageRef(img) };
-    })
-    .sort((a, b) => Number(b.recommended) - Number(a.recommended));
-}
 
 // ---------------------------------------------------------------------------
 // Executor / step-type icon maps (mirrors workflow-diagram.tsx)
@@ -140,19 +128,9 @@ const TIP = {
   agentFallback:           'What to do if the agent fails or is below the confidence threshold: escalate to human, retry, or skip.',
   agentAllowedTools:       'Tools the agent may call, comma-separated. Leave empty to allow all available tools.',
   agentPrompt:             'Additional instructions appended to the agent\'s system prompt for this step only.',
-  agentImage:              'Docker image for the agent container (e.g. python:3.11-slim). Required for deployed execution.',
-  agentDockerfile:         'Path to a Dockerfile in agent.repo. When set, the container is built from this file instead of agent.image.',
-  agentRepo:               'Git repository URL to clone into the container before running the agent.',
-  agentCommit:             'Commit SHA or branch to check out from agent.repo. Defaults to the repo\'s default branch.',
-  agentRepoAuth:           'Name of a workflow secret holding the auth token for cloning a private repository.',
 
   scriptRuntime:           'Language runtime for the inline script: javascript, python, r, or bash.',
   scriptCommand:           'Shell command to run in the container, typically to invoke a file from script.repo.',
-  scriptImage:             'Docker base image for the container (e.g. python:3.11-slim).',
-  scriptDockerfile:        'Path to a Dockerfile in script.repo. When set, the container is built from this file instead of script.image.',
-  scriptRepo:              'Git repository URL to clone into the container before running the command.',
-  scriptCommit:            'Commit SHA or branch to check out from script.repo. Defaults to the repo\'s default branch.',
-  scriptRepoAuth:          'Name of a workflow secret holding the auth token for cloning a private repository.',
   scriptInlineScript:      'Script source code to run directly in the container. Set the language via script.runtime.',
 
   databricksJobId:         'ID of an existing Databricks job to trigger. Supports ${steps.*} interpolation when given as a string.',
@@ -253,6 +231,7 @@ export function StepEditor({
   errors,
   imageWarning,
   dockerImages,
+  catalogEntries = NO_CATALOG_ENTRIES,
   workflowExternalSkillsRepo,
   workflowArtifacts,
 }: {
@@ -264,6 +243,7 @@ export function StepEditor({
   errors?: Record<string, string>;
   imageWarning?: string;
   dockerImages?: DockerImageInfo[];
+  catalogEntries?: ImageCatalogEntryView[];
   workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
   /** The files this workflow carries. Skills among them are offered here, so a
    *  skill uploaded in the Files panel is picked rather than typed as a path. */
@@ -379,20 +359,43 @@ export function StepEditor({
   const selMax = typeof step.selection === 'number' ? step.selection : step.selection?.max;
 
   // Leaving agent.image blank is not "unset" — registration fills in the golden
-  // image, unless the step builds its own from repo + commit. Say which, so the
-  // picker and the saved definition agree.
-  const agentBuildsOwnImage =
-    typeof step.agent?.repo === 'string' && step.agent.repo.length > 0
-    && typeof step.agent?.commit === 'string' && step.agent.commit.length > 0;
-  const agentBuildsFromWorkflowSource =
-    typeof step.agent?.dockerfile === 'string' && step.agent.dockerfile.length > 0
-    && typeof workflowExternalSkillsRepo?.url === 'string' && workflowExternalSkillsRepo.url.length > 0
-    && typeof workflowExternalSkillsRepo.commit === 'string' && workflowExternalSkillsRepo.commit.length > 0;
-  const agentBlankOptionLabel = agentBuildsOwnImage
-    ? 'Built from agent.repo'
-    : agentBuildsFromWorkflowSource
-      ? 'Built from workflow source'
-      : `Default — ${DEFAULT_AGENT_IMAGE}`;
+  // image. Only a step whose source is a ready image reaches the picker at all;
+  // one that builds its own never shows it, so the blank option has one meaning.
+  const agentBlankOptionLabel = `Default — ${DEFAULT_AGENT_IMAGE}`;
+
+  // The picker's options come from the namespace's image catalog: name and
+  // intent instead of a bare `repo:tag`, grouped by what each was built on, and
+  // filtered to what the step can actually run — an agent step is not offered
+  // an image a probe proved carries no agent CLI, which is the `exec: "claude":
+  // executable file not found` class of run-time failure. It curates, it does
+  // not gate: the field beside the select still saves any string, and a step
+  // pinning an image no entry covers keeps it (ADR-0022 decision 5).
+  //
+  // A catalog with nothing to say — empty, or a daemon nobody could reach —
+  // degrades to the daemon listing the picker offered before it existed, so an
+  // author never faces an empty picker (AGENTS.md §13).
+  // What decides a step's image source: the files the workflow carries, the
+  // skills repo behind a bare `dockerfile`, and the handle whose catalog names
+  // a build must not land on.
+  const imageSourceDefinition = useMemo(
+    () => ({ artifacts: workflowArtifacts, namespace: handle, externalSkillsRepo: workflowExternalSkillsRepo }),
+    [workflowArtifacts, handle, workflowExternalSkillsRepo],
+  );
+
+  const agentImagePicker = useMemo(
+    () => buildImagePicker({ catalogEntries, dockerImages: dockerImages ?? [], executor: 'agent' }),
+    [catalogEntries, dockerImages],
+  );
+  const scriptRuntime = requiredRuntimeFor(step);
+  const scriptImagePicker = useMemo(
+    () => buildImagePicker({
+      catalogEntries,
+      dockerImages: dockerImages ?? [],
+      executor: 'script',
+      requiredRuntime: scriptRuntime,
+    }),
+    [catalogEntries, dockerImages, scriptRuntime],
+  );
 
   function updateAgent(patch: Partial<NonNullable<WorkflowStep['agent']>>) {
     onChange({ agent: { ...step.agent, ...patch } });
@@ -873,79 +876,19 @@ export function StepEditor({
         </FieldGroup>
 
         <FieldGroup>
-          <FieldRow label="agent.image" tooltip={TIP.agentImage}>
-            {dockerImages && dockerImages.length > 0 ? (
-              <div className="grid gap-2 sm:grid-cols-2">
-                <select
-                  aria-label="Known Docker image"
-                  value={pickerImageValue(step.agent?.image ?? '')}
-                  onChange={(e) => updateAgent({ image: e.target.value || undefined })}
-                  className={rs}
-                >
-                  <option value="">{agentBlankOptionLabel}</option>
-                  {agentImageOptions(dockerImages).map(({ img, label }) => (
-                    <option key={img.id} value={pickerImageValue(imageRef(img))}>{label}</option>
-                  ))}
-                  {step.agent?.image && !dockerImages.some(
-                    (img) => pickerImageValue(imageRef(img)) === pickerImageValue(step.agent?.image ?? ''),
-                  ) && (
-                    <option value={step.agent.image}>{step.agent.image}</option>
-                  )}
-                </select>
-                <input
-                  aria-label="Custom Docker image"
-                  value={step.agent?.image ?? ''}
-                  onChange={(e) => updateAgent({ image: e.target.value || undefined })}
-                  className={riMono}
-                />
-              </div>
-            ) : (
-              <input
-                aria-label="Custom Docker image"
-                value={step.agent?.image ?? ''}
-                onChange={(e) => updateAgent({ image: e.target.value || undefined })}
-                className={riMono}
-              />
-            )}
-          </FieldRow>
-          {imageWarning && (
-            <div className="flex items-center gap-1.5 px-3 -mt-1">
-              <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
-              <span className="text-[11px] text-amber-600 dark:text-amber-400">{imageWarning}</span>
-            </div>
-          )}
-
-          <FieldRow label="agent.dockerfile" tooltip={TIP.agentDockerfile}>
-            <input
-              value={step.agent?.dockerfile ?? ''}
-              onChange={(e) => updateAgent({ dockerfile: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
-          <FieldRow label="agent.repo" tooltip={TIP.agentRepo}>
-            <input
-              value={step.agent?.repo ?? ''}
-              onChange={(e) => updateAgent({ repo: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
-          <FieldRow label="agent.commit" tooltip={TIP.agentCommit}>
-            <input
-              value={step.agent?.commit ?? ''}
-              onChange={(e) => updateAgent({ commit: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
-          <FieldRow label="agent.repoAuth" tooltip={TIP.agentRepoAuth}>
-            <input
-              value={step.agent?.repoAuth ?? ''}
-              onChange={(e) => updateAgent({ repoAuth: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
+          <ImageSourceFields
+            // Remounted per step, so a source chosen for one step is not still
+            // selected when another is opened in the same panel.
+            key={`agent-${step.id}`}
+            prefix="agent"
+            config={step.agent}
+            definition={imageSourceDefinition}
+            picker={agentImagePicker}
+            onChange={updateAgent}
+            blankOptionLabel={agentBlankOptionLabel}
+            imageWarning={imageWarning}
+            pickerValue={pickerImageValue}
+          />
         </FieldGroup>
       </>)}
 
@@ -1066,78 +1009,17 @@ export function StepEditor({
 
         {step.plugin !== 'databricks-job' && (
           <FieldGroup>
-            <FieldRow label="script.image" tooltip={TIP.scriptImage}>
-              {dockerImages && dockerImages.length > 0 ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <select
-                    aria-label="Known Docker image"
-                    value={step.script?.image ?? ''}
-                    onChange={(e) => updateScript({ image: e.target.value || undefined })}
-                    className={rs}
-                  >
-                    <option value="">Select image…</option>
-                    {dockerImages.map((img) => {
-                      const ref = imageRef(img);
-                      return <option key={img.id} value={ref}>{ref}</option>;
-                    })}
-                    {step.script?.image && !dockerImages.some((img) => imageRef(img) === step.script?.image) && (
-                      <option value={step.script.image}>{step.script.image}</option>
-                    )}
-                  </select>
-                  <input
-                    aria-label="Custom Docker image"
-                    value={step.script?.image ?? ''}
-                    onChange={(e) => updateScript({ image: e.target.value || undefined })}
-                    className={riMono}
-                  />
-                </div>
-              ) : (
-                <input
-                  aria-label="Custom Docker image"
-                  value={step.script?.image ?? ''}
-                  onChange={(e) => updateScript({ image: e.target.value || undefined })}
-                  className={riMono}
-                />
-              )}
-            </FieldRow>
-            {imageWarning && (
-              <div className="flex items-center gap-1.5 px-3 -mt-1">
-                <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
-                <span className="text-[11px] text-amber-600 dark:text-amber-400">{imageWarning}</span>
-              </div>
-            )}
-
-            <FieldRow label="script.dockerfile" tooltip={TIP.scriptDockerfile}>
-              <input
-                value={step.script?.dockerfile ?? ''}
-                onChange={(e) => updateScript({ dockerfile: e.target.value || undefined })}
-                className={riMono}
-              />
-            </FieldRow>
-
-            <FieldRow label="script.repo" tooltip={TIP.scriptRepo}>
-              <input
-                value={step.script?.repo ?? ''}
-                onChange={(e) => updateScript({ repo: e.target.value || undefined })}
-                className={riMono}
-              />
-            </FieldRow>
-
-            <FieldRow label="script.commit" tooltip={TIP.scriptCommit}>
-              <input
-                value={step.script?.commit ?? ''}
-                onChange={(e) => updateScript({ commit: e.target.value || undefined })}
-                className={riMono}
-              />
-            </FieldRow>
-
-            <FieldRow label="script.repoAuth" tooltip={TIP.scriptRepoAuth}>
-              <input
-                value={step.script?.repoAuth ?? ''}
-                onChange={(e) => updateScript({ repoAuth: e.target.value || undefined })}
-                className={riMono}
-              />
-            </FieldRow>
+            <ImageSourceFields
+              key={`script-${step.id}`}
+              prefix="script"
+              config={step.script}
+              definition={imageSourceDefinition}
+              picker={scriptImagePicker}
+              onChange={updateScript}
+              blankOptionLabel="Select image…"
+              imageWarning={imageWarning}
+              pickerValue={identityImageValue}
+            />
           </FieldGroup>
         )}
       </>)}

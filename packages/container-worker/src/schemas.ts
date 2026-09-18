@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BuildContextSchema } from '@mediforce/platform-core';
 
 /**
  * Payload sent from the API process to the worker via BullMQ.
@@ -42,8 +43,16 @@ export const DockerJobDataSchema = z.object({
     repoRef: z.string().optional(),
     commit: z.string().optional(),
     dockerfile: z.string().optional(),
+    /** Build context from the repo root; `dockerfile` is then read from it. */
+    context: BuildContextSchema.optional(),
     repoToken: z.string().optional(),
     contextDir: z.string().optional(),
+    /** Content hash of the files in `contextDir`; compared with the image's label on reuse. */
+    artifactsHash: z.string().optional(),
+    /** Workflow definition whose step triggered the build; written as an image label. */
+    workflow: z.string().optional(),
+    /** Namespace owning that definition; written as an image label. */
+    namespace: z.string().optional(),
   }).optional(),
 });
 

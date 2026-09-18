@@ -1,0 +1,766 @@
+'use client';
+
+import { useMemo, useState, type ReactNode } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  Layers,
+  Plus,
+  Search,
+  Server,
+} from 'lucide-react';
+import type {
+  ImageCatalogEntryView,
+  ImageCatalogVersion,
+} from '@mediforce/platform-api/contract';
+import { carriedSourceLine, isCatalogReference, shortImageId } from '@mediforce/platform-core';
+import { cn } from '@/lib/utils';
+import { routes } from '@/lib/routes';
+import { ConceptPopover } from '@/components/ui/concept-intro';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import { useNamespaceRole } from '@/hooks/use-namespace-role';
+import { useImageCatalogEntries, useImageCatalogEntry } from '@/hooks/use-image-catalog';
+import { AddImageDialog } from '@/components/images/add-image-dialog';
+import { BuildImageDialog } from '@/components/images/build-image-dialog';
+import { DeleteImageEntryDialog } from '@/components/images/delete-image-entry-dialog';
+import { ImageDescriptionDialog } from '@/components/images/image-description-dialog';
+import { PublishImageDialog } from '@/components/images/publish-image-dialog';
+import { UploadImageDialog } from '@/components/images/upload-image-dialog';
+import { useWorkflowsByImage, type WorkflowImageMatch } from '@/hooks/use-workflows-by-image';
+import {
+  groupByBase,
+  matchesImageQuery,
+  resolveVersionSource,
+  type ImageVersionSource,
+} from './image-catalog-view';
+
+const AVAILABILITY: Record<
+  ImageCatalogEntryView['availability'],
+  { label: string; className: string }
+> = {
+  present: {
+    label: 'On the daemon',
+    className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  },
+  absent: {
+    label: 'Unavailable',
+    className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  },
+  unknown: {
+    label: 'Not checked',
+    className: 'bg-muted text-muted-foreground',
+  },
+};
+
+function Chip({ children, title }: { children: ReactNode; title?: string }) {
+  return (
+    <InstantTooltip label={title}>
+      <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+        {children}
+      </span>
+    </InstantTooltip>
+  );
+}
+
+/** A cryptic value on a version row, explained on hover. */
+function ExplainedValue({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <InstantTooltip label={label}>
+      <span className="cursor-help font-mono text-muted-foreground underline decoration-dotted underline-offset-2">
+        {children}
+      </span>
+    </InstantTooltip>
+  );
+}
+
+/** Capability chips for the version an author is about to pick — the newest.
+ *  An unprobed image says so rather than claiming an empty toolchain. */
+function CapabilityChips({ version }: { version: ImageCatalogVersion | undefined }) {
+  if (version === undefined) return null;
+  if (version.capabilities.status !== 'known') {
+    return (
+      <Chip title="Nobody has probed this image yet. Expanding the entry runs the probe — a listing would start a container per version on every poll.">
+        Capabilities not probed
+      </Chip>
+    );
+  }
+  const { runtimes, agentCapable } = version.capabilities;
+  return (
+    <>
+      {runtimes.map((runtime) => (
+        <Chip key={runtime}>{runtime}</Chip>
+      ))}
+      {agentCapable ? (
+        <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+          agent-capable
+        </span>
+      ) : (
+        <Chip title="No agent CLI found, so an agent step on this image fails at container start">
+          script only
+        </Chip>
+      )}
+      {runtimes.length === 0 && <Chip>no known runtime</Chip>}
+    </>
+  );
+}
+
+/** A commit is only ever shown abbreviated; the full one is in the href. */
+function shortCommit(commit: string | undefined): string {
+  return commit === undefined ? '' : commit.slice(0, 7);
+}
+
+/** The rung the source ladder reached, and the link if it reached one. Rungs
+ *  are never presented as equivalent: the label names which one answered. */
+function SourceLine({ source, handle }: { source: ImageVersionSource; handle: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs">
+        <span className="font-medium text-foreground">{source.label}</span>
+        <span className="text-muted-foreground"> — {source.detail}</span>
+      </p>
+      {source.workflow !== undefined && (
+        <Link
+          href={routes.workflow(handle, source.workflow)}
+          className="inline-flex items-center gap-1 font-mono text-xs font-medium text-primary hover:underline"
+        >
+          {carriedSourceLine(source.workflow, source.dockerfile ?? '')}
+        </Link>
+      )}
+      {source.url !== null && (
+        <a
+          href={source.url}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+        >
+          {source.dockerfile === undefined
+            ? `Open the repository at ${shortCommit(source.commit)}`
+            : `Open ${source.dockerfile} at ${shortCommit(source.commit)}`}
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The layers a version adds over its base.
+ *
+ * Labelled layer commands everywhere it is named. `docker history` has no file
+ * contents, no comments, no formatting and no `FROM` boundary — calling it a
+ * Dockerfile would promise a reader something none of it delivers (#1296).
+ */
+function LayerCommands({
+  version,
+  baseTag,
+}: {
+  version: ImageCatalogVersion;
+  baseTag: string | null;
+}) {
+  const steps = version.lineage.addedSteps;
+  if (steps === undefined) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Layer commands are not available for this image right now.
+      </p>
+    );
+  }
+  if (steps.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {baseTag === null
+          ? 'No layer commands recorded for this image.'
+          : `Adds no layers over ${baseTag}.`}
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs text-muted-foreground">
+        {baseTag === null
+          ? `${steps.length} layer command${steps.length === 1 ? '' : 's'}, oldest first.`
+          : `${steps.length} layer command${steps.length === 1 ? '' : 's'} added over ${baseTag}, oldest first.`}{' '}
+        These are what the image records about how it was assembled — not a Dockerfile: no file
+        contents, no comments, no formatting. Build-arg values are redacted.
+      </p>
+      <ol className="divide-y rounded-md border bg-muted/20 text-[11px]">
+        {steps.map((step, index) => (
+          <li key={`${index}-${step.command}`} className="flex gap-3 px-3 py-1.5">
+            <pre className="flex-1 overflow-x-auto whitespace-pre-wrap break-all font-mono">
+              {step.command}
+            </pre>
+            <span className="shrink-0 text-muted-foreground">{step.size}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/**
+ * The workflows pinning this image.
+ *
+ * The scan behind it is deployment-wide — a public workflow in a workspace the
+ * reader has not joined pins the same daemon image and belongs in the answer,
+ * since a version nobody pins is what the `unused` chip claims. It is named,
+ * not linked: `/<handle>/workflows/<name>` is member-gated, and a non-member
+ * following it lands on "Workspace unavailable" rather than the workflow.
+ */
+function UsedBy({
+  workflows,
+  loading,
+  error,
+  handle,
+}: {
+  workflows: WorkflowImageMatch[] | undefined;
+  loading: boolean;
+  error: Error | null;
+  handle: string;
+}) {
+  if (error !== null) {
+    return <p className="text-xs text-destructive">{error.message}</p>;
+  }
+  if (loading) {
+    return <p className="text-xs text-muted-foreground animate-pulse">Loading usages…</p>;
+  }
+  if (workflows === undefined) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No version of this image is on the daemon, so there is nothing to look for.
+      </p>
+    );
+  }
+  if (workflows.length === 0) {
+    return <p className="text-xs text-muted-foreground">No workflow step pins this image.</p>;
+  }
+  return (
+    <ul className="space-y-1">
+      {workflows.map((workflow) => (
+        <li
+          key={`${workflow.namespace}:${workflow.name}:${workflow.version}`}
+          className="text-xs"
+        >
+          {workflow.namespace === handle ? (
+            <Link
+              href={routes.workflow(workflow.namespace, workflow.name)}
+              className="font-medium text-primary hover:underline"
+            >
+              {workflow.title ?? workflow.name}
+            </Link>
+          ) : (
+            <span
+              className="font-medium"
+              title={`This workflow lives in @${workflow.namespace}, not in @${handle}`}
+            >
+              {workflow.title ?? workflow.name}
+            </span>
+          )}
+          <span className="text-muted-foreground">
+            {' '}
+            — {workflow.namespace}/{workflow.name} v{workflow.version} · {workflow.steps.join(', ')}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * One version: what it is, where it came from, and what it adds over its base.
+ *
+ * The layer summary sits on every version because the entry read computes one
+ * for every version — the CLI's `images show` prints them all, and an author
+ * comparing a superseded build against the current one is asking exactly what
+ * changed. Only the current version's is open on arrival: an entry accumulates
+ * a version per build, and unrolling every layer list at once buries the one
+ * answer almost every reader came for.
+ */
+function VersionRow({
+  entry,
+  version,
+  index,
+  handle,
+  usedTags,
+  detailLoading,
+}: {
+  entry: ImageCatalogEntryView;
+  version: ImageCatalogVersion;
+  index: number;
+  handle: string;
+  usedTags: ReadonlySet<string> | null;
+  detailLoading: boolean;
+}) {
+  const source = resolveVersionSource(entry, version);
+  const [layersOpen, setLayersOpen] = useState(index === 0);
+  const [publishing, setPublishing] = useState(false);
+  // A carried version builds only when a step runs, so publishing is how it
+  // outlives the workflow — never a Build (ADR-0022).
+  const publishable = entry.source.kind === 'carried';
+  const baseTag = version.lineage.base?.imageTag ?? null;
+  return (
+    <li className="space-y-1.5 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <InstantTooltip label="Image tag — what a workflow step pins to run this version">
+          <span className="cursor-help font-mono">{version.imageTag}</span>
+        </InstantTooltip>
+        {version.commit !== undefined && (
+          <ExplainedValue label={`Git commit the image was built from: ${version.commit}`}>
+            {shortCommit(version.commit)}
+          </ExplainedValue>
+        )}
+        {version.contentHash !== undefined && (
+          <ExplainedValue
+            label={`Hash of the workflow's carried files the image was built from: ${version.contentHash} — what a commit is to an image built from a repository`}
+          >
+            {version.contentHash}
+          </ExplainedValue>
+        )}
+        <span className="text-muted-foreground">{version.created}</span>
+        <span className="text-muted-foreground">{version.size}</span>
+        <ExplainedValue
+          label={`Docker image ID: ${version.imageId} — identifies the image contents; two tags with the same ID are the same image`}
+        >
+          {shortImageId(version.imageId)}
+        </ExplainedValue>
+        {index === 0 ? (
+          <Chip title="The newest build of this entry — what a new pin picks">current</Chip>
+        ) : (
+          <Chip title="An older build, replaced by a newer one — workflows pinning it keep running it">
+            superseded
+          </Chip>
+        )}
+        {usedTags !== null && !usedTags.has(version.imageTag) && (
+          <Chip title="No workflow step pins this version">unused</Chip>
+        )}
+        {publishable && (
+          <button
+            type="button"
+            onClick={() => setPublishing(true)}
+            className="ml-auto rounded-md border bg-background px-2 py-0.5 text-[11px] font-medium transition-colors hover:bg-muted"
+          >
+            Publish as image
+          </button>
+        )}
+      </div>
+      {publishing && (
+        <PublishImageDialog
+          entry={entry}
+          version={version}
+          handle={handle}
+          open={publishing}
+          onOpenChange={setPublishing}
+        />
+      )}
+      <SourceLine source={source} handle={handle} />
+      <button
+        type="button"
+        onClick={() => setLayersOpen((current) => !current)}
+        aria-expanded={layersOpen}
+        className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+      >
+        {layersOpen ? (
+          <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ChevronRight className="h-3 w-3" />
+        )}
+        {baseTag === null ? 'Layer commands' : 'What it adds over its base'}
+      </button>
+      {layersOpen &&
+        (detailLoading ? (
+          <p className="text-xs text-muted-foreground animate-pulse">Reading layer commands…</p>
+        ) : (
+          <LayerCommands version={version} baseTag={baseTag} />
+        ))}
+    </li>
+  );
+}
+
+function EntryCard({
+  entry,
+  depth,
+  baseName,
+  handle,
+  canAdmin,
+  expanded,
+  onToggle,
+}: {
+  entry: ImageCatalogEntryView;
+  depth: number;
+  baseName: string | null;
+  handle: string;
+  canAdmin: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  // The listing deliberately omits the per-version layer summary, so the
+  // expanded card reads the entry on its own to get it.
+  const detail = useImageCatalogEntry(handle, entry.id, expanded);
+  const shown = detail.entry ?? entry;
+  const [writingDescription, setWritingDescription] = useState(false);
+  const [building, setBuilding] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const discovered = shown.origin === 'discovered';
+  // Only a built source carries the recipe a build needs. A `referenced` entry
+  // names an image the platform holds no inputs for, so it has nothing to build.
+  const buildable = shown.source.kind === 'built';
+  // A referenced entry under this workspace's name takes a new upload instead
+  // — never a rebuild (#1345, ADR-0022).
+  const uploadReference =
+    shown.source.kind === 'referenced' && isCatalogReference(shown.source.reference, handle)
+      ? shown.source.reference
+      : null;
+  const versions = shown.versions;
+  const newest = versions[0];
+
+  const imageTags = useMemo(() => versions.map((version) => version.imageTag), [versions]);
+  const usage = useWorkflowsByImage(imageTags, expanded);
+  const usedTags = useMemo(
+    () =>
+      usage.workflows === undefined
+        ? null
+        : new Set(usage.workflows.flatMap((workflow) => workflow.images)),
+    [usage.workflows],
+  );
+
+  const availability = AVAILABILITY[shown.availability];
+
+  return (
+    <div style={{ marginLeft: depth * 24 }} data-testid={`image-entry-${entry.id}`}>
+      <div className="rounded-lg border bg-card shadow-sm">
+        <div className="flex items-start">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            className="flex min-w-0 flex-1 items-start gap-3 px-4 py-3 text-left"
+          >
+            {expanded ? (
+              <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold">{shown.name}</h3>
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                    availability.className,
+                  )}
+                >
+                  {availability.label}
+                </span>
+                {discovered && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    Needs a description
+                  </span>
+                )}
+                {baseName !== null && (
+                  <span className="text-xs text-muted-foreground">Built on {baseName}</span>
+                )}
+                {shown.source.kind === 'carried' && (
+                  <span className="text-xs text-muted-foreground">
+                    From workflow {shown.source.workflow}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {discovered ? (
+                  <em>@{handle} built this image. Nobody has said what it is for yet.</em>
+                ) : (
+                  shown.intent
+                )}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <CapabilityChips version={newest} />
+              </div>
+            </div>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {versions.length} version{versions.length === 1 ? '' : 's'}
+            </span>
+          </button>
+          <div className="flex shrink-0 gap-2 py-3 pr-4">
+            {buildable && (
+              <button
+                type="button"
+                onClick={() => setBuilding(true)}
+                className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
+              >
+                Build
+              </button>
+            )}
+            {uploadReference !== null && (
+              <button
+                type="button"
+                onClick={() => setUploading(true)}
+                className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
+              >
+                Upload version
+              </button>
+            )}
+            {/* Every entry carries the same human-written fields, so every
+                entry can be edited — any member, the gate the entry was
+                created under (ADR-0022 decision 3). A discovered entry has no
+                stored row yet, so the same form describes it into one. */}
+            <button
+              type="button"
+              onClick={() => setWritingDescription(true)}
+              className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
+            >
+              {discovered ? 'Describe' : 'Edit'}
+            </button>
+            {/* Admin only. Delete takes the entry's images with it, and the
+                daemon is deployment-wide — one tag can back steps in
+                workspaces this reader cannot see. A member can still add an
+                entry; retiring one is an admin's call. */}
+            {canAdmin && (
+              <button
+                type="button"
+                onClick={() => setDeleting(true)}
+                className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
+        {writingDescription && (
+          <ImageDescriptionDialog
+            entry={shown}
+            handle={handle}
+            open={writingDescription}
+            onOpenChange={setWritingDescription}
+          />
+        )}
+        {building && (
+          <BuildImageDialog
+            entry={shown}
+            handle={handle}
+            open={building}
+            onOpenChange={setBuilding}
+          />
+        )}
+        {uploading && uploadReference !== null && (
+          <UploadImageDialog
+            reference={uploadReference}
+            handle={handle}
+            open={uploading}
+            onOpenChange={setUploading}
+          />
+        )}
+        {deleting && (
+          <DeleteImageEntryDialog
+            entry={shown}
+            handle={handle}
+            open={deleting}
+            onOpenChange={setDeleting}
+          />
+        )}
+
+        {expanded && (
+          <div className="space-y-4 border-t px-4 py-3">
+            {detail.error !== null && (
+              <p className="text-xs text-destructive">{detail.error.message}</p>
+            )}
+
+            <section className="space-y-1.5">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Versions
+              </h4>
+              {versions.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {shown.availability === 'unknown'
+                    ? 'The daemon could not be reached, so its versions are unknown.'
+                    : 'No image matching this entry is on the daemon.'}
+                </p>
+              ) : (
+                <ul className="divide-y rounded-md border">
+                  {versions.map((version, index) => (
+                    <VersionRow
+                      key={version.imageId + version.imageTag}
+                      entry={shown}
+                      version={version}
+                      index={index}
+                      handle={handle}
+                      usedTags={usedTags}
+                      detailLoading={detail.loading}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="space-y-1.5">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Used by
+              </h4>
+              <UsedBy
+                workflows={usage.workflows}
+                loading={usage.loading}
+                error={usage.error}
+                handle={handle}
+              />
+            </section>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function ImagesPage() {
+  const params = useParams();
+  const rawHandle = params.handle;
+  const handle = Array.isArray(rawHandle) ? rawHandle[0] : (rawHandle ?? '');
+  const search = useSearchParams();
+  const { canAdmin } = useNamespaceRole(handle);
+
+  const { entries, loading, error } = useImageCatalogEntries(handle);
+  const [query, setQuery] = useState('');
+  // `?entry=` is how Infrastructure crosses over to a specific entry.
+  const [expandedId, setExpandedId] = useState<string | null>(search.get('entry'));
+  const [adding, setAdding] = useState(false);
+
+  const grouped = useMemo(
+    () => groupByBase(entries.filter((entry) => matchesImageQuery(entry, query))),
+    [entries, query],
+  );
+
+  const daemonUnknown =
+    entries.length > 0 && entries.every((entry) => entry.availability === 'unknown');
+
+  return (
+    <div className="flex flex-1 flex-col p-6">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-1.5">
+            <h1 className="font-headline text-xl font-semibold">Images</h1>
+            <ConceptPopover label="What is an image entry?">
+              <p>
+                <strong>
+                  An image catalog entry is an image this workspace offers for workflow steps.
+                </strong>{' '}
+                It is keyed on the repository and Dockerfile it is built from, not on the commit —
+                so a rebuild is another version of the entry you already picked, not another row.
+              </p>
+              <p>
+                Everything but the one sentence of intent is derived from the image itself:
+                capabilities are probed, versions and lineage are recomputed from the daemon on
+                every read. Admin → Infrastructure stays the raw daemon inventory.
+              </p>
+              <p>
+                An image a workflow here built shows up on its own, marked{' '}
+                <strong>Needs a description</strong> — the build recorded its repository,
+                Dockerfile and commit, and the sentence is the one thing no build can write.
+                Describing it is what registers the entry and probes what is inside.
+              </p>
+              <p>
+                An image built from an uploaded folder is keyed on its name instead, and its
+                versions are tags. The platform keeps none of the folder, so it can never rebuild
+                one — each version is its own upload.
+              </p>
+              <p>
+                An image a step built from a Dockerfile its workflow carries is keyed on that
+                workflow and Dockerfile, and its versions are hashes of the carried files. It
+                builds when the step runs, so it has no Build — <strong>Publish as image</strong>{' '}
+                copies a version into an image of its own that outlives the workflow.
+              </p>
+            </ConceptPopover>
+          </div>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Images @{handle} offers for workflow steps, grouped by what each was built on.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {canAdmin && (
+            <Link
+              href={routes.adminInfrastructure(handle)}
+              className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              <Server className="h-3.5 w-3.5" />
+              Raw daemon inventory
+            </Link>
+          )}
+          {/* Any member, matching the write gate on the entry itself — an entry
+              executes nothing and names an image string a step author can
+              already type (ADR-0022 decision 3). */}
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add image
+          </button>
+        </div>
+      </div>
+
+      {adding && <AddImageDialog handle={handle} open={adding} onOpenChange={setAdding} />}
+
+      <div className="relative mb-6">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="text"
+          placeholder="Search images by name, intent, repository or capability…"
+          aria-label="Search images"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          className="w-full rounded-md border bg-background py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+      </div>
+
+      {error !== null && (
+        <div className="mb-4 rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error.message}
+        </div>
+      )}
+
+      {daemonUnknown && (
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-800 dark:bg-amber-950/20">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+          <p className="text-xs text-muted-foreground">
+            The Docker daemon could not be reached, so versions, capabilities and lineage are
+            unknown for now. The entries themselves still read.
+          </p>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="py-20 text-center text-sm text-muted-foreground animate-pulse">
+          Loading images…
+        </div>
+      ) : grouped.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <Layers className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {query.trim() === ''
+              ? 'No images catalogued yet, and no workflow here has built one. Add image registers the repository and Dockerfile yours are built from, or builds one from a folder you upload.'
+              : 'No images match your search.'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {grouped.map(({ entry, depth, baseName }) => (
+            <EntryCard
+              key={entry.id}
+              entry={entry}
+              depth={depth}
+              baseName={baseName}
+              handle={handle}
+              canAdmin={canAdmin}
+              expanded={expandedId === entry.id}
+              onToggle={() => setExpandedId((current) => (current === entry.id ? null : entry.id))}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

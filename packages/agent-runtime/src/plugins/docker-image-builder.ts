@@ -4,14 +4,21 @@
  * Two build sources. A git repo at a commit: cloned into a temp dir, labelled
  * with the SHA so a later run detects staleness and rebuilds. Or a directory
  * that already exists on the host — the materialized files a workflow carries,
- * written for the `/artifacts` mount — which needs no clone, and whose tag is
- * derived from the files' content so an existing image with that tag was built
- * from exactly those files.
+ * written for the `/artifacts` mount — which needs no clone, and is labelled
+ * with the files' content hash so a later run detects an edit the same way.
  */
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
+import {
+  BUILD_LABELS,
+  buildProvenanceLabelArgs,
+  carriedImageLabelArgs,
+  normalizeRepoPath,
+  resolveDockerBuildPaths,
+} from '@mediforce/platform-core';
 import { cloneRepoAtCommit } from './git-clone';
 
 export interface BuildImageOptions {
@@ -21,7 +28,13 @@ export interface BuildImageOptions {
   repoRef?: string;
   commit: string;
   dockerfile?: string;
+  /** Build context from the repo root; `dockerfile` is then read from it. */
+  context?: string;
   repoToken?: string;
+  /** Workflow definition whose step triggered this build. Recorded as a label. */
+  workflow?: string;
+  /** Namespace owning that definition. Recorded as a label. */
+  namespace?: string;
 }
 
 export interface EnsureImageOptions {
@@ -30,21 +43,28 @@ export interface EnsureImageOptions {
   repoRef?: string;
   commit?: string;
   dockerfile?: string;
+  context?: string;
   repoToken?: string;
   /** Host directory to build from, instead of a clone. The files a workflow
    *  carries, already materialized for the `/artifacts` mount. */
   contextDir?: string;
+  /** Content hash of the files in `contextDir`, labelled on the image. */
+  artifactsHash?: string;
+  workflow?: string;
+  namespace?: string;
 }
 
-const BUILD_COMMIT_LABEL = 'mediforce.build.commit';
+const BUILD_COMMIT_LABEL = BUILD_LABELS.commit;
 
 
 /** In-process mutex to avoid concurrent builds of the same image. */
 const buildLocks = new Map<string, Promise<void>>();
 
+// argv form, not a shell string: a step may name its own image, and that name
+// is workflow config.
 export async function imageExistsLocally(image: string): Promise<boolean> {
   try {
-    execSync(`docker image inspect "${image}"`, { stdio: 'pipe' });
+    execFileSync('docker', ['image', 'inspect', image], { stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -52,9 +72,14 @@ export async function imageExistsLocally(image: string): Promise<boolean> {
 }
 
 export async function getImageBuildCommit(image: string): Promise<string | null> {
+  return getImageBuildLabel(image, BUILD_COMMIT_LABEL);
+}
+
+async function getImageBuildLabel(image: string, key: string): Promise<string | null> {
   try {
-    const output = execSync(
-      `docker inspect --format '{{index .Config.Labels "${BUILD_COMMIT_LABEL}"}}' "${image}"`,
+    const output = execFileSync(
+      'docker',
+      ['inspect', '--format', `{{index .Config.Labels "${key}"}}`, image],
       { stdio: 'pipe' },
     ).toString().trim();
     return output.length > 0 ? output : null;
@@ -63,20 +88,53 @@ export async function getImageBuildCommit(image: string): Promise<string | null>
   }
 }
 
+/**
+ * Refuse a build path the checkout resolves outside the clone.
+ * `resolveDockerBuildPaths` already refused `..` in the strings; this catches a
+ * symlink committed to the repo, which `docker build` follows — a context of
+ * `ctx -> /` would otherwise send the build host's filesystem, deploy key
+ * included, to the daemon and into an image.
+ */
+export function assertInsideClone(cloneDir: string, relativePath: string): void {
+  const root = realpathSync(cloneDir);
+  let resolved: string;
+  try {
+    resolved = realpathSync(join(cloneDir, relativePath));
+  } catch {
+    // Missing: there is nothing to escape through, and `docker build` names
+    // the missing path itself.
+    return;
+  }
+  if (resolved !== root && resolved.startsWith(`${root}${sep}`) === false) {
+    throw new Error(`Build path "${relativePath}" resolves outside the repository.`);
+  }
+}
+
 export async function buildImageFromRepo(options: BuildImageOptions): Promise<void> {
-  const { image, repoUrl, commit, dockerfile = 'Dockerfile', repoToken } = options;
+  const { image, repoUrl, commit, context, repoToken, workflow, namespace } = options;
+  // Resolved for `-f` and the context; the labels keep the inputs as named,
+  // which is what `deriveBuildTag` hashed (see `resolveDockerBuildPaths`).
+  const paths = resolveDockerBuildPaths(options.dockerfile, context);
   const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-build-'));
 
   try {
     // Clone repo at specific commit (sparse — fetch only what we need)
     cloneRepoAtCommit(buildDir, options.repoRef ?? repoUrl, commit, repoToken);
+    assertInsideClone(buildDir, paths.context);
+    assertInsideClone(buildDir, paths.dockerfile);
 
-    // Build image — use the Dockerfile's directory as build context so COPY paths work naturally
-    const dockerfilePath = join(buildDir, dockerfile);
-    const buildContext = dirname(dockerfilePath);
     console.log(`[docker-image-builder] Building image "${image}" from ${repoUrl}@${commit.slice(0, 8)}`);
-    execSync(
-      `docker build -t "${image}" --label "${BUILD_COMMIT_LABEL}=${commit}" -f "${dockerfilePath}" "${buildContext}"`,
+    // argv form, not a shell string: the label values carry a repo URL, a
+    // workflow name and a namespace, none of which are safe to interpolate.
+    execFileSync(
+      'docker',
+      [
+        'build',
+        '-t', image,
+        ...buildProvenanceLabelArgs({ repoUrl, commit, dockerfile: options.dockerfile ?? '', context, workflow, namespace, repoToken }),
+        '-f', join(buildDir, paths.dockerfile),
+        join(buildDir, paths.context),
+      ],
       { stdio: 'pipe' },
     );
     console.log(`[docker-image-builder] Image "${image}" built successfully`);
@@ -86,44 +144,65 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
 }
 
 /**
- * Build from a directory that is already on the host. The build context is the
- * whole directory rather than the Dockerfile's own, so `COPY scripts/ /scripts/`
- * from a `container/Dockerfile` works the way it does in a repository.
+ * Build from the files a workflow carries, already on the host. `dockerfile` is
+ * a path from the root of those files and the context is always all of them, so
+ * `COPY scripts/ /scripts/` from a `container/Dockerfile` works (`carriedDockerfile`).
  */
 export async function buildImageFromDirectory(options: {
   image: string;
   contextDir: string;
   dockerfile?: string;
+  artifactsHash?: string;
+  workflow?: string;
+  namespace?: string;
 }): Promise<void> {
-  const { image, contextDir, dockerfile = 'Dockerfile' } = options;
-  const dockerfilePath = join(contextDir, dockerfile);
+  const { image, contextDir, dockerfile = 'Dockerfile', artifactsHash, workflow, namespace } = options;
+  const dockerfilePath = normalizeRepoPath(dockerfile);
+  if (dockerfilePath === null || dockerfilePath === '') {
+    throw new Error(`Dockerfile "${dockerfile}" is outside the workflow's files.`);
+  }
   console.log(`[docker-image-builder] Building image "${image}" from ${contextDir}`);
-  execSync(
-    `docker build -t "${image}" -f "${dockerfilePath}" "${contextDir}"`,
+  // argv form, not a shell string: the label values carry a workflow name and
+  // a namespace, neither of which is safe to interpolate.
+  execFileSync(
+    'docker',
+    [
+      'build',
+      '-t', image,
+      ...carriedImageLabelArgs({ artifactsHash: artifactsHash ?? '', dockerfile, workflow, namespace }),
+      '-f', join(contextDir, dockerfilePath),
+      contextDir,
+    ],
     { stdio: 'pipe' },
   );
   console.log(`[docker-image-builder] Image "${image}" built successfully`);
 }
 
 export async function ensureImage(options: EnsureImageOptions): Promise<void> {
-  const { image, repoUrl, repoRef, commit, dockerfile, repoToken, contextDir } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile, context, repoToken, contextDir, artifactsHash, workflow, namespace } = options;
 
-  // A directory the caller already has: the tag is derived from the content of
-  // the files in it, so an image that exists under this tag was built from
-  // exactly them and there is no staleness question to ask.
+  // A directory the caller already has. A derived tag already names the
+  // content, but a tag the step named does not, so an existing image is reused
+  // only when its label says it was built from these files — the same question
+  // the commit label answers for a repo build. A job queued without a hash has
+  // nothing to compare, and reuses what is there as it did before the label.
   if (contextDir !== undefined) {
     const existingLock = buildLocks.get(image);
     if (existingLock) {
+      // The build waited on may have been of other files under the same tag.
       await existingLock;
-      return;
+      return ensureImage(options);
     }
     const buildPromise = (async () => {
       try {
         if (await imageExistsLocally(image)) {
-          console.log(`[docker-image-builder] Image "${image}" already built from these files`);
-          return;
+          if (artifactsHash === undefined || (await getImageBuildLabel(image, BUILD_LABELS.artifacts)) === artifactsHash) {
+            console.log(`[docker-image-builder] Image "${image}" already built from these files`);
+            return;
+          }
+          console.log(`[docker-image-builder] Image "${image}" built from other files, rebuilding`);
         }
-        await buildImageFromDirectory({ image, contextDir, dockerfile });
+        await buildImageFromDirectory({ image, contextDir, dockerfile, artifactsHash, workflow, namespace });
       } finally {
         buildLocks.delete(image);
       }
@@ -162,7 +241,7 @@ export async function ensureImage(options: EnsureImageOptions): Promise<void> {
         console.log(`[docker-image-builder] Image "${image}" stale (${currentCommit?.slice(0, 8)} → ${commit.slice(0, 8)}), rebuilding`);
       }
 
-      await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, repoToken });
+      await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, context, repoToken, workflow, namespace });
     } finally {
       buildLocks.delete(image);
     }

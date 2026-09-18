@@ -3,7 +3,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import type { AgentDefinition, ModelRegistryEntry, WorkflowStep } from '@mediforce/platform-core';
-import type { DockerImageInfo } from '@mediforce/platform-api/contract';
+import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 
 // ---- Mocks (must be before component import) ----
 
@@ -124,6 +124,35 @@ function expandCard(name: string) {
 const dockerImages: DockerImageInfo[] = [
   { repository: 'mediforce/golden-image', tag: 'latest', id: 'abc', size: '1GB', created: '1d ago' },
 ];
+
+function catalogEntry(
+  overrides: Partial<ImageCatalogEntryView> & Pick<ImageCatalogEntryView, 'id' | 'name'>,
+): ImageCatalogEntryView {
+  return {
+    intent: `what ${overrides.name} is for`,
+    source: { kind: 'referenced', reference: overrides.name },
+    capabilities: {},
+    versions: [],
+    availability: 'present',
+    baseEntryId: null,
+    ...overrides,
+  };
+}
+
+function catalogVersion(
+  imageTag: string,
+  imageId: string,
+  capabilities: ImageCatalogEntryView['versions'][number]['capabilities'],
+): ImageCatalogEntryView['versions'][number] {
+  return {
+    imageTag,
+    imageId,
+    created: '1d ago',
+    size: '1GB',
+    capabilities,
+    lineage: { base: null, ownLabels: {} },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -684,6 +713,10 @@ describe('StepEditor', () => {
     );
 
     expandCard('Prompt & model');
+    // Behind a toggle since the picker is the way in: an image worth running is
+    // one the catalog describes, and this is the escape hatch for one nobody
+    // has catalogued yet.
+    fireEvent.click(screen.getByText('Name an image the catalog does not list'));
     fireEvent.change(screen.getByLabelText('Custom Docker image'), {
       target: { value: 'python:3.11-slim' },
     });
@@ -692,12 +725,32 @@ describe('StepEditor', () => {
   });
 
   // Picking a minimal base image for an agent step fails at container start —
-  // it carries no agent CLI. The picker offers every discovered image equally,
-  // so it must at least say which one works and what leaving it blank does.
+  // it carries no agent CLI. Since #1298 the picker is sourced from the image
+  // catalog rather than the raw daemon list, so what it offers is what a probe
+  // says can run, described by the entry's own sentence.
   describe('agent image picker', () => {
     const mixedImages: DockerImageInfo[] = [
       { repository: 'alpine', tag: '3.24', id: 'a1', size: '8MB', created: '1d ago' },
       { repository: 'mediforce-golden-image', tag: 'latest', id: 'g1', size: '1GB', created: '1d ago' },
+    ];
+
+    const catalogEntries: ImageCatalogEntryView[] = [
+      catalogEntry({
+        id: 'golden',
+        name: 'Golden image',
+        intent: 'the agent image the platform ships',
+        versions: [catalogVersion('mediforce-golden-image:latest', 'g1', {
+          status: 'known', agentCapable: true, runtimes: ['opencode', 'bash'],
+        })],
+      }),
+      catalogEntry({
+        id: 'alpine',
+        name: 'Alpine',
+        intent: 'a minimal base for scripts',
+        versions: [catalogVersion('alpine:3.24', 'a1', {
+          status: 'known', agentCapable: false, runtimes: [],
+        })],
+      }),
     ];
 
     function renderAgentStep(
@@ -710,6 +763,7 @@ describe('StepEditor', () => {
           allSteps={[]}
           onChange={noop}
           dockerImages={mixedImages}
+          catalogEntries={catalogEntries}
           workflowExternalSkillsRepo={workflowExternalSkillsRepo}
         />,
       );
@@ -722,28 +776,114 @@ describe('StepEditor', () => {
       expect(select.options[0].textContent).toContain('mediforce-golden-image');
     });
 
-    it('[RENDER] marks the golden image as recommended and lists it first', () => {
+    it('[RENDER] describes an option by name and intent, and omits known incompatible images', () => {
       const select = renderAgentStep();
       const listed = Array.from(select.options).slice(1).map((o) => o.textContent ?? '');
-      expect(listed[0]).toBe('★ mediforce-golden-image:latest');
-      expect(listed).toContain('alpine:3.24');
+      expect(listed).toEqual(['Golden image — the agent image the platform ships']);
+      expect(select.options[1].value).toBe(DEFAULT_AGENT_IMAGE);
     });
 
-    it('[RENDER] a build-mode step reports its build source instead of the default', () => {
-      const select = renderAgentStep({
-        agent: { repo: 'https://github.com/acme/wf.git', commit: 'abc1234', dockerfile: 'Dockerfile' },
-      });
-      expect(select.options[0].textContent).not.toContain('mediforce-golden-image');
-      expect(select.options[0].textContent).toContain('agent.repo');
-    });
-
-    it('[RENDER] a workflow-level build source is reflected in the blank option', () => {
-      const select = renderAgentStep(
-        { agent: { dockerfile: 'Dockerfile' } },
-        { url: 'https://github.com/acme/wf.git', commit: 'abc1234' },
+    it('[RENDER] groups an entry under the catalogued image it was built on', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'agent' })}
+          allSteps={[]}
+          onChange={noop}
+          dockerImages={mixedImages}
+          catalogEntries={[
+            ...catalogEntries,
+            catalogEntry({
+              id: 'tealflow',
+              name: 'TealFlow agent',
+              intent: 'reads TealFlow specs',
+              baseEntryId: 'golden',
+              versions: [catalogVersion('tealflow:abc1234', 't1', {
+                status: 'known', agentCapable: true, runtimes: ['claude', 'bash'],
+              })],
+            }),
+          ]}
+        />,
       );
-      expect(select.options[0].textContent).not.toContain(DEFAULT_AGENT_IMAGE);
-      expect(select.options[0].textContent).toContain('workflow');
+      expandCard('Prompt & model');
+      const groups = Array.from(document.querySelectorAll('optgroup')).map((g) => g.getAttribute('label'));
+      expect(groups).toEqual(['Base images', 'Built on Golden image']);
+    });
+
+    it('[REGRESSION] degrades to the raw daemon list when the catalog has nothing to say', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'agent' })}
+          allSteps={[]}
+          onChange={noop}
+          dockerImages={mixedImages}
+        />,
+      );
+      expandCard('Prompt & model');
+      const select = screen.getByLabelText('Known Docker image') as HTMLSelectElement;
+      const listed = Array.from(select.options).slice(1).map((o) => o.textContent ?? '');
+
+      // No catalog means nothing has been probed, so nothing is ruled out and
+      // nothing is ranked — the author still gets a picker (AGENTS.md §13).
+      expect(listed).toEqual(['alpine:3.24', 'mediforce-golden-image:latest']);
+    });
+
+    it('[REGRESSION] a catalog that suits nothing keeps the select and its default, not the daemon list', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'agent' })}
+          allSteps={[]}
+          onChange={noop}
+          dockerImages={mixedImages}
+          catalogEntries={[catalogEntries[1]]}
+        />,
+      );
+      expandCard('Prompt & model');
+      const select = screen.getByLabelText('Known Docker image') as HTMLSelectElement;
+
+      // "None of these" is an answer: the raw daemon list must not come back and
+      // put alpine one click from an agent step. The blank option still names
+      // what registration fills in, so the author is not stuck.
+      expect(Array.from(select.options)).toHaveLength(1);
+      expect(select.options[0].textContent).toContain('mediforce-golden-image');
+    });
+
+    it('[RENDER] a step that builds its own image is not offered a picker at all', () => {
+      // The three sources are mutually exclusive, so a build-mode step shows the
+      // build fields instead of an image list it would ignore.
+      render(
+        <StepEditor
+          step={buildStep({
+            executor: 'agent',
+            agent: { repo: 'https://github.com/acme/wf.git', commit: 'abc1234', dockerfile: 'Dockerfile' },
+          })}
+          allSteps={[]}
+          onChange={vi.fn()}
+          dockerImages={mixedImages}
+          catalogEntries={catalogEntries}
+        />,
+      );
+      expandCard('Prompt & model');
+
+      expect(screen.queryByLabelText('Known Docker image')).toBeNull();
+      expect(screen.getByText('Built from a git repo')).toBeTruthy();
+    });
+
+    it('[RENDER] a bare Dockerfile behind the workflow skills repo reads as a repo build', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'agent', agent: { dockerfile: 'Dockerfile' } })}
+          allSteps={[]}
+          onChange={vi.fn()}
+          dockerImages={mixedImages}
+          catalogEntries={catalogEntries}
+          workflowExternalSkillsRepo={{ url: 'https://github.com/acme/wf.git', commit: 'abc1234' }}
+        />,
+      );
+      expandCard('Prompt & model');
+
+      expect(screen.queryByLabelText('Known Docker image')).toBeNull();
+      // The repo it inherits is named, rather than left as two empty boxes.
+      expect(screen.getByText(/github.com\/acme\/wf.git/)).toBeTruthy();
     });
 
     it('[REGRESSION] treats the untagged persisted default as the discovered latest image', () => {
@@ -755,6 +895,31 @@ describe('StepEditor', () => {
       expect(select.value).toBe(DEFAULT_AGENT_IMAGE);
     });
 
+    it('[REGRESSION] a step pinning an image no catalog entry covers still loads it', () => {
+      const select = renderAgentStep({ agent: { image: 'ghcr.io/acme/private-agent:v9' } });
+      expect(select.value).toBe('ghcr.io/acme/private-agent:v9');
+      expect(Array.from(select.options).map((o) => o.value)).toContain('ghcr.io/acme/private-agent:v9');
+    });
+
+    it('[REGRESSION] the custom-image field still saves a string the catalog never offered', () => {
+      const onChange = vi.fn();
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'agent' })}
+          allSteps={[]}
+          onChange={onChange}
+          dockerImages={mixedImages}
+          catalogEntries={catalogEntries}
+        />,
+      );
+      expandCard('Prompt & model');
+      fireEvent.click(screen.getByText('Name an image the catalog does not list'));
+      fireEvent.change(screen.getByLabelText('Custom Docker image'), {
+        target: { value: 'ghcr.io/acme/private-agent:v9' },
+      });
+      expect(onChange).toHaveBeenCalledWith({ agent: { image: 'ghcr.io/acme/private-agent:v9' } });
+    });
+
     it('[RENDER] the script picker keeps a neutral blank option — no agent default applies', () => {
       render(
         <StepEditor
@@ -762,11 +927,44 @@ describe('StepEditor', () => {
           allSteps={[]}
           onChange={noop}
           dockerImages={mixedImages}
+          catalogEntries={catalogEntries}
         />,
       );
       expandCard('Script');
       const select = screen.getByLabelText('Known Docker image') as HTMLSelectElement;
       expect(select.options[0].textContent).not.toContain('mediforce-golden-image');
+    });
+
+    it('[RENDER] a script step offers an image an agent step may not, and narrows to its runtime', () => {
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'script', script: { runtime: 'r', inlineScript: 'print(1)' } })}
+          allSteps={[]}
+          onChange={noop}
+          dockerImages={mixedImages}
+          catalogEntries={[
+            catalogEntry({
+              id: 'alpine',
+              name: 'Alpine',
+              intent: 'a minimal base for scripts',
+              versions: [catalogVersion('alpine:3.24', 'a1', {
+                status: 'known', agentCapable: false, runtimes: ['Rscript', 'bash'],
+              })],
+            }),
+            catalogEntry({
+              id: 'py',
+              name: 'Python image',
+              intent: 'pipelines',
+              versions: [catalogVersion('python:3.11', 'p1', {
+                status: 'known', agentCapable: false, runtimes: ['python3', 'bash'],
+              })],
+            }),
+          ]}
+        />,
+      );
+      expandCard('Script');
+      const select = screen.getByLabelText('Known Docker image') as HTMLSelectElement;
+      expect(Array.from(select.options).slice(1).map((o) => o.value)).toEqual(['alpine:3.24']);
     });
   });
 
@@ -1415,5 +1613,99 @@ describe('StepEditor — skills the workflow carries', () => {
     render(<StepEditor step={agentStep()} allSteps={[agentStep()]} onChange={vi.fn()} />);
     fireEvent.click(screen.getByText('Prompt & model'));
     expect(screen.queryByLabelText('Skill')).toBeNull();
+  });
+});
+
+// Three sources, one choice. The editor used to show `image`, `dockerfile`,
+// `context`, `repo`, `commit` and `repoAuth` at once, with no way to tell which
+// the runtime would use.
+describe('StepEditor — where a step\'s image comes from', () => {
+  const CARRIED = [
+    { path: 'container/Dockerfile', contents: 'FROM alpine:3.21\n' },
+    { path: 'scripts/run.py', contents: 'print("run")\n' },
+  ];
+
+  function renderScriptStep(step: Partial<WorkflowStep>, onChange = vi.fn()) {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'script', ...step })}
+        allSteps={[]}
+        onChange={onChange}
+        dockerImages={dockerImages}
+        workflowArtifacts={CARRIED}
+      />,
+    );
+    expandCard('Script');
+    return onChange;
+  }
+
+  it('opens a carried step on its carried Dockerfile, picked from the files the workflow holds', () => {
+    renderScriptStep({ script: { command: 'run', dockerfile: 'container/Dockerfile' } });
+
+    const select = screen.getByLabelText('Carried Dockerfile') as HTMLSelectElement;
+    expect(select.value).toBe('container/Dockerfile');
+    // The workflow's other carried file is not a Dockerfile and is not offered.
+    expect(Array.from(select.options).map((option) => option.value)).toEqual(['', 'container/Dockerfile']);
+    expect(screen.queryByLabelText('Known Docker image')).toBeNull();
+  });
+
+  it('clears the build fields when the author switches to a ready image', () => {
+    const onChange = renderScriptStep({
+      script: { command: 'run', dockerfile: 'container/Dockerfile', context: '.' },
+    });
+
+    fireEvent.click(screen.getByText('Ready image'));
+
+    expect(onChange).toHaveBeenCalledWith({
+      script: expect.objectContaining({
+        image: undefined,
+        dockerfile: undefined,
+        context: undefined,
+        repo: undefined,
+        commit: undefined,
+        repoAuth: undefined,
+      }),
+    });
+  });
+
+  it('calls the image a build tag in a build mode, where that is what it means', () => {
+    renderScriptStep({ script: { command: 'run', dockerfile: 'container/Dockerfile' } });
+
+    expect(screen.getByLabelText('Build tag')).toBeTruthy();
+  });
+
+  it('says which fields the chosen source ignores, and clears them only when asked', () => {
+    const onChange = renderScriptStep({
+      script: { command: 'run', dockerfile: 'container/Dockerfile', repo: 'org/agent' },
+    });
+
+    expect(screen.getByText(/script.repo, which this source does not use/)).toBeTruthy();
+    // Opening the editor changes nothing by itself.
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText('Clear it'));
+    expect(onChange).toHaveBeenCalledWith({ script: expect.objectContaining({ repo: undefined }) });
+  });
+
+  it('switches to a git repo, which nothing in the step says yet', () => {
+    // The mode is read back from the fields, and a repo build starts with none
+    // of them filled in — so the selector has to remember the choice, or the
+    // click appears to do nothing at all.
+    renderScriptStep({ script: { command: 'run', dockerfile: 'container/Dockerfile' } });
+
+    fireEvent.click(screen.getByText('Built from a git repo'));
+
+    expect(screen.getByText('Script Repo')).toBeTruthy();
+    expect(screen.getByText('Script Commit')).toBeTruthy();
+    expect(screen.queryByLabelText('Carried Dockerfile')).toBeNull();
+  });
+
+  it('switches from a ready image to the workflow files', () => {
+    renderScriptStep({ script: { command: 'run', image: 'python:3.11-slim' } });
+
+    fireEvent.click(screen.getByText('Built from workflow files'));
+
+    expect(screen.getByLabelText('Carried Dockerfile')).toBeTruthy();
+    expect(screen.queryByLabelText('Known Docker image')).toBeNull();
   });
 });

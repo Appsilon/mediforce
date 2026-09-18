@@ -1,0 +1,311 @@
+/**
+ * Build provenance carried on the images the platform builds.
+ *
+ * A build-mode step that omits `image` runs under a tag derived from its build
+ * inputs (`mediforce-built:<12 hex>`), so the tag itself says nothing about
+ * which repo, commit or Dockerfile produced it. The builder writes that
+ * provenance as image labels; the daemon listing reads it back. Pure strings,
+ * shared so both builders emit the same keys the listing looks for.
+ */
+
+import { z } from 'zod';
+import { normalizeRepoUrls, redactRepoCredentials } from './repo-url';
+import { PULL_IMAGE_PATTERN } from './image-reference';
+import { BuildContextSchema } from './docker-build-paths';
+
+/** Label keys the platform writes on every image it builds. */
+export const BUILD_LABELS = {
+  repo: 'mediforce.build.repo',
+  commit: 'mediforce.build.commit',
+  dockerfile: 'mediforce.build.dockerfile',
+  context: 'mediforce.build.context',
+  workflow: 'mediforce.build.workflow',
+  namespace: 'mediforce.build.namespace',
+  /** Content hash of the files a workflow carries, for an image built from them. */
+  artifacts: 'mediforce.build.artifacts',
+} as const;
+
+/**
+ * Standard OCI keys, emitted alongside the `mediforce.build.*` ones.
+ *
+ * Not redundant: they are what the rest of the ecosystem reads, and — because
+ * labels are inherited from the base image — leaving them unset makes our
+ * images report the base's repository as their own. An image built on
+ * `rocker/tidyverse` claims `org.opencontainers.image.source =
+ * https://github.com/rocker-org/rocker-versioned2` until we override it.
+ */
+export const OCI_LABELS = {
+  source: 'org.opencontainers.image.source',
+  revision: 'org.opencontainers.image.revision',
+} as const;
+
+export interface ImageProvenance {
+  /** Normalized git URL of the build context repo. */
+  repoUrl: string;
+  commit: string;
+  /** Dockerfile path inside the repo, as the build resolved it. */
+  dockerfile: string;
+  /** Build context the step named, as written. Absent for one that named none. */
+  context?: string;
+  /** Workflow definition whose step triggered the build. */
+  workflow?: string;
+  /** Namespace owning that definition. */
+  namespace?: string;
+  /** Clone token — used only to keep it out of the labels, never written. */
+  repoToken?: string;
+}
+
+/**
+ * The inputs a build needs, as sent across a process boundary.
+ *
+ * The platform builds an image in two places — in-process when the daemon is
+ * local, and over the worker's HTTP route when it is not — and both call the
+ * same `buildImageFromRepo`. Shared here so the two processes cannot drift
+ * apart on a field, which the container-worker README calls out as the hazard
+ * of a cross-process payload.
+ */
+export const BuildImageRequestSchema = z
+  .object({
+    /** Tag to build under — `deriveBuildTag`'s output for a build-mode step. */
+    image: z.string().min(1),
+    /** Normalized git URL cloned for the build context. */
+    repoUrl: z.string().min(1),
+    /** Pre-normalization reference, which picks the clone transport. */
+    repoRef: z.string().min(1).optional(),
+    commit: z.string().min(1),
+    /** Empty is a value, not an absence: it is what `deriveBuildTag` hashes. */
+    dockerfile: z.string().default(''),
+    /** Directory from the repo root; `dockerfile` is then read from it. */
+    context: BuildContextSchema.optional(),
+    repoToken: z.string().optional(),
+    workflow: z.string().optional(),
+    namespace: z.string().optional(),
+  })
+  .strict();
+
+export type BuildImageRequest = z.infer<typeof BuildImageRequestSchema>;
+
+/**
+ * A build from an uploaded context rather than a clone (#1345). The archive
+ * itself is the request body; this is what travels beside it.
+ */
+export const BuildUploadedImageRequestSchema = z
+  .object({
+    /** `reference:tag`, as the uploader named it. */
+    image: z.string().min(1),
+    /** Path from the context root; empty is the default `Dockerfile`. */
+    dockerfile: z.string().default(''),
+    /** Namespace that uploaded it. Recorded as a label. */
+    namespace: z.string().min(1),
+  })
+  .strict();
+
+export type BuildUploadedImageRequest = z.infer<typeof BuildUploadedImageRequestSchema>;
+
+/**
+ * A pull of a registry image onto the daemon. Shared for the reason
+ * `BuildImageRequestSchema` is: in-process and over the worker's route.
+ */
+export const PullImageRequestSchema = z
+  .object({
+    /** `reference:tag`, exactly as the daemon will list it. */
+    image: z.string().regex(PULL_IMAGE_PATTERN, 'image must be a registry image and tag, e.g. ghcr.io/acme/agent:v1'),
+  })
+  .strict();
+
+export type PullImageRequest = z.infer<typeof PullImageRequestSchema>;
+
+/** Why an upload or a pull may not land on `image`: a version is never
+ *  replaced (ADR-0022). */
+export function imageTagTakenMessage(image: string, act: 'upload' | 'pull'): string {
+  const remedy = act === 'upload' ? 'upload under another tag' : 'pull another tag';
+  return `"${image}" is already on the daemon. A version is never replaced — a workflow pinning it would start running something else — so ${remedy}.`;
+}
+
+/**
+ * `--label` arguments for `docker build`, one flag pair per known fact.
+ *
+ * Labels are immutable and travel with the image, so the repo URL is redacted
+ * before it goes in: an authenticated HTTPS reference would otherwise bake its
+ * credentials into every layer of the result. A repo with no browsable HTTPS
+ * form (a local path) gets no OCI source label rather than an empty one.
+ *
+ * The context label is the exception to "no value, no label": it is written
+ * empty when the build named none. Labels are inherited from the base image,
+ * so an image built `FROM` one that named a context would otherwise claim that
+ * context as its own, and the catalog would key it on the wrong Dockerfile.
+ * `readProvenanceLabels` reads the empty value as absent.
+ */
+export function buildProvenanceLabelArgs(provenance: ImageProvenance): string[] {
+  const repoUrl = redactRepoCredentials(provenance.repoUrl, provenance.repoToken);
+  const { httpsUrl } = normalizeRepoUrls(repoUrl);
+
+  const labels: Array<[string, string | undefined]> = [
+    [BUILD_LABELS.repo, repoUrl],
+    [BUILD_LABELS.commit, provenance.commit],
+    [BUILD_LABELS.dockerfile, provenance.dockerfile],
+    [BUILD_LABELS.workflow, provenance.workflow],
+    [BUILD_LABELS.namespace, provenance.namespace],
+    [OCI_LABELS.source, httpsUrl.length > 0 ? httpsUrl : undefined],
+    [OCI_LABELS.revision, provenance.commit],
+  ];
+
+  return [
+    ...labels.flatMap(([key, value]) =>
+      value === undefined || value.length === 0 ? [] : ['--label', `${key}=${value}`],
+    ),
+    '--label',
+    `${BUILD_LABELS.context}=${provenance.context ?? ''}`,
+    '--label',
+    `${BUILD_LABELS.artifacts}=`,
+  ];
+}
+
+/** `--label` arguments for an uploaded context: every build label but the
+ *  namespace written empty, so none is inherited (ADR-0022). */
+export function uploadedImageLabelArgs(namespace: string): string[] {
+  const blanked = [
+    BUILD_LABELS.repo,
+    BUILD_LABELS.commit,
+    BUILD_LABELS.dockerfile,
+    BUILD_LABELS.context,
+    BUILD_LABELS.workflow,
+    BUILD_LABELS.artifacts,
+    OCI_LABELS.source,
+    OCI_LABELS.revision,
+  ];
+  return [
+    ...blanked.flatMap((key) => ['--label', `${key}=`]),
+    '--label',
+    `${BUILD_LABELS.namespace}=${namespace}`,
+  ];
+}
+
+/**
+ * `--label` arguments for a Dockerfile a workflow carries. The content hash is
+ * what tells a step-named tag whether it still holds these files, and with the
+ * workflow, the Dockerfile and the namespace it is what the Image Catalog keys
+ * a carried entry on (ADR-0022). The repo labels are written empty, as for an
+ * upload, so none is inherited, and so is the context: a carried build always
+ * reads every carried file.
+ */
+export function carriedImageLabelArgs(provenance: {
+  artifactsHash: string;
+  /** As the step named it, like a repo build's label. */
+  dockerfile: string;
+  workflow?: string;
+  namespace?: string;
+}): string[] {
+  const labels: Array<[string, string]> = [
+    [BUILD_LABELS.repo, ''],
+    [BUILD_LABELS.commit, ''],
+    [OCI_LABELS.source, ''],
+    [OCI_LABELS.revision, ''],
+    [BUILD_LABELS.dockerfile, provenance.dockerfile],
+    [BUILD_LABELS.context, ''],
+    [BUILD_LABELS.workflow, provenance.workflow ?? ''],
+    [BUILD_LABELS.namespace, provenance.namespace ?? ''],
+    [BUILD_LABELS.artifacts, provenance.artifactsHash],
+  ];
+  return labels.flatMap(([key, value]) => ['--label', `${key}=${value}`]);
+}
+
+/**
+ * `docker image inspect --format` template pairing an image id with its labels
+ * and its layers.
+ *
+ * `index` rather than `.Config.Labels`: an image with no labels has no such key
+ * at all, and the dotted form fails the whole invocation — one unlabelled
+ * `postgres` would strip the provenance off every other row in the batch.
+ * `docker images` cannot answer this itself; its template context has neither
+ * a `.Labels` nor a `.RootFS` field, which is why reading either costs a second
+ * call — and why they travel in one call rather than two.
+ */
+export const IMAGE_INSPECT_FORMAT =
+  '{{.Id}}\t{{json (index .Config "Labels")}}\t{{json .RootFS.Layers}}';
+
+/** `docker` arguments that emit one `IMAGE_INSPECT_FORMAT` line per image. */
+export function imageInspectArgs(imageIds: readonly string[]): string[] {
+  return ['image', 'inspect', '--format', IMAGE_INSPECT_FORMAT, ...imageIds];
+}
+
+/** `docker images` truncates ids; `docker image inspect` does not. */
+export function shortImageId(id: string): string {
+  return id.replace(/^sha256:/, '').slice(0, 12);
+}
+
+/** Provenance read back off an image, as the daemon listing exposes it. */
+export interface ReadImageProvenance {
+  buildRepo?: string;
+  buildCommit?: string;
+  buildDockerfile?: string;
+  buildContext?: string;
+  buildWorkflow?: string;
+  buildNamespace?: string;
+  buildArtifacts?: string;
+}
+
+/**
+ * Pick the platform's build labels out of an image's label map.
+ *
+ * Every field is optional: an image built before the labels existed, or pulled
+ * from a registry, simply has none of them and lists unannotated.
+ */
+export function readProvenanceLabels(
+  labels: Readonly<Record<string, string>> | null | undefined,
+): ReadImageProvenance {
+  const pick = (key: string): string | undefined => {
+    const value = labels?.[key];
+    return typeof value === 'string' && value.length > 0 ? value : undefined;
+  };
+
+  return {
+    buildRepo: pick(BUILD_LABELS.repo),
+    buildCommit: pick(BUILD_LABELS.commit),
+    buildDockerfile: pick(BUILD_LABELS.dockerfile),
+    buildContext: pick(BUILD_LABELS.context),
+    buildWorkflow: pick(BUILD_LABELS.workflow),
+    buildNamespace: pick(BUILD_LABELS.namespace),
+    buildArtifacts: pick(BUILD_LABELS.artifacts),
+  };
+}
+
+/** What `IMAGE_INSPECT_FORMAT` reads back off one image. */
+export interface InspectedImage {
+  /** Every label the image carries — the ones inherited from its base
+   *  included, indistinguishably. Splitting them is lineage's job. */
+  labels: Record<string, string>;
+  /** `RootFS.Layers`: ordered, content-addressed diff ids. */
+  layers: string[];
+}
+
+const LabelMapSchema = z.record(z.string(), z.string()).catch({});
+const LayerListSchema = z.array(z.string()).catch([]);
+
+/**
+ * Labels and layers for each inspected image, keyed by short id.
+ *
+ * A line that will not parse annotates nothing and the rest of the batch still
+ * stands — a listing degrades to unannotated rows, never to an error.
+ */
+export function parseImageInspect(stdout: string): Map<string, InspectedImage> {
+  const byId = new Map<string, InspectedImage>();
+
+  for (const line of stdout.trim().split('\n')) {
+    const [id, rawLabels, rawLayers] = line.split('\t');
+    if (!id || !rawLabels) continue;
+    try {
+      byId.set(shortImageId(id), {
+        // `null` for an unlabelled image, and a label map can hold a non-string
+        // value; `catch` turns either into the empty answer rather than an
+        // exception that would drop the row.
+        labels: LabelMapSchema.parse(JSON.parse(rawLabels)),
+        layers: LayerListSchema.parse(rawLayers === undefined ? [] : JSON.parse(rawLayers)),
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return byId;
+}

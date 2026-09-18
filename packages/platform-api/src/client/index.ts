@@ -196,6 +196,24 @@ import {
   UpdateToolCatalogEntryOutputSchema,
   DeleteToolCatalogEntryInputSchema,
   DeleteToolCatalogEntryOutputSchema,
+  ListImageCatalogEntriesInputSchema,
+  ListImageCatalogEntriesOutputSchema,
+  GetImageCatalogEntryInputSchema,
+  GetImageCatalogEntryOutputSchema,
+  CreateImageCatalogEntryInputApiSchema,
+  CreateImageCatalogEntryOutputSchema,
+  UpdateImageCatalogEntryInputApiSchema,
+  UpdateImageCatalogEntryOutputSchema,
+  BuildImageCatalogVersionInputSchema,
+  BuildImageCatalogVersionOutputSchema,
+  UploadImageCatalogVersionInputSchema,
+  UploadImageCatalogVersionOutputSchema,
+  PublishImageCatalogVersionInputSchema,
+  PublishImageCatalogVersionOutputSchema,
+  PullImageCatalogVersionInputSchema,
+  PullImageCatalogVersionOutputSchema,
+  DeleteImageCatalogEntryInputSchema,
+  DeleteImageCatalogEntryOutputSchema,
   ListNamespaceMembersInputSchema,
   ListNamespaceMembersOutputSchema,
   InviteUserInputSchema,
@@ -283,6 +301,24 @@ import {
   type UpdateToolCatalogEntryOutput,
   type DeleteToolCatalogEntryInput,
   type DeleteToolCatalogEntryOutput,
+  type ListImageCatalogEntriesInput,
+  type ListImageCatalogEntriesOutput,
+  type GetImageCatalogEntryInput,
+  type GetImageCatalogEntryOutput,
+  type CreateImageCatalogEntryInputApi,
+  type CreateImageCatalogEntryOutput,
+  type UpdateImageCatalogEntryInputApi,
+  type UpdateImageCatalogEntryOutput,
+  type BuildImageCatalogVersionInput,
+  type BuildImageCatalogVersionOutput,
+  type UploadImageCatalogVersionInput,
+  type UploadImageCatalogVersionOutput,
+  type PublishImageCatalogVersionInput,
+  type PublishImageCatalogVersionOutput,
+  type PullImageCatalogVersionInput,
+  type PullImageCatalogVersionOutput,
+  type DeleteImageCatalogEntryInput,
+  type DeleteImageCatalogEntryOutput,
   type ListTasksInput,
   type ListTasksOutput,
   type GetTaskInput,
@@ -494,6 +530,7 @@ import {
   type RevokeJoinLinkInput,
   type RevokeJoinLinkOutput,
 } from '../contract/index';
+import { BUILD_CONTEXT_MEDIA_TYPE } from '@mediforce/platform-core';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
 // Server-side handlers throw `HandlerError` (or subclasses) imported from
@@ -796,6 +833,27 @@ export class Mediforce {
     create: (input: CreateToolCatalogEntryInputApi) => Promise<CreateToolCatalogEntryOutput>;
     update: (input: UpdateToolCatalogEntryInputApi) => Promise<UpdateToolCatalogEntryOutput>;
     delete: (input: DeleteToolCatalogEntryInput) => Promise<DeleteToolCatalogEntryOutput>;
+  };
+
+  readonly imageCatalog: {
+    list: (input: ListImageCatalogEntriesInput) => Promise<ListImageCatalogEntriesOutput>;
+    get: (input: GetImageCatalogEntryInput) => Promise<GetImageCatalogEntryOutput>;
+    create: (input: CreateImageCatalogEntryInputApi) => Promise<CreateImageCatalogEntryOutput>;
+    update: (input: UpdateImageCatalogEntryInputApi) => Promise<UpdateImageCatalogEntryOutput>;
+    delete: (input: DeleteImageCatalogEntryInput) => Promise<DeleteImageCatalogEntryOutput>;
+    /** Build one version of a built source. Long-running: it clones and runs a
+     *  Dockerfile on the deployment's daemon before resolving. */
+    build: (input: BuildImageCatalogVersionInput) => Promise<BuildImageCatalogVersionOutput>;
+    /** Build an image from an uploaded context and catalogue it (#1345).
+     *  `context` is a tar archive — `packBuildContextArchive` writes one.
+     *  Long-running, like `build`. */
+    upload: (input: UploadImageCatalogVersionInput) => Promise<UploadImageCatalogVersionOutput>;
+    /** Publish one version of a carried entry as a `referenced` image, rebuilt
+     *  from the workflow files it came from. Long-running, like `build`. */
+    publish: (input: PublishImageCatalogVersionInput) => Promise<PublishImageCatalogVersionOutput>;
+    /** Pull a registry image onto the daemon and catalogue it as a `referenced`
+     *  version. Long-running, like `build`. */
+    pull: (input: PullImageCatalogVersionInput) => Promise<PullImageCatalogVersionOutput>;
   };
 
   readonly users: {
@@ -2042,6 +2100,116 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.delete');
         return DeleteToolCatalogEntryOutputSchema.parse(body);
+      },
+    };
+
+    this.imageCatalog = {
+      list: async (input) => {
+        const validated = ListImageCatalogEntriesInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/image-catalog${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.list');
+        return ListImageCatalogEntriesOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetImageCatalogEntryInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/image-catalog/${encodeURIComponent(validated.id)}${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.get');
+        return GetImageCatalogEntryOutputSchema.parse(body);
+      },
+      create: async (input) => {
+        const validated = CreateImageCatalogEntryInputApiSchema.parse(input);
+        const { namespace, ...createBody } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/image-catalog${qs}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(createBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.create');
+        return CreateImageCatalogEntryOutputSchema.parse(body);
+      },
+      update: async (input) => {
+        const validated = UpdateImageCatalogEntryInputApiSchema.parse(input);
+        const { namespace, id, ...patch } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(
+          `/api/image-catalog/${encodeURIComponent(id)}${qs}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.update');
+        return UpdateImageCatalogEntryOutputSchema.parse(body);
+      },
+      delete: async (input) => {
+        const validated = DeleteImageCatalogEntryInputSchema.parse(input);
+        // Sent only when asked for, so an ordinary delete carries no hint that
+        // the destructive half exists.
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          ...(validated.withImages === true ? { withImages: 'true' } : {}),
+        });
+        const res = await this.request(
+          `/api/image-catalog/${encodeURIComponent(validated.id)}${qs}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.delete');
+        return DeleteImageCatalogEntryOutputSchema.parse(body);
+      },
+      build: async (input) => {
+        const validated = BuildImageCatalogVersionInputSchema.parse(input);
+        const { namespace, ...buildBody } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/image-catalog/build${qs}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.build');
+        return BuildImageCatalogVersionOutputSchema.parse(body);
+      },
+      upload: async (input) => {
+        const { namespace, context, ...fields } = UploadImageCatalogVersionInputSchema.parse(input);
+        // multipart/form-data — let fetch set the boundary Content-Type. The
+        // archive rides as a file; everything else is the contract as JSON.
+        const form = new FormData();
+        form.append('input', JSON.stringify(fields));
+        form.append('context', new Blob([context], { type: BUILD_CONTEXT_MEDIA_TYPE }), 'context.tar');
+        const res = await this.request(
+          `/api/image-catalog/upload${toSearchParams({ namespace })}`,
+          { method: 'POST', body: form },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.upload');
+        return UploadImageCatalogVersionOutputSchema.parse(body);
+      },
+      publish: async (input) => {
+        const { namespace, id, ...publishBody } = PublishImageCatalogVersionInputSchema.parse(input);
+        const res = await this.request(
+          `/api/image-catalog/${encodeURIComponent(id)}/publish${toSearchParams({ namespace })}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(publishBody),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.publish');
+        return PublishImageCatalogVersionOutputSchema.parse(body);
+      },
+      pull: async (input) => {
+        const { namespace, ...pullBody } = PullImageCatalogVersionInputSchema.parse(input);
+        const res = await this.request(`/api/image-catalog/pull${toSearchParams({ namespace })}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(pullBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.pull');
+        return PullImageCatalogVersionOutputSchema.parse(body);
       },
     };
 

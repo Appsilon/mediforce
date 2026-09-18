@@ -393,6 +393,12 @@ describe('runPreflightChecks — files the workflow references but does not carr
       commit: 'a'.repeat(40),
     };
     expect(runPreflightChecks(fromRepo, ctx).filter((w) => w.category === 'missing-file')).toEqual([]);
+
+    const fromSkillsRepo = buildWorkflowDefinition({ name: 'test-wf' });
+    fromSkillsRepo.steps[0].executor = 'agent';
+    fromSkillsRepo.steps[0].agent = { dockerfile: 'Dockerfile' };
+    fromSkillsRepo.externalSkillsRepo = { url: 'https://github.com/org/skills.git', commit: 'b'.repeat(40) };
+    expect(runPreflightChecks(fromSkillsRepo, ctx).filter((w) => w.category === 'missing-file')).toEqual([]);
   });
 
   it('says nothing about a skills directory, which may live in the checkout', () => {
@@ -445,5 +451,67 @@ describe('runPreflightChecks — an input contract the first step asks for again
     wd.steps[0].params = [{ name: 'app_name', type: 'string', required: true }];
 
     expect(runPreflightChecks(wd, ctx).filter((w) => w.category === 'contract-collected-twice')).toEqual([]);
+  });
+});
+
+describe('runPreflightChecks — a step that names an image and carries a Dockerfile', () => {
+  function carriedDefinition(image?: string) {
+    const wd = buildWorkflowDefinition({ name: 'test-artifacts' });
+    wd.namespace = 'db';
+    wd.artifacts = [{ path: 'container/Dockerfile', contents: 'FROM alpine:3.21\n' }];
+    wd.steps[0].executor = 'script';
+    wd.steps[0].script = {
+      command: 'python3 /artifacts/scripts/run.py',
+      dockerfile: 'container/Dockerfile',
+      ...(image === undefined ? {} : { image }),
+    };
+    return wd;
+  }
+
+  it('warns when the image is a catalog name, which the build never replaces, so it is not what runs', () => {
+    const result = runPreflightChecks(carriedDefinition('db/test-artifacts:test-publish-as-image'), {
+      ...BASE_CTX,
+      dockerImages: IMAGES,
+      dockerAvailable: true,
+      secretKeys: [],
+    });
+
+    const warning = result.find((entry) => entry.category === 'image-and-dockerfile');
+    expect(warning?.resource).toBe('db/test-artifacts:test-publish-as-image');
+    expect(warning?.message).toContain('not \'db/test-artifacts:test-publish-as-image\'');
+    expect(warning?.stepNames).toEqual([carriedDefinition().steps[0].name]);
+  });
+
+  it('is silent for a build tag outside the catalog, which is the tag the build writes', () => {
+    const categories = runPreflightChecks(carriedDefinition('my-agent:v1'), {
+      ...BASE_CTX,
+      dockerImages: IMAGES,
+      dockerAvailable: true,
+      secretKeys: [],
+    }).map((entry) => entry.category);
+
+    expect(categories).not.toContain('image-and-dockerfile');
+  });
+
+  it('is silent when the step names only one of them', () => {
+    const categories = runPreflightChecks(carriedDefinition(), {
+      ...BASE_CTX,
+      dockerImages: IMAGES,
+      dockerAvailable: true,
+      secretKeys: [],
+    }).map((entry) => entry.category);
+
+    expect(categories).not.toContain('image-and-dockerfile');
+  });
+
+  it('does not warn about the pinned image being absent from the daemon, which the build explains', () => {
+    const categories = runPreflightChecks(carriedDefinition('db/test-artifacts:test-publish-as-image'), {
+      ...BASE_CTX,
+      dockerImages: IMAGES,
+      dockerAvailable: true,
+      secretKeys: [],
+    }).map((entry) => entry.category);
+
+    expect(categories).not.toContain('missing-image');
   });
 });

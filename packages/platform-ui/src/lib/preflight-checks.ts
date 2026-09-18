@@ -1,5 +1,5 @@
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
-import { type WorkflowDefinition, normaliseModelId, stepHasBuildSource, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
+import { type WorkflowDefinition, carriedDockerfile, isCatalogReference, normaliseModelId, stepHasBuildSource, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
 
 export interface PreflightAction {
   label: string;
@@ -13,7 +13,8 @@ export interface PreflightWarning {
     | 'missing-file'
     | 'low-credits'
     | 'unknown-model'
-    | 'contract-collected-twice';
+    | 'contract-collected-twice'
+    | 'image-and-dockerfile';
   resource: string;
   stepNames: string[];
   message: string;
@@ -116,7 +117,7 @@ function collectMissingFiles(
 
     const dockerfile = config?.dockerfile;
     if (typeof dockerfile === 'string' && dockerfile.length > 0
-      && stepHasBuildSource(config, definition.artifacts) === false) {
+      && stepHasBuildSource(config, definition) === false) {
       note(dockerfile, step.name);
     }
   }
@@ -159,7 +160,7 @@ export function runPreflightChecks(
       // step's `image` is ever looked up.
       if (
         typeof image === 'string' && image.length > 0 &&
-        stepHasBuildSource(containerConfig, definition.artifacts) === false
+        stepHasBuildSource(containerConfig, definition) === false
       ) {
         const [repo, tag = 'latest'] = image.split(':');
         const found = options.dockerImages.some((img) => img.repository === repo && img.tag === tag);
@@ -197,6 +198,35 @@ export function runPreflightChecks(
       stepNames,
       message: `Image '${image}' not found on platform`,
       actions,
+    });
+  }
+
+  // A step that builds from a carried Dockerfile and names an image this
+  // workspace's catalog owns: a build never lands on such a name (ADR-0022), so
+  // the run uses the image built from the carried files and the pinned one is
+  // never what runs. Any other name is simply the tag the build writes.
+  const ambiguous = steps
+    .filter((step) => step.executor === 'agent' || step.executor === 'script')
+    .map((step) => {
+      const config = step.executor === 'script' ? step.script : step.agent;
+      const image = config?.image;
+      if (typeof image !== 'string' || isCatalogReference(image, definition.namespace) === false) return null;
+      const dockerfile = carriedDockerfile(config, definition.artifacts);
+      return dockerfile === null ? null : { stepName: step.name, image, dockerfile };
+    })
+    .filter((entry) => entry !== null);
+  for (const entry of ambiguous) {
+    warnings.push({
+      category: 'image-and-dockerfile',
+      resource: entry.image,
+      stepNames: [entry.stepName],
+      message: `'${entry.stepName}' builds '${entry.dockerfile}', which the workflow carries, and names '${entry.image}', an Image Catalog image. A build never replaces a catalog image, so the run uses the image built from the carried files, not '${entry.image}'. Switch the step to a ready image to run '${entry.image}', or clear the image to build from the carried files.`,
+      actions: [{
+        label: 'Edit step',
+        href: options.version !== undefined
+          ? `/${options.handle}/workflows/${encodedName}/definitions/${options.version}`
+          : `/${options.handle}/workflows/${encodedName}`,
+      }],
     });
   }
 
@@ -354,7 +384,7 @@ export function findSkippedChecks(
     const image = containerConfig?.image;
     if (
       typeof image === 'string' && image.length > 0 &&
-      stepHasBuildSource(containerConfig, definition.artifacts) === false
+      stepHasBuildSource(containerConfig, definition) === false
     ) {
       needsImageLookup = true;
     }

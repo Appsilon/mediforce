@@ -1,0 +1,5 @@
+# container/Dockerfile COPYs only scripts/. Everything else — sample-data/ is
+# over 300 MB — stays out of the build context, and so out of an upload from
+# the Images view or `mediforce images build --context`.
+*
+!scripts

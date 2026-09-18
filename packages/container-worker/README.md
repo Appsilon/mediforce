@@ -33,9 +33,54 @@ cleanup, daemon probing, workspace file transfer, and a health endpoint.
 effects and then re-ran produces duplicate work, and for a workflow step that
 means a duplicated audit trail.
 
+**Host-daemon HTTP routes carry the shared secret.** The info server's reads
+(`/health`, `/images`, `/disk`, `GET /images/:image/history`) are open, but
+anything that acts on the daemon — `DELETE /images/:id`,
+`GET /images/:image/capabilities`, which starts a probe container,
+`POST /images/build`, which clones a repo — or unpacks an uploaded build
+context, sent as an `application/x-tar` body — and runs a Dockerfile, and
+`POST /images/pull`, which pulls a registry image onto the daemon — requires
+`X-Worker-Secret` once `CONTAINER_WORKER_SECRET` is set, and the platform sends
+the same value. History is on the open side deliberately: it reads metadata the
+daemon already holds and starts nothing.
+
+**The worker's Docker CLI has its own credentials.** It talks to the host
+daemon over the mounted socket, but authentication is the *client's*: a
+`docker login` run on the host writes the invoking user's
+`~/.docker/config.json`, which this container never sees. `docker-compose.prod.yml`
+therefore mounts `DOCKER_CONFIG_DIR` (default `/home/deploy/.docker`) at
+`/root/.docker` read-only, which is what makes a private-registry pull
+(`POST /images/pull`) or a private base image in a build work at all. An unset
+variable mounts an empty directory: public images only, as before.
+
 **Payload schemas are a cross-process contract.** The enqueuing platform and the
 worker are deployed separately and can briefly run different versions. Change
-`src/schemas.ts` additively.
+`src/schemas.ts` additively. The build route's body is the exception that proves
+it: `BuildImageRequestSchema` lives in `platform-core` because the platform
+builds in two places — in-process when the daemon is local, over this route when
+it is not — and one shape is what stops the two drifting on a field. An upload's
+query string is `BuildUploadedImageRequestSchema`, and a pull's body
+`PullImageRequestSchema`, beside it, for the same reason.
+
+**An uploaded context is extracted, not piped.** `docker build -` reads a tar
+from stdin but applies no `.dockerignore` inside it, so `buildImageFromUpload`
+unpacks the archive into a `mkdtemp` directory with the host's `tar` and builds
+that directory exactly as `buildImageFromRepo` builds a checkout — the same
+symlink refusal, the same `finally rm`. The CLI and the Images view have
+already left out what the `.dockerignore` excludes; Docker applying it again
+here is what stops a client's reading of the file from changing the image. The
+platform has already refused an
+archive with a path that is absolute, climbs out or runs through a symlink
+(`checkBuildContextArchive`); `tar`'s own defaults and `assertInsideClone` are the
+second and third lines. It builds under a throwaway `mediforce-upload-staging:*`
+tag and moves that onto the requested tag only if the daemon still has none
+there, answering **409** (`ImageTagTakenError`) when another upload took it
+during the build ([ADR-0022](../../docs/adr/0022-image-catalog.md)). The check
+and `docker tag` run back to back and synchronously, so no other upload in the
+same process can land between them; only a second process tagging on the same
+daemon in those milliseconds could. It counts the body as it unpacks and
+answers **413** (`BuildContextTooLargeError`) past the 100 MiB limit, for a
+caller that skipped the platform's own check.
 
 ## Testing
 
