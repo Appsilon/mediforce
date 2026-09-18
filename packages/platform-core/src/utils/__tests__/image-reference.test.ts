@@ -6,6 +6,7 @@ import {
   daemonRepositoryName,
   isRegistryHost,
   normalizeImageRef,
+  splitImageRef,
 } from '../image-reference';
 
 describe('daemonRepositoryName', () => {
@@ -79,5 +80,17 @@ describe('normalizeImageRef', () => {
     expect(normalizeImageRef('localhost:5000/acme/agent@sha256:abc')).toBe(
       'localhost:5000/acme/agent@sha256:abc',
     );
+  });
+});
+
+describe('splitImageRef', () => {
+  it.each([
+    ['alpine', 'alpine', 'latest'],
+    ['alpine:3.22', 'alpine', '3.22'],
+    ['rocker/r-ver:4.4', 'rocker/r-ver', '4.4'],
+    ['localhost:5000/acme/agent', 'localhost:5000/acme/agent', 'latest'],
+    ['localhost:5000/acme/agent:v1', 'localhost:5000/acme/agent', 'v1'],
+  ])('splits %s into %s at %s', (ref, repository, tag) => {
+    expect(splitImageRef(ref)).toEqual({ repository, tag });
   });
 });

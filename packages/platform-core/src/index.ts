@@ -610,6 +610,7 @@ export {
   daemonRepositoryName,
   isRegistryHost,
   normalizeImageRef,
+  splitImageRef,
 } from './utils/image-reference';
 export {
   BuildContextSchema,

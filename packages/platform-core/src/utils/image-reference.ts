@@ -41,6 +41,24 @@ export function normalizeImageRef(ref: string): string {
   return lastComponent.includes(':') ? ref : `${ref}:latest`;
 }
 
+/**
+ * A reference split the way the daemon lists it: `localhost:5000/acme/agent:v1`
+ * is the repository `localhost:5000/acme/agent` at `v1`, never `localhost` at
+ * `5000`. Untagged means `latest`, by the rule above.
+ *
+ * For matching a reference against a daemon listing, which has no digests in
+ * it — a digest reference splits at the digest's own colon and matches no row,
+ * which is the right answer for a listing that names tags.
+ */
+export function splitImageRef(ref: string): { repository: string; tag: string } {
+  const normalized = normalizeImageRef(ref);
+  const separator = normalized.lastIndexOf(':');
+  return {
+    repository: normalized.slice(0, separator),
+    tag: normalized.slice(separator + 1),
+  };
+}
+
 const DOCKER_HUB_HOSTS = ['docker.io/', 'index.docker.io/', 'registry-1.docker.io/'];
 
 /**

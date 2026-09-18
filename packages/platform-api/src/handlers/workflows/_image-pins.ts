@@ -9,20 +9,6 @@ import {
   type WorkflowDefinitionGroup,
 } from '@mediforce/platform-core';
 
-/**
- * Which workflow versions pin a given set of image tags.
- *
- * One place, because the callers ask the same question for opposite reasons:
- * `GET /api/workflow-definitions/by-image` renders "used by", and
- * `assertNoLiveImagePins` below refuses to destroy an image a live version
- * needs. They must not be allowed to disagree about what counts as a pin.
- *
- * **Every version, not just the latest.** The read this replaced looked at
- * `latestVersion` alone and skipped archived workflows entirely, so "what
- * breaks if I delete this?" was answered from a fraction of the definitions
- * that could break.
- */
-
 /** One workflow **version** that pins one or more of the images asked about. */
 export interface WorkflowImagePin {
   namespace: string;
@@ -80,6 +66,20 @@ function stepImages(definition: WorkflowDefinition): { stepId: string; image: st
   }
   return resolved;
 }
+
+/**
+ * Which workflow versions pin a given set of image tags.
+ *
+ * One place, because the callers ask the same question for opposite reasons:
+ * `GET /api/workflow-definitions/by-image` renders "used by", and
+ * `assertNoLiveImagePins` below refuses to destroy an image a live version
+ * needs. They must not be allowed to disagree about what counts as a pin.
+ *
+ * **Every version, not just the latest.** The read this replaced looked at
+ * `latestVersion` alone and skipped archived workflows entirely, so "what
+ * breaks if I delete this?" was answered from a fraction of the definitions
+ * that could break.
+ */
 
 export function findWorkflowImagePins(
   groups: readonly WorkflowDefinitionGroup[],
