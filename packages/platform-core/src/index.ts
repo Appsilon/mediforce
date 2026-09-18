@@ -679,3 +679,7 @@ export {
   type AssignmentTableUiConfig,
   type StepUiComponent,
 } from './schemas/step-ui-config';
+
+export { formatAgentLogLine, stageLogEntry, appendStageEntry, AgentLogFormatSchema, type AgentLogFormat } from './utils/agent-log-format';
+
+export { auditSignificance, type AuditSignificance } from './schemas/audit-significance';

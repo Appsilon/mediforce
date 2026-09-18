@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BuildContextSchema } from '@mediforce/platform-core';
+import { AgentLogFormatSchema, BuildContextSchema } from '@mediforce/platform-core';
 
 /**
  * Payload sent from the API process to the worker via BullMQ.
@@ -28,6 +28,11 @@ export const DockerJobDataSchema = z.object({
   outputDir: z.string(),
   /** Host-side log file path for realtime activity streaming (null = no logging). */
   logFile: z.string().nullable(),
+  /** How to turn the container's stdout into activity-log entries. Named rather
+   *  than passed as a function because the job crosses Redis, and the worker is
+   *  the only process that sees a line while the container is still running.
+   *  Optional: a job that produces nothing loggable need not say so. */
+  lineFormat: AgentLogFormatSchema.optional(),
   /** Files from outputDir, keyed by POSIX relative path with base64-encoded
    *  content (see file-payload.ts). Sent through Redis when caller and worker
    *  don't share a filesystem (e.g. Vercel → VPS). */

@@ -112,6 +112,13 @@ and keep any new payload field readable by a worker one release behind.
 Host capacity, the probe that watches it, and recovery are in
 [`docs/guides/redis-operations.md`](../../docs/guides/redis-operations.md).
 
+**Nothing in a job payload can be a function.** The job crosses Redis as JSON.
+Behaviour the worker needs travels as a name it can resolve against a shared
+module — `lineFormat` picks a `formatAgentLogLine` formatter from `platform-core`
+— never as a callback. A dropped callback here is silent: the worker is the only
+process watching a running container, so the step's log simply stays empty until
+the job ends.
+
 ## Testing
 
 Vitest covers the pieces with real logic — job processing, image builds,

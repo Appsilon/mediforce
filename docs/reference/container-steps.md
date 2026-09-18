@@ -185,11 +185,24 @@ exactly the steps that leave it unset.
 `getDockerSpawnStrategy()` picks one
 ([`docker-spawn-strategy.ts`](../../packages/agent-runtime/src/plugins/docker-spawn-strategy.ts)):
 
-- **Local** (default) — `docker run` as a child process, stdout streamed live.
+- **Local** (default) — `docker run` as a child process.
 - **Queued** (`REDIS_URL` set) — enqueued to the BullMQ `container-worker`,
-  which may run on another machine. Output is buffered and replayed through the
-  same line reader after exit, so event payloads are byte-identical; only the
-  timing differs.
+  which may run on another machine.
+
+Both write the step's activity log live, as the container produces lines. Which
+process does the writing differs — the orchestrator locally, the worker through
+the queue — so the *format* travels in the job payload (`lineFormat`) rather than
+as a callback, and both apply the same `formatAgentLogLine` from `platform-core`.
+A build that happens before the container exists is bracketed with `stage`
+entries, so a cold image build reads as progress instead of an empty log.
+
+A script step uses `raw`, since its stdout has no event structure. When caller
+and worker are on different machines (the `inputFiles` case), the worker's live
+writes land on its own disk, so the queued strategy rebuilds the log from
+buffered stdout after exit — that topology cannot stream through a file at all.
+
+The agent's result envelope is still assembled from buffered stdout after exit;
+only the activity log streams.
 
 ## Git auth
 

@@ -11,7 +11,8 @@ import { spawn } from 'node:child_process';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { ensureImage } from './docker-image-builder';
-import { createLineStreamReader } from '@mediforce/platform-core';
+import { appendStageEntry, createLineStreamReader, formatAgentLogLine } from '@mediforce/platform-core';
+import type { AgentLogFormat } from '@mediforce/platform-core';
 
 /**
  * How to get the image if it is not there. Either a git repo at a commit, or a
@@ -58,11 +59,12 @@ export interface DockerSpawnRequest {
   outputDir: string;
   logFile: string | null;
   /**
-   * When provided, each raw stdout line is passed through this function before being written
-   * to the log file. Returns an array of JSONL strings to write (empty = skip the line).
-   * Used by LocalDockerSpawnStrategy to write parsed log entries in real-time.
+   * How to turn each raw stdout line into activity-log entries. Named, not a
+   * function, so the queued path can carry it through Redis and the worker can
+   * write the same entries live — the orchestrator never sees a line until the
+   * container has exited.
    */
-  lineProcessor?: (rawLine: string) => string[];
+  lineFormat?: AgentLogFormat;
   /**
    * When provided, called once for each complete stdout line. The local strategy invokes
    * this live (as the line arrives from the container); the queued strategy invokes it
@@ -119,7 +121,16 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
 
   async spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
     if (request.imageBuild) {
-      await ensureImage(request.imageBuild);
+      // Bracketed with stage entries: a cold build is minutes during which no
+      // container exists to emit anything, and the step just looks hung.
+      await appendStageEntry(request.logFile, `Preparing container image ${request.imageBuild.image}`);
+      try {
+        await ensureImage(request.imageBuild);
+      } catch (error) {
+        await appendStageEntry(request.logFile, `Container image failed: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+      }
+      await appendStageEntry(request.logFile, 'Container image ready');
     }
 
     // Remove any stale container holding this name (crashed/killed/retried
@@ -171,13 +182,9 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
           }
         }
         if (logFile && logDirReady) {
-          if (request.lineProcessor) {
-            const entries = request.lineProcessor(trimmed);
-            if (entries.length > 0) {
-              void logDirReady.then(() => appendFile(logFile, entries.join('\n') + '\n')).catch(() => {});
-            }
-          } else {
-            void logDirReady.then(() => appendFile(logFile, trimmed + '\n')).catch(() => {});
+          const entries = formatAgentLogLine(request.lineFormat ?? 'none', trimmed);
+          if (entries.length > 0) {
+            void logDirReady.then(() => appendFile(logFile, entries.join('\n') + '\n')).catch(() => {});
           }
         }
       };
@@ -280,6 +287,7 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
       stepId: 'build-image',
       outputDir: '',
       logFile: null,
+      lineFormat: 'none',
       imageBuild: build,
     });
   }
@@ -306,6 +314,7 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
       stepId: request.stepId,
       outputDir: request.outputDir,
       logFile: request.logFile,
+      lineFormat: request.lineFormat ?? 'none',
       inputFiles,
       imageBuild: request.imageBuild,
     });
@@ -338,6 +347,21 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
       });
       reader.push(result.stderr);
       reader.flush();
+    }
+
+    // Split filesystem: the worker wrote the log live, but to its own disk,
+    // where this process cannot read it. `inputFiles` is what says the two are
+    // not the same machine — the same condition that made us ship the files.
+    // The log is reconstructed here after exit; on a shared filesystem (the
+    // supported prod topology) the worker's live writes are the only ones.
+    if (request.logFile !== null && Object.keys(inputFiles).length > 0) {
+      const entries = result.stdout
+        .split('\n')
+        .flatMap((line) => formatAgentLogLine(request.lineFormat ?? 'none', line));
+      if (entries.length > 0) {
+        await mkdir(dirname(request.logFile), { recursive: true });
+        await appendFile(request.logFile, entries.join('\n') + '\n');
+      }
     }
 
     // Write output files from worker back to caller's outputDir
