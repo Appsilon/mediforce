@@ -16,9 +16,10 @@ const FilePayloadSchema = z.record(z.string(), z.string());
 
 /**
  * Text under this size stays in the job. Job hashes and `completed` events are
- * retained, so the bound is what one retained job may hold, not what Redis can
- * take: 10 completed jobs and 100 events against a 64 KiB ceiling is single-digit
- * megabytes however loud the container.
+ * both retained, so the bound is what retention may hold rather than what Redis
+ * can take: 30 retained jobs at up to 192 KiB (stdin, stdout, stderr) plus 100
+ * events carrying the return value at up to 128 KiB is ~19 MiB against a 640 MiB
+ * budget — however loud the container.
  */
 export const TEXT_INLINE_MAX_BYTES = 64 * 1024;
 
@@ -96,8 +97,10 @@ export async function restoreJobPayload(client: FilePayloadRedisClient, data: Do
 }
 
 /** Worker side, before returning: move `outputFiles` and oversized stdout /
- *  stderr out of the return value. A caller that predates a key only knows how
- *  to read that part inline, so each is gated on what the job says it sent. */
+ *  stderr out of the return value. A caller that predates the keys only knows
+ *  how to read them inline, so the whole thing is gated on the job saying
+ *  otherwise — `payloadKeysSupported` from a current platform, or an
+ *  `inputFilesKey` from the one release that offloaded files and nothing else. */
 export async function offloadResultPayload(
   client: FilePayloadRedisClient,
   jobId: string,
@@ -105,16 +108,17 @@ export async function offloadResultPayload(
   result: DockerJobResult,
   ttlSeconds: number,
 ): Promise<DockerJobResult> {
+  const callerReadsKeys = data.payloadKeysSupported === true || data.inputFilesKey !== undefined;
   let offloaded = result;
 
-  if (data.inputFilesKey !== undefined && offloaded.outputFiles !== undefined) {
+  if (callerReadsKeys && offloaded.outputFiles !== undefined) {
     const { outputFiles, ...rest } = offloaded;
     const key = payloadKey(jobId, 'output');
     await client.set(key, JSON.stringify(outputFiles), { EX: ttlSeconds });
     offloaded = { ...rest, outputFilesKey: key };
   }
 
-  if (data.payloadKeysSupported === true) {
+  if (callerReadsKeys) {
     if (isOversized(offloaded.stdout)) {
       const key = payloadKey(jobId, 'stdout');
       await client.set(key, offloaded.stdout, { EX: ttlSeconds });

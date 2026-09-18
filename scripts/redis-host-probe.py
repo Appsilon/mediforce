@@ -42,6 +42,8 @@ DEFAULT_THRESHOLDS = {
     "DISK_CRIT_PCT": 85.0,
 }
 
+LOG_MAX_BYTES = 5 * 1024 * 1024
+
 OK, WARN, CRIT = "ok", "warn", "crit"
 EXIT_CODES = {OK: 0, WARN: 1, CRIT: 2}
 
@@ -53,8 +55,18 @@ class Finding:
     message: str
 
 
+# A wedged Docker daemon is one of the failures this probe exists to catch, so
+# no call to it may block: cron fires again in 5 minutes with no overlap guard.
+DOCKER_TIMEOUT_SECONDS = 10
+
+
 def run(command: list[str]) -> tuple[int, str]:
-    result = subprocess.run(command, capture_output=True, text=True)
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=DOCKER_TIMEOUT_SECONDS
+        )
+    except subprocess.TimeoutExpired:
+        return 124, ""
     return result.returncode, result.stdout.strip()
 
 
@@ -177,7 +189,9 @@ def check_temp_snapshots(container: str) -> Finding:
 
 def check_disk(warn_pct: float, crit_pct: float) -> Finding:
     usage = shutil.disk_usage("/")
-    pct = usage.used / usage.total * 100
+    # Root-reserved blocks are capacity nobody can use, and `df` leaves them out
+    # of its percentage. Match what the operator sees while recovering a host.
+    pct = usage.used / (usage.used + usage.free) * 100
     detail = f"root filesystem {pct:.0f}% used, {usage.free / 1024 ** 3:.0f} GiB free"
     if pct >= crit_pct:
         return Finding("disk", CRIT, f"{detail} — RDB saves need room for a full copy")
@@ -224,7 +238,13 @@ def main() -> None:
 
     container = find_redis_container()
     if container is None:
-        findings = [Finding("container", CRIT, "no running Redis container found")]
+        findings = [
+            Finding(
+                "container",
+                CRIT,
+                f"no running Redis container found (or `docker ps` took over {DOCKER_TIMEOUT_SECONDS}s)",
+            )
+        ]
         restart_count = state.get("redis_restart_count", 0)
     else:
         info = redis_info(container, env.get("REDIS_PASSWORD"))
@@ -251,6 +271,10 @@ def main() -> None:
 
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
+        # Keep one previous log. Unbounded growth on the filesystem this probe
+        # watches would be a poor joke.
+        if log_path.is_file() and log_path.stat().st_size > LOG_MAX_BYTES:
+            log_path.replace(log_path.with_suffix(".log.1"))
         with log_path.open("a") as log:
             log.write("\n".join(log_lines) + "\n")
         state_path.write_text(json.dumps({"redis_restart_count": restart_count}))

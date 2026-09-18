@@ -139,6 +139,16 @@ describe('job payload store', () => {
     expect(client.store.size).toBe(0);
   });
 
+  it('still returns output files by key to the release that offloaded files and nothing else', async () => {
+    const client = buildInMemoryClient();
+    const bridgeData = buildJobData({ inputFilesKey: 'some-key', payloadKeysSupported: undefined });
+    const workerResult: DockerJobResult = { stdout: '', stderr: '', exitCode: 0, signal: null, outputFiles };
+
+    const returned = await offloadResultPayload(client, jobId, bridgeData, workerResult, 3600);
+    expect(returned.outputFiles).toBeUndefined();
+    expect(returned.outputFilesKey).toBeDefined();
+  });
+
   it('keeps stdout inline for a caller that predates the result keys', async () => {
     const client = buildInMemoryClient();
     const legacyData = buildJobData({ payloadKeysSupported: undefined });

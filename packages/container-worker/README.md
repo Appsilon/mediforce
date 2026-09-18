@@ -95,10 +95,18 @@ large fields out of job data and results the same way; anything still over
 `src/queue-client.ts` stays small anyway — 10 completed jobs for an hour, 20
 failed for a day, 100 events.
 
-A result key is only written when the job says the caller understands it
-(`payloadKeysSupported`, and `inputFilesKey` for output files), so a worker
-deployed ahead of the platform still answers the old shape. Host capacity, the
-probe that watches it, and recovery are in
+**The worker must never lag the platform.** The two skew directions are not
+symmetric. A worker ahead of its platform is safe: it writes a result key only
+when the job says the caller reads them (`payloadKeysSupported`, or an
+`inputFilesKey` from the one release that offloaded files and nothing else),
+and otherwise answers the old inline shape. A *platform* ahead of its worker is
+not: the old worker's schema strips the key fields it does not know, so it runs
+the container with no prompt or no input files and exits 0 — a wrong answer
+rather than an error. Both deploy scripts therefore bring `container-worker` up
+in its own `up -d` before everything else; keep that ordering if you touch them,
+and keep any new payload field readable by a worker one release behind.
+
+Host capacity, the probe that watches it, and recovery are in
 [`docs/guides/redis-operations.md`](../../docs/guides/redis-operations.md).
 
 ## Testing

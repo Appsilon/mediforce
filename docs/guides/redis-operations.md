@@ -54,6 +54,12 @@ A job whose remaining data still exceeds `JOB_DATA_MAX_BYTES` (256 KiB) is
 rejected before it reaches Redis. If you see that error, something new is being
 carried inside the job that belongs beside it.
 
+Because payloads travel by key, **the worker must never lag the platform**: a
+worker one release behind drops the key fields it does not know and runs the
+container with no prompt, exiting 0 rather than failing. Both deploy scripts
+bring `container-worker` up in its own `up -d` ahead of the rest for exactly
+this reason. If you ever start services by hand, do the same.
+
 ## The probe
 
 [`scripts/redis-host-probe.py`](../../scripts/redis-host-probe.py) runs on the

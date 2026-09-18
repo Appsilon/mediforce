@@ -17,6 +17,8 @@ Usage:
 Each job reads what it needs from the server's /opt/mediforce/.env.
 """
 
+from __future__ import annotations
+
 import argparse
 import subprocess
 import sys
@@ -110,8 +112,11 @@ def install(host: str, job: CronJob, interval: int) -> None:
     output = (result.stdout.strip() or result.stderr.strip()).splitlines()
     for line in output:
         print(f"    {line}")
-    if job.name == "heartbeat" and (result.returncode != 0 or "200" not in result.stdout):
-        print("  WARN: Expected HTTP 200 — check .env DOMAIN and PLATFORM_API_KEY")
+    if job.name == "heartbeat":
+        if result.returncode != 0:
+            print(f"  WARN: Heartbeat script failed: {result.stderr.strip()}")
+        elif "200" not in result.stdout:
+            print("  WARN: Expected HTTP 200 — check .env DOMAIN and PLATFORM_API_KEY")
     # The probe exits 1 (warn) / 2 (crit) when it finds real trouble on the
     # host. That is the probe working, not the install failing — but it is
     # exactly what you came to learn, so say so.
@@ -140,9 +145,12 @@ def main() -> None:
     parser.add_argument(
         "--interval",
         type=int,
-        help="Cron interval in minutes, overriding each job's default",
+        help="Cron interval in minutes, overriding the job's default (requires --job)",
     )
     args = parser.parse_args()
+
+    if args.interval is not None and args.job == "all":
+        parser.error("--interval applies to one job — name it with --job")
 
     selected = list(JOBS.values()) if args.job == "all" else [JOBS[args.job]]
 
