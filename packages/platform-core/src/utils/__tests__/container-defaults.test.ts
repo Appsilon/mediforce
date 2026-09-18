@@ -17,9 +17,9 @@ describe('the engine defaults a new workspace is seeded with', () => {
 
   it('keys every seed on a repository with no tag and no Docker Hub prefix', () => {
     for (const entry of DEFAULT_IMAGE_CATALOG_ENTRIES) {
-      expect(entry.reference, entry.name).not.toContain(':');
-      expect(entry.reference, entry.name).not.toContain('library/');
-      expect(entry.intent.length, entry.name).toBeGreaterThan(0);
+      expect(entry.reference, entry.reference).not.toContain(':');
+      expect(entry.reference, entry.reference).not.toContain('library/');
+      expect(entry.intent.length, entry.reference).toBeGreaterThan(0);
     }
     expect(DEFAULT_IMAGE_CATALOG_ENTRIES.map((entry) => entry.reference)).toEqual([
       DEFAULT_AGENT_IMAGE,

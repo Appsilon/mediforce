@@ -601,7 +601,9 @@ For the workspaces themselves rather than the daemon,
 `scripts/migrations/seed_default_image_catalogs.py --from-file handles.txt --apply`
 gives each listed workspace the five entries a new one is created with. It needs
 no draft phase — those sentences are written in `platform-core`, beside the
-constants the engine runs from — and it is re-runnable.
+constants the engine runs from — and it is re-runnable: it writes only the
+defaults a workspace is missing, reports that count, and never touches a row
+somebody has already catalogued or edited.
 
 Images are grouped by **source**, so five `mediforce-agent:*` tags become one
 entry with five versions rather than five rows. Test artifacts

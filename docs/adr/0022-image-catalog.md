@@ -676,6 +676,13 @@ release's `python` the first time one of them changed. Each goes through
 keyed on the repository with no tag (decision 1): one row with a version per tag,
 not a row per tag.
 
+**A seeded row is named after its image.** `mediforce-node`, not "JavaScript
+runtime": the name is what an author types into a step's image field, it matches
+what a hand-catalogued row is called and the basename `discoverEntries` suggests
+(decision 7), and the `intent` sentence beside it carries the meaning a prose
+label would. Deriving the name from the reference also keeps the seed one fact
+per image rather than a label that can drift from the constant it describes.
+
 **A seeded `intent` is compatible with decision 2.** These sentences are
 human-written — once, in code, beside the constants they describe — and they say
 what the *platform* does with the image ("The image the engine runs a Python

@@ -23,8 +23,6 @@ export const DEFAULT_SCRIPT_RUNTIME_IMAGES = {
 
 /** One image every workspace's catalog is seeded with, as a catalog row. */
 export interface DefaultImageCatalogEntry {
-  /** Human handle for the row. */
-  name: string;
   /**
    * The sentence the catalog requires (ADR-0022 decision 2). Written by a
    * human — once, here — and about platform behaviour rather than a
@@ -32,7 +30,13 @@ export interface DefaultImageCatalogEntry {
    * entry may not.
    */
   intent: string;
-  /** Repository with no tag: what a `referenced` entry is keyed on. */
+  /**
+   * Repository with no tag: what a `referenced` entry is keyed on, and the
+   * row's name. A catalogued image is named after the image — the convention
+   * `discoverEntries` already follows with its repo basename — so the name is
+   * what an author types into a step's image field, and the sentence beside it
+   * carries the meaning.
+   */
   reference: string;
 }
 
@@ -52,27 +56,22 @@ function seedReference(image: string): string {
  */
 export const DEFAULT_IMAGE_CATALOG_ENTRIES: readonly DefaultImageCatalogEntry[] = [
   {
-    name: 'Golden image',
     intent: 'The image the engine runs an agent step in when the step names neither an image nor a build source.',
     reference: seedReference(DEFAULT_AGENT_IMAGE),
   },
   {
-    name: 'JavaScript runtime',
     intent: 'The image the engine runs a JavaScript script step in when the step names none.',
     reference: seedReference(DEFAULT_SCRIPT_RUNTIME_IMAGES.javascript),
   },
   {
-    name: 'Python runtime',
     intent: 'The image the engine runs a Python script step in when the step names none.',
     reference: seedReference(DEFAULT_SCRIPT_RUNTIME_IMAGES.python),
   },
   {
-    name: 'R runtime',
     intent: 'The image the engine runs an R script step in when the step names none.',
     reference: seedReference(DEFAULT_SCRIPT_RUNTIME_IMAGES.r),
   },
   {
-    name: 'Bash runtime',
     intent: 'The image the engine runs a Bash script step in when the step names none.',
     reference: seedReference(DEFAULT_SCRIPT_RUNTIME_IMAGES.bash),
   },

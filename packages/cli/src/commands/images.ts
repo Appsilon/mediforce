@@ -579,7 +579,11 @@ export const imagesSeedCommand = defineCommand({
       printJson(output, result);
       return 0;
     }
-    output.stdout(`Seeded ${String(result.seeded)} default entries in "${args.namespace}".`);
+    output.stdout(
+      result.seeded === 0
+        ? `"${args.namespace}" already catalogues every default — nothing written.`
+        : `Seeded ${String(result.seeded)} missing default entries in "${args.namespace}".`,
+    );
     output.stdout('`mediforce images list` to see them.');
     return 0;
   },

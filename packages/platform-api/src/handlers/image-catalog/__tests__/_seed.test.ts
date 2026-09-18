@@ -21,6 +21,11 @@ describe('seedDefaultImageCatalogEntries', () => {
     expect(entries.map((entry) => entry.source)).toEqual(
       DEFAULT_IMAGE_CATALOG_ENTRIES.map((seed) => ({ kind: 'referenced', reference: seed.reference })),
     );
+    // Named after the image, like a hand-catalogued row and like the basename
+    // `discoverEntries` suggests — not a prose label the step editor can't match.
+    expect(entries.map((entry) => entry.name)).toEqual(
+      DEFAULT_IMAGE_CATALOG_ENTRIES.map((seed) => seed.reference),
+    );
     // A tag would key five rows where the catalog wants one with five versions
     // (ADR-0022 decision 1), so no seed may carry one.
     expect(entries.some((entry) => entry.source.kind === 'referenced' && entry.source.reference.includes(':'))).toBe(false);
@@ -37,12 +42,12 @@ describe('seedDefaultImageCatalogEntries', () => {
     );
   });
 
-  it('is idempotent — the same source upserts the same row', async () => {
+  it('is idempotent — a re-seed writes nothing and says so', async () => {
     const scope = createTestScope({ imageCatalogRepo: repo, caller: userCaller('u-1', []) });
 
     await seedDefaultImageCatalogEntries('fresh', scope);
-    await seedDefaultImageCatalogEntries('fresh', scope);
 
+    expect(await seedDefaultImageCatalogEntries('fresh', scope)).toBe(0);
     expect(await repo.list('fresh')).toHaveLength(DEFAULT_IMAGE_CATALOG_ENTRIES.length);
   });
 
