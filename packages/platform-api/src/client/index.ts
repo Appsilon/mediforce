@@ -212,6 +212,8 @@ import {
   PublishImageCatalogVersionOutputSchema,
   PullImageCatalogVersionInputSchema,
   PullImageCatalogVersionOutputSchema,
+  SeedImageCatalogEntriesInputSchema,
+  SeedImageCatalogEntriesOutputSchema,
   DeleteImageCatalogEntryInputSchema,
   DeleteImageCatalogEntryOutputSchema,
   ListNamespaceMembersInputSchema,
@@ -317,6 +319,8 @@ import {
   type PublishImageCatalogVersionOutput,
   type PullImageCatalogVersionInput,
   type PullImageCatalogVersionOutput,
+  type SeedImageCatalogEntriesInput,
+  type SeedImageCatalogEntriesOutput,
   type DeleteImageCatalogEntryInput,
   type DeleteImageCatalogEntryOutput,
   type ListTasksInput,
@@ -854,6 +858,9 @@ export class Mediforce {
     /** Pull a registry image onto the daemon and catalogue it as a `referenced`
      *  version. Long-running, like `build`. */
     pull: (input: PullImageCatalogVersionInput) => Promise<PullImageCatalogVersionOutput>;
+    /** Seed the workspace with the images a step falls back to when it names
+     *  none. Idempotent, and what every workspace is created with (#1376). */
+    seed: (input: SeedImageCatalogEntriesInput) => Promise<SeedImageCatalogEntriesOutput>;
   };
 
   readonly users: {
@@ -2210,6 +2217,14 @@ export class Mediforce {
         });
         const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.pull');
         return PullImageCatalogVersionOutputSchema.parse(body);
+      },
+      seed: async (input) => {
+        const { namespace } = SeedImageCatalogEntriesInputSchema.parse(input);
+        const res = await this.request(`/api/image-catalog/seed${toSearchParams({ namespace })}`, {
+          method: 'POST',
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.seed');
+        return SeedImageCatalogEntriesOutputSchema.parse(body);
       },
     };
 

@@ -23,6 +23,20 @@ Getting an image to a step takes two things:
 Most paths below do both in one act. Every create and register action is open to
 any workspace member; only **Delete** needs workspace admin or owner.
 
+## What your workspace already offers
+
+A workspace is created with five entries: `mediforce-golden-image`, which an
+agent step runs in when it names no image, and the four an inline script step
+runs in — `mediforce-node`, `python`, `rocker/r-ver` and `alpine`
+([ADR-0022](../adr/0022-image-catalog.md) decision 8). They are ordinary rows:
+yours to edit, yours to delete, and each carries a version per tag of it the
+daemon holds. Everything below is about adding your own image beside them.
+
+A workspace created before that opens on an empty catalog. `mediforce images
+seed --namespace <handle>` catalogues the same five, and
+`scripts/migrations/seed_default_image_catalogs.py` does it over a list of
+handles.
+
 ## Pick your path
 
 | You have… | Path | Platform can rebuild it? |
@@ -558,6 +572,14 @@ moment those other tags cannot be checked, so the delete is refused rather than
 guessed at — retry, or name the image as `repository:tag`, which needs no
 listing.
 
+**An image the engine falls back to keeps its image.** For the five a workspace
+starts with, `--keep-images` is the only accepted form and the browser dialog
+offers only the record-only delete. A step that names no image pins nothing, so
+the live-pin check above is blind to every `runtime: python` step on the
+deployment — and the daemon is shared, so removing `python` from a workspace
+minutes old would break all of them
+([ADR-0022](../adr/0022-image-catalog.md) decision 8).
+
 ## Backfilling an existing deployment
 
 For those hand-built and pulled images, `scripts/migrations/adopt_daemon_images.py`
@@ -574,6 +596,12 @@ python3 scripts/migrations/adopt_daemon_images.py --namespace acme --draft image
 # 2. Fill in every "intent", then register.
 python3 scripts/migrations/adopt_daemon_images.py --apply images.json
 ```
+
+For the workspaces themselves rather than the daemon,
+`scripts/migrations/seed_default_image_catalogs.py --from-file handles.txt --apply`
+gives each listed workspace the five entries a new one is created with. It needs
+no draft phase — those sentences are written in `platform-core`, beside the
+constants the engine runs from — and it is re-runnable.
 
 Images are grouped by **source**, so five `mediforce-agent:*` tags become one
 entry with five versions rather than five rows. Test artifacts
@@ -598,4 +626,6 @@ source is skipped, not failed.
 - `mediforce system images` — the raw Docker daemon listing: every image on the
   host, `postgres` and dangling layers included. Deployment-wide and ops-facing;
   the one to reach for when hunting disk, not when choosing a step image.
+- `mediforce images seed` — catalogue the five images a step falls back to when
+  it names none, for a workspace created before that became automatic. Idempotent.
 - `mediforce system status` — check Docker daemon reachability

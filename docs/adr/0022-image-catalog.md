@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-09-17
+last_reviewed: 2026-09-18
 ---
 
 # ADR-0022: The Image Catalog is an image the platform offers, keyed on its source
@@ -10,7 +10,7 @@ last_reviewed: 2026-09-17
 **Deciders:** Krystian Zieliński
 **Epic:** [#1292](https://github.com/Appsilon/mediforce/issues/1292) — Step Image Catalog
 
-**All seven decisions are built.** #1294 landed `image_catalog_entries`, the
+**All eight decisions are built.** #1294 landed `image_catalog_entries`, the
 source-derived key, the required `intent`, `unknown` as a state, the
 workspace-member write gate, the handlers, the contract, the route adapters and
 `mediforce images`; #1295 landed probed capabilities; #1296 landed lineage — the
@@ -22,7 +22,8 @@ Infrastructure; #1298 pointed the step-editor picker at the catalog, which is
 where decision 5 stops being a claim about a future control and starts being the
 behaviour of the one authors use. Decision 7 landed after the first workspace
 ran a build-mode workflow and found the image it had just built missing from
-its own catalog.
+its own catalog; decision 8 (#1376) after the rollout to staging found that a
+workspace which has built nothing gets the pre-catalog picker back.
 
 #1344 later added a way to *produce* a version — `mediforce images build` and a
 **Build** action — without changing any of the seven decisions: it reuses
@@ -642,6 +643,78 @@ Admin → Infrastructure remains the raw inventory (decision 3), and a pulled or
 hand-built image is still catalogued by hand — there is nothing to derive its
 source from.
 
+### 8. A new workspace is born with the images a step falls back to
+
+*Added 2026-09-18 (#1376).*
+
+Every workspace is created with five catalogued entries: the image an agent step
+falls back to when it names neither an image nor a build source
+(`DEFAULT_AGENT_IMAGE`), and the four a `script.runtime` step falls back to
+(`DEFAULT_SCRIPT_RUNTIME_IMAGES` — `mediforce-node`, `python`, `rocker/r-ver`,
+`alpine`). Both creation paths seed them: `createNamespace`, and the personal
+workspace `getMe` bootstraps on first sign-in, which is where most workspaces
+come from.
+
+**The problem this fixes.** Decision 7 fills a catalog from what a namespace
+*built*; a workspace that has built nothing gets nothing, so a new workspace
+opened on *"No images catalogued yet"* and a picker falling through to
+`buildDaemonImageGroups` — the raw deployment-wide daemon listing, `postgres`
+and `caddy` included, with no intent sentences and no filtering. That is the
+pre-catalog behaviour decision 5 set out to replace. Worse, the fallback in
+decision 5 turns on whether the catalog covers *any* image, so the first entry a
+member catalogued by hand flipped that workspace to catalogue-only and dropped
+their agent picker from every daemon row to one. A workspace that catalogued one
+image was worse off than one that catalogued none, and nobody could be expected
+to know that.
+
+**The set is derived from the engine's constants, never a second list.** The
+seed is exactly what the engine defaults to, so it reads `DEFAULT_AGENT_IMAGE`
+and `DEFAULT_SCRIPT_RUNTIME_IMAGES` — the same constants
+`ScriptContainerPlugin` runs from. A hand-written copy would offer last
+release's `python` the first time one of them changed. Each goes through
+`daemonRepositoryName(untaggedReference(...))` because a `referenced` entry is
+keyed on the repository with no tag (decision 1): one row with a version per tag,
+not a row per tag.
+
+**A seeded `intent` is compatible with decision 2.** These sentences are
+human-written — once, in code, beside the constants they describe — and they say
+what the *platform* does with the image ("The image the engine runs a Python
+script step in when the step names none"), which is a fact about the engine and
+not a generated description of an image's contents. What decision 2 refuses is a
+machine filling the field so the row can exist; that is still refused, and
+`adopt_daemon_images.py` still leaves `intent` blank for a human.
+
+**Seeded without probing and never at the cost of the workspace.** The rows are
+written through the repository with empty capabilities rather than through
+`createImageCatalogEntry`, which reads the daemon and runs
+`refreshEntryCapabilities` — five probe containers, which a first login blocking
+on `getMe` cannot pay for. `getImageCatalogEntry` probes unattempted versions on
+the first single-entry read, so they fill in on demand exactly as decision 7's
+discovered entries do. The seed touches no daemon at all, so an unreachable one
+costs the versions and not the rows; and the whole seed is best-effort, reported
+in the creating handler's own audit entry (`seededImageCatalogEntries`) the way
+the ADR-0020 grant beside it is. The workspace exists by the time this runs, so
+failing the request would leave a real workspace behind a 500 and a retry that
+can only 409.
+
+**The rows are the workspace's, and editing or deleting one is ordinary**
+(decision 3) — no shared or global catalog tier that every workspace reads, and
+no second sharing mechanism to reason about. The one exception is the image
+half of a delete: `isDefaultEngineImageSource` refuses `withImages` for these
+references, and the UI offers only the record-only delete. The daemon is
+deployment-wide and a step that names *no* image pins nothing, so the live-pin
+check that protects every other entry is blind here — an admin of a
+minutes-old workspace could otherwise take `python:3.12-slim` off the daemon for
+every workspace on it. Derived from the reference rather than a stored marker,
+so it holds for a row somebody renamed and for one catalogued by hand before
+seeding existed.
+
+**Backfilled by a script, not lazily on read.** `mediforce images seed` runs the
+same helper, and `scripts/migrations/seed_default_image_catalogs.py` runs it over
+a list of handles. Seeding on read would turn a listing polled every 30 seconds
+into a write path, which is the reason decision 7 derives discovered entries
+instead of storing them.
+
 ### 6. The vocabulary, fixed before the code
 
 This ADR is the canonical home for the vocabulary while none of the objects
@@ -726,7 +799,16 @@ User-visible changes, each a §12 gate in the issue that made it:
 - **A deployment with no catalog authors exactly as it did before.** An empty
   catalog, or a daemon nobody can reach, degrades the picker to the daemon
   listing it always showed — unranked, since without a probe nothing has been
-  measured (AGENTS.md §13).
+  measured (AGENTS.md §13). Since decision 8 a workspace reaches that state only
+  by emptying its own catalog, or on a daemon holding none of the engine's own
+  defaults.
+- **A new workspace opens on five entries it did not write** (decision 8),
+  described and sourced as `referenced`. Additive: nothing that was offered
+  stopped being offered, and the rows are the workspace's to edit or delete.
+- **The image behind an engine default cannot be deleted from a workspace**
+  (decision 8). The record can; `--keep-images` is the only accepted form, and
+  the UI offers only that. The one place the delete gate is stricter than
+  "admin of this workspace plus no live pin".
 
 ## Out of scope
 

@@ -157,6 +157,38 @@ describe('deleteImageCatalogEntry handler', () => {
     expect(await repo.getById('alpha', created.entry.id)).toBeNull();
   });
 
+  it('refuses to take an engine default off the shared daemon, but drops the row', async () => {
+    const removed: string[] = [];
+    // The image a `runtime: python` step falls back to, and a step that names
+    // no image pins nothing — so the live-pin check has nothing to refuse on.
+    daemon.value = daemonWith([builtImage({ repository: 'python', tag: '3.12-slim', id: 'sha-py', buildRepo: undefined })]);
+    const scope = await adminScopeWith({
+      delete: async (imageId) => {
+        removed.push(imageId);
+        return { deleted: imageId };
+      },
+    });
+    const created = await createImageCatalogEntry(
+      {
+        namespace: 'alpha',
+        name: 'Python runtime',
+        intent: 'The image the engine runs a Python script step in when the step names none.',
+        source: { kind: 'referenced', reference: 'python' },
+      },
+      scope,
+    );
+
+    await expect(
+      deleteImageCatalogEntry({ namespace: 'alpha', id: created.entry.id, withImages: true }, scope),
+    ).rejects.toBeInstanceOf(ConflictError);
+    expect(removed).toEqual([]);
+    expect(await repo.getById('alpha', created.entry.id)).not.toBeNull();
+
+    // The row belongs to the workspace, so removing it alone is ordinary.
+    await deleteImageCatalogEntry({ namespace: 'alpha', id: created.entry.id }, scope);
+    expect(await repo.getById('alpha', created.entry.id)).toBeNull();
+  });
+
   it('removes every version tag from the daemon, then the entry', async () => {
     const removed: string[] = [];
     daemon.value = TWO_VERSIONS;

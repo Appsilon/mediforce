@@ -2,6 +2,7 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle, Loader2, X } from 'lucide-react';
+import { isDefaultEngineImageSource } from '@mediforce/platform-core';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { useDeleteImageEntry } from '@/hooks/use-image-catalog';
 import { useArchiveWorkflowVersion } from '@/hooks/use-archive-workflow-version';
@@ -60,9 +61,15 @@ export function DeleteImageEntryDialog({
   const remove = useDeleteImageEntry(handle);
   const archive = useArchiveWorkflowVersion();
   const tags = entry.versions.map((version) => version.imageTag);
+  // An image the engine falls back to when a step names none is not this
+  // workspace's to destroy: the daemon is shared by every workspace, and a step
+  // that names no image pins nothing for the scan below to find (#1376). The
+  // row is still the workspace's own, so the delete stays — it stops at the
+  // record, and the handler refuses the image half anyway.
+  const removesImages = tags.length > 0 && isDefaultEngineImageSource(entry.source) === false;
   // `all`, not the default: every version and archived workflows included. The
   // narrow answer would hide exactly the history this delete destroys.
-  const usage = useWorkflowsByImage(tags, open && tags.length > 0, 'all');
+  const usage = useWorkflowsByImage(tags, open && removesImages, 'all');
   const pins = usage.workflows ?? [];
   const blockingLive = pins.filter((pin) => pin.live);
   const historical = pins.filter((pin) => pin.live === false);
@@ -97,10 +104,12 @@ export function DeleteImageEntryDialog({
             <div>
               <Dialog.Title className="text-lg font-semibold">Delete {entry.name}?</Dialog.Title>
               <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-                {tags.length === 0 ? (
+                {removesImages === false ? (
                   <>
-                    No image for this entry is on the daemon, so this removes the record and
-                    nothing else. The source can be catalogued again.
+                    {tags.length === 0
+                      ? 'No image for this entry is on the daemon, so this removes the record and nothing else.'
+                      : 'This is an image the engine falls back to when a step names none, so it stays on the shared daemon — this removes the record alone.'}{' '}
+                    The source can be catalogued again.
                   </>
                 ) : (
                   <>
@@ -125,7 +134,7 @@ export function DeleteImageEntryDialog({
           </div>
 
           <div className="space-y-4">
-            {tags.length > 0 && (
+            {removesImages && (
               <div className="space-y-1.5">
                 <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   {tags.length} version{tags.length === 1 ? '' : 's'} to remove
@@ -273,7 +282,7 @@ export function DeleteImageEntryDialog({
                 type="button"
                 onClick={() =>
                   remove.mutate(
-                    { id: entry.id, withImages: tags.length > 0 },
+                    { id: entry.id, withImages: removesImages },
                     { onSuccess: () => onOpenChange(false) },
                   )
                 }
@@ -281,7 +290,7 @@ export function DeleteImageEntryDialog({
                 className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
               >
                 {remove.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                {tags.length === 0
+                {removesImages === false
                   ? 'Delete entry'
                   : `Delete ${storedRow ? 'entry and ' : ''}${String(tags.length)} image${tags.length === 1 ? '' : 's'}`}
               </button>

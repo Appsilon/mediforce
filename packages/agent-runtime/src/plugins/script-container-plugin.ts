@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import type { AgentConfig, ScriptStepConfig, StepConfig, PluginCapabilityMetadata, Presentation } from '@mediforce/platform-core';
-import { resolveStepTimeoutMinutes } from '@mediforce/platform-core';
+import { DEFAULT_SCRIPT_RUNTIME_IMAGES, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
 import { isLocalExecutionAllowed } from './base-container-agent-plugin';
@@ -15,12 +15,15 @@ import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-arti
 // default (30 min) so the two never silently disagree (ADR-0010).
 const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 
-/** Runtime → Docker image, file extension, and run command (as array for spawn). */
+/** Runtime → Docker image, file extension, and run command (as array for spawn).
+ *  The images come from `DEFAULT_SCRIPT_RUNTIME_IMAGES` because the Image
+ *  Catalog seeds a new workspace with the same list (#1376) — two spellings of
+ *  the same default would leave the catalog offering an image nothing runs. */
 const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (path: string) => string[] }> = {
-  javascript: { image: 'mediforce-node:latest', ext: '.mjs', cmd: (p) => ['node', p] },
-  python: { image: 'python:3.12-slim', ext: '.py', cmd: (p) => ['python3', p] },
-  r: { image: 'rocker/r-ver:4', ext: '.R', cmd: (p) => ['Rscript', p] },
-  bash: { image: 'alpine:3.19', ext: '.sh', cmd: (p) => ['sh', p] },
+  javascript: { image: DEFAULT_SCRIPT_RUNTIME_IMAGES.javascript, ext: '.mjs', cmd: (p) => ['node', p] },
+  python: { image: DEFAULT_SCRIPT_RUNTIME_IMAGES.python, ext: '.py', cmd: (p) => ['python3', p] },
+  r: { image: DEFAULT_SCRIPT_RUNTIME_IMAGES.r, ext: '.R', cmd: (p) => ['Rscript', p] },
+  bash: { image: DEFAULT_SCRIPT_RUNTIME_IMAGES.bash, ext: '.sh', cmd: (p) => ['sh', p] },
 };
 
 /**

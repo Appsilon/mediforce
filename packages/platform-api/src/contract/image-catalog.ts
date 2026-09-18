@@ -331,6 +331,25 @@ export const DeleteImageCatalogEntryOutputSchema = z.object({
   deletedImages: z.array(z.string()),
 });
 
+/**
+ * POST input to (re)seed a workspace's catalog with the images a step falls
+ * back to when it names none (#1376).
+ *
+ * No body beyond the workspace: the set is `DEFAULT_IMAGE_CATALOG_ENTRIES`,
+ * derived from the engine's own defaults, so a caller choosing which to seed
+ * would be choosing against the engine. Idempotent — the rows are keyed on
+ * their source — which is what lets a workspace created before seeding existed
+ * be backfilled by the same call.
+ */
+export const SeedImageCatalogEntriesInputSchema = NamespaceQuery.strict();
+export const SeedImageCatalogEntriesOutputSchema = z.object({
+  /** How many default rows the workspace now has. */
+  seeded: z.number().int().nonnegative(),
+});
+
+export type SeedImageCatalogEntriesInput = z.infer<typeof SeedImageCatalogEntriesInputSchema>;
+export type SeedImageCatalogEntriesOutput = z.infer<typeof SeedImageCatalogEntriesOutputSchema>;
+
 export type ImageCatalogVersionBase = z.infer<typeof ImageCatalogVersionBaseSchema>;
 export type ImageVersionLineage = z.infer<typeof ImageVersionLineageSchema>;
 export type ImageCatalogVersion = z.infer<typeof ImageCatalogVersionSchema>;

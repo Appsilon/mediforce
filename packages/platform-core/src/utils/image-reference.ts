@@ -27,38 +27,6 @@ export const PULL_REFERENCE_PATTERN = new RegExp(`^(?:${REGISTRY_HOST}/)?${REPOS
  *  never be read as a `docker pull` flag. */
 export const PULL_IMAGE_PATTERN = new RegExp(`^(?:${REGISTRY_HOST}/)?${REPOSITORY_PATH}:${TAG}$`);
 
-/**
- * `repo` and `repo:latest` are the same image to Docker, so anything matching
- * one reference against another has to spell them the same way.
- *
- * The tag separator is the colon in the *last* path component. An earlier one
- * belongs to the registry host's port — `localhost:5000/acme/agent` is
- * untagged and names `:latest` — and a digest reference carries its own
- * `algorithm:hex`, which is not a tag to add one to either.
- */
-export function normalizeImageRef(ref: string): string {
-  const lastComponent = ref.slice(ref.lastIndexOf('/') + 1);
-  return lastComponent.includes(':') ? ref : `${ref}:latest`;
-}
-
-/**
- * A reference split the way the daemon lists it: `localhost:5000/acme/agent:v1`
- * is the repository `localhost:5000/acme/agent` at `v1`, never `localhost` at
- * `5000`. Untagged means `latest`, by the rule above.
- *
- * For matching a reference against a daemon listing, which has no digests in
- * it — a digest reference splits at the digest's own colon and matches no row,
- * which is the right answer for a listing that names tags.
- */
-export function splitImageRef(ref: string): { repository: string; tag: string } {
-  const normalized = normalizeImageRef(ref);
-  const separator = normalized.lastIndexOf(':');
-  return {
-    repository: normalized.slice(0, separator),
-    tag: normalized.slice(separator + 1),
-  };
-}
-
 const DOCKER_HUB_HOSTS = ['docker.io/', 'index.docker.io/', 'registry-1.docker.io/'];
 
 /**
@@ -83,4 +51,43 @@ export function daemonRepositoryName(reference: string): string {
   const [first] = path.split('/');
   if (host === undefined && first !== undefined && isRegistryHost(first)) return reference;
   return path.startsWith('library/') ? path.slice('library/'.length) : path;
+}
+
+/**
+ * A reference with its tag dropped — `python:3.12-slim` is `python`,
+ * `localhost:5000/agent:1` is `localhost:5000/agent`. A colon followed by a
+ * `/` is a registry port, not a tag, which is the whole reason this is not a
+ * `split(':')[0]`.
+ */
+export function untaggedReference(reference: string): string {
+  const lastColon = reference.lastIndexOf(':');
+  if (lastColon === -1 || reference.includes('/', lastColon)) return reference;
+  return reference.slice(0, lastColon);
+}
+
+/**
+ * `repo` and `repo:latest` are the same image to Docker, so anything matching
+ * one reference against another has to spell them the same way. Untagged is
+ * whatever `untaggedReference` hands back unchanged, so the registry port and
+ * the digest are reasoned about once rather than in every caller.
+ */
+export function normalizeImageRef(ref: string): string {
+  return untaggedReference(ref) === ref ? `${ref}:latest` : ref;
+}
+
+/**
+ * A reference split the way the daemon lists it: `localhost:5000/acme/agent:v1`
+ * is the repository `localhost:5000/acme/agent` at `v1`, never `localhost` at
+ * `5000`, and an untagged one is at `latest`.
+ *
+ * For matching against a daemon listing, which names tags and not digests: a
+ * digest reference splits at the digest's own colon and so matches no row,
+ * which is the right answer there.
+ */
+export function splitImageRef(ref: string): { repository: string; tag: string } {
+  const repository = untaggedReference(ref);
+  return {
+    repository,
+    tag: repository === ref ? 'latest' : ref.slice(repository.length + 1),
+  };
 }
