@@ -264,12 +264,7 @@ function ExecutorText({ executedBy = '', executorType, plugin, runtime }: {
     label = 'Human';
   }
 
-  return (
-    <span className="text-xs text-muted-foreground">
-      <span className="text-muted-foreground/60 mr-1">Executor</span>
-      {label}
-    </span>
-  );
+  return <span className="truncate max-w-[220px]" title={label}>{label}</span>;
 }
 
 function VirtualRowMeta({
@@ -288,12 +283,12 @@ function VirtualRowMeta({
       {taskForStep && (
         <>
           <span className="text-xs text-muted-foreground">
-            <span className="text-muted-foreground/60 mr-1">Started</span>
+            <span className="sr-only">Started </span>
             {format(new Date(taskForStep.createdAt), 'MMM d, HH:mm')}
           </span>
           <span className="text-muted-foreground/40">·</span>
           <span className="text-xs text-muted-foreground">
-            <span className="text-muted-foreground/60 mr-1">Duration</span>
+            <span className="sr-only">Duration </span>
             <ElapsedTimer startedAt={taskForStep.createdAt} />
           </span>
           <span className="text-muted-foreground/40">·</span>
@@ -626,44 +621,27 @@ export function StepStatusPanel({
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span className="text-xs text-muted-foreground">
-                    <span className="text-muted-foreground/60 mr-1">Started</span>
-                    {format(new Date(execution.startedAt), 'MMM d, HH:mm')}
-                  </span>
+                {/* Start time, how long it took, what it cost, who ran it —
+                    without repeating a label in front of each. The labels took
+                    more width than the values and the separators trailed off
+                    the end of the row. */}
+                <div className="flex items-center gap-x-3 gap-y-0.5 mt-1 flex-wrap text-xs text-muted-foreground tabular-nums">
+                  <span>{format(new Date(execution.startedAt), 'MMM d, HH:mm')}</span>
                   {!execution.completedAt && (
-                    <>
-                      <span className="text-muted-foreground/40">·</span>
-                      <span className="text-xs text-muted-foreground">
-                        <span className="text-muted-foreground/60 mr-1">Duration</span>
-                        <ElapsedTimer startedAt={execution.startedAt} />
-                      </span>
-                    </>
+                    <span className="font-medium text-foreground">
+                      <ElapsedTimer startedAt={execution.startedAt} />
+                    </span>
                   )}
                   {execution.completedAt && (
-                    <>
-                      <span className="text-muted-foreground/40">·</span>
-                      <span className="text-xs text-muted-foreground">
-                        <span className="text-muted-foreground/60 mr-1">Completed</span>
-                        {format(new Date(execution.completedAt), 'MMM d, HH:mm')}
-                      </span>
-                      <span className="text-muted-foreground/40">·</span>
-                      <span className="text-xs text-muted-foreground">
-                        <span className="text-muted-foreground/60 mr-1">Duration</span>
-                        {formatDuration(new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime())}
-                      </span>
-                      {execution.agentOutput?.estimatedCostUsd != null && (
-                        <>
-                          <span className="text-muted-foreground/40">·</span>
-                          <span className="text-xs text-muted-foreground">
-                            <span className="text-muted-foreground/60 mr-1">Cost</span>
-                            {formatCostUsd(execution.agentOutput.estimatedCostUsd)}
-                          </span>
-                        </>
-                      )}
-                    </>
+                    <span className="font-medium text-foreground">
+                      {formatDuration(new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime())}
+                    </span>
                   )}
-                  <span className="text-muted-foreground/40">·</span>
+                  {execution.completedAt && execution.agentOutput?.estimatedCostUsd != null && (
+                    <span className="font-medium text-foreground">
+                      {formatCostUsd(execution.agentOutput.estimatedCostUsd)}
+                    </span>
+                  )}
                   <ExecutorText
                     executedBy={execution.executedBy}
                     executorType={stepConfig?.executorType}
