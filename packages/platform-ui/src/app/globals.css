@@ -102,12 +102,17 @@
   --sidebar-ring: 158 64% 52%;
 }
 
-* {
-  @apply border-border;
-}
+/* Layered, not bare: Tailwind v4 puts utilities in `@layer utilities`, and an
+   unlayered rule outranks every layered one whatever its specificity — bare,
+   this `*` overrode every `border-<colour>` class in the app. */
+@layer base {
+  * {
+    @apply border-border;
+  }
 
-body {
-  @apply bg-background text-foreground;
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
 @media print {
