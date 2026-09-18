@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import type { WorkflowRunSummary } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
+import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 
 export interface DefinitionVersion {
@@ -44,16 +45,19 @@ export interface DefinitionGroup {
  * `refetchOnWindowFocus: true` (default) is enough; mutations to workflows
  * (`workflows.register`, `workflows.delete`, etc.) invalidate the cache.
  *
- * Source is `mediforce.workflows.list({})` which returns the latest version
- * per `(name, namespace)` group; consumers on workspace home don't iterate
+ * Source is `mediforce.workflows.list({ includeArchived: true })`: per
+ * `(name, namespace)` group, the newest non-archived version, or the newest
+ * outright when every version is archived; consumers on workspace home don't iterate
  * historical versions. For full version pickers use `useWorkflowVersions`
  * (separate hook, separate endpoint).
  */
 export function useProcessDefinitions(includeCompletedRuns: boolean = true) {
   const query = useQuery({
-    queryKey: ['workflows', 'list', includeCompletedRuns] as const,
+    queryKey: queryKeys.workflowsList(includeCompletedRuns),
     queryFn: async () => {
-      const result = await mediforce.workflows.list({ includeCompletedRuns });
+      // Archived too: the catalog filters them behind "Archived workflows", the only
+      // way back to a workflow's Unarchive once every version is archived.
+      const result = await mediforce.workflows.list({ includeCompletedRuns, includeArchived: true });
       return result.definitions;
     },
     retry: stopRetryOn4xx,

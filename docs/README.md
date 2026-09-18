@@ -41,7 +41,7 @@ Every engineering doc, what it is for, and how far to trust it.
 | See how the packages fit together | [`concepts/architecture.md`](concepts/architecture.md) | engineers | living |
 | Know how the team operates | [`concepts/how-we-work.md`](concepts/how-we-work.md) | everyone | living |
 | Build a workflow, end to end | [`guides/create-workflow.md`](guides/create-workflow.md) | workflow-authors | living |
-| Build and push step images | [`guides/docker-image-setup.md`](guides/docker-image-setup.md) | workflow-authors | living |
+| Create and register Docker images for steps | [`guides/docker-image-setup.md`](guides/docker-image-setup.md) | workflow-authors | living |
 | Import a workflow from git | [`guides/import-from-git.md`](guides/import-from-git.md) | workflow-authors | living |
 | Pass the four verification gates | [`guides/verify-a-workflow.md`](guides/verify-a-workflow.md) | workflow-authors | living |
 | Onboard a landing zone | [`guides/landing-zone-onboarding.md`](guides/landing-zone-onboarding.md) | operators | living |

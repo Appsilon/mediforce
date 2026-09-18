@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 vi.mock('node:child_process', () => ({
-  execSync: vi.fn(),
   execFileSync: vi.fn(),
 }));
 
@@ -13,21 +12,28 @@ vi.mock('node:fs/promises', () => ({
   rm: vi.fn(),
 }));
 
-import { execFileSync, execSync } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { buildImageFromRepo } from './docker-image-builder';
+// The clone is never on disk here, so every path resolves to itself.
+vi.mock('node:fs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs')>()),
+  realpathSync: vi.fn((path: string) => path),
+}));
 
-const execSyncMock = vi.mocked(execSync);
+import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { buildImageFromRepo, ensureImage } from './docker-image-builder';
+
 const execFileSyncMock = vi.mocked(execFileSync);
 const mkdtempMock = vi.mocked(mkdtemp);
 const rmMock = vi.mocked(rm);
+const realpathSyncMock = vi.mocked(realpathSync);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  realpathSyncMock.mockImplementation((path) => String(path));
   delete process.env.DEPLOY_KEY_PATH;
   mkdtempMock.mockResolvedValue('/tmp/mediforce-worker-build-abc');
   rmMock.mockResolvedValue(undefined);
-  execSyncMock.mockReturnValue(Buffer.from(''));
   execFileSyncMock.mockReturnValue(Buffer.from(''));
 });
 
@@ -42,7 +48,105 @@ function fetchCalls(): Parameters<typeof execFileSync>[] {
   );
 }
 
+/** Value of a `--label key=value` pair in the `docker build` arguments. */
+function buildLabel(key: string): string | undefined {
+  const call = execFileSyncMock.mock.calls.find(
+    ([command, args]) => command === 'docker' && args?.[0] === 'build',
+  );
+  return (call?.[1] as string[] | undefined)
+    ?.find((arg) => arg.startsWith(`${key}=`))
+    ?.slice(key.length + 1);
+}
+
 describe('container-worker buildImageFromRepo', () => {
+  it('writes the same build labels as the agent-runtime copy', async () => {
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'git@github.com:owner/repo.git',
+      commit: 'abc123',
+      dockerfile: 'container/Dockerfile',
+      workflow: 'sdtm-mapping',
+      namespace: 'acme',
+    });
+
+    expect(buildLabel('mediforce.build.repo')).toBe('git@github.com:owner/repo.git');
+    expect(buildLabel('mediforce.build.commit')).toBe('abc123');
+    expect(buildLabel('mediforce.build.dockerfile')).toBe('container/Dockerfile');
+    expect(buildLabel('mediforce.build.workflow')).toBe('sdtm-mapping');
+    expect(buildLabel('mediforce.build.namespace')).toBe('acme');
+    expect(buildLabel('org.opencontainers.image.source')).toBe('https://github.com/owner/repo');
+    expect(buildLabel('org.opencontainers.image.revision')).toBe('abc123');
+  });
+
+  it('builds from the named context, like the agent-runtime copy', async () => {
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'git@github.com:owner/repo.git',
+      commit: 'abc123',
+      dockerfile: 'container/Dockerfile',
+      context: '.',
+    });
+
+    const call = execFileSyncMock.mock.calls.find(
+      ([command, args]) => command === 'docker' && args?.[0] === 'build',
+    );
+    const args = call?.[1] as string[] | undefined;
+    expect(args?.[(args?.indexOf('-f') ?? 0) + 1]).toBe(
+      '/tmp/mediforce-worker-build-abc/container/Dockerfile',
+    );
+    expect(args?.at(-1)).toBe('/tmp/mediforce-worker-build-abc');
+    expect(buildLabel('mediforce.build.context')).toBe('.');
+  });
+
+  it('keeps the Dockerfile\'s own directory as the context when none is named', async () => {
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'git@github.com:owner/repo.git',
+      commit: 'abc123',
+      dockerfile: 'container/Dockerfile',
+    });
+
+    const call = execFileSyncMock.mock.calls.find(
+      ([command, args]) => command === 'docker' && args?.[0] === 'build',
+    );
+    expect((call?.[1] as string[] | undefined)?.at(-1)).toBe('/tmp/mediforce-worker-build-abc/container');
+    // Written empty so it overrides any context inherited from the base image.
+    expect(buildLabel('mediforce.build.context')).toBe('');
+  });
+
+  it('refuses a context the checkout symlinks outside the clone, before building', async () => {
+    realpathSyncMock.mockImplementation((path) =>
+      String(path) === '/tmp/mediforce-worker-build-abc/ctx' ? '/' : String(path),
+    );
+
+    await expect(
+      buildImageFromRepo({
+        image: 'test-image',
+        repoUrl: 'git@github.com:owner/repo.git',
+        commit: 'abc123',
+        dockerfile: '../Dockerfile',
+        context: 'ctx',
+      }),
+    ).rejects.toThrow(/outside the repository/);
+
+    const built = execFileSyncMock.mock.calls.some(
+      ([command, args]) => command === 'docker' && args?.[0] === 'build',
+    );
+    expect(built).toBe(false);
+  });
+
+  it('refuses a context outside the clone before cloning anything', async () => {
+    await expect(
+      buildImageFromRepo({
+        image: 'test-image',
+        repoUrl: 'git@github.com:owner/repo.git',
+        commit: 'abc123',
+        context: '../..',
+      }),
+    ).rejects.toThrow(/outside the repository/);
+    expect(fetchCalls()).toHaveLength(0);
+  });
+
   it('uses anonymous HTTPS for owner/repo shorthand without a deploy key', async () => {
     await buildImageFromRepo({
       image: 'test-image',
@@ -142,5 +246,35 @@ describe('container-worker buildImageFromRepo', () => {
     } finally {
       rmSync(deployKeyDirectory, { recursive: true, force: true });
     }
+  });
+});
+
+// Mirrors the agent-runtime copy: a step that names its own tag for a carried
+// Dockerfile is rebuilt when the files behind it change.
+describe('container-worker ensureImage — a Dockerfile the workflow carries', () => {
+  it('does not rebuild an image already built from these files', async () => {
+    execFileSyncMock.mockReturnValueOnce(Buffer.from('')); // inspect succeeds
+    execFileSyncMock.mockReturnValueOnce(Buffer.from('abc123\n')); // artifacts label
+
+    await ensureImage({ image: 'my-registry/mine:v2', contextDir: '/ctx', artifactsHash: 'abc123' });
+
+    expect(execFileSyncMock.mock.calls.some(([command, args]) => command === 'docker' && args?.[0] === 'build')).toBe(false);
+  });
+
+  it('rebuilds an image the step named once the files it was built from change', async () => {
+    execFileSyncMock.mockReturnValueOnce(Buffer.from('')); // inspect succeeds
+    execFileSyncMock.mockReturnValueOnce(Buffer.from('old000hash00\n')); // artifacts label
+
+    await ensureImage({
+      image: 'my-registry/mine:v2',
+      contextDir: '/ctx',
+      artifactsHash: 'new111hash11',
+      workflow: 'wf',
+      namespace: 'acme',
+    });
+
+    expect(buildLabel('mediforce.build.artifacts')).toBe('new111hash11');
+    expect(buildLabel('mediforce.build.namespace')).toBe('acme');
+    expect(buildLabel('mediforce.build.repo')).toBe('');
   });
 });

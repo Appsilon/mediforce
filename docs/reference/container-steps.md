@@ -58,14 +58,31 @@ failure fails the dry run, which is what the person asked by running it.
 
 A carried `Dockerfile` is also a build source. When a step sets `dockerfile`
 and the workflow carries a file at that path, the image is built from the
-materialized directory with no clone anywhere: the whole set is the build
-context (so `COPY scripts/ /scripts/` from a `container/Dockerfile` works as it
-does in a repository), and the tag is derived from the files' content
-(`mediforce-artifacts:<hash>`) — so an edit builds a new image and a rerun of
-unchanged files finds the one already there. An explicit step-level
-`repo` + `commit` still wins; `externalSkillsRepo` remains the fallback. The
-first build takes as long as a `docker build` does, which is minutes for a
-sizeable image.
+materialized directory with no clone anywhere. `dockerfile` is a path from the
+root of the carried files and the whole set is the build context, so `COPY
+scripts/ /scripts/` from a `container/Dockerfile` works as it does in a
+repository; a `context` on such a step is ignored. The tag is derived from the
+carried files, the Dockerfile, and the workflow and namespace
+(`mediforce-artifacts:<hash>`), so an edit to any carried file builds a new
+image and a rerun of unchanged files finds the one already there. A
+step that also names its own `image` keeps that tag, which says nothing about
+the files, so the build labels the content hash (`mediforce.build.artifacts`)
+and an existing image is reused only when the label matches — otherwise it is
+rebuilt under the same tag, as a repo build is when its commit moves. An
+explicit step-level `repo` + `commit` still wins; `externalSkillsRepo` remains
+the fallback. The first build takes as long as a `docker build` does, which is
+minutes for a sizeable image. The image appears in the Image Catalog as a
+`carried` entry ([ADR-0022](../adr/0022-image-catalog.md)).
+
+In the step editor these are one choice, not six fields: **ready image**, **built
+from workflow files**, or **built from a git repo**. The mode is read back from
+the step with the same precedence the runtime applies, so the editor cannot
+offer a combination that resolves to something else, and switching clears the
+fields the new source does not use. A stored step that sets more than one
+source keeps them until an author clears them — the editor says which are
+ignored rather than dropping anyone's work on open. `image` is the one field
+that changes meaning: in the two build modes it is the tag to build under, and
+it is labelled as such.
 
 A step that names a file the workflow does not carry is flagged before the run
 (preflight, beside missing secrets and images): a command reading
@@ -116,18 +133,52 @@ Two independent config surfaces, easy to confuse:
 | Field | Schema | Means |
 |---|---|---|
 | `workspace.remote`, `workspace.remoteAuth` | `WorkflowWorkspaceSchema` (workflow level) | Where the run worktree comes from. Unset → the bare repo is local-only. |
-| `image`, `dockerfile`, `repo`, `commit`, `repoAuth` | `ContainerSchema` (step level, merged into agent and script config) | Where the **image** comes from. `repo` + `commit` is the Docker build context, not the agent's working repo. |
+| `image`, `dockerfile`, `context`, `repo`, `commit`, `repoAuth` | `ContainerSchema` (step level, merged into agent and script config) | Where the **image** comes from. `repo` + `commit` is what the Docker build clones, not the agent's working repo; `context` picks the directory inside it the build sees (default: the Dockerfile's own), and `dockerfile` is then read from it. |
 
 Both live in
 [`workflow-definition.ts`](../../packages/platform-core/src/schemas/workflow-definition.ts).
 `commit` is an exact SHA in both cases — pinned, cannot drift.
 
 With `dockerfile` + `repo` + `commit` set, the image is built lazily on first
-use and tagged `mediforce-built:<hash>`, keyed on the build inputs; a rebuild
-happens only when the pinned commit moves. With `image` alone, it must already
+use and tagged `mediforce-built:<hash>`, keyed on the build inputs — `context`
+folds in only when set, so a step without one keeps the tag it always had; a rebuild
+happens only when the pinned commit moves. A step that names only `dockerfile`
+builds from the workflow's `externalSkillsRepo` the same way. No build lands on
+the golden image: a step with a build source that names `mediforce-golden-image`
+builds and runs under its derived tag. With `image` alone, it must already
 exist locally or be pullable. Without either, the step fails unless
 `ALLOW_LOCAL_AGENTS=true` — a dev-only escape hatch that runs the step on the
 host with no isolation.
+
+## Build provenance
+
+The derived tag is a hash, so the image carries what the tag cannot say. Every
+build writes `mediforce.build.repo`, `.commit`, `.dockerfile`, `.workflow` and
+`.namespace`, and `.context` — written empty when the step named none, so it
+overrides a context inherited from the base image — plus `org.opencontainers.image.source` and `.revision`
+([`image-provenance.ts`](../../packages/platform-core/src/utils/image-provenance.ts),
+emitted by both the in-process and the `container-worker` builder). Overriding
+the two OCI keys is a correctness fix, not just interoperability: labels are
+inherited from the base image, so without our own values an image built on
+`rocker/tidyverse` reports *its* repository as the source.
+
+The daemon listing reads them back into the optional `build*` fields of
+`DockerImageInfoSchema`. `docker images` cannot emit labels, so this costs a
+second `docker image inspect` over the distinct ids; a failure leaves every row
+unannotated rather than failing the listing, and an image built before the
+labels existed simply carries none.
+
+A build from a carried Dockerfile writes `.workflow`, `.namespace`,
+`.dockerfile` and `.context` as the step named them, and `.artifacts` (the
+content hash) — what the Image Catalog keys a `carried` entry on — and writes
+`.repo` and `.commit` empty, as an upload does, so an image built `FROM` a repo
+build is not read back as a version of that repo.
+
+`GET /api/workflow-definitions/by-image` recomputes the derived tag for
+build-mode steps with the runtime's own `resolveStepImage`, so a
+`mediforce-built:*` or `mediforce-artifacts:*` row still names the workflows and
+steps that use it — matching only the stored `image` string would be blind to
+exactly the steps that leave it unset.
 
 ## Where the container runs
 

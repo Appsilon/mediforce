@@ -144,6 +144,32 @@ export {
   StepMcpRestrictionSchema,
   StepMcpRestrictionEntrySchema,
   ToolCatalogEntrySchema,
+  ImageCatalogSourceSchema,
+  ImageCatalogDeclaredSourceSchema,
+  ImageCatalogEntrySchema,
+  isCatalogReference,
+  ImageRuntimeSchema,
+  KnownImageCapabilitiesSchema,
+  UnknownImageCapabilitiesSchema,
+  ImageCapabilitiesSchema,
+  ImageCapabilityCacheSchema,
+  parseImageCapabilities,
+  unknownImageCapabilities,
+  imageCapabilityProbeArgs,
+  IMAGE_CAPABILITY_PROBE_TIMEOUT_MS,
+  ImageBuildStepSchema,
+  IMAGE_HISTORY_TIMEOUT_MS,
+  imageHistoryArgs,
+  imageStepDelta,
+  isImageDescendantOf,
+  ownImageLabels,
+  parseImageHistory,
+  readableBuildStepCommand,
+  resolveImageBases,
+  resolveImageLineage,
+  type ImageBuildStep,
+  type ImageLineageFacts,
+  type LayeredImage,
   buildTaskVerdicts,
   defaultVerdictIntent,
   defaultVerdictLabel,
@@ -270,6 +296,12 @@ export type {
   StepMcpRestriction,
   StepMcpRestrictionEntry,
   ToolCatalogEntry,
+  ImageCatalogSource,
+  ImageCatalogDeclaredSource,
+  ImageCatalogEntry,
+  ImageRuntime,
+  ImageCapabilities,
+  ImageCapabilityCache,
   TaskVerdict,
   Attachment,
   AssignmentItem,
@@ -348,6 +380,7 @@ export type {
   TriggerRepository,
   TriggerUpdate,
   ToolCatalogRepository,
+  ImageCatalogRepository,
   NamespaceRepository,
   NamespaceUpdates,
   NamespaceSecretsRepository,
@@ -499,7 +532,7 @@ export type {
   VersionCandidate,
   WorkflowVersionSource,
 } from './workflows/resolve-runnable-version';
-export { stepHasBuildSource } from './workflows/build-source';
+export { carriedDockerfile, stepHasBuildSource } from './workflows/build-source';
 export { resolveStepAssignee, type ResolvedStepAssignee } from './workflows/step-assignee';
 
 // MCP resolver (pure; wires AgentDefinition + step restrictions + catalog)
@@ -539,11 +572,69 @@ export { DOCKER_IMAGE_SETUP_URL, VERIFY_WORKFLOW_URL, CREATE_WORKFLOW_URL } from
 export { DEFAULT_AGENT_IMAGE } from './utils/container-defaults';
 export {
   normalizeRepoUrls,
+  githubPermalink,
   toHttpsWithToken,
   resolveRepoCloneTargets,
   redactRepoCredentials,
 } from './utils/repo-url';
 export type { RepoCloneTarget } from './utils/repo-url';
+export {
+  BUILD_LABELS,
+  OCI_LABELS,
+  IMAGE_INSPECT_FORMAT,
+  BuildImageRequestSchema,
+  BuildUploadedImageRequestSchema,
+  PullImageRequestSchema,
+  buildProvenanceLabelArgs,
+  carriedImageLabelArgs,
+  imageInspectArgs,
+  imageTagTakenMessage,
+  parseImageInspect,
+  readProvenanceLabels,
+  shortImageId,
+  uploadedImageLabelArgs,
+} from './utils/image-provenance';
+export type {
+  BuildImageRequest,
+  BuildUploadedImageRequest,
+  PullImageRequest,
+  ImageProvenance,
+  InspectedImage,
+  ReadImageProvenance,
+} from './utils/image-provenance';
+export {
+  DOCKER_REPOSITORY_PATTERN,
+  DOCKER_TAG_PATTERN,
+  PULL_IMAGE_PATTERN,
+  PULL_REFERENCE_PATTERN,
+  daemonRepositoryName,
+  isRegistryHost,
+} from './utils/image-reference';
+export {
+  BuildContextSchema,
+  buildPathsStayInRepo,
+  builtSourceLine,
+  carriedSourceLine,
+  catalogDockerfileKey,
+  imageSourceLine,
+  looksLikeDockerfile,
+  normalizeBuildContext,
+  normalizeRepoPath,
+  resolveDockerBuildPaths,
+} from './utils/docker-build-paths';
+export type { DockerBuildPaths } from './utils/docker-build-paths';
+export {
+  BUILD_CONTEXT_MAX_BYTES,
+  BUILD_CONTEXT_MEDIA_TYPE,
+  buildContextDockerfileProblem,
+  checkBuildContextArchive,
+  checkBuildContextSize,
+  listBuildContextArchive,
+  packBuildContextArchive,
+} from './utils/build-context-archive';
+export type { BuildContextArchiveEntry } from './utils/build-context-archive';
+export { buildContextFilter, dockerignoreCandidates } from './utils/dockerignore';
+export type { BuildContextFilter } from './utils/dockerignore';
 export { getWorkflowStatus, type WorkflowStatus } from './utils/workflow-status';
 export { toSlug, uniqueName, uniqueSlug } from './utils/slug';
 

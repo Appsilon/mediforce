@@ -161,6 +161,47 @@ export {
 } from './agent-mcp-binding';
 
 export {
+  ImageRuntimeSchema,
+  KnownImageCapabilitiesSchema,
+  UnknownImageCapabilitiesSchema,
+  ImageCapabilitiesSchema,
+  ImageCapabilityCacheSchema,
+  parseImageCapabilities,
+  unknownImageCapabilities,
+  imageCapabilityProbeArgs,
+  IMAGE_CAPABILITY_PROBE_TIMEOUT_MS,
+  type ImageRuntime,
+  type ImageCapabilities,
+  type ImageCapabilityCache,
+} from './image-capabilities';
+
+export {
+  ImageBuildStepSchema,
+  IMAGE_HISTORY_TIMEOUT_MS,
+  imageHistoryArgs,
+  imageStepDelta,
+  isImageDescendantOf,
+  ownImageLabels,
+  parseImageHistory,
+  readableBuildStepCommand,
+  resolveImageBases,
+  resolveImageLineage,
+  type ImageBuildStep,
+  type ImageLineageFacts,
+  type LayeredImage,
+} from './image-lineage';
+
+export {
+  ImageCatalogSourceSchema,
+  ImageCatalogDeclaredSourceSchema,
+  ImageCatalogEntrySchema,
+  type ImageCatalogSource,
+  type ImageCatalogDeclaredSource,
+  type ImageCatalogEntry,
+  isCatalogReference,
+} from './image-catalog-entry';
+
+export {
   ContainerSchema,
   WorkflowAgentConfigSchema,
   ScriptStepConfigSchema,

@@ -1,0 +1,255 @@
+'use client';
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { mediforce } from '@/lib/mediforce';
+import { queryKeys } from '@/lib/query-keys';
+import { stopRetryOn4xx } from '@/lib/retry';
+import { NICE_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
+import type {
+  ImageCatalogEntryView,
+  PublishImageCatalogVersionInput,
+  PullImageCatalogVersionInput,
+  UploadImageCatalogVersionInput,
+} from '@mediforce/platform-api/contract';
+
+/**
+ * The namespace's catalog, grouped by base and roots-first — the order the
+ * handler computed, which is the grouping the Images view renders.
+ *
+ * NICE LIVE (30 s): the stored half only changes when a member registers or
+ * edits an entry, and the derived half — versions, availability, lineage — is
+ * recomputed per read from the daemon, so a build that finishes while the page
+ * is open shows up within the cadence. An editor left open must pick that up:
+ * an image whose probe failed at registration stays offered without a
+ * suitability claim until a later probe answers.
+ *
+ * `undefined` is a namespace not resolved yet, not an error — nothing is
+ * fetched and the caller renders on the empty list.
+ */
+export function useImageCatalogEntries(namespace: string | undefined): {
+  entries: ImageCatalogEntryView[];
+  loading: boolean;
+  error: Error | null;
+} {
+  const query = useQuery({
+    queryKey: queryKeys.imageCatalog.list(namespace ?? ''),
+    queryFn: async () => (await mediforce.imageCatalog.list({ namespace: namespace ?? '' })).entries,
+    enabled: namespace !== undefined && namespace !== '',
+    staleTime: NICE_LIVE_INTERVAL_MS,
+    refetchInterval: (q) => (q.state.error !== null ? false : NICE_LIVE_INTERVAL_MS),
+    retry: stopRetryOn4xx,
+  });
+
+  return {
+    entries: query.data ?? [],
+    loading: query.isPending && namespace !== undefined && namespace !== '',
+    error: (query.error as Error | null) ?? null,
+  };
+}
+
+/**
+ * One entry, read on demand.
+ *
+ * Separate from the listing because the single-entry read is the only one that
+ * carries `lineage.addedSteps` — a `docker history` per version, which the
+ * listing cannot afford for a whole catalog. So the layer summary arrives when
+ * a reader expands the entry that needs it, and never before.
+ *
+ * NICE LIVE (30 s) while expanded, the same cadence as the listing: an expanded
+ * card renders this read in preference to the list row, so leaving it un-polled
+ * would freeze versions, availability, capabilities and lineage at the moment
+ * of expansion while the rest of the page kept moving. Collapsed, `enabled` is
+ * false and nothing is polled — and the view expands one entry at a time, so
+ * the `docker history` calls above are paid for one entry, never a catalog.
+ */
+export function useImageCatalogEntry(
+  namespace: string,
+  id: string,
+  enabled: boolean,
+): { entry: ImageCatalogEntryView | undefined; loading: boolean; error: Error | null } {
+  const query = useQuery({
+    queryKey: queryKeys.imageCatalogEntry(namespace, id),
+    queryFn: async () => (await mediforce.imageCatalog.get({ namespace, id })).entry,
+    enabled: enabled && namespace !== '',
+    staleTime: NICE_LIVE_INTERVAL_MS,
+    refetchInterval: (q) => (q.state.error !== null ? false : NICE_LIVE_INTERVAL_MS),
+    retry: stopRetryOn4xx,
+  });
+
+  return {
+    entry: query.data,
+    loading: query.isPending && enabled,
+    error: (query.error as Error | null) ?? null,
+  };
+}
+
+/**
+ * Register an entry against a source.
+ *
+ * Both callers are the same `POST`, because both are the same act. Describing
+ * a discovered entry writes the sentence for a source the platform already
+ * built from, and the id derives from that source, so the row lands at the
+ * identity the listing was already showing rather than beside it. Adding an
+ * entry by hand names a source nobody has built here yet, and gets a row with
+ * no versions until something builds one.
+ *
+ * The response is a probed view — `createImageCatalogEntry` probes capabilities
+ * in the same request — which is why this is the moment a card stops saying
+ * "not probed". No optimistic update: the probe is the point, and guessing the
+ * answer locally to correct it a second later is worse than a pending button.
+ *
+ * Once the row is stored, changing it is `useUpdateImageEntry`: a second `POST`
+ * against the same source conflicts on the id that source derives.
+ */
+export function useCatalogueImage(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; intent: string; source: ImageCatalogEntryView['source'] }) =>
+      mediforce.imageCatalog.create({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entry.id),
+      });
+    },
+  });
+}
+
+/**
+ * Change a stored entry's source, name or sentence — everything a human wrote.
+ *
+ * `source` is optional and **re-keys** the entry when it changes: the id derives
+ * from the source (ADR-0022 decision 1), so the handler writes the row at the
+ * new id and drops the old one. `data.entry.id` is therefore the id to
+ * invalidate, not the one that was sent. Everything else on the row is derived
+ * from the image on every read, so these three fields are the whole editable
+ * surface.
+ *
+ * Only for a `catalogued` entry. A `discovered` one is computed per read rather
+ * than stored, so there is no row to patch until `useCatalogueImage` writes it.
+ *
+ * The response is a re-probed view — the handler refreshes capabilities in the
+ * same request — so both reads are invalidated rather than patched locally.
+ */
+export function useUpdateImageEntry(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      name: string;
+      intent: string;
+      source?: ImageCatalogEntryView['source'];
+    }) => mediforce.imageCatalog.update({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entry.id),
+      });
+    },
+  });
+}
+
+/**
+ * Remove an entry, and — only if asked — the images behind it.
+ *
+ * Two acts under two gates, which is why `withImages` is a separate flag and
+ * not the default. Removing the entry removes an offer: no Workflow Definition
+ * references one, so nothing that runs today changes (ADR-0022 decision 3).
+ * Removing the images acts on the **deployment-wide** daemon, where a tag can
+ * back steps in namespaces the caller cannot even see, so the handler puts it
+ * behind Infrastructure's admin gate and audits it under `_system`.
+ *
+ * Both reads are invalidated rather than patched: with the entry gone the list
+ * is what says so, and if its images went too, every other entry's lineage and
+ * `unused` marks were computed against images that no longer exist.
+ */
+export function useDeleteImageEntry(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; withImages: boolean }) =>
+      mediforce.imageCatalog.delete({
+        namespace,
+        id: input.id,
+        ...(input.withImages ? { withImages: true } : {}),
+      }),
+    onSuccess: (_data, input) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, input.id),
+      });
+    },
+  });
+}
+
+/**
+ * Build one version of a built entry, without running a workflow.
+ *
+ * The request stays open for the whole build — minutes, not the sub-second the
+ * other mutations take — so the caller must keep its pending state visible
+ * rather than treating this as a click that settles. On success both reads are
+ * invalidated: the new version is on the daemon, and every version fact is
+ * recomputed per read, so an invalidate is the whole update (#1344).
+ */
+export function useBuildImageVersion(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { repo: string; commit: string; dockerfile: string; context?: string }) =>
+      mediforce.imageCatalog.build({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entryId),
+      });
+    },
+  });
+}
+
+/** Build an image from a picked folder and catalogue it (#1345). Long-running
+ *  like `useBuildImageVersion`; the first upload creates the entry, so the
+ *  list is invalidated as well. */
+export function useUploadImageVersion(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<UploadImageCatalogVersionInput, 'namespace'>) =>
+      mediforce.imageCatalog.upload({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entryId),
+      });
+    },
+  });
+}
+
+/** Publish one version of a carried entry as a referenced image of its own,
+ *  rebuilt from the workflow's files through the upload path. Long-running like
+ *  `useUploadImageVersion`, and like it the first publish creates the entry. */
+export function usePublishImageVersion(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<PublishImageCatalogVersionInput, 'namespace'>) =>
+      mediforce.imageCatalog.publish({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entryId),
+      });
+    },
+  });
+}
+
+/** Pull a registry image onto the daemon and catalogue it. Long-running like
+ *  `useUploadImageVersion`, and like it the first pull creates the entry. */
+export function usePullImageVersion(namespace: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<PullImageCatalogVersionInput, 'namespace'>) =>
+      mediforce.imageCatalog.pull({ namespace, ...input }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageCatalog.list(namespace) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.imageCatalogEntry(namespace, data.entryId),
+      });
+    },
+  });
+}

@@ -3,7 +3,7 @@
  * Requires Docker daemon running. Skipped if Docker is not available.
  * Uses local bare git repos — no network required.
  */
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   imageExistsLocally,
@@ -11,7 +11,16 @@ import {
   buildImageFromRepo,
   ensureImage,
 } from '../docker-image-builder';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import {
+  imageInspectArgs,
+  parseImageInspect,
+  readProvenanceLabels,
+} from '@mediforce/platform-core';
 import { createTestRepo, addCommitToTestRepo, type TestRepo } from './helpers/create-test-repo';
+import { artifactsBuildHash, materializeArtifacts } from '../workflow-artifacts';
 
 function dockerAvailable(): boolean {
   try {
@@ -66,6 +75,47 @@ describe.skipIf(!dockerAvailable())('docker-image-builder integration', () => {
 
     const buildCommit = await getImageBuildCommit(image);
     expect(buildCommit).toBe(repo.commitSha);
+  }, 60_000);
+
+  it('labels a built image with provenance the listing can read back', async () => {
+    const image = testImageName('provenance');
+
+    await buildImageFromRepo({
+      image,
+      repoUrl: repo.repoPath,
+      commit: repo.commitSha,
+      // Named explicitly: a step that omits it gets no `dockerfile` label at
+      // all, because the builders label what `deriveBuildTag` hashed. This
+      // case is here to prove all five labels survive a real daemon.
+      dockerfile: 'Dockerfile',
+      workflow: 'sdtm-mapping',
+      namespace: 'acme',
+    });
+
+    // An image with no labels at all — the shape a `postgres` row has on a real
+    // daemon, and the one a Go template that dots into `.Config.Labels` trips on.
+    const unlabelled = testImageName('unlabelled');
+    const contextDir = mkdtempSync(join(tmpdir(), 'mediforce-test-unlabelled-'));
+    writeFileSync(join(contextDir, 'Dockerfile'), 'FROM alpine:3.21\n');
+    execFileSync('docker', ['build', '-t', unlabelled, contextDir], { stdio: 'pipe' });
+    rmSync(contextDir, { recursive: true, force: true });
+
+    // Same call the daemon listing makes, over both images at once: tripping on
+    // the unlabelled one would strip the provenance off the labelled one too.
+    const stdout = execFileSync(
+      'docker',
+      imageInspectArgs([image, unlabelled]),
+      { stdio: 'pipe' },
+    ).toString();
+
+    const inspected = [...parseImageInspect(stdout).values()];
+    expect(inspected.map((entry) => readProvenanceLabels(entry.labels))).toContainEqual({
+      buildRepo: repo.repoPath,
+      buildCommit: repo.commitSha,
+      buildDockerfile: 'Dockerfile',
+      buildWorkflow: 'sdtm-mapping',
+      buildNamespace: 'acme',
+    });
   }, 60_000);
 
   it('ensureImage skips rebuild when commit matches', async () => {
@@ -185,4 +235,24 @@ describe.skipIf(!dockerAvailable())('docker-image-builder integration', () => {
       ensureImage({ image: 'mediforce-nonexistent-image-xyz' }),
     ).rejects.toThrow(/not found locally.*no repo\+commit/i);
   });
+
+  it('rebuilds a tag the step named once a file its carried Dockerfile copies is edited', async () => {
+    const image = testImageName('carried-pinned');
+    const dockerfile = { path: 'container/Dockerfile', contents: 'FROM alpine:3.21\nCOPY scripts/greet.sh /greet.sh\n' };
+    const ensureFrom = async (greeting: string): Promise<string> => {
+      const artifacts = [dockerfile, { path: 'scripts/greet.sh', contents: `echo ${greeting}\n` }];
+      const contextDir = await materializeArtifacts(artifacts);
+      if (contextDir === null) throw new Error('artifacts were not materialized');
+      await ensureImage({
+        image,
+        contextDir,
+        dockerfile: dockerfile.path,
+        artifactsHash: artifactsBuildHash(artifacts, { dockerfile: dockerfile.path }),
+      });
+      return execFileSync('docker', ['run', '--rm', image, 'cat', '/greet.sh']).toString();
+    };
+
+    expect(await ensureFrom('first')).toBe('echo first\n');
+    expect(await ensureFrom('second')).toBe('echo second\n');
+  }, 120_000);
 });

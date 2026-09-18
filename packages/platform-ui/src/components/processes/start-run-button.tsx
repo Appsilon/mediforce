@@ -125,7 +125,7 @@ export function StartRunButton({
   const buildsItsOwnImage = (effectiveDefinition?.steps ?? []).some((step) => {
     if (step.executor !== 'agent' && step.executor !== 'script') return false;
     const config = step.executor === 'script' ? step.script : step.agent;
-    return stepHasBuildSource(config, effectiveDefinition?.artifacts);
+    return stepHasBuildSource(config, effectiveDefinition ?? undefined);
   });
 
   const hasContext = secretKeysCtx !== null;
@@ -421,6 +421,10 @@ export function StartRunButton({
                   <WarningGroup
                     title="Unknown models"
                     warnings={warnings.filter((w) => w.category === 'unknown-model')}
+                  />
+                  <WarningGroup
+                    title="Ambiguous image"
+                    warnings={warnings.filter((w) => w.category === 'image-and-dockerfile')}
                   />
                 </div>
               </>

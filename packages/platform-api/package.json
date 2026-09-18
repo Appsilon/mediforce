@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@mediforce/agent-runtime": "workspace:*",
+    "@mediforce/container-worker": "workspace:*",
     "@mediforce/core-actions": "workspace:*",
     "@mediforce/mcp-client": "workspace:*",
     "@mediforce/platform-core": "workspace:*",

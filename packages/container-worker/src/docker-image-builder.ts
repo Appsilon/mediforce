@@ -4,14 +4,31 @@
  * Lightweight copy of agent-runtime/plugins/docker-image-builder.ts.
  * Duplicated to avoid pulling agent-runtime into container-worker.
  */
-import { execFileSync, execSync } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { chmodSync, copyFileSync, existsSync, mkdtempSync, statSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { chmodSync, copyFileSync, existsSync, mkdtempSync, realpathSync, statSync } from 'node:fs';
+import { join, sep } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
-import { redactRepoCredentials, resolveRepoCloneTargets } from '@mediforce/platform-core';
+import { Transform, type Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { promisify } from 'node:util';
+import {
+  BUILD_CONTEXT_MAX_BYTES,
+  BUILD_LABELS,
+  buildProvenanceLabelArgs,
+  carriedImageLabelArgs,
+  imageTagTakenMessage,
+  normalizeRepoPath,
+  redactRepoCredentials,
+  resolveDockerBuildPaths,
+  resolveRepoCloneTargets,
+  uploadedImageLabelArgs,
+  type BuildUploadedImageRequest,
+  type DockerBuildPaths,
+} from '@mediforce/platform-core';
 
-const BUILD_COMMIT_LABEL = 'mediforce.build.commit';
+const BUILD_COMMIT_LABEL = BUILD_LABELS.commit;
 
 let preparedDeployKeyPath: string | null = null;
 
@@ -39,9 +56,11 @@ function getGitSshCommand(): string {
   return `ssh -i ${prepareDeployKeyPath()} -o StrictHostKeyChecking=no -o IdentitiesOnly=yes`;
 }
 
+// argv form, not a shell string: a step may name its own image, and that name
+// is workflow config.
 export async function imageExistsLocally(image: string): Promise<boolean> {
   try {
-    execSync(`docker image inspect "${image}"`, { stdio: 'pipe' });
+    execFileSync('docker', ['image', 'inspect', image], { stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -49,9 +68,14 @@ export async function imageExistsLocally(image: string): Promise<boolean> {
 }
 
 export async function getImageBuildCommit(image: string): Promise<string | null> {
+  return getImageBuildLabel(image, BUILD_COMMIT_LABEL);
+}
+
+async function getImageBuildLabel(image: string, key: string): Promise<string | null> {
   try {
-    const output = execSync(
-      `docker inspect --format '{{index .Config.Labels "${BUILD_COMMIT_LABEL}"}}' "${image}"`,
+    const output = execFileSync(
+      'docker',
+      ['inspect', '--format', `{{index .Config.Labels "${key}"}}`, image],
       { stdio: 'pipe' },
     ).toString().trim();
     return output.length > 0 ? output : null;
@@ -109,6 +133,29 @@ function cloneRepoAtCommit(
   );
 }
 
+/**
+ * Refuse a build path the checkout resolves outside the clone. Keep in sync
+ * with the copy in `packages/agent-runtime/src/plugins/docker-image-builder.ts`.
+ * `resolveDockerBuildPaths` already refused `..` in the strings; this catches a
+ * symlink committed to the repo, which `docker build` follows — a context of
+ * `ctx -> /` would otherwise send the build host's filesystem, deploy key
+ * included, to the daemon and into an image.
+ */
+export function assertInsideClone(cloneDir: string, relativePath: string): void {
+  const root = realpathSync(cloneDir);
+  let resolved: string;
+  try {
+    resolved = realpathSync(join(cloneDir, relativePath));
+  } catch {
+    // Missing: there is nothing to escape through, and `docker build` names
+    // the missing path itself.
+    return;
+  }
+  if (resolved !== root && resolved.startsWith(`${root}${sep}`) === false) {
+    throw new Error(`Build path "${relativePath}" resolves outside the repository.`);
+  }
+}
+
 export async function buildImageFromRepo(options: {
   image: string;
   repoUrl: string;
@@ -116,46 +163,222 @@ export async function buildImageFromRepo(options: {
   repoRef?: string;
   commit: string;
   dockerfile?: string;
+  /** Build context from the repo root; `dockerfile` is then read from it. */
+  context?: string;
   repoToken?: string;
+  /** Workflow definition whose step triggered this build. Recorded as a label. */
+  workflow?: string;
+  /** Namespace owning that definition. Recorded as a label. */
+  namespace?: string;
 }): Promise<void> {
-  const { image, repoUrl, commit, dockerfile = 'Dockerfile', repoToken } = options;
+  const { image, repoUrl, commit, context, repoToken, workflow, namespace } = options;
+  // Resolved for `-f` and the context; the labels keep the inputs as named,
+  // which is what `deriveBuildTag` hashed (see `resolveDockerBuildPaths`).
+  const paths = resolveDockerBuildPaths(options.dockerfile, context);
   const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-build-'));
 
   try {
     cloneRepoAtCommit(buildDir, options.repoRef ?? repoUrl, commit, repoToken);
-
-    const dockerfilePath = join(buildDir, dockerfile);
-    const buildContext = dirname(dockerfilePath);
     console.log(`[docker-image-builder] Building image "${image}" from ${repoUrl}@${commit.slice(0, 8)}`);
-    execSync(
-      `docker build -t "${image}" --label "${BUILD_COMMIT_LABEL}=${commit}" -f "${dockerfilePath}" "${buildContext}"`,
-      { stdio: 'pipe' },
+    buildDirectory(
+      buildDir,
+      paths,
+      image,
+      buildProvenanceLabelArgs({ repoUrl, commit, dockerfile: options.dockerfile ?? '', context, workflow, namespace, repoToken }),
     );
-    console.log(`[docker-image-builder] Image "${image}" built successfully`);
   } finally {
     await rm(buildDir, { recursive: true, force: true });
   }
 }
 
 /**
- * Build from a directory that is already on the host, with the whole directory
- * as the context so `COPY scripts/ /scripts/` from a `container/Dockerfile`
- * behaves as it does in a repository. Mirrors
- * `buildImageFromDirectory` in agent-runtime.
+ * Build from the files a workflow carries, already on the host. `dockerfile` is
+ * a path from the root of those files and the context is always all of them, so
+ * `COPY scripts/ /scripts/` from a `container/Dockerfile` works (`carriedDockerfile`).
+ * Mirrors `buildImageFromDirectory` in agent-runtime.
  */
 export async function buildImageFromDirectory(options: {
   image: string;
   contextDir: string;
   dockerfile?: string;
+  artifactsHash?: string;
+  workflow?: string;
+  namespace?: string;
 }): Promise<void> {
-  const { image, contextDir, dockerfile = 'Dockerfile' } = options;
-  const dockerfilePath = join(contextDir, dockerfile);
+  const { image, contextDir, dockerfile = 'Dockerfile', artifactsHash, workflow, namespace } = options;
+  const dockerfilePath = normalizeRepoPath(dockerfile);
+  if (dockerfilePath === null || dockerfilePath === '') {
+    throw new Error(`Dockerfile "${dockerfile}" is outside the workflow's files.`);
+  }
   console.log(`[docker-image-builder] Building image "${image}" from ${contextDir}`);
-  execSync(
-    `docker build -t "${image}" -f "${dockerfilePath}" "${contextDir}"`,
+  // argv form, not a shell string: the label values carry a workflow name and
+  // a namespace, neither of which is safe to interpolate.
+  execFileSync(
+    'docker',
+    [
+      'build',
+      '-t', image,
+      ...carriedImageLabelArgs({ artifactsHash: artifactsHash ?? '', dockerfile, workflow, namespace }),
+      '-f', join(contextDir, dockerfilePath),
+      contextDir,
+    ],
     { stdio: 'pipe' },
   );
   console.log(`[docker-image-builder] Image "${image}" built successfully`);
+}
+
+/**
+ * `docker build` of a context already on disk — a checkout or an extracted
+ * upload. Refuses a path reached through a symlink first, then builds.
+ */
+function buildDirectory(buildDir: string, paths: DockerBuildPaths, image: string, labelArgs: string[]): void {
+  assertInsideClone(buildDir, paths.context);
+  assertInsideClone(buildDir, paths.dockerfile);
+  // argv form, not a shell string: the label values carry a repo URL, a
+  // workflow name and a namespace, none of which are safe to interpolate.
+  execFileSync(
+    'docker',
+    ['build', '-t', image, ...labelArgs, '-f', join(buildDir, paths.dockerfile), join(buildDir, paths.context)],
+    { stdio: 'pipe' },
+  );
+  console.log(`[docker-image-builder] Image "${image}" built successfully`);
+}
+
+/** An uploaded context over the size limit. The platform refuses one before
+ *  it gets here; the worker counts again for a caller that skipped it. */
+export class BuildContextTooLargeError extends Error {
+  constructor(maxBytes: number) {
+    super(`The uploaded build context is over the ${String(maxBytes)}-byte limit.`);
+    this.name = 'BuildContextTooLargeError';
+  }
+}
+
+function limitBytes(maxBytes: number): Transform {
+  let seen = 0;
+  return new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      seen += chunk.length;
+      callback(seen > maxBytes ? new BuildContextTooLargeError(maxBytes) : null, chunk);
+    },
+  });
+}
+
+/** Unpack an uploaded context with the host's own `tar` — the second line of
+ *  defence after `checkBuildContextArchive`, `assertInsideClone` the third. */
+async function extractArchive(archive: Readable, targetDir: string, maxBytes: number): Promise<void> {
+  const child = spawn('tar', ['-x', '--no-same-owner', '-f', '-', '-C', targetDir], {
+    stdio: ['pipe', 'ignore', 'pipe'],
+  });
+  const stderr: Buffer[] = [];
+  child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+  const exited = new Promise<number | null>((resolve, reject) => {
+    child.on('error', reject);
+    child.on('close', resolve);
+  });
+
+  // Both settle before either is judged: `tar` giving up mid-stream breaks the
+  // pipe, and its own message is the one worth reporting — unless the stream
+  // was cut for size, which is what made `tar` give up.
+  const [piped, exitCode] = await Promise.allSettled([pipeline(archive, limitBytes(maxBytes), child.stdin), exited]);
+  if (piped.status === 'rejected' && piped.reason instanceof BuildContextTooLargeError) throw piped.reason;
+  if (exitCode.status === 'rejected' || exitCode.value !== 0) {
+    const reason = Buffer.concat(stderr).toString('utf8').trim();
+    throw new Error(`Could not unpack the uploaded build context${reason === '' ? '.' : `: ${reason}`}`);
+  }
+  if (piped.status === 'rejected') throw piped.reason;
+}
+
+/** An upload or a pull aimed at a tag the daemon already has. */
+export class ImageTagTakenError extends Error {
+  constructor(image: string, act: 'upload' | 'pull') {
+    super(imageTagTakenMessage(image, act));
+    this.name = 'ImageTagTakenError';
+  }
+}
+
+/** Whether the daemon has `image`. A daemon that cannot answer throws: it
+ *  cannot promise the tag is free. */
+function daemonHasImage(image: string): boolean {
+  try {
+    execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', image], { stdio: 'pipe' });
+    return true;
+  } catch (error) {
+    const stderr = error instanceof Error && 'stderr' in error ? String(error.stderr) : '';
+    if (/no such image/i.test(stderr)) return false;
+    throw error;
+  }
+}
+
+/**
+ * Build an uploaded context (#1345): extracted, not piped to `docker build -`,
+ * and built under a throwaway tag that is moved onto `request.image` only if
+ * that tag is still free once the build is done (ADR-0022).
+ */
+export async function buildImageFromUpload(
+  request: BuildUploadedImageRequest,
+  archive: Readable,
+  maxBytes: number = BUILD_CONTEXT_MAX_BYTES,
+): Promise<void> {
+  const paths = resolveDockerBuildPaths(request.dockerfile, '.');
+  const staging = `mediforce-upload-staging:${randomUUID()}`;
+  const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-upload-'));
+
+  try {
+    await extractArchive(archive, buildDir, maxBytes);
+    console.log(`[docker-image-builder] Building image "${request.image}" from an uploaded context`);
+    buildDirectory(buildDir, paths, staging, uploadedImageLabelArgs(request.namespace));
+  } finally {
+    await rm(buildDir, { recursive: true, force: true });
+  }
+
+  try {
+    if (daemonHasImage(request.image)) throw new ImageTagTakenError(request.image, 'upload');
+    execFileSync('docker', ['tag', staging, request.image], { stdio: 'pipe' });
+  } finally {
+    removeStagingTag(staging);
+  }
+}
+
+/** A pull downloads whole images, so it is bounded as widely as a build. */
+const IMAGE_PULL_TIMEOUT_MS = 30 * 60 * 1000;
+/** `docker pull` prints a progress line per layer; a large image outgrows the
+ *  1 MiB default before it fails. */
+const IMAGE_PULL_OUTPUT_MAX_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Pull a registry image onto the daemon (ADR-0022).
+ *
+ * `docker pull` writes the tag directly — there is no staging tag to move the
+ * way an upload has — so the tag is checked right before pulling. Asynchronous,
+ * unlike the builds: a pull is mostly waiting on the network, and blocking the
+ * worker's event loop for that long would stall every other route.
+ */
+export async function pullImage(image: string): Promise<void> {
+  if (daemonHasImage(image)) throw new ImageTagTakenError(image, 'pull');
+  console.log(`[docker-image-builder] Pulling image "${image}"`);
+  try {
+    // `--` as well as the schema's pattern: an image is never read as a flag.
+    await promisify(execFile)('docker', ['pull', '--', image], {
+      timeout: IMAGE_PULL_TIMEOUT_MS,
+      maxBuffer: IMAGE_PULL_OUTPUT_MAX_BYTES,
+    });
+  } catch (error) {
+    if (error instanceof Error && 'killed' in error && error.killed === true) {
+      throw new Error(`Pulling "${image}" did not finish within ${String(IMAGE_PULL_TIMEOUT_MS / 60_000)} minutes.`);
+    }
+    const stderr = error instanceof Error && 'stderr' in error ? String(error.stderr).trim() : '';
+    throw new Error(stderr === '' ? `Could not pull "${image}".` : stderr);
+  }
+}
+
+/** Only the tag goes: once retagged, the image itself stays. A failure is
+ *  logged, never thrown over the error that brought the build here. */
+function removeStagingTag(staging: string): void {
+  try {
+    execFileSync('docker', ['image', 'rm', staging], { stdio: 'pipe' });
+  } catch (error) {
+    console.warn(`[docker-image-builder] Could not remove "${staging}":`, error);
+  }
 }
 
 export async function ensureImage(options: {
@@ -164,19 +387,27 @@ export async function ensureImage(options: {
   repoRef?: string;
   commit?: string;
   dockerfile?: string;
+  context?: string;
   repoToken?: string;
   contextDir?: string;
+  artifactsHash?: string;
+  workflow?: string;
+  namespace?: string;
 }): Promise<void> {
-  const { image, repoUrl, repoRef, commit, dockerfile, repoToken, contextDir } = options;
+  const { image, repoUrl, repoRef, commit, dockerfile, context, repoToken, contextDir, artifactsHash, workflow, namespace } = options;
 
-  // The tag is derived from the content of the files in the directory, so an
-  // image that exists under it was built from exactly them.
+  // A tag the step named says nothing about the files, so an existing image is
+  // reused only when its label says it was built from these ones. A job queued
+  // without a hash has nothing to compare, and reuses what is there.
   if (contextDir !== undefined) {
     if (await imageExistsLocally(image)) {
-      console.log(`[docker-image-builder] Image "${image}" already built from these files`);
-      return;
+      if (artifactsHash === undefined || (await getImageBuildLabel(image, BUILD_LABELS.artifacts)) === artifactsHash) {
+        console.log(`[docker-image-builder] Image "${image}" already built from these files`);
+        return;
+      }
+      console.log(`[docker-image-builder] Image "${image}" built from other files, rebuilding`);
     }
-    await buildImageFromDirectory({ image, contextDir, dockerfile });
+    await buildImageFromDirectory({ image, contextDir, dockerfile, artifactsHash, workflow, namespace });
     return;
   }
 
@@ -198,5 +429,5 @@ export async function ensureImage(options: {
     console.log(`[docker-image-builder] Image "${image}" stale (${currentCommit?.slice(0, 8)} → ${commit.slice(0, 8)}), rebuilding`);
   }
 
-  await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, repoToken });
+  await buildImageFromRepo({ image, repoUrl, repoRef, commit, dockerfile, context, repoToken, workflow, namespace });
 }

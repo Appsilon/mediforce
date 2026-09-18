@@ -28,7 +28,7 @@ Deployment is in play.
 
 **Namespace** *(canonical domain term; Workspace is the UI/storage term per ADR-0001)*:
 An isolated scope of work inside a Deployment. Owns workflow definitions,
-workflow runs, agents, OAuth providers, secrets, tool catalog,
+workflow runs, agents, OAuth providers, secrets, tool catalog, image catalog,
 cowork sessions. Identified by a URL-safe `handle`. Two types: `personal`
 (auto-created per user, linked via `linkedUserId`) and `organization`
 (multi-member, shared — e.g. a department inside the customer tenant).
@@ -240,6 +240,80 @@ per-step via Step MCP Restriction (subtractive).
 Admin-curated stdio MCP server definition that agents reference by `catalogId`
 (prevents inline RCE). Namespace-scoped.
 
+**Image Catalog**:
+The per-namespace set of Image Catalog Entries — the curated shelf of container
+images the platform offers for Steps. Sibling of the Tool Catalog, not nested
+inside it: building an image makes it runnable, cataloguing it makes it
+selectable ([ADR-0022](docs/adr/0022-image-catalog.md)). Curating an image never
+restricts one — a Step may still name any image string.
+
+**Image Catalog Entry**:
+One image the platform offers, identified by its **source**: `built`
+`(repo, dockerfile)`, `referenced` (an untagged image reference — also what an
+image built from an **uploaded build context** lands in, named
+`<workspace>/<name>`, and what an image **pulled from a registry** lands in,
+since the platform keeps none of their inputs), or `carried`
+`(workflow, dockerfile)` for a Dockerfile a Workflow Definition carries in its
+files. Deliberately
+**not** keyed on the commit, so a rebuild is another **Version** of a row the
+author already chose rather than a new row — nor on the **build context** a
+`built` source may name, which is how the Dockerfile is built rather than which
+Dockerfile it is. Every fact on it is derived from the Docker daemon; the one
+thing a human writes is its **Intent**. Any Workspace member may create and edit
+one — an entry executes nothing; deleting one takes its images with it and needs
+Workspace admin.
+
+**Discovered Entry** *(of an Image Catalog)*:
+An Image Catalog Entry the platform derived from an image this namespace built
+and nobody has described yet — keyed on the `(repo, dockerfile)` or, for a
+carried Dockerfile, the `(workflow, dockerfile)` the build labelled, carrying every derived fact and an empty **Intent**. Not a stored row:
+it is recomputed from the daemon on every read, and describing it is what
+registers it, at the same id ([ADR-0022](docs/adr/0022-image-catalog.md)
+decision 7). A **Catalogued Entry** is the opposite — one somebody wrote a
+sentence for. The only difference in what the platform derives is where the
+probe result is kept: a memo in the API process rather than a stored column.
+
+**Version** *(of an Image Catalog Entry)*:
+One built artifact of an entry's source: a commit for a `built` entry, a tag for
+a `referenced` one, a content hash for a `carried` one, carrying the image tag that names it on the daemon. Versions
+are derived on read from the daemon's build labels, never stored.
+
+**Capability** *(of an Image Catalog Version)*:
+The derived set of `claude`, `opencode`, `bash`, `python3`, `Rscript`, and
+`node` binaries that a bounded, network-isolated probe found. It is cached by
+daemon image ID when the entry is registered, so rendering a catalog or picker
+never starts a container. A **Discovered Entry** has no row to cache into, so
+its probe results are memoised in the API process by image id instead — filled
+on the same single-entry read, lost on restart, never a stored fact. A Version is **agent-capable** only when it has
+`bash` and either agent CLI; an unavailable daemon or timed-out probe is
+explicitly `unknown`, which remains selectable without a suitability claim.
+
+**Lineage** *(of an Image Catalog Version)*:
+The ancestry relation between images, computed from `RootFS.Layers` prefix
+containment — image X descends from image P exactly when X's layer array starts
+with the whole of P's — never parsed from a `FROM` string, so it holds for
+images the platform did not build. Recomputed on every read; nothing about it
+is stored.
+
+**Base** *(of an Image Catalog Entry or Version)*:
+The nearest ancestor **in the same namespace's catalog**, or `none` for a root.
+Nearest, not the root of the tree: an image built on one that is itself
+catalogued names the closer of the two, and the catalog view groups entries
+under it, roots first. Nothing is special-cased — an entry for `python3.12-slim`
+collects everything built on it exactly as the golden image collects the
+workflow images. A **layer summary** is the steps a Version adds over its base,
+cut at that boundary and read off `docker history` with build-arg values
+redacted; it is never "the Dockerfile" — no file contents, no comments, no
+multi-stage.
+
+**Intent** *(of an Image Catalog Entry)*:
+The single required human sentence: what the image is *for* — "R-based
+interactive exploration of ADaM datasets". Not a description of its contents;
+contents go stale on the next pin bump, intent does not. Required on every
+stored entry, and empty on exactly one thing: a **Discovered Entry**, which no
+build can write it for.
+Labelled **Description** in the Images view.
+
 ### Identity / auth
 
 **User**:
@@ -426,7 +500,7 @@ the user-facing immutable log.
 - A **Deployment** contains many **Namespaces**.
 - A **Namespace** owns its **Workflows** (with their **Workflow Definitions**),
   **Workflow Runs**, **Agents**, **OAuth Providers**, **Secrets**,
-  **Tool Catalog**.
+  **Tool Catalog**, **Image Catalog**.
 - A **Workflow** has many versioned **Workflow Definitions**; its `visibility`
   controls cross-Namespace read access.
 - A **Workflow Run** belongs to exactly one **Workflow Definition**
