@@ -5,11 +5,15 @@
  */
 import { Worker } from 'bullmq';
 import { getRedisConnection } from './connection';
-import { QUEUE_NAME } from './schemas';
+import { DockerJobDataSchema, QUEUE_NAME } from './schemas';
+import { offloadOutputFiles, restoreInputFiles } from './file-payload-store';
 import { startHttpServer } from './http-server';
 import { processDockerJob } from './job-processor';
 
 const connection = getRedisConnection();
+// The caller reads output files the moment the job completes and then deletes
+// them; this only bounds a caller that died while waiting.
+const OUTPUT_FILES_TTL_SECONDS = 3600;
 
 const worker = new Worker(
   QUEUE_NAME,
@@ -17,7 +21,11 @@ const worker = new Worker(
     const label = `${job.data.processInstanceId}/${job.data.stepId}`;
     console.log(`[worker] Processing job ${job.id} (${label})`);
 
-    const result = await processDockerJob(job.data);
+    if (job.id === undefined) throw new Error(`Job for ${label} has no id`);
+    const client = await worker.client;
+    const data = DockerJobDataSchema.parse(job.data);
+    const processed = await processDockerJob(await restoreInputFiles(client, data));
+    const result = await offloadOutputFiles(client, job.id, data, processed, OUTPUT_FILES_TTL_SECONDS);
 
     const exitInfo = result.signal
       ? `signal ${result.signal}`

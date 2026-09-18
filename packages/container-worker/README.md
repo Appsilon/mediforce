@@ -82,6 +82,15 @@ daemon in those milliseconds could. It counts the body as it unpacks and
 answers **413** (`BuildContextTooLargeError`) past the 100 MiB limit, for a
 caller that skipped the platform's own check.
 
+**Workspace files never ride inside a job.** A remote caller's files are base64
+and can run to many MB. BullMQ keeps job data in the job hash and a return value
+in both the hash and the `completed` event, retained by count (and the events
+stream trimmed by entry count, not bytes), so files there filled a 256 MiB Redis.
+`src/file-payload-store.ts` moves them to their own keys: the caller deletes them
+once the job settles, a TTL covers a caller that died. Keep new large fields out
+of job data and results the same way. Retention in `src/queue-client.ts` stays
+small anyway, since stdout/stderr still sit in every return value.
+
 ## Testing
 
 Vitest covers the pieces with real logic — job processing, image builds,
