@@ -11,7 +11,8 @@ import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepo
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { createLineStreamReader, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
+import { createLineStreamReader, formatAgentLogLine, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
+import type { AgentLogFormat } from '@mediforce/platform-core';
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
  *  but the agent context carries no OAuth token entry for that server. The
@@ -339,12 +340,10 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *  Expected format: JSON object with a `result` field containing the agent's output string. */
   abstract parseAgentOutput(rawStdout: string): string;
 
-  /** Process a single stdout line for activity logging.
-   *  Return JSONL strings to append to the log file.
-   *  Default: no-op (no streaming log support). */
-  protected processOutputLine(_line: string): string[] {
-    return [];
-  }
+  /** Shape of this agent's stdout, so whichever process is watching the
+   *  container can write activity-log entries as the lines arrive. Default:
+   *  'none' (this agent streams nothing a reader of the log wants). */
+  protected readonly logFormat: AgentLogFormat = 'none';
 
   /** Extract a human-readable error detail from the final result/output.
    *  Default: null (no error extraction). */
@@ -1418,7 +1417,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         rawLines.push(trimmed);
 
         if (logFile) {
-          const logEntries = this.processOutputLine(trimmed);
+          const logEntries = formatAgentLogLine(this.logFormat, trimmed);
           if (logEntries.length > 0) {
             appendFile(logFile, logEntries.join('\n') + '\n').catch(() => {});
           }
@@ -1625,27 +1624,16 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       outputDir,
       logFile,
       imageBuild,
-      // Pass lineProcessor so LocalDockerSpawnStrategy writes JSONL entries in real-time.
-      // QueuedDockerSpawnStrategy ignores this (can't pass functions through Redis).
-      lineProcessor: (line) => this.processOutputLine(line),
+      lineFormat: this.logFormat,
     });
 
-    // Build rawLines for parseAgentOutput. For LocalDockerSpawnStrategy the log file was
-    // already written in real-time via lineProcessor; for QueuedDockerSpawnStrategy we
-    // do a batch write here since the worker cannot use the callback.
-    const isQueuedStrategy = Boolean(process.env.REDIS_URL);
+    // The log file is written live by whichever process watched the container
+    // (this one locally, the worker on the queued path), so nothing is appended
+    // here. These lines are only for parseAgentOutput.
     const rawLines: string[] = [];
     for (const line of spawnResult.stdout.split('\n')) {
       const trimmed = line.trim();
-      if (!trimmed) continue;
-      rawLines.push(trimmed);
-
-      if (logFile && isQueuedStrategy) {
-        const logEntries = this.processOutputLine(trimmed);
-        if (logEntries.length > 0) {
-          await appendFile(logFile, logEntries.join('\n') + '\n');
-        }
-      }
+      if (trimmed) rawLines.push(trimmed);
     }
 
     const rawStdout = rawLines.join('\n');

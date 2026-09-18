@@ -91,6 +91,13 @@ once the job settles, a TTL covers a caller that died. Keep new large fields out
 of job data and results the same way. Retention in `src/queue-client.ts` stays
 small anyway, since stdout/stderr still sit in every return value.
 
+**Nothing in a job payload can be a function.** The job crosses Redis as JSON.
+Behaviour the worker needs travels as a name it can resolve against a shared
+module — `lineFormat` picks a `formatAgentLogLine` formatter from `platform-core`
+— never as a callback. A dropped callback here is silent: the worker is the only
+process watching a running container, so the step's log simply stays empty until
+the job ends.
+
 ## Testing
 
 Vitest covers the pieces with real logic — job processing, image builds,
