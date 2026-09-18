@@ -1,5 +1,5 @@
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
-import { type WorkflowDefinition, carriedDockerfile, isCatalogReference, normaliseModelId, stepHasBuildSource, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
+import { type WorkflowDefinition, carriedDockerfile, isCatalogReference, normaliseModelId, splitImageRef, stepHasBuildSource, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
 
 export interface PreflightAction {
   label: string;
@@ -162,8 +162,10 @@ export function runPreflightChecks(
         typeof image === 'string' && image.length > 0 &&
         stepHasBuildSource(containerConfig, definition) === false
       ) {
-        const [repo, tag = 'latest'] = image.split(':');
-        const found = options.dockerImages.some((img) => img.repository === repo && img.tag === tag);
+        const { repository, tag } = splitImageRef(image);
+        const found = options.dockerImages.some(
+          (img) => img.repository === repository && img.tag === tag,
+        );
         if (!found) {
           const existing = imageMap.get(image);
           if (existing) { existing.push(step.name); }

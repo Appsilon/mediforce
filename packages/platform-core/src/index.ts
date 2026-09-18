@@ -615,6 +615,8 @@ export {
   PULL_REFERENCE_PATTERN,
   daemonRepositoryName,
   isRegistryHost,
+  normalizeImageRef,
+  splitImageRef,
   untaggedReference,
 } from './utils/image-reference';
 export {

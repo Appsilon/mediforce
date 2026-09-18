@@ -792,6 +792,98 @@ test.describe('image catalog API journey', () => {
     }
   });
 
+  /**
+   * Admin -> Infrastructure's own delete, not the catalog's (#1375).
+   *
+   * Here rather than in a journey of its own because it destroys images on the
+   * same deployment-wide daemon every test in this file reads, and one worker
+   * running them in order is what keeps them from starving each other.
+   */
+  test('the infrastructure delete refuses an image a live version still runs on', async ({
+    request,
+  }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    const stamp = Date.now();
+    const tag = `mediforce-e2e-infra-rmi-${stamp}:v1`;
+    const workflowName = `e2e-infra-pin-${stamp}`;
+
+    try {
+      docker('image', 'inspect', PROBE_BASE_IMAGE);
+    } catch {
+      docker('pull', PROBE_BASE_IMAGE);
+    }
+    deriveImage(tag, PROBE_BASE_IMAGE, 'mkdir /e2e-infra-marker');
+
+    const rmi = (headers: Record<string, string>) =>
+      request.delete('/api/admin/docker-images', { headers, data: { imageId: tag } });
+
+    try {
+      const workflowRes = await request.post(
+        `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
+        {
+          headers: apiKeyHeaders(),
+          data: {
+            name: workflowName,
+            title: `E2E Infra Pin ${stamp}`,
+            steps: [
+              {
+                id: 'analyse',
+                name: 'Analyse',
+                type: 'creation',
+                executor: 'agent',
+                autonomyLevel: 'L2',
+                agent: { image: tag },
+              },
+              { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+            ],
+            transitions: [{ from: 'analyse', to: 'done' }],
+          },
+        },
+      );
+      expect(workflowRes.status(), await workflowRes.text()).toBe(201);
+
+      // The outsider owns their personal workspace and nothing else, which is
+      // all the endpoint's own gate asks for — so before this check they could
+      // destroy an image every step in `test` runs on.
+      const outsiderRes = await rmi(sessionCookieHeaders(callers.outsider));
+      expect(outsiderRes.status(), await outsiderRes.text()).toBe(409);
+      const outsiderBody = await outsiderRes.text();
+      // Blocked and told why, without being told whose private workflow it is.
+      expect(outsiderBody).not.toContain(workflowName);
+      expect(outsiderBody).toContain('cannot see');
+      docker('image', 'inspect', tag);
+
+      // A caller who may read the workflow gets it named, so the refusal is
+      // actionable rather than a bare no.
+      const namedRes = await rmi(apiKeyHeaders());
+      expect(namedRes.status(), await namedRes.text()).toBe(409);
+      expect(await namedRes.text()).toContain(`${TEST_ORG_HANDLE}/${workflowName} v1 (analyse)`);
+      docker('image', 'inspect', tag);
+
+      // Archived, so no run starts from it any more: an image nothing live
+      // pins is reclaimable, which is the whole point of the `live` test.
+      const archived = await request.post(
+        `/api/workflow-definitions/${workflowName}/versions/1/archive?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders(), data: { archived: true } },
+      );
+      expect(archived.ok(), await archived.text()).toBe(true);
+
+      const allowed = await rmi(apiKeyHeaders());
+      expect(allowed.ok(), await allowed.text()).toBe(true);
+      expect(() => docker('image', 'inspect', tag)).toThrow();
+    } finally {
+      await request.delete(
+        `/api/workflow-definitions/${workflowName}?namespace=${TEST_ORG_HANDLE}`,
+        { headers: apiKeyHeaders() },
+      );
+      try {
+        docker('rmi', '-f', tag);
+      } catch {
+        /* the delete under test removed it */
+      }
+    }
+  });
+
   test('deleting with the images removes them from the daemon', async ({ request }) => {
     test.skip(!dockerAvailable(), 'Docker daemon not available');
     // A `docker commit` of its own, never a shared tag: this test destroys the

@@ -5,6 +5,8 @@ import {
   PULL_REFERENCE_PATTERN,
   daemonRepositoryName,
   isRegistryHost,
+  normalizeImageRef,
+  splitImageRef,
   untaggedReference,
 } from '../image-reference';
 
@@ -69,5 +71,36 @@ describe('reference patterns', () => {
     // The colon is the port, not a tag — the whole reason this is not a split.
     expect(untaggedReference('localhost:5000/acme/agent')).toBe('localhost:5000/acme/agent');
     expect(untaggedReference('localhost:5000/acme/agent:v1')).toBe('localhost:5000/acme/agent');
+  });
+});
+
+describe('normalizeImageRef', () => {
+  it.each([
+    ['alpine', 'alpine:3.22'],
+    ['rocker/r-ver', 'rocker/r-ver:4.4'],
+    ['ghcr.io/acme/agent', 'ghcr.io/acme/agent:v1'],
+    ['localhost:5000/acme/agent', 'localhost:5000/acme/agent:latest'],
+  ])('adds the implicit latest tag to %s', (untagged, tagged) => {
+    expect(normalizeImageRef(untagged)).toBe(`${untagged}:latest`);
+    expect(normalizeImageRef(tagged)).toBe(tagged);
+  });
+
+  it('leaves a digest reference alone — it pins an image, not a tag', () => {
+    expect(normalizeImageRef('alpine@sha256:abc')).toBe('alpine@sha256:abc');
+    expect(normalizeImageRef('localhost:5000/acme/agent@sha256:abc')).toBe(
+      'localhost:5000/acme/agent@sha256:abc',
+    );
+  });
+});
+
+describe('splitImageRef', () => {
+  it.each([
+    ['alpine', 'alpine', 'latest'],
+    ['alpine:3.22', 'alpine', '3.22'],
+    ['rocker/r-ver:4.4', 'rocker/r-ver', '4.4'],
+    ['localhost:5000/acme/agent', 'localhost:5000/acme/agent', 'latest'],
+    ['localhost:5000/acme/agent:v1', 'localhost:5000/acme/agent', 'v1'],
+  ])('splits %s into %s at %s', (ref, repository, tag) => {
+    expect(splitImageRef(ref)).toEqual({ repository, tag });
   });
 });

@@ -67,6 +67,23 @@ describe('runPreflightChecks', () => {
     expect(action?.href).toBe('/acme/workflows/my-wf');
   });
 
+  it('does not warn about a private-registry image the daemon holds', () => {
+    // `localhost:5000/acme/agent` is one repository at `:latest`; split on the
+    // first colon it is `localhost` at `5000`, and every step pinning a
+    // port-bearing registry gets a missing-image warning it cannot act on.
+    const wd = makeDefinition({ image: 'localhost:5000/acme/agent' });
+    const result = runPreflightChecks(wd, {
+      ...BASE_CTX,
+      dockerImages: [
+        ...IMAGES,
+        { repository: 'localhost:5000/acme/agent', tag: 'latest', id: 'xyz', size: '1GB', created: '1d ago' },
+      ],
+      dockerAvailable: true,
+      secretKeys: [],
+    });
+    expect(result.filter((w) => w.category === 'missing-image')).toEqual([]);
+  });
+
   it('skips image warning when repo + commit configured (engine auto-builds)', () => {
     const wd = makeDefinition({ image: 'mediforce/nonexistent:v1' });
     wd.steps[0].script = { ...wd.steps[0].script, repo: 'git@github.com:org/repo.git', commit: 'abc1234' };

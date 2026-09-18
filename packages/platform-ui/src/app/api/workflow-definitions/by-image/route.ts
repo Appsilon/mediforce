@@ -13,8 +13,8 @@ import { resolveCallerIdentity } from '@/lib/api-auth';
  * an artifact. Everything else wants the narrow one, since a superseded version
  * is not a workflow anybody is running.
  *
- * The matching itself lives in `findWorkflowImagePins` so this and
- * `deleteImageCatalogEntry` cannot disagree about what counts as a pin.
+ * The matching itself lives in `findWorkflowImagePins` so this and the delete
+ * flow's `assertNoLiveImagePins` cannot disagree about what counts as a pin.
  */
 export async function GET(request: Request): Promise<NextResponse> {
   const { processRepo, namespaceRepo } = getPlatformServices();

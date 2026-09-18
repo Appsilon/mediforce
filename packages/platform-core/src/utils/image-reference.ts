@@ -64,3 +64,30 @@ export function untaggedReference(reference: string): string {
   if (lastColon === -1 || reference.includes('/', lastColon)) return reference;
   return reference.slice(0, lastColon);
 }
+
+/**
+ * `repo` and `repo:latest` are the same image to Docker, so anything matching
+ * one reference against another has to spell them the same way. Untagged is
+ * whatever `untaggedReference` hands back unchanged, so the registry port and
+ * the digest are reasoned about once rather than in every caller.
+ */
+export function normalizeImageRef(ref: string): string {
+  return untaggedReference(ref) === ref ? `${ref}:latest` : ref;
+}
+
+/**
+ * A reference split the way the daemon lists it: `localhost:5000/acme/agent:v1`
+ * is the repository `localhost:5000/acme/agent` at `v1`, never `localhost` at
+ * `5000`, and an untagged one is at `latest`.
+ *
+ * For matching against a daemon listing, which names tags and not digests: a
+ * digest reference splits at the digest's own colon and so matches no row,
+ * which is the right answer there.
+ */
+export function splitImageRef(ref: string): { repository: string; tag: string } {
+  const repository = untaggedReference(ref);
+  return {
+    repository,
+    tag: repository === ref ? 'latest' : ref.slice(repository.length + 1),
+  };
+}

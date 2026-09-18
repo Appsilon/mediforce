@@ -66,10 +66,11 @@ because a record whose images stay is re-derived on the next read — which need
 admin of that workspace, audits under `_system` since the daemon is
 deployment-wide, and is refused while a live workflow version still pins one of
 them (`--keep-images` for the rare record-only case; `system rmi` still removes
-one image by id or tag). An entry naming an image the engine falls back to when
-a step names none refuses the image half outright and takes only `--keep-images`:
-a `runtime: python` step pins nothing, so the live-pin check cannot see what
-deleting `python` would break across the deployment.
+one image by id or tag, and a live pin refuses it too). An entry naming an image
+the engine falls back to when a step names none refuses the image half outright
+and takes only `--keep-images`: a `runtime: python` step pins nothing, so the
+live-pin check cannot see what deleting `python` would break across the
+deployment.
 `images seed` catalogues exactly those engine defaults — the golden image and
 the four script runtimes. Every workspace is created with them (#1376), so this
 is for a workspace created before that, or one whose seed lost a race with an
