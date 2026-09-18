@@ -38,10 +38,10 @@ export async function seedImageCatalogEntries(
   await scope.system.audit.append({
     ...actor,
     action: 'image_catalog.seeded',
-    description: `Seeded ${String(seeded)} default image catalog entries in namespace '${input.namespace}'`,
+    description: `Seeded ${String(seeded)} missing default image catalog entries in namespace '${input.namespace}'`,
     timestamp: new Date().toISOString(),
     inputSnapshot: { namespace: input.namespace },
-    outputSnapshot: { seeded, expected: DEFAULT_IMAGE_CATALOG_ENTRIES.length },
+    outputSnapshot: { seeded, defaults: DEFAULT_IMAGE_CATALOG_ENTRIES.length },
     basis: 'Default image catalog entries seeded via API',
     entityType: 'namespace',
     entityId: input.namespace,

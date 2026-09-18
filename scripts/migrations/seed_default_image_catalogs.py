@@ -30,7 +30,7 @@ Usage:
 Handles come from the deployment's database, e.g.
 
     docker exec mediforce-postgres-1 \
-        psql -U mediforce -t -A -c 'select handle from namespaces'
+        psql -U mediforce -d mediforce -t -A -c 'select handle from workspaces'
 """
 
 from __future__ import annotations

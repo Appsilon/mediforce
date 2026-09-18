@@ -44,7 +44,7 @@ function catalogued(entries: ImageCatalogEntryView[]): { name: string; intent: s
 }
 
 const EXPECTED = DEFAULT_IMAGE_CATALOG_ENTRIES.map((seed) => ({
-  name: seed.name,
+  name: seed.reference,
   intent: seed.intent,
   reference: seed.reference,
 })).sort((a, b) => a.name.localeCompare(b.name));
@@ -81,8 +81,10 @@ test.describe('A new workspace is born with a catalog — API E2E', () => {
     expect(
       entries.filter((entry) => entry.origin === 'catalogued').every((entry) => entry.source.kind === 'referenced'),
     ).toBe(true);
-    const pythonRuntime = entries.find((entry) => entry.name === 'Python runtime');
-    if (pythonRuntime === undefined) throw new Error('expected a seeded Python runtime entry');
+    const pythonRuntime = entries.find(
+      (entry) => entry.source.kind === 'referenced' && entry.source.reference === 'python',
+    );
+    if (pythonRuntime === undefined) throw new Error('expected a seeded python entry');
 
     // The daemon is deployment-wide and a `runtime: python` step pins nothing,
     // so the live-pin check cannot see what this would break.
@@ -107,7 +109,9 @@ test.describe('A new workspace is born with a catalog — API E2E', () => {
       headers: sessionCookieHeaders(owner),
     });
     expect(seed.status(), await seed.text()).toBe(200);
-    expect((await seed.json()).seeded).toBe(DEFAULT_IMAGE_CATALOG_ENTRIES.length);
+    // One row was deleted above and the other four are untouched, so a re-seed
+    // reports the one write it made rather than all five defaults.
+    expect((await seed.json()).seeded).toBe(1);
 
     expect(catalogued(await listCatalog(request, ORG_HANDLE))).toEqual(EXPECTED);
   });
