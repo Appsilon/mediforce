@@ -174,6 +174,7 @@ export function createCallerScope(
       agentRunner: services.agentRunner,
       blobStore: services.blobStore,
       audit: services.auditRepo,
+      imageCatalog: services.imageCatalogRepo,
       runKicker: services.runKicker,
       inviteService: services.inviteService,
       joinLinkService: services.joinLinkService,

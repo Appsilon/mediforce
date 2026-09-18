@@ -66,7 +66,15 @@ because a record whose images stay is re-derived on the next read — which need
 admin of that workspace, audits under `_system` since the daemon is
 deployment-wide, and is refused while a live workflow version still pins one of
 them (`--keep-images` for the rare record-only case; `system rmi` still removes
-one image by id or tag).
+one image by id or tag). An entry naming an image the engine falls back to when
+a step names none refuses the image half outright and takes only `--keep-images`:
+a `runtime: python` step pins nothing, so the live-pin check cannot see what
+deleting `python` would break across the deployment.
+`images seed` catalogues exactly those engine defaults — the golden image and
+the four script runtimes. Every workspace is created with them (#1376), so this
+is for a workspace created before that, or one whose seed lost a race with an
+outage; it is idempotent, and `scripts/migrations/seed_default_image_catalogs.py`
+runs it over a list of handles.
 `images build --repo --commit [--dockerfile] [--context]` builds one version of a built
 source there and then, instead of waiting for a workflow run to build it
 lazily: it mints the same tag a build-mode step pinning that commit resolves

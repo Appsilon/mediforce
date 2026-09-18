@@ -3,6 +3,7 @@ import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
 import { resolveTargetUid } from '../_helpers';
 import type { CallerScope } from '../../repositories/index';
 import type { GetMeInput, GetMeOutput, MeNamespace } from '../../contract/users';
+import { seedDefaultImageCatalogEntries } from '../image-catalog/_seed';
 
 const PERSONAL_HANDLE_FALLBACK = 'user';
 
@@ -201,6 +202,13 @@ async function ensurePersonalNamespace(
         .then(() => true)
         .catch(() => false);
 
+  // #1376: the majority of workspaces are bootstrapped here, so seeding only
+  // `createNamespace` would leave most of them with the empty catalog and the
+  // unfiltered picker. Best-effort and probe-free — every signed-in client
+  // blocks on this read, so it can afford neither a failure nor five probe
+  // containers.
+  const seededImageCatalogEntries = await seedDefaultImageCatalogEntries(handle, scope);
+
   await scope.system.audit.append({
     actorId: user.uid,
     actorType: 'user',
@@ -209,7 +217,7 @@ async function ensurePersonalNamespace(
     description: `Personal namespace '${handle}' bootstrapped for user '${user.uid}'`,
     timestamp: now,
     inputSnapshot: { uid: user.uid },
-    outputSnapshot: { handle, type: 'personal', ownerRoleGranted },
+    outputSnapshot: { handle, type: 'personal', ownerRoleGranted, seededImageCatalogEntries },
     basis: 'Lazy bootstrap on GET /api/users/me',
     entityType: 'namespace',
     entityId: handle,

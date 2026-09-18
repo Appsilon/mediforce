@@ -569,7 +569,13 @@ export { emailLayout, escapeHtml } from './utils/email-layout';
 export { isPasswordAuthEnabled, parseAutoJoinWorkspaces, autoJoinHandlesForEmail } from './utils/auth-env';
 export type { AutoJoinRule } from './utils/auth-env';
 export { DOCKER_IMAGE_SETUP_URL, VERIFY_WORKFLOW_URL, CREATE_WORKFLOW_URL } from './utils/docs-links';
-export { DEFAULT_AGENT_IMAGE } from './utils/container-defaults';
+export {
+  DEFAULT_AGENT_IMAGE,
+  DEFAULT_SCRIPT_RUNTIME_IMAGES,
+  DEFAULT_IMAGE_CATALOG_ENTRIES,
+  isDefaultEngineImageSource,
+} from './utils/container-defaults';
+export type { DefaultImageCatalogEntry } from './utils/container-defaults';
 export {
   normalizeRepoUrls,
   githubPermalink,
@@ -609,6 +615,7 @@ export {
   PULL_REFERENCE_PATTERN,
   daemonRepositoryName,
   isRegistryHost,
+  untaggedReference,
 } from './utils/image-reference';
 export {
   BuildContextSchema,

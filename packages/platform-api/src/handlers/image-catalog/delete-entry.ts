@@ -1,3 +1,4 @@
+import { isDefaultEngineImageSource } from '@mediforce/platform-core';
 import {
   assertCallerIsNamespaceAdmin,
   assertNamespaceAccess,
@@ -60,6 +61,18 @@ export async function deleteImageCatalogEntry(
       // Neither a row nor an image the platform built for this namespace.
       // Deleting is idempotent, so this is a no-op rather than a 404.
       return { success: true, deletedImages };
+    }
+
+    // An engine default is not this workspace's to destroy. Every workspace's
+    // catalog is seeded with these (#1376), and a step that names no image
+    // pins nothing — so the live-pin check below cannot see the `runtime: r`
+    // steps across the deployment that this delete would break. The row is
+    // still the workspace's own to remove, which `--keep-images` does.
+    if (isDefaultEngineImageSource(source)) {
+      throw new ConflictError(
+        `'${input.id}' is an image the engine falls back to when a step names none, and the daemon is shared by every workspace. ` +
+        'Delete the catalog entry alone (`--keep-images`, or "Keep images" in the UI) — removing the image would break every step in every workspace that relies on that default.',
+      );
     }
 
     const versions = resolveEntryVersions(input.namespace, source, daemon.images);
