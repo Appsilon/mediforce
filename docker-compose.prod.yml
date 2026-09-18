@@ -211,6 +211,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp
       - ${DEPLOY_KEY_PATH:-/home/deploy/.ssh/deploy_key}:/root/.ssh/deploy_key:ro
+      # The worker's own Docker CLI reads its credentials here, not the host
+      # user's: `docker login` on the host writes ~/.docker/config.json, which
+      # this container would otherwise never see, so every private-registry
+      # pull would fail with `unauthorized`. An absent directory mounts empty,
+      # which is exactly today's behaviour — public images only.
+      - ${DOCKER_CONFIG_DIR:-/home/deploy/.docker}:/root/.docker:ro
     depends_on:
       redis:
         condition: service_healthy

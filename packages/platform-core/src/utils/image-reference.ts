@@ -10,8 +10,12 @@
 const PATH_COMPONENT = '[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*';
 /** `acme/agent`, `rocker/r-ver` — no registry host, no tag. */
 const REPOSITORY_PATH = `${PATH_COMPONENT}(?:/${PATH_COMPONENT})*`;
-/** `ghcr.io`, `localhost:5000`. */
-const REGISTRY_HOST = '[a-zA-Z0-9.-]+(?::[0-9]+)?';
+/** One hostname label: alphanumeric ends, hyphens only inside. */
+const HOST_LABEL = '[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?';
+/** `ghcr.io`, `localhost:5000`. Dotted labels and an optional port, so a
+ *  malformed host (`./x`, `foo..bar`) is a 400 here rather than a failed
+ *  `docker pull` reported as an internal error. */
+const REGISTRY_HOST = `${HOST_LABEL}(?:\\.${HOST_LABEL})*(?::[0-9]{1,5})?`;
 const TAG = '[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}';
 
 /** A repository path with no host or tag — what an upload or publish names. */

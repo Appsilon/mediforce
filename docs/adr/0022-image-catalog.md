@@ -227,8 +227,13 @@ is a registry host and never a handle. The check is the platform's: the
 worker's route takes any well-formed `reference:tag` and is protected by the
 worker secret, like every route that acts on the daemon. A digest is not
 accepted yet — a version of a `referenced` entry is a tag. Pulling is a member's right, as uploading is: a step
-naming the image already pulls it at run time. A private registry still needs
-`docker login` on the host — the platform holds no registry credentials.
+naming the image already pulls it at run time. A private registry still needs a login the
+**worker** can read: the pull runs inside `container-worker`, whose Docker CLI
+reads its own `/root/.docker` rather than the host user's, so
+`docker-compose.prod.yml` mounts `DOCKER_CONFIG_DIR` (default
+`/home/deploy/.docker`) there read-only. Unset, it mounts empty and public
+pulls work as before (§13). The platform holds no registry credentials of its
+own and never asks for any.
 
 An entry's **source became editable** after the Images view shipped without any
 way to change one: an entry added through **Add image** was final, so a mistyped

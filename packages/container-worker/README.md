@@ -44,6 +44,15 @@ context, sent as an `application/x-tar` body — and runs a Dockerfile, and
 the same value. History is on the open side deliberately: it reads metadata the
 daemon already holds and starts nothing.
 
+**The worker's Docker CLI has its own credentials.** It talks to the host
+daemon over the mounted socket, but authentication is the *client's*: a
+`docker login` run on the host writes the invoking user's
+`~/.docker/config.json`, which this container never sees. `docker-compose.prod.yml`
+therefore mounts `DOCKER_CONFIG_DIR` (default `/home/deploy/.docker`) at
+`/root/.docker` read-only, which is what makes a private-registry pull
+(`POST /images/pull`) or a private base image in a build work at all. An unset
+variable mounts an empty directory: public images only, as before.
+
 **Payload schemas are a cross-process contract.** The enqueuing platform and the
 worker are deployed separately and can briefly run different versions. Change
 `src/schemas.ts` additively. The build route's body is the exception that proves

@@ -48,6 +48,13 @@ describe('reference patterns', () => {
     expect(PULL_REFERENCE_PATTERN.test('alpine@sha256:abc')).toBe(false);
   });
 
+  it('refuses a malformed host, so it is a 400 and never a failed pull', () => {
+    for (const reference of ['./image', '../image', 'foo..bar/image', '-ghcr.io/acme/agent', 'ghcr.io-/acme/agent', 'ghcr.io:99999999/acme/agent']) {
+      expect(PULL_REFERENCE_PATTERN.test(reference), reference).toBe(false);
+      expect(PULL_IMAGE_PATTERN.test(`${reference}:v1`), reference).toBe(false);
+    }
+  });
+
   it('takes exactly reference:tag for the image a worker pulls, never a flag', () => {
     expect(PULL_IMAGE_PATTERN.test('ghcr.io/acme/agent:v1.0.0')).toBe(true);
     expect(PULL_IMAGE_PATTERN.test('--all-tags')).toBe(false);

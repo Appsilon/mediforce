@@ -140,9 +140,8 @@ mediforce images pull --namespace <handle> --reference ghcr.io/my-org/my-agent -
   --name "My agent" --intent "What this image is for"
 ```
 
-A private registry needs an administrator to run `docker login` on the host
-first — the platform holds no registry credentials
-([details](#pulling-a-registry-image)).
+A private registry needs an administrator to log the worker in first — the
+platform holds no registry credentials ([details](#pulling-a-registry-image)).
 
 ### F. Anything else, via a host administrator
 
@@ -337,8 +336,14 @@ rules are an upload's:
   for one.
 - **A tag, not a digest.** A reference with `@sha256:…` is refused; pull the tag
   that digest belongs to.
-- **A private registry needs `docker login` on the host**, performed by an
-  administrator. The pull fails with the registry's own error until then.
+- **A private registry needs a login the worker can read.** The pull runs inside
+  the `container-worker` container, which reads `/root/.docker` — not the host
+  user's `~/.docker`. An administrator runs `docker login` on the host as the
+  user whose config directory `DOCKER_CONFIG_DIR` points at (default
+  `/home/deploy/.docker`, mounted read-only in `docker-compose.prod.yml`) and
+  restarts the worker. Until then the pull fails with the registry's own
+  `unauthorized`. A deployment that never sets it mounts an empty directory and
+  pulls public images exactly as before.
 
 A step can still name a pullable reference in its `image` field without
 cataloguing it — `docker run` pulls it on first use. The step editor's amber
