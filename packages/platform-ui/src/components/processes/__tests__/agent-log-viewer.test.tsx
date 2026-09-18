@@ -21,6 +21,7 @@ type AgentLogSection = import('../agent-log-viewer').AgentLogSection;
 function section(stepId: string, texts: string[], overrides: Partial<AgentLogSection> = {}): AgentLogSection {
   return {
     stepId,
+    file: `${stepId}.jsonl`,
     executor: 'agent',
     entries: texts.map((text) => ({ ts: '2026-01-01T00:00:00.000Z', type: 'assistant', subtype: 'text', text })),
     rawContent: null,

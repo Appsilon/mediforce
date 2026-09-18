@@ -38,6 +38,9 @@ interface AgentLogViewerProps {
 
 export interface AgentLogSection {
   stepId: string;
+  /** The log file this section came from. Two runs of one step share a
+   *  `stepId` but never a file, so this is what identifies a section. */
+  file: string;
   executor: string;
   entries: LogEntry[];
   rawContent: string | null;
@@ -504,16 +507,16 @@ export function AgentLogSections({ sections, runningStepIds, openStepId }: {
         const isRunning = runningStepIds?.has(section.stepId) === true;
         // A finished step is a heading until asked for; the one still working,
         // the one you came here for, and a lone step are open.
-        const open = overrides[section.stepId]
+        const open = overrides[section.file]
           ?? (single || isRunning || section.stepId === openStepId);
 
         return (
           <details
-            key={section.stepId}
+            key={section.file}
             open={open}
             onToggle={(event) => {
               const next = (event.currentTarget as HTMLDetailsElement).open;
-              setOverrides((prev) => (prev[section.stepId] === next ? prev : { ...prev, [section.stepId]: next }));
+              setOverrides((prev) => (prev[section.file] === next ? prev : { ...prev, [section.file]: next }));
             }}
             className="group"
           >
@@ -612,7 +615,7 @@ export function AgentLogViewer({ logFiles, initialStepId, runningStepIds, runAct
       const results = await Promise.all(
         latest.current.logFiles.map(async (logFile) => {
           const result = await fetchSingleLog(logFile.file);
-          return { stepId: logFile.stepId, executor: logFile.executor, ...result };
+          return { stepId: logFile.stepId, file: logFile.file, executor: logFile.executor, ...result };
         }),
       );
       setSections(results);
