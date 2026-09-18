@@ -16,12 +16,42 @@ test.describe('Run Detail Journey', () => {
     await expect(historyPanel.getByText('Vendor Assessment', { exact: true })).toBeVisible();
     await expect(historyPanel.getByText('Narrative Summary', { exact: true })).toBeVisible();
 
-    // Right panel: "Execution Log" button always visible; clicking opens the panel
-    // with the Audit Log tab. No Step History tab.
-    await expect(page.getByRole('button', { name: /^Execution Log$/i })).toBeVisible();
-    await page.getByRole('button', { name: /^Execution Log$/i }).click();
-    await expect(page.getByRole('button', { name: /audit log/i })).toBeVisible();
+    // Right panel: each view has its own pull down the edge; opening one shows
+    // the tab strip. No Step History tab.
+    await expect(page.getByRole('button', { name: /^Log$/i }).first()).toBeVisible();
+    await page.getByRole('button', { name: /^Log$/i }).first().click();
+    await expect(page.getByRole('button', { name: /^Audit$/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /step history/i })).not.toBeVisible();
+  });
+
+  /**
+   * The execution log is every step of the run, each one collapsible — there is
+   * no "which step am I looking at" mode to be in. Two seeded step logs on
+   * proc-running-1 make that visible: both are listed, and both their outputs
+   * are reachable without switching anything.
+   */
+  test('execution log lists every step of the run', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1`);
+    await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
+
+    // The panel opens from its own tab down the edge, not a header button.
+    await page.getByRole('button', { name: 'Log' }).first().click();
+
+    // Both steps are listed, and a finished step opens on click.
+    await expect(page.locator('[data-step-heading]', { hasText: 'vendor-assessment' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-step-heading]', { hasText: 'narrative-summary' })).toBeVisible();
+    await page.locator('[data-step-heading]', { hasText: 'vendor-assessment' }).click();
+    await expect(page.getByText('collect --vendors all')).toBeVisible({ timeout: 10_000 });
+
+    // The task list is one live checklist, not a reprint per revision, and the
+    // result echoing it back is not dumped as JSON.
+    await expect(page.getByText('Collect vendor submissions')).toHaveCount(1);
+    await expect(page.getByText(/\[\{"content":"Collect vendor submissions"/)).not.toBeVisible();
+
+    // One "Done" per real completion — the `tool-calls` turn boundary in the
+    // fixture is the model pausing to use a tool and must not add another.
+    await expect(page.getByText('Done', { exact: true })).toHaveCount(2);
   });
 
   test('completed run shows results panel, duration, and completed steps', async ({ page }) => {
@@ -32,18 +62,19 @@ test.describe('Run Detail Journey', () => {
     await expect(page.getByText('Verify Data Quality', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('Review Results', { exact: true }).first()).toBeVisible();
 
-    // 2 executed steps, both completed
+    // 2 executed steps, both completed. Rows no longer print the word
+    // "Completed" — the status is the node's shape and the row shows a duration.
     const historyPanel = page.locator('.bg-card').filter({ has: page.locator('h3', { hasText: 'Execution History' }) });
     await expect(historyPanel.locator('ol > li')).toHaveCount(2);
-    const completedSteps = historyPanel.locator('li').filter({ hasText: 'Completed' });
-    await expect(completedSteps).toHaveCount(2);
+    await expect(historyPanel.getByText('Verify Data Quality', { exact: true })).toBeVisible();
+    await expect(historyPanel.getByText('Review Results', { exact: true })).toBeVisible();
 
     // Duration is visible for a completed run
-    await expect(page.getByText(/^Duration:/i)).toBeVisible();
+    await expect(page.getByText('Duration', { exact: true })).toBeVisible();
 
-    // Right panel: expand via "Execution Log", then Audit Log tab is visible
-    await page.getByRole('button', { name: /^Execution Log$/i }).click();
-    await expect(page.getByRole('button', { name: /audit log/i })).toBeVisible();
+    // Right panel: every run has an Audit pull, whether or not it wrote logs.
+    await page.getByRole('button', { name: /^Audit$/i }).first().click();
+    await expect(page.getByRole('heading', { name: 'Audit' })).toBeVisible();
   });
 
   test('autonomy badges and executor identity labels', async ({ page }) => {
@@ -80,11 +111,11 @@ test.describe('Run Detail Journey', () => {
     // Running process: Duration metadata field must NOT appear
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1`);
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/^Duration:/i)).not.toBeVisible();
+    await expect(page.getByText('Duration', { exact: true })).not.toBeVisible();
 
     // Completed process: Duration metadata field IS visible
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review/runs/proc-completed-1`);
     await expect(page.getByRole('heading', { name: 'Data Quality Review' })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/^Duration:/i)).toBeVisible();
+    await expect(page.getByText('Duration', { exact: true })).toBeVisible();
   });
 });

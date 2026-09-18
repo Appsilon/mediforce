@@ -5,16 +5,17 @@ import { trackPageErrors } from '../helpers/page-errors';
 test.describe('Run Report Journey', () => {
   test('completed run report shows timeline, toggles detail level, and has branding', async ({ page }) => {
     trackPageErrors(page);
-    // First check the View Report link exists on run detail
+    // The report is a pull down the run's right edge, and renders in the panel.
     const runUrl = `/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review/runs/proc-completed-1`;
     await page.goto(runUrl);
-    const reportLink = page.getByRole('link', { name: /View Report/i });
-    await expect(reportLink).toBeVisible({ timeout: 10_000 });
-    await expect(reportLink).toHaveAttribute('href', /\/report$/);
+    await page.getByRole('button', { name: /^Report$/i }).first().click();
+    await expect(page.getByRole('heading', { name: /Data Quality Review — Run Report/i })).toBeVisible({ timeout: 10_000 });
 
-    // Navigate to report by clicking the link
-    await reportLink.click();
-    await page.waitForURL(/\/report$/, { timeout: 20_000 });
+    // "Open in new tab" is the way out to the standalone page, which is what
+    // the rest of this journey exercises.
+    const openInNewTab = page.getByRole('link', { name: /Open in new tab/i });
+    await expect(openInNewTab).toHaveAttribute('href', /\/report$/);
+    await page.goto(`${runUrl}/report`);
     await expect(page.getByRole('heading', { name: /Data Quality Review — Run Report/i })).toBeVisible({ timeout: 10_000 });
 
     // Step Timeline and step names
