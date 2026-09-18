@@ -150,4 +150,57 @@
   .report-step {
     break-inside: avoid;
   }
+
+  /* When the report is on the page, the report IS the document.
+     `*:has([data-print-root])` is every ancestor of the report, so the chain
+     from <html> down to its wrapper gets flattened: no sticky positioning, no
+     scroll clipping, no half-width column, no fixed heights. Then everything
+     hanging off that chain that is not the report itself is dropped.
+
+     An earlier attempt positioned the report absolutely instead. That resolves
+     against the nearest positioned ancestor — the side panel is `sticky`, which
+     counts — so the report stayed inside the panel's box and was clipped by its
+     `overflow-y-auto`, which is why printing produced a slice of the screen. */
+  *:has([data-print-root]) {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* Siblings along that chain — the run's own column, the tab rail, the panel
+     header — are not part of the document being printed. */
+  *:has([data-print-root]) > *:not(:has([data-print-root])):not([data-print-root]) {
+    display: none !important;
+  }
+
+  [data-print-root] {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  /* Anything scrollable inside the report is cut off on paper otherwise. */
+  [data-print-root] pre,
+  [data-print-root] [class*="max-h-"] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  h1, h2, h3 {
+    break-after: avoid;
+  }
+}
+
+@page {
+  margin: 16mm;
 }
