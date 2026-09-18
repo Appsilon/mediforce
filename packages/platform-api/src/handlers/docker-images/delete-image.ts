@@ -1,4 +1,4 @@
-import { shortImageId } from '@mediforce/platform-core';
+import { normalizeImageRef, shortImageId } from '@mediforce/platform-core';
 import { assertCallerCanAdminDockerImages } from '../../auth';
 import { emitAudit } from '../../audit-helpers';
 import { PreconditionFailedError } from '../../errors';
@@ -8,7 +8,7 @@ import type {
   DeleteDockerImageOutput,
 } from '../../contract/docker-images';
 import { fetchDaemonImages } from '../system/_docker';
-import { assertNoLiveImagePins, normalizeImageRef } from '../workflows/_image-pins';
+import { assertNoLiveImagePins } from '../workflows/_image-pins';
 
 /** A reference that *may* name an image by id rather than by repository and
  *  tag — `docker rmi` accepts any unambiguous prefix, with or without the

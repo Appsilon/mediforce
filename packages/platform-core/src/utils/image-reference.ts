@@ -27,6 +27,20 @@ export const PULL_REFERENCE_PATTERN = new RegExp(`^(?:${REGISTRY_HOST}/)?${REPOS
  *  never be read as a `docker pull` flag. */
 export const PULL_IMAGE_PATTERN = new RegExp(`^(?:${REGISTRY_HOST}/)?${REPOSITORY_PATH}:${TAG}$`);
 
+/**
+ * `repo` and `repo:latest` are the same image to Docker, so anything matching
+ * one reference against another has to spell them the same way.
+ *
+ * The tag separator is the colon in the *last* path component. An earlier one
+ * belongs to the registry host's port — `localhost:5000/acme/agent` is
+ * untagged and names `:latest` — and a digest reference carries its own
+ * `algorithm:hex`, which is not a tag to add one to either.
+ */
+export function normalizeImageRef(ref: string): string {
+  const lastComponent = ref.slice(ref.lastIndexOf('/') + 1);
+  return lastComponent.includes(':') ? ref : `${ref}:latest`;
+}
+
 const DOCKER_HUB_HOSTS = ['docker.io/', 'index.docker.io/', 'registry-1.docker.io/'];
 
 /**

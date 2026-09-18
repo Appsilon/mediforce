@@ -243,6 +243,19 @@ describe('deleteDockerImage handler', () => {
     ).rejects.toBeInstanceOf(ConflictError);
   });
 
+  it('[PINS] reads a colon before a slash as a registry port, not a tag', async () => {
+    // `localhost:5000/acme/agent` is untagged — the colon is the port — so it
+    // names `:latest` just as `shared-r` does, and the live pin blocks it.
+    const scope = await scopeWith(personalWorkspaceCaller, [
+      pinning('localhost:5000/acme/agent:latest'),
+    ]);
+
+    await expect(
+      deleteDockerImage({ imageId: 'localhost:5000/acme/agent' }, scope),
+    ).rejects.toBeInstanceOf(ConflictError);
+    expect(deleter.calls).toEqual([]);
+  });
+
   it('[PINS] deletes anyway when only a superseded version pins it', async () => {
     const scope = await scopeWith(personalWorkspaceCaller, [
       pinning('shared-r:4.4', { version: 1 }),

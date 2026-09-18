@@ -609,6 +609,7 @@ export {
   PULL_REFERENCE_PATTERN,
   daemonRepositoryName,
   isRegistryHost,
+  normalizeImageRef,
 } from './utils/image-reference';
 export {
   BuildContextSchema,

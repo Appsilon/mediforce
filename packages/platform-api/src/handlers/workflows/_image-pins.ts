@@ -3,6 +3,7 @@ import type { CallerIdentity } from '../../auth';
 import { ConflictError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import {
+  normalizeImageRef,
   pickRunnableVersion,
   type WorkflowDefinition,
   type WorkflowDefinitionGroup,
@@ -63,12 +64,6 @@ export interface WorkflowImagePin {
   /** Which of the requested images this version uses, in the order asked —
    *  echoed back as the caller spelled them. */
   images: string[];
-}
-
-/** `repo` and `repo:latest` are the same image to Docker, so they must be the
- *  same needle here. */
-export function normalizeImageRef(ref: string): string {
-  return ref.includes(':') ? ref : `${ref}:latest`;
 }
 
 /** Every image one version's steps resolve to, agent and script alike, by the

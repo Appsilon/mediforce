@@ -5,6 +5,7 @@ import {
   PULL_REFERENCE_PATTERN,
   daemonRepositoryName,
   isRegistryHost,
+  normalizeImageRef,
 } from '../image-reference';
 
 describe('daemonRepositoryName', () => {
@@ -59,5 +60,24 @@ describe('reference patterns', () => {
     expect(PULL_IMAGE_PATTERN.test('ghcr.io/acme/agent:v1.0.0')).toBe(true);
     expect(PULL_IMAGE_PATTERN.test('--all-tags')).toBe(false);
     expect(PULL_IMAGE_PATTERN.test('alpine')).toBe(false);
+  });
+});
+
+describe('normalizeImageRef', () => {
+  it.each([
+    ['alpine', 'alpine:3.22'],
+    ['rocker/r-ver', 'rocker/r-ver:4.4'],
+    ['ghcr.io/acme/agent', 'ghcr.io/acme/agent:v1'],
+    ['localhost:5000/acme/agent', 'localhost:5000/acme/agent:latest'],
+  ])('adds the implicit latest tag to %s', (untagged, tagged) => {
+    expect(normalizeImageRef(untagged)).toBe(`${untagged}:latest`);
+    expect(normalizeImageRef(tagged)).toBe(tagged);
+  });
+
+  it('leaves a digest reference alone — it pins an image, not a tag', () => {
+    expect(normalizeImageRef('alpine@sha256:abc')).toBe('alpine@sha256:abc');
+    expect(normalizeImageRef('localhost:5000/acme/agent@sha256:abc')).toBe(
+      'localhost:5000/acme/agent@sha256:abc',
+    );
   });
 });
