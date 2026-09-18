@@ -565,3 +565,22 @@ export const imagesPullCommand = defineCommand({
     return 0;
   },
 });
+
+export const imagesSeedCommand = defineCommand({
+  name: 'mediforce images seed',
+  description:
+    'Catalogue the images a step falls back to when it names none — the golden image and the four script runtimes. Every workspace is created with them; this is the handle for one created before that, or one whose seed failed. Idempotent.',
+  args: {
+    namespace: { type: 'string', required: true, description: 'Namespace handle' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.imageCatalog.seed({ namespace: args.namespace });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    output.stdout(`Seeded ${String(result.seeded)} default entries in "${args.namespace}".`);
+    output.stdout('`mediforce images list` to see them.');
+    return 0;
+  },
+});

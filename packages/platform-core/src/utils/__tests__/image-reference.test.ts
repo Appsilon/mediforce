@@ -5,6 +5,7 @@ import {
   PULL_REFERENCE_PATTERN,
   daemonRepositoryName,
   isRegistryHost,
+  untaggedReference,
 } from '../image-reference';
 
 describe('daemonRepositoryName', () => {
@@ -59,5 +60,14 @@ describe('reference patterns', () => {
     expect(PULL_IMAGE_PATTERN.test('ghcr.io/acme/agent:v1.0.0')).toBe(true);
     expect(PULL_IMAGE_PATTERN.test('--all-tags')).toBe(false);
     expect(PULL_IMAGE_PATTERN.test('alpine')).toBe(false);
+  });
+
+  it('drops a tag and keeps a registry port', () => {
+    expect(untaggedReference('python:3.12-slim')).toBe('python');
+    expect(untaggedReference('rocker/r-ver:4')).toBe('rocker/r-ver');
+    expect(untaggedReference('mediforce-golden-image')).toBe('mediforce-golden-image');
+    // The colon is the port, not a tag — the whole reason this is not a split.
+    expect(untaggedReference('localhost:5000/acme/agent')).toBe('localhost:5000/acme/agent');
+    expect(untaggedReference('localhost:5000/acme/agent:v1')).toBe('localhost:5000/acme/agent');
   });
 });

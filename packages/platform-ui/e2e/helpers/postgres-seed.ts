@@ -54,7 +54,7 @@ export async function seedPostgresNamespace(
     //   fixture    – test, tenant-a, tenant-b
     //   journeys   – other, acme-labs, invited-personal, bio-clear-labs,
     //                bio-clear-owner, journey-user, bootstrap-journey,
-    //                branding-personal, role-gate-org, role-gate-org-2,
+    //                branding-personal, img-seed, role-gate-org, role-gate-org-2,
     //                member-roles-labs, personal-manager (the workspace
     //                default-workflow-access.journey has GET /api/users/me
     //                bootstrap for it, so each run asserts the write rather
@@ -92,6 +92,7 @@ export async function seedPostgresNamespace(
       'journey-user',
       'bootstrap-journey',
       'branding-personal',
+      'img-seed',
       'role-gate-org',
       'role-gate-org-2',
       'member-roles-labs',

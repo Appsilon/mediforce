@@ -5,6 +5,7 @@ import type {
   BlobStore,
   CredentialsRepository,
   EmailProviderInfo,
+  ImageCatalogRepository,
   ModelRegistryRepository,
   NamespaceRepository,
   PlatformSettingsRepository,
@@ -136,6 +137,15 @@ export interface SystemServices {
    * (the writer is a handler that already passed the read-side gate).
    */
   readonly audit: AuditRepository;
+  /**
+   * Ungated image-catalog write surface, for the one write that happens in a
+   * workspace the caller is not yet a member of: seeding a workspace's catalog
+   * at the moment it is created (#1376). The caller's membership set is a
+   * request-time snapshot, so `scope.imageCatalog` would refuse a workspace
+   * created microseconds earlier by that same caller. Every other write goes
+   * through the wrapper.
+   */
+  readonly imageCatalog: ImageCatalogRepository;
   readonly runKicker: RunKicker;
   /**
    * Invite-flow surface (seed an `auth_users` row + workspace membership).

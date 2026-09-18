@@ -52,3 +52,15 @@ export function daemonRepositoryName(reference: string): string {
   if (host === undefined && first !== undefined && isRegistryHost(first)) return reference;
   return path.startsWith('library/') ? path.slice('library/'.length) : path;
 }
+
+/**
+ * A reference with its tag dropped — `python:3.12-slim` is `python`,
+ * `localhost:5000/agent:1` is `localhost:5000/agent`. A colon followed by a
+ * `/` is a registry port, not a tag, which is the whole reason this is not a
+ * `split(':')[0]`.
+ */
+export function untaggedReference(reference: string): string {
+  const lastColon = reference.lastIndexOf(':');
+  if (lastColon === -1 || reference.includes('/', lastColon)) return reference;
+  return reference.slice(0, lastColon);
+}

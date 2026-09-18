@@ -62,6 +62,7 @@ import {
   imagesBuildCommand,
   imagesPublishCommand,
   imagesPullCommand,
+  imagesSeedCommand,
 } from './commands/images';
 import { emailStatusCommand } from './commands/email-status';
 import { systemCreditsCommand } from './commands/system-credits';
@@ -315,6 +316,10 @@ export const TREE: Record<string, BranchEntry> = {
       build: { description: 'Build a version from --repo/--commit, no workflow run', fn: imagesBuildCommand },
       publish: { description: "Publish a workflow's carried image as an image of its own", fn: imagesPublishCommand },
       pull: { description: 'Pull a registry image onto the deployment and catalogue it', fn: imagesPullCommand },
+      seed: {
+        description: "Catalogue the images a step falls back to when it names none (idempotent)",
+        fn: imagesSeedCommand,
+      },
     },
   },
   email: {

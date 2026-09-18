@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { UserDirectoryService } from '@mediforce/platform-core';
 import {
   InMemoryAuditRepository,
+  InMemoryImageCatalogRepository,
   InMemoryUserDirectoryService,
 } from '@mediforce/platform-core/testing';
+import { DEFAULT_IMAGE_CATALOG_ENTRIES } from '@mediforce/platform-core';
 import { InMemoryNamespaceRepo, createTestScope, stubUserDirectory, userCaller } from '../../../testing/index';
 import { getMe } from '../get-me';
 import { ForbiddenError, ValidationError } from '../../../errors';
@@ -98,6 +100,53 @@ describe('getMe handler', () => {
     const events = auditRepo.getAll().filter((e) => e.action === 'user.personal_namespace_created');
     expect(events).toHaveLength(1);
     expect(events[0]?.entityId).toBe('alice');
+  });
+
+  it('seeds the bootstrapped workspace with the images a step falls back to (#1376)', async () => {
+    // Most workspaces are born here, not in `createNamespace`, so seeding only
+    // the hand-made path would leave the majority on the empty catalog.
+    const directory = directoryWith('uid-1', { email: 'alice@example.test', displayName: 'Alice' });
+    const imageCatalogRepo = new InMemoryImageCatalogRepository();
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      imageCatalogRepo,
+      userDirectory: directory,
+      caller: userCaller('uid-1', []),
+    });
+
+    await getMe({}, scope);
+
+    expect((await imageCatalogRepo.list('alice')).map((entry) => entry.source)).toEqual(
+      DEFAULT_IMAGE_CATALOG_ENTRIES.map((seed) => ({ kind: 'referenced', reference: seed.reference })),
+    );
+    const created = auditRepo.getAll().find((e) => e.action === 'user.personal_namespace_created');
+    expect(created?.outputSnapshot).toMatchObject({
+      seededImageCatalogEntries: DEFAULT_IMAGE_CATALOG_ENTRIES.length,
+    });
+  });
+
+  it('still answers the profile read when the catalog seed fails', async () => {
+    // Every signed-in client blocks on this read, so a catalog that refuses
+    // its rows must cost the rows and not the session.
+    const directory = directoryWith('uid-1', { email: 'alice@example.test', displayName: 'Alice' });
+    const imageCatalogRepo = new InMemoryImageCatalogRepository();
+    imageCatalogRepo.upsert = async () => {
+      throw new Error('image catalog unavailable');
+    };
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      imageCatalogRepo,
+      userDirectory: directory,
+      caller: userCaller('uid-1', []),
+    });
+
+    const result = await getMe({}, scope);
+
+    expect(result.namespaces[0]).toMatchObject({ handle: 'alice', type: 'personal' });
+    const created = auditRepo.getAll().find((e) => e.action === 'user.personal_namespace_created');
+    expect(created?.outputSnapshot).toMatchObject({ seededImageCatalogEntries: 0 });
   });
 
   it('grants the owner workflow-manager on the workspace it bootstraps', async () => {
