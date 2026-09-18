@@ -25,10 +25,17 @@ services:
     depends_on:
       - platform-ui
 
+  # Two limits, deliberately different. `mem_limit` is the kernel's: crossing it
+  # is a SIGKILL mid-RDB-save, which leaves orphaned `temp-*.rdb` files behind
+  # and loses the queue. `--maxmemory` sits below it so Redis refuses writes
+  # while the kernel still has room — a visible `OOM command not allowed` on one
+  # enqueue instead of a dead container. The gap is headroom for the RDB save's
+  # copy-on-write. `noeviction` because BullMQ jobs are durable work, not cache.
   redis:
     image: redis:8-alpine
     restart: unless-stopped
-    mem_limit: ${REDIS_MEM_LIMIT:-256m}
+    mem_limit: ${REDIS_MEM_LIMIT:-1g}
+    command: redis-server --maxmemory ${REDIS_MAX_MEMORY:-640mb} --maxmemory-policy noeviction
     volumes:
       - redis-data:/data
     healthcheck:

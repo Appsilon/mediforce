@@ -82,18 +82,29 @@ daemon in those milliseconds could. It counts the body as it unpacks and
 answers **413** (`BuildContextTooLargeError`) past the 100 MiB limit, for a
 caller that skipped the platform's own check.
 
-**Workspace files never ride inside a job.** A remote caller's files are base64
-and can run to many MB. BullMQ keeps job data in the job hash and a return value
-in both the hash and the `completed` event, retained by count (and the events
-stream trimmed by entry count, not bytes), so files there filled a 256 MiB Redis.
-`src/file-payload-store.ts` moves them to their own keys: the caller deletes them
-once the job settles, a TTL covers a caller that died. Keep new large fields out
-of job data and results the same way. Retention in `src/queue-client.ts` stays
-small anyway, since stdout/stderr still sit in every return value.
+**Bulk payloads never ride inside a job.** A remote caller's files are base64
+and can run to many MB, and an agent's prompt and stdout reach the same size.
+BullMQ keeps job data in the job hash and a return value in both the hash and
+the `completed` event, retained by count (and the events stream trimmed by entry
+count, not bytes), so payloads there filled a 256 MiB Redis.
+`src/file-payload-store.ts` moves them to their own keys — workspace files
+always, stdin/stdout/stderr past `TEXT_INLINE_MAX_BYTES` (64 KiB): the caller
+deletes them once the job settles, a TTL covers a caller that died. Keep new
+large fields out of job data and results the same way; anything still over
+`JOB_DATA_MAX_BYTES` (256 KiB) is refused before it reaches Redis. Retention in
+`src/queue-client.ts` stays small anyway — 10 completed jobs for an hour, 20
+failed for a day, 100 events.
+
+A result key is only written when the job says the caller understands it
+(`payloadKeysSupported`, and `inputFilesKey` for output files), so a worker
+deployed ahead of the platform still answers the old shape. Host capacity, the
+probe that watches it, and recovery are in
+[`docs/guides/redis-operations.md`](../../docs/guides/redis-operations.md).
 
 ## Testing
 
 Vitest covers the pieces with real logic — job processing, image builds,
-payload transfer, cleanup, daemon probing, the health endpoint. The queue
-round trip itself is proven by the container runs it serves, not by mocking
-BullMQ.
+payload transfer, cleanup, daemon probing, the health endpoint. The queue round
+trip itself is proven by the container runs it serves; `queue-client.test.ts`
+mocks BullMQ for the two bounds alone (what the queue retains, and the job-size
+ceiling), because an outage is what taught us those two are worth pinning.
