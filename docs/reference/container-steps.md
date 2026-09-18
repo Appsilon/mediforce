@@ -84,6 +84,28 @@ ignored rather than dropping anyone's work on open. `image` is the one field
 that changes meaning: in the two build modes it is the tag to build under, and
 it is labelled as such.
 
+A step that builds from a repository can be read without a checkout. **Files**
+in the version editor lists the paths such a step names — its `dockerfile`, and
+the `SKILL.md` an agent step resolves — under a *from a repository* divider,
+and opens them read-only in the same editor as the carried files
+(`GET /api/workflow-definitions/:name/repo-files`, or
+`mediforce.workflows.repoFiles`). The read happens at the commit the **saved**
+definition pins, so what is shown is what a run would build from, not what an
+unsaved draft points at; the response carries the `repo` and `commit` it used
+and the panel labels the file from those. **Edit in workflow** copies a file
+into `artifacts` at the same path, after which it wins over the repository by
+the rule above — deleting it hands the repository back. A file larger than a
+workflow may carry is shown truncated and cannot be copied in.
+
+Three refusals apply, because the server clones on a caller's behalf and hands
+back what it read. A `repo` beginning `/` or `.` is a local path and is
+refused; a host outside `github.com`, `gitlab.com`, `bitbucket.org` and
+`MEDIFORCE_REPO_HOSTS` is refused, since a clone carrying `repoAuth` sends that
+secret to the host as basic auth; and a *public* workflow belonging to another
+workspace is readable but not previewable, because the clone uses the
+platform's deploy key rather than the caller's credentials. Symlinks in the
+checkout are never followed.
+
 A step that names a file the workflow does not carry is flagged before the run
 (preflight, beside missing secrets and images): a command reading
 `/artifacts/<path>` with no such file, or a `dockerfile` with neither a carried

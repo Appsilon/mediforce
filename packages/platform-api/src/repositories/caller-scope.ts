@@ -20,6 +20,7 @@ import type {
   WorkflowEngine,
 } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth';
+import type { RepoFileReader } from '../runtime/repo-file-reader';
 import type { RunKicker } from '../runtime/run-kicker';
 import type { DockerImagesService } from '../services/docker-images-service';
 import type { InviteNotificationService, InviteService } from '../services/invite-notification';
@@ -147,6 +148,8 @@ export interface SystemServices {
    */
   readonly imageCatalog: ImageCatalogRepository;
   readonly runKicker: RunKicker;
+  /** Reads named files out of a repository at a commit, for the file preview. */
+  readonly repoFileReader: RepoFileReader;
   /**
    * Invite-flow surface (seed an `auth_users` row + workspace membership).
    * `null` when not wired; handlers throw `PreconditionFailedError` in that

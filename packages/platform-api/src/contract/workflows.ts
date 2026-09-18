@@ -461,3 +461,27 @@ export const GetManifestOutputSchema = z.object({
 export type ManifestEntry = z.infer<typeof ManifestEntrySchema>;
 export type GetManifestInput = z.infer<typeof GetManifestInputSchema>;
 export type GetManifestOutput = z.infer<typeof GetManifestOutputSchema>;
+
+/** One file read back from the repository a step builds from, for display only. */
+export const RepoFilePreviewSchema = z.object({
+  path: z.string(),
+  contents: z.string(),
+  /** Set when the file was longer than a workflow artifact may be. */
+  truncated: z.boolean().optional(),
+});
+export const PreviewRepoFilesInputSchema = z.object({
+  name: z.string().min(1),
+  stepId: z.string().min(1),
+  namespace: z.string().optional(),
+  version: z.number().int().positive().optional(),
+});
+export const PreviewRepoFilesOutputSchema = z.object({
+  repo: z.string(),
+  commit: z.string(),
+  /** Name of the workflow secret used to clone, never its value. */
+  usedAuthKey: z.string().optional(),
+  files: z.array(RepoFilePreviewSchema),
+});
+export type RepoFilePreview = z.infer<typeof RepoFilePreviewSchema>;
+export type PreviewRepoFilesInput = z.infer<typeof PreviewRepoFilesInputSchema>;
+export type PreviewRepoFilesOutput = z.infer<typeof PreviewRepoFilesOutputSchema>;

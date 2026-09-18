@@ -1373,6 +1373,9 @@ export function WorkflowEditorCanvas({
             <WorkflowFilesPanel
               artifacts={settingsDraft?.artifacts ?? []}
               onChange={(artifacts) => onSettingsChange?.({ ...settingsDraft, artifacts })}
+              steps={editedSteps}
+              workflowName={workflowName}
+              namespace={namespace}
             />
           </div>
         </div>

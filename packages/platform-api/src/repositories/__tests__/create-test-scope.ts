@@ -48,6 +48,7 @@ import type {
 import type { CallerIdentity } from '../../auth';
 import type { CallerScope } from '../caller-scope';
 import { createCallerScope, type CallerScopeServices } from '../create-caller-scope';
+import { createStubRepoFileReader, type RepoFileReader } from '../../runtime/repo-file-reader';
 import { noopRunKicker, type RunKicker } from '../../runtime/run-kicker';
 import type { DockerImagesService } from '../../services/docker-images-service';
 import type { InviteNotificationService, InviteService } from '../../services/invite-notification';
@@ -197,6 +198,7 @@ export interface TestScopeOverrides {
   readonly secretsRepo?: WorkflowSecretsRepository;
   readonly namespaceSecretsRepo?: NamespaceSecretsRepository;
   readonly runKicker?: RunKicker;
+  readonly repoFileReader?: RepoFileReader;
   readonly inviteService?: InviteService | null;
   readonly joinLinkService?: JoinLinkService | null;
   readonly inviteNotificationService?: InviteNotificationService | null;
@@ -265,6 +267,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     webhookRouter: null as unknown as CallerScopeServices['webhookRouter'],
     agentRunner: null as unknown as CallerScopeServices['agentRunner'],
     runKicker: overrides.runKicker ?? noopRunKicker(),
+    repoFileReader: overrides.repoFileReader ?? createStubRepoFileReader(),
     inviteService: overrides.inviteService ?? null,
     joinLinkService: overrides.joinLinkService ?? null,
     inviteNotificationService: overrides.inviteNotificationService ?? null,
