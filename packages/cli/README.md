@@ -66,7 +66,7 @@ because a record whose images stay is re-derived on the next read — which need
 admin of that workspace, audits under `_system` since the daemon is
 deployment-wide, and is refused while a live workflow version still pins one of
 them (`--keep-images` for the rare record-only case; `system rmi` still removes
-one image by id or tag).
+one image by id or tag, and a live pin refuses it too).
 `images build --repo --commit [--dockerfile] [--context]` builds one version of a built
 source there and then, instead of waiting for a workflow run to build it
 lazily: it mints the same tag a build-mode step pinning that commit resolves

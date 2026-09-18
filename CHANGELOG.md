@@ -128,6 +128,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Security
 - `next` moves to 16.3.4, through the root `pnpm.overrides` pin that held it at 16.3.1. Two critical advisories were published against that version (GHSA-2xp9-vwfh-vxw4 and GHSA-p293-qw3h-jr36), which the supply-chain audit blocks on, and the pin meant the `^16.0.0` range in `platform-ui` could not pick the fix up on its own.
+- Prevent deletion of Docker images still used by live workflow versions [#1378](https://github.com/Appsilon/mediforce/pull/1378).
 
 ### Added
 - Authorable in the step editor: `script.timeoutMinutes` (which `agent` and `databricks` already had, so a long script was killed at the 30-minute default with no way to raise it), the verdict `label`, `intent` and `requiresComment` fields, and `params[].requiredForVerdicts`.

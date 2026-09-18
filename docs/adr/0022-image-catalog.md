@@ -265,9 +265,22 @@ deployment-wide artifact is not reversible by anyone.
 The gate is `assertCallerIsNamespaceAdmin`, not
 `assertCallerCanAdminDockerImages`, whose own comment calls it a loose
 approximation until #376 — owner or admin of *any* namespace, which nearly
-every user satisfies through a personal workspace. That looser gate still
-applies underneath via `deleteDockerImage`, so **Admin → Infrastructure** is
-unchanged.
+every user satisfies through a personal workspace. That looser gate is still
+all that stands at the other door: **Admin → Infrastructure** and
+`mediforce system rmi` reach the same deployment-wide daemon without a workspace
+to be admin of. #1375 therefore moved the live-pin refusal below both doors,
+into `deleteDockerImage` itself — the gates still differ, the check no longer
+does. It resolves an image id to every tag that names it first, since
+`docker rmi` on an id takes them all, and refuses outright when the daemon
+cannot list them: an unreachable daemon degrades to an empty listing by decision
+2, which is the right answer for a read and a silent fail-open here.
+
+Neither door gets a `force`. Re-pointing the step or archiving the version is
+the answer, as it already was for the catalog — a flag that destroys an image
+400 live steps run on is the behaviour this revision removed, not one to
+re-offer behind a checkbox. Rebuilding the shared golden image is not affected:
+it is replaced in place on the host (`scripts/rebuild-docker-images.sh`), never
+by deleting it first.
 
 **A live workflow version blocks the delete; a superseded one does not.** Live
 means the version a run starts from, by the same `pickRunnableVersion` rule

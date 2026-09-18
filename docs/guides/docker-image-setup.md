@@ -550,8 +550,13 @@ cannot see blocks the delete just the same, and is reported as a count rather
 than by name.
 
 `mediforce images delete --keep-images` removes only the record — rarely what
-you want, for the reason above — and `mediforce system rmi <id-or-tag>` still
-removes one image on its own.
+you want, for the reason above. `mediforce system rmi <id-or-tag>` and
+**Admin → Infrastructure** still remove one image on its own, and the same live
+pin blocks them: deleting by id weighs every tag that names the image, since
+`docker rmi` on an id takes them all. If the daemon cannot be listed at that
+moment those other tags cannot be checked, so the delete is refused rather than
+guessed at — retry, or name the image as `repository:tag`, which needs no
+listing.
 
 ## Backfilling an existing deployment
 

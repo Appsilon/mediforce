@@ -1,16 +1,11 @@
-import {
-  assertCallerIsNamespaceAdmin,
-  assertNamespaceAccess,
-  type CallerIdentity,
-} from '../../auth';
-import { ConflictError } from '../../errors';
+import { assertCallerIsNamespaceAdmin, assertNamespaceAccess } from '../../auth';
 import type { CallerScope } from '../../repositories/index';
 import type {
   DeleteImageCatalogEntryInput,
   DeleteImageCatalogEntryOutput,
 } from '../../contract/image-catalog';
 import { actorFromCaller } from '../_helpers';
-import { findWorkflowImagePins, type WorkflowImagePin } from '../workflows/_image-pins';
+import { assertNoLiveImagePins } from '../workflows/_image-pins';
 import { deleteDockerImage } from '../docker-images/delete-image';
 import { fetchDaemonImages } from '../system/_docker';
 import { discoverEntries } from './_discovered';
@@ -42,6 +37,7 @@ export async function deleteImageCatalogEntry(
     // stricter than the one `deleteDockerImage` applies underneath: that one is
     // documented as a loose approximation — owner or admin of *any* namespace —
     // which nearly every user satisfies through their own personal workspace.
+    // The *live-pin* refusal is the same on both paths, and asked below.
 
     const daemon = await fetchDaemonImages();
     // A discovered entry is derived on read rather than stored (ADR-0022
@@ -70,19 +66,12 @@ export async function deleteImageCatalogEntry(
     // only by naming the same artifact twice.
     const tags = [...new Set(versions.map((version) => version.imageTag))];
 
-    // A live version pinning one of these tags is a run that will fail at
-    // container start, and unlike a superseded version its author can still
-    // re-point it — so this refuses rather than breaking it. Judged
-    // deployment-wide, because the daemon is: a step in a namespace this caller
-    // cannot read breaks just the same.
-    const pins = findWorkflowImagePins(
-      await scope.workflowDefinitions.listGroupsForImageAudit(),
-      tags,
-    );
-    const live = pins.filter((pin) => pin.live);
-    if (live.length > 0) {
-      throw new ConflictError(describeLivePins(live, scope.caller));
-    }
+    // `deleteDockerImage` asks this of every tag it is handed, so the rule and
+    // its message live in one place. Asked here too, over all of them at once,
+    // because the loop below destroys tags one at a time: leave it to the call
+    // underneath and a refusal on the second tag arrives with the first one
+    // already gone. A refused delete destroys nothing.
+    await assertNoLiveImagePins(tags, scope);
 
     // Images first, and every one of them: the entry is the only handle anyone
     // has on what is left behind, so removing the row while a tag survives
@@ -91,7 +80,8 @@ export async function deleteImageCatalogEntry(
     for (const tag of tags) {
       // The admin handler, not the service: one code path for destroying an
       // image, so this cannot drift from Infrastructure's own delete on the
-      // gate, the `_system` audit or the unconfigured-deployment error.
+      // gate, the `_system` audit, the live-pin refusal or the
+      // unconfigured-deployment error.
       await deleteDockerImage({ imageId: tag }, scope);
       deletedImages.push(tag);
     }
@@ -123,36 +113,4 @@ export async function deleteImageCatalogEntry(
   }
 
   return { success: true, deletedImages };
-}
-
-/**
- * Why a delete was refused, in terms the caller can act on.
- *
- * Redacted, because the scan behind it is deployment-wide while workflow names
- * are not: a private workflow in a namespace this caller has not joined is
- * counted, never named. The count still has to be there — a block with no
- * reason is indistinguishable from a bug.
- */
-function describeLivePins(live: readonly WorkflowImagePin[], caller: CallerIdentity): string {
-  const visible = live.filter(
-    (pin) =>
-      caller.isSystemActor || caller.namespaces.has(pin.namespace) || pin.visibility === 'public',
-  );
-  const hidden = live.length - visible.length;
-
-  const named = visible.map(
-    (pin) => `${pin.namespace}/${pin.name} v${String(pin.version)} (${pin.steps.join(', ')})`,
-  );
-  if (hidden > 0) {
-    named.push(
-      `${String(hidden)} more in ${hidden === 1 ? 'a workspace' : 'workspaces'} you cannot see`,
-    );
-  }
-
-  return (
-    `Cannot delete these images: ${String(live.length)} workflow ${live.length === 1 ? 'version' : 'versions'} ` +
-    `still ${live.length === 1 ? 'runs' : 'run'} on ${live.length === 1 ? 'it' : 'them'} — ${named.join('; ')}. ` +
-    'Point those steps at another image, or archive the version, then delete again. ' +
-    'Superseded and archived versions do not block, since a registered version cannot be re-pointed.'
-  );
 }

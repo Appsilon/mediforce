@@ -365,6 +365,30 @@ describe('deleteImageCatalogEntry handler', () => {
     expect(await repo.getById('alpha', created.entry.id)).not.toBeNull();
   });
 
+  it('destroys nothing when the pin is on the second of an entry\'s tags', async () => {
+    const removed: string[] = [];
+    daemon.value = TWO_VERSIONS;
+    const scope = await adminScopeWith(
+      {
+        delete: async (imageId) => {
+          removed.push(imageId);
+          return { deleted: imageId };
+        },
+      },
+      [pinning('mediforce-built:bbbbbbbbbbbb')],
+    );
+    const created = await createImageCatalogEntry({ namespace: 'alpha', ...TEALFLOW }, scope);
+
+    await expect(
+      deleteImageCatalogEntry({ namespace: 'alpha', id: created.entry.id, withImages: true }, scope),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    // The refusal is weighed over every tag before the loop starts, so the
+    // unpinned first tag is not already gone by the time the second refuses.
+    expect(removed).toEqual([]);
+    expect(await repo.getById('alpha', created.entry.id)).not.toBeNull();
+  });
+
   it('names the blocking workflow and version, so the message is actionable', async () => {
     daemon.value = TWO_VERSIONS;
     const scope = await adminScopeWith(

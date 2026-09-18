@@ -1,4 +1,7 @@
 import { resolveStepImage } from '@mediforce/agent-runtime';
+import type { CallerIdentity } from '../../auth';
+import { ConflictError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
 import {
   pickRunnableVersion,
   type WorkflowDefinition,
@@ -8,10 +11,10 @@ import {
 /**
  * Which workflow versions pin a given set of image tags.
  *
- * One place, because two callers ask the same question for opposite reasons:
+ * One place, because the callers ask the same question for opposite reasons:
  * `GET /api/workflow-definitions/by-image` renders "used by", and
- * `deleteImageCatalogEntry` refuses to destroy an image a live version needs.
- * They must not be allowed to disagree about what counts as a pin.
+ * `assertNoLiveImagePins` below refuses to destroy an image a live version
+ * needs. They must not be allowed to disagree about what counts as a pin.
  *
  * **Every version, not just the latest.** The read this replaced looked at
  * `latestVersion` alone and skipped archived workflows entirely, so "what
@@ -128,4 +131,60 @@ export function findWorkflowImagePins(
   }
 
   return pins;
+}
+
+/**
+ * Refuse to destroy images a live workflow version still runs on.
+ *
+ * Shared by both doors onto that act — Admin → Infrastructure's
+ * `deleteDockerImage` and the Image Catalog's composite delete — so the rule
+ * and the message it refuses with cannot drift between them (#1375).
+ *
+ * Judged deployment-wide, because the daemon is: a step in a namespace this
+ * caller cannot read breaks just the same. Superseded and archived versions do
+ * not block, for the reason `WorkflowImagePin.live` states.
+ */
+export async function assertNoLiveImagePins(
+  tags: readonly string[],
+  scope: CallerScope,
+): Promise<void> {
+  const live = findWorkflowImagePins(
+    await scope.workflowDefinitions.listGroupsForImageAudit(),
+    tags,
+  ).filter((pin) => pin.live);
+  if (live.length > 0) {
+    throw new ConflictError(describeLivePins(live, scope.caller));
+  }
+}
+
+/**
+ * Why a delete was refused, in terms the caller can act on.
+ *
+ * Redacted, because the scan behind it is deployment-wide while workflow names
+ * are not: a private workflow in a namespace this caller has not joined is
+ * counted, never named. The count still has to be there — a block with no
+ * reason is indistinguishable from a bug.
+ */
+function describeLivePins(live: readonly WorkflowImagePin[], caller: CallerIdentity): string {
+  const visible = live.filter(
+    (pin) =>
+      caller.isSystemActor || caller.namespaces.has(pin.namespace) || pin.visibility === 'public',
+  );
+  const hidden = live.length - visible.length;
+
+  const named = visible.map(
+    (pin) => `${pin.namespace}/${pin.name} v${String(pin.version)} (${pin.steps.join(', ')})`,
+  );
+  if (hidden > 0) {
+    named.push(
+      `${String(hidden)} more in ${hidden === 1 ? 'a workspace' : 'workspaces'} you cannot see`,
+    );
+  }
+
+  return (
+    `Cannot delete these images: ${String(live.length)} workflow ${live.length === 1 ? 'version' : 'versions'} ` +
+    `still ${live.length === 1 ? 'runs' : 'run'} on ${live.length === 1 ? 'it' : 'them'} — ${named.join('; ')}. ` +
+    'Point those steps at another image, or archive the version, then delete again. ' +
+    'Superseded and archived versions do not block, since a registered version cannot be re-pointed.'
+  );
 }
