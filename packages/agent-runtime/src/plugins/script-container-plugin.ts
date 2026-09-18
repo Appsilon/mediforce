@@ -349,6 +349,9 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           stepId: this.context.stepId,
           outputDir,
           logFile,
+          // A script's stdout has no event structure; it goes to the log verbatim,
+          // written live by whichever process is watching the container.
+          lineFormat: 'raw',
           imageBuild: this.imageBuild,
           onStdoutLine: emitLine,
           onStderrLine: (line) => emitLine(`[stderr] ${line}`),

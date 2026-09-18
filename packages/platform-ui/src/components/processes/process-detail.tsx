@@ -4,7 +4,8 @@ import * as React from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, FileBarChart, Archive, ArchiveRestore, ScrollText, X, GitBranch } from 'lucide-react';
+import { Archive, ArchiveRestore, CheckCircle2, GitBranch, ScrollText, ShieldCheck, X } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { ProcessInstance, StepExecution, AuditEvent, Step, WorkflowStep, WorkflowDefinition } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 import { AuditLogTab } from './audit-log-tab';
@@ -21,6 +22,8 @@ import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 import { cn } from '@/lib/utils';
+import { secondaryButtonClass, destructiveButtonClass } from '@/components/ui/button-styles';
+import { RunReport } from '@/components/reports/run-report';
 import { MissingEnvBanner } from './missing-env-banner';
 import { AgentEscalatedBanner } from './agent-escalated-banner';
 import { PreviousRunBanner } from './previous-run-banner';
@@ -113,9 +116,26 @@ export function ProcessDetail({
     [stepExecutions],
   );
 
-  const [rightTab, setRightTab] = React.useState<'agent-log' | 'audit' | 'diagram'>(() =>
+  const [rightTab, setRightTab] = React.useState<'agent-log' | 'audit' | 'diagram' | 'report'>(() =>
     agentLogFiles.length > 0 ? 'agent-log' : 'audit',
   );
+
+  // One list for the edge pulls and the panel header, so they cannot drift.
+  const rightPanels = React.useMemo((): Array<{
+    value: 'agent-log' | 'audit' | 'diagram' | 'report';
+    label: string;
+    Icon: LucideIcon;
+    /** The report only exists once the run finishes, so its pull announces
+     *  itself rather than sitting quietly with the other three. */
+    ready?: boolean;
+  }> => [
+    ...(agentLogFiles.length > 0 ? [{ value: 'agent-log' as const, label: 'Log', Icon: ScrollText }] : []),
+    { value: 'audit' as const, label: 'Audit', Icon: ShieldCheck },
+    ...(definition ? [{ value: 'diagram' as const, label: 'Diagram', Icon: GitBranch }] : []),
+    ...(instance.status === 'completed'
+      ? [{ value: 'report' as const, label: 'Report', Icon: CheckCircle2, ready: true }]
+      : []),
+  ], [agentLogFiles.length, definition, instance.status]);
 
   // When a new agent log file appears (new step started), switch to Agent Log.
   // Only switch when the count increases so the user's manual tab choice is
@@ -204,18 +224,32 @@ export function ProcessDetail({
   }, [auditEvents, rightTab]);
 
   return (
-    <div className="flex items-start gap-0 p-6">
+    <div className="flex items-start gap-0 p-6 pr-0">
       <div className="flex-1 min-w-0 space-y-6 pr-6">
         {/* Header */}
         <div className="space-y-2">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-headline font-semibold flex-1">{formatStepName(instance.definitionName)}</h1>
+            <h1
+              className="text-2xl font-headline font-semibold min-w-0 truncate"
+              title={formatStepName(instance.definitionName)}
+            >
+              {formatStepName(instance.definitionName)}
+            </h1>
+            <div className="shrink-0 mr-auto flex items-center gap-2">
+              <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} error={instance.error} dryRun={instance.dryRun} />
+              {instance.archived === true && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                  <Archive className="h-3 w-3" />
+                  Archived
+                </span>
+              )}
+            </div>
             {canArchive && (
               <button
                 onClick={handleArchiveToggle}
                 disabled={archiving}
                 title={instance.archived === true ? 'Unarchive run' : 'Archive run'}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0 disabled:opacity-50"
+                className={cn(secondaryButtonClass, "shrink-0")}
               >
                 {instance.archived === true
                   ? <><ArchiveRestore className="h-3.5 w-3.5" />Unarchive</>
@@ -225,103 +259,75 @@ export function ProcessDetail({
             {canCancel && cancelStep === 0 && (
               <button
                 onClick={() => setCancelStep(1)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors shrink-0"
+                className={cn(secondaryButtonClass, "shrink-0 hover:text-destructive")}
               >
                 <X className="h-3.5 w-3.5" />
-                Cancel Run
+                Cancel run
               </button>
             )}
             {canCancel && cancelStep === 1 && (
               <div className="flex items-center gap-1.5 shrink-0">
-                <span className="text-xs text-destructive">This cannot be undone.</span>
-                <button
-                  onClick={handleConfirmCancel}
-                  className="rounded-md bg-destructive px-2.5 py-1 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                >
+                <span className="text-sm text-destructive">This cannot be undone.</span>
+                <button onClick={handleConfirmCancel} className={destructiveButtonClass}>
                   Confirm cancel
                 </button>
                 <button
                   onClick={() => { setCancelStep(0); setCancelError(null); }}
-                  className="rounded-md border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors"
+                  className={secondaryButtonClass}
                 >
                   Keep running
                 </button>
               </div>
             )}
             {canCancel && cancelStep === 2 && (
-              <span className="text-xs text-muted-foreground shrink-0">Cancelling...</span>
+              <span className="text-sm text-muted-foreground shrink-0">Cancelling…</span>
             )}
             {cancelError && (
               <span className="text-xs text-destructive shrink-0">{cancelError}</span>
             )}
-            <button
-              onClick={() => {
-                if (logsOpen) {
-                  setLogsOpen(false);
-                } else {
-                  setRightTab(agentLogFiles.length > 0 ? 'agent-log' : 'audit');
-                  setLogsOpen(true);
-                }
-              }}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0"
-            >
-              <ScrollText className="h-3.5 w-3.5" />
-              {logsOpen ? 'Hide Execution Log' : 'Execution Log'}
-            </button>
-            {definition && (
-              <button
-                onClick={() => {
-                  if (logsOpen && rightTab === 'diagram') {
-                    setLogsOpen(false);
-                  } else {
-                    setRightTab('diagram');
-                    setLogsOpen(true);
-                  }
-                }}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors shrink-0',
-                  logsOpen && rightTab === 'diagram'
-                    ? 'border-primary/40 text-primary bg-primary/5'
-                    : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
-                )}
-              >
-                <GitBranch className="h-3.5 w-3.5" />
-                Workflow Diagram
-              </button>
-            )}
           </div>
 
-          {/* Metadata row */}
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground items-center">
-            <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} error={instance.error} dryRun={instance.dryRun} />
-            {instance.archived === true && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                <Archive className="h-3 w-3" />
-                Archived
-              </span>
-            )}
-            <span>Definition: <span className="font-mono text-foreground">v{instance.definitionVersion}</span></span>
-            {instance.configName && (
-              <span>Config: <span className="font-mono text-foreground">{instance.configName} v{instance.configVersion}</span></span>
-            )}
-            <span title={instance.id}>ID: <span className="font-mono text-foreground text-xs">{instance.id.slice(0, 8)}</span></span>
-            <span>Created: <span className="text-foreground">{format(new Date(instance.createdAt), 'MMM d, yyyy HH:mm')}</span></span>
+          {/* Run facts. A labelled column each, rather than one sentence that
+              wraps: these are numbers people compare across runs, and they were
+              unreadable run together with their labels inline. */}
+          <dl className="grid grid-flow-col auto-cols-fr gap-px overflow-x-auto rounded-lg border bg-border">
             {wfStatus.displayStatus !== 'in_progress' && (
-              <span>Duration: <span className="text-foreground">{formatDuration(runDurationMs)}</span></span>
+              <div className="bg-card px-3 py-2">
+                <dt className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Duration</dt>
+                <dd className="mt-0.5 text-sm font-semibold tabular-nums">{formatDuration(runDurationMs)}</dd>
+              </div>
             )}
             {totalCostUsd != null && (
-              <span>Cost: <span className={isTerminal ? 'text-foreground' : 'text-amber-600 dark:text-amber-400'}>{formatCostUsd(totalCostUsd)}{isTerminal ? '' : '+'}</span></span>
+              <div className="bg-card px-3 py-2">
+                <dt className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Cost</dt>
+                <dd className={cn('mt-0.5 text-sm font-semibold tabular-nums', isTerminal ? '' : 'text-amber-600 dark:text-amber-400')}>
+                  {formatCostUsd(totalCostUsd)}{isTerminal ? '' : '+'}
+                </dd>
+              </div>
             )}
-            {instance.status === 'completed' && (
-              <Link
-                href={`/${handle}/workflows/${encodeURIComponent(instance.definitionName)}/runs/${instance.id}/report`}
-                className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
-              >
-                <FileBarChart className="h-3.5 w-3.5" />
-                View Report
-              </Link>
+            <div className="bg-card px-3 py-2">
+              <dt className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Definition</dt>
+              <dd className="mt-0.5 text-sm font-semibold">v{instance.definitionVersion}</dd>
+            </div>
+            {instance.configName && (
+              <div className="bg-card px-3 py-2 min-w-0">
+                <dt className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Config</dt>
+                <dd className="mt-0.5 truncate font-mono text-xs" title={`${instance.configName} v${instance.configVersion}`}>
+                  {instance.configName} v{instance.configVersion}
+                </dd>
+              </div>
             )}
-          </div>
+            <div className="bg-card px-3 py-2 min-w-0">
+              <dt className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Run ID</dt>
+              <dd className="mt-0.5 truncate font-mono text-xs" title={instance.id}>{instance.id.slice(0, 8)}</dd>
+            </div>
+            <div className="bg-card px-3 py-2 min-w-0">
+              <dt className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Started</dt>
+              <dd className="mt-0.5 truncate text-sm font-semibold tabular-nums" title={format(new Date(instance.createdAt), 'MMM d, yyyy HH:mm')}>
+                {format(new Date(instance.createdAt), 'MMM d, HH:mm')}
+              </dd>
+            </div>
+          </dl>
 
           {needsHumanTaskAction && blockingTask && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 dark:bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
@@ -423,68 +429,108 @@ export function ProcessDetail({
         )}
       </div>
 
-      {/* Right panel — sticky log sidebar, expands leftward */}
+      {/* Right panel. The pulls down the edge are the only switcher — open or
+          closed, they sit in the same place and say what is behind them. A
+          second row of tabs inside meant two controls for one job. */}
       <div
         className={cn(
-          'sticky top-4 h-[calc(100vh-2rem)] shrink-0 flex border-l transition-[width] duration-300 ease-in-out',
-          logsOpen ? 'w-1/2' : 'w-10',
+          'sticky top-4 h-[calc(100vh-2rem)] shrink-0 flex gap-0 transition-[width] duration-300 ease-in-out',
+          logsOpen ? 'w-1/2' : 'w-8',
         )}
       >
-        {/* Toggle strip — always visible */}
-        <button
-          onClick={() => setLogsOpen((prev) => !prev)}
-          className="w-10 shrink-0 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors"
-          title={logsOpen ? 'Collapse panel' : 'Expand panel'}
-        >
-          {logsOpen
-            ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            : <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-          }
-        </button>
+        <div className="w-8 shrink-0 flex flex-col items-end justify-center gap-1.5">
+          {rightPanels.map(({ value, label, Icon, ready }) => {
+            const active = logsOpen && rightTab === value;
+            return (
+              <button
+                key={value}
+                onClick={() => {
+                  if (active) {
+                    setLogsOpen(false);
+                    return;
+                  }
+                  setRightTab(value);
+                  setLogsOpen(true);
+                }}
+                className={cn(
+                  'flex flex-col items-center gap-1.5 rounded-l-md border border-r-0 px-2 py-3 text-xs font-medium tracking-wide whitespace-nowrap transition-colors',
+                  active && 'bg-card text-foreground border-border',
+                  !active && ready === true && 'bg-primary-subtle text-primary border-primary/30 hover:brightness-95',
+                  !active && ready !== true && 'bg-muted/60 text-muted-foreground border-transparent hover:text-foreground hover:bg-muted',
+                )}
+              >
+                {/* Turned with the label, which `vertical-rl` rotates 90°. */}
+                <Icon className={cn('h-3.5 w-3.5 shrink-0 rotate-90', ready === true && 'text-primary')} />
+                <span style={{ writingMode: 'vertical-rl' }}>{label}</span>
+              </button>
+            );
+          })}
+        </div>
 
-        {/* Log content — fades in/out with the panel */}
         <div
           className={cn(
-            'flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden border-l transition-opacity duration-200',
+            'flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden rounded-l-lg border bg-card shadow-sm transition-opacity duration-200',
             logsOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
           )}
         >
-          {/* Tab bar */}
-          <div className="flex gap-1 border-b shrink-0">
-            {[
-              ...(agentLogFiles.length > 0 ? [{ value: 'agent-log' as const, label: 'Step Log' }] : []),
-              { value: 'audit' as const, label: 'Audit Log' },
-              ...(definition ? [{ value: 'diagram' as const, label: 'Diagram' }] : []),
-            ].map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setRightTab(value)}
-                className={cn(
-                  'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
-                  rightTab === value
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b shrink-0">
+            {(() => {
+              const panel = rightPanels.find((entry) => entry.value === rightTab);
+              if (panel === undefined) return null;
+              return (
+                <>
+                  <panel.Icon className={cn('h-4 w-4 shrink-0', panel.ready === true ? 'text-primary' : 'text-muted-foreground')} />
+                  <h2 className="font-headline text-sm font-semibold truncate">{panel.label}</h2>
+                </>
+              );
+            })()}
+            <button
+              onClick={() => setLogsOpen(false)}
+              className="ml-auto shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Close panel"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
 
           <div className={cn('flex-1 min-h-0 p-4 flex flex-col overflow-hidden', rightTab !== 'agent-log' && 'hidden')}>
-            <AgentLogViewer logFiles={agentLogFiles} initialStepId={agentLogStepId} runningStepIds={runningStepIds} />
+            <AgentLogViewer
+              logFiles={agentLogFiles}
+              initialStepId={agentLogStepId}
+              runningStepIds={runningStepIds}
+              runActive={isTerminal === false}
+            />
           </div>
 
           <div
             ref={auditScrollRef}
             className={cn('flex-1 min-h-0 overflow-y-auto p-4', rightTab !== 'audit' && 'hidden')}
           >
-            <AuditLogTab events={auditEvents} loading={auditEventsLoading} error={auditEventsError} />
+            <AuditLogTab
+              events={auditEvents}
+              loading={auditEventsLoading}
+              error={auditEventsError}
+              printable={rightTab === 'audit'}
+            />
           </div>
 
-          <div className={cn('flex-1 min-h-0 overflow-y-auto', rightTab !== 'diagram' && 'hidden')}>
+          <div className={cn('flex-1 min-h-0 overflow-auto grid place-items-center p-4', rightTab !== 'diagram' && 'hidden')}>
             {definition && rightTab === 'diagram' && (
               <WorkflowDiagram definition={definition} className="w-full" />
+            )}
+          </div>
+
+          {/* Same component as the standalone report page. */}
+          <div className={cn('flex-1 min-h-0 overflow-y-auto', rightTab !== 'report' && 'hidden')}>
+            {rightTab === 'report' && (
+              <RunReport
+                instance={instance}
+                stepExecutions={stepExecutions}
+                auditEvents={auditEvents}
+                definitionSteps={definitionSteps}
+                runDetailHref={routes.workflowRun(handle, instance.definitionName, instance.id)}
+                embedded
+              />
             )}
           </div>
         </div>
