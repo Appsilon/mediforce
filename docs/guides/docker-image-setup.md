@@ -380,9 +380,9 @@ A step runs its command *inside* the image, so the image must already contain wh
 | `executor: agent` | The agent CLI (`claude` or `opencode`) and a shell — start from `mediforce-golden-image` |
 | `executor: script`, `script.command` | Whatever the command invokes (`python`, `Rscript`, `node`, …) |
 | `executor: script`, `script.inlineScript` without `script.image` | Nothing — the runtime image is selected automatically |
-| `executor: script`, `script.inlineScript` with an explicit `script.image` | The selected runtime (`python3`, `node`, `Rscript`, or `bash`) |
+| `executor: script`, `script.inlineScript` with an explicit `script.image` | The binary the selected runtime is run with — `python3`, `node`, `Rscript`, or, for `bash`, `sh` |
 
-Minimal base images (`alpine`, `scratch`, distroless) ship none of this. `alpine` in particular has BusyBox `sh` but no `bash`, and no agent CLI at all, so an agent step pointed at it fails at container start. They are only useful as the `FROM` line of an image you build on top of.
+Minimal base images (`alpine`, `scratch`, distroless) ship none of this. `alpine` in particular has BusyBox `sh` but no `bash`, and no agent CLI at all, so an agent step pointed at it fails at container start — while a `runtime: bash` step runs there fine, because the engine hands the script to `sh`. They are only useful as the `FROM` line of an image you build on top of.
 
 ## Troubleshooting
 

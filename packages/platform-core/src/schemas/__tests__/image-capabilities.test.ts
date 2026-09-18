@@ -20,6 +20,16 @@ describe('parseImageCapabilities', () => {
     });
   });
 
+  it('records the busybox `sh` an alpine-style image carries without bash', () => {
+    // The engine runs a `runtime: bash` step as `sh <script>`, so `sh` is the
+    // binary that decides whether such a step can run at all (#1377).
+    expect(parseImageCapabilities('/bin/sh\n')).toEqual({
+      status: 'known',
+      agentCapable: false,
+      runtimes: ['sh'],
+    });
+  });
+
   it('treats empty and non-zero probe output as a known capability set', () => {
     expect(parseImageCapabilities('')).toEqual({
       status: 'known',
@@ -35,7 +45,7 @@ describe('imageCapabilityProbeArgs', () => {
 
   it('asks for one runtime per `command -v`, which is all dash answers', () => {
     expect(script).toBe(
-      'for runtime in claude opencode bash python3 Rscript node; do command -v "$runtime" || true; done',
+      'for runtime in claude opencode bash sh python3 Rscript node; do command -v "$runtime" || true; done',
     );
   });
 
