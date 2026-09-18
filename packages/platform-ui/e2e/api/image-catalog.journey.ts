@@ -69,9 +69,10 @@ interface EntryView {
   baseEntryId: string | null;
 }
 
-/** The image the capability probe runs against: `alpine` has a shell and none
- *  of the probed runtimes, so its honest answer is a known, empty set — the
- *  case the agent picker must drop rather than offer. */
+/** The image the capability probe runs against: `alpine` has busybox `sh` and
+ *  none of the other probed runtimes, so its honest answer is `sh` alone and
+ *  not agent-capable — offered to a `runtime: bash` step, which the engine runs
+ *  as `sh` (#1377), and dropped by the agent picker. */
 const PROBE_BASE_IMAGE = 'alpine:3.22';
 
 function docker(...args: string[]): void {
@@ -374,7 +375,7 @@ test.describe('image catalog API journey', () => {
     expect(entry.versions[0].capabilities).toEqual({
       status: 'known',
       agentCapable: false,
-      runtimes: [],
+      runtimes: ['sh'],
     });
 
     // Read back through a fresh request: the probe result is a stored column
@@ -511,7 +512,7 @@ test.describe('image catalog API journey', () => {
       expect(read.versions[0].capabilities).toEqual({
         status: 'known',
         agentCapable: false,
-        runtimes: [],
+        runtimes: ['sh'],
       });
 
       // Describing it is an ordinary create on the source it already carried,

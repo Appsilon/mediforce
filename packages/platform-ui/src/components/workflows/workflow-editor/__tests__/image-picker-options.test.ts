@@ -167,6 +167,18 @@ describe('image picker options — issue #1298', () => {
       expect(values).toEqual(['mystery:1']);
     });
 
+    it('[UNIT] offers a busybox-only image to a bash step, which the engine runs as `sh`', () => {
+      // `alpine` is the image the engine runs a `runtime: bash` step in, and it
+      // carries no `bash` at all — probing for one filtered it out of the one
+      // step type it is the default for (#1377).
+      const values = buildCatalogImageGroups(
+        [entry({ id: 'a', name: 'Alpine', versions: [version('alpine:3.24', { status: 'known', agentCapable: false, runtimes: ['sh'] })] })],
+        'script',
+        'sh',
+      ).flatMap((g) => g.options.map((o) => o.value));
+      expect(values).toEqual(['alpine:3.24']);
+    });
+
     it('[UNIT] does not apply the agent-capable rule to a script step', () => {
       const values = buildCatalogImageGroups(
         [entry({ id: 'a', name: 'Alpine', versions: [version('alpine:3.24', notAgentCapable)] })],
@@ -181,7 +193,7 @@ describe('image picker options — issue #1298', () => {
       expect(requiredRuntimeFor(step('javascript'))).toBe('node');
       expect(requiredRuntimeFor(step('python'))).toBe('python3');
       expect(requiredRuntimeFor(step('r'))).toBe('Rscript');
-      expect(requiredRuntimeFor(step('bash'))).toBe('bash');
+      expect(requiredRuntimeFor(step('bash'))).toBe('sh');
       expect(requiredRuntimeFor({ id: 's', name: 'S', type: 'creation', executor: 'script', script: { command: 'run' } } as WorkflowStep)).toBeUndefined();
     });
   });

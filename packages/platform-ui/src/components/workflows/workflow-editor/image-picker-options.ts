@@ -31,12 +31,18 @@ export interface ImagePicker {
 
 /** The probed binary a `script.runtime` needs to be present in the image.
  *  `inlineScript` is handed to this interpreter, so an image without it fails
- *  at container start the same way an agent image without a CLI does. */
+ *  at container start the same way an agent image without a CLI does.
+ *
+ *  `bash` asks for `sh`, not for `bash`: the engine runs a `runtime: bash` step
+ *  as `sh <script>` (`RUNTIME_CONFIG` in `script-container-plugin`), and the
+ *  image it defaults to for one is `alpine`, which carries busybox `sh` and no
+ *  `bash` at all. Probing for `bash` filtered that image out of the only step
+ *  type it is the default for (#1377). */
 const RUNTIME_BINARY: Record<NonNullable<WorkflowStep['script']>['runtime'] & string, ImageRuntime> = {
   javascript: 'node',
   python: 'python3',
   r: 'Rscript',
-  bash: 'bash',
+  bash: 'sh',
 };
 
 /** The runtime a step is knowably going to need, or `undefined` when it is not

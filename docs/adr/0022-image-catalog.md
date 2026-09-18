@@ -740,7 +740,9 @@ it, so the glossary never defines a thing a reader cannot go and find:
   Not a description of its contents.
 - **Capability** — a derived, probed fact about a version: the runtimes it
   carries and whether it is **agent-capable** (an agent CLI *and* `bash`).
-  Present, absent, or unknown; never declared.
+  Present, absent, or unknown; never declared. `sh` is probed as a runtime of
+  its own beside `bash`, because a `runtime: bash` step is executed as
+  `sh <script>` (#1377).
 - **Lineage** — the ancestry relation between images, computed from
   `RootFS.Layers` prefix containment, not parsed from `FROM`.
 - **Base** — an entry's nearest ancestor in the catalog, or `none` for a root.

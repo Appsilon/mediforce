@@ -21,8 +21,9 @@ import { trackPageErrors } from '../helpers/page-errors';
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
 const AUTH = { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' };
 
-/** `alpine` has a shell and none of the probed runtimes, so both images come
- *  out as a known, empty capability set — enough to prove the chips render. */
+/** `alpine` carries busybox `sh` and none of the other probed runtimes, so both
+ *  images come out as a known `sh` and not agent-capable — enough to prove the
+ *  chips render. */
 const BASE_IMAGE = 'alpine:3.22';
 
 function docker(...args: string[]): void {

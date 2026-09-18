@@ -4,6 +4,7 @@ export const ImageRuntimeSchema = z.enum([
   'claude',
   'opencode',
   'bash',
+  'sh',
   'python3',
   'Rscript',
   'node',
@@ -54,7 +55,8 @@ const IMAGE_CAPABILITY_PROBE_SCRIPT =
 /**
  * `docker run` arguments for one capability probe. The image supplies the `sh`
  * that runs, so the container is capped the way agent and script containers are
- * — smaller, because this one only resolves six paths — and gets no network.
+ * — smaller, because this one only resolves a handful of paths — and gets no
+ * network.
  */
 export function imageCapabilityProbeArgs(image: string): string[] {
   return [

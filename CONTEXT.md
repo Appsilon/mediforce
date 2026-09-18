@@ -279,7 +279,7 @@ a `referenced` one, a content hash for a `carried` one, carrying the image tag t
 are derived on read from the daemon's build labels, never stored.
 
 **Capability** *(of an Image Catalog Version)*:
-The derived set of `claude`, `opencode`, `bash`, `python3`, `Rscript`, and
+The derived set of `claude`, `opencode`, `bash`, `sh`, `python3`, `Rscript`, and
 `node` binaries that a bounded, network-isolated probe found. It is cached by
 daemon image ID when the entry is registered, so rendering a catalog or picker
 never starts a container. A **Discovered Entry** has no row to cache into, so
@@ -287,6 +287,9 @@ its probe results are memoised in the API process by image id instead — filled
 on the same single-entry read, lost on restart, never a stored fact. A Version is **agent-capable** only when it has
 `bash` and either agent CLI; an unavailable daemon or timed-out probe is
 explicitly `unknown`, which remains selectable without a suitability claim.
+`sh` and `bash` are two members of the set rather than one, because the engine
+runs a `runtime: bash` step as `sh <script>`: an `alpine` carrying only busybox
+`sh` runs one, and only a step needing bash-only syntax needs `bash`.
 
 **Lineage** *(of an Image Catalog Version)*:
 The ancestry relation between images, computed from `RootFS.Layers` prefix
