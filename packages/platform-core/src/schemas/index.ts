@@ -483,3 +483,5 @@ export {
   type AssignmentTableUiConfig,
   type StepUiComponent,
 } from './step-ui-config';
+
+export { auditSignificance, type AuditSignificance } from './audit-significance';
