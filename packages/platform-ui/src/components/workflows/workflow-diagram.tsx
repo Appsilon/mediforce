@@ -525,7 +525,7 @@ function CanvasControls({ onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlock
   const zoom = useStore((s) => s.transform[2]);
 
   return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-white dark:bg-background border border-border/60 rounded-xl shadow-sm px-1.5 py-1.5 z-10 whitespace-nowrap">
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-white dark:bg-background border border-border/60 rounded-xl shadow-sm px-1.5 py-1.5 z-10 whitespace-nowrap" data-tour="editor-controls">
       {(onUndo || onRedo) && (
         <>
           <button

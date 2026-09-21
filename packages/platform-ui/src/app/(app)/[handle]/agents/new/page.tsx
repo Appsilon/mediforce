@@ -96,7 +96,7 @@ export default function NewAgentPage() {
   }, [modelDropdownOpen]);
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl">
+    <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl" data-tour="agent-new-form">
       <ConceptIntro>
         <p>
           <strong>An agent is a reusable configuration workflow steps call by id</strong> — its system prompt, its
@@ -189,6 +189,7 @@ export default function NewAgentPage() {
             <button
               type="button"
               onClick={() => setModelDropdownOpen((prev) => !prev)}
+              data-tour="agent-new-model"
               className={cn(
                 'flex w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm transition-colors',
                 'hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-ring',
@@ -252,6 +253,7 @@ export default function NewAgentPage() {
           <button
             type="button"
             onClick={handleSave}
+            data-tour="agent-new-save"
             disabled={!canSave}
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-colors',

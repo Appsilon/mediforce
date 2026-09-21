@@ -59,7 +59,7 @@ export default function ModelsPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Model Registry</h1>
+          <h1 className="text-2xl font-bold" data-tour="models-header">Model Registry</h1>
           <p className="text-sm text-muted-foreground mt-1">
             LLM models synced from OpenRouter. Use this data when selecting models for workflow steps.
           </p>

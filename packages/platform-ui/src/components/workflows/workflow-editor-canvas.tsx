@@ -940,7 +940,7 @@ export function WorkflowEditorCanvas({
 
       <div className="shrink-0 border-b px-4 py-1.5 flex items-center gap-1.5 flex-wrap bg-white dark:bg-background">
 
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex items-center gap-1.5" data-tour="editor-toolbar">
           <AuthoringPathsPopover />
 
           <button

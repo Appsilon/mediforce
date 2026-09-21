@@ -490,7 +490,7 @@ export function StepStatusPanel({
   }
 
   return (
-    <div className="rounded-lg border bg-card p-4 space-y-1">
+    <div className="rounded-lg border bg-card p-4 space-y-1" data-tour="run-history">
       <h3 className="text-sm font-medium mb-3">Execution History</h3>
       <ol>
         {history.map((item, i) => {

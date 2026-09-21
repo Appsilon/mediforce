@@ -15,6 +15,7 @@ export function NewTicketTrigger() {
       className="inline-flex h-8 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
       aria-label="File a ticket"
       data-testid="new-ticket-trigger"
+      data-tour="ticket"
     >
       <TicketPlus className="h-3.5 w-3.5" />
       <span className="hidden sm:inline">Ticket</span>

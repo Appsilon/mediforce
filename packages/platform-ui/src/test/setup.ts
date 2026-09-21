@@ -18,6 +18,12 @@ Object.defineProperty(globalThis, 'localStorage', {
   } as Storage,
 });
 
+// jsdom implements no layout, so it ships no scrollIntoView at all. Guarded
+// because this file also sets up the suites that run in the node environment.
+if (typeof Element !== 'undefined' && Element.prototype.scrollIntoView === undefined) {
+  Element.prototype.scrollIntoView = vi.fn();
+}
+
 vi.mock('@/hooks/use-handle-from-path', () => ({
   useHandleFromPath: () => 'test-org',
 }));

@@ -591,7 +591,7 @@ export function TaskGroupedView({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2" data-tour="tasks-list">
       <div className="flex items-center justify-between">
         {selectedIds.size > 0 ? (
           <BulkActionBar

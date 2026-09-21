@@ -53,6 +53,15 @@ export default function ProcessDefinitionPage() {
   return <ProcessDefinitionPageMember name={name} handle={handle} />;
 }
 
+/** Anchor per tab, so a guide step rings the tab it is describing. */
+const WORKFLOW_TAB_TOURS: Record<string, string> = {
+  runs: 'workflow-tab-runs',
+  definitions: 'workflow-tab-definitions',
+  triggers: 'workflow-tab-triggers',
+  secrets: 'workflow-tab-secrets',
+  access: 'workflow-tab-access',
+};
+
 function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: string }) {
   const decodedName = decodeURIComponent(name);
   const router = useRouter();
@@ -97,7 +106,7 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
             {definition.description && (
               <p className="text-sm text-muted-foreground mt-0.5">{definition.description}</p>
             )}
-            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground" data-tour="workflow-meta">
               {definition.namespace && (
                 <>
                   <span className="flex items-center gap-1">
@@ -416,7 +425,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 min-w-0">
-              <h1 className="text-lg font-semibold truncate min-w-0">
+              <h1 className="text-lg font-semibold truncate min-w-0" data-tour="workflow-header">
                 {workflowDisplayName(latest ?? { name: decodedName })}
               </h1>
               {isPrivate ? (
@@ -438,7 +447,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
             {latest?.description && (
               <p className="text-sm text-muted-foreground mt-0.5">{latest.description}</p>
             )}
-            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground" data-tour="workflow-meta">
               {(latest?.namespace) && (
                 <>
                   <span className="flex items-center gap-1">
@@ -651,11 +660,12 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
 
       {/* Tabs */}
       <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex flex-1 flex-col">
-        <Tabs.List className="flex border-b px-6 gap-0">
+        <Tabs.List className="flex border-b px-6 gap-0" data-tour="workflow-tabs">
           {['runs', 'definitions', 'triggers', 'secrets', 'access'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
+              data-tour={WORKFLOW_TAB_TOURS[tab]}
               className={cn(
                 'px-4 py-2.5 text-sm font-medium capitalize border-b-2 -mb-px transition-colors',
                 'text-muted-foreground border-transparent',

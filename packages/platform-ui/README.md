@@ -43,6 +43,17 @@ without both is how an endpoint becomes a mail relay.
 composition root is `getPlatformServices()` in `@mediforce/platform-api/services`;
 the shim exists only until its call sites migrate. Do not add symbols to it.
 
+**The guide points at `data-tour`, not at class names.** The Guide button in the
+top bar runs over `src/components/tour/`, spotlighting whichever element carries
+the `data-tour` value a step names. Adding a step means adding
+that attribute to the real element — never a CSS selector over layout classes,
+which the next restyle silently breaks. A step whose element is absent still
+runs and narrates centred, so a guide survives a panel that renders only when
+it has something to show. Route matching and the card geometry live in
+`src/lib/tour.ts`; the chapters themselves in `src/lib/tour-content.ts`, where
+a test holds each one to at least three steps and forbids ringing the same
+element more than twice.
+
 **Never call `fetch` directly from a client component.** Middleware 401s
 silently because no auth header is attached. Use the typed `mediforce` client
 from `@/lib/mediforce`, or `apiFetch` from `@/lib/api-fetch` for an endpoint
