@@ -35,6 +35,13 @@ export const DockerJobDataSchema = z.object({
   /** Redis key holding `inputFiles` when they travel beside the job instead of
    *  inside it (see file-payload-store.ts). */
   inputFilesKey: z.string().optional(),
+  /** Redis key holding `stdinPayload` when the prompt is too large to sit in
+   *  the job (see file-payload-store.ts). */
+  stdinPayloadKey: z.string().optional(),
+  /** Set by a caller that understands the `*Key` fields in the result. Absent
+   *  means a platform older than those keys, so the worker keeps text inline
+   *  rather than returning a key the caller would drop on the floor. */
+  payloadKeysSupported: z.boolean().optional(),
   /** Image build metadata — when present, worker ensures image exists before
    *  docker run. Either a repo at a commit, or `contextDir`: a host directory
    *  that already holds the build context (the files a workflow carries,
@@ -72,6 +79,10 @@ export const DockerJobResultSchema = z.object({
   outputFiles: z.record(z.string(), z.string()).optional(),
   /** Redis key holding `outputFiles` when the job's inputs came by key. */
   outputFilesKey: z.string().optional(),
+  /** Redis keys holding `stdout` / `stderr` when the container wrote more than
+   *  belongs in a retained job hash and its `completed` event. */
+  stdoutKey: z.string().optional(),
+  stderrKey: z.string().optional(),
 });
 
 export type DockerJobResult = z.infer<typeof DockerJobResultSchema>;

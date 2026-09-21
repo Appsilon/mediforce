@@ -45,6 +45,7 @@ Every engineering doc, what it is for, and how far to trust it.
 | Import a workflow from git | [`guides/import-from-git.md`](guides/import-from-git.md) | workflow-authors | living |
 | Pass the four verification gates | [`guides/verify-a-workflow.md`](guides/verify-a-workflow.md) | workflow-authors | living |
 | Onboard a landing zone | [`guides/landing-zone-onboarding.md`](guides/landing-zone-onboarding.md) | operators | living |
+| Keep Redis inside its limits, or recover it | [`guides/redis-operations.md`](guides/redis-operations.md) | operators | living |
 | Look up what a workflow *can* do | [`reference/workflow-capabilities.md`](reference/workflow-capabilities.md) | workflow-authors | living |
 | Know the rules a production workflow must satisfy | [`reference/workflow-authoring-golden-rules.md`](reference/workflow-authoring-golden-rules.md) | workflow-authors | living |
 | Add a handler, contract, or repository | [`reference/api-architecture.md`](reference/api-architecture.md) | engineers | living |

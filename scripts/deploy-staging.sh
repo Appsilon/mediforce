@@ -46,6 +46,11 @@ else
   echo "==> Starting services (builds locally if pull missed any image, SHA: $NEXT_PUBLIC_GIT_SHA)"
 fi
 
+# The worker leads, for the same reason deploy.sh gives it its own call: a job
+# carries bulk payloads under Redis keys the worker has to know how to read, and
+# a platform ahead of its worker enqueues jobs that run with the payload missing.
+$COMPOSE up -d --force-recreate container-worker
+
 # --remove-orphans kills containers left over from services that no longer
 # exist in the compose files — an orphaned worker once kept consuming the
 # BullMQ queue with weeks-old code.
