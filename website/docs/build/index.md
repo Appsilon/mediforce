@@ -166,7 +166,8 @@ a run.
 
 `script` and `agent` steps run in a container image that must already be on the
 platform. A missing image fails the run at its first step, and the readiness
-check warns about it beforehand.
+check warns about it beforehand. [Container images](../images/) covers building,
+uploading or pulling one and choosing it for a step.
 
 ## Saving
 
