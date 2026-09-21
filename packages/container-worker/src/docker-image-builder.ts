@@ -97,7 +97,7 @@ function cloneRepoAtCommit(
   repoToken?: string,
 ): void {
   const targets = resolveRepoCloneTargets(repoRef, repoToken);
-  let lastError: unknown;
+  const failures: { transport: string; message: string }[] = [];
 
   execFileSync('git', ['init', targetDir], { stdio: 'pipe' });
 
@@ -114,22 +114,31 @@ function cloneRepoAtCommit(
           : { ...process.env, GIT_TERMINAL_PROMPT: '0' },
       };
 
-      execFileSync('git', ['-C', targetDir, 'fetch', cloneUrl, commit, '--depth', '1'], execOpts);
+      // A throwaway clone never needs maintenance, and the detached run `git
+      // fetch` starts would still be writing into it while it is removed.
+      execFileSync('git', ['-C', targetDir, '-c', 'maintenance.auto=false', 'fetch', cloneUrl, commit, '--depth', '1'], execOpts);
       execFileSync('git', ['-C', targetDir, 'checkout', 'FETCH_HEAD'], execOpts);
       return;
     } catch (error) {
-      lastError = error;
+      failures.push({
+        transport: useSsh ? 'SSH' : 'HTTPS',
+        message: error instanceof Error ? error.message : String(error),
+      });
       console.warn(
         `[docker-image-builder] ${useSsh ? 'SSH' : 'HTTPS'} fetch of ${redactRepoCredentials(repoRef, repoToken)}@${commit.slice(0, 8)} failed`,
       );
     }
   }
 
-  const transports = targets.map(({ useSsh }) => (useSsh ? 'SSH' : 'HTTPS')).join(' then ');
+  const transports = failures.map(({ transport }) => transport).join(' then ');
   const safeRepoRef = redactRepoCredentials(repoRef, repoToken);
-  const lastErrorMessage = lastError instanceof Error ? lastError.message : String(lastError);
+  // Every attempt's cause, not just the last: with SSH tried first, the last is
+  // HTTPS, and it would hide the deploy-key error that explains the failure.
+  const causes = failures.length === 1
+    ? failures[0].message
+    : failures.map(({ transport, message }) => `${transport}: ${message}`).join('; ');
   throw new Error(
-    `Failed to fetch ${safeRepoRef}@${commit.slice(0, 8)} over ${transports}: ${redactRepoCredentials(lastErrorMessage, repoToken)}`,
+    `Failed to fetch ${safeRepoRef}@${commit.slice(0, 8)} over ${transports}: ${redactRepoCredentials(causes, repoToken)}`,
   );
 }
 

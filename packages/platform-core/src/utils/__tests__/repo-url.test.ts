@@ -2,9 +2,16 @@ import { describe, it, expect } from 'vitest';
 import { githubPermalink, redactRepoCredentials, resolveRepoCloneTargets } from '../repo-url';
 
 describe('resolveRepoCloneTargets', () => {
-  it('[DATA] clones a git@ ref over SSH as given, never converting to HTTPS', () => {
+  it('[DATA] clones a GitHub SSH ref over SSH first, then anonymous HTTPS so a public repo needs no deploy key', () => {
     expect(resolveRepoCloneTargets('git@github.com:Appsilon/mediforce.git')).toEqual([
       { cloneUrl: 'git@github.com:Appsilon/mediforce.git', useSsh: true },
+      { cloneUrl: 'https://github.com/Appsilon/mediforce', useSsh: false },
+    ]);
+  });
+
+  it('[DATA] clones a non-GitHub SSH ref over SSH only, having no HTTPS form to derive', () => {
+    expect(resolveRepoCloneTargets('git@gitlab.com:org/repo.git')).toEqual([
+      { cloneUrl: 'git@gitlab.com:org/repo.git', useSsh: true },
     ]);
   });
 
