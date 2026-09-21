@@ -102,7 +102,7 @@ export function AllRunsPanel({
         ) : (
           <span />
         )}
-        <div className="inline-flex rounded-md border divide-x text-xs">
+        <div className="inline-flex rounded-md border divide-x text-xs" data-tour="runs-dry-filter">
           {(['all', 'production', 'dry-run'] as const).map((value) => (
             <button
               key={value}
@@ -123,6 +123,7 @@ export function AllRunsPanel({
           ))}
         </div>
         <button
+          data-tour="runs-archived"
           onClick={() => setShowArchivedRuns(!showArchivedRuns)}
           className={cn(
             'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',

@@ -109,7 +109,7 @@ export function WorkspaceMembersSection({
   return (
     <div className="mb-10">
       <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Members</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" data-tour="settings-members">Members</h2>
         {canManageMembers && !showInviteForm && (
           <button
             type="button"

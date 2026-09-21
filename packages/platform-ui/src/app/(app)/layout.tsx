@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { AppShell } from '@/components/app-shell';
 import { CommandPaletteProvider } from '@/components/command-palette';
+import { TourProvider } from '@/components/tour';
 import { DockerImagesProvider } from '@/contexts/docker-images-context';
 import { OpenRouterCreditsProvider } from '@/contexts/openrouter-credits-context';
 
@@ -38,7 +39,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <DockerImagesProvider>
       <OpenRouterCreditsProvider>
         <CommandPaletteProvider>
-          <AppShell>{children}</AppShell>
+          <TourProvider>
+            <AppShell>{children}</AppShell>
+          </TourProvider>
         </CommandPaletteProvider>
       </OpenRouterCreditsProvider>
     </DockerImagesProvider>

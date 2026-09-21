@@ -413,7 +413,7 @@ function WorkflowCatalogPublic({ handle }: { handle: string }) {
           </div>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2" data-tour="workflow-list">
           {sorted.map((definition) => (
             <ProcessCard
               key={definition.name}
@@ -489,7 +489,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Workflows</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" data-tour="workflow-actions">
           <DisplayPopover
             showCompleted={showCompleted}
             onToggleCompleted={() => setShowCompleted((prev) => !prev)}
@@ -572,7 +572,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
           </button>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2" data-tour="workflow-list">
           {sortedDefinitions.map((definition) => (
             <ProcessCard
               key={definition.name}

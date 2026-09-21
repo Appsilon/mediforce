@@ -11,11 +11,11 @@ import { TasksTab } from '@/components/monitoring/tasks-tab';
 import { IntegrationsTab } from '@/components/monitoring/integrations-tab';
 
 const TABS = [
-  { value: 'workflows', label: 'Workflows' },
-  { value: 'agents', label: 'Agents' },
-  { value: 'users', label: 'Users' },
-  { value: 'tasks', label: 'Tasks' },
-  { value: 'integrations', label: 'Integrations' },
+  { value: 'workflows', label: 'Workflows', tour: 'monitoring-workflows' },
+  { value: 'agents', label: 'Agents', tour: 'monitoring-agents' },
+  { value: 'users', label: 'Users', tour: 'monitoring-users' },
+  { value: 'tasks', label: 'Tasks', tour: 'monitoring-tasks' },
+  { value: 'integrations', label: 'Integrations', tour: 'monitoring-integrations' },
 ] as const;
 
 export default function MonitoringPage() {
@@ -26,11 +26,12 @@ export default function MonitoringPage() {
   return (
     <div className="p-6 space-y-6">
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
-        <Tabs.List className="flex gap-1 border-b">
-          {TABS.map(({ value, label }) => (
+        <Tabs.List className="flex gap-1 border-b" data-tour="monitoring-tabs">
+          {TABS.map(({ value, label, tour }) => (
             <Tabs.Trigger
               key={value}
               value={value}
+              data-tour={tour}
               className="px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary -mb-px"
             >
               {label}

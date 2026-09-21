@@ -224,7 +224,7 @@ export default function WorkflowDefinitionVersionPage() {
         <div className="flex items-start justify-between gap-6">
           {/* Left: workflow identity */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold tracking-tight text-foreground truncate">
+            <h1 className="text-xl font-bold tracking-tight text-foreground truncate" data-tour="editor-header">
               {workflowDisplayName(definition)}
             </h1>
             <input
@@ -234,7 +234,7 @@ export default function WorkflowDefinitionVersionPage() {
               className="w-full bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
             />
             {/* Secondary metadata row */}
-            <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground/60 flex-wrap">
+            <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground/60 flex-wrap" data-tour="editor-version">
               {definition.namespace && (
                 <>
                   <span className="shrink-0">Namespace:</span>
@@ -253,7 +253,7 @@ export default function WorkflowDefinitionVersionPage() {
           </div>
 
           {/* Right: save controls */}
-          <div className="flex items-center gap-3 shrink-0 pt-0.5">
+          <div className="flex items-center gap-3 shrink-0 pt-0.5" data-tour="editor-actions">
             {saveState.status === 'saved' && (
               <span className="text-sm text-green-600 dark:text-green-400 font-medium">
                 Saved as v{saveState.version}

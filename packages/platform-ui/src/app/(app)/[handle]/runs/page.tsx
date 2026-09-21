@@ -51,7 +51,7 @@ function RunsPageContent({ handle }: { handle: string }) {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4" data-tour="runs-header">
         <p className="text-sm text-muted-foreground">
           {workflowFilter
             ? 'All runs for this workflow.'

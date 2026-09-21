@@ -643,7 +643,7 @@ export default function ImagesPage() {
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-1.5">
-            <h1 className="font-headline text-xl font-semibold">Images</h1>
+            <h1 className="font-headline text-xl font-semibold" data-tour="images-header">Images</h1>
             <ConceptPopover label="What is an image entry?">
               <p>
                 <strong>
@@ -696,6 +696,7 @@ export default function ImagesPage() {
           <button
             type="button"
             onClick={() => setAdding(true)}
+            data-tour="images-add"
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -706,7 +707,7 @@ export default function ImagesPage() {
 
       {adding && <AddImageDialog handle={handle} open={adding} onOpenChange={setAdding} />}
 
-      <div className="relative mb-6">
+      <div className="relative mb-6" data-tour="images-search">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="text"
@@ -750,7 +751,7 @@ export default function ImagesPage() {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" data-tour="images-list">
           {grouped.map(({ entry, depth, baseName }) => (
             <EntryCard
               key={entry.id}

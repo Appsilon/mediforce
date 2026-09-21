@@ -615,7 +615,7 @@ export function StepEditor({
   ) : null;
 
   return (
-    <div className="flex flex-col gap-3 h-full min-h-0" data-testid="step-editor">
+    <div className="flex flex-col gap-3 h-full min-h-0" data-testid="step-editor" data-tour="step-editor">
 
       {/* ── Basics (carries the step identity header) ────────────── */}
       <CollapsibleCard

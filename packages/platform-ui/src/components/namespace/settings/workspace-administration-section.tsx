@@ -29,7 +29,7 @@ export function WorkspaceAdministrationSection({ handle }: { handle: string }) {
 
   return (
     <div className="mb-10 space-y-4">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Administration</h2>
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" data-tour="settings-admin">Administration</h2>
       <div className="rounded-lg border bg-card px-4 py-5 space-y-3">
         {entries.map((entry, index) => (
           <Fragment key={entry.href}>
