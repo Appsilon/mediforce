@@ -53,11 +53,14 @@ export async function refreshEntryCapabilities(
     if (settled) continue;
     // Another workspace already paid for this image: copy its answer to the
     // row rather than start a container for the same question.
-    const memoised = probedImages.get(version.imageId)?.capabilities;
-    if (memoised?.status === 'known') {
-      probed[version.imageId] = memoised;
+    const memoised = probedImages.get(version.imageId);
+    if (memoised?.capabilities.status === 'known') {
+      probed[version.imageId] = memoised.capabilities;
       continue;
     }
+    // A read respects the background's retry window too: a probe that just
+    // failed is not worth another container because someone opened the card.
+    if (options?.unattemptedOnly === true && memoised !== undefined && !isDueForProbe(version.imageId)) continue;
     if (Date.now() >= deadline) break;
     probed[version.imageId] = await probeImage(version.imageId, version.imageTag);
   }
@@ -86,6 +89,7 @@ export async function refreshEntryCapabilities(
  *
  * It also holds what no row can: the versions of a discovered entry, which is
  * derived on read (decision 7). Losing it on restart costs one probe per image.
+ * The listing prunes it to the ids the daemon still has (`forgetRemovedImages`).
  */
 interface ProbeRecord {
   readonly capabilities: ImageCapabilities;
@@ -93,27 +97,54 @@ interface ProbeRecord {
 }
 const probedImages = new Map<string, ProbeRecord>();
 
-/** Bounded by the daemon's image count in practice; capped anyway so a daemon
- *  churning through thousands of tags cannot grow it without limit. Oldest
- *  first, which is insertion order — a `Map` keeps it. */
-const PROBE_MEMO_LIMIT = 512;
-
 /** How long a failed probe stands before the listing tries that image again.
  *  Long enough that an image the probe cannot run is not a container start on
  *  every 30 s poll; short enough that a worker which was briefly down heals. */
 const FAILED_PROBE_RETRY_MS = 10 * 60 * 1000;
 
-async function probeImage(imageId: string, imageTag: string): Promise<ImageCapabilities> {
+/** Probes running now, keyed like the memo, so a foreground read and the
+ *  background queue asking about one image share one container. */
+const runningProbes = new Map<string, Promise<ImageCapabilities>>();
+
+function probeImage(imageId: string, imageTag: string): Promise<ImageCapabilities> {
+  const running = runningProbes.get(imageId);
+  if (running !== undefined) return running;
   // `probeImageCapabilities` answers `unknown` rather than throwing; a throw is
   // recorded as the same answer, so it waits out the retry window like one.
-  const capabilities = await probeImageCapabilities(imageTag).catch(() => unknownImageCapabilities());
-  probedImages.delete(imageId);
-  if (probedImages.size >= PROBE_MEMO_LIMIT) {
-    const oldest = probedImages.keys().next();
-    if (oldest.done === false) probedImages.delete(oldest.value);
+  const probe = probeImageCapabilities(imageTag)
+    .catch(() => unknownImageCapabilities())
+    .then((capabilities) => {
+      // A `known` answer is final for a content-addressed id: a later transient
+      // failure must not replace it.
+      if (probedImages.get(imageId)?.capabilities.status !== 'known') {
+        probedImages.set(imageId, { capabilities, probedAt: Date.now() });
+      }
+      return probedImages.get(imageId)?.capabilities ?? capabilities;
+    })
+    .finally(() => runningProbes.delete(imageId));
+  runningProbes.set(imageId, probe);
+  return probe;
+}
+
+/** No answer yet, or a failed one old enough to try again. */
+function isDueForProbe(imageId: string): boolean {
+  const previous = probedImages.get(imageId);
+  if (previous === undefined) return true;
+  if (previous.capabilities.status === 'known') return false;
+  return Date.now() - previous.probedAt >= FAILED_PROBE_RETRY_MS;
+}
+
+/**
+ * Drop the answers for images the daemon no longer has, so the memo is bounded
+ * by the daemon's image count. Pruning by what is visible rather than capping
+ * by age: a cap smaller than the estate would evict answers still on screen,
+ * and the next poll would probe them again, for ever.
+ */
+export function forgetRemovedImages(images: readonly DockerImageInfo[]): void {
+  const present = new Set(images.map((image) => image.id));
+  for (const imageId of probedImages.keys()) {
+    if (!present.has(imageId)) probedImages.delete(imageId);
   }
-  probedImages.set(imageId, { capabilities, probedAt: Date.now() });
-  return capabilities;
 }
 
 /**
@@ -162,9 +193,9 @@ export async function probeDiscoveredCapabilities(
   return withProbedCapabilities(namespace, entry, images).capabilities;
 }
 
-/** Image ids queued or running in the background, so two listings polled at
+/** Image ids waiting in the background queue, so two listings polled at
  *  once — two tabs, two users, two workspaces — never queue one image twice. */
-const pendingProbes = new Set<string>();
+const queuedProbes = new Set<string>();
 /** One probe at a time: each is a container start on the shared host, and a
  *  catalog opened after a deploy must not start one per image at once. */
 let probeQueue: Promise<void> = Promise.resolve();
@@ -185,16 +216,16 @@ export function probeInBackground(
   for (const entry of entries) {
     for (const version of resolveEntryVersions(namespace, entry.source, images, entry.capabilities)) {
       if (version.capabilities.status === 'known') continue;
-      if (pendingProbes.has(version.imageId)) continue;
-      const previous = probedImages.get(version.imageId);
-      if (previous !== undefined && Date.now() - previous.probedAt < FAILED_PROBE_RETRY_MS) continue;
+      if (queuedProbes.has(version.imageId) || runningProbes.has(version.imageId)) continue;
+      if (!isDueForProbe(version.imageId)) continue;
 
-      pendingProbes.add(version.imageId);
+      queuedProbes.add(version.imageId);
       probeQueue = probeQueue.then(async () => {
         try {
-          await probeImage(version.imageId, version.imageTag);
+          // A foreground read may have answered it while it waited its turn.
+          if (isDueForProbe(version.imageId)) await probeImage(version.imageId, version.imageTag);
         } finally {
-          pendingProbes.delete(version.imageId);
+          queuedProbes.delete(version.imageId);
         }
       });
     }
@@ -205,5 +236,7 @@ export function probeInBackground(
  *  never attempted by this process nor by the row — rather than probed and
  *  failed. */
 export function isProbePending(imageId: string, cached: ImageCapabilities | undefined): boolean {
-  return pendingProbes.has(imageId) || (!probedImages.has(imageId) && cached === undefined);
+  return queuedProbes.has(imageId)
+    || runningProbes.has(imageId)
+    || (!probedImages.has(imageId) && cached === undefined);
 }

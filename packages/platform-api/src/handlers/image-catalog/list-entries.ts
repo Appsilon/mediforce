@@ -5,7 +5,7 @@ import type {
   ListImageCatalogEntriesOutput,
 } from '../../contract/image-catalog';
 import { fetchDaemonImages } from '../system/_docker';
-import { probeInBackground, withProbedCapabilities } from './_capabilities';
+import { forgetRemovedImages, probeInBackground, withProbedCapabilities } from './_capabilities';
 import { discoverEntries } from './_discovered';
 import { toEntryViews } from './_view';
 import { orderByLineage } from './_lineage';
@@ -24,6 +24,8 @@ export async function listImageCatalogEntries(
   // could not produce — the same guard `toEntryViews` applies to the versions.
   const daemon = await fetchDaemonImages();
   const images = daemon.available ? daemon.images : [];
+  // Only a listing the daemon produced says what is gone; an outage says nothing.
+  if (daemon.available) forgetRemovedImages(daemon.images);
   // Every answer this process already holds, whichever workspace paid for it —
   // a discovered entry has no row, and a stored one's row may predate the build.
   const stored = rows.map((entry) => withProbedCapabilities(input.namespace, entry, images));

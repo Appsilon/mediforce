@@ -753,9 +753,13 @@ background probe and the listing returns at once. The queue runs one probe at a
 time — each is a container on the shared host — and never holds one image
 twice, so two tabs, two users or fifty workspaces opening the catalog after a
 deploy cost one probe per image. A `known` answer is final for its id; a failed
-one is retried after ten minutes, not on every 30 s poll. This is the
-"container per version on every poll" that decision 7 refused, bounded to once
-per image.
+one is retried after ten minutes, not on every 30 s poll — and not sooner
+because someone expanded the card. A read that asks about an image already being
+probed waits on that probe rather than starting a second container. The memo is
+pruned to the ids the daemon still holds, never capped by count: a cap smaller
+than the estate would evict answers still on screen and re-probe them forever.
+This is the "container per version on every poll" that decision 7 refused,
+bounded to once per image.
 
 **Pending and failed are different states.** A version without an answer
 carries `capabilityProbe: 'pending' | 'failed'`, so the card says *Probing

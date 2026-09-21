@@ -14,7 +14,8 @@ vi.mock('../../system/_docker', () => ({
   probeImageCapabilities: probe,
 }));
 
-const { refreshEntryCapabilities } = await import('../_capabilities');
+const { forgetRemovedImages, probeInBackground, refreshEntryCapabilities, withProbedCapabilities } =
+  await import('../_capabilities');
 
 const entry: ImageCatalogEntry = {
   id: 'tealflow-1a2b3c4d',
@@ -102,5 +103,52 @@ describe('refreshEntryCapabilities', () => {
 
     expect(await refreshEntryCapabilities('alpha', entry, scope)).toEqual(entry);
     expect(probe).not.toHaveBeenCalled();
+  });
+});
+
+describe('shared probe memo', () => {
+  beforeEach(() => {
+    probe.mockReset();
+  });
+
+  it('joins a read to the probe the background already started for the image', async () => {
+    const scope = createTestScope({ imageCatalogRepo: new InMemoryImageCatalogRepository() });
+    daemon.value = daemonWith([builtImage({ id: 'sha-joined', tag: 'joined' })]);
+    let answer: (capabilities: unknown) => void = () => {};
+    probe.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
+
+    probeInBackground('alpha', [entry], daemon.value.images);
+    await vi.waitFor(() => expect(probe).toHaveBeenCalledTimes(1));
+    const read = refreshEntryCapabilities('alpha', entry, scope, daemon.value, { unattemptedOnly: true });
+    answer({ status: 'known', agentCapable: true, runtimes: ['claude'] });
+
+    expect((await read).capabilities['sha-joined']).toEqual({ status: 'known', agentCapable: true, runtimes: ['claude'] });
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-probe on read an image whose background probe just failed', async () => {
+    const scope = createTestScope({ imageCatalogRepo: new InMemoryImageCatalogRepository() });
+    daemon.value = daemonWith([builtImage({ id: 'sha-just-failed', tag: 'just-failed' })]);
+    probe.mockResolvedValue({ status: 'unknown' });
+
+    probeInBackground('alpha', [entry], daemon.value.images);
+    await vi.waitFor(() => expect(withProbedCapabilities('alpha', entry, daemon.value.images).capabilities)
+      .toEqual({ 'sha-just-failed': { status: 'unknown' } }));
+    await refreshEntryCapabilities('alpha', entry, scope, daemon.value, { unattemptedOnly: true });
+
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it('forgets answers for images the daemon no longer holds, and keeps the rest', async () => {
+    const scope = createTestScope({ imageCatalogRepo: new InMemoryImageCatalogRepository() });
+    const kept = builtImage({ id: 'sha-kept', tag: 'kept' });
+    const removed = builtImage({ id: 'sha-removed', tag: 'removed' });
+    daemon.value = daemonWith([kept, removed]);
+    probe.mockResolvedValue({ status: 'known', agentCapable: false, runtimes: ['sh'] });
+    await refreshEntryCapabilities('alpha', entry, scope);
+
+    forgetRemovedImages([kept]);
+
+    expect(Object.keys(withProbedCapabilities('alpha', entry, daemon.value.images).capabilities)).toEqual(['sha-kept']);
   });
 });
