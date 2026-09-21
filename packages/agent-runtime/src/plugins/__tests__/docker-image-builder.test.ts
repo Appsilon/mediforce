@@ -121,7 +121,7 @@ describe('buildImageFromRepo', () => {
     expect(gitCalls).toContainEqual(['git', ['init', '/tmp/mediforce-build-abc'], expect.anything()]);
     expect(gitCalls).toContainEqual([
       'git',
-      ['-C', '/tmp/mediforce-build-abc', 'fetch', '/tmp/test-repo.git', 'abc123', '--depth', '1'],
+      ['-C', '/tmp/mediforce-build-abc', '-c', 'maintenance.auto=false', 'fetch', '/tmp/test-repo.git', 'abc123', '--depth', '1'],
       expect.anything(),
     ]);
     expect(gitCalls).toContainEqual([
@@ -303,7 +303,7 @@ describe('buildImageFromRepo', () => {
     // Anonymous HTTPS — no token, no SSH.
     expect(command).toBe('git');
     expect(args).toEqual([
-      '-C', '/tmp/mediforce-build-abc', 'fetch', 'https://github.com/owner/repo', 'abc123', '--depth', '1',
+      '-C', '/tmp/mediforce-build-abc', '-c', 'maintenance.auto=false', 'fetch', 'https://github.com/owner/repo', 'abc123', '--depth', '1',
     ]);
     // No GIT_SSH_COMMAND for an anonymous HTTPS clone — the deploy key is never referenced.
     expect(options?.env?.GIT_SSH_COMMAND).toBeUndefined();
@@ -346,6 +346,37 @@ describe('buildImageFromRepo', () => {
     expect(command).toBe('git');
     expect(args).toContain('git@github.com:owner/private.git');
     expect(options?.env?.GIT_SSH_COMMAND).toContain('ssh -i');
+  });
+
+  it('disables git auto-maintenance on the throwaway clone, whose detached run would race its removal', async () => {
+    execFileSyncMock.mockReturnValue(Buffer.from(''));
+
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'git@github.com:owner/repo.git',
+      repoRef: 'owner/repo',
+      commit: 'abc123',
+    });
+
+    const [, args] = fetchCalls()[0];
+    expect(args).toEqual(expect.arrayContaining(['-c', 'maintenance.auto=false']));
+  });
+
+  it('names every transport that failed when none reaches the repo', async () => {
+    execFileSyncMock.mockImplementation((_command, args) => {
+      if (args?.includes('https://github.com/owner/private')) throw new Error('remote: Repository not found');
+      if (args?.includes('fetch')) throw new Error('git@github.com: Permission denied (publickey).');
+      return Buffer.from('');
+    });
+
+    await expect(
+      buildImageFromRepo({
+        image: 'test-image',
+        repoUrl: 'git@github.com:owner/private.git',
+        repoRef: 'git@github.com:owner/private.git',
+        commit: 'abc123',
+      }),
+    ).rejects.toThrow(/over SSH then HTTPS: SSH: git@github\.com: Permission denied \(publickey\)\.; HTTPS: remote: Repository not found/);
   });
 
   it('redacts repository tokens from clone errors and warnings', async () => {

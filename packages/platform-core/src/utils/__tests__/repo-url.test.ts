@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { githubPermalink, redactRepoCredentials, resolveRepoCloneTargets } from '../repo-url';
 
 describe('resolveRepoCloneTargets', () => {
-  it('[DATA] tries anonymous HTTPS first for a GitHub SSH ref, so a public repo needs no deploy key', () => {
+  it('[DATA] clones a GitHub SSH ref over SSH first, then anonymous HTTPS so a public repo needs no deploy key', () => {
     expect(resolveRepoCloneTargets('git@github.com:Appsilon/mediforce.git')).toEqual([
-      { cloneUrl: 'https://github.com/Appsilon/mediforce', useSsh: false },
       { cloneUrl: 'git@github.com:Appsilon/mediforce.git', useSsh: true },
+      { cloneUrl: 'https://github.com/Appsilon/mediforce', useSsh: false },
     ]);
   });
 

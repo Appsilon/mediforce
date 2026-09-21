@@ -175,7 +175,7 @@ describe('container-worker buildImageFromRepo', () => {
     expect(options?.env?.GIT_SSH_COMMAND).toContain('ssh -i');
   });
 
-  it('builds a public repo given in GitHub SSH form over anonymous HTTPS, never reading the deploy key', async () => {
+  it('builds a public repo given in GitHub SSH form over anonymous HTTPS when the deploy key is unusable', async () => {
     const deployKeyDirectory = mkdtempSync(join(tmpdir(), 'mediforce-worker-deploy-key-'));
     process.env.DEPLOY_KEY_PATH = deployKeyDirectory;
 
@@ -195,6 +195,40 @@ describe('container-worker buildImageFromRepo', () => {
     } finally {
       rmSync(deployKeyDirectory, { recursive: true, force: true });
     }
+  });
+
+  it('names every transport that failed, so a broken deploy key is not hidden behind the HTTPS error', async () => {
+    const deployKeyDirectory = mkdtempSync(join(tmpdir(), 'mediforce-worker-deploy-key-'));
+    process.env.DEPLOY_KEY_PATH = deployKeyDirectory;
+    execFileSyncMock.mockImplementation((_command, args) => {
+      if (args?.includes('fetch')) throw new Error('remote: Repository not found');
+      return Buffer.from('');
+    });
+
+    try {
+      await expect(
+        buildImageFromRepo({
+          image: 'test-image',
+          repoUrl: 'git@github.com:owner/private.git',
+          repoRef: 'git@github.com:owner/private.git',
+          commit: 'abc123',
+        }),
+      ).rejects.toThrow(/over SSH then HTTPS: SSH: Deploy key path .* regular file\.; HTTPS: remote: Repository not found/);
+    } finally {
+      rmSync(deployKeyDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('disables git auto-maintenance on the throwaway clone, whose detached run would race its removal', async () => {
+    await buildImageFromRepo({
+      image: 'test-image',
+      repoUrl: 'git@github.com:owner/repo.git',
+      repoRef: 'owner/repo',
+      commit: 'abc123',
+    });
+
+    const [, args] = fetchCalls()[0];
+    expect(args).toEqual(expect.arrayContaining(['-c', 'maintenance.auto=false']));
   });
 
   it('falls back to the SSH deploy key when anonymous HTTPS cannot see a private owner/repo', async () => {
