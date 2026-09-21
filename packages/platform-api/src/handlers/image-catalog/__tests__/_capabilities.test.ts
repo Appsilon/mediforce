@@ -14,7 +14,8 @@ vi.mock('../../system/_docker', () => ({
   probeImageCapabilities: probe,
 }));
 
-const { refreshEntryCapabilities } = await import('../_capabilities');
+const { forgetRemovedImages, probeInBackground, refreshEntryCapabilities, withProbedCapabilities } =
+  await import('../_capabilities');
 
 const entry: ImageCatalogEntry = {
   id: 'tealflow-1a2b3c4d',
@@ -44,10 +45,22 @@ describe('refreshEntryCapabilities', () => {
     expect(await repo.getById('alpha', entry.id)).toEqual(result);
   });
 
+  it('copies an answer another workspace already probed instead of probing again', async () => {
+    const scope = createTestScope({ imageCatalogRepo: new InMemoryImageCatalogRepository() });
+    daemon.value = daemonWith([builtImage({ id: 'sha-shared', tag: 'shared' })]);
+    probe.mockResolvedValue({ status: 'known', agentCapable: false, runtimes: ['sh'] });
+    await refreshEntryCapabilities('alpha', entry, scope);
+
+    const result = await refreshEntryCapabilities('beta', entry, scope);
+
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(result.capabilities['sha-shared']).toEqual({ status: 'known', agentCapable: false, runtimes: ['sh'] });
+  });
+
   it('keeps a concurrent edit made while the probe ran', async () => {
     const repo = new InMemoryImageCatalogRepository();
     const scope = createTestScope({ imageCatalogRepo: repo });
-    daemon.value = daemonWith([builtImage({ id: 'sha-image', tag: 'v1' })]);
+    daemon.value = daemonWith([builtImage({ id: 'sha-image-concurrent', tag: 'v1' })]);
     await repo.upsert('alpha', entry);
     // The rename lands after `entry` was read and before the probe returns —
     // the write below must carry it, not the name the caller started from.
@@ -59,7 +72,7 @@ describe('refreshEntryCapabilities', () => {
     const result = await refreshEntryCapabilities('alpha', entry, scope);
 
     expect(result.name).toBe('Renamed by someone else');
-    expect(result.capabilities['sha-image']).toEqual({
+    expect(result.capabilities['sha-image-concurrent']).toEqual({
       status: 'known', agentCapable: true, runtimes: ['claude', 'bash'],
     });
   });
@@ -90,5 +103,52 @@ describe('refreshEntryCapabilities', () => {
 
     expect(await refreshEntryCapabilities('alpha', entry, scope)).toEqual(entry);
     expect(probe).not.toHaveBeenCalled();
+  });
+});
+
+describe('shared probe memo', () => {
+  beforeEach(() => {
+    probe.mockReset();
+  });
+
+  it('joins a read to the probe the background already started for the image', async () => {
+    const scope = createTestScope({ imageCatalogRepo: new InMemoryImageCatalogRepository() });
+    daemon.value = daemonWith([builtImage({ id: 'sha-joined', tag: 'joined' })]);
+    let answer: (capabilities: unknown) => void = () => {};
+    probe.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
+
+    probeInBackground('alpha', [entry], daemon.value.images);
+    await vi.waitFor(() => expect(probe).toHaveBeenCalledTimes(1));
+    const read = refreshEntryCapabilities('alpha', entry, scope, daemon.value, { unattemptedOnly: true });
+    answer({ status: 'known', agentCapable: true, runtimes: ['claude'] });
+
+    expect((await read).capabilities['sha-joined']).toEqual({ status: 'known', agentCapable: true, runtimes: ['claude'] });
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-probe on read an image whose background probe just failed', async () => {
+    const scope = createTestScope({ imageCatalogRepo: new InMemoryImageCatalogRepository() });
+    daemon.value = daemonWith([builtImage({ id: 'sha-just-failed', tag: 'just-failed' })]);
+    probe.mockResolvedValue({ status: 'unknown' });
+
+    probeInBackground('alpha', [entry], daemon.value.images);
+    await vi.waitFor(() => expect(withProbedCapabilities('alpha', entry, daemon.value.images).capabilities)
+      .toEqual({ 'sha-just-failed': { status: 'unknown' } }));
+    await refreshEntryCapabilities('alpha', entry, scope, daemon.value, { unattemptedOnly: true });
+
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it('forgets answers for images the daemon no longer holds, and keeps the rest', async () => {
+    const scope = createTestScope({ imageCatalogRepo: new InMemoryImageCatalogRepository() });
+    const kept = builtImage({ id: 'sha-kept', tag: 'kept' });
+    const removed = builtImage({ id: 'sha-removed', tag: 'removed' });
+    daemon.value = daemonWith([kept, removed]);
+    probe.mockResolvedValue({ status: 'known', agentCapable: false, runtimes: ['sh'] });
+    await refreshEntryCapabilities('alpha', entry, scope);
+
+    forgetRemovedImages([kept]);
+
+    expect(Object.keys(withProbedCapabilities('alpha', entry, daemon.value.images).capabilities)).toEqual(['sha-kept']);
   });
 });

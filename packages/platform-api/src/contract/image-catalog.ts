@@ -87,6 +87,11 @@ export const ImageCatalogVersionSchema = z.object({
   /** Cached probe result. Unknown means the image was not probed or the
    * daemon could not complete the bounded probe; it is never a render error. */
   capabilities: ImageCapabilitiesSchema,
+  /** Why `capabilities` is unknown — absent once it is known. `pending`: a
+   * probe is queued or was never attempted, and the listing fills it in the
+   * background. `failed`: the probe ran and could not answer; it is retried
+   * after a while. */
+  capabilityProbe: z.enum(['pending', 'failed']).optional(),
   lineage: ImageVersionLineageSchema,
 });
 

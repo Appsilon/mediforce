@@ -622,7 +622,8 @@ source is skipped, not failed.
 - `mediforce images list` — the **Image Catalog**: the images your namespace
   offers for steps, one row per source, each with a sentence saying what it is
   for and a cached probe of each version's runtimes and agent suitability
-  ([ADR-0022](../adr/0022-image-catalog.md)). Curated and per-namespace, and
+  ([ADR-0022](../adr/0022-image-catalog.md)) — probed in the background the first
+  time any workspace lists the image. Curated and per-namespace, and
   indented under the image each was built on — `mediforce images show` prints
   that base and the layers the version adds over it.
 - `mediforce system images` — the raw Docker daemon listing: every image on the

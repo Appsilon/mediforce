@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-09-18
+last_reviewed: 2026-09-21
 ---
 
 # ADR-0022: The Image Catalog is an image the platform offers, keyed on its source
@@ -10,7 +10,7 @@ last_reviewed: 2026-09-18
 **Deciders:** Krystian Zieliński
 **Epic:** [#1292](https://github.com/Appsilon/mediforce/issues/1292) — Step Image Catalog
 
-**All eight decisions are built.** #1294 landed `image_catalog_entries`, the
+**All nine decisions are built.** #1294 landed `image_catalog_entries`, the
 source-derived key, the required `intent`, `unknown` as a state, the
 workspace-member write gate, the handlers, the contract, the route adapters and
 `mediforce images`; #1295 landed probed capabilities; #1296 landed lineage — the
@@ -23,7 +23,9 @@ where decision 5 stops being a claim about a future control and starts being the
 behaviour of the one authors use. Decision 7 landed after the first workspace
 ran a build-mode workflow and found the image it had just built missing from
 its own catalog; decision 8 (#1376) after the rollout to staging found that a
-workspace which has built nothing gets the pre-catalog picker back.
+workspace which has built nothing gets the pre-catalog picker back. Decision 9
+after staging showed a default image unprobed in every workspace but one,
+again after each deploy.
 
 #1344 later added a way to *produce* a version — `mediforce images build` and a
 **Build** action — without changing any of the seven decisions: it reuses
@@ -623,6 +625,10 @@ stored one does — the user-initiated, one-at-a-time read — and the listing
 starts no probe for either kind, while showing what an earlier read already
 paid for. Losing the memo on restart costs one probe per image.
 
+*Superseded in part by decision 9:* the memo now holds every probe, not only a
+discovered entry's, and the listing queues a background probe for what it
+cannot answer rather than starting none.
+
 Making this the one derived fact a discovered entry never filled in was the
 first shape of decision 7, and it was wrong: an entry where everything is
 derived except the sentence has to derive everything except the sentence, and
@@ -721,6 +727,46 @@ same helper, and `scripts/migrations/seed_default_image_catalogs.py` runs it ove
 a list of handles. Seeding on read would turn a listing polled every 30 seconds
 into a write path, which is the reason decision 7 derives discovered entries
 instead of storing them.
+
+### 9. A probe answers every workspace, and the listing fills the gaps in the background
+
+*Added 2026-09-21.*
+
+**The problem this fixes.** Probe answers were stored on the row, and rows are
+per workspace. Decision 8 seeds the same five images into every workspace, and a
+deployment rebuilds `mediforce-node:latest` on every deploy — a new image id. On
+staging that left 52 of 53 workspaces showing `Capabilities not probed` for the
+image a `runtime: node` step runs on, fixed only in the one workspace where
+somebody expanded the card, and broken again on the next deploy.
+
+**The answer is the image's, so one probe serves every workspace.** A probe
+depends on nothing but the image, and the key is the daemon's content-addressed
+id, so decision 7's memo is now where *every* probe lands — stored entries'
+included. Both reads lay a `known` memo answer over a row that lacks one, and
+`refreshEntryCapabilities` copies it to the row instead of starting a container.
+The row stays the durable cache; the memo is what lets one workspace's probe
+answer another's before any of them writes. It is lost on restart, which costs
+one background probe per image that no row has answered yet.
+
+**The listing queues, never waits.** An unanswered version is queued for a
+background probe and the listing returns at once. The queue runs one probe at a
+time — each is a container on the shared host — and never holds one image
+twice, so two tabs, two users or fifty workspaces opening the catalog after a
+deploy cost one probe per image. A `known` answer is final for its id; a failed
+one is retried after ten minutes, not on every 30 s poll — and not sooner
+because someone expanded the card. A read that asks about an image already being
+probed waits on that probe rather than starting a second container. The memo is
+pruned to the ids the daemon still holds, never capped by count: a cap smaller
+than the estate would evict answers still on screen and re-probe them forever.
+This is the "container per version on every poll" that decision 7 refused,
+bounded to once per image.
+
+**Pending and failed are different states.** A version without an answer
+carries `capabilityProbe: 'pending' | 'failed'`, so the card says *Probing
+capabilities…* while the answer is on its way and *Capabilities unknown* when
+the probe ran and could not answer — instead of one label that told the reader
+to expand a card that could not help. The Images view polls at 5 s while
+anything is pending, and back at 30 s once nothing is.
 
 ### 6. The vocabulary, fixed before the code
 

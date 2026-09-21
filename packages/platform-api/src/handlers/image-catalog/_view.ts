@@ -4,6 +4,7 @@ import type { ImageCatalogEntryView, ImageCatalogOrigin } from '../../contract/i
 import { fetchDaemonImages, type DaemonImageListing } from '../system/_docker';
 import { entryAvailability, resolveEntryVersions } from './_versions';
 import { resolveCatalogLineage } from './_lineage';
+import { isProbePending } from './_capabilities';
 
 /**
  * Annotate stored entries with the facts recomputed for this read.
@@ -29,7 +30,11 @@ export async function toEntryViews(
   // the whole namespace's catalog once every entry has its versions.
   return resolveCatalogLineage(
     entries.map((entry) => {
-      const versions = resolveEntryVersions(namespace, entry.source, images, entry.capabilities);
+      const versions = resolveEntryVersions(namespace, entry.source, images, entry.capabilities).map(
+        (version) => version.capabilities.status === 'known'
+          ? version
+          : { ...version, capabilityProbe: isProbePending(version.imageId, entry.capabilities[version.imageId]) ? 'pending' as const : 'failed' as const },
+      );
       return {
         ...entry,
         origin,

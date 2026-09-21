@@ -4,13 +4,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
-import { NICE_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
+import { NICE_LIVE_INTERVAL_MS, STANDARD_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
 import type {
   ImageCatalogEntryView,
   PublishImageCatalogVersionInput,
   PullImageCatalogVersionInput,
   UploadImageCatalogVersionInput,
 } from '@mediforce/platform-api/contract';
+
+function hasPendingProbe(entries: readonly ImageCatalogEntryView[] | undefined): boolean {
+  return (entries ?? []).some((entry) =>
+    entry.versions.some((version) => version.capabilityProbe === 'pending'),
+  );
+}
 
 /**
  * The namespace's catalog, grouped by base and roots-first — the order the
@@ -22,6 +28,10 @@ import type {
  * is open shows up within the cadence. An editor left open must pick that up:
  * an image whose probe failed at registration stays offered without a
  * suitability claim until a later probe answers.
+ *
+ * STANDARD LIVE (5 s) while any version's probe is pending: the listing queues
+ * those probes in the background, and the answer lands a few seconds later —
+ * waiting a full 30 s to show it is what made the card look stuck.
  *
  * `undefined` is a namespace not resolved yet, not an error — nothing is
  * fetched and the caller renders on the empty list.
@@ -36,7 +46,10 @@ export function useImageCatalogEntries(namespace: string | undefined): {
     queryFn: async () => (await mediforce.imageCatalog.list({ namespace: namespace ?? '' })).entries,
     enabled: namespace !== undefined && namespace !== '',
     staleTime: NICE_LIVE_INTERVAL_MS,
-    refetchInterval: (q) => (q.state.error !== null ? false : NICE_LIVE_INTERVAL_MS),
+    refetchInterval: (q) => {
+      if (q.state.error !== null) return false;
+      return hasPendingProbe(q.state.data) ? STANDARD_LIVE_INTERVAL_MS : NICE_LIVE_INTERVAL_MS;
+    },
     retry: stopRetryOn4xx,
   });
 
@@ -94,9 +107,10 @@ export function useImageCatalogEntry(
  * no versions until something builds one.
  *
  * The response is a probed view — `createImageCatalogEntry` probes capabilities
- * in the same request — which is why this is the moment a card stops saying
- * "not probed". No optimistic update: the probe is the point, and guessing the
- * answer locally to correct it a second later is worse than a pending button.
+ * in the same request — so the card has them without waiting for the listing's
+ * background probe. No optimistic update: the probe is the point, and guessing
+ * the answer locally to correct it a second later is worse than a pending
+ * button.
  *
  * Once the row is stored, changing it is `useUpdateImageEntry`: a second `POST`
  * against the same source conflicts on the id that source derives.

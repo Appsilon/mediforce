@@ -82,9 +82,13 @@ function ExplainedValue({ label, children }: { label: string; children: ReactNod
 function CapabilityChips({ version }: { version: ImageCatalogVersion | undefined }) {
   if (version === undefined) return null;
   if (version.capabilities.status !== 'known') {
-    return (
-      <Chip title="Nobody has probed this image yet. Expanding the entry runs the probe — a listing would start a container per version on every poll.">
-        Capabilities not probed
+    return version.capabilityProbe === 'failed' ? (
+      <Chip title="The probe could not run this image — it may have no sh, or the container worker was unreachable. It is retried automatically.">
+        Capabilities unknown
+      </Chip>
+    ) : (
+      <Chip title="The image is being checked in the background for its runtimes and agent CLI. The result appears here in a few seconds.">
+        Probing capabilities…
       </Chip>
     );
   }

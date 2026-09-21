@@ -5,7 +5,7 @@ import type {
   ListImageCatalogEntriesOutput,
 } from '../../contract/image-catalog';
 import { fetchDaemonImages } from '../system/_docker';
-import { memoisedCapabilities } from './_capabilities';
+import { forgetRemovedImages, probeInBackground, withProbedCapabilities } from './_capabilities';
 import { discoverEntries } from './_discovered';
 import { toEntryViews } from './_view';
 import { orderByLineage } from './_lineage';
@@ -15,25 +15,29 @@ export async function listImageCatalogEntries(
   scope: CallerScope,
 ): Promise<ListImageCatalogEntriesOutput> {
   assertNamespaceAccess(scope.caller, input.namespace);
-  const stored = await scope.imageCatalog.list(input.namespace);
+  const rows = await scope.imageCatalog.list(input.namespace);
 
   // One daemon read for the whole response. Discovery is arithmetic over the
   // listing the entry views need anyway, so offering every source this
-  // namespace built costs no extra call, no probe and no write — which is what
-  // makes it affordable on a listing polled every 30 seconds.
+  // namespace built costs no extra call and no write of its own.
   // An unreachable daemon discovers nothing rather than reading a listing it
   // could not produce — the same guard `toEntryViews` applies to the versions.
   const daemon = await fetchDaemonImages();
   const images = daemon.available ? daemon.images : [];
-  // Whatever a single-entry read has already probed. The listing pays for no
-  // probe of its own — a container per version on a 30 s poll — but a stored
-  // entry shows the answer its row holds, and a discovered one should not read
-  // as unprobed just because its answer lives in a memo instead.
-  const discovered = discoverEntries(input.namespace, images, stored).map((entry) => ({
-    ...entry,
-    capabilities: memoisedCapabilities(input.namespace, entry, images),
-  }));
+  // Only a listing the daemon produced says what is gone; an outage says nothing.
+  if (daemon.available) forgetRemovedImages(daemon.images);
+  // Every answer this process already holds, whichever workspace paid for it —
+  // a discovered entry has no row, and a stored one's row may predate the build.
+  const stored = rows.map((entry) => withProbedCapabilities(input.namespace, entry, images));
+  const discovered = discoverEntries(input.namespace, images, rows).map((entry) =>
+    withProbedCapabilities(input.namespace, entry, images),
+  );
   const catalog = [...stored, ...discovered];
+
+  // Whatever is still unanswered is probed off the request, one image at a
+  // time, and shows on the next poll. The listing never waits for a container,
+  // and never queues the same image twice.
+  probeInBackground(input.namespace, catalog, images);
 
   // Grouped by base rather than listed flat: the estate is a tree — the golden
   // image and everything built on it — and four unrelated rows is what the

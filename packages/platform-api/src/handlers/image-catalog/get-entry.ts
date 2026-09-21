@@ -9,7 +9,11 @@ import { fetchDaemonImages } from '../system/_docker';
 import { discoverEntries } from './_discovered';
 import { toEntryView, toEntryViews } from './_view';
 import { withBuildSteps } from './_lineage';
-import { probeDiscoveredCapabilities, refreshEntryCapabilities } from './_capabilities';
+import {
+  probeDiscoveredCapabilities,
+  refreshEntryCapabilities,
+  withProbedCapabilities,
+} from './_capabilities';
 
 export async function getImageCatalogEntry(
   input: GetImageCatalogEntryInput,
@@ -49,16 +53,18 @@ export async function getImageCatalogEntry(
   // refreshed only on create and update, which left the ordinary build-mode
   // sequence — catalogue the entry, build the image on the first run — showing
   // "Capabilities not probed" for ever, since no write ever followed the build.
-  // Reading one entry is the user-initiated, one-at-a-time moment where paying
-  // for a probe is affordable; the listing deliberately still does not, because
-  // that would probe a whole catalog on every poll.
+  // Reading one entry is user-initiated and one at a time, so the answer can be
+  // in this response; the listing only queues its probes in the background.
   const probed = await refreshEntryCapabilities(input.namespace, entry, scope, daemon, {
     unattemptedOnly: true,
   });
 
   // An entry whose image is gone from the daemon is not a 404: the sentence
   // someone wrote about it is still the answer to "what was this for?".
-  const view = await toEntryView(input.namespace, probed, scope, daemon);
+  // An answer another workspace's probe holds for a version this row has not.
+  const images = daemon.available ? daemon.images : [];
+  const answered = withProbedCapabilities(input.namespace, probed, images);
+  const view = await toEntryView(input.namespace, answered, scope, daemon);
   // The layer delta costs a `docker history` per version, so it is attached
   // here and not on the listing — one entry at a time is what it is for.
   return { entry: await withBuildSteps(view) };
