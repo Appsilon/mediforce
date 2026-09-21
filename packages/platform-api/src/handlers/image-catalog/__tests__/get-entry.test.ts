@@ -85,7 +85,7 @@ describe('getImageCatalogEntry handler', () => {
     // would turn an image the probe cannot answer for into a container start
     // per poll, for as long as anyone leaves the card open.
     const { scope, id } = await seedEntry();
-    daemon.value = daemonWith([builtImage({ tag: 'unprobeable' })]);
+    daemon.value = daemonWith([builtImage({ tag: 'unprobeable', id: 'sha-unprobeable' })]);
 
     await getImageCatalogEntry({ namespace: 'alpha', id }, scope);
     expect(probe.calls).toHaveLength(1);

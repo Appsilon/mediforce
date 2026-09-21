@@ -394,6 +394,60 @@ test.describe('image catalog API journey', () => {
     docker('rmi', `${reference}:v1`);
   });
 
+  test('the listing probes an image in the background, once for every workspace', async ({ request }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    // Catalogued in both workspaces before the image exists, so neither create
+    // probes anything — the shape of a default image rebuilt on deploy.
+    const reference = `mediforce-e2e-shared-probe-${Date.now()}`;
+    const payload = {
+      name: 'E2E shared probe image',
+      intent: 'Proves one background probe answers every workspace',
+      source: { kind: 'referenced', reference },
+    };
+    const outsiderHeaders = sessionCookieHeaders(callers.outsider);
+    const testCreate = await request.post(catalogUrl(), { headers: apiKeyHeaders(), data: payload });
+    expect(testCreate.status(), await testCreate.text()).toBe(201);
+    const otherCreate = await request.post(catalogUrl(OUTSIDER_NAMESPACE), { headers: outsiderHeaders, data: payload });
+    expect(otherCreate.status(), await otherCreate.text()).toBe(201);
+    const { entry } = (await testCreate.json()) as { entry: EntryView };
+    try {
+      docker('image', 'inspect', PROBE_BASE_IMAGE);
+    } catch {
+      docker('pull', PROBE_BASE_IMAGE);
+    }
+    // A layer of its own, so its image id is one nothing has probed yet — a tag
+    // of the base would share the id an earlier test already answered for.
+    deriveImage(`${reference}:v1`, PROBE_BASE_IMAGE, `touch /${reference}`);
+
+    const versionIn = async (namespace: string, headers: Record<string, string>) => {
+      const res = await request.get(catalogUrl(namespace), { headers });
+      expect(res.ok(), await res.text()).toBe(true);
+      const { entries } = (await res.json()) as { entries: (EntryView & { versions: (VersionView & { capabilityProbe?: string })[] })[] };
+      return entries.find((candidate) => candidate.id === entry.id)?.versions[0];
+    };
+
+    try {
+      const first = await versionIn(TEST_ORG_HANDLE, apiKeyHeaders());
+      expect(first?.capabilities).toEqual({ status: 'unknown' });
+      expect(first?.capabilityProbe).toBe('pending');
+
+      await expect
+        .poll(async () => (await versionIn(TEST_ORG_HANDLE, apiKeyHeaders()))?.capabilities, { timeout: 30_000 })
+        .toEqual({ status: 'known', agentCapable: false, runtimes: ['sh'] });
+      // The other workspace was never listed while the probe ran, and still has
+      // the answer on its first read.
+      expect((await versionIn(OUTSIDER_NAMESPACE, outsiderHeaders))?.capabilities).toEqual({
+        status: 'known',
+        agentCapable: false,
+        runtimes: ['sh'],
+      });
+    } finally {
+      await request.delete(`/api/image-catalog/${entry.id}?namespace=${TEST_ORG_HANDLE}`, { headers: apiKeyHeaders() });
+      await request.delete(`/api/image-catalog/${entry.id}?namespace=${OUTSIDER_NAMESPACE}`, { headers: outsiderHeaders });
+      docker('rmi', `${reference}:v1`);
+    }
+  });
+
   test('a derived image is grouped under the entry it was built on', async ({ request }) => {
     test.skip(!dockerAvailable(), 'Docker daemon not available');
     const stamp = Date.now();

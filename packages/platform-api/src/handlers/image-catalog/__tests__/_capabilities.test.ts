@@ -44,10 +44,22 @@ describe('refreshEntryCapabilities', () => {
     expect(await repo.getById('alpha', entry.id)).toEqual(result);
   });
 
+  it('copies an answer another workspace already probed instead of probing again', async () => {
+    const scope = createTestScope({ imageCatalogRepo: new InMemoryImageCatalogRepository() });
+    daemon.value = daemonWith([builtImage({ id: 'sha-shared', tag: 'shared' })]);
+    probe.mockResolvedValue({ status: 'known', agentCapable: false, runtimes: ['sh'] });
+    await refreshEntryCapabilities('alpha', entry, scope);
+
+    const result = await refreshEntryCapabilities('beta', entry, scope);
+
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(result.capabilities['sha-shared']).toEqual({ status: 'known', agentCapable: false, runtimes: ['sh'] });
+  });
+
   it('keeps a concurrent edit made while the probe ran', async () => {
     const repo = new InMemoryImageCatalogRepository();
     const scope = createTestScope({ imageCatalogRepo: repo });
-    daemon.value = daemonWith([builtImage({ id: 'sha-image', tag: 'v1' })]);
+    daemon.value = daemonWith([builtImage({ id: 'sha-image-concurrent', tag: 'v1' })]);
     await repo.upsert('alpha', entry);
     // The rename lands after `entry` was read and before the probe returns —
     // the write below must carry it, not the name the caller started from.
@@ -59,7 +71,7 @@ describe('refreshEntryCapabilities', () => {
     const result = await refreshEntryCapabilities('alpha', entry, scope);
 
     expect(result.name).toBe('Renamed by someone else');
-    expect(result.capabilities['sha-image']).toEqual({
+    expect(result.capabilities['sha-image-concurrent']).toEqual({
       status: 'known', agentCapable: true, runtimes: ['claude', 'bash'],
     });
   });

@@ -16,10 +16,14 @@ const daemon = vi.hoisted(() => ({
 }));
 const probe = vi.hoisted(() => ({
   answer: { status: 'unknown' } as { status: string; agentCapable?: boolean; runtimes?: string[] },
+  calls: [] as string[],
 }));
 vi.mock('../../system/_docker', () => ({
   fetchDaemonImages: async () => daemon.value,
-  probeImageCapabilities: async () => probe.answer,
+  probeImageCapabilities: async (image: string) => {
+    probe.calls.push(image);
+    return probe.answer;
+  },
   fetchImageHistory: async () => null,
 }));
 
@@ -36,6 +40,7 @@ describe('listImageCatalogEntries handler', () => {
     auditRepo = new InMemoryAuditRepository();
     daemon.value = UNREACHABLE_DAEMON;
     probe.answer = { status: 'unknown' };
+    probe.calls = [];
   });
 
   const scopeFor = (uid: string, namespaces: string[]) =>
@@ -63,15 +68,67 @@ describe('listImageCatalogEntries handler', () => {
     expect(entries[0].availability).toBe('present');
   });
 
-  it('starts no probe of its own for a discovered entry — a listing is polled', async () => {
+  it('probes an unanswered version in the background, without holding the listing', async () => {
     const scope = scopeFor('u-member', ['alpha']);
+    probe.answer = { status: 'known', agentCapable: false, runtimes: ['bash'] };
     daemon.value = daemonWith([
       builtImage({ buildNamespace: 'alpha', id: 'sha-list-1', tag: 'list-1' }),
     ]);
 
-    const { entries } = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+    const first = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
 
-    expect(entries[0].versions.map((v) => v.capabilities)).toEqual([{ status: 'unknown' }]);
+    expect(first.entries[0].versions[0].capabilities).toEqual({ status: 'unknown' });
+    expect(first.entries[0].versions[0].capabilityProbe).toBe('pending');
+    await vi.waitFor(async () => {
+      const { entries } = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+      expect(entries[0].versions[0].capabilities).toEqual({
+        status: 'known',
+        agentCapable: false,
+        runtimes: ['bash'],
+      });
+      expect(entries[0].versions[0].capabilityProbe).toBeUndefined();
+    });
+    expect(probe.calls).toEqual(['mediforce-built:list-1']);
+  });
+
+  it('probes an image once for every workspace that catalogues it', async () => {
+    // The default images are seeded into every workspace (ADR-0022 decision 8)
+    // and rebuilt on deploy, so a per-row probe left most workspaces unprobed.
+    const scope = scopeFor('u-both', ['alpha', 'beta']);
+    const shared = {
+      name: 'Node runtime',
+      intent: 'Runs node script steps',
+      source: { kind: 'referenced' as const, reference: 'mediforce-node' },
+    };
+    await createImageCatalogEntry({ namespace: 'alpha', ...shared }, scope);
+    await createImageCatalogEntry({ namespace: 'beta', ...shared }, scope);
+    probe.answer = { status: 'known', agentCapable: false, runtimes: ['sh', 'node'] };
+    daemon.value = daemonWith([
+      builtImage({ repository: 'mediforce-node', tag: 'latest', id: 'sha-node-rebuilt', buildRepo: undefined, buildDockerfile: undefined }),
+    ]);
+
+    await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+    await vi.waitFor(() => expect(probe.calls).toHaveLength(1));
+    const beta = await listImageCatalogEntries({ namespace: 'beta' }, scope);
+
+    expect(beta.entries[0].versions[0].capabilities.status).toBe('known');
+    expect(probe.calls).toEqual(['mediforce-node:latest']);
+  });
+
+  it('marks a probe that could not answer as failed, and does not retry it on the next poll', async () => {
+    const scope = scopeFor('u-member', ['alpha']);
+    daemon.value = daemonWith([
+      builtImage({ buildNamespace: 'alpha', id: 'sha-list-failed', tag: 'list-failed' }),
+    ]);
+
+    await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+
+    await vi.waitFor(async () => {
+      const { entries } = await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+      expect(entries[0].versions[0].capabilityProbe).toBe('failed');
+    });
+    await listImageCatalogEntries({ namespace: 'alpha' }, scope);
+    expect(probe.calls).toEqual(['mediforce-built:list-failed']);
   });
 
   it('shows a discovered entry the capabilities an earlier entry read probed', async () => {
