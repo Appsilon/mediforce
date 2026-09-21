@@ -99,6 +99,21 @@ prints its real arguments; the tables below name the ones that are required.
 | `users me` | Who the current key authenticates as |
 | `users clear-must-change-password --uid` | Release someone stuck in first-password setup |
 
+## Images
+
+See [Container images](../images/) for which path to take.
+
+| Command | Does |
+|---|---|
+| `images list` / `images show <entry-id> --namespace` | The workspace's Image Catalog, and one entry's versions |
+| `images create --namespace --name --intent` + `--repo` / `--reference` / `--workflow` | Catalogue an image |
+| `images build --namespace` + `--repo --commit` or `--reference --context` | Build a version from a git repo, or upload a local folder |
+| `images pull --namespace --reference --tag` | Pull a registry image and catalogue it |
+| `images publish <entry-id> --namespace --version --reference` | Keep a workflow-built image as an entry of its own |
+| `images update <entry-id> --namespace` | Change an entry's source, name or description |
+| `images delete <entry-id> --namespace` | Remove an entry and its images |
+| `images seed --namespace` | Catalogue the five default images |
+
 ## Cowork and system
 
 | Command | Does |
