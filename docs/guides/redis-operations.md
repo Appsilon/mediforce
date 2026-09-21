@@ -109,7 +109,9 @@ When Redis is refusing writes (`MISCONF Errors writing to the RDB snapshot`):
    deploy runs.
 4. **Give Redis room** if it is genuinely at its ceiling: raise
    `REDIS_MEM_LIMIT` and `REDIS_MAX_MEMORY` together in `.env`, keeping the
-   ~62% ratio, then `docker compose -f docker-compose.prod.yml up -d redis`.
+   ~62% ratio, then `docker compose -f docker-compose.prod.yml up -d redis` — on staging add
+   `-f docker-compose.staging.yml`, or Redis comes back without `--requirepass`
+   behind a published tunnel port.
 5. **Force a save and confirm it worked:** `docker exec <redis> redis-cli bgsave`,
    then check `rdb_last_bgsave_status:ok` in `redis-cli info persistence`.
    Writes resume on their own once a save succeeds.

@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   TEXT_INLINE_MAX_BYTES,
+  advertisePayloadKeySupport,
   deleteJobPayloads,
   offloadJobPayload,
   offloadResultPayload,
@@ -109,12 +110,21 @@ describe('job payload store', () => {
 
   it('carries an oversized prompt by key and hands the worker the whole thing back', async () => {
     const client = buildInMemoryClient();
+    await advertisePayloadKeySupport(client);
 
     const enqueued = await offloadJobPayload(client, jobId, buildJobData({ stdinPayload: oversizedText }), 600);
     expect(enqueued.stdinPayload).toBeNull();
     expect(enqueued.stdinPayloadKey).toBeDefined();
 
     expect((await restoreJobPayload(client, enqueued)).stdinPayload).toBe(oversizedText);
+  });
+
+  it('keeps an oversized prompt inline while no worker has said it restores prompts by key', async () => {
+    const client = buildInMemoryClient();
+    const data = buildJobData({ stdinPayload: oversizedText });
+
+    expect(await offloadJobPayload(client, jobId, data, 600)).toEqual(data);
+    expect(client.store.size).toBe(0);
   });
 
   it('carries oversized stdout and stderr by key and hands the caller the whole thing back', async () => {
@@ -147,6 +157,15 @@ describe('job payload store', () => {
     const returned = await offloadResultPayload(client, jobId, bridgeData, workerResult, 3600);
     expect(returned.outputFiles).toBeUndefined();
     expect(returned.outputFilesKey).toBeDefined();
+  });
+
+  it('keeps stdout inline for the release that offloaded files and nothing else', async () => {
+    const client = buildInMemoryClient();
+    const bridgeData = buildJobData({ inputFilesKey: 'some-key', payloadKeysSupported: undefined });
+    const workerResult: DockerJobResult = { stdout: oversizedText, stderr: oversizedText, exitCode: 0, signal: null };
+
+    expect(await offloadResultPayload(client, jobId, bridgeData, workerResult, 3600)).toEqual(workerResult);
+    expect(client.store.size).toBe(0);
   });
 
   it('keeps stdout inline for a caller that predates the result keys', async () => {

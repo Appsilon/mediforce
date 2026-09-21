@@ -6,7 +6,12 @@
 import { Worker } from 'bullmq';
 import { getRedisConnection } from './connection';
 import { DockerJobDataSchema, QUEUE_NAME } from './schemas';
-import { offloadResultPayload, restoreJobPayload } from './file-payload-store';
+import {
+  advertisePayloadKeySupport,
+  offloadResultPayload,
+  restoreJobPayload,
+  WORKER_CAPABILITY_REFRESH_MS,
+} from './file-payload-store';
 import { startHttpServer } from './http-server';
 import { processDockerJob } from './job-processor';
 
@@ -44,6 +49,10 @@ const worker = new Worker(
 const httpServer = startHttpServer();
 
 worker.on('ready', () => {
+  const advertise = async () => advertisePayloadKeySupport(await worker.client);
+  const advertiseOrLog = () => advertise().catch((error: Error) => console.error('[worker] Capability heartbeat failed:', error.message));
+  void advertiseOrLog();
+  setInterval(advertiseOrLog, WORKER_CAPABILITY_REFRESH_MS).unref();
   console.log(`[worker] Ready — listening on queue '${QUEUE_NAME}'`);
 });
 

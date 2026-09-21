@@ -97,12 +97,15 @@ failed for a day, 100 events.
 
 **The worker must never lag the platform.** The two skew directions are not
 symmetric. A worker ahead of its platform is safe: it writes a result key only
-when the job says the caller reads them (`payloadKeysSupported`, or an
-`inputFilesKey` from the one release that offloaded files and nothing else),
-and otherwise answers the old inline shape. A *platform* ahead of its worker is
+when the job says the caller reads them (`payloadKeysSupported`; an
+`inputFilesKey` alone vouches only for output files), and otherwise answers the
+old inline shape. A *platform* ahead of its worker is
 not: the old worker's schema strips the key fields it does not know, so it runs
 the container with no prompt or no input files and exits 0 — a wrong answer
-rather than an error. Both deploy scripts therefore bring `container-worker` up
+rather than an error. A live worker therefore advertises prompt-by-key support in
+a short-TTL Redis key and a caller keeps an oversized prompt inline until it sees
+it, so previews or rollbacks against a lagging worker stay correct. Both deploy
+scripts also bring `container-worker` up
 in its own `up -d` before everything else; keep that ordering if you touch them,
 and keep any new payload field readable by a worker one release behind.
 

@@ -7,12 +7,13 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { DockerJobData } from '../schemas';
+import { advertisePayloadKeySupport } from '../file-payload-store';
 
+const redis = vi.hoisted(() => new Map<string, string>());
 const queueConstructed = vi.fn<(name: string, options: Record<string, unknown>) => void>();
 const jobAdded = vi.fn<(name: string, data: DockerJobData) => void>();
 
 vi.mock('bullmq', () => {
-  const redis = new Map<string, string>();
   return {
     Queue: class {
       client = Promise.resolve({
@@ -61,6 +62,7 @@ async function loadQueueClient() {
 }
 
 beforeEach(() => {
+  redis.clear();
   process.env.REDIS_URL = 'redis://localhost:6379';
   queueConstructed.mockClear();
   jobAdded.mockClear();
@@ -99,6 +101,14 @@ describe('queue client', () => {
   it('enqueues an oversized prompt by key instead of rejecting it', async () => {
     const { enqueueDockerJob, JOB_DATA_MAX_BYTES, closeQueueClient } = await loadQueueClient();
     const longPrompt = 'x'.repeat(JOB_DATA_MAX_BYTES + 1);
+    await advertisePayloadKeySupport({
+      get: async () => null,
+      del: async () => 0,
+      set: async (key, value) => {
+        redis.set(key, value);
+        return 'OK';
+      },
+    });
 
     await enqueueDockerJob(buildJobData({ stdinPayload: longPrompt }));
 

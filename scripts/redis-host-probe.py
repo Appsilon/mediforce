@@ -170,7 +170,9 @@ def check_restarts(container: str, state: dict[str, int]) -> tuple[Finding, int]
     return Finding("restarts", OK, f"Redis restart count steady at {current}"), current
 
 
-def check_temp_snapshots(container: str) -> Finding:
+def check_temp_snapshots(container: str, info: dict[str, str]) -> Finding:
+    if info.get("rdb_bgsave_in_progress") == "1":
+        return Finding("snapshots", OK, "a save is in progress — its temp-*.rdb is live, not orphaned")
     code, output = run(
         ["docker", "exec", container, "sh", "-c", "ls -1 /data/temp-*.rdb 2>/dev/null | wc -l"]
     )
@@ -261,7 +263,7 @@ def main() -> None:
                     threshold(env, "REDIS_MEM_CRIT_PCT"),
                 ),
                 restarts,
-                check_temp_snapshots(container),
+                check_temp_snapshots(container, info),
             ]
     findings.append(check_disk(threshold(env, "DISK_WARN_PCT"), threshold(env, "DISK_CRIT_PCT")))
 

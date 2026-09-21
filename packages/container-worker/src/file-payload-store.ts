@@ -33,6 +33,19 @@ type PayloadSlot = 'input' | 'output' | 'stdin' | 'stdout' | 'stderr';
 
 const PAYLOAD_SLOTS: readonly PayloadSlot[] = ['input', 'output', 'stdin', 'stdout', 'stderr'];
 
+const WORKER_CAPABILITY_KEY = `${QUEUE_NAME}:worker:payload-keys`;
+const WORKER_CAPABILITY_TTL_SECONDS = 60;
+export const WORKER_CAPABILITY_REFRESH_MS = 20_000;
+
+/** Worker side: say, for as long as this keeps being called, that it restores
+ *  `stdinPayloadKey`. A worker one release behind never sets it, and a rolled
+ *  back one lets it lapse — so callers that deploy independently of the worker
+ *  (previews on the staging Redis) keep the prompt inline instead of sending a
+ *  key the old worker would strip and run without a prompt. */
+export async function advertisePayloadKeySupport(client: FilePayloadRedisClient): Promise<void> {
+  await client.set(WORKER_CAPABILITY_KEY, '1', { EX: WORKER_CAPABILITY_TTL_SECONDS });
+}
+
 function payloadKey(jobId: string, slot: PayloadSlot): string {
   return `${QUEUE_NAME}:files:${jobId}:${slot}`;
 }
@@ -53,8 +66,8 @@ function isOversized(text: string): boolean {
   return Buffer.byteLength(text, 'utf-8') > TEXT_INLINE_MAX_BYTES;
 }
 
-/** Caller side, before enqueueing: move `inputFiles` and an oversized prompt
- *  out of the job data. */
+/** Caller side, before enqueueing: move `inputFiles` out of the job data, and
+ *  an oversized prompt too when a live worker has said it restores it. */
 export async function offloadJobPayload(
   client: FilePayloadRedisClient,
   jobId: string,
@@ -70,7 +83,11 @@ export async function offloadJobPayload(
     offloaded = { ...rest, inputFilesKey: key };
   }
 
-  if (offloaded.stdinPayload !== null && isOversized(offloaded.stdinPayload)) {
+  if (
+    offloaded.stdinPayload !== null &&
+    isOversized(offloaded.stdinPayload) &&
+    (await client.get(WORKER_CAPABILITY_KEY)) !== null
+  ) {
     const key = payloadKey(jobId, 'stdin');
     await client.set(key, offloaded.stdinPayload, { EX: ttlSeconds });
     offloaded = { ...offloaded, stdinPayload: null, stdinPayloadKey: key };
@@ -99,8 +116,9 @@ export async function restoreJobPayload(client: FilePayloadRedisClient, data: Do
 /** Worker side, before returning: move `outputFiles` and oversized stdout /
  *  stderr out of the return value. A caller that predates the keys only knows
  *  how to read them inline, so the whole thing is gated on the job saying
- *  otherwise — `payloadKeysSupported` from a current platform, or an
- *  `inputFilesKey` from the one release that offloaded files and nothing else. */
+ *  otherwise — `payloadKeysSupported` from a current platform. An
+ *  `inputFilesKey` alone (the one release that offloaded files and nothing
+ *  else) only vouches for `outputFilesKey`, not the text keys. */
 export async function offloadResultPayload(
   client: FilePayloadRedisClient,
   jobId: string,
@@ -108,17 +126,18 @@ export async function offloadResultPayload(
   result: DockerJobResult,
   ttlSeconds: number,
 ): Promise<DockerJobResult> {
-  const callerReadsKeys = data.payloadKeysSupported === true || data.inputFilesKey !== undefined;
+  const callerReadsTextKeys = data.payloadKeysSupported === true;
+  const callerReadsOutputKey = callerReadsTextKeys || data.inputFilesKey !== undefined;
   let offloaded = result;
 
-  if (callerReadsKeys && offloaded.outputFiles !== undefined) {
+  if (callerReadsOutputKey && offloaded.outputFiles !== undefined) {
     const { outputFiles, ...rest } = offloaded;
     const key = payloadKey(jobId, 'output');
     await client.set(key, JSON.stringify(outputFiles), { EX: ttlSeconds });
     offloaded = { ...rest, outputFilesKey: key };
   }
 
-  if (callerReadsKeys) {
+  if (callerReadsTextKeys) {
     if (isOversized(offloaded.stdout)) {
       const key = payloadKey(jobId, 'stdout');
       await client.set(key, offloaded.stdout, { EX: ttlSeconds });
