@@ -509,8 +509,9 @@ undescribed. Describe it first, then **Edit** can correct it.
 
 ## Removing an entry and its images
 
-**Delete** on an entry removes it **and** every image behind it, running
-`docker rmi` on each tag it offered. Admin or owner of the workspace, and
+**Delete** on an entry removes it **and** every image behind it that this
+workspace produced, running `docker rmi` on each of those tags. Admin or owner
+of the workspace, and
 `mediforce images delete <entry-id> --namespace <handle>` is the same write.
 
 The two are one act on purpose. An entry exists *for* its images, and for a
@@ -572,13 +573,33 @@ moment those other tags cannot be checked, so the delete is refused rather than
 guessed at — retry, or name the image as `repository:tag`, which needs no
 listing.
 
-**An image the engine falls back to keeps its image.** For the five a workspace
-starts with, `--keep-images` is the only accepted form and the browser dialog
-offers only the record-only delete. A step that names no image pins nothing, so
-the live-pin check above is blind to every `runtime: python` step on the
-deployment — and the daemon is shared, so removing `python` from a workspace
-minutes old would break all of them
-([ADR-0022](../adr/0022-image-catalog.md) decision 8).
+### Only what this workspace produced leaves the daemon
+
+Cataloguing an image describes it; it does not make it the workspace's. So the
+images that go are the ones this workspace provably produced: those whose build
+label — which the platform stamps on every build and upload — names this
+workspace, and for a `referenced` entry also sit under its handle (`acme/agent`),
+as an upload does. Everything else stays on the daemon and the dialog lists it
+as kept (`mediforce images delete` prints it too):
+
+- **An image adopted through Existing image** — `postgres`, anything that was on
+  the daemon before anyone catalogued it. Another workspace, or a service outside
+  Mediforce, may be using it.
+- **Another workspace's build of the same repo.** A repo names the same files
+  wherever it is built, so a `built` entry's versions include every workspace's
+  builds of it; only yours go.
+- **An image pulled from a registry**, even under your handle. A pull carries no
+  build label, and a name alone proves nothing: a handle can match a registry
+  organisation.
+- **An image the engine falls back to** — the five a workspace starts with, even
+  when its name happens to start with your handle. A step that names no image
+  pins nothing, so the live-pin check above is blind to every `runtime: python`
+  step on the deployment ([ADR-0022](../adr/0022-image-catalog.md) decision 8).
+
+For the same reason **Existing image** does not offer another workspace's upload,
+and cataloguing or re-keying onto a name under another workspace's handle is
+refused. To reclaim an image the catalog keeps, a deployment admin removes it
+from **Admin → Infrastructure** or with `mediforce system rmi`.
 
 ## Backfilling an existing deployment
 

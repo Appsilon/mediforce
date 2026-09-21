@@ -1,6 +1,5 @@
-import { isDefaultEngineImageSource } from '@mediforce/platform-core';
+import { isImageVersionOwnedBy } from '@mediforce/platform-core';
 import { assertCallerIsNamespaceAdmin, assertNamespaceAccess } from '../../auth';
-import { ConflictError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type {
   DeleteImageCatalogEntryInput,
@@ -31,9 +30,10 @@ export async function deleteImageCatalogEntry(
   const existing = await scope.imageCatalog.getById(input.namespace, input.id);
 
   const deletedImages: string[] = [];
+  const keptImages: string[] = [];
   if (input.withImages === true) {
-    // The daemon is deployment-wide, so this destroys artifacts that steps in
-    // other namespaces may pin.
+    // The daemon is deployment-wide, so even an image this workspace produced
+    // may back steps in other namespaces.
     //
     // The gate above already asserted admin of this workspace, which is
     // stricter than the one `deleteDockerImage` applies underneath: that one is
@@ -57,28 +57,26 @@ export async function deleteImageCatalogEntry(
     if (source === undefined) {
       // Neither a row nor an image the platform built for this namespace.
       // Deleting is idempotent, so this is a no-op rather than a 404.
-      return { success: true, deletedImages };
+      return { success: true, deletedImages, keptImages };
     }
 
-    // An engine default is not this workspace's to destroy. Every workspace's
-    // catalog is seeded with these (#1376), and a step that names no image
-    // pins nothing — so the live-pin check below cannot see the `runtime: r`
-    // steps across the deployment that this delete would break. The row is
-    // still the workspace's own to remove, which `--keep-images` does.
-    if (isDefaultEngineImageSource(source)) {
-      throw new ConflictError(
-        `'${input.id}' is an image the engine falls back to when a step names none, and the daemon is shared by every workspace. ` +
-        'Delete the catalog entry alone (`--keep-images`, or "Keep images" in the UI) — removing the image would break every step in every workspace that relies on that default.',
-      );
-    }
-
+    // Only what this workspace produced leaves the daemon. The rest — an image
+    // catalogued through **Existing image**, another workspace's build of the
+    // same repo, an engine default a step that names no image falls back to —
+    // stays, and the entry goes without it: the delete removes this
+    // workspace's offer, never another's capability.
     const versions = resolveEntryVersions(input.namespace, source, daemon.images);
+    const owned = versions.filter((version) => isImageVersionOwnedBy(input.namespace, source, version));
+    const ownedTags = new Set(owned.map((version) => version.imageTag));
+    keptImages.push(
+      ...new Set(versions.map((version) => version.imageTag).filter((tag) => ownedTags.has(tag) === false)),
+    );
     // By tag, not by image id. A tag names exactly what this entry offered, so
     // an image a second tag still references survives — where `docker rmi` on
     // a shared id refuses outright and forcing it would delete a version some
     // other entry offers. Deduplicated because two versions can share a tag
     // only by naming the same artifact twice.
-    const tags = [...new Set(versions.map((version) => version.imageTag))];
+    const tags = [...ownedTags];
 
     // `deleteDockerImage` asks this of every tag it is handed, so the rule and
     // its message live in one place. Asked here too, over all of them at once,
@@ -118,7 +116,7 @@ export async function deleteImageCatalogEntry(
         id: input.id,
         withImages: input.withImages === true,
       },
-      outputSnapshot: { id: input.id, deletedImages },
+      outputSnapshot: { id: input.id, deletedImages, keptImages },
       basis: 'Image catalog entry deleted via API',
       entityType: 'imageCatalogEntry',
       entityId: input.id,
@@ -126,5 +124,5 @@ export async function deleteImageCatalogEntry(
     });
   }
 
-  return { success: true, deletedImages };
+  return { success: true, deletedImages, keptImages };
 }

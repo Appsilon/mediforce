@@ -61,16 +61,17 @@ its commit.
 one, so the image outlives its workflow: the platform rebuilds that version's
 build context from the workflow version that carried it, through the same path
 as `images build --reference`, and under the same rules.
-`images delete` removes an entry **and** the images behind it — one act,
-because a record whose images stay is re-derived on the next read — which needs
-admin of that workspace, audits under `_system` since the daemon is
-deployment-wide, and is refused while a live workflow version still pins one of
-them (`--keep-images` for the rare record-only case; `system rmi` still removes
-one image by id or tag, and a live pin refuses it too). An entry naming an image
-the engine falls back to when a step names none refuses the image half outright
-and takes only `--keep-images`: a `runtime: python` step pins nothing, so the
-live-pin check cannot see what deleting `python` would break across the
-deployment.
+`images delete` removes an entry **and** the images behind it that the
+workspace produced — one act, because a record whose images stay is re-derived
+on the next read — which needs admin of that workspace, audits under `_system`
+since the daemon is deployment-wide, and is refused while a live workflow
+version still pins one of them (`--keep-images` for the rare record-only case;
+`system rmi` still removes one image by id or tag, and a live pin refuses it
+too). An image the workspace did not produce stays on the daemon and is printed
+as kept: one adopted through **Existing image** or pulled, another workspace's build of
+the same repo, or an image the engine falls back to when a step names none — a
+`runtime: python` step pins nothing, so the live-pin check cannot see what
+deleting `python` would break across the deployment.
 `images seed` catalogues exactly those engine defaults — the golden image and
 the four script runtimes. Every workspace is created with them (#1376), so this
 is for a workspace created before that, or one whose seed lost a race with an

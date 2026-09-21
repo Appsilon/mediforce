@@ -311,14 +311,12 @@ export const PublishImageCatalogVersionOutputSchema = BuildImageCatalogVersionOu
  * DELETE input: id from URL.
  *
  * `withImages` extends the act from "remove an offer" to "remove the artifacts
- * too", and the two are gated differently on purpose. Removing an entry is a
- * member's right, because it destroys nothing — no Workflow Definition
- * references an entry (decision 3). Removing an image acts on the
- * **deployment-wide** daemon, where a tag can back steps in namespaces the
- * caller cannot see, so it carries Infrastructure's admin gate and audits
- * under `_system`. Optional, and absent means no: the destructive half is
- * always asked for, never assumed, and a caller that does not care about it
- * need not mention it.
+ * too". Either way the caller must be admin or owner of the workspace
+ * (ADR-0022). The images live on the **deployment-wide** daemon, so only the
+ * versions this workspace produced are removed — see `isImageVersionOwnedBy`;
+ * the rest come back in `keptImages`. Removing an image audits under
+ * `_system`. Optional, and absent means no: the destructive half is always
+ * asked for, never assumed.
  */
 export const DeleteImageCatalogEntryInputSchema = NamespaceQuery.extend({
   id: z.string().min(1),
@@ -329,6 +327,10 @@ export const DeleteImageCatalogEntryOutputSchema = z.object({
   /** Tags removed from the daemon — empty unless `withImages` was set, and
    *  empty when the entry had no version on the daemon to remove. */
   deletedImages: z.array(z.string()),
+  /** Tags of the entry left on the daemon because this workspace did not
+   *  produce them — an adopted image, another workspace's build, an engine
+   *  default. Empty unless `withImages` was set. */
+  keptImages: z.array(z.string()),
 });
 
 /**

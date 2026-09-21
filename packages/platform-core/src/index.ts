@@ -574,6 +574,7 @@ export {
   DEFAULT_SCRIPT_RUNTIME_IMAGES,
   DEFAULT_IMAGE_CATALOG_ENTRIES,
   isDefaultEngineImageSource,
+  isImageVersionOwnedBy,
 } from './utils/container-defaults';
 export type { DefaultImageCatalogEntry } from './utils/container-defaults';
 export {

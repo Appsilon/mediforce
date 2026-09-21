@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-09-18
+last_reviewed: 2026-09-21
 ---
 
 # ADR-0022: The Image Catalog is an image the platform offers, keyed on its source
@@ -310,6 +310,27 @@ still references survives instead of needing a force that would destroy a
 version another entry offers; and they go before the row, all or nothing, since
 the entry is the only handle anyone has on a version left behind.
 
+**Only an image the workspace produced goes with its entry** (2026-09-21). The
+delete above took every version an entry resolved, and an entry can resolve
+images the workspace never made: **Existing image** catalogues anything the
+daemon holds — `postgres`, another workspace's upload — and a `built` entry
+matches every workspace's build of its repo, since a repo names the same files
+wherever it is built. So an admin of one workspace could adopt an image and then
+delete it off the shared daemon, and the live-pin check was the only thing in
+the way; drafts, un-pinned uses and anything outside Mediforce were not. The
+argument for one act — a record alone is re-derived — only ever held for images
+this namespace built. `isImageVersionOwnedBy` now decides which versions go: an
+image whose namespace label — stamped by the platform on every build and upload —
+names the workspace, and for a `referenced` entry also sits under its handle, as
+an upload does. A name alone is not proof: another workspace's build-mode step
+can tag `<handle>/…`, and a handle can match a registry organisation. So an
+image a workspace *pulled*, which carries no label, is kept too. The rest stays, is listed as kept
+in the dialog and returned as `keptImages`, and the row goes without it — the
+same outcome an engine default already had, which folds into the same rule
+instead of a 409 of its own. **Existing image** stops offering another
+workspace's upload, and cataloguing or re-keying onto a name under another
+workspace's handle is refused, as pulling one already was.
+
 Decision 7 is dated 2026-09-08 and revises one line of the original
 consequences — *"a new row appears only when someone catalogues a source nobody
 has catalogued before"*. That stays true of **rows**; it is no longer true of
@@ -488,6 +509,12 @@ cross-namespace write path is the cost avoided.
 **The catalog is therefore not an isolation boundary,** and this must not be
 misread later: an image absent from your namespace's catalog is not an image
 your namespace is denied. It is one nobody here has described yet.
+
+Nor is it a confidentiality boundary. The daemon listing behind **Admin →
+Infrastructure** is readable by any signed-in user, and **Existing image** offers
+any member the daemon's repositories. Scoping rows per namespace buys each workspace
+its own sentences and picker, and no cross-namespace write path; it does not
+hide what another workspace put on the daemon.
 
 **Any workspace member may create, edit and delete an entry.** Every write is
 audited the way a Tool Catalog write is. This is deliberately looser than the
@@ -707,8 +734,9 @@ can only 409.
 **The rows are the workspace's, and editing or deleting one is ordinary**
 (decision 3) — no shared or global catalog tier that every workspace reads, and
 no second sharing mechanism to reason about. The one exception is the image
-half of a delete: `isDefaultEngineImageSource` refuses `withImages` for these
-references, and the UI offers only the record-only delete. The daemon is
+half of a delete: `isImageVersionOwnedBy` never counts these references as the
+workspace's, so their images stay on the daemon and the UI offers only the
+record-only delete. The daemon is
 deployment-wide and a step that names *no* image pins nothing, so the live-pin
 check that protects every other entry is blind here — an admin of a
 minutes-old workspace could otherwise take `python:3.12-slim` off the daemon for
@@ -814,10 +842,10 @@ User-visible changes, each a §12 gate in the issue that made it:
 - **A new workspace opens on five entries it did not write** (decision 8),
   described and sourced as `referenced`. Additive: nothing that was offered
   stopped being offered, and the rows are the workspace's to edit or delete.
-- **The image behind an engine default cannot be deleted from a workspace**
-  (decision 8). The record can; `--keep-images` is the only accepted form, and
-  the UI offers only that. The one place the delete gate is stricter than
-  "admin of this workspace plus no live pin".
+- **Only an image a workspace produced can be deleted from its catalog.** An
+  adopted image, another workspace's build and an engine default (decision 8)
+  stay on the daemon when their entry goes, and are reported as kept. Reclaiming
+  one is **Admin → Infrastructure** or `mediforce system rmi`.
 
 ## Out of scope
 

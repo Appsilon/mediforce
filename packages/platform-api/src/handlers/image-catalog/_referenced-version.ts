@@ -1,11 +1,14 @@
 import {
   imageTagTakenMessage,
+  isDefaultEngineImageSource,
+  isRegistryHost,
   ImageCatalogEntrySchema,
   type ImageCatalogDeclaredSource,
   type ImageCatalogEntry,
 } from '@mediforce/platform-core';
 import {
   ConflictError,
+  ForbiddenError,
   HandlerError,
   PreconditionFailedError,
   ValidationError,
@@ -15,6 +18,30 @@ import { actorFromCaller } from '../_helpers';
 import { fetchDaemonImages } from '../system/_docker';
 import { deriveImageCatalogEntryId } from './_source';
 import { refreshEntryCapabilities } from './_capabilities';
+
+/**
+ * Refuse a reference whose first segment is another workspace's handle.
+ *
+ * `<workspace>/<name>` is the Image Catalog's naming for what a workspace
+ * uploads and publishes, and the daemon is shared. Pulled or catalogued from
+ * elsewhere, such a name would run there as if its own members had put it on
+ * the daemon — and, catalogued, would hand the other workspace its delete.
+ */
+export async function assertReferenceNotAnotherWorkspaces(
+  reference: string,
+  namespace: string,
+  scope: CallerScope,
+): Promise<void> {
+  // An engine default is every workspace's to catalogue (decision 8), even
+  // when a workspace's handle happens to be its first segment.
+  if (isDefaultEngineImageSource({ kind: 'referenced', reference })) return;
+  const [owner, ...path] = reference.split('/');
+  if (owner === undefined || path.length === 0 || owner === namespace || isRegistryHost(owner)) return;
+  if ((await scope.workspaces.getNamespace(owner)) === null) return;
+  throw new ForbiddenError(
+    `"${reference}" is a name that belongs to workspace "${owner}" on this deployment: the daemon lists it as that workspace's image, so another workspace cannot pull or catalogue it.`,
+  );
+}
 
 /** One version of a `referenced` entry, as an upload or a pull names it. */
 export interface ReferencedVersionRequest {

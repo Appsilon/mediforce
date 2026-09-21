@@ -87,11 +87,12 @@ function docker(...args: string[]): void {
  * without occupying BuildKit. Every test in this suite reads the same daemon
  * on every request, so a journey that keeps it busy times its neighbours out.
  */
-function deriveImage(tag: string, from: string, command: string): void {
+function deriveImage(tag: string, from: string, command: string, labels: Record<string, string> = {}): void {
   const container = `mediforce-e2e-lineage-${tag.replace(/[^a-z0-9]/gi, '-')}`;
   docker('run', '--name', container, from, ...command.split(' '));
   try {
-    docker('commit', container, tag);
+    const changes = Object.entries(labels).flatMap(([key, value]) => ['--change', `LABEL ${key}=${value}`]);
+    docker('commit', ...changes, container, tag);
   } finally {
     docker('rm', '-f', container);
   }
@@ -672,7 +673,9 @@ test.describe('image catalog API journey', () => {
   test('a delete stays blocked until no runnable version pins the image', async ({ request }) => {
     test.skip(!dockerAvailable(), 'Docker daemon not available');
     const stamp = Date.now();
-    const reference = `mediforce-e2e-pinned-${stamp}`;
+    // Under the workspace handle and labelled with it, as an upload is: only an
+    // image this workspace produced leaves the daemon with its entry.
+    const reference = `${TEST_ORG_HANDLE}/mediforce-e2e-pinned-${stamp}`;
     const tag = `${reference}:v1`;
     const workflowName = `e2e-pin-${stamp}`;
     let entryId = '';
@@ -682,7 +685,7 @@ test.describe('image catalog API journey', () => {
     } catch {
       docker('pull', PROBE_BASE_IMAGE);
     }
-    deriveImage(tag, PROBE_BASE_IMAGE, 'mkdir /e2e-pin-marker');
+    deriveImage(tag, PROBE_BASE_IMAGE, 'mkdir /e2e-pin-marker', { 'mediforce.build.namespace': TEST_ORG_HANDLE });
 
     try {
       const createRes = await request.post(catalogUrl(), {
@@ -890,7 +893,9 @@ test.describe('image catalog API journey', () => {
     // A `docker commit` of its own, never a shared tag: this test destroys the
     // image it names, and a neighbour reading the same tag would lose it.
     const stamp = Date.now();
-    const reference = `mediforce-e2e-rmi-${stamp}`;
+    // Under the workspace handle and labelled with it, as an upload is: only an
+    // image this workspace produced leaves the daemon with its entry.
+    const reference = `${TEST_ORG_HANDLE}/mediforce-e2e-rmi-${stamp}`;
     const tag = `${reference}:v1`;
     let entryId = '';
 
@@ -899,7 +904,7 @@ test.describe('image catalog API journey', () => {
     } catch {
       docker('pull', PROBE_BASE_IMAGE);
     }
-    deriveImage(tag, PROBE_BASE_IMAGE, 'mkdir /e2e-rmi-marker');
+    deriveImage(tag, PROBE_BASE_IMAGE, 'mkdir /e2e-rmi-marker', { 'mediforce.build.namespace': TEST_ORG_HANDLE });
 
     try {
       const createRes = await request.post(catalogUrl(), {
@@ -943,6 +948,63 @@ test.describe('image catalog API journey', () => {
         docker('rmi', '-f', tag);
       } catch {
         /* the delete under test removed it */
+      }
+    }
+  });
+
+  test('deleting an adopted image removes the entry and keeps the image', async ({ request }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    // No workspace prefix and no build label: an image that was on the daemon
+    // before anyone catalogued it, which **Existing image** adopts. The daemon
+    // is shared, so the entry is this workspace's to drop and the image is not.
+    const stamp = Date.now();
+    const reference = `mediforce-e2e-adopted-${stamp}`;
+    const tag = `${reference}:v1`;
+    let entryId = '';
+
+    try {
+      docker('image', 'inspect', PROBE_BASE_IMAGE);
+    } catch {
+      docker('pull', PROBE_BASE_IMAGE);
+    }
+    deriveImage(tag, PROBE_BASE_IMAGE, 'mkdir /e2e-adopted-marker');
+
+    try {
+      const createRes = await request.post(catalogUrl(), {
+        headers: apiKeyHeaders(),
+        data: {
+          name: `E2E adopted ${stamp}`,
+          intent: 'Proves an adopted image outlives its entry.',
+          source: { kind: 'referenced', reference },
+        },
+      });
+      expect(createRes.status(), await createRes.text()).toBe(201);
+      entryId = ((await createRes.json()) as { entry: EntryView }).entry.id;
+
+      const res = await request.delete(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(res.ok(), await res.text()).toBe(true);
+      expect(await res.json()).toEqual({ success: true, deletedImages: [], keptImages: [tag] });
+      entryId = '';
+
+      docker('image', 'inspect', tag);
+      const listRes = await request.get(catalogUrl(), { headers: apiKeyHeaders() });
+      const references = ((await listRes.json()) as { entries: EntryView[] }).entries.map(
+        (candidate) => candidate.source.reference,
+      );
+      expect(references).not.toContain(reference);
+    } finally {
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+      try {
+        docker('rmi', '-f', tag);
+      } catch {
+        /* never created */
       }
     }
   });
