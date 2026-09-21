@@ -40,7 +40,7 @@ export function getGitSshCommand(): string {
 /**
  * Fetch `commit` from `repoRef` into `targetDir` (already-existing directory),
  * trying each transport the reference resolves to. Anonymous HTTPS is tried
- * before the SSH deploy key for shorthand and HTTPS references, so a public
+ * before the SSH deploy key for every GitHub reference, so a public
  * repo needs no credentials and a private one still reaches its deploy key.
  */
 export function cloneRepoAtCommit(

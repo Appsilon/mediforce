@@ -161,18 +161,40 @@ describe('container-worker buildImageFromRepo', () => {
     expect(options?.env?.GIT_SSH_COMMAND).toBeUndefined();
   });
 
-  it('uses SSH for git@ refs', async () => {
+  it('uses SSH for a non-GitHub git@ ref', async () => {
     await buildImageFromRepo({
       image: 'test-image',
-      repoUrl: 'git@github.com:owner/repo.git',
-      repoRef: 'git@github.com:owner/repo.git',
+      repoUrl: 'git@gitlab.com:owner/repo.git',
+      repoRef: 'git@gitlab.com:owner/repo.git',
       commit: 'abc123',
     });
 
     const [command, args, options] = fetchCalls()[0];
     expect(command).toBe('git');
-    expect(args).toContain('git@github.com:owner/repo.git');
+    expect(args).toContain('git@gitlab.com:owner/repo.git');
     expect(options?.env?.GIT_SSH_COMMAND).toContain('ssh -i');
+  });
+
+  it('builds a public repo given in GitHub SSH form over anonymous HTTPS, never reading the deploy key', async () => {
+    const deployKeyDirectory = mkdtempSync(join(tmpdir(), 'mediforce-worker-deploy-key-'));
+    process.env.DEPLOY_KEY_PATH = deployKeyDirectory;
+
+    try {
+      await buildImageFromRepo({
+        image: 'test-image',
+        repoUrl: 'git@github.com:owner/public.git',
+        repoRef: 'git@github.com:owner/public.git',
+        commit: 'abc123',
+      });
+
+      const fetches = fetchCalls();
+      expect(fetches).toHaveLength(1);
+      const [, args, options] = fetches[0];
+      expect(args).toContain('https://github.com/owner/public');
+      expect(options?.env?.GIT_SSH_COMMAND).toBeUndefined();
+    } finally {
+      rmSync(deployKeyDirectory, { recursive: true, force: true });
+    }
   });
 
   it('falls back to the SSH deploy key when anonymous HTTPS cannot see a private owner/repo', async () => {
@@ -238,8 +260,8 @@ describe('container-worker buildImageFromRepo', () => {
       await expect(
         buildImageFromRepo({
           image: 'test-image',
-          repoUrl: 'git@github.com:owner/repo.git',
-          repoRef: 'git@github.com:owner/repo.git',
+          repoUrl: 'git@gitlab.com:owner/repo.git',
+          repoRef: 'git@gitlab.com:owner/repo.git',
           commit: 'abc123',
         }),
       ).rejects.toThrow(/deploy key.*regular file/i);

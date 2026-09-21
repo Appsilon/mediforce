@@ -195,7 +195,9 @@ exactly the steps that leave it unset.
 
 Cloning uses anonymous HTTPS first, then an SSH deploy key
 (`$DEPLOY_KEY_PATH`, default `~/.ssh/deploy_key`) — a public repo needs no
-credentials, a private one still reaches its key. For HTTPS, `repoAuth` /
+credentials, a private one still reaches its key. That holds for a
+`git@github.com:` ref too; an SSH ref to any other host goes straight to the
+key, having no HTTPS form to derive. For HTTPS, `repoAuth` /
 `remoteAuth` name a workflow secret holding a token. Secrets are never an
 interpolation source and never reach a commit or an audit snapshot.
 

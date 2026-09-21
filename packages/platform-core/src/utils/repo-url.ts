@@ -101,11 +101,13 @@ export function redactRepoCredentials(value: string, repoToken?: string): string
  *                      over HTTPS, mirroring the main-repo clone path. A host
  *                      the token converter doesn't understand keeps SSH so a
  *                      configured deploy key still applies.
- *   - `git@…`        → SSH as given (needs deploy key + `GIT_SSH_COMMAND`)
  *   - local path     → as given
- *   - `owner/repo` shorthand / `https://…` → anonymous HTTPS first, so a public
- *                      repo clones with no credentials at all; a private one
- *                      answers 404 there, so SSH with the deploy key follows.
+ *   - `owner/repo` shorthand / `https://…` / `git@github.com:…` → anonymous
+ *                      HTTPS first, so a public repo clones with no credentials
+ *                      at all; a private one answers 404 there, so SSH with the
+ *                      deploy key follows.
+ *   - other `git@…`  → SSH as given (needs deploy key + `GIT_SSH_COMMAND`);
+ *                      there is no HTTPS form to derive for an unknown host.
  */
 export function resolveRepoCloneTargets(repoRef: string, repoToken?: string): RepoCloneTarget[] {
   if (repoRef.startsWith('/') || repoRef.startsWith('.')) {
@@ -117,7 +119,7 @@ export function resolveRepoCloneTargets(repoRef: string, repoToken?: string): Re
       ? [{ cloneUrl: tokenUrl, useSsh: false }]
       : [{ cloneUrl: repoRef, useSsh: true }];
   }
-  if (repoRef.startsWith('git@')) {
+  if (repoRef.startsWith('git@') && repoRef.startsWith('git@github.com:') === false) {
     return [{ cloneUrl: repoRef, useSsh: true }];
   }
   const { gitUrl, httpsUrl } = normalizeRepoUrls(repoRef);

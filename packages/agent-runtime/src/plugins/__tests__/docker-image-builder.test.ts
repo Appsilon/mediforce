@@ -309,19 +309,19 @@ describe('buildImageFromRepo', () => {
     expect(options?.env?.GIT_SSH_COMMAND).toBeUndefined();
   });
 
-  it('clones a git@ ref over SSH and sets GIT_SSH_COMMAND', async () => {
+  it('clones a non-GitHub git@ ref over SSH and sets GIT_SSH_COMMAND', async () => {
     execFileSyncMock.mockReturnValue(Buffer.from(''));
 
     await buildImageFromRepo({
       image: 'test-image',
-      repoUrl: 'git@github.com:owner/repo.git',
-      repoRef: 'git@github.com:owner/repo.git',
+      repoUrl: 'git@gitlab.com:owner/repo.git',
+      repoRef: 'git@gitlab.com:owner/repo.git',
       commit: 'abc123',
     });
 
     const [command, args, options] = fetchCalls()[0];
     expect(command).toBe('git');
-    expect(args).toContain('git@github.com:owner/repo.git');
+    expect(args).toContain('git@gitlab.com:owner/repo.git');
     expect(options?.env?.GIT_SSH_COMMAND).toContain('ssh -i');
   });
 
