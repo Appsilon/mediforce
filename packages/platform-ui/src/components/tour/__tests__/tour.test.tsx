@@ -7,14 +7,24 @@ vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
 }));
 
-const { TourProvider } = await import('../tour-provider');
+const { TourProvider, useTour } = await import('../tour-provider');
 const { GuideTrigger } = await import('../tour-triggers');
+
+function ScenarioStarter() {
+  const { startScenario } = useTour();
+  return (
+    <button type="button" onClick={() => startScenario('run')} data-testid="start-run-scenario">
+      run
+    </button>
+  );
+}
 
 function mount() {
   return render(
     <TourProvider>
       <div data-tour="workflow-list">workflows</div>
       <GuideTrigger />
+      <ScenarioStarter />
     </TourProvider>,
   );
 }
@@ -102,5 +112,29 @@ describe('guide', () => {
     mount();
     fireEvent.click(screen.getByTestId('guide-trigger'));
     expect(screen.getByTestId('tour-card').textContent).toContain('Everything waiting on a person');
+  });
+});
+
+describe('demo scenarios', () => {
+  it('survives the navigation a guide would end on', () => {
+    const view = mount();
+    fireEvent.click(screen.getByTestId('start-run-scenario'));
+    expect(screen.getByTestId('tour-card').textContent).toContain('1 of ');
+
+    pathname = '/test/workflows/etymology-checker';
+    view.rerender(
+      <TourProvider>
+        <GuideTrigger />
+        <ScenarioStarter />
+      </TourProvider>,
+    );
+    expect(screen.queryByTestId('tour-card')).not.toBeNull();
+  });
+
+  it('shows what the viewer is being asked to do', () => {
+    mount();
+    fireEvent.click(screen.getByTestId('start-run-scenario'));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByTestId('tour-card').textContent).toContain('Press Start Run');
   });
 });

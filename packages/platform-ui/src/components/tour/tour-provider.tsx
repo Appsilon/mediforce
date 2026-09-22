@@ -3,15 +3,24 @@
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { isEditableTarget } from '@/components/command-palette/provider';
-import { chapterForPath, type TourStep } from '@/lib/tour';
+import { chapterForPath, matchesRoute, type TourStep } from '@/lib/tour';
 import { GUIDE_CHAPTERS } from '@/lib/tour-content';
+import { DEMO_SCENARIOS } from '@/lib/demo-content';
+import type { DemoStep } from '@/lib/demo';
 import { TourOverlay } from './tour-overlay';
 
-type TourState = { title: string; steps: readonly TourStep[]; index: number };
+type TourState = {
+  title: string;
+  steps: readonly (TourStep & { route?: string; action?: string })[];
+  index: number;
+  /** A guide ends when you leave the page; a scenario is meant to cross pages. */
+  crossesPages: boolean;
+};
 
 type TourContextValue = {
   active: TourState | null;
   start: () => void;
+  startScenario: (scenarioId: string) => void;
   stop: () => void;
   next: () => void;
   back: () => void;
@@ -42,8 +51,14 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const start = React.useCallback(() => {
     const chapter = chapterForPath(GUIDE_CHAPTERS, pathname);
     if (chapter === null) return;
-    setActive({ title: chapter.title, steps: chapter.steps, index: 0 });
+    setActive({ title: chapter.title, steps: chapter.steps, index: 0, crossesPages: false });
   }, [pathname]);
+
+  const startScenario = React.useCallback((scenarioId: string) => {
+    const scenario = DEMO_SCENARIOS.find((entry) => entry.id === scenarioId);
+    if (scenario === undefined) return;
+    setActive({ title: scenario.title, steps: scenario.steps, index: 0, crossesPages: true });
+  }, []);
 
   const stop = React.useCallback(() => setActive(null), []);
 
@@ -59,8 +74,19 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     setActive((prev) => (prev === null ? null : { ...prev, index: Math.max(0, prev.index - 1) }));
   }, []);
 
-  // The guide explains the page you are on, so leaving that page ends it.
-  React.useEffect(() => setActive(null), [pathname]);
+  // The guide explains the page you are on, so leaving that page ends it. A
+  // scenario spans pages by design, and navigating is how the viewer advances:
+  // arriving at a later step's route moves to that step.
+  React.useEffect(() => {
+    setActive((prev) => {
+      if (prev === null) return null;
+      if (!prev.crossesPages) return null;
+      const arrivedAt = (prev.steps as readonly DemoStep[]).findIndex(
+        (step, i) => i > prev.index && step.route !== undefined && matchesRoute(step.route, pathname),
+      );
+      return arrivedAt === -1 ? prev : { ...prev, index: arrivedAt };
+    });
+  }, [pathname]);
 
   const running = active !== null;
 
@@ -88,8 +114,8 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   }, [running, stop, next, back]);
 
   const value = React.useMemo<TourContextValue>(
-    () => ({ active, start, stop, next, back }),
-    [active, start, stop, next, back],
+    () => ({ active, start, startScenario, stop, next, back }),
+    [active, start, startScenario, stop, next, back],
   );
 
   const step = active === null ? null : active.steps[active.index] ?? null;
@@ -101,6 +127,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         <TourOverlay
           title={active.title}
           step={step}
+          action={(step as DemoStep).action}
           index={active.index}
           total={active.steps.length}
           onNext={next}

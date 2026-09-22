@@ -39,6 +39,9 @@ DEMO_ENV: dict[str, str] = {
     "PLATFORM_API_KEY": "test-api-key",
     "SECRETS_ENCRYPTION_KEY": "0" * 64,
     "MEDIFORCE_DISABLE_EMAIL": "true",
+    # The Demo button is normally Appsilon-only; the seeded mock user is not,
+    # so open it here to make the scenarios walkable against the mock seed.
+    "NEXT_PUBLIC_DEMO_MODE": "true",
 }
 
 

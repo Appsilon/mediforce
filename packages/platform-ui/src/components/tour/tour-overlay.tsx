@@ -95,6 +95,7 @@ function useTargetBox(target: string | undefined): Box | null {
 export function TourOverlay({
   title,
   step,
+  action,
   index,
   total,
   onNext,
@@ -103,6 +104,8 @@ export function TourOverlay({
 }: {
   title: string;
   step: TourStep;
+  /** What a demo scenario asks the viewer to do here; a guide step has none. */
+  action?: string;
   index: number;
   total: number;
   onNext: () => void;
@@ -192,9 +195,15 @@ export function TourOverlay({
           </button>
         </div>
 
-        <p id="tour-step-body" className="px-4 py-3 text-sm text-muted-foreground">
+        <p id="tour-step-body" className="px-4 pb-3 pt-3 text-sm text-muted-foreground">
           {step.body}
         </p>
+
+        {action !== undefined && (
+          <p className="mx-4 mb-3 rounded-md bg-primary-subtle px-2.5 py-1.5 text-xs font-medium text-primary">
+            {action}
+          </p>
+        )}
 
         <div className="flex items-center justify-between gap-2 border-t px-4 py-2.5">
           <div className="flex items-center gap-2.5">

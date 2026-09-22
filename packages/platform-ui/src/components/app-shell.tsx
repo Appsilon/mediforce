@@ -13,7 +13,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { ThemeToggle } from './theme-toggle';
 import { NewTicketTrigger } from './command-palette';
-import { GuideTrigger } from './tour';
+import { DemoTrigger, GuideTrigger } from './tour';
 import { cn } from '@/lib/utils';
 import { workspaceSwitchHref } from '@/lib/workspace-switch';
 import { useNamespace } from '@/hooks/use-namespace';
@@ -432,6 +432,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
+            <DemoTrigger />
             <GuideTrigger />
             <NewTicketTrigger />
             <ThemeToggle />
