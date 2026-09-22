@@ -21,6 +21,7 @@ vi.mock('next/navigation', () => ({
 
 const { TourProvider, useTour } = await import('../tour-provider');
 const { GuideTrigger } = await import('../tour-triggers');
+const { TourPill } = await import('../tour-pill');
 
 function ScenarioStarter() {
   const { startScenario } = useTour();
@@ -43,6 +44,7 @@ function mount() {
       <div data-tour="workflow-list">workflows</div>
       <GuideTrigger />
       <ScenarioStarter />
+      <TourPill />
     </TourProvider>,
     ),
   );
@@ -164,6 +166,7 @@ describe('demo scenarios', () => {
         <TourProvider>
           <GuideTrigger />
           <ScenarioStarter />
+          <TourPill />
         </TourProvider>,
       ),
     );

@@ -171,33 +171,9 @@ export function TourOverlay({
   const placed = cardPlacement(spotlight, viewport, { width: CARD_WIDTH, height: cardHeight });
   const isLast = index === total - 1;
 
-  if (collapsed) {
-    return createPortal(
-      <div className="fixed right-4 top-14 z-[100] print:hidden" data-testid="tour-overlay">
-        <div className="flex items-center gap-1 rounded-full border bg-popover py-1 pl-3 pr-1 text-xs shadow-lg">
-          <button
-            type="button"
-            onClick={onExpand}
-            className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
-            data-testid="tour-resume"
-          >
-            <Compass className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-            <span className="max-w-[12rem] truncate font-medium text-foreground">{title}</span>
-            <span className="tabular-nums">{index + 1} of {total}</span>
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="End walkthrough"
-            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>,
-      document.body,
-    );
-  }
+  // Folded away, the walkthrough lives in the top bar beside the Demo button
+  // rather than floating over the page — see `TourPill`.
+  if (collapsed) return null;
 
   return createPortal(
     <div className="pointer-events-none fixed inset-0 z-[100] print:hidden" data-testid="tour-overlay">
