@@ -6,23 +6,10 @@
  * where it happens; arriving there is what advances it.
  */
 
-import { matchesRoute } from './tour';
+import { matchesRoute, type TourStep } from './tour';
 
-export type DemoStep = {
-  id: string;
-  title: string;
-  body: string;
-  /** `data-tour` value to spotlight. Absent, or absent from the page, narrates centred. */
-  target?: string;
-  /**
-   * Route pattern this step belongs to, in `chapterForPath` syntax. When the
-   * viewer is somewhere else the card says where to go; arriving advances it.
-   * Omitted means the step belongs wherever the previous one left off.
-   */
-  route?: string;
-  /** What the viewer does here, shown as the step's call to action. */
-  action?: string;
-};
+/** A scenario step is a tour step that also knows where it happens. */
+export type DemoStep = TourStep;
 
 /** A step's route without its query — the part `matchesRoute` understands. */
 export function routePattern(step: Pick<DemoStep, 'route'>): string | null {
@@ -62,11 +49,8 @@ export function isAppsilonEmail(email: string | null | undefined): boolean {
  * deployment that never sets it keeps the domain rule — the flag has to be
  * chosen, never inherited.
  */
-export function offersDemo(
-  email: string | null | undefined,
-  opts: { demoModeEnabled: boolean },
-): boolean {
-  return opts.demoModeEnabled || isAppsilonEmail(email);
+export function offersDemo(email: string | null | undefined, demoModeEnabled: boolean): boolean {
+  return demoModeEnabled || isAppsilonEmail(email);
 }
 
 /**
@@ -82,6 +66,10 @@ export function resolveDemoRoute(
   pathname: string,
   run?: DemoRunCandidate | null,
 ): string | null {
+  // `:name` and `:runId` name one run between them, so they are filled from one
+  // source or neither. Taking the workflow from the path and the run id from a
+  // workspace-wide pick produced `/ns/workflows/foo/runs/<a-run-of-bar>`.
+  const needsRunId = route.includes(':runId');
   const [path, query] = route.split('?');
   const wanted = (path ?? '').split('/').filter((part) => part !== '');
   const current = pathname.split('/').filter((part) => part !== '');
@@ -97,9 +85,9 @@ export function resolveDemoRoute(
       filled.push(part);
       continue;
     }
-    // The path the viewer is on wins: if they already opened a workflow, the
-    // scenario stays on theirs rather than hopping to the one it chose.
-    const resolved = current[index] ?? fromRun[part];
+    const resolved = needsRunId && part in fromRun
+      ? fromRun[part]
+      : current[index] ?? fromRun[part];
     if (resolved === undefined || resolved === '') return null;
     filled.push(resolved);
   }
@@ -146,15 +134,15 @@ export function pickDemoRun(runs: readonly DemoRunCandidate[]): DemoRunCandidate
 /**
  * What a running scenario should do about where the viewer currently is.
  *
- * One rule rather than four interacting ones, and pure, because every routing
- * bug in this feature came from two of those rules disagreeing about the same
- * pathname. `stay` covers both "already in the right place" and "cannot build
- * a URL", which the caller treats identically.
+ * One rule rather than four interacting ones, so two of them can never
+ * disagree about the same pathname.
  */
 export type DemoRouteAction =
   | { kind: 'stay' }
   | { kind: 'advance'; index: number }
-  | { kind: 'navigate'; url: string };
+  | { kind: 'navigate'; url: string }
+  /** No URL can be built — the viewer has to go somewhere first. */
+  | { kind: 'unreachable'; needs: string };
 
 export function nextRouteAction(input: {
   steps: readonly DemoStep[];
@@ -177,8 +165,21 @@ export function nextRouteAction(input: {
   const step = steps[index];
   if (step?.route === undefined) return { kind: 'stay' };
   const url = resolveDemoRoute(step.route, pathname, run);
-  if (url === null || url === currentUrl) return { kind: 'stay' };
+  if (url === null) return { kind: 'unreachable', needs: unreachableReason(step) };
+  if (url === currentUrl) return { kind: 'stay' };
   return { kind: 'navigate', url };
+}
+
+/**
+ * What the viewer has to do before a step can be reached. A run id can only
+ * come from a run, so an empty workspace is told that rather than shown a
+ * spotlight with nothing under it.
+ */
+function unreachableReason(step: TourStep): string {
+  const params = routeParams(step);
+  if (params.includes(':runId')) return 'This step needs a run. Start one, then come back.';
+  if (params.includes(':name')) return 'This step needs a workflow. Open one, then come back.';
+  return 'This step is on a page that is not open yet.';
 }
 
 /** Where a scenario should open for a viewer already standing somewhere. */

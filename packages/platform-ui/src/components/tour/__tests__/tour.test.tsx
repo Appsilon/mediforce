@@ -234,10 +234,29 @@ describe('demo scenarios', () => {
     expect(screen.getByTestId('tour-card')).toBeTruthy();
   });
 
+  it('says what is missing rather than pointing at nothing', () => {
+    pathname = '/test';
+    demoRun = null;
+    mount();
+    fireEvent.click(screen.getByTestId('start-run-scenario'));
+    while (screen.queryByRole('button', { name: 'Next' }) !== null) {
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+      if (screen.getByTestId('tour-card').textContent?.includes('needs a run') === true) break;
+    }
+    expect(screen.getByTestId('tour-card').textContent).toContain('Start one, then come back');
+  });
+
   it('shows what the viewer is being asked to do', () => {
+    pathname = '/test/workflows/etymology-checker';
     mount();
     fireEvent.click(screen.getByTestId('start-run-scenario'));
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(screen.getByTestId('tour-card').textContent).toContain('Press Start Run');
+  });
+
+  it('calls itself Demo, not Guide', () => {
+    mount();
+    fireEvent.click(screen.getByTestId('start-run-scenario'));
+    expect(screen.getByTestId('tour-card').textContent).toContain('Demo · Run it and explore');
   });
 });

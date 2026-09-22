@@ -93,28 +93,31 @@ function useTargetBox(target: string | undefined): Box | null {
 }
 
 export function TourOverlay({
+  kind,
   title,
   step,
   action,
+  unreachable,
   collapsed,
   autoCollapse,
   onCollapse,
-  onExpand,
   index,
   total,
   onNext,
   onBack,
   onClose,
 }: {
+  kind: 'guide' | 'scenario';
   title: string;
   step: TourStep;
   /** What a demo scenario asks the viewer to do here; a guide step has none. */
   action?: string;
+  /** Why this step cannot be reached from here, if it cannot be. */
+  unreachable?: string | null;
   collapsed: boolean;
   /** Whether touching the page behind should get out of the way on its own. */
   autoCollapse: boolean;
   onCollapse: () => void;
-  onExpand: () => void;
   index: number;
   total: number;
   onNext: () => void;
@@ -150,7 +153,7 @@ export function TourOverlay({
 
   // Touching the app is the viewer doing the step, so it folds itself away.
   React.useEffect(() => {
-    if (!autoCollapse || collapsed) return;
+    if (autoCollapse === false || collapsed) return;
     function onPointerDown(event: PointerEvent): void {
       const inTheCard = event.target instanceof Node && cardRef.current?.contains(event.target) === true;
       if (!inTheCard) onCollapse();
@@ -204,7 +207,7 @@ export function TourOverlay({
           <Compass className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Guide · {title}
+              {kind === 'scenario' ? 'Demo' : 'Guide'} · {title}
             </p>
             <h2 className="font-headline text-sm font-semibold leading-snug">{step.title}</h2>
           </div>
@@ -231,7 +234,13 @@ export function TourOverlay({
           {step.body}
         </p>
 
-        {action !== undefined && (
+        {unreachable !== undefined && unreachable !== null && (
+          <p className="mx-4 mb-3 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+            {unreachable}
+          </p>
+        )}
+
+        {action !== undefined && unreachable == null && (
           <p className="mx-4 mb-3 rounded-md bg-primary-subtle px-2.5 py-1.5 text-xs font-medium text-primary">
             {action}
           </p>

@@ -56,13 +56,13 @@ describe('isAppsilonEmail', () => {
 
 describe('offersDemo', () => {
   it('keeps the Appsilon rule when demo mode is off', () => {
-    expect(offersDemo('someone@appsilon.com', { demoModeEnabled: false })).toBe(true);
-    expect(offersDemo('test@mediforce.dev', { demoModeEnabled: false })).toBe(false);
+    expect(offersDemo('someone@appsilon.com', false)).toBe(true);
+    expect(offersDemo('test@mediforce.dev', false)).toBe(false);
   });
 
   it('opens to anyone under demo mode, which is how dev:mock walks it', () => {
-    expect(offersDemo('test@mediforce.dev', { demoModeEnabled: true })).toBe(true);
-    expect(offersDemo(null, { demoModeEnabled: true })).toBe(true);
+    expect(offersDemo('test@mediforce.dev', true)).toBe(true);
+    expect(offersDemo(null, true)).toBe(true);
   });
 });
 
@@ -86,6 +86,12 @@ describe('resolveDemoRoute', () => {
     const run = { id: 'run-7', definitionName: 'etymology-checker', status: 'completed' };
     expect(resolveDemoRoute('/:handle/workflows/:name/runs/:runId', '/test', run))
       .toBe('/test/workflows/etymology-checker/runs/run-7');
+  });
+
+  it('never pairs the viewer\u2019s workflow with another workflow\u2019s run', () => {
+    const run = { id: 'run-7', definitionName: 'bar', status: 'completed' };
+    expect(resolveDemoRoute('/:handle/workflows/:name/runs/:runId', '/test/workflows/foo', run))
+      .toBe('/test/workflows/bar/runs/run-7');
   });
 
   it('keeps the workflow the viewer already opened over the one it picked', () => {
@@ -188,14 +194,14 @@ describe('nextRouteAction', () => {
     })).toEqual({ kind: 'navigate', url: '/test/workflows/etym/runs/run-7' });
   });
 
-  it('stays put when there is no run to build the URL from', () => {
+  it('says what is missing when no URL can be built', () => {
     expect(nextRouteAction({
       steps,
       index: 2,
       pathname: '/test',
       currentUrl: '/test',
       run: null,
-    })).toEqual({ kind: 'stay' });
+    })).toEqual({ kind: 'unreachable', needs: 'This step needs a run. Start one, then come back.' });
   });
 });
 

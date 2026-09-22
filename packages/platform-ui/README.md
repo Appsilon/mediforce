@@ -54,6 +54,22 @@ it has something to show. Route matching and the card geometry live in
 a test holds each one to at least three steps and forbids ringing the same
 element more than twice.
 
+**Demo is the same overlay with a different job.** A guide explains the page you
+are on and ends when you leave it; a *scenario* (`src/lib/demo-content.ts`)
+walks one job across pages, navigates to the page and tab each step is about,
+and folds into a pill in the top bar when the viewer touches the app. Where a
+step cannot be reached — an empty workspace has no run for `:runId` — it says
+what is missing rather than spotlighting nothing. Every routing decision is one
+pure function, `nextRouteAction` in `src/lib/demo.ts`; keep it that way, because
+the bugs here come from two rules disagreeing about the same pathname.
+
+The button is offered to `@appsilon.com` addresses, or to anyone when
+`NEXT_PUBLIC_DEMO_MODE=true` (which `pnpm dev:mock` sets so the scenarios are
+walkable against the mock seed). Being `NEXT_PUBLIC_*`, the flag is inlined into
+the client bundle, so it is presentation only — the scenarios are static copy
+with no privileged data behind them, and nothing about the gate is a security
+boundary.
+
 **Never call `fetch` directly from a client component.** Middleware 401s
 silently because no auth header is attached. Use the typed `mediforce` client
 from `@/lib/mediforce`, or `apiFetch` from `@/lib/api-fetch` for an endpoint

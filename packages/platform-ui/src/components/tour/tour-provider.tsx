@@ -3,22 +3,19 @@
 import * as React from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { isEditableTarget } from '@/components/command-palette/provider';
-import { chapterForPath } from '@/lib/tour';
+import { chapterForPath, type TourStep } from '@/lib/tour';
 import { GUIDE_CHAPTERS } from '@/lib/tour-content';
 import { DEMO_SCENARIOS } from '@/lib/demo-content';
-import { nextRouteAction, routeParams, startingIndex, type DemoStep } from '@/lib/demo';
+import { nextRouteAction, routeParams, startingIndex } from '@/lib/demo';
 import { useDemoRun } from '@/hooks/use-demo-run';
 import { TourOverlay } from './tour-overlay';
 
 type TourState = {
-  /**
-   * A guide is about the page you are on and ends when you leave it. A scenario
-   * crosses pages, navigates, looks up a run, and folds away when the viewer
-   * touches the app — five behaviours, so it is named rather than a flag.
-   */
+  /** Gates five behaviours: ending on navigation, navigating, the run lookup,
+   *  auto-collapse, and advancing on arrival. */
   kind: 'guide' | 'scenario';
   title: string;
-  steps: readonly DemoStep[];
+  steps: readonly TourStep[];
   index: number;
   /** Folded into a pill so the viewer can work, or show someone the screen. */
   collapsed: boolean;
@@ -105,11 +102,14 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const step = active === null ? null : active.steps[active.index] ?? null;
+  const [unreachable, setUnreachable] = React.useState<string | null>(null);
 
   const needsRun =
     active?.kind === 'scenario'
     && active.steps.some((entry) => routeParams(entry).some((param) => param !== ':handle'));
-  const demoRun = useDemoRun(pathname.split('/')[1] ?? '', needsRun === true);
+  // `(app)` also serves `/workspaces`, where the first segment is not a handle.
+  const handle = pathname.split('/')[1] ?? '';
+  const demoRun = useDemoRun(handle === 'workspaces' ? '' : handle, needsRun === true);
 
   const query = searchParams?.toString() ?? '';
   const currentUrl = query === '' ? pathname : `${pathname}?${query}`;
@@ -133,6 +133,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       setActive((prev) => (prev === null ? null : { ...prev, index: action.index, collapsed: false }));
     }
     if (action.kind === 'navigate') router.push(action.url);
+    setUnreachable(action.kind === 'unreachable' ? action.needs : null);
   }, [active, pathname, currentUrl, demoRun, router]);
 
   const running = active !== null;
@@ -172,15 +173,16 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       {children}
       {active !== null && step !== null && (
         <TourOverlay
+          kind={active.kind}
           title={active.title}
           step={step}
-          action={(step as DemoStep).action}
+          action={step.action}
+          unreachable={unreachable}
           index={active.index}
           total={active.steps.length}
           collapsed={active.collapsed}
           autoCollapse={active.kind === 'scenario'}
           onCollapse={collapse}
-          onExpand={expand}
           onNext={next}
           onBack={back}
           onClose={stop}

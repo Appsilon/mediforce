@@ -29,9 +29,11 @@ export function useProcessInstancesPage(params: {
   displayStatus?: WorkflowDisplayStatus | null;
   sort: 'started' | 'cost';
   direction: 'asc' | 'desc';
+  /** Skip the query entirely — for a caller that only needs it sometimes. */
+  enabled?: boolean;
 }) {
   const { namespace, workflowFilter, dryRun, archived, displayStatus, sort, direction } = params;
-  const enabled = namespace.length > 0;
+  const enabled = namespace.length > 0 && params.enabled !== false;
 
   return usePaginatedQuery({
     queryKey: queryKeys.runs.page(namespace, {

@@ -46,6 +46,7 @@ COPY . .
 # secret into the image's layer history.
 ARG NEXT_PUBLIC_APP_URL=__NEXT_PUBLIC_APP_URL__
 ARG NEXT_PUBLIC_GIT_SHA=__NEXT_PUBLIC_GIT_SHA__
+ARG NEXT_PUBLIC_DEMO_MODE=__NEXT_PUBLIC_DEMO_MODE__
 
 RUN pnpm --filter @mediforce/platform-ui build
 

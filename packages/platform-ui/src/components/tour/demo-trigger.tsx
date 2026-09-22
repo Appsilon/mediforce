@@ -18,7 +18,7 @@ export function DemoTrigger() {
   const [open, setOpen] = React.useState(false);
 
   const demoModeEnabled = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
-  if (!offersDemo(user?.email, { demoModeEnabled })) return null;
+  if (offersDemo(user?.email, demoModeEnabled) === false) return null;
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
