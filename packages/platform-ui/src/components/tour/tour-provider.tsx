@@ -123,21 +123,31 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const query = searchParams?.toString() ?? '';
   const currentUrl = query === '' ? pathname : `${pathname}?${query}`;
 
-  // Where the viewer already stands, if it is a page some step of this
-  // scenario covers. Navigating there is how they advance, so pushing them off
-  // it would fight the arrival that is about to move the step on.
-  const onAStepOfThisScenario =
-    active?.crossesPages === true
-    && active.steps.some((entry) => {
+  // The viewer has walked ahead of the narration — they are standing on a page
+  // a *later* step covers. Arrival is about to move the step on, so pushing
+  // them back to this step's page would bounce them. Only a later step counts:
+  // treating the current step's own page as "ahead" is what stopped the
+  // scenario ever advancing from the workflow page to the run.
+  const stepPattern = step?.route?.split('?')[0];
+  // Consecutive steps share a page and differ only by tab, so "somewhere a
+  // later step covers" is not enough — it describes the current step's page
+  // too, and suppressing there is what stopped the scenario ever moving.
+  const onThisStepsPage = stepPattern !== undefined && matchesRoute(stepPattern, pathname);
+  const walkedAhead =
+    active !== null
+    && active.crossesPages
+    && !onThisStepsPage
+    && active.steps.some((entry, entryIndex) => {
+      if (entryIndex <= active.index) return false;
       const pattern = entry.route?.split('?')[0];
       return pattern !== undefined && matchesRoute(pattern, pathname);
     });
 
   React.useEffect(() => {
     if (wantedRoute === null || wantedRoute === currentUrl) return;
-    if (onAStepOfThisScenario === true && wantedRoute.split('?')[0] !== pathname) return;
+    if (walkedAhead) return;
     router.push(wantedRoute);
-  }, [wantedRoute, currentUrl, pathname, onAStepOfThisScenario, router]);
+  }, [wantedRoute, currentUrl, walkedAhead, router]);
 
   const running = active !== null;
 

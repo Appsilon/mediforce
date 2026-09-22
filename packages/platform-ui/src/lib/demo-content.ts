@@ -1,10 +1,10 @@
 import type { DemoScenario } from './demo';
 
 /**
- * Four scenarios, in the order a process actually lives: someone builds it,
- * someone runs it, someone decides on it, and someone later has to prove what
- * happened. Each is narrated over the real app — nothing is seeded and nothing
- * is clicked for you, so what a scenario shows is whatever this workspace
+ * Three scenarios, in the order a process actually lives: someone builds it,
+ * someone runs it and reads back what happened, and someone decides on it.
+ * Each is narrated over the real app — nothing is seeded and nothing is
+ * clicked for you, so what a scenario shows is whatever this workspace
  * genuinely has.
  */
 export const DEMO_SCENARIOS: readonly DemoScenario[] = [
@@ -61,9 +61,9 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
   },
   {
     id: 'run',
-    title: 'Run it and watch',
-    blurb: 'Start a run, see what it checks first, then follow it live.',
-    minutes: 3,
+    title: 'Run it and explore',
+    blurb: 'Start a run, follow it live, then read it back as the record.',
+    minutes: 5,
     steps: [
       {
         id: 'triggers',
@@ -102,6 +102,29 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
         target: 'run-pull-log',
         action: 'Open the Log pull',
       },
+      {
+        id: 'audit',
+        route: '/:handle/workflows/:name/runs/:runId',
+        title: 'Decisions are separated from bookkeeping',
+        body: 'A run records hundreds of events. The ones where somebody or something chose are kept apart from the routine trail, so a reviewer reads the decisions first and the rest only when they need it.',
+        target: 'run-pull-audit',
+        action: 'Open the Audit pull',
+      },
+      {
+        id: 'attribution',
+        route: '/:handle/workflows/:name/runs/:runId',
+        title: 'Every record names its actor',
+        body: 'A person, an agent, or the system — with the time it happened and the evidence it acted on. An agent decision is attributed as plainly as a human one, which is the point.',
+        target: 'run-pull-audit',
+      },
+      {
+        id: 'report',
+        route: '/:handle/workflows/:name/runs/:runId',
+        title: 'The report is the run, written up',
+        body: 'Once a run finishes it can be read as a document rather than a timeline, and printed as the record — not as a screenshot of a screen.',
+        target: 'run-pull-report',
+        action: 'Open the Report pull',
+      },
     ],
   },
   {
@@ -135,44 +158,6 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
         title: 'The run picks up where it stopped',
         body: 'Your verdict chooses the next step, and the agent work resumes from there. The pause was part of the process, not an interruption to it.',
         target: 'tasks-list',
-      },
-    ],
-  },
-  {
-    id: 'prove',
-    title: 'Prove what happened',
-    blurb: 'Read the run the way an auditor would, and print the record.',
-    minutes: 3,
-    steps: [
-      {
-        id: 'why',
-        title: 'This is the part that is regulated',
-        body: 'Not that the work was done — that you can show who did it, when, on what evidence, and that the record was written as it happened rather than assembled afterwards.',
-        route: '/:handle/workflows/:name/runs/:runId',
-        target: 'run-history',
-      },
-      {
-        id: 'audit',
-        route: '/:handle/workflows/:name/runs/:runId',
-        title: 'Decisions are separated from bookkeeping',
-        body: 'A run records hundreds of events. The ones where somebody or something chose are kept apart from the routine trail, so a reviewer reads the decisions first and the rest only when they need it.',
-        target: 'run-pull-audit',
-        action: 'Open the Audit pull',
-      },
-      {
-        id: 'attribution',
-        route: '/:handle/workflows/:name/runs/:runId',
-        title: 'Every record names its actor',
-        body: 'A person, an agent, or the system — with the time it happened and the evidence it acted on. An agent decision is attributed as plainly as a human one, which is the point.',
-        target: 'run-pull-audit',
-      },
-      {
-        id: 'report',
-        route: '/:handle/workflows/:name/runs/:runId',
-        title: 'The report is the run, written up',
-        body: 'Once a run finishes it can be read as a document rather than a timeline, and printed as the record — not as a screenshot of a screen.',
-        target: 'run-pull-report',
-        action: 'Open the Report pull',
       },
     ],
   },

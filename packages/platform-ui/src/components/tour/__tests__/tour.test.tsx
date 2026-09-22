@@ -7,6 +7,12 @@ let pathname = '/test';
 let search = '';
 const pushMock = vi.fn();
 
+let demoRun: { id: string; definitionName: string; status: string } | null = null;
+
+vi.mock('@/hooks/use-demo-run', () => ({
+  useDemoRun: () => demoRun,
+}));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
   useSearchParams: () => new URLSearchParams(search),
@@ -45,6 +51,7 @@ function mount() {
 beforeEach(() => {
   pathname = '/test';
   search = '';
+  demoRun = null;
   pushMock.mockClear();
 });
 
@@ -179,6 +186,24 @@ describe('demo scenarios', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(pushMock).toHaveBeenCalledWith('/test/workflows/etymology-checker?tab=runs');
+  });
+
+  it('walks all the way to the run, not just between tabs', () => {
+    pathname = '/test/workflows/etymology-checker';
+    search = 'tab=runs';
+    demoRun = { id: 'run-7', definitionName: 'etymology-checker', status: 'completed' };
+    mount();
+    fireEvent.click(screen.getByTestId('start-run-scenario'));
+
+    // triggers -> preflight -> dry run -> the run itself
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    pushMock.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(screen.getByTestId('tour-card').textContent).toContain('The run tells you where it is');
+    expect(pushMock).toHaveBeenCalledTimes(1);
+    expect(pushMock).toHaveBeenCalledWith('/test/workflows/etymology-checker/runs/run-7');
   });
 
   it('shows what the viewer is being asked to do', () => {
