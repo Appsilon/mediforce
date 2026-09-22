@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Added
+- ADR-0023 designs **Step Evaluation** — Evaluators, single-step Eval Runs, and a signed Step Qualification bound to a Step Fingerprint — taking up ADR-0007's deferred layers 2–4; the research behind it is in `docs/research/step-evaluation.md`.
 - Image capabilities fill in without expanding a card: one probe per image answers every workspace that catalogues it (a default image rebuilt on deploy no longer shows unprobed in all but one workspace), the Images listing queues unanswered versions for a one-at-a-time background probe, and cards say *Probing capabilities…* or *Capabilities unknown* instead of a blanket "not probed" (ADR-0022 decision 9).
 - **Guide** in the top bar walks you through whatever page you are on, spotlighting each thing in turn without navigating you away — fifteen screens, from the workflow editor's control modes and versioning to what a join link actually is.
 - New workspaces catalogue the engine’s five default step images — each named after the image itself (`mediforce-node`, `rocker/r-ver`), the way a hand-catalogued row is, with the sentence beside it carrying the meaning — existing workspaces can be backfilled with `mediforce images seed` (which writes only the defaults a workspace is missing and reports that count), and shared defaults are protected from daemon deletion [#1379](https://github.com/Appsilon/mediforce/pull/1379).

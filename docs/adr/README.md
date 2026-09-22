@@ -79,7 +79,7 @@ appendix can capture what actually shipped vs the original decision body.
 | [0004](./0004-scoped-data-access-authorization.md) | Authorization enforcement moves to a scoped data-access layer (§4 role-enforcement deferral taken up by [0019](./0019-workspace-scoped-roles.md)) | Finalized |
 | [0005](./0005-headless-platform-api-ui-separation.md) | Headless platform: API/UI separation | Accepted |
 | [0006](./0006-client-side-server-state.md) | Client-side server-state management | Accepted |
-| [0007](./0007-llm-evaluation-observability.md) | LLM evaluation & observability: layered model, hybrid system of record | Accepted |
+| [0007](./0007-llm-evaluation-observability.md) | LLM evaluation & observability: layered model, hybrid system of record | Partially superseded by [0023](./0023-step-evaluation.md) (§ Deferred) |
 | [0008](./0008-step-executor-model.md) | Step Executor Model — separating agent from script execution | Accepted |
 | [0009](./0009-workflow-import-scope-boundary.md) | Workflow git import is a one-time copy from public GitHub only | Accepted |
 | [0010](./0010-durable-step-timeout-recovery.md) | Durable step timeout & stranded-run recovery | Accepted |
@@ -95,3 +95,4 @@ appendix can capture what actually shipped vs the original decision body.
 | [0020](./0020-built-in-roles-and-default-workflow-access.md) | Built-in roles carry their privilege as a default, not as an override (extends [0019](./0019-workspace-scoped-roles.md)) | Accepted |
 | [0021](./0021-workspace-join-links.md) | A join link authorizes membership; the mailbox still authorizes the session (amends [0002](./0002-firebase-auth-to-nextauth.md) §4a) | Accepted |
 | [0022](./0022-image-catalog.md) | The Image Catalog is an image the platform offers, keyed on its source | Accepted |
+| [0023](./0023-step-evaluation.md) | Step Evaluation: Evaluators, single-step Eval Runs, Step Qualification (partially supersedes [0007](./0007-llm-evaluation-observability.md) § Deferred) | Proposed |
