@@ -25,9 +25,9 @@ export type DemoStep = {
 export type DemoScenario = {
   id: string;
   title: string;
-  /** One line, shown in the scenario picker. */
+  /** Shown under the title in the scenario picker. */
   blurb: string;
-  /** Roughly how long it takes to walk, shown beside the blurb. */
+  /** Rough walking time, shown beside the blurb. */
   minutes: number;
   steps: DemoStep[];
 };
@@ -94,7 +94,6 @@ export function resolveDemoRoute(
   return query === undefined ? built : `${built}?${query}`;
 }
 
-/** The little a scenario needs to point at a real run. */
 export type DemoRunCandidate = {
   id: string;
   definitionName: string;
@@ -103,13 +102,11 @@ export type DemoRunCandidate = {
 };
 
 /**
- * Rank: 0 is the best run to demonstrate.
- *
- * A completed run is the only one that has the whole story — every step ran,
- * the log is finished and the report exists — so it wins outright. A run
- * waiting on a person comes next, because that pause is itself a thing worth
- * showing. Anything still moving may finish mid-demo, and a failed or
- * cancelled run is the one thing not to open in front of a customer.
+ * Lower is better to demonstrate. Completed wins outright — it is the only
+ * status with the whole story, log finished and report written. A run waiting
+ * on a person comes next because that pause is worth showing; anything still
+ * moving may finish mid-demo; a failed run is what not to open in front of a
+ * customer.
  */
 function demoRunRank(status: string): number {
   if (status === 'completed') return 0;

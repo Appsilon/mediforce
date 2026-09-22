@@ -4,10 +4,9 @@ import { Compass, X } from 'lucide-react';
 import { useTour } from './tour-provider';
 
 /**
- * The folded-away walkthrough, parked in the top bar beside the button that
- * started it. It sits in the header rather than floating over the page so that
- * a collapsed walkthrough covers nothing at all — the whole point of folding it
- * is to show somebody the screen.
+ * The folded-away walkthrough. It lives in the top bar rather than floating
+ * over the page, so folding it leaves the screen completely clear — which is
+ * the point of folding it.
  */
 export function TourPill() {
   const { active, stop, expand } = useTour();

@@ -148,8 +148,7 @@ export function TourOverlay({
     cardRef.current?.focus();
   }, [step.id]);
 
-  // Touching the app is the viewer doing the step, so the overlay gets out of
-  // the way rather than making them dismiss it first.
+  // Touching the app is the viewer doing the step, so it folds itself away.
   React.useEffect(() => {
     if (!autoCollapse || collapsed) return;
     function onPointerDown(event: PointerEvent): void {
@@ -171,8 +170,7 @@ export function TourOverlay({
   const placed = cardPlacement(spotlight, viewport, { width: CARD_WIDTH, height: cardHeight });
   const isLast = index === total - 1;
 
-  // Folded away, the walkthrough lives in the top bar beside the Demo button
-  // rather than floating over the page — see `TourPill`.
+  // Folded away it is rendered by `TourPill`, in the top bar, covering nothing.
   if (collapsed) return null;
 
   return createPortal(

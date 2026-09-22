@@ -70,8 +70,8 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const startScenario = React.useCallback((scenarioId: string) => {
     const scenario = DEMO_SCENARIOS.find((entry) => entry.id === scenarioId);
     if (scenario === undefined) return;
-    // Begin where the viewer already stands. Starting "run it" from a run
-    // should not march them back to the workflow page to work forwards again.
+    // Starting "run it" from a run should not march the viewer back to the
+    // workflow page to work forwards again.
     const here = scenario.steps.findIndex((entry) => {
       const pattern = entry.route?.split('?')[0];
       return pattern !== undefined && matchesRoute(pattern, pathname);
@@ -110,9 +110,8 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  // The guide explains the page you are on, so leaving that page ends it. A
-  // scenario spans pages by design, and navigating is how the viewer advances:
-  // arriving at a later step's route moves to that step.
+  // A guide is about the page you are on, so leaving ends it. A scenario spans
+  // pages, and arriving at a later step's route is how the viewer advances.
   React.useEffect(() => {
     setActive((prev) => {
       if (prev === null) return null;
@@ -124,12 +123,8 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     });
   }, [pathname]);
 
-  // A scenario takes you to the page its step happens on, so a viewer is never
-  // reading a card about a screen they are not looking at. It navigates only —
-  // opening the panel or the tab is still theirs to do.
   const step = active === null ? null : active.steps[active.index] ?? null;
 
-  // Only a scenario that still has a parameter to fill pays for the lookup.
   const needsRun =
     active?.crossesPages === true
     && active.steps.some((entry) => entry.route?.includes(':name') === true || entry.route?.includes(':runId') === true);
@@ -140,20 +135,15 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       ? resolveDemoRoute(step.route, pathname, demoRun)
       : null;
 
-  // Compared with the query included: a tab is `?tab=`, so ignoring the query
-  // made every step that only changes a tab look like it had already arrived.
+  // The query is part of the comparison because a tab is `?tab=`; without it
+  // every step that only switches tab looks like it has already arrived.
   const query = searchParams?.toString() ?? '';
   const currentUrl = query === '' ? pathname : `${pathname}?${query}`;
 
-  // The viewer has walked ahead of the narration — they are standing on a page
-  // a *later* step covers. Arrival is about to move the step on, so pushing
-  // them back to this step's page would bounce them. Only a later step counts:
-  // treating the current step's own page as "ahead" is what stopped the
-  // scenario ever advancing from the workflow page to the run.
+  // Arrival is about to move the step on, so pushing would bounce the viewer.
+  // Only a page the current step does not itself cover counts as ahead —
+  // consecutive steps share a page and differ only by tab.
   const stepPattern = step?.route?.split('?')[0];
-  // Consecutive steps share a page and differ only by tab, so "somewhere a
-  // later step covers" is not enough — it describes the current step's page
-  // too, and suppressing there is what stopped the scenario ever moving.
   const onThisStepsPage = stepPattern !== undefined && matchesRoute(stepPattern, pathname);
   const walkedAhead =
     active !== null
@@ -165,6 +155,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       return pattern !== undefined && matchesRoute(pattern, pathname);
     });
 
+  // A scenario navigates only; opening the panel or the tab is the viewer's.
   React.useEffect(() => {
     if (wantedRoute === null || wantedRoute === currentUrl) return;
     if (walkedAhead) return;
@@ -181,8 +172,8 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         if (isTopmostOverlay()) stop();
         return;
       }
-      // The guide sits over a live page, so an arrow key moving a caret must
-      // not also move the guide.
+      // A walkthrough sits over a live page: an arrow key moving a caret must
+      // not also move the step.
       if (isEditableTarget(event.target)) return;
       if (isCollapsed) return;
       if (event.key === 'ArrowRight') {

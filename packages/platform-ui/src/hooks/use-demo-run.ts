@@ -5,12 +5,11 @@ import { pickDemoRun, type DemoRunCandidate } from '@/lib/demo';
 import { useProcessInstancesPage } from './use-process-instances-page';
 
 /**
- * A real run for a demo scenario to open — the best one this workspace has.
+ * The best run this workspace has for a scenario to open.
  *
- * Fetched only while a scenario actually needs it, because the alternative is
- * every page paying for a query that four walkthroughs use. Dry runs are
- * excluded: a scenario about proving what happened should not open a run whose
- * steps were mocked.
+ * `enabled` is false on every page that is not mid-scenario, so the query is
+ * not a cost the rest of the app pays. Dry runs are excluded: a walkthrough of
+ * what happened should not open a run whose steps were mocked.
  */
 export function useDemoRun(namespace: string, enabled: boolean): DemoRunCandidate | null {
   const { data } = useProcessInstancesPage({
