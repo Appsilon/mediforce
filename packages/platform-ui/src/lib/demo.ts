@@ -6,6 +6,8 @@
  * where it happens; arriving there is what advances it.
  */
 
+import { matchesRoute } from './tour';
+
 export type DemoStep = {
   id: string;
   title: string;
@@ -21,6 +23,18 @@ export type DemoStep = {
   /** What the viewer does here, shown as the step's call to action. */
   action?: string;
 };
+
+/** A step's route without its query — the part `matchesRoute` understands. */
+export function routePattern(step: Pick<DemoStep, 'route'>): string | null {
+  return step.route?.split('?')[0] ?? null;
+}
+
+/** The names a step's route still needs filled, e.g. `[':name', ':runId']`. */
+export function routeParams(step: Pick<DemoStep, 'route'>): string[] {
+  return (routePattern(step) ?? '')
+    .split('/')
+    .filter((part) => part.startsWith(':'));
+}
 
 export type DemoScenario = {
   id: string;
@@ -127,4 +141,51 @@ export function pickDemoRun(runs: readonly DemoRunCandidate[]): DemoRunCandidate
     return (b.startedAt ?? '').localeCompare(a.startedAt ?? '');
   });
   return ranked[0] ?? null;
+}
+
+/**
+ * What a running scenario should do about where the viewer currently is.
+ *
+ * One rule rather than four interacting ones, and pure, because every routing
+ * bug in this feature came from two of those rules disagreeing about the same
+ * pathname. `stay` covers both "already in the right place" and "cannot build
+ * a URL", which the caller treats identically.
+ */
+export type DemoRouteAction =
+  | { kind: 'stay' }
+  | { kind: 'advance'; index: number }
+  | { kind: 'navigate'; url: string };
+
+export function nextRouteAction(input: {
+  steps: readonly DemoStep[];
+  index: number;
+  pathname: string;
+  currentUrl: string;
+  run: DemoRunCandidate | null;
+}): DemoRouteAction {
+  const { steps, index, pathname, currentUrl, run } = input;
+  const covers = (step: DemoStep | undefined): boolean => {
+    const pattern = step === undefined ? null : routePattern(step);
+    return pattern !== null && matchesRoute(pattern, pathname);
+  };
+
+  // The viewer walking to a later step's page is how they advance, and it wins
+  // over navigation so the two can never fight over the same pathname.
+  const arrivedAt = steps.findIndex((step, at) => at > index && covers(step));
+  if (arrivedAt !== -1 && !covers(steps[index])) return { kind: 'advance', index: arrivedAt };
+
+  const step = steps[index];
+  if (step?.route === undefined) return { kind: 'stay' };
+  const url = resolveDemoRoute(step.route, pathname, run);
+  if (url === null || url === currentUrl) return { kind: 'stay' };
+  return { kind: 'navigate', url };
+}
+
+/** Where a scenario should open for a viewer already standing somewhere. */
+export function startingIndex(steps: readonly DemoStep[], pathname: string): number {
+  const here = steps.findIndex((step) => {
+    const pattern = routePattern(step);
+    return pattern !== null && matchesRoute(pattern, pathname);
+  });
+  return here === -1 ? 0 : here;
 }

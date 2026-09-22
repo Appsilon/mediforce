@@ -1,7 +1,17 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { isAppsilonEmail, offersDemo, pickDemoRun, resolveDemoRoute } from '@/lib/demo';
+import {
+  isAppsilonEmail,
+  nextRouteAction,
+  offersDemo,
+  pickDemoRun,
+  resolveDemoRoute,
+  routeParams,
+  routePattern,
+  startingIndex,
+} from '@/lib/demo';
+import type { DemoStep } from '@/lib/demo';
 import { DEMO_SCENARIOS } from '@/lib/demo-content';
 import { matchesRoute } from '@/lib/tour';
 
@@ -114,6 +124,89 @@ describe('pickDemoRun', () => {
 
   it('is null for a workspace with no runs at all', () => {
     expect(pickDemoRun([])).toBeNull();
+  });
+});
+
+describe('routePattern / routeParams', () => {
+  it('drops the query, which is not part of route matching', () => {
+    expect(routePattern({ route: '/:handle/workflows/:name?tab=runs' })).toBe('/:handle/workflows/:name');
+    expect(routePattern({})).toBeNull();
+  });
+
+  it('names the parameters a route still needs', () => {
+    expect(routeParams({ route: '/:handle/workflows/:name/runs/:runId' }))
+      .toEqual([':handle', ':name', ':runId']);
+    expect(routeParams({ route: '/:handle/tasks' })).toEqual([':handle']);
+  });
+});
+
+describe('nextRouteAction', () => {
+  const steps: DemoStep[] = [
+    { id: 'a', title: 't', body: 'b', route: '/:handle/workflows/:name?tab=triggers' },
+    { id: 'b', title: 't', body: 'b', route: '/:handle/workflows/:name?tab=runs' },
+    { id: 'c', title: 't', body: 'b', route: '/:handle/workflows/:name/runs/:runId' },
+  ];
+  const run = { id: 'run-7', definitionName: 'etym', status: 'completed' };
+
+  it('navigates between two steps that differ only by tab', () => {
+    expect(nextRouteAction({
+      steps,
+      index: 1,
+      pathname: '/test/workflows/etym',
+      currentUrl: '/test/workflows/etym?tab=triggers',
+      run,
+    })).toEqual({ kind: 'navigate', url: '/test/workflows/etym?tab=runs' });
+  });
+
+  it('stays once the URL already matches, query included', () => {
+    expect(nextRouteAction({
+      steps,
+      index: 1,
+      pathname: '/test/workflows/etym',
+      currentUrl: '/test/workflows/etym?tab=runs',
+      run,
+    })).toEqual({ kind: 'stay' });
+  });
+
+  it('advances instead of navigating when the viewer walks ahead', () => {
+    expect(nextRouteAction({
+      steps,
+      index: 0,
+      pathname: '/test/workflows/etym/runs/run-7',
+      currentUrl: '/test/workflows/etym/runs/run-7',
+      run,
+    })).toEqual({ kind: 'advance', index: 2 });
+  });
+
+  it('navigates on to the run rather than treating its own page as ahead', () => {
+    expect(nextRouteAction({
+      steps,
+      index: 2,
+      pathname: '/test/workflows/etym',
+      currentUrl: '/test/workflows/etym?tab=runs',
+      run,
+    })).toEqual({ kind: 'navigate', url: '/test/workflows/etym/runs/run-7' });
+  });
+
+  it('stays put when there is no run to build the URL from', () => {
+    expect(nextRouteAction({
+      steps,
+      index: 2,
+      pathname: '/test',
+      currentUrl: '/test',
+      run: null,
+    })).toEqual({ kind: 'stay' });
+  });
+});
+
+describe('startingIndex', () => {
+  it('opens on the step covering where the viewer already stands', () => {
+    const steps: DemoStep[] = [
+      { id: 'a', title: 't', body: 'b', route: '/:handle/workflows/:name' },
+      { id: 'b', title: 't', body: 'b', route: '/:handle/workflows/:name/runs/:runId' },
+    ];
+    expect(startingIndex(steps, '/test/workflows/etym/runs/r1')).toBe(1);
+    expect(startingIndex(steps, '/test/agents')).toBe(0);
   });
 });
 

@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
@@ -32,21 +31,14 @@ function ScenarioStarter() {
   );
 }
 
-function wrap(children: React.ReactNode) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-}
-
 function mount() {
   return render(
-    wrap(
     <TourProvider>
       <div data-tour="workflow-list">workflows</div>
       <GuideTrigger />
       <ScenarioStarter />
       <TourPill />
     </TourProvider>,
-    ),
   );
 }
 
@@ -162,13 +154,11 @@ describe('demo scenarios', () => {
 
     pathname = '/test/workflows/etymology-checker';
     view.rerender(
-      wrap(
-        <TourProvider>
-          <GuideTrigger />
-          <ScenarioStarter />
-          <TourPill />
-        </TourProvider>,
-      ),
+      <TourProvider>
+        <GuideTrigger />
+        <ScenarioStarter />
+        <TourPill />
+      </TourProvider>,
     );
     expect(screen.queryByTestId('tour-card')).not.toBeNull();
   });

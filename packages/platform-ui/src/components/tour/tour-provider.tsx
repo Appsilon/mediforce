@@ -3,19 +3,23 @@
 import * as React from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { isEditableTarget } from '@/components/command-palette/provider';
-import { chapterForPath, matchesRoute, type TourStep } from '@/lib/tour';
+import { chapterForPath } from '@/lib/tour';
 import { GUIDE_CHAPTERS } from '@/lib/tour-content';
 import { DEMO_SCENARIOS } from '@/lib/demo-content';
-import { resolveDemoRoute, type DemoStep } from '@/lib/demo';
+import { nextRouteAction, routeParams, startingIndex, type DemoStep } from '@/lib/demo';
 import { useDemoRun } from '@/hooks/use-demo-run';
 import { TourOverlay } from './tour-overlay';
 
 type TourState = {
+  /**
+   * A guide is about the page you are on and ends when you leave it. A scenario
+   * crosses pages, navigates, looks up a run, and folds away when the viewer
+   * touches the app — five behaviours, so it is named rather than a flag.
+   */
+  kind: 'guide' | 'scenario';
   title: string;
-  steps: readonly (TourStep & { route?: string; action?: string })[];
+  steps: readonly DemoStep[];
   index: number;
-  /** A guide ends when you leave the page; a scenario is meant to cross pages. */
-  crossesPages: boolean;
   /** Folded into a pill so the viewer can work, or show someone the screen. */
   collapsed: boolean;
 };
@@ -58,29 +62,19 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const start = React.useCallback(() => {
     const chapter = chapterForPath(GUIDE_CHAPTERS, pathname);
     if (chapter === null) return;
-    setActive({
-      title: chapter.title,
-      steps: chapter.steps,
-      index: 0,
-      crossesPages: false,
-      collapsed: false,
-    });
+    setActive({ kind: 'guide', title: chapter.title, steps: chapter.steps, index: 0, collapsed: false });
   }, [pathname]);
 
   const startScenario = React.useCallback((scenarioId: string) => {
     const scenario = DEMO_SCENARIOS.find((entry) => entry.id === scenarioId);
     if (scenario === undefined) return;
-    // Starting "run it" from a run should not march the viewer back to the
-    // workflow page to work forwards again.
-    const here = scenario.steps.findIndex((entry) => {
-      const pattern = entry.route?.split('?')[0];
-      return pattern !== undefined && matchesRoute(pattern, pathname);
-    });
     setActive({
+      kind: 'scenario',
       title: scenario.title,
       steps: scenario.steps,
-      index: here === -1 ? 0 : here,
-      crossesPages: true,
+      // Starting "run it" from a run should not march the viewer back to the
+      // workflow page to work forwards again.
+      index: startingIndex(scenario.steps, pathname),
       collapsed: false,
     });
   }, [pathname]);
@@ -110,57 +104,36 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  // A guide is about the page you are on, so leaving ends it. A scenario spans
-  // pages, and arriving at a later step's route is how the viewer advances.
-  React.useEffect(() => {
-    setActive((prev) => {
-      if (prev === null) return null;
-      if (!prev.crossesPages) return null;
-      const arrivedAt = (prev.steps as readonly DemoStep[]).findIndex(
-        (step, i) => i > prev.index && step.route !== undefined && matchesRoute(step.route, pathname),
-      );
-      return arrivedAt === -1 ? prev : { ...prev, index: arrivedAt, collapsed: false };
-    });
-  }, [pathname]);
-
   const step = active === null ? null : active.steps[active.index] ?? null;
 
   const needsRun =
-    active?.crossesPages === true
-    && active.steps.some((entry) => entry.route?.includes(':name') === true || entry.route?.includes(':runId') === true);
+    active?.kind === 'scenario'
+    && active.steps.some((entry) => routeParams(entry).some((param) => param !== ':handle'));
   const demoRun = useDemoRun(pathname.split('/')[1] ?? '', needsRun === true);
 
-  const wantedRoute =
-    active?.crossesPages === true && step?.route !== undefined
-      ? resolveDemoRoute(step.route, pathname, demoRun)
-      : null;
-
-  // The query is part of the comparison because a tab is `?tab=`; without it
-  // every step that only switches tab looks like it has already arrived.
   const query = searchParams?.toString() ?? '';
   const currentUrl = query === '' ? pathname : `${pathname}?${query}`;
 
-  // Arrival is about to move the step on, so pushing would bounce the viewer.
-  // Only a page the current step does not itself cover counts as ahead —
-  // consecutive steps share a page and differ only by tab.
-  const stepPattern = step?.route?.split('?')[0];
-  const onThisStepsPage = stepPattern !== undefined && matchesRoute(stepPattern, pathname);
-  const walkedAhead =
-    active !== null
-    && active.crossesPages
-    && !onThisStepsPage
-    && active.steps.some((entry, entryIndex) => {
-      if (entryIndex <= active.index) return false;
-      const pattern = entry.route?.split('?')[0];
-      return pattern !== undefined && matchesRoute(pattern, pathname);
-    });
+  // A guide is about the page you are on, so leaving ends it.
+  React.useEffect(() => {
+    setActive((prev) => (prev === null || prev.kind === 'guide' ? null : prev));
+  }, [pathname]);
 
   // A scenario navigates only; opening the panel or the tab is the viewer's.
   React.useEffect(() => {
-    if (wantedRoute === null || wantedRoute === currentUrl) return;
-    if (walkedAhead) return;
-    router.push(wantedRoute);
-  }, [wantedRoute, currentUrl, walkedAhead, router]);
+    if (active === null || active.kind !== 'scenario') return;
+    const action = nextRouteAction({
+      steps: active.steps,
+      index: active.index,
+      pathname,
+      currentUrl,
+      run: demoRun,
+    });
+    if (action.kind === 'advance') {
+      setActive((prev) => (prev === null ? null : { ...prev, index: action.index, collapsed: false }));
+    }
+    if (action.kind === 'navigate') router.push(action.url);
+  }, [active, pathname, currentUrl, demoRun, router]);
 
   const running = active !== null;
   const isCollapsed = active?.collapsed === true;
@@ -205,7 +178,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
           index={active.index}
           total={active.steps.length}
           collapsed={active.collapsed}
-          autoCollapse={active.crossesPages}
+          autoCollapse={active.kind === 'scenario'}
           onCollapse={collapse}
           onExpand={expand}
           onNext={next}
