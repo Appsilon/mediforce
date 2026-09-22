@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { createPortal } from 'react-dom';
-import { Compass, X } from 'lucide-react';
+import { Compass, Minus, X } from 'lucide-react';
 import {
   cardPlacement,
   clampToViewport,
@@ -96,6 +96,10 @@ export function TourOverlay({
   title,
   step,
   action,
+  collapsed,
+  autoCollapse,
+  onCollapse,
+  onExpand,
   index,
   total,
   onNext,
@@ -106,6 +110,11 @@ export function TourOverlay({
   step: TourStep;
   /** What a demo scenario asks the viewer to do here; a guide step has none. */
   action?: string;
+  collapsed: boolean;
+  /** Whether touching the page behind should get out of the way on its own. */
+  autoCollapse: boolean;
+  onCollapse: () => void;
+  onExpand: () => void;
   index: number;
   total: number;
   onNext: () => void;
@@ -139,6 +148,18 @@ export function TourOverlay({
     cardRef.current?.focus();
   }, [step.id]);
 
+  // Touching the app is the viewer doing the step, so the overlay gets out of
+  // the way rather than making them dismiss it first.
+  React.useEffect(() => {
+    if (!autoCollapse || collapsed) return;
+    function onPointerDown(event: PointerEvent): void {
+      const inTheCard = event.target instanceof Node && cardRef.current?.contains(event.target) === true;
+      if (!inTheCard) onCollapse();
+    }
+    window.addEventListener('pointerdown', onPointerDown, true);
+    return () => window.removeEventListener('pointerdown', onPointerDown, true);
+  }, [autoCollapse, collapsed, onCollapse]);
+
   React.useEffect(() => {
     const opener = document.activeElement;
     return () => {
@@ -149,6 +170,34 @@ export function TourOverlay({
   const spotlight = box === null ? null : clampToViewport(box, viewport);
   const placed = cardPlacement(spotlight, viewport, { width: CARD_WIDTH, height: cardHeight });
   const isLast = index === total - 1;
+
+  if (collapsed) {
+    return createPortal(
+      <div className="fixed right-4 top-14 z-[100] print:hidden" data-testid="tour-overlay">
+        <div className="flex items-center gap-1 rounded-full border bg-popover py-1 pl-3 pr-1 text-xs shadow-lg">
+          <button
+            type="button"
+            onClick={onExpand}
+            className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+            data-testid="tour-resume"
+          >
+            <Compass className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+            <span className="max-w-[12rem] truncate font-medium text-foreground">{title}</span>
+            <span className="tabular-nums">{index + 1} of {total}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="End walkthrough"
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
 
   return createPortal(
     <div className="pointer-events-none fixed inset-0 z-[100] print:hidden" data-testid="tour-overlay">
@@ -185,6 +234,15 @@ export function TourOverlay({
             </p>
             <h2 className="font-headline text-sm font-semibold leading-snug">{step.title}</h2>
           </div>
+          <button
+            type="button"
+            onClick={onCollapse}
+            aria-label="Get out of the way"
+            data-testid="tour-collapse"
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Minus className="h-3.5 w-3.5" />
+          </button>
           <button
             type="button"
             onClick={onClose}

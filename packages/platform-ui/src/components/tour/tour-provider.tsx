@@ -16,6 +16,8 @@ type TourState = {
   index: number;
   /** A guide ends when you leave the page; a scenario is meant to cross pages. */
   crossesPages: boolean;
+  /** Folded into a pill so the viewer can work, or show someone the screen. */
+  collapsed: boolean;
 };
 
 type TourContextValue = {
@@ -25,6 +27,8 @@ type TourContextValue = {
   stop: () => void;
   next: () => void;
   back: () => void;
+  collapse: () => void;
+  expand: () => void;
 };
 
 const Ctx = React.createContext<TourContextValue | null>(null);
@@ -54,7 +58,13 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const start = React.useCallback(() => {
     const chapter = chapterForPath(GUIDE_CHAPTERS, pathname);
     if (chapter === null) return;
-    setActive({ title: chapter.title, steps: chapter.steps, index: 0, crossesPages: false });
+    setActive({
+      title: chapter.title,
+      steps: chapter.steps,
+      index: 0,
+      crossesPages: false,
+      collapsed: false,
+    });
   }, [pathname]);
 
   const startScenario = React.useCallback((scenarioId: string) => {
@@ -71,21 +81,33 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       steps: scenario.steps,
       index: here === -1 ? 0 : here,
       crossesPages: true,
+      collapsed: false,
     });
   }, [pathname]);
 
   const stop = React.useCallback(() => setActive(null), []);
 
+  const collapse = React.useCallback(
+    () => setActive((prev) => (prev === null ? null : { ...prev, collapsed: true })),
+    [],
+  );
+  const expand = React.useCallback(
+    () => setActive((prev) => (prev === null ? null : { ...prev, collapsed: false })),
+    [],
+  );
+
   const next = React.useCallback(() => {
     setActive((prev) => {
       if (prev === null) return null;
       if (prev.index >= prev.steps.length - 1) return null;
-      return { ...prev, index: prev.index + 1 };
+      return { ...prev, index: prev.index + 1, collapsed: false };
     });
   }, []);
 
   const back = React.useCallback(() => {
-    setActive((prev) => (prev === null ? null : { ...prev, index: Math.max(0, prev.index - 1) }));
+    setActive((prev) =>
+      prev === null ? null : { ...prev, index: Math.max(0, prev.index - 1), collapsed: false },
+    );
   }, []);
 
   // The guide explains the page you are on, so leaving that page ends it. A
@@ -98,7 +120,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       const arrivedAt = (prev.steps as readonly DemoStep[]).findIndex(
         (step, i) => i > prev.index && step.route !== undefined && matchesRoute(step.route, pathname),
       );
-      return arrivedAt === -1 ? prev : { ...prev, index: arrivedAt };
+      return arrivedAt === -1 ? prev : { ...prev, index: arrivedAt, collapsed: false };
     });
   }, [pathname]);
 
@@ -150,6 +172,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   }, [wantedRoute, currentUrl, walkedAhead, router]);
 
   const running = active !== null;
+  const isCollapsed = active?.collapsed === true;
 
   React.useEffect(() => {
     if (!running) return;
@@ -161,6 +184,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       // The guide sits over a live page, so an arrow key moving a caret must
       // not also move the guide.
       if (isEditableTarget(event.target)) return;
+      if (isCollapsed) return;
       if (event.key === 'ArrowRight') {
         event.preventDefault();
         next();
@@ -172,11 +196,11 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [running, stop, next, back]);
+  }, [running, isCollapsed, stop, next, back]);
 
   const value = React.useMemo<TourContextValue>(
-    () => ({ active, start, startScenario, stop, next, back }),
-    [active, start, startScenario, stop, next, back],
+    () => ({ active, start, startScenario, stop, next, back, collapse, expand }),
+    [active, start, startScenario, stop, next, back, collapse, expand],
   );
 
   return (
@@ -189,6 +213,10 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
           action={(step as DemoStep).action}
           index={active.index}
           total={active.steps.length}
+          collapsed={active.collapsed}
+          autoCollapse={active.crossesPages}
+          onCollapse={collapse}
+          onExpand={expand}
           onNext={next}
           onBack={back}
           onClose={stop}

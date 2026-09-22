@@ -107,6 +107,21 @@ describe('guide', () => {
     expect(screen.queryByTestId('tour-overlay')).toBeNull();
   });
 
+  it('folds away on demand and leaves the page alone', () => {
+    mount();
+    fireEvent.click(screen.getByTestId('guide-trigger'));
+    fireEvent.click(screen.getByTestId('tour-collapse'));
+    expect(screen.queryByTestId('tour-card')).toBeNull();
+    expect(screen.getByTestId('tour-resume')).toBeTruthy();
+  });
+
+  it('does not fold away by itself during a guide', () => {
+    mount();
+    fireEvent.click(screen.getByTestId('guide-trigger'));
+    fireEvent.pointerDown(document.body);
+    expect(screen.getByTestId('tour-card')).toBeTruthy();
+  });
+
   it('ends on Escape', () => {
     mount();
     fireEvent.click(screen.getByTestId('guide-trigger'));
@@ -204,6 +219,26 @@ describe('demo scenarios', () => {
     expect(screen.getByTestId('tour-card').textContent).toContain('The run tells you where it is');
     expect(pushMock).toHaveBeenCalledTimes(1);
     expect(pushMock).toHaveBeenCalledWith('/test/workflows/etymology-checker/runs/run-7');
+  });
+
+  it('gets out of the way when the viewer touches the app, and comes back', () => {
+    mount();
+    fireEvent.click(screen.getByTestId('start-run-scenario'));
+    expect(screen.getByTestId('tour-card')).toBeTruthy();
+
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByTestId('tour-card')).toBeNull();
+    expect(screen.getByTestId('tour-resume')).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId('tour-resume'));
+    expect(screen.getByTestId('tour-card')).toBeTruthy();
+  });
+
+  it('stays put when the click lands inside the card', () => {
+    mount();
+    fireEvent.click(screen.getByTestId('start-run-scenario'));
+    fireEvent.pointerDown(screen.getByTestId('tour-card'));
+    expect(screen.getByTestId('tour-card')).toBeTruthy();
   });
 
   it('shows what the viewer is being asked to do', () => {
