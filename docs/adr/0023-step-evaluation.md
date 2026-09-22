@@ -4,7 +4,7 @@ audience: engineers
 last_reviewed: 2026-09-22
 ---
 
-# 0023 — Step Evaluation: Evaluators, single-step Eval Runs, Step Qualification
+# 0023 — Step Evaluation: Evaluation Assistant, Evaluators, single-step Eval Runs, Step Qualification
 
 - **Status:** Proposed
 - **Date:** 2026-09-22
@@ -14,7 +14,7 @@ last_reviewed: 2026-09-22
 - **Research:** [`../research/step-evaluation.md`](../research/step-evaluation.md)
   (landscape, capabilities, phasing), building on
   [`../research/layer2-scores-research.md`](../research/layer2-scores-research.md).
-- **Vocabulary:** Evaluation, Evaluator, Eval Case, Eval Dataset, Eval Run,
+- **Vocabulary:** Evaluation, Evaluation Assistant, Evaluation Brief, Evaluator, Eval Case, Eval Dataset, Eval Run,
   Agent Trajectory, Step Fingerprint, Acceptance Criteria, Step Qualification
   — all in [`CONTEXT.md`](../../CONTEXT.md) § Evaluation domain.
 
@@ -23,7 +23,8 @@ last_reviewed: 2026-09-22
 ADR-0007 named four layers (Traces → Scores → Eval Datasets → Eval Runs),
 shipped layer 1, and deferred the rest. Workflow authors now need to answer,
 per agent Step: *can this Step, in this configuration, be trusted for its
-context of use?* — and when not, be helped to fix it. Pharma framing sets the
+context of use?* — and when not, be helped to fix it. The help is an agent
+the user works with through the whole Evaluation, not a set of forms. Pharma framing sets the
 bar: the FDA AI credibility framework and the FDA–EMA Good AI Practice
 principles (2026-01) assess credibility per context of use, proportional to
 model risk, against acceptance criteria set in advance.
@@ -31,7 +32,8 @@ model risk, against acceptance criteria set in advance.
 ## Decisions
 
 **D1 — Vocabulary: Evaluation, not validation.** In pharma *validation* means
-Computer System Validation of the platform. The activity is Evaluation, a rule
+Computer System Validation of the platform, and in `CONTEXT.md` it already
+names schema-shape checking of a Definition. The activity is Evaluation, a rule
 is an Evaluator, the signed outcome is a Step Qualification.
 
 **D2 — Evaluators and Eval Datasets are platform entities owned by one Step.**
@@ -121,6 +123,40 @@ only writes Scores. Human verdicts on CM3 reviews become Scores automatically.
 `outputSchema` violations, after one retry with the errors, follow the same
 fallback route.
 
+**D14 — One Evaluation Assistant, built on the workflow assistant's
+blocks.** A single assistant per Step covers the whole Evaluation: suggest a
+plan, draft Evaluators and Eval Cases, help calibrate, prepare and explain Eval
+Runs, diagnose failures, propose fixes. It reuses the workflow editor
+assistant's design — an OpenRouter tool-calling loop, Zod tool registries in
+`platform-core`, *mutation* tools returned as proposals versus *platform* tools
+run server-side as the caller through `CallerScope`, one audit event per
+request. That loop moves into a shared assistant core in `platform-api` that
+both assistants use. Heavy work is exposed as platform tools, never done by the
+model itself: `preview_evaluator` runs a draft check (in `script-container`
+for `code`) against existing outputs of the Step so the assistant sees a check
+fail on real outputs before proposing it. Every tool wraps a headless handler
+(ADR-0005), so the CLI and the manual UI get the same operations.
+
+**D15 — The assistant's authority is tiered by consequence.**
+- *Runs freely:* reads (Step config, SKILL.md, MCPs, runs, trajectories,
+  reports, Scores) and `preview_evaluator`.
+- *Proposes; the user accepts:* Evaluators, Eval Cases, Acceptance Criteria,
+  Evaluation Brief drafts, fix variants, changes to the Step itself.
+- *Prepares; the user confirms with the cost shown:* starting an Eval Run.
+- *Never:* signing a Step Qualification, approving a `code` Evaluator's
+  source, labelling calibration outputs — D9 and D10 require these to be human.
+  Unattended fix attempts (Phase 4) run only under a budget the user grants per
+  request.
+
+**D16 — An Evaluation Brief states each Step's context of use.** A short,
+versioned text per Step — what it is for, who relies on its output, which
+failures matter most — written by the user or drafted by the assistant and
+accepted. It is sent to the assistant on every turn, seeds the evaluation plan
+and the Acceptance Criteria suggestions, and a Step Qualification cites the
+Brief version it was judged against as its context-of-use statement (step 1 of
+the FDA credibility framework). The workflow assistant's per-user instructions
+are not reused: priorities belong to the Step, not to a person.
+
 ## Considered options
 
 - **An eval framework as the runtime (promptfoo, Inspect AI, DeepEval).**
@@ -135,6 +171,13 @@ fallback route.
 - **Enforcing qualification** (refusing CM4 or downgrading to CM3 when stale).
   Considered as an opt-in namespace policy; rejected for now by D11. Revisit
   when a customer asks for it — the Fingerprint makes it a small change.
+- **A container agent (Claude Code + `mediforce-mcp`) as the Evaluation
+  Assistant**, or a chat front with container workers behind it. It could
+  execute the checks it writes, but it is slow and costly per turn and would be
+  a second assistant architecture. D14 gets the same "test before proposing"
+  property from a `preview_evaluator` platform tool. Rejected.
+- **Forms first, assistant later.** The forms would be built to be bypassed;
+  the assistant is the primary surface from Phase 1b. Rejected by D14.
 - **Trajectories read from the trace store.** Content is off in production by
   default and the store may not exist. Rejected by D8.
 
@@ -149,6 +192,8 @@ fallback route.
 - Eval Runs multiply container runs (cases × variants × trials); a pre-run
   cost estimate from model-registry pricing and a budget cap are part of the
   Eval Run, not an afterthought.
-- Delivery is phased (1a foundations → 1b Eval Runs → 2 assistant → 3
-  qualification → 4 fix loop → 5 optimisation and red-team), tracked in the
+- Delivery is phased (1a foundations → 1b Eval Runs with the Evaluation
+  Assistant → 2 assistant planning and calibration → 3 qualification → 4 fix
+  loop → 5 optimisation and red-team); from 1b on, each phase adds tools to the
+  one assistant rather than screens. Tracked in the
   Step Evaluation epic [#1394](https://github.com/Appsilon/mediforce/issues/1394).

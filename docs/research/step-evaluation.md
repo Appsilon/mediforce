@@ -31,7 +31,9 @@ Workflow Run, variants as patches bound to a Step Fingerprint, default-deny MCP
 eval policy, immutable Evaluator versions, persisted Agent Trajectories, trust
 gate per Evaluator kind, pre-set Acceptance Criteria on interval bounds,
 informational Step Qualification, provenance-tracked few-shot examples, opt-in
-production Evaluators.
+production Evaluators — and D14–D16: one Evaluation Assistant built on the
+workflow editor assistant's blocks, its tiered authority, and a per-Step
+Evaluation Brief.
 
 ## What exists today (checked against source 2026-09-22)
 
@@ -90,9 +92,23 @@ Score            one Evaluator × one trial (layer-2 schema + evaluatorId)
 Step Qualification  config hash + evalRunId + acceptance criteria + decision + e-signature
 ```
 
+## The Evaluation Assistant
+
+Every capability below is delivered **through one Evaluation Assistant** per
+Workflow Step — the agent the user works with from "what should I check?" to
+"apply this fix". It reuses the workflow editor assistant's blocks (tool loop,
+Zod tool registries, mutation-vs-platform tools, caller-scoped execution,
+audit), extracted into a shared assistant core. Heavy work is platform tools —
+`preview_evaluator` runs a draft check against the Step's existing outputs so
+the assistant tests before it proposes. Reads run freely; Evaluators, cases,
+criteria and fixes are proposals the user accepts; Eval Runs need a cost
+confirmation; signing, approving check source and calibration labels stay
+human. The user's priorities live in the Step's **Evaluation Brief**, which
+the Step Qualification cites as its context of use.
+
 ## Capabilities
 
-1. **Rule → check.** Plain-language rule; the assistant picks the cheapest
+1. **Rule → check.** Plain-language rule; the Evaluation Assistant picks the cheapest
    reliable kind (code check in the `script-container` sandbox first, LLM judge
    only for subjective rules); the user reviews it and grades 5–10 outputs;
    agreement (rate, κ) gates `draft → active`.
@@ -104,11 +120,11 @@ Step Qualification  config hash + evalRunId + acceptance criteria + decision + e
 3. **Structured output.** New `outputSchema` on `WorkflowAgentConfig`:
    injected into the prompt, validated on `result.json`, one retry with the
    errors, and auto-registered as a critical `schema` Evaluator.
-4. **Evaluation-plan assistant.** Reads prompt, SKILL.md, agent
+4. **Evaluation plan.** The Evaluation Assistant reads prompt, SKILL.md, agent
    `systemPrompt`, input/output descriptions, effective MCPs and
-   `allowedTools`, upstream outputs, sample runs, user priorities → a
-   risk-ranked plan of Evaluators, cases and thresholds. Same shape as the
-   workflow assistant (OpenRouter + tool calls → proposals the user accepts).
+   `allowedTools`, upstream outputs, sample runs and the Evaluation Brief → a
+   risk-ranked plan of Evaluators, cases and thresholds, as proposals the user
+   accepts.
 5. **Matrix runs and report.** Variants: model, prompt override, skill
    commit, tools/MCP restrictions; n trials each. Per Evaluator: pass rate +
    Wilson 95% CI, pass@k, pass^k, flakiness. Per variant: cost, tokens,
@@ -116,7 +132,7 @@ Step Qualification  config hash + evalRunId + acceptance criteria + decision + e
    trajectory. User-defined acceptance criteria → signed Step Qualification
    bound to a config hash; any config change marks it **stale**. Pre-run
    cost estimate and budget cap.
-6. **Fix assistant.** Cluster failures by root cause (ambiguous instruction,
+6. **Fixes.** The Evaluation Assistant clusters failures by root cause (ambiguous instruction,
    missing context, tool denied/missing, model capability, evaluator wrong);
    propose fixes — instruction diff, few-shot examples (`agent.examples`),
    deterministic guardrail, model swap, tool/MCP change, preprocessing step,
@@ -167,8 +183,8 @@ licence change announced). Neither changes the ADR-0007 call:
 |---|---|
 | 0 | ADR-0023; glossary terms in `CONTEXT.md` |
 | 1a — Foundations | `outputSchema` on agent steps (prompt, validation, one retry, fallback); Agent Trajectory persistence; Score entity with automatic `human_verdict` Scores |
-| 1b — Eval Runs | Evaluators (`schema`, `code`, `llm_judge`) with the trust gate; Eval Cases (production + manual) and Datasets; single-step eval Workflow Run with MCP eval policy; one variant × n trials; report with CI and pass^k; `mediforce eval` CLI; step-editor Evaluation tab |
-| 2 — Assistant | Evaluation-plan suggestions; rule → check generation; calibration labelling; case synthesis incl. negative cases |
-| 3 — Qualification | Variant matrix, champion/challenger, Acceptance Criteria, signed Step Qualification, Fingerprint and staleness badge, confidence calibration |
-| 4 — Fix loop | Failure clustering, fix proposals as evaluated variants, `agent.examples` with exclusion, production Evaluators |
+| 1b — Eval Runs + Evaluation Assistant | Shared assistant core extracted from the workflow assistant; Evaluation tab = Step view + assistant panel; Evaluation Brief; Evaluators (`schema`, `code`, `llm_judge`) with the trust gate; Eval Cases (production + manual) and Datasets; single-step eval Workflow Run with MCP eval policy; one variant × n trials; report with CI and pass^k; `mediforce eval` CLI. Assistant tools: reads, propose Evaluator / Eval Case, `preview_evaluator`, prepare Eval Run with cost, explain report |
+| 2 — Assistant planning | Assistant tools: evaluation plan from Step config + Brief; rule → self-tested check; calibration help (choose outputs to label); case synthesis incl. negative cases |
+| 3 — Qualification | Variant matrix, champion/challenger, Acceptance Criteria, signed Step Qualification citing the Brief, Fingerprint and staleness badge, confidence calibration. Assistant tools: propose criteria from risk, compare variants, recommend `confidenceThreshold` / Control Mode |
+| 4 — Fix loop | Assistant tools: diagnose failure clusters, propose and run fix variants, per-request budget for unattended attempts; `agent.examples` with exclusion; production Evaluators |
 | 5 | GEPA optimisation, MCP record/replay, red-team and robustness suites, drift alerts |
