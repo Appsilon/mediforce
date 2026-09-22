@@ -69,7 +69,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
         id: 'triggers',
         title: 'Something has to be allowed to start it',
         body: 'Manual is the Start Run button itself. A schedule runs it on a cron, a webhook gives it an endpoint, and Input above them is the contract every one of them is checked against.',
-        route: '/:handle/workflows/:name',
+        route: '/:handle/workflows/:name?tab=triggers',
         target: 'workflow-tab-triggers',
       },
       {

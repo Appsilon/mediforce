@@ -1,12 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { isEditableTarget } from '@/components/command-palette/provider';
 import { chapterForPath, matchesRoute, type TourStep } from '@/lib/tour';
 import { GUIDE_CHAPTERS } from '@/lib/tour-content';
 import { DEMO_SCENARIOS } from '@/lib/demo-content';
-import type { DemoStep } from '@/lib/demo';
+import { resolveDemoRoute, type DemoStep } from '@/lib/demo';
 import { TourOverlay } from './tour-overlay';
 
 type TourState = {
@@ -46,6 +46,7 @@ function isTopmostOverlay(): boolean {
 
 export function TourProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? '/';
+  const router = useRouter();
   const [active, setActive] = React.useState<TourState | null>(null);
 
   const start = React.useCallback(() => {
@@ -88,6 +89,21 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     });
   }, [pathname]);
 
+  // A scenario takes you to the page its step happens on, so a viewer is never
+  // reading a card about a screen they are not looking at. It navigates only —
+  // opening the panel or the tab is still theirs to do.
+  const step = active === null ? null : active.steps[active.index] ?? null;
+  const wantedRoute =
+    active?.crossesPages === true && step?.route !== undefined
+      ? resolveDemoRoute(step.route, pathname)
+      : null;
+
+  React.useEffect(() => {
+    if (wantedRoute === null) return;
+    if (wantedRoute === pathname || wantedRoute.startsWith(`${pathname}?`)) return;
+    router.push(wantedRoute);
+  }, [wantedRoute, pathname, router]);
+
   const running = active !== null;
 
   React.useEffect(() => {
@@ -117,8 +133,6 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     () => ({ active, start, startScenario, stop, next, back }),
     [active, start, startScenario, stop, next, back],
   );
-
-  const step = active === null ? null : active.steps[active.index] ?? null;
 
   return (
     <Ctx.Provider value={value}>

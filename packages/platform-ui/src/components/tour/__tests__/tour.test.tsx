@@ -2,9 +2,11 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 let pathname = '/test';
+const pushMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
+  useRouter: () => ({ push: pushMock }),
 }));
 
 const { TourProvider, useTour } = await import('../tour-provider');
@@ -31,6 +33,7 @@ function mount() {
 
 beforeEach(() => {
   pathname = '/test';
+  pushMock.mockClear();
 });
 
 describe('guide', () => {
@@ -129,6 +132,19 @@ describe('demo scenarios', () => {
       </TourProvider>,
     );
     expect(screen.queryByTestId('tour-card')).not.toBeNull();
+  });
+
+  it('takes the viewer to the page a step happens on', () => {
+    pathname = '/test/workflows/etymology-checker/runs/r1';
+    mount();
+    fireEvent.click(screen.getByTestId('start-run-scenario'));
+    expect(pushMock).toHaveBeenCalledWith('/test/workflows/etymology-checker?tab=triggers');
+  });
+
+  it('never invents a parameter, so a guide step is left where it is', () => {
+    mount();
+    fireEvent.click(screen.getByTestId('guide-trigger'));
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it('shows what the viewer is being asked to do', () => {

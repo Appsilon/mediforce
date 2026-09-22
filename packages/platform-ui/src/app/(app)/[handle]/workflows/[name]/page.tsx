@@ -250,6 +250,11 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
     tabParam === 'secrets' || tabParam === 'triggers' || tabParam === 'access' ? tabParam : 'runs';
   const setupParam = searchParams.get('setup');
   const [activeTab, setActiveTab] = React.useState(initialTab);
+
+  // `?tab=` was only read into the initial state, so changing it on a mounted
+  // page did nothing — which broke back/forward across tabs and any deep link
+  // followed from inside the app.
+  React.useEffect(() => setActiveTab(initialTab), [initialTab]);
   // Lifted out of AllRunsPanel (controlled props) so the header/tab run count
   // below can mirror them — the count must match what the table's own
   // toggles are currently showing, not a fixed unfiltered total.

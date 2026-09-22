@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { isAppsilonEmail, offersDemo } from '@/lib/demo';
+import { isAppsilonEmail, offersDemo, resolveDemoRoute } from '@/lib/demo';
 import { DEMO_SCENARIOS } from '@/lib/demo-content';
 import { matchesRoute } from '@/lib/tour';
 
@@ -56,6 +56,23 @@ describe('offersDemo', () => {
   });
 });
 
+describe('resolveDemoRoute', () => {
+  it('fills parameters from the path the viewer is already on', () => {
+    expect(resolveDemoRoute('/:handle/tasks', '/test/workflows/etym/runs/r1')).toBe('/test/tasks');
+    expect(resolveDemoRoute('/:handle', '/test/agents')).toBe('/test');
+  });
+
+  it('carries a query through, which is how a tab is deep-linked', () => {
+    expect(resolveDemoRoute('/:handle/workflows/:name?tab=triggers', '/test/workflows/etym'))
+      .toBe('/test/workflows/etym?tab=triggers');
+  });
+
+  it('refuses to invent a parameter the viewer has not opened yet', () => {
+    expect(resolveDemoRoute('/:handle/workflows/:name', '/test')).toBeNull();
+    expect(resolveDemoRoute('/:handle/workflows/:name/runs/:runId', '/test/workflows/etym')).toBeNull();
+  });
+});
+
 describe('demo scenarios', () => {
   it('ships four, each with a unique id', () => {
     expect(DEMO_SCENARIOS).toHaveLength(4);
@@ -83,8 +100,9 @@ describe('demo scenarios', () => {
     for (const scenario of DEMO_SCENARIOS) {
       for (const step of scenario.steps) {
         if (step.route === undefined) continue;
-        const sample = step.route.replace(/:[a-zA-Z]+/g, 'x');
-        expect([step.id, matchesRoute(step.route, sample)]).toEqual([step.id, true]);
+        const sample = (step.route.split('?')[0] ?? '').replace(/:[a-zA-Z]+/g, 'x');
+        const pattern = step.route.split('?')[0] ?? '';
+        expect([step.id, matchesRoute(pattern, sample)]).toEqual([step.id, true]);
       }
     }
   });

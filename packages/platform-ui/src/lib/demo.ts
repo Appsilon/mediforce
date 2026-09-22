@@ -54,3 +54,31 @@ export function offersDemo(
 ): boolean {
   return opts.demoModeEnabled || isAppsilonEmail(email);
 }
+
+/**
+ * The concrete URL for a step's route, or `null` when it cannot be built.
+ *
+ * `:handle` and any other parameter are filled from the path the viewer is
+ * already on, matched by position. A scenario cannot invent a workflow name or
+ * a run id, so a step that needs one the viewer has not opened yet resolves to
+ * `null` and the card narrates where to go instead of guessing a URL.
+ */
+export function resolveDemoRoute(route: string, pathname: string): string | null {
+  const [path, query] = route.split('?');
+  const wanted = (path ?? '').split('/').filter((part) => part !== '');
+  const current = pathname.split('/').filter((part) => part !== '');
+
+  const filled: string[] = [];
+  for (const [index, part] of wanted.entries()) {
+    if (!part.startsWith(':')) {
+      filled.push(part);
+      continue;
+    }
+    const fromCurrent = current[index];
+    if (fromCurrent === undefined || fromCurrent === '') return null;
+    filled.push(fromCurrent);
+  }
+
+  const built = `/${filled.join('/')}`;
+  return query === undefined ? built : `${built}?${query}`;
+}
