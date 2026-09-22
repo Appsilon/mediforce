@@ -4,10 +4,12 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 let pathname = '/test';
+let search = '';
 const pushMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
+  useSearchParams: () => new URLSearchParams(search),
   useRouter: () => ({ push: pushMock }),
 }));
 
@@ -42,6 +44,7 @@ function mount() {
 
 beforeEach(() => {
   pathname = '/test';
+  search = '';
   pushMock.mockClear();
 });
 
@@ -146,16 +149,36 @@ describe('demo scenarios', () => {
   });
 
   it('takes the viewer to the page a step happens on', () => {
-    pathname = '/test/workflows/etymology-checker/runs/r1';
+    pathname = '/test/workflows/etymology-checker';
     mount();
     fireEvent.click(screen.getByTestId('start-run-scenario'));
     expect(pushMock).toHaveBeenCalledWith('/test/workflows/etymology-checker?tab=triggers');
+  });
+
+  it('starts where the viewer already stands rather than marching them back', () => {
+    pathname = '/test/workflows/etymology-checker/runs/r1';
+    mount();
+    fireEvent.click(screen.getByTestId('start-run-scenario'));
+
+    expect(screen.getByTestId('tour-card').textContent).toContain('The run tells you where it is');
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it('never invents a parameter, so a guide step is left where it is', () => {
     mount();
     fireEvent.click(screen.getByTestId('guide-trigger'));
     expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('moves on to the next tab instead of sticking on the first', () => {
+    pathname = '/test/workflows/etymology-checker';
+    search = 'tab=triggers';
+    mount();
+    fireEvent.click(screen.getByTestId('start-run-scenario'));
+    pushMock.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(pushMock).toHaveBeenCalledWith('/test/workflows/etymology-checker?tab=runs');
   });
 
   it('shows what the viewer is being asked to do', () => {

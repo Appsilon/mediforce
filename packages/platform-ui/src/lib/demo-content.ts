@@ -74,6 +74,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
       },
       {
         id: 'preflight',
+        route: '/:handle/workflows/:name?tab=runs',
         title: 'It refuses to start badly',
         body: 'Before anything runs, Mediforce checks the images exist, the secrets are set, the files are present and the models are reachable — and names what is missing instead of failing three steps in.',
         target: 'workflow-tab-runs',
@@ -81,18 +82,21 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
       },
       {
         id: 'dry-run',
+        route: '/:handle/workflows/:name?tab=runs',
         title: 'A dry run proves it without doing it',
         body: 'Step execution is mocked, but the image is really built. It answers "will this run at all" without touching anything real, which is why dry runs are listed apart from the record.',
         target: 'workflow-tab-runs',
       },
       {
         id: 'history',
+        route: '/:handle/workflows/:name/runs/:runId',
         title: 'The run tells you where it is',
         body: 'Every step that has executed, in order, with who or what ran it and how long it took. Steps that have not started are absent — this is what happened, not the plan.',
         target: 'run-history',
       },
       {
         id: 'log',
+        route: '/:handle/workflows/:name/runs/:runId',
         title: 'The log streams as the agent works',
         body: 'One collapsible section per step, with the tool calls and their results as they arrive. No reloading, and no waiting for the step to finish before you learn what it is doing.',
         target: 'run-pull-log',
@@ -149,6 +153,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
       },
       {
         id: 'audit',
+        route: '/:handle/workflows/:name/runs/:runId',
         title: 'Decisions are separated from bookkeeping',
         body: 'A run records hundreds of events. The ones where somebody or something chose are kept apart from the routine trail, so a reviewer reads the decisions first and the rest only when they need it.',
         target: 'run-pull-audit',
@@ -156,12 +161,14 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
       },
       {
         id: 'attribution',
+        route: '/:handle/workflows/:name/runs/:runId',
         title: 'Every record names its actor',
         body: 'A person, an agent, or the system — with the time it happened and the evidence it acted on. An agent decision is attributed as plainly as a human one, which is the point.',
         target: 'run-pull-audit',
       },
       {
         id: 'report',
+        route: '/:handle/workflows/:name/runs/:runId',
         title: 'The report is the run, written up',
         body: 'Once a run finishes it can be read as a document rather than a timeline, and printed as the record — not as a screenshot of a screen.',
         target: 'run-pull-report',

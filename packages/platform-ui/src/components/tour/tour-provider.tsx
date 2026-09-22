@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { isEditableTarget } from '@/components/command-palette/provider';
 import { chapterForPath, matchesRoute, type TourStep } from '@/lib/tour';
 import { GUIDE_CHAPTERS } from '@/lib/tour-content';
@@ -47,6 +47,7 @@ function isTopmostOverlay(): boolean {
 
 export function TourProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? '/';
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [active, setActive] = React.useState<TourState | null>(null);
 
@@ -59,8 +60,19 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const startScenario = React.useCallback((scenarioId: string) => {
     const scenario = DEMO_SCENARIOS.find((entry) => entry.id === scenarioId);
     if (scenario === undefined) return;
-    setActive({ title: scenario.title, steps: scenario.steps, index: 0, crossesPages: true });
-  }, []);
+    // Begin where the viewer already stands. Starting "run it" from a run
+    // should not march them back to the workflow page to work forwards again.
+    const here = scenario.steps.findIndex((entry) => {
+      const pattern = entry.route?.split('?')[0];
+      return pattern !== undefined && matchesRoute(pattern, pathname);
+    });
+    setActive({
+      title: scenario.title,
+      steps: scenario.steps,
+      index: here === -1 ? 0 : here,
+      crossesPages: true,
+    });
+  }, [pathname]);
 
   const stop = React.useCallback(() => setActive(null), []);
 
@@ -106,11 +118,26 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       ? resolveDemoRoute(step.route, pathname, demoRun)
       : null;
 
+  // Compared with the query included: a tab is `?tab=`, so ignoring the query
+  // made every step that only changes a tab look like it had already arrived.
+  const query = searchParams?.toString() ?? '';
+  const currentUrl = query === '' ? pathname : `${pathname}?${query}`;
+
+  // Where the viewer already stands, if it is a page some step of this
+  // scenario covers. Navigating there is how they advance, so pushing them off
+  // it would fight the arrival that is about to move the step on.
+  const onAStepOfThisScenario =
+    active?.crossesPages === true
+    && active.steps.some((entry) => {
+      const pattern = entry.route?.split('?')[0];
+      return pattern !== undefined && matchesRoute(pattern, pathname);
+    });
+
   React.useEffect(() => {
-    if (wantedRoute === null) return;
-    if (wantedRoute === pathname || wantedRoute.startsWith(`${pathname}?`)) return;
+    if (wantedRoute === null || wantedRoute === currentUrl) return;
+    if (onAStepOfThisScenario === true && wantedRoute.split('?')[0] !== pathname) return;
     router.push(wantedRoute);
-  }, [wantedRoute, pathname, router]);
+  }, [wantedRoute, currentUrl, pathname, onAStepOfThisScenario, router]);
 
   const running = active !== null;
 
