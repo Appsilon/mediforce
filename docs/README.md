@@ -59,6 +59,7 @@ Every engineering doc, what it is for, and how far to trust it.
 | Know why the code is shaped the way it is | [`adr/README.md`](adr/README.md) | engineers | living |
 | Read the cowork streaming exploration | [`research/cowork-streaming.md`](research/cowork-streaming.md) | engineers | draft |
 | Read the Layer 2 score exploration | [`research/layer2-scores-research.md`](research/layer2-scores-research.md) | engineers | draft |
+| Read the step evaluation plan (ADR-0007 layers 2–4) | [`research/step-evaluation.md`](research/step-evaluation.md) | engineers | draft |
 | Cite finished work | [`archive/`](archive/) | engineers | historical |
 | Change the product docs site | [`../website/README.md`](../website/README.md) | everyone | living |
 

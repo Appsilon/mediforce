@@ -449,9 +449,9 @@ Namespace Secret with the same key.
 ### Evaluation domain
 
 *(Layered model and system-of-record split defined in
-[ADR-0007](docs/adr/0007-llm-evaluation-observability.md). Score / Eval
-Dataset / Eval Run are reserved canonical names; their detailed design is
-deliberately deferred until tracing ships.)*
+[ADR-0007](docs/adr/0007-llm-evaluation-observability.md); the design of
+Evaluators, Eval Runs and Step Qualification in
+[ADR-0023](docs/adr/0023-step-evaluation.md).)*
 
 **Trace**:
 The telemetry record of one Agent Run's execution — a tree of spans (LLM
@@ -474,16 +474,56 @@ agent's **self-assessment**, a Score is an **external judgment**. Also avoid
 "evaluation" for a single judgment (an evaluation is a process; a Score is
 one data point).
 
-**Eval Dataset** *(reserved; design deferred)*:
-A curated set of golden / regression cases (input → accepted output) frozen
-from selected production Agent Runs. Namespace-scoped platform entity.
+**Agent Trajectory**:
+The durable, platform-owned record of the tool calls one Agent Run made and
+what they returned; its content is subject to the same capture switch as a
+Trace.
+_Avoid_: confusing with **Trace** (external telemetry, may not exist) and
+"transcript" / "log" (the transient activity log it replaces).
+
+**Evaluation**:
+The activity of measuring whether one agent Step, in one configuration, is
+trustworthy for its context of use.
+_Avoid_: "validation" — in pharma that means Computer System Validation of
+the platform itself (GAMP 5, 21 CFR Part 11).
+
+**Evaluator**:
+One rule a Step's output must satisfy, stated in plain language and backed by
+an executable check that produces Scores.
+_Avoid_: "validation rule", "assertion", "metric", "grader".
+
+**Eval Case**:
+One input fixture for a Step plus what its output must — or must not — contain.
+_Avoid_: "test case", "sample", "golden" (a case can be a negative one).
+
+**Eval Dataset**:
+A versioned, frozen set of Eval Cases for one Step, drawn from production
+Agent Runs, synthesised, or written by hand. Namespace-scoped.
 _Avoid_: "Dataset" alone (collides with generic data-engineering usage),
 "Benchmark" (implies public/academic suites).
 
-**Eval Run** *(reserved; design deferred)*:
-One execution of an Eval Dataset against a configuration (model, prompt,
-agent variant), producing Scores and a champion-vs-challenger comparison.
-Platform entity; fits the existing Run family (Workflow Run, Agent Run).
+**Step Fingerprint**:
+The identity of everything that shapes one agent Step's behaviour — its
+config, the skill and agent instructions it reads, its image and its
+effective MCP tools — independent of the Workflow Definition version.
+_Avoid_: "step version", "config hash".
+
+**Acceptance Criteria**:
+The pass thresholds an Eval Run is judged against, fixed before it starts;
+signing a Step Qualification despite a missed criterion records a deviation
+with a written justification.
+_Avoid_: "threshold" alone (collides with `confidenceThreshold`), "target".
+
+**Step Qualification**:
+A signed decision that one Step Fingerprint met its acceptance criteria in an
+Eval Run; it goes stale when the Step's current Fingerprint differs.
+_Avoid_: "validated", "certified", "approved step".
+
+**Eval Run**:
+One execution of an Eval Dataset against one or more variants of a Step
+(model, prompt, examples), repeated per case, producing Scores and a
+champion-vs-challenger comparison. Fits the existing Run family (Workflow Run,
+Agent Run).
 _Avoid_: "Experiment" (vague, collides with nothing but explains nothing).
 
 ### Audit / observability
@@ -514,6 +554,15 @@ the user-facing immutable log.
 - An **Agent Run** may produce 0..N **Handoffs**.
 - An **Agent** has many **Agent MCP Bindings** (per server) and
   many **Agent OAuth Tokens** (per server).
+- An agent **Step** of a **Workflow** owns 0..N **Evaluators** and 0..N
+  versioned **Eval Datasets**; neither is shared with another Step (reuse is
+  by copy).
+- An **Evaluator** has many versions; a version that has produced a **Score**
+  never changes.
+- An **Eval Run** executes one **Eval Dataset** version against 1..N
+  variants of one Step; each trial is a single-step **Workflow Run**.
+- A **Step Qualification** cites exactly one **Eval Run**, one
+  **Step Fingerprint**, and the **Evaluator** versions it was judged by.
 
 ## Flagged ambiguities
 
