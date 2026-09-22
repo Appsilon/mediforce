@@ -58,15 +58,24 @@ export function offersDemo(
 /**
  * The concrete URL for a step's route, or `null` when it cannot be built.
  *
- * `:handle` and any other parameter are filled from the path the viewer is
- * already on, matched by position. A scenario cannot invent a workflow name or
- * a run id, so a step that needs one the viewer has not opened yet resolves to
- * `null` and the card narrates where to go instead of guessing a URL.
+ * Parameters are filled from the path the viewer is already on, matched by
+ * position, and otherwise from `run` — the real run the scenario picked out of
+ * this workspace. With neither, it resolves to `null` and the card narrates
+ * where to go rather than guessing a URL that would 404.
  */
-export function resolveDemoRoute(route: string, pathname: string): string | null {
+export function resolveDemoRoute(
+  route: string,
+  pathname: string,
+  run?: DemoRunCandidate | null,
+): string | null {
   const [path, query] = route.split('?');
   const wanted = (path ?? '').split('/').filter((part) => part !== '');
   const current = pathname.split('/').filter((part) => part !== '');
+
+  const fromRun: Record<string, string | undefined> = {
+    ':name': run?.definitionName,
+    ':runId': run?.id,
+  };
 
   const filled: string[] = [];
   for (const [index, part] of wanted.entries()) {
@@ -74,11 +83,51 @@ export function resolveDemoRoute(route: string, pathname: string): string | null
       filled.push(part);
       continue;
     }
-    const fromCurrent = current[index];
-    if (fromCurrent === undefined || fromCurrent === '') return null;
-    filled.push(fromCurrent);
+    // The path the viewer is on wins: if they already opened a workflow, the
+    // scenario stays on theirs rather than hopping to the one it chose.
+    const resolved = current[index] ?? fromRun[part];
+    if (resolved === undefined || resolved === '') return null;
+    filled.push(resolved);
   }
 
   const built = `/${filled.join('/')}`;
   return query === undefined ? built : `${built}?${query}`;
+}
+
+/** The little a scenario needs to point at a real run. */
+export type DemoRunCandidate = {
+  id: string;
+  definitionName: string;
+  status: string;
+  startedAt?: string;
+};
+
+/**
+ * Rank: 0 is the best run to demonstrate.
+ *
+ * A completed run is the only one that has the whole story — every step ran,
+ * the log is finished and the report exists — so it wins outright. A run
+ * waiting on a person comes next, because that pause is itself a thing worth
+ * showing. Anything still moving may finish mid-demo, and a failed or
+ * cancelled run is the one thing not to open in front of a customer.
+ */
+function demoRunRank(status: string): number {
+  if (status === 'completed') return 0;
+  if (status === 'waiting_for_human' || status === 'paused') return 1;
+  if (status === 'running' || status === 'in_progress') return 2;
+  return 3;
+}
+
+/**
+ * The run a scenario should open, or `null` when the workspace has none.
+ * Ties break on recency, so the same workspace always demonstrates the same
+ * run rather than whichever row the query happened to return first.
+ */
+export function pickDemoRun(runs: readonly DemoRunCandidate[]): DemoRunCandidate | null {
+  const ranked = [...runs].sort((a, b) => {
+    const byStatus = demoRunRank(a.status) - demoRunRank(b.status);
+    if (byStatus !== 0) return byStatus;
+    return (b.startedAt ?? '').localeCompare(a.startedAt ?? '');
+  });
+  return ranked[0] ?? null;
 }

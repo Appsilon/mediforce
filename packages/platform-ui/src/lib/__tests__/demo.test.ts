@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { isAppsilonEmail, offersDemo, resolveDemoRoute } from '@/lib/demo';
+import { isAppsilonEmail, offersDemo, pickDemoRun, resolveDemoRoute } from '@/lib/demo';
 import { DEMO_SCENARIOS } from '@/lib/demo-content';
 import { matchesRoute } from '@/lib/tour';
 
@@ -67,9 +67,53 @@ describe('resolveDemoRoute', () => {
       .toBe('/test/workflows/etym?tab=triggers');
   });
 
-  it('refuses to invent a parameter the viewer has not opened yet', () => {
+  it('refuses to invent a parameter with no run to draw on', () => {
     expect(resolveDemoRoute('/:handle/workflows/:name', '/test')).toBeNull();
     expect(resolveDemoRoute('/:handle/workflows/:name/runs/:runId', '/test/workflows/etym')).toBeNull();
+  });
+
+  it('fills the workflow and run from the run the scenario picked', () => {
+    const run = { id: 'run-7', definitionName: 'etymology-checker', status: 'completed' };
+    expect(resolveDemoRoute('/:handle/workflows/:name/runs/:runId', '/test', run))
+      .toBe('/test/workflows/etymology-checker/runs/run-7');
+  });
+
+  it('keeps the workflow the viewer already opened over the one it picked', () => {
+    const run = { id: 'run-7', definitionName: 'etymology-checker', status: 'completed' };
+    expect(resolveDemoRoute('/:handle/workflows/:name?tab=triggers', '/test/workflows/mine', run))
+      .toBe('/test/workflows/mine?tab=triggers');
+  });
+});
+
+describe('pickDemoRun', () => {
+  const run = (id: string, status: string, startedAt?: string) =>
+    ({ id, definitionName: 'etym', status, startedAt });
+
+  it('prefers a completed run over anything still moving', () => {
+    expect(pickDemoRun([
+      run('a', 'running', '2026-03-01'),
+      run('b', 'completed', '2026-01-01'),
+    ])?.id).toBe('b');
+  });
+
+  it('takes a run waiting on a person over one still running', () => {
+    expect(pickDemoRun([run('a', 'running'), run('b', 'waiting_for_human')])?.id).toBe('b');
+  });
+
+  it('opens a failed run only when nothing better exists', () => {
+    expect(pickDemoRun([run('a', 'error'), run('b', 'completed')])?.id).toBe('b');
+    expect(pickDemoRun([run('a', 'error')])?.id).toBe('a');
+  });
+
+  it('breaks ties on recency, so the same workspace shows the same run', () => {
+    expect(pickDemoRun([
+      run('old', 'completed', '2026-01-01'),
+      run('new', 'completed', '2026-06-01'),
+    ])?.id).toBe('new');
+  });
+
+  it('is null for a workspace with no runs at all', () => {
+    expect(pickDemoRun([])).toBeNull();
   });
 });
 

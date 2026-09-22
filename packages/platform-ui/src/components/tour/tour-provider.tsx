@@ -7,6 +7,7 @@ import { chapterForPath, matchesRoute, type TourStep } from '@/lib/tour';
 import { GUIDE_CHAPTERS } from '@/lib/tour-content';
 import { DEMO_SCENARIOS } from '@/lib/demo-content';
 import { resolveDemoRoute, type DemoStep } from '@/lib/demo';
+import { useDemoRun } from '@/hooks/use-demo-run';
 import { TourOverlay } from './tour-overlay';
 
 type TourState = {
@@ -93,9 +94,16 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   // reading a card about a screen they are not looking at. It navigates only —
   // opening the panel or the tab is still theirs to do.
   const step = active === null ? null : active.steps[active.index] ?? null;
+
+  // Only a scenario that still has a parameter to fill pays for the lookup.
+  const needsRun =
+    active?.crossesPages === true
+    && active.steps.some((entry) => entry.route?.includes(':name') === true || entry.route?.includes(':runId') === true);
+  const demoRun = useDemoRun(pathname.split('/')[1] ?? '', needsRun === true);
+
   const wantedRoute =
     active?.crossesPages === true && step?.route !== undefined
-      ? resolveDemoRoute(step.route, pathname)
+      ? resolveDemoRoute(step.route, pathname, demoRun)
       : null;
 
   React.useEffect(() => {
