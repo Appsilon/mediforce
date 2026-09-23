@@ -26,6 +26,10 @@ import {
   ListWorkflowsInputSchema,
   ListWorkflowsOutputSchema,
   GetWorkflowInputSchema,
+  BrowseDraftRepoInputSchema,
+  BrowseDraftRepoOutputSchema,
+  PreviewRepoFilesInputSchema,
+  PreviewRepoFilesOutputSchema,
   GetWorkflowOutputSchema,
   ListWorkflowVersionsInputSchema,
   ListWorkflowVersionsOutputSchema,
@@ -342,6 +346,10 @@ import {
   type ListWorkflowsRequest,
   type ListWorkflowsOutput,
   type GetWorkflowInput,
+  type BrowseDraftRepoInput,
+  type BrowseDraftRepoOutput,
+  type PreviewRepoFilesInput,
+  type PreviewRepoFilesOutput,
   type GetWorkflowOutput,
   type ListWorkflowVersionsInput,
   type ListWorkflowVersionsOutput,
@@ -715,6 +723,9 @@ export class Mediforce {
     schema: () => Promise<GetWorkflowSchemaOutput>;
     list: (input?: ListWorkflowsRequest) => Promise<ListWorkflowsOutput>;
     get: (input: GetWorkflowInput) => Promise<GetWorkflowOutput>;
+    repoFiles: (input: PreviewRepoFilesInput) => Promise<PreviewRepoFilesOutput>;
+    /** The same read for a draft that has no saved name yet. */
+    draftRepoFiles: (input: BrowseDraftRepoInput) => Promise<BrowseDraftRepoOutput>;
     versions: (input: ListWorkflowVersionsInput) => Promise<ListWorkflowVersionsOutput>;
     archiveVersion: (input: ArchiveVersionInput, options: { namespace: string }) => Promise<ArchiveVersionOutput>;
     archiveAll: (input: ArchiveAllInput, options: { namespace: string }) => Promise<ArchiveAllOutput>;
@@ -1312,6 +1323,32 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.get');
         return GetWorkflowOutputSchema.parse(body);
+      },
+      draftRepoFiles: async (input) => {
+        const validated = BrowseDraftRepoInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          repo: validated.repo,
+          commit: validated.commit,
+          path: validated.path,
+        });
+        const res = await this.request(`/api/repo-files${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.draftRepoFiles');
+        return BrowseDraftRepoOutputSchema.parse(body);
+      },
+      repoFiles: async (input) => {
+        const validated = PreviewRepoFilesInputSchema.parse(input);
+        const qs = toSearchParams({
+          stepId: validated.stepId,
+          namespace: validated.namespace,
+          version: validated.version !== undefined ? String(validated.version) : undefined,
+          path: validated.path,
+        });
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/repo-files${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.repoFiles');
+        return PreviewRepoFilesOutputSchema.parse(body);
       },
       versions: async (input) => {
         const validated = ListWorkflowVersionsInputSchema.parse(input);

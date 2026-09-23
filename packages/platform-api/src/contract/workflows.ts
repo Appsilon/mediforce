@@ -461,3 +461,62 @@ export const GetManifestOutputSchema = z.object({
 export type ManifestEntry = z.infer<typeof ManifestEntrySchema>;
 export type GetManifestInput = z.infer<typeof GetManifestInputSchema>;
 export type GetManifestOutput = z.infer<typeof GetManifestOutputSchema>;
+
+/** One file read back from the repository a step builds from, for display only. */
+export const RepoFilePreviewSchema = z.object({
+  path: z.string(),
+  contents: z.string(),
+  /** Set when the file was longer than a workflow artifact may be. */
+  truncated: z.boolean().optional(),
+});
+/** A file in the commit's tree. No size: reporting one costs a blob fetch. */
+export const RepoTreeEntrySchema = z.object({
+  path: z.string(),
+});
+
+/** A file the explorer will not render, with the cap that refused it. */
+export const RepoFileTooLargeSchema = z.object({
+  path: z.string(),
+  maxBytes: z.number().int().positive(),
+  tooLarge: z.literal(true),
+});
+
+export const PreviewRepoFilesInputSchema = z.object({
+  name: z.string().min(1),
+  stepId: z.string().min(1),
+  namespace: z.string().optional(),
+  version: z.number().int().positive().optional(),
+  /** Omitted lists the tree; given fetches that one file's contents. */
+  path: z.string().min(1).optional(),
+});
+export const PreviewRepoFilesOutputSchema = z.object({
+  repo: z.string(),
+  commit: z.string(),
+  /** Name of the workflow secret used to clone, never its value. */
+  usedAuthKey: z.string().optional(),
+  /** Every file in the commit. Always present — it is what the explorer lists. */
+  entries: z.array(RepoTreeEntrySchema),
+  /** The one file asked for by `path`, absent when only the tree was wanted. */
+  file: z.union([RepoFilePreviewSchema, RepoFileTooLargeSchema]).optional(),
+});
+/** Reading a repository the caller names, before any workflow holds it. */
+export const BrowseDraftRepoInputSchema = z.object({
+  namespace: z.string().min(1),
+  repo: z.string().min(1),
+  commit: z.string().min(1),
+  path: z.string().min(1).optional(),
+});
+export const BrowseDraftRepoOutputSchema = z.object({
+  repo: z.string(),
+  commit: z.string(),
+  entries: z.array(RepoTreeEntrySchema),
+  file: z.union([RepoFilePreviewSchema, RepoFileTooLargeSchema]).optional(),
+});
+export type BrowseDraftRepoInput = z.infer<typeof BrowseDraftRepoInputSchema>;
+export type BrowseDraftRepoOutput = z.infer<typeof BrowseDraftRepoOutputSchema>;
+
+export type RepoFilePreview = z.infer<typeof RepoFilePreviewSchema>;
+export type RepoTreeEntry = z.infer<typeof RepoTreeEntrySchema>;
+export type RepoFileTooLarge = z.infer<typeof RepoFileTooLargeSchema>;
+export type PreviewRepoFilesInput = z.infer<typeof PreviewRepoFilesInputSchema>;
+export type PreviewRepoFilesOutput = z.infer<typeof PreviewRepoFilesOutputSchema>;

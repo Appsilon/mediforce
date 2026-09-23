@@ -137,6 +137,20 @@ export {
   type GetWorkflowAccessOutput,
   type SetWorkflowAccessInput,
   type SetWorkflowAccessOutput,
+  PreviewRepoFilesInputSchema,
+  PreviewRepoFilesOutputSchema,
+  RepoFilePreviewSchema,
+  RepoTreeEntrySchema,
+  RepoFileTooLargeSchema,
+  BrowseDraftRepoInputSchema,
+  BrowseDraftRepoOutputSchema,
+  type PreviewRepoFilesInput,
+  type PreviewRepoFilesOutput,
+  type RepoFilePreview,
+  type RepoTreeEntry,
+  type RepoFileTooLarge,
+  type BrowseDraftRepoInput,
+  type BrowseDraftRepoOutput,
 } from './workflows';
 
 export {
