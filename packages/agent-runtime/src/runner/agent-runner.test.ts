@@ -622,7 +622,7 @@ describe('AgentRunner', () => {
 });
 
 describe('AgentRunner.reapAsTimeout (issue #868)', () => {
-  it('terminates the orphaned running AgentRun and routes through the timeout fallback', async () => {
+  it('terminates the orphaned running AgentRun, routes through the timeout fallback, and names the run', async () => {
     const instanceRepository = new InMemoryProcessInstanceRepository();
     const auditRepository = new InMemoryAuditRepository();
     const eventLog = new InMemoryAgentEventLog();
@@ -656,6 +656,7 @@ describe('AgentRunner.reapAsTimeout (issue #868)', () => {
 
     expect(result.fallbackReason).toBe('timeout');
     expect(result.status).toBe('escalated');
+    expect(result.agentRunId).toBe('run-stranded');
 
     const stranded = await agentRunRepo.getById('run-stranded');
     expect(stranded?.status).toBe('escalated');
