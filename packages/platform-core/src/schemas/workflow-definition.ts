@@ -378,7 +378,7 @@ function validateSteps(
       plugin?: string;
       action?: unknown;
       assignedTo?: string;
-      agent?: unknown;
+      agent?: { outputSchema?: unknown };
       autonomyLevel?: string;
       cowork?: unknown;
       script?: unknown;
@@ -445,6 +445,14 @@ function validateSteps(
           message: `step '${step.id}': cowork config is not allowed on script steps`,
         });
       }
+    }
+
+    if (step.agent?.outputSchema !== undefined && step.executor !== 'agent') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['steps', i, 'agent', 'outputSchema'],
+        message: `step '${step.id}' has agent.outputSchema but executor is '${step.executor}' (only executor='agent' enforces it)`,
+      });
     }
 
     if (step.assignedTo !== undefined && step.executor !== 'human') {

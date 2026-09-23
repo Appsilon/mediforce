@@ -106,12 +106,14 @@ export type GetAgentRunOutput = z.infer<typeof GetAgentRunOutputSchema>;
 /**
  * Contract for `GET /api/agent-runs/:agentRunId/trajectory` — the Agent
  * Trajectory (ADR-0023 D8): the run's tool calls, tool results and text in
- * `seq` order. Entries carry `redacted: true` when content capture was off.
+ * `seq` order. `afterSeq` is the incremental-poll cursor: when set, only
+ * entries with `seq > afterSeq` are returned; absent → the whole trajectory.
  * An Agent Run that recorded nothing answers `entries: []`; an unknown or
  * out-of-workspace run is 404.
  */
 export const GetAgentTrajectoryInputSchema = z.object({
   agentRunId: z.uuid(),
+  afterSeq: z.coerce.number().int().nonnegative().optional(),
 });
 
 export const GetAgentTrajectoryOutputSchema = AgentTrajectorySchema;

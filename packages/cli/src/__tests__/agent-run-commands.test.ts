@@ -120,4 +120,18 @@ describe('agent-run trajectory command', () => {
     expect(printed).toMatch(/0 {2}2026-09-23T08:00:00.000Z {2}assistant\/tool_call {2}Read {2}\{"file_path":"\/data\/ae.csv"\}/);
     expect(printed).toMatch(/result\/success/);
   });
+
+  it('passes --after-seq as the incremental cursor', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ agentRunId: AGENT_RUN_ID, entries: [] }),
+    );
+    const output = captureOutput();
+    const code = await agentRunTrajectoryCommand({
+      argv: [AGENT_RUN_ID, '--after-seq', '4', '--base-url', 'http://localhost:5555'],
+      env: { MEDIFORCE_API_KEY: 'k' },
+      output,
+    });
+    expect(code).toBe(0);
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(`http://localhost:5555/api/agent-runs/${AGENT_RUN_ID}/trajectory?afterSeq=4`);
+  });
 });

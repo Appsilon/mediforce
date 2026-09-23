@@ -113,7 +113,6 @@ export {
   AgentTrajectoryEntrySchema,
   StoredAgentTrajectoryEntrySchema,
   AgentTrajectorySchema,
-  redactTrajectoryEntry,
   type AgentTrajectoryEntry,
   type StoredAgentTrajectoryEntry,
   type AgentTrajectory,

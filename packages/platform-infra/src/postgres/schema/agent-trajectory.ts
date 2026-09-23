@@ -8,8 +8,8 @@ import { agentRuns } from './agent-run';
  * One row per entry rather than a jsonb array on `agent_runs`, so the runner's
  * batched appends are inserts, not rewrites of an ever-growing document. No
  * `workspace` column: reads are keyed by `agent_run_id` and scope through the
- * parent `agent_runs.workspace`. `entry` holds the entry minus `seq`, already
- * redacted when content capture was off.
+ * parent `agent_runs.workspace`. `entry` holds the entry minus `seq`, with full
+ * content.
  */
 export const agentTrajectoryEntries = pgTable(
   'agent_trajectory_entries',
