@@ -11,13 +11,14 @@ makes it the place a shared type belongs and a bad place for anything else.
 
 | Directory | Holds |
 |---|---|
-| `src/schemas/` | Domain schemas — `WorkflowDefinition`, `ProcessInstance`, `StepExecution`, `HumanTask`, `AgentRun` and its Agent Trajectory, `Score`, triggers, actions, MCP bindings, and the built-in roles whose verbs the default workflow access and step `allowedRoles` derive from ([ADR-0020](../../docs/adr/0020-built-in-roles-and-default-workflow-access.md)) |
+| `src/schemas/` | Domain schemas — `WorkflowDefinition`, `ProcessInstance`, `StepExecution`, `HumanTask`, `AgentRun` and its Agent Trajectory, `Score`, the Evaluation domain (Briefs, Evaluators, Eval Cases, Datasets, MCP eval policies), triggers, actions, MCP bindings, and the built-in roles whose verbs the default workflow access and step `allowedRoles` derive from ([ADR-0020](../../docs/adr/0020-built-in-roles-and-default-workflow-access.md)) |
 | `src/interfaces/` | Repository and service contracts the infra layer implements |
 | `src/repositories/` | Repository-side shared types |
 | `src/parser/` | YAML process-definition parsing |
 | `src/mcp/` | MCP server resolution and tool-catalog validation |
 | `src/validation/` | Cross-field workflow validation, graph and reference checks |
 | `src/collaboration/` | Handoff registry |
+| `src/evaluation/` | Pure Evaluation rules — the Evaluator trust gate (ADR-0023 D9) and the MCP eval policy as step restrictions (D6) |
 | `src/testing/` | In-memory repositories and `build*` factories |
 
 Three entry points: `.` for the domain surface, `./testing` for the doubles and

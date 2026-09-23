@@ -27,3 +27,4 @@ export * from './workflow-access';
 export * from './workflow-assistant-instructions';
 export * from './agent-trajectory';
 export * from './score';
+export * from './evaluation';

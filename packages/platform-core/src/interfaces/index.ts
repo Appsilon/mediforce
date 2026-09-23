@@ -28,6 +28,7 @@ export type {
   AgentTrajectoryRepository,
 } from './agent-trajectory-repository';
 export type { ScoreRepository, ListScoresFilter } from './score-repository';
+export type { EvaluationRepository } from './evaluation-repository';
 export type { CoworkSessionRepository } from './cowork-session-repository';
 export type { TriggerRepository, TriggerUpdate } from './trigger-repository';
 export type { ToolCatalogRepository } from './tool-catalog-repository';

@@ -9,6 +9,7 @@ import {
   InMemoryAgentRunRepository,
   InMemoryAgentTrajectoryRepository,
   InMemoryScoreRepository,
+  InMemoryEvaluationRepository,
   InMemoryAuditRepository,
   InMemoryCoworkSessionRepository,
   InMemoryHandoffRepository,
@@ -33,6 +34,7 @@ import type {
   AgentRunRepository,
   AgentTrajectoryRepository,
   ScoreRepository,
+  EvaluationRepository,
   AutoJoinRule,
   BlobStore,
   EmailProviderInfo,
@@ -190,6 +192,7 @@ export interface TestScopeOverrides {
   readonly agentRunRepo?: AgentRunRepository;
   readonly agentTrajectoryRepo?: AgentTrajectoryRepository;
   readonly scoreRepo?: ScoreRepository;
+  readonly evaluationRepo?: EvaluationRepository;
   readonly handoffRepo?: InMemoryHandoffRepository;
   readonly agentDefinitionRepo?: InMemoryAgentDefinitionRepository;
   readonly coworkSessionRepo?: InMemoryCoworkSessionRepository;
@@ -247,6 +250,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     agentRunRepo,
     agentTrajectoryRepo: overrides.agentTrajectoryRepo ?? new InMemoryAgentTrajectoryRepository(agentRunRepo),
     scoreRepo: overrides.scoreRepo ?? new InMemoryScoreRepository(),
+    evaluationRepo: overrides.evaluationRepo ?? new InMemoryEvaluationRepository(),
     humanTaskRepo: overrides.humanTaskRepo ?? new InMemoryHumanTaskRepository(instanceRepo),
     taskAttachmentRepo: overrides.taskAttachmentRepo ?? new InMemoryTaskAttachmentRepository(),
     blobStore: overrides.blobStore ?? new InMemoryBlobStore(),

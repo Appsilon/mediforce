@@ -11,7 +11,7 @@ actually executes and whether its result is trustworthy enough to continue.
 
 | Directory | Holds |
 |---|---|
-| `src/runner/` | `AgentRunner`, `PluginRegistry`, `FallbackHandler`, step executors, `OpenRouterLlmClient`, OTel tracing |
+| `src/runner/` | `AgentRunner`, `PluginRegistry`, `FallbackHandler`, step executors, `OpenRouterLlmClient`, the `LlmJudgeReviewPlugin` behind `llm_judge` Evaluators, OTel tracing |
 | `src/plugins/` | `BaseContainerAgentPlugin` and the concrete plugins — see [`src/plugins/README.md`](src/plugins/README.md) |
 | `src/interfaces/` | `StepExecutorPlugin`, review and step-executor contracts |
 | `src/mcp/` | Per-step MCP resolution (`resolveMcpForStep`) |

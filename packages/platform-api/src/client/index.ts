@@ -542,6 +542,76 @@ import {
   type RevokeJoinLinkInput,
   type RevokeJoinLinkOutput,
 } from '../contract/index';
+import {
+  AddEvaluatorVersionInputSchema,
+  ApproveEvaluatorSourceInputSchema,
+  ArchiveEvalCaseInputSchema,
+  ArchiveEvaluatorInputSchema,
+  CalibrateEvaluatorInputSchema,
+  CalibrateEvaluatorOutputSchema,
+  CreateEvalCaseFromAgentRunInputSchema,
+  CreateEvalCaseInputSchema,
+  CreateEvaluatorInputSchema,
+  EvalCaseOutputSchema,
+  EvaluatorOutputSchema,
+  FreezeEvalDatasetInputSchema,
+  FreezeEvalDatasetOutputSchema,
+  GetEvaluationBriefInputSchema,
+  GetEvaluationBriefOutputSchema,
+  GetEvaluatorInputSchema,
+  GetMcpEvalPolicyInputSchema,
+  GetMcpEvalPolicyOutputSchema,
+  LabelEvaluatorOutputInputSchema,
+  LabelEvaluatorOutputOutputSchema,
+  ListEvalCasesInputSchema,
+  ListEvalCasesOutputSchema,
+  ListEvalDatasetsInputSchema,
+  ListEvalDatasetsOutputSchema,
+  ListEvaluatorsInputSchema,
+  ListEvaluatorsOutputSchema,
+  ListStepAgentRunsInputSchema,
+  ListStepAgentRunsOutputSchema,
+  PreviewEvaluatorInputSchema,
+  PreviewEvaluatorOutputSchema,
+  SetEvaluationBriefInputSchema,
+  SetEvaluationBriefOutputSchema,
+  SetMcpEvalPolicyInputSchema,
+  SetMcpEvalPolicyOutputSchema,
+  type AddEvaluatorVersionInput,
+  type ApproveEvaluatorSourceInput,
+  type ArchiveEvalCaseInput,
+  type ArchiveEvaluatorInput,
+  type CalibrateEvaluatorInput,
+  type CalibrateEvaluatorOutput,
+  type CreateEvalCaseFromAgentRunInput,
+  type CreateEvalCaseInput,
+  type CreateEvaluatorInput,
+  type EvalCaseOutput,
+  type EvaluatorOutput,
+  type FreezeEvalDatasetInput,
+  type FreezeEvalDatasetOutput,
+  type GetEvaluationBriefInput,
+  type GetEvaluationBriefOutput,
+  type GetEvaluatorInput,
+  type GetMcpEvalPolicyInput,
+  type GetMcpEvalPolicyOutput,
+  type LabelEvaluatorOutputInput,
+  type LabelEvaluatorOutputOutput,
+  type ListEvalCasesInput,
+  type ListEvalCasesOutput,
+  type ListEvalDatasetsInput,
+  type ListEvalDatasetsOutput,
+  type ListEvaluatorsInput,
+  type ListEvaluatorsOutput,
+  type ListStepAgentRunsInput,
+  type ListStepAgentRunsOutput,
+  type PreviewEvaluatorInput,
+  type PreviewEvaluatorOutput,
+  type SetEvaluationBriefInput,
+  type SetEvaluationBriefOutput,
+  type SetMcpEvalPolicyInput,
+  type SetMcpEvalPolicyOutput,
+} from '../contract/evaluation';
 import { BUILD_CONTEXT_MEDIA_TYPE } from '@mediforce/platform-core';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
@@ -915,6 +985,30 @@ export class Mediforce {
 
   readonly scores: {
     list: (input?: ListScoresInput) => Promise<ListScoresOutput>;
+  };
+
+  /** The Evaluation domain (ADR-0023): Briefs, Evaluators, Eval Cases, Datasets, MCP eval policies. */
+  readonly evaluation: {
+    getBrief: (input: GetEvaluationBriefInput) => Promise<GetEvaluationBriefOutput>;
+    setBrief: (input: SetEvaluationBriefInput) => Promise<SetEvaluationBriefOutput>;
+    listEvaluators: (input: ListEvaluatorsInput) => Promise<ListEvaluatorsOutput>;
+    getEvaluator: (input: GetEvaluatorInput) => Promise<EvaluatorOutput>;
+    createEvaluator: (input: CreateEvaluatorInput) => Promise<EvaluatorOutput>;
+    addEvaluatorVersion: (input: AddEvaluatorVersionInput) => Promise<EvaluatorOutput>;
+    archiveEvaluator: (input: ArchiveEvaluatorInput) => Promise<EvaluatorOutput>;
+    approveEvaluatorSource: (input: ApproveEvaluatorSourceInput) => Promise<EvaluatorOutput>;
+    labelOutput: (input: LabelEvaluatorOutputInput) => Promise<LabelEvaluatorOutputOutput>;
+    calibrateEvaluator: (input: CalibrateEvaluatorInput) => Promise<CalibrateEvaluatorOutput>;
+    previewEvaluator: (input: PreviewEvaluatorInput) => Promise<PreviewEvaluatorOutput>;
+    listStepAgentRuns: (input: ListStepAgentRunsInput) => Promise<ListStepAgentRunsOutput>;
+    listCases: (input: ListEvalCasesInput) => Promise<ListEvalCasesOutput>;
+    createCase: (input: CreateEvalCaseInput) => Promise<EvalCaseOutput>;
+    createCaseFromAgentRun: (input: CreateEvalCaseFromAgentRunInput) => Promise<EvalCaseOutput>;
+    archiveCase: (input: ArchiveEvalCaseInput) => Promise<EvalCaseOutput>;
+    listDatasets: (input: ListEvalDatasetsInput) => Promise<ListEvalDatasetsOutput>;
+    freezeDataset: (input: FreezeEvalDatasetInput) => Promise<FreezeEvalDatasetOutput>;
+    getMcpPolicy: (input: GetMcpEvalPolicyInput) => Promise<GetMcpEvalPolicyOutput>;
+    setMcpPolicy: (input: SetMcpEvalPolicyInput) => Promise<SetMcpEvalPolicyOutput>;
   };
 
   readonly monitoring: {
@@ -2290,6 +2384,113 @@ export class Mediforce {
       },
     };
 
+    this.evaluation = {
+      getBrief: async (input) => {
+        const step = GetEvaluationBriefInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/briefs${toSearchParams(step)}`, GetEvaluationBriefOutputSchema, 'mediforce.evaluation.getBrief');
+      },
+      setBrief: async (input) => this.sendJson(
+        'POST', '/api/evaluation/briefs', SetEvaluationBriefInputSchema.parse(input),
+        SetEvaluationBriefOutputSchema, 'mediforce.evaluation.setBrief',
+      ),
+      listEvaluators: async (input) => {
+        const validated = ListEvaluatorsInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflowName: validated.workflowName,
+          stepId: validated.stepId,
+          includeArchived: validated.includeArchived === undefined ? undefined : String(validated.includeArchived),
+        });
+        return this.getJson(`/api/evaluation/evaluators${qs}`, ListEvaluatorsOutputSchema, 'mediforce.evaluation.listEvaluators');
+      },
+      getEvaluator: async (input) => {
+        const { evaluatorId } = GetEvaluatorInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}`, EvaluatorOutputSchema, 'mediforce.evaluation.getEvaluator');
+      },
+      createEvaluator: async (input) => this.sendJson(
+        'POST', '/api/evaluation/evaluators', CreateEvaluatorInputSchema.parse(input),
+        EvaluatorOutputSchema, 'mediforce.evaluation.createEvaluator',
+      ),
+      addEvaluatorVersion: async (input) => {
+        const { evaluatorId, ...body } = AddEvaluatorVersionInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/versions`, body,
+          EvaluatorOutputSchema, 'mediforce.evaluation.addEvaluatorVersion');
+      },
+      archiveEvaluator: async (input) => {
+        const { evaluatorId, ...body } = ArchiveEvaluatorInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/archive`, body,
+          EvaluatorOutputSchema, 'mediforce.evaluation.archiveEvaluator');
+      },
+      approveEvaluatorSource: async (input) => {
+        const { evaluatorId, ...body } = ApproveEvaluatorSourceInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/approve`, body,
+          EvaluatorOutputSchema, 'mediforce.evaluation.approveEvaluatorSource');
+      },
+      labelOutput: async (input) => {
+        const { evaluatorId, ...body } = LabelEvaluatorOutputInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/labels`, body,
+          LabelEvaluatorOutputOutputSchema, 'mediforce.evaluation.labelOutput');
+      },
+      calibrateEvaluator: async (input) => {
+        const { evaluatorId, ...body } = CalibrateEvaluatorInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/calibrate`, body,
+          CalibrateEvaluatorOutputSchema, 'mediforce.evaluation.calibrateEvaluator');
+      },
+      previewEvaluator: async (input) => this.sendJson(
+        'POST', '/api/evaluation/evaluators/preview', PreviewEvaluatorInputSchema.parse(input),
+        PreviewEvaluatorOutputSchema, 'mediforce.evaluation.previewEvaluator',
+      ),
+      listStepAgentRuns: async (input) => {
+        const validated = ListStepAgentRunsInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflowName: validated.workflowName,
+          stepId: validated.stepId,
+          limit: String(validated.limit),
+        });
+        return this.getJson(`/api/evaluation/agent-runs${qs}`, ListStepAgentRunsOutputSchema, 'mediforce.evaluation.listStepAgentRuns');
+      },
+      listCases: async (input) => {
+        const validated = ListEvalCasesInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflowName: validated.workflowName,
+          stepId: validated.stepId,
+          includeArchived: validated.includeArchived === undefined ? undefined : String(validated.includeArchived),
+        });
+        return this.getJson(`/api/evaluation/cases${qs}`, ListEvalCasesOutputSchema, 'mediforce.evaluation.listCases');
+      },
+      createCase: async (input) => this.sendJson(
+        'POST', '/api/evaluation/cases', CreateEvalCaseInputSchema.parse(input),
+        EvalCaseOutputSchema, 'mediforce.evaluation.createCase',
+      ),
+      createCaseFromAgentRun: async (input) => this.sendJson(
+        'POST', '/api/evaluation/cases/from-agent-run', CreateEvalCaseFromAgentRunInputSchema.parse(input),
+        EvalCaseOutputSchema, 'mediforce.evaluation.createCaseFromAgentRun',
+      ),
+      archiveCase: async (input) => {
+        const { caseId, ...body } = ArchiveEvalCaseInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/cases/${encodeURIComponent(caseId)}/archive`, body,
+          EvalCaseOutputSchema, 'mediforce.evaluation.archiveCase');
+      },
+      listDatasets: async (input) => {
+        const step = ListEvalDatasetsInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/datasets${toSearchParams(step)}`, ListEvalDatasetsOutputSchema, 'mediforce.evaluation.listDatasets');
+      },
+      freezeDataset: async (input) => this.sendJson(
+        'POST', '/api/evaluation/datasets', FreezeEvalDatasetInputSchema.parse(input),
+        FreezeEvalDatasetOutputSchema, 'mediforce.evaluation.freezeDataset',
+      ),
+      getMcpPolicy: async (input) => {
+        const step = GetMcpEvalPolicyInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/mcp-policy${toSearchParams(step)}`, GetMcpEvalPolicyOutputSchema, 'mediforce.evaluation.getMcpPolicy');
+      },
+      setMcpPolicy: async (input) => this.sendJson(
+        'PUT', '/api/evaluation/mcp-policy', SetMcpEvalPolicyInputSchema.parse(input),
+        SetMcpEvalPolicyOutputSchema, 'mediforce.evaluation.setMcpPolicy',
+      ),
+    };
+
     this.scores = {
       list: async (input) => {
         const validated = ListScoresInputSchema.parse(input ?? {});
@@ -2575,6 +2776,12 @@ export class Mediforce {
       init.body = JSON.stringify(body);
     }
     const res = await this.request(path, init);
+    return outputSchema.parse(await parseJsonOrThrow(res, ctx));
+  }
+
+  /** Query helper — `request(path)` → `parseJsonOrThrow` → `outputSchema.parse(body)`. */
+  private async getJson<TOut>(path: string, outputSchema: { parse: (b: unknown) => TOut }, ctx: string): Promise<TOut> {
+    const res = await this.request(path);
     return outputSchema.parse(await parseJsonOrThrow(res, ctx));
   }
 
