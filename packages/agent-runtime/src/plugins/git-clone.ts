@@ -47,8 +47,34 @@ export function cloneRepoAtCommit(
   repoRef: string,
   commit: string,
   repoToken?: string,
+  options?: {
+    /** Caps a fetch triggered by a request rather than by a run, where an
+     *  arbitrary repository could otherwise hold the caller open indefinitely. */
+    readonly timeoutMs?: number;
+    /**
+     * Fetch the commit's trees but none of its file contents, and do not check
+     * out, leaving `FETCH_HEAD` rather than a working tree. Listing then costs
+     * the directory structure rather than every byte the repository holds, and
+     * `git show` fetches a single blob when somebody opens that one file.
+     */
+    readonly treeless?: boolean;
+    /**
+     * Only try transports that carry no credential of ours. The deploy key
+     * reaches private repositories the caller may have no claim to, so a read
+     * the caller can trigger for an arbitrary repository must not use it.
+     */
+    readonly anonymousOnly?: boolean;
+  },
 ): void {
-  const targets = resolveRepoCloneTargets(repoRef, repoToken);
+  const resolved = resolveRepoCloneTargets(repoRef, repoToken);
+  const targets = options?.anonymousOnly === true
+    ? resolved.filter((target) => target.useSsh === false)
+    : resolved;
+  if (targets.length === 0) {
+    throw new Error(
+      `'${redactRepoCredentials(repoRef, repoToken)}' can only be reached with this deployment's own key, which is not used for this read.`,
+    );
+  }
   const failures: { transport: string; message: string }[] = [];
 
   execFileSync('git', ['init', targetDir], { stdio: 'pipe' });
@@ -61,6 +87,7 @@ export function cloneRepoAtCommit(
       // the try so a broken key surfaces alongside the earlier transport's failure.
       const execOpts = {
         stdio: 'pipe' as const,
+        ...(options?.timeoutMs === undefined ? {} : { timeout: options.timeoutMs }),
         env: useSsh
           ? { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: getGitSshCommand() }
           : { ...process.env, GIT_TERMINAL_PROMPT: '0' },
@@ -68,7 +95,17 @@ export function cloneRepoAtCommit(
 
       // A throwaway clone never needs maintenance, and the detached run `git
       // fetch` starts would still be writing into it while it is removed.
-      execFileSync('git', ['-C', targetDir, '-c', 'maintenance.auto=false', 'fetch', cloneUrl, commit, '--depth', '1'], execOpts);
+      const fetchArgs = [
+        '-C', targetDir, '-c', 'maintenance.auto=false',
+        'fetch', cloneUrl, commit, '--depth', '1',
+      ];
+      if (options?.treeless === true) fetchArgs.push('--filter=blob:none');
+      execFileSync('git', fetchArgs, execOpts);
+      // The fetch itself records the promisor remote, keyed on the URL, which
+      // is what a later `git show` lazy-fetches a blob through. Naming a second
+      // `origin` remote adds nothing and would write the credentialed URL into
+      // the checkout's own config.
+      if (options?.treeless === true) return;
       execFileSync('git', ['-C', targetDir, 'checkout', 'FETCH_HEAD'], execOpts);
       return;
     } catch (error) {

@@ -136,3 +136,4 @@ export {
   InMemoryAgentEventLog,
   NoopLlmClient,
 } from './testing/index';
+export { cloneRepoAtCommit } from './plugins/git-clone';
