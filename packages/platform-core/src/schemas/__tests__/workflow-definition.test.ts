@@ -486,6 +486,14 @@ describe('WorkflowDefinitionSchema — agent.outputSchema', () => {
     expect(issueMessages(wd)).toEqual([]);
   });
 
+  it.each([
+    ['a property type outside JSON Schema', { type: 'object', properties: { grade: { type: 'text' } } }],
+    ['a non-object top-level type', { type: 'array' }],
+  ])('rejects %s', (_case, invalidSchema) => {
+    const wd = wdWithReviewStep({ executor: 'agent', plugin: 'claude-code-agent', agent: { outputSchema: invalidSchema } });
+    expect(issueMessages(wd)).not.toEqual([]);
+  });
+
   it.each(['human', 'cowork', 'script'] as const)('rejects agent.outputSchema on an executor=%s step', (executor) => {
     const wd = wdWithReviewStep({ executor, agent: { outputSchema } });
     expect(

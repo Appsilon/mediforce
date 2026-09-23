@@ -561,7 +561,7 @@ describe('ClaudeCodeAgentPlugin', () => {
     });
 
     it('[DATA] includes agent.outputSchema and the rejected attempt\'s error in the prompt', async () => {
-      const outputSchema = { type: 'object', required: ['findings'] };
+      const outputSchema = { type: 'object' as const, required: ['findings'] };
       const context: WorkflowAgentContext = {
         stepId: 'extract',
         processInstanceId: 'pi-001',

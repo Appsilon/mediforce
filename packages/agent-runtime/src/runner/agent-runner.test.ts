@@ -753,7 +753,7 @@ describe('AgentRunner.markStepRunsInterrupted (issue #907)', () => {
 });
 
 describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
-  const outputSchema = { type: 'object', required: ['findings'], properties: { findings: { type: 'array' } } };
+  const outputSchema = { type: 'object' as const, required: ['findings'], properties: { findings: { type: 'array' as const } } };
 
   function makeSchemaStepContext(
     fallbackBehavior: 'escalate_to_human' | 'continue_with_flag' | 'pause',

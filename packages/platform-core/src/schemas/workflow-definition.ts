@@ -146,10 +146,12 @@ export const ContainerSchema = z.object({
  * cowork enforces (`type`, `required`, per-property `type`); other keywords pass
  * through to the prompt as guidance but are not checked.
  */
+export const OutputSchemaPropertyTypeSchema = z.enum(['string', 'number', 'integer', 'boolean', 'null', 'array', 'object']);
+
 export const AgentOutputSchemaSchema = z.looseObject({
-  type: z.string().optional(),
+  type: z.literal('object').optional(),
   required: z.array(z.string()).optional(),
-  properties: z.record(z.string(), z.looseObject({ type: z.string().optional() })).optional(),
+  properties: z.record(z.string(), z.looseObject({ type: OutputSchemaPropertyTypeSchema.optional() })).optional(),
 });
 
 export const WorkflowAgentConfigSchema = z.object({
@@ -946,6 +948,7 @@ export function parseWorkflowTemplate(input: unknown) {
 
 export type ContainerConfig = z.infer<typeof ContainerSchema>;
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
+export type OutputSchemaPropertyType = z.infer<typeof OutputSchemaPropertyTypeSchema>;
 export type ScriptStepConfig = z.infer<typeof ScriptStepConfigSchema>;
 export type DatabricksJobConfig = z.infer<typeof DatabricksJobConfigSchema>;
 export type WorkflowCoworkConfig = z.infer<typeof WorkflowCoworkConfigSchema>;

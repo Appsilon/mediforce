@@ -5,27 +5,34 @@ import {
 } from '@mediforce/platform-core';
 
 const DEFAULT_FLUSH_INTERVAL_MS = 1_000;
+const DEFAULT_RETRY_DELAY_MS = 1_000;
+const MAX_WRITE_ATTEMPTS = 3;
 
 /**
  * Collects one Agent Run's trajectory from a plugin's output stream and writes
  * it in batches (ADR-0023 D8). `record` is synchronous so a stdout line
  * callback never waits on the database; writes are chained so entries land in
- * order, and a failed write is logged and dropped — a trajectory is evidence
- * about the run, never a reason to fail it.
+ * order. A failed write is retried before any later entry is written, so a
+ * transient error leaves no hole; entries recorded meanwhile wait as one
+ * backlog batch. A write that keeps failing is logged and dropped — a
+ * trajectory is evidence about the run, never a reason to fail it.
  */
 export class TrajectoryRecorder {
   private readonly flushIntervalMs: number;
+  private readonly retryDelayMs: number;
   private pending: StoredAgentTrajectoryEntry[] = [];
   private nextSeq = 0;
   private writes: Promise<void> = Promise.resolve();
+  private writeQueued = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly repository: AgentTrajectoryRepository,
     private readonly agentRunId: string,
-    options: { flushIntervalMs?: number } = {},
+    options: { flushIntervalMs?: number; retryDelayMs?: number } = {},
   ) {
     this.flushIntervalMs = options.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS;
+    this.retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
   }
 
   record(entries: readonly AgentTrajectoryEntry[]): void {
@@ -46,18 +53,33 @@ export class TrajectoryRecorder {
       clearTimeout(this.timer);
       this.timer = null;
     }
-    const batch = this.pending;
-    this.pending = [];
-    if (batch.length > 0) {
-      this.writes = this.writes.then(() =>
-        this.repository.append(this.agentRunId, batch).catch((error: unknown) => {
-          console.warn(
-            `[trajectory] dropped ${batch.length} entr${batch.length === 1 ? 'y' : 'ies'} for agent run ${this.agentRunId}:`,
-            error instanceof Error ? error.message : error,
-          );
-        }),
-      );
+    if (this.pending.length > 0 && this.writeQueued === false) {
+      this.writeQueued = true;
+      this.writes = this.writes.then(() => {
+        this.writeQueued = false;
+        const batch = this.pending;
+        this.pending = [];
+        return this.write(batch);
+      });
     }
     return this.writes;
+  }
+
+  private async write(batch: StoredAgentTrajectoryEntry[]): Promise<void> {
+    for (let attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt += 1) {
+      try {
+        await this.repository.append(this.agentRunId, batch);
+        return;
+      } catch (error: unknown) {
+        if (attempt === MAX_WRITE_ATTEMPTS) {
+          console.warn(
+            `[trajectory] dropped ${batch.length} entr${batch.length === 1 ? 'y' : 'ies'} for agent run ${this.agentRunId} after ${MAX_WRITE_ATTEMPTS} attempts:`,
+            error instanceof Error ? error.message : error,
+          );
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, this.retryDelayMs * attempt));
+      }
+    }
   }
 }
