@@ -271,9 +271,11 @@ export class AgentRunner {
       'timeout', context, [], null,
     );
 
+    let reapedRunId: string | undefined;
     if (this.agentRunRepository) {
       const orphaned = (await this.agentRunRepository.getByInstanceId(processInstanceId))
         .filter((run) => run.stepId === stepId && run.status === 'running');
+      reapedRunId = orphaned[0]?.id;
       for (const run of orphaned) {
         // create() upserts on runId — recreating with the same id terminates
         // the orphaned row rather than inserting a duplicate.
@@ -289,7 +291,7 @@ export class AgentRunner {
     await this.appendAuditEventFromWorkflowStep(
       context, null, fallbackResult.status, 0, errorMessage,
     );
-    return { ...fallbackResult, errorMessage };
+    return { ...fallbackResult, errorMessage, agentRunId: reapedRunId };
   }
 
   /**
