@@ -124,11 +124,13 @@ as the caller and returns a refusal as a result (`needsAdmin`) instead of
 throwing. Tools that change what the person is editing are *proposals* the
 client applies; *platform* tools run here through `CallerScope`. The workspace
 `OPENROUTER_API_KEY` check is `services/openrouter-key.ts`, since non-assistant
-LLM calls need it too. The tool-calling loop itself is not shared yet: the
-workflow assistant (`handlers/workflow-assistant/ask-workflow-assistant.ts`)
-still runs its own, interleaved with its graph-completeness gates and truncation
-salvage. The cowork chat (`handlers/cowork/`) is a separate OpenRouter loop and
-does not use the core.
+LLM calls need it too. `runProposalToolLoop` is the loop for an assistant whose
+changes are all proposals — the Evaluation Assistant
+(`handlers/evaluation-assistant/`) runs on it. The workflow assistant
+(`handlers/workflow-assistant/ask-workflow-assistant.ts`) keeps its own loop,
+interleaved with its graph-completeness gates and truncation salvage. The
+cowork chat (`handlers/cowork/`) is a separate OpenRouter loop and does not use
+the core.
 
 **`getPlatformServices()` is the only composition root.** It wires repositories,
 the workflow engine, the plugin registry and the action registry. It lives here —

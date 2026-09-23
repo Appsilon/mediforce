@@ -74,7 +74,8 @@ pnpm dev:mock
 Level definitions (L1–L5) + the rules: [e2e-strategy.md](../testing/e2e-strategy.md).
 Product features must land at **L3**.
 
-Playwright's `globalSetup` applies migrations and starts the mock OAuth server —
+Playwright's `globalSetup` applies migrations and starts the mock OAuth server and the
+scripted mock OpenRouter (`E2E_OPENROUTER_MOCK_PORT`, default 9019) —
 no separate migration step before `pnpm test:e2e`.
 
 **Your dev data is safe.** The suite deletes only the workspace handles it owns

@@ -60,7 +60,15 @@ move the anchor back rather than date around it.
 ## Run
 
 `DATABASE_URL` must point to local Postgres. The full suite applies migrations,
-starts a mock OAuth server, and seeds the fixture.
+starts a mock OAuth server and a scripted mock OpenRouter, and seeds the fixture.
+
+The e2e server's `OPENROUTER_BASE_URL` points at the mock OpenRouter
+([`mock-openrouter-server.ts`](../../packages/platform-ui/e2e/helpers/mock-openrouter-server.ts),
+port `E2E_OPENROUTER_MOCK_PORT`, default 9019), so an assistant turn or an LLM
+judge never reaches a model. A journey scripts the turns of its conversation
+under its first user message (`scriptOpenRouter`) and reads back what the
+platform sent (`openRouterRequests`); keying by that message is what lets
+parallel journeys share one mock.
 
 | From the repository root | Runs |
 |---|---|
