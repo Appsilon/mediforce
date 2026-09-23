@@ -1,4 +1,4 @@
-import type { Score } from '../schemas/score';
+import type { Score, ScoreSource } from '../schemas/score';
 
 /** Narrowing filters for `ScoreRepository.list*`; every set field must match. */
 export interface ListScoresFilter {
@@ -6,6 +6,8 @@ export interface ListScoresFilter {
   readonly processInstanceId?: string;
   readonly stepId?: string;
   readonly name?: string;
+  readonly evaluatorId?: string;
+  readonly source?: ScoreSource;
   readonly namespace?: string;
   readonly limit: number;
 }

@@ -26,14 +26,15 @@ logic belongs in the handler, where the UI and agents get it too.
 bin/mediforce.cjs        Executable entry
 src/cli.ts               Command wiring
 src/define-command.ts    Command definition helper — start here to add one
-src/commands/            One file per command
+src/commands/            One file per command; the `eval-*` files group one entity's `mediforce eval` leaves
 src/config.ts            Profile / credential resolution
 src/output.ts            Human and JSON output shaping
 src/errors.ts            Exit-code mapping
 ```
 
 Sixty-plus commands across workflows, runs, tasks, agents, namespaces,
-users, secrets, models, scores, cowork, config, images and system.
+users, secrets, models, scores, evaluation (`mediforce eval`), cowork, config,
+images and system.
 
 `mediforce images` and `mediforce system images` are different things and the
 names are close enough to be worth stating: `images` is the per-namespace
