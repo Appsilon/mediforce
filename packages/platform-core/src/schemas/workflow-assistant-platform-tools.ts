@@ -70,5 +70,5 @@ export const WORKFLOW_ASSISTANT_PLATFORM_TOOLS = {
 export type WorkflowAssistantPlatformToolName = keyof typeof WORKFLOW_ASSISTANT_PLATFORM_TOOLS;
 
 export function isPlatformToolName(name: string): name is WorkflowAssistantPlatformToolName {
-  return name in WORKFLOW_ASSISTANT_PLATFORM_TOOLS;
+  return Object.hasOwn(WORKFLOW_ASSISTANT_PLATFORM_TOOLS, name);
 }

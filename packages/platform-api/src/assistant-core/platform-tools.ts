@@ -20,7 +20,7 @@ export interface PlatformToolCall<TName extends string> {
  */
 export async function runPlatformTool<TName extends string>(call: PlatformToolCall<TName>): Promise<unknown> {
   const { toolName, rawArguments, tools, execute } = call;
-  if (!(toolName in tools)) {
+  if (!Object.hasOwn(tools, toolName)) {
     const valid = Object.keys(tools).join(', ');
     return { error: `Unknown tool '${toolName}'. Platform tools: ${valid}.` };
   }

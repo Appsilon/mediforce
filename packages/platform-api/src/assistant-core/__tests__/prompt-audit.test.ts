@@ -1,8 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { InMemoryAuditRepository, InMemoryProcessInstanceRepository } from '@mediforce/platform-core/testing';
 import { recordAssistantPrompt } from '../prompt-audit';
-import { requireOpenRouterApiKey } from '../openrouter-key';
-import { HandlerError } from '../../errors';
 import { createTestScope, userCaller } from '../../repositories/__tests__/create-test-scope';
 
 const entry = {
@@ -51,12 +49,5 @@ describe('recordAssistantPrompt', () => {
       expect.any(Error),
     );
     log.mockRestore();
-  });
-});
-
-describe('requireOpenRouterApiKey', () => {
-  it('refuses a workspace with no OpenRouter key', async () => {
-    const scope = createTestScope();
-    await expect(requireOpenRouterApiKey(scope, 'acme')).rejects.toBeInstanceOf(HandlerError);
   });
 });

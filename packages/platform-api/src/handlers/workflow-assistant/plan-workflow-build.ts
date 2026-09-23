@@ -10,7 +10,7 @@ import { callOpenRouter } from '../../services/openrouter-client';
 import { buildPlanPrompt } from './_lib/plan-prompt';
 import { callerInstructionMessages } from './_lib/caller-instructions';
 import { parseModelJson } from './_lib/parse-model-json';
-import { requireOpenRouterApiKey } from '../../assistant-core';
+import { requireOpenRouterApiKey } from '../../services/openrouter-key';
 
 interface PlanScopedInput extends PlanWorkflowBuildInput {
   namespace: string;
