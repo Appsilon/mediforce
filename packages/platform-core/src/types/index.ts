@@ -56,7 +56,20 @@ export type {
   AgentRunStatus,
   AgentRun,
   AgentRunCardStatus,
+  AgentFallbackReason,
 } from '../schemas/agent-run';
+
+export type {
+  AgentTrajectoryEntry,
+  StoredAgentTrajectoryEntry,
+  AgentTrajectory,
+} from '../schemas/agent-trajectory';
+
+export type {
+  ScoreSubject,
+  ScoreSource,
+  Score,
+} from '../schemas/score';
 
 export type {
   WorkflowAgentConfig,

@@ -504,6 +504,14 @@ import {
   type GetAgentRunOutput,
   type GetAgentRunCardStatusCountsInput,
   type GetAgentRunCardStatusCountsOutput,
+  GetAgentTrajectoryInputSchema,
+  GetAgentTrajectoryOutputSchema,
+  type GetAgentTrajectoryInput,
+  type GetAgentTrajectoryOutput,
+  ListScoresInputSchema,
+  ListScoresOutputSchema,
+  type ListScoresInput,
+  type ListScoresOutput,
   MonitoringSummaryInputSchema,
   GetMonitoringSummaryOutputSchema,
   type MonitoringSummaryInput,
@@ -902,6 +910,11 @@ export class Mediforce {
     cardStatusCounts: (
       input?: GetAgentRunCardStatusCountsInput,
     ) => Promise<GetAgentRunCardStatusCountsOutput>;
+    trajectory: (input: GetAgentTrajectoryInput) => Promise<GetAgentTrajectoryOutput>;
+  };
+
+  readonly scores: {
+    list: (input?: ListScoresInput) => Promise<ListScoresOutput>;
   };
 
   readonly monitoring: {
@@ -2263,6 +2276,31 @@ export class Mediforce {
         const res = await this.request(`/api/agent-runs/card-status-counts${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.cardStatusCounts');
         return GetAgentRunCardStatusCountsOutputSchema.parse(body);
+      },
+      trajectory: async (input) => {
+        const validated = GetAgentTrajectoryInputSchema.parse(input);
+        const res = await this.request(
+          `/api/agent-runs/${encodeURIComponent(validated.agentRunId)}/trajectory`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.trajectory');
+        return GetAgentTrajectoryOutputSchema.parse(body);
+      },
+    };
+
+    this.scores = {
+      list: async (input) => {
+        const validated = ListScoresInputSchema.parse(input ?? {});
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          agentRunId: validated.agentRunId,
+          runId: validated.runId,
+          stepId: validated.stepId,
+          name: validated.name,
+          limit: validated.limit !== undefined ? String(validated.limit) : undefined,
+        });
+        const res = await this.request(`/api/scores${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.scores.list');
+        return ListScoresOutputSchema.parse(body);
       },
     };
 

@@ -24,7 +24,8 @@ All four are registered in
 ## Writing one
 
 Subclass `BaseContainerAgentPlugin` and implement `getAgentCommand()`,
-`getMockDockerArgs()`, and `parseAgentOutput()`. The base class already handles
+`getMockDockerArgs()`, and `parseAgentOutput()`; override `processOutputLine()`
+to turn the CLI's stream into Agent Trajectory entries. The base class already handles
 spawning, mounts, git clone, MCP config assembly, environment resolution, and
 output extraction — roughly everything that is hard to get right and identical
 across plugins.

@@ -1,12 +1,14 @@
 import {
   AgentOutputEnvelopeSchema,
   resolveStepTimeoutMinutes,
+  type AgentFallbackReason,
   type AgentOutputEnvelope,
   type AgentRunStatus,
   type ProcessInstanceRepository,
   type AuditRepository,
   type StepConfig,
   type AgentRunRepository,
+  type AgentTrajectoryRepository,
   type WorkflowStep,
 } from '@mediforce/platform-core';
 import { randomUUID } from 'crypto';
@@ -15,6 +17,8 @@ import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext } from '../
 import type { AgentEventLog } from './agent-event-log';
 import { FallbackHandler } from './fallback-handler';
 import { PluginRunner } from './plugin-runner';
+import { validateOutputSchema } from './output-schema';
+import { TrajectoryRecorder } from './trajectory-recorder';
 import {
   annotateAgentRunSpan,
   withAgentRunSpan,
@@ -25,8 +29,19 @@ export interface AgentRunResult {
   status: AgentRunStatus;
   envelope: AgentOutputEnvelope | null;
   appliedToWorkflow: boolean; // true only for L4; false for L0/L1/L2/L3 and fallbacks
-  fallbackReason: 'timeout' | 'low_confidence' | 'error' | null;
+  fallbackReason: AgentFallbackReason | null;
   errorMessage?: string | null;
+  /** The Agent Run this result belongs to; absent when none was started (reap). */
+  agentRunId?: string;
+}
+
+/** What one plugin execution produced, before fallback and autonomy apply. */
+interface AttemptOutcome {
+  envelope: AgentOutputEnvelope | null;
+  fallbackReason: AgentFallbackReason | null;
+  errorMessage: string | null;
+  /** The `validateOutputSchema` message when `fallbackReason` is `output_schema`. */
+  outputSchemaViolation: string | null;
 }
 
 export class AgentRunner {
@@ -39,6 +54,7 @@ export class AgentRunner {
     private readonly eventLog: AgentEventLog,
     private readonly agentRunRepository?: AgentRunRepository,
     private readonly tracingOptions: OpenTelemetryTracingOptions = {},
+    private readonly agentTrajectoryRepository?: AgentTrajectoryRepository,
   ) {
     this.fallbackHandler = new FallbackHandler(instanceRepository);
     this.pluginRunner = new PluginRunner(eventLog);
@@ -117,31 +133,33 @@ export class AgentRunner {
       }
 
       const timeoutMs = resolveStepTimeoutMinutes(context.step) * 60_000;
-      const { resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(
-        plugin, context, timeoutMs,
-      );
+      // Content follows the same switch as traces (ADR-0007 D5).
+      const trajectory = this.agentTrajectoryRepository === undefined
+        ? undefined
+        : new TrajectoryRecorder(this.agentTrajectoryRepository, runId, {
+            captureContent: this.tracingOptions.captureContent === true,
+          });
+      const runContext: WorkflowAgentContext = trajectory === undefined ? context : { ...context, trajectory };
+      let attempt = await this.runAttempt(plugin, runContext, timeoutMs);
 
-      let fallbackReason: 'timeout' | 'low_confidence' | 'error' | null = null;
-      let envelope: AgentOutputEnvelope | null = null;
-
-      if (timedOut) {
-        fallbackReason = 'timeout';
-      } else if (errorMessage !== null) {
-        fallbackReason = 'error';
-      } else if (resultPayload === null) {
-        fallbackReason = 'error';
-      } else {
-        const parseResult = AgentOutputEnvelopeSchema.safeParse(resultPayload);
-        if (!parseResult.success) {
-          fallbackReason = 'error';
-        } else {
-          envelope = parseResult.data;
-          const threshold = context.step.agent?.confidenceThreshold ?? 0;
-          if (envelope.confidence < threshold) {
-            fallbackReason = 'low_confidence';
-          }
-        }
+      if (attempt.outputSchemaViolation !== null) {
+        await this.eventLog.write(processInstanceId, stepId, {
+          type: 'status',
+          payload: `result does not match agent.outputSchema (${attempt.outputSchemaViolation}) — retrying once with the validation error`,
+          timestamp: new Date().toISOString(),
+        });
+        // A retry is fresh activity: keep the heartbeat's stranded sweep from
+        // reading the doubled step time as a dead driver.
+        await this.instanceRepository.update(processInstanceId, { updatedAt: new Date().toISOString() });
+        attempt = await this.runAttempt(
+          plugin,
+          { ...runContext, outputSchemaViolation: attempt.outputSchemaViolation },
+          timeoutMs,
+        );
       }
+      await trajectory?.flush();
+
+      const { envelope, fallbackReason, errorMessage } = attempt;
 
       if (fallbackReason) {
         const partialWork = this.eventLog.getPartialWork(processInstanceId, stepId);
@@ -157,7 +175,7 @@ export class AgentRunner {
           span, runId, context, startedAt, { ...fallbackResult, errorMessage },
           fallbackResult.envelope?.model ?? envelope?.model ?? null,
         );
-        return { ...fallbackResult, errorMessage };
+        return { ...fallbackResult, errorMessage, agentRunId: runId };
       }
 
       const result = await this.applyAutonomyBehaviorForWorkflowStep(autonomyLevel, envelope!, context);
@@ -167,8 +185,51 @@ export class AgentRunner {
         span, runId, context, startedAt, result,
         result.envelope?.model ?? envelope!.model,
       );
-      return result;
+      return { ...result, agentRunId: runId };
     });
+  }
+
+  /** Execute the plugin once and classify the outcome. The output-schema check
+   *  runs before the confidence check: a malformed result is not trusted for
+   *  its self-assessed confidence either. */
+  private async runAttempt(
+    plugin: StepExecutorPlugin,
+    context: WorkflowAgentContext,
+    timeoutMs: number,
+  ): Promise<AttemptOutcome> {
+    const { resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(
+      plugin, context, timeoutMs,
+    );
+    const failed = (reason: AgentFallbackReason): AttemptOutcome => ({
+      envelope: null, fallbackReason: reason, errorMessage, outputSchemaViolation: null,
+    });
+
+    if (timedOut) return failed('timeout');
+    if (errorMessage !== null || resultPayload === null) return failed('error');
+    const parseResult = AgentOutputEnvelopeSchema.safeParse(resultPayload);
+    if (!parseResult.success) return failed('error');
+    const envelope = parseResult.data;
+
+    const outputSchema = context.step.agent?.outputSchema;
+    const violation = outputSchema === undefined
+      ? null
+      : validateOutputSchema(envelope.result ?? {}, outputSchema);
+    if (violation !== null) {
+      return {
+        envelope,
+        fallbackReason: 'output_schema',
+        errorMessage: `result does not match agent.outputSchema: ${violation}`,
+        outputSchemaViolation: violation,
+      };
+    }
+
+    const threshold = context.step.agent?.confidenceThreshold ?? 0;
+    return {
+      envelope,
+      fallbackReason: envelope.confidence < threshold ? 'low_confidence' : null,
+      errorMessage: null,
+      outputSchemaViolation: null,
+    };
   }
 
   /**
@@ -271,7 +332,7 @@ export class AgentRunner {
       plugin, context, timeoutMs,
     );
 
-    let fallbackReason: 'timeout' | 'low_confidence' | 'error' | null = null;
+    let fallbackReason: AgentFallbackReason | null = null;
     let envelope: AgentOutputEnvelope | null = null;
 
     if (timedOut) {
