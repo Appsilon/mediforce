@@ -91,6 +91,17 @@ authenticated, and only these two may do that.
 in-process only (`handlers/scores/record-score.ts`, reached from task completion
 for Control Mode 3 verdicts); `listScores` is the only exposed Score API.
 
+**Assistants share one core.** `src/assistant-core/` holds what every
+OpenRouter tool-calling assistant needs
+([ADR-0023](../../docs/adr/0023-step-evaluation.md) D14): the workspace key
+check, one prompt audit event per request, Zod registries turned into tool
+definitions, argument parsing that tells the model what it sent, and the
+platform-tool runner that executes a call as the caller and returns a refusal as
+a result (`needsAdmin`) instead of throwing. Tools that change what the person
+is editing are *proposals* the client applies; *platform* tools run here through
+`CallerScope`. The workflow assistant (`handlers/workflow-assistant/`) keeps only
+what is canvas-specific — its graph-completeness gates and truncation salvage.
+
 **`getPlatformServices()` is the only composition root.** It wires repositories,
 the workflow engine, the plugin registry and the action registry. It lives here —
 not in `platform-ui`, whose `src/lib/platform-services.ts` is a re-export shim
