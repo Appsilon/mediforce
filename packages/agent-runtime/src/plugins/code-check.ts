@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -42,9 +43,11 @@ export interface CodeCheckOutcome {
 export async function runCodeCheck(request: CodeCheckRequest): Promise<CodeCheckOutcome> {
   const runtime = RUNTIME_CONFIG[request.runtime]!;
   const outputDir = await realpath(await mkdtemp(join(tmpdir(), 'mediforce-code-check-')));
-  const workspaceDir = join(outputDir, 'workspace');
+  // Beside the output directory, never inside it: the queued spawn strategy
+  // ships all of `outputDir` through Redis, and a step's workspace can be large.
+  // Both live under the shared temp directory, so the worker mounts it as is.
+  const workspaceDir = await realpath(await mkdtemp(join(tmpdir(), 'mediforce-code-check-workspace-')));
   try {
-    await mkdir(workspaceDir);
     await writeFile(join(outputDir, 'input.json'), JSON.stringify(request.input, null, 2), 'utf-8');
     if (request.workspace !== null) {
       await exportCommit(request.workspace.bareRepoPath, request.workspace.commit, workspaceDir);
@@ -68,12 +71,13 @@ export async function runCodeCheck(request: CodeCheckRequest): Promise<CodeCheck
     return { passed: parsed.data.passed, comment: parsed.data.comment ?? null };
   } finally {
     await rm(outputDir, { recursive: true, force: true }).catch(() => {});
+    await rm(workspaceDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
 /** The commit's tree as plain files — no worktree, so nothing is left in the bare repo. */
 async function exportCommit(bareRepoPath: string, commit: string, targetDir: string): Promise<void> {
-  const archive = join(targetDir, '..', 'workspace.tar');
+  const archive = `${targetDir}.tar`;
   await execFileAsync('git', ['--git-dir', bareRepoPath, 'archive', '--format=tar', '-o', archive, commit]);
   await execFileAsync('tar', ['-xf', archive, '-C', targetDir]);
   await rm(archive, { force: true });
@@ -116,12 +120,21 @@ async function runInContainer(
   workspaceDir: string,
 ): Promise<number | null> {
   await writeFile(join(outputDir, `check${runtime.ext}`), request.source, 'utf-8');
-  const containerName = `mediforce-code-check-${request.label}`.replace(/[^a-zA-Z0-9_.-]/g, '-').slice(0, 63);
+  // Unique per check: the same run can be previewed and calibrated at once, and
+  // the local strategy removes any container already holding the name.
+  const containerName = `mediforce-code-check-${request.label}`.replace(/[^a-zA-Z0-9_.-]/g, '-').slice(0, 50)
+    + `-${randomUUID().slice(0, 12)}`;
   const result = await getDockerSpawnStrategy().spawn({
     dockerArgs: [
       'run', '--rm',
       '--name', containerName,
       '--network', 'none',
+      // DAC_OVERRIDE is the one capability kept: `mkdtemp` directories are 0700
+      // and owned by whoever runs the platform, not by the container's root.
+      '--cap-drop', 'ALL',
+      '--cap-add', 'DAC_OVERRIDE',
+      '--security-opt', 'no-new-privileges',
+      '--pids-limit', '256',
       '--memory', '2g',
       '--cpus', '1',
       '-v', `${outputDir}:/output`,

@@ -9,7 +9,7 @@ async function reviewVerdict(fixture: EvaluationFixture, agentRunId: string, val
     subject: { type: 'agent_run', id: agentRunId },
     name: 'human_verdict',
     value,
-    label: value === 1 ? 'approve' : 'reject',
+    label: value === 1 ? 'approve' : value === 0 ? 'reject' : 'revise',
     comment,
     source: 'human',
     createdBy: 'reviewer-1',
@@ -50,6 +50,14 @@ describe('Eval Cases', () => {
     await reviewVerdict(fixture, GRADED_RUN, 1, null);
     const { evalCase } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, split: 'holdout' }, fixture.scope());
     expect(evalCase).toMatchObject({ expectation: 'positive', split: 'holdout', notes: null });
+  });
+
+  it('asks for the expectation of a run sent back for revision, rather than calling it positive', async () => {
+    await reviewVerdict(fixture, GRADED_RUN, 0.5, 'Grade the sepsis event again.');
+    await expect(createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, split: 'dev' }, fixture.scope()))
+      .rejects.toThrow(/sent back/);
+    const { evalCase } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'negative', split: 'dev' }, fixture.scope());
+    expect(evalCase).toMatchObject({ expectation: 'negative', notes: 'Grade the sepsis event again.' });
   });
 
   it('asks for the expectation of a run nobody reviewed', async () => {

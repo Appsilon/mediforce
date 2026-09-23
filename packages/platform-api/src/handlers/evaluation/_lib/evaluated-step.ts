@@ -17,6 +17,7 @@ export interface LoadedStep {
  * The agent Step an Evaluation call is about, as it stands in the workflow's
  * runnable version, with the caller's right to act on it checked: `read` needs
  * only to see the workflow, `edit` and `run` ask its Access rows (ADR-0019).
+ * `run` gates what executes on the Step's behalf — check code, a paid judge.
  * An invisible workflow reads as missing, never as forbidden.
  */
 export async function loadEvaluatedStep(
@@ -34,6 +35,15 @@ export async function loadEvaluatedStep(
   }
   if (step.executor !== 'agent') {
     throw new ValidationError(`Step '${ref.stepId}' is a ${step.executor} step; only agent steps are evaluated`);
+  }
+  // Inline servers bypass the agent's bindings, so an eval policy cannot deny
+  // them in a trial (D6) — fail closed until they move onto the agent.
+  const inlineServers = step.agent?.mcpServers ?? [];
+  if (inlineServers.length > 0) {
+    throw new ValidationError(
+      `Step '${ref.stepId}' declares MCP servers inline (${inlineServers.map((server) => server.name).join(', ')}); `
+      + 'move them onto its agent before evaluating it',
+    );
   }
   if (verb === 'edit') await assertCallerMayEditWorkflow(scope, ref.namespace, ref.workflowName);
   if (verb === 'run') await assertCallerMayRunWorkflow(scope, ref.namespace, ref.workflowName);

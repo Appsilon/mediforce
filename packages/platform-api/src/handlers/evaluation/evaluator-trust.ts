@@ -1,4 +1,4 @@
-import type { Score } from '@mediforce/platform-core';
+import { JUDGE_PASS_VALUE, type Score } from '@mediforce/platform-core';
 import type {
   ApproveEvaluatorSourceInput,
   CalibrateEvaluatorInput,
@@ -133,7 +133,7 @@ export async function calibrateEvaluator(
   let graded = 0;
   let failures = 0;
   for (const label of labels) {
-    const humanPassed = label.value >= 0.5;
+    const humanPassed = label.value >= JUDGE_PASS_VALUE;
     const subject = await loadEvaluationSubject(scope, label.subject.id, step);
     const outcome = await runEvaluatorCheck(scope, version.check, subject, null);
     if (outcome.passed === null) {
@@ -162,7 +162,7 @@ export async function calibrateEvaluator(
     entityId: evaluator.id,
     inputSnapshot: { version: version.version, labels: labels.length },
     outputSnapshot: { ...calibration, disagreements: disagreements.length, errors: errors.length },
-    basis: 'A judge counts only above set agreement with human labels (ADR-0023 D9)',
+    basis: 'A judge counts only at or above set agreement with human labels (ADR-0023 D9)',
   });
   return { evaluator: await evaluatorView(scope, evaluator), disagreements, errors };
 }

@@ -71,7 +71,7 @@ export class LlmJudgeReviewPlugin implements ReviewPlugin {
           ...(this.config.stepInput === null ? [] : [`Step input:\n${section(this.config.stepInput)}`]),
           ...(this.config.expectation === null ? [] : [`What the output must or must not contain:\n${this.config.expectation}`]),
           `Step output:\n${section(context.executorOutput.result ?? null)}`,
-          ...(context.executorOutput.reasoning_summary ? [`The agent's own summary:\n${context.executorOutput.reasoning_summary}`] : []),
+          ...(context.executorOutput.reasoning_summary.length > 0 ? [`The agent's own summary:\n${context.executorOutput.reasoning_summary}`] : []),
         ].join('\n\n'),
       },
     ], this.config.model);

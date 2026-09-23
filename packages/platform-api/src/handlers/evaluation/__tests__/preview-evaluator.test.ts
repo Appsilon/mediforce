@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { NotFoundError } from '../../../errors';
+import { ForbiddenError, NotFoundError } from '../../../errors';
+import { userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { previewEvaluator } from '../preview-evaluator';
 import { evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN } from './fixture';
 
@@ -16,6 +17,13 @@ describe('previewEvaluator', () => {
     ]));
     expect(await fixture.scoreRepo.list({ limit: 10 })).toEqual([]);
     expect(await fixture.evaluationRepo.listEvaluators(STEP)).toEqual([]);
+  });
+
+  it('is refused to a member who may not run the workflow — a preview runs check code and spends the model key', async () => {
+    const fixture = await evaluationFixture();
+    await fixture.processRepo.setWorkflowAccess(NAMESPACE, STEP.workflowName, { run: ['runner'], edit: [] });
+    await expect(previewEvaluator({ ...STEP, check: findingsSchema, limit: 5 }, fixture.scope(userCaller('viewer', [NAMESPACE]))))
+      .rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it('refuses an Agent Run of another step', async () => {

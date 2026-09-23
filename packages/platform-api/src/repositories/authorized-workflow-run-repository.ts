@@ -147,9 +147,10 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
   getIdsByDefinitionName = async (
     namespace: string,
     definitionName: string,
+    options?: { excludeDryRuns?: boolean },
   ): Promise<string[]> => {
     if (!this.canSeeNamespace(namespace)) return [];
-    return this.raw.getIdsByDefinitionName(namespace, definitionName);
+    return this.raw.getIdsByDefinitionName(namespace, definitionName, options);
   };
 
   softDeleteByDefinitionName = async (

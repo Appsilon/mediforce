@@ -7,7 +7,7 @@ export async function listStepProductionAgentRuns(
   step: EvaluatedStep,
   limit: number,
 ): Promise<AgentRun[]> {
-  const instanceIds = await scope.runs.getIdsByDefinitionName(step.namespace, step.workflowName);
+  const instanceIds = await scope.runs.getIdsByDefinitionName(step.namespace, step.workflowName, { excludeDryRuns: true });
   if (instanceIds.length === 0) return [];
   // Over-fetch: running rows are dropped below and a page is at most 50.
   const page = await scope.agentRuns.listPage({

@@ -138,7 +138,7 @@ export const PreviewEvaluatorInputSchema = EvaluatedStepSchema.extend({
 });
 export const PreviewEvaluatorOutputSchema = z.object({ results: z.array(EvaluatorOutcomeSchema) });
 
-/** The Step's finished production Agent Runs, newest first — eval trials excluded. */
+/** The Step's finished production Agent Runs, newest first — dry runs excluded. */
 export const ListStepAgentRunsInputSchema = EvaluatedStepSchema.extend({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });

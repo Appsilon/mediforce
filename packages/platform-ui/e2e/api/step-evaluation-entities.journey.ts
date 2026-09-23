@@ -5,6 +5,7 @@ import {
   EvaluatorOutputSchema,
   FreezeEvalDatasetOutputSchema,
   GetMcpEvalPolicyOutputSchema,
+  ListEvalCasesOutputSchema,
   ListEvaluatorsOutputSchema,
   PreviewEvaluatorOutputSchema,
 } from '@mediforce/platform-api/contract';
@@ -21,7 +22,10 @@ import {
   setupMultiNamespaceCallers,
   sessionCookieHeaders,
   type MultiNamespaceFixture,
+  type UserCaller,
 } from '../helpers/multi-namespace';
+import { createTestUser, signInAndGetSessionCookie } from '../helpers/emulator';
+import { seedPostgresOrganizationNamespace, seedPostgresWorkspaceMember } from '../helpers/postgres-seed';
 
 /**
  * API E2E for the Evaluation entities of ADR-0023 phase 1b: a step's
@@ -31,7 +35,28 @@ import {
  *
  * The production run is driven with MOCK_AGENT=true (result `{ mock, summary }`);
  * `code` checks run locally under ALLOW_LOCAL_AGENTS=true.
+ *
+ * The workflow Access gates (ADR-0019) are exercised in a dedicated
+ * `eval-access-org`, so no role holder joins the shared `test` workspace whose
+ * roster other journeys render.
  */
+const ACCESS_ORG_HANDLE = 'eval-access-org';
+const RUN_ROLE = 'eval-access-runner';
+const EDIT_ROLE = 'eval-access-editor';
+
+/** A workspace member holding exactly `role`, with a live session. */
+async function memberHolding(request: APIRequestContext, role: string): Promise<UserCaller> {
+  const email = `${role}@mediforce.dev`;
+  const password = `${role}-password-123456`;
+  const uid = await createTestUser(email, password, role);
+  await seedPostgresWorkspaceMember(ACCESS_ORG_HANDLE, uid, 'member', role);
+  const granted = await request.put(`/api/namespaces/${ACCESS_ORG_HANDLE}/members/${uid}/roles`, {
+    headers: JSON_HEADERS,
+    data: { grants: [{ role, workflowName: null }] },
+  });
+  expect(granted.status(), await granted.text()).toBe(200);
+  return { uid, sessionCookie: await signInAndGetSessionCookie(email, password) };
+}
 
 async function post(request: APIRequestContext, path: string, data: Record<string, unknown>, status = 200) {
   const res = await request.post(path, { headers: JSON_HEADERS, data });
@@ -103,6 +128,12 @@ test.describe('Step Evaluation entities — API E2E', () => {
       { headers: sessionCookieHeaders(callers.outsider) },
     );
     expect(outsider.status()).toBe(404);
+
+    // ...nor reach one of its Evaluators by id.
+    const outsiderById = await request.get(`/api/evaluation/evaluators/${schema.evaluator.id}`, {
+      headers: sessionCookieHeaders(callers.outsider),
+    });
+    expect(outsiderById.status(), await outsiderById.text()).toBe(404);
   });
 
   test('a draft check is previewed against the step\'s real output without writing anything', async ({ request }) => {
@@ -151,6 +182,18 @@ test.describe('Step Evaluation entities — API E2E', () => {
 
     const { dataset } = FreezeEvalDatasetOutputSchema.parse(await post(request, '/api/evaluation/datasets', step, 201));
     expect(dataset).toMatchObject({ version: 1, caseIds: [evalCase.id], containsProductionData: true });
+
+    // Another workspace's user cannot reach the case by id, and does not touch it.
+    const outsiderArchive = await request.post(`/api/evaluation/cases/${evalCase.id}/archive`, {
+      headers: sessionCookieHeaders(callers.outsider), data: { archived: true },
+    });
+    expect(outsiderArchive.status(), await outsiderArchive.text()).toBe(404);
+    const casesRes = await request.get(
+      `/api/evaluation/cases?namespace=${step.namespace}&workflowName=${step.workflowName}&stepId=${step.stepId}`,
+      { headers: AUTH_HEADERS },
+    );
+    const { cases } = ListEvalCasesOutputSchema.parse(await casesRes.json());
+    expect(cases.find((listed) => listed.id === evalCase.id)?.archived).toBe(false);
   });
 
   test('an agent with no MCP servers has nothing to deny; an unknown server is refused', async ({ request }) => {
@@ -164,5 +207,73 @@ test.describe('Step Evaluation entities — API E2E', () => {
       headers: JSON_HEADERS, data: { ...step, servers: { email: { mode: 'live' } } },
     });
     expect(refused.status(), await refused.text()).toBe(400);
+  });
+
+  test.describe('workflow Access', () => {
+    let gatedStep: { namespace: string; workflowName: string; stepId: string };
+    let runner: UserCaller;
+    let editor: UserCaller;
+
+    test.beforeAll(async ({ request }) => {
+      await seedPostgresOrganizationNamespace(ACCESS_ORG_HANDLE, TEST_USER_ID, 'Eval Access Org');
+      const workflowName = `e2e-eval-access-${randomUUID().slice(0, 8)}`;
+      await post(
+        request,
+        `/api/workflow-definitions?namespace=${ACCESS_ORG_HANDLE}`,
+        agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }),
+        201,
+      );
+      const access = await request.put(
+        `/api/workflow-definitions/${workflowName}/access?namespace=${ACCESS_ORG_HANDLE}`,
+        { headers: JSON_HEADERS, data: { access: { run: [RUN_ROLE], edit: [EDIT_ROLE] } } },
+      );
+      expect(access.status(), await access.text()).toBe(200);
+      gatedStep = { namespace: ACCESS_ORG_HANDLE, workflowName, stepId: 'grade-aes' };
+      runner = await memberHolding(request, RUN_ROLE);
+      editor = await memberHolding(request, EDIT_ROLE);
+    });
+
+    test('changing a step\'s Evaluation needs the workflow\'s edit role', async ({ request }) => {
+      const evaluator = {
+        ...gatedStep,
+        name: 'summary-present',
+        rule: 'The result carries a summary.',
+        severity: 'critical',
+        check: { kind: 'schema', schema: { required: ['summary'] } },
+      };
+
+      const refused = await request.post('/api/evaluation/evaluators', {
+        headers: sessionCookieHeaders(runner), data: evaluator,
+      });
+      expect(refused.status(), await refused.text()).toBe(403);
+      const refusedPolicy = await request.put('/api/evaluation/mcp-policy', {
+        headers: sessionCookieHeaders(runner), data: { ...gatedStep, servers: {} },
+      });
+      expect(refusedPolicy.status(), await refusedPolicy.text()).toBe(403);
+
+      const created = await request.post('/api/evaluation/evaluators', {
+        headers: sessionCookieHeaders(editor), data: evaluator,
+      });
+      expect(created.status(), await created.text()).toBe(201);
+      const policy = await request.put('/api/evaluation/mcp-policy', {
+        headers: sessionCookieHeaders(editor), data: { ...gatedStep, servers: {} },
+      });
+      expect(policy.status(), await policy.text()).toBe(200);
+    });
+
+    test('previewing a check runs the step\'s outputs, so it needs the workflow\'s run role', async ({ request }) => {
+      const draft = { ...gatedStep, check: { kind: 'schema', schema: { required: ['summary'] } } };
+
+      const refused = await request.post('/api/evaluation/evaluators/preview', {
+        headers: sessionCookieHeaders(editor), data: draft,
+      });
+      expect(refused.status(), await refused.text()).toBe(403);
+
+      const previewed = await request.post('/api/evaluation/evaluators/preview', {
+        headers: sessionCookieHeaders(runner), data: draft,
+      });
+      expect(previewed.status(), await previewed.text()).toBe(200);
+      expect(PreviewEvaluatorOutputSchema.parse(await previewed.json()).results).toEqual([]);
+    });
   });
 });

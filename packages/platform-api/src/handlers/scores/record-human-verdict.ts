@@ -9,6 +9,9 @@ import {
 import type { CallerScope } from '../../repositories/index';
 import { recordScore } from './record-score';
 
+/** The Score a reviewer's verdict on an Agent Run is recorded as. */
+export const HUMAN_VERDICT_SCORE_NAME = 'human_verdict';
+
 const VALUE_BY_INTENT: Record<TaskVerdict['intent'], number> = {
   success: 1,
   danger: 0,
@@ -67,7 +70,7 @@ export async function recordHumanVerdictScore(
 
   return recordScore({
     subject: { type: 'agent_run', id: agentRunId },
-    name: 'human_verdict',
+    name: HUMAN_VERDICT_SCORE_NAME,
     value: VALUE_BY_INTENT[intent],
     label: payload.verdict,
     comment: comment.length > 0 ? comment : null,

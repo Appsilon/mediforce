@@ -17,7 +17,7 @@ export async function previewEvaluator(
   scope: CallerScope,
 ): Promise<PreviewEvaluatorOutput> {
   const step = stepRef(input);
-  await loadEvaluatedStep(scope, step, 'read');
+  await loadEvaluatedStep(scope, step, 'run');
   const agentRunIds = input.agentRunIds
     ?? (await listStepProductionAgentRuns(scope, step, input.limit)).map((run) => run.id);
 

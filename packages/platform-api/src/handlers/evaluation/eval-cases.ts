@@ -16,6 +16,7 @@ import { NotFoundError, ValidationError } from '../../errors';
 import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
 import { loadEvaluationSubject } from './_lib/evaluation-subject';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
+import { HUMAN_VERDICT_SCORE_NAME } from '../scores/record-human-verdict';
 
 const execFileAsync = promisify(execFile);
 
@@ -87,12 +88,20 @@ async function parentCommit(bareRepoPath: string, commitSha: string): Promise<st
   }
 }
 
+/** Approved (1) is positive, rejected (0) negative; revise and recheck (0.5) are neither. */
+function verdictExpectation(value: number | undefined): EvalCaseExpectation | undefined {
+  if (value === 1) return 'positive';
+  if (value === 0) return 'negative';
+  return undefined;
+}
+
 /**
  * "Add to eval set" from a production Agent Run (ADR-0023 D4): the trigger
  * payload and the outputs of the steps before it rebuild the step's input,
  * and the parent of the commit it produced is the workspace it saw. An
  * approved run is a positive case; a rejected one is negative, carrying the
- * reviewer's comment as what the output must not do.
+ * reviewer's comment as what the output must not do. A run sent back for
+ * revision or a recheck says neither, so the caller must.
  */
 export async function createEvalCaseFromAgentRun(
   input: z.output<typeof CreateEvalCaseFromAgentRunInputSchema>,
@@ -106,14 +115,12 @@ export async function createEvalCaseFromAgentRun(
   };
   await loadEvaluatedStep(scope, step, 'edit');
 
-  const [verdict] = await scope.scores.list({ agentRunId: input.agentRunId, name: 'human_verdict', limit: 1 });
-  const verdictExpectation: EvalCaseExpectation | undefined = verdict === undefined
-    ? undefined
-    : verdict.value >= 0.5 ? 'positive' : 'negative';
-  const expectation = input.expectation ?? verdictExpectation;
+  const [verdict] = await scope.scores.list({ agentRunId: input.agentRunId, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 });
+  const expectation = input.expectation ?? verdictExpectation(verdict?.value);
   if (expectation === undefined) {
+    const why = verdict === undefined ? 'was never reviewed' : 'was sent back, neither approved nor rejected';
     throw new ValidationError(
-      `Agent Run '${input.agentRunId}' was never reviewed — say whether it is a positive or negative case`,
+      `Agent Run '${input.agentRunId}' ${why} — say whether it is a positive or negative case`,
     );
   }
 

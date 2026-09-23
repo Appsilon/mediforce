@@ -97,7 +97,7 @@ without reaching into the run's step events.
 
 **D9 — Only trusted Evaluators count toward Acceptance Criteria.**
 `schema` is active on creation. `code` needs a recorded human approval of its
-source, whoever wrote it. `llm_judge` needs agreement above a set level with
+source, whoever wrote it. `llm_judge` needs agreement at or above a set level with
 at least 10 human-labelled outputs, at least 2 of them failures, per version.
 `human` is ground truth. Draft Evaluators appear in reports as "not counted".
 
