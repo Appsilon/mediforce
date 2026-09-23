@@ -1,12 +1,12 @@
 ---
-status: proposed
+status: accepted
 audience: engineers
-last_reviewed: 2026-09-22
+last_reviewed: 2026-09-23
 ---
 
 # 0023 — Step Evaluation: Evaluation Assistant, Evaluators, single-step Eval Runs, Step Qualification
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-22
 - **Authors:** Krystian Zielinski (@Griphu), with Claude
 - **Supersedes in part:** [ADR-0007](./0007-llm-evaluation-observability.md)
