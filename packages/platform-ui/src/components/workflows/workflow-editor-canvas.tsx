@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { X, HelpCircle, Save, KeyRound, Code2, FileCode, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle, Square } from 'lucide-react';
+import { X, HelpCircle, Save, KeyRound, Code2, FileCode, GitBranch, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle, Square } from 'lucide-react';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import {
@@ -38,6 +38,7 @@ import { useToast } from '@/components/command-palette';
 import { applyWorkflowAssistantToolCalls, type WorkflowAssistantToolCall } from '@mediforce/platform-core';
 import { CodeEditor } from './workflow-editor/code-editor';
 import { WorkflowFilesPanel } from './workflow-files-panel';
+import { WorkflowRepoPanel } from './workflow-repo-panel';
 import { AssistantPlan, answersMessage } from './assistant-plan';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
@@ -111,7 +112,7 @@ export function WorkflowEditorCanvas({
   stepErrors,
 }: WorkflowEditorCanvasProps) {
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
-  const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'settings' | 'notifications' | 'files' | 'add-block' | null>(null);
+  const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'settings' | 'notifications' | 'files' | 'repo' | 'add-block' | null>(null);
   const [addBlockContext, setAddBlockContext] = useState<{ fromId: string; toId: string } | null>(null);
   const [aiPaneOpen, setAiPaneOpen] = useState(false);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
@@ -971,6 +972,15 @@ export function WorkflowEditorCanvas({
           </button>
 
           <button
+            onClick={() => setRightPanelView('repo')}
+            aria-label="Repository"
+            title="Repository: read the files this workflow builds from, at the commit it pins"
+            className="inline-flex items-center rounded-md border p-1.5 text-foreground transition-colors hover:bg-muted"
+          >
+            <GitBranch className="h-3.5 w-3.5" />
+          </button>
+
+          <button
             onClick={() => setRightPanelView('secrets')}
             aria-label="Secrets"
             title="Secrets: the values this workflow reads at run time"
@@ -1373,6 +1383,39 @@ export function WorkflowEditorCanvas({
             <WorkflowFilesPanel
               artifacts={settingsDraft?.artifacts ?? []}
               onChange={(artifacts) => onSettingsChange?.({ ...settingsDraft, artifacts })}
+            />
+          </div>
+        </div>
+      )}
+
+      {rightPanelView === 'repo' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
+          <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-4xl mx-4 space-y-4 h-[85vh] flex flex-col">
+            <div className="shrink-0 flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <GitBranch className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-semibold">Repository</h2>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  What this workflow builds from, at the commit each step pins. Read-only:
+                  files are fetched as you open them, and nothing is copied into the workflow.
+                </p>
+              </div>
+              <button
+                onClick={() => setRightPanelView(null)}
+                aria-label="Close repository"
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <WorkflowRepoPanel
+              steps={editedSteps}
+              savedSteps={initialSteps}
+              {...(workflowName === undefined ? {} : { workflowName })}
+              {...(namespace === undefined ? {} : { namespace })}
             />
           </div>
         </div>
