@@ -12,7 +12,7 @@ import {
 import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { callOpenRouter } from '../../../services/openrouter-client';
-import { requireOpenRouterApiKey } from '../../../assistant-core';
+import { requireOpenRouterApiKey } from '../../../services/openrouter-key';
 import type { EvaluationSubject } from './evaluation-subject';
 
 const CODE_CHECK_TIMEOUT_MS = 2 * 60_000;
