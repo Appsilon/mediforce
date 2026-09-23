@@ -1,4 +1,4 @@
-import type { CallerScope } from '../repositories/index';
+import type { CallerScope } from '../../../repositories/index';
 
 export const LIST_MODELS_TOOL_NAME = 'list_models';
 

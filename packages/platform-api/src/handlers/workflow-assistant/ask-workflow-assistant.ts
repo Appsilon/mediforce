@@ -31,14 +31,13 @@ import { callOpenRouter, type OpenRouterChatMessage, type OpenRouterToolDefiniti
 import { PlanQuestionSchema } from '../../contract/workflow-assistant';
 import { buildWorkflowAssistantSystemPrompt } from './_lib/system-prompt';
 import { callerInstructionMessages } from './_lib/caller-instructions';
-import { runPlatformTool } from './_lib/run-platform-tool';
+import { runWorkflowPlatformTool } from './_lib/run-platform-tool';
+import { LIST_MODELS_TOOL_NAME, runListModelsTool } from './_lib/list-models-tool';
+import { requireOpenRouterApiKey } from '../../services/openrouter-key';
 import { parseModelJson } from './_lib/parse-model-json';
 import {
-  LIST_MODELS_TOOL_NAME,
   parseToolArguments,
   recordAssistantPrompt,
-  requireOpenRouterApiKey,
-  runListModelsTool,
   toolDefinitions,
   type ToolIssueHint,
 } from '../../assistant-core';
@@ -432,7 +431,7 @@ export async function askWorkflowAssistant(
         const result = await runListModelsTool(scope);
         messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify(result) });
       } else if (r.kind === 'platform') {
-        const result = await runPlatformTool(r.toolName, r.arguments, scope, input.namespace, input.workflowName);
+        const result = await runWorkflowPlatformTool(r.toolName, r.arguments, scope, input.namespace, input.workflowName);
         messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify(result) });
       } else if (r.kind === 'error') {
         messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify({ error: r.error }) });

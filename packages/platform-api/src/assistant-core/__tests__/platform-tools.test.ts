@@ -22,6 +22,13 @@ describe('runPlatformTool', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it('answers a tool named after an Object built-in as unknown, not with a crash', async () => {
+    const execute = vi.fn();
+    const result = await runPlatformTool({ toolName: 'constructor', rawArguments: {}, tools, execute });
+    expect(result).toEqual({ error: "Unknown tool 'constructor'. Platform tools: list_runs." });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it('answers invalid arguments as a result, not an exception', async () => {
     const execute = vi.fn();
     const result = await runPlatformTool({ toolName: 'list_runs', rawArguments: { limit: -1 }, tools, execute });

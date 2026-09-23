@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { WORKFLOW_ASSISTANT_PLATFORM_TOOLS, type WorkflowAssistantPlatformToolName } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
-import { runPlatformTool as runAssistantPlatformTool } from '../../../assistant-core';
+import { runPlatformTool } from '../../../assistant-core';
 import { createAgent } from '../../agents/create-agent';
 import { createToolCatalogEntry } from '../../tool-catalog/create-entry';
 import { createTrigger } from '../../triggers/manage-triggers';
@@ -11,7 +11,7 @@ import { listNamespaceMembers } from '../../users/list-members';
  * Runs one of the workflow assistant's platform tools as the person who asked;
  * validation and refusal-as-result come from the shared assistant core.
  */
-export async function runPlatformTool(
+export async function runWorkflowPlatformTool(
   toolName: string,
   rawArguments: unknown,
   scope: CallerScope,
@@ -19,7 +19,7 @@ export async function runPlatformTool(
   // The saved workflow the canvas is a version of.
   workflowName?: string,
 ): Promise<unknown> {
-  return runAssistantPlatformTool({
+  return runPlatformTool({
     toolName,
     rawArguments,
     tools: WORKFLOW_ASSISTANT_PLATFORM_TOOLS,
