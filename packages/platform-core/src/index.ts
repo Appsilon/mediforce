@@ -534,6 +534,12 @@ export type {
 } from './workflows/resolve-runnable-version';
 export { carriedDockerfile, stepHasBuildSource } from './workflows/build-source';
 export { resolveStepAssignee, type ResolvedStepAssignee } from './workflows/step-assignee';
+export {
+  stepContainerConfig,
+  allowedRepoHosts,
+  repoHost,
+  type StepContainerConfig,
+} from './workflows/repo-backed-files';
 
 // MCP resolver (pure; wires AgentDefinition + step restrictions + catalog)
 export {
