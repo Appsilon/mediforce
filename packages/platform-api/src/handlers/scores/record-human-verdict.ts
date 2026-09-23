@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   defaultVerdictIntent,
   type CompleteHumanTaskPayload,
@@ -15,25 +16,16 @@ const VALUE_BY_INTENT: Record<TaskVerdict['intent'], number> = {
   neutral: 0.5,
 };
 
-/**
- * The Agent Run a CM3 review task judges. New review tasks carry its id; one
- * created before they did falls back to the step's most recent Agent Run.
- */
-async function reviewedAgentRunId(task: HumanTask, scope: CallerScope): Promise<string | null> {
-  const completionData = task.completionData as { agentOutput?: { agentRunId?: unknown } } | null;
-  const carried = completionData?.agentOutput?.agentRunId;
-  if (typeof carried === 'string') return carried;
-  const [latest] = (await scope.agentRuns.getByInstanceId(task.processInstanceId))
-    .filter((run) => run.stepId === task.stepId)
-    .sort((left, right) => right.startedAt.localeCompare(left.startedAt));
-  return latest?.id ?? null;
-}
+const ReviewTaskDataSchema = z.object({
+  agentOutput: z.object({ agentRunId: z.string().min(1) }),
+});
 
 /**
  * Turn a completed CM3 review into a `human_verdict` Score on the Agent Run it
  * reviewed (ADR-0023 D13). The verdict key is the label; its intent is mapped
  * to 1 / 0.5 / 0 so verdicts from different vocabularies aggregate. Returns
- * `null` for any task that is not an agent review with a verdict.
+ * `null` for any task that is not an agent review with a verdict, or whose
+ * review data carries no `agentRunId` to attach the Score to.
  */
 export async function recordHumanVerdictScore(
   params: {
@@ -48,8 +40,9 @@ export async function recordHumanVerdictScore(
   if (task.creationReason !== 'agent_review_l3') return null;
   if (payload.kind !== 'verdict' && payload.kind !== 'verdict-with-params') return null;
 
-  const agentRunId = await reviewedAgentRunId(task, scope);
-  if (agentRunId === null) return null;
+  const reviewData = ReviewTaskDataSchema.safeParse(task.completionData);
+  if (reviewData.success === false) return null;
+  const agentRunId = reviewData.data.agentOutput.agentRunId;
 
   const intent = task.verdicts?.find((descriptor) => descriptor.key === payload.verdict)?.intent
     ?? defaultVerdictIntent(payload.verdict);

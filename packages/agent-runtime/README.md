@@ -35,14 +35,16 @@ The same rule covers timeouts and errors: they are envelope outcomes handled by
 `FallbackHandler`, not exceptions a plugin swallows.
 
 `agent.outputSchema` is the runner's check too: it validates `result`, reruns
-the plugin once with the violation in `context.outputSchemaViolation`, then
-falls back with reason `output_schema` (ADR-0023 D13).
+the plugin once with the violation in `context.outputSchemaViolation` — within
+what is left of the one step timeout — then falls back with reason
+`output_schema` (ADR-0023 D13).
 
 **Plugins record what the agent did through `context.trajectory`, never a file.**
 The runner hands each Agent Run a `TrajectoryRecorder`; a plugin maps its CLI's
-stdout to entries (`processOutputLine`) and the recorder persists them, redacted
-to shape when content capture is off (ADR-0023 D8). A host log file dies with
-the container and no other replica, CLI or API caller can read it.
+stdout to entries (`processOutputLine`) and the recorder persists them with full
+content (ADR-0023 D8) — `captureContent` governs exported spans only (ADR-0007
+D5). A host log file dies with the container and no other replica, CLI or API
+caller can read it.
 
 ## Rules
 

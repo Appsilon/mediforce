@@ -461,6 +461,41 @@ describe('reap / stranded budgets', () => {
   });
 });
 
+describe('WorkflowDefinitionSchema — agent.outputSchema', () => {
+  const outputSchema = { type: 'object', required: ['findings'] };
+
+  function wdWithReviewStep(reviewStep: Record<string, unknown>) {
+    return {
+      ...baseWd,
+      steps: [
+        { id: 'review', name: 'Review', type: 'creation' as const, ...reviewStep },
+        { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
+      ],
+      transitions: [{ from: 'review', to: 'done' }],
+    };
+  }
+
+  function issueMessages(wd: Record<string, unknown>): string[] {
+    const result = WorkflowDefinitionSchema.safeParse(wd);
+    if (result.success) return [];
+    return result.error.issues.map((issue) => issue.message);
+  }
+
+  it('accepts agent.outputSchema on an agent step', () => {
+    const wd = wdWithReviewStep({ executor: 'agent', plugin: 'claude-code-agent', agent: { outputSchema } });
+    expect(issueMessages(wd)).toEqual([]);
+  });
+
+  it.each(['human', 'cowork', 'script'] as const)('rejects agent.outputSchema on an executor=%s step', (executor) => {
+    const wd = wdWithReviewStep({ executor, agent: { outputSchema } });
+    expect(
+      issueMessages(wd).some((message) =>
+        message === `step 'review' has agent.outputSchema but executor is '${executor}' (only executor='agent' enforces it)`,
+      ),
+    ).toBe(true);
+  });
+});
+
 describe('WorkflowDefinitionSchema — assignedTo', () => {
   it('accepts assignedTo (with interpolation) on a human step', () => {
     const wd = {

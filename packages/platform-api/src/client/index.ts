@@ -2279,8 +2279,11 @@ export class Mediforce {
       },
       trajectory: async (input) => {
         const validated = GetAgentTrajectoryInputSchema.parse(input);
+        const qs = toSearchParams({
+          afterSeq: validated.afterSeq === undefined ? undefined : String(validated.afterSeq),
+        });
         const res = await this.request(
-          `/api/agent-runs/${encodeURIComponent(validated.agentRunId)}/trajectory`,
+          `/api/agent-runs/${encodeURIComponent(validated.agentRunId)}/trajectory${qs}`,
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.trajectory');
         return GetAgentTrajectoryOutputSchema.parse(body);

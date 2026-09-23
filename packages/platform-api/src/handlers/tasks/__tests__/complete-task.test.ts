@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   InMemoryAgentRunRepository,
   InMemoryAuditRepository,
@@ -10,7 +10,7 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import type { HumanTask, ProcessInstance, CompleteHumanTaskPayload } from '@mediforce/platform-core';
+import type { HumanTask, ProcessInstance, CompleteHumanTaskPayload, Score } from '@mediforce/platform-core';
 import { completeTask } from '../complete-task';
 import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../../errors';
 import {
@@ -309,7 +309,7 @@ describe('completeTask human_verdict Score (ADR-0023 D13)', () => {
     Object.assign(scope.system, {
       engine: makeEngineStub({ task: { ...task, status: 'completed' as const }, instance }),
     });
-    await completeTask({ taskId: task.id, payload }, scope);
+    return completeTask({ taskId: task.id, payload }, scope);
   }
 
   function reviewTask(overrides: Partial<HumanTask> = {}): HumanTask {
@@ -347,6 +347,28 @@ describe('completeTask human_verdict Score (ADR-0023 D13)', () => {
     });
     const scoreAudit = (await auditRepo.getByProcess('inst-a')).find((event) => event.action === 'score.created');
     expect(scoreAudit).toMatchObject({ actorId: 'u-1', actorType: 'user', entityType: 'score', entityId: score!.id });
+  });
+
+  it('still completes the task when the Score write fails, logging the failure', async () => {
+    class FailingScoreRepository extends InMemoryScoreRepository {
+      override async create(): Promise<Score> {
+        throw new Error('connection reset');
+      }
+    }
+    scoreRepo = new FailingScoreRepository();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const result = await complete(reviewTask(), { kind: 'verdict', verdict: 'approve' });
+
+    expect(result.task.status).toBe('completed');
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("human_verdict Score not recorded for task 'review-1'"),
+      expect.any(Error),
+    );
+    const actions = (await auditRepo.getByProcess('inst-a')).map((event) => event.action);
+    expect(actions).toContain('task.completed');
+    expect(actions).not.toContain('score.created');
+    consoleError.mockRestore();
   });
 
   it('records nothing for a task that is not a CM3 review', async () => {

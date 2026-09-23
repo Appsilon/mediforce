@@ -10,10 +10,11 @@ interface RouteContext {
 }
 
 /**
- * GET /api/agent-runs/:agentRunId/trajectory
+ * GET /api/agent-runs/:agentRunId/trajectory?afterSeq=N
  *
- * The Agent Run's Agent Trajectory (ADR-0023 D8). An unknown run and a run in
- * a workspace the caller is not a member of are both 404.
+ * The Agent Run's Agent Trajectory (ADR-0023 D8); the optional `afterSeq`
+ * cursor returns only entries with `seq > afterSeq`. An unknown run and a run
+ * in a workspace the caller is not a member of are both 404.
  */
 export const GET = createRouteAdapter<
   typeof GetAgentTrajectoryInputSchema,
@@ -22,6 +23,9 @@ export const GET = createRouteAdapter<
   RouteContext
 >(
   GetAgentTrajectoryInputSchema,
-  async (_req, ctx) => ({ agentRunId: (await ctx.params).agentRunId }),
+  async (req, ctx) => ({
+    agentRunId: (await ctx.params).agentRunId,
+    afterSeq: req.nextUrl.searchParams.get('afterSeq') ?? undefined,
+  }),
   getAgentTrajectory,
 );

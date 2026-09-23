@@ -70,6 +70,20 @@ function contract(
       expect(await repo.list(randomUUID())).toBeNull();
     });
 
+    it('returns only entries after the `afterSeq` cursor, in both reads', async () => {
+      const agentRunId = await createAgentRun('ws-1');
+      await repo.append(agentRunId, [
+        { ...toolCall, seq: 0 },
+        { ...toolResult, seq: 1 },
+        { ...toolCall, seq: 2 },
+      ]);
+
+      expect((await repo.list(agentRunId, { afterSeq: 0 }))?.map((entry) => entry.seq)).toEqual([1, 2]);
+      expect(await repo.list(agentRunId, { afterSeq: 2 })).toEqual([]);
+      expect((await repo.listInNamespaces(agentRunId, ['ws-1'], { afterSeq: 1 }))?.map((entry) => entry.seq)).toEqual([2]);
+      expect(await repo.list(randomUUID(), { afterSeq: 0 })).toBeNull();
+    });
+
     it('scopes reads to the run\'s workspace', async () => {
       const agentRunId = await createAgentRun('ws-1');
       await repo.append(agentRunId, [{ ...toolCall, seq: 0 }]);

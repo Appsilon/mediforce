@@ -1,11 +1,26 @@
 import type { APIRequestContext } from '@playwright/test';
+import type { AgentRun, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
+import {
+  GetAgentTrajectoryOutputSchema,
+  ListAgentRunsOutputSchema,
+  ListScoresOutputSchema,
+} from '@mediforce/platform-api/contract';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
+import { pollUntil } from '../helpers/poll-until';
+import {
+  setupMultiNamespaceCallers,
+  sessionCookieHeaders,
+  type MultiNamespaceFixture,
+} from '../helpers/multi-namespace';
 
 /**
- * API E2E for Step Evaluation 1a (ADR-0023 D8, D13): `agent.outputSchema`
- * enforcement, Agent Trajectory persistence, and the `human_verdict` Score a
- * Control Mode 3 review writes.
+ * API E2E for the evaluation groundwork on agent steps (ADR-0023 D8, D13):
+ * a result that breaks `agent.outputSchema` is retried once and then routed to
+ * `fallbackBehavior`; every Agent Run's Agent Trajectory is persisted and
+ * readable only from the run's workspace; and a Control Mode 3 review verdict
+ * is recorded as a `human_verdict` Score on the reviewed Agent Run, likewise
+ * invisible from other workspaces.
  *
  * Every run is driven through the platform with MOCK_AGENT=true. The mock
  * agent's result is `{ mock, summary }` and it records two trajectory entries
@@ -14,34 +29,6 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
 const AUTH_HEADERS = { 'X-Api-Key': API_KEY };
-
-interface AgentRunRow {
-  id: string;
-  stepId: string;
-  status: string;
-  fallbackReason: string | null;
-}
-
-interface TrajectoryEntry {
-  seq: number;
-  type: string;
-  subtype?: string;
-  text?: string;
-  redacted?: true;
-}
-
-async function pollUntil<T>(
-  fn: () => Promise<T | null>,
-  { timeoutMs = 20_000, intervalMs = 250, description = 'condition' }: { timeoutMs?: number; intervalMs?: number; description?: string } = {},
-): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const value = await fn();
-    if (value !== null) return value;
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-  throw new Error(`Timed out waiting for ${description} (${timeoutMs}ms)`);
-}
 
 async function startRun(request: APIRequestContext, wd: Record<string, unknown>): Promise<string> {
   const createWdRes = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
@@ -59,22 +46,31 @@ async function startRun(request: APIRequestContext, wd: Record<string, unknown>)
   return run.id;
 }
 
-async function awaitFinishedAgentRun(request: APIRequestContext, runId: string): Promise<AgentRunRow> {
+async function listAgentRuns(request: APIRequestContext, runId: string): Promise<AgentRun[] | null> {
+  const res = await request.get(`/api/agent-runs?runId=${runId}`, { headers: AUTH_HEADERS });
+  if (res.status() !== 200) return null;
+  return ListAgentRunsOutputSchema.parse(await res.json()).runs;
+}
+
+async function awaitFinishedAgentRun(request: APIRequestContext, runId: string): Promise<AgentRun> {
   return pollUntil(
     async () => {
-      const res = await request.get(`/api/agent-runs?runId=${runId}`, { headers: AUTH_HEADERS });
-      if (res.status() !== 200) return null;
-      const { runs } = (await res.json()) as { runs: AgentRunRow[] };
+      const runs = await listAgentRuns(request, runId);
+      if (runs === null) return null;
       return runs.find((agentRun) => agentRun.status !== 'running') ?? null;
     },
     { description: `a finished agent run in ${runId}` },
   );
 }
 
-async function getTrajectory(request: APIRequestContext, agentRunId: string): Promise<TrajectoryEntry[]> {
-  const res = await request.get(`/api/agent-runs/${agentRunId}/trajectory`, { headers: AUTH_HEADERS });
+async function getTrajectory(
+  request: APIRequestContext,
+  agentRunId: string,
+  headers: Record<string, string> = AUTH_HEADERS,
+): Promise<StoredAgentTrajectoryEntry[]> {
+  const res = await request.get(`/api/agent-runs/${agentRunId}/trajectory`, { headers });
   expect(res.status(), await res.text()).toBe(200);
-  const body = (await res.json()) as { agentRunId: string; entries: TrajectoryEntry[] };
+  const body = GetAgentTrajectoryOutputSchema.parse(await res.json());
   expect(body.agentRunId).toBe(agentRunId);
   return body.entries;
 }
@@ -92,6 +88,12 @@ function agentStepWorkflow(name: string, step: Record<string, unknown>): Record<
 }
 
 test.describe('Step Evaluation foundations — API E2E', () => {
+  let callers: MultiNamespaceFixture;
+
+  test.beforeAll(async () => {
+    callers = await setupMultiNamespaceCallers();
+  });
+
   test('a result that breaks agent.outputSchema is retried once, then routed to fallbackBehavior', async ({ request }) => {
     const runId = await startRun(request, agentStepWorkflow(`e2e-output-schema-${Date.now()}`, {
       autonomyLevel: 'L4',
@@ -129,7 +131,7 @@ test.describe('Step Evaluation foundations — API E2E', () => {
     expect(run.pauseReason).toBe('agent_escalated');
   });
 
-  test('an agent run\'s trajectory is retrievable by its id, and scoped like the run', async ({ request }) => {
+  test('an agent run\'s trajectory is retrievable by its id, and scoped to the run\'s workspace', async ({ request }) => {
     const runId = await startRun(request, agentStepWorkflow(`e2e-trajectory-${Date.now()}`, { autonomyLevel: 'L4' }));
 
     const agentRun = await awaitFinishedAgentRun(request, runId);
@@ -140,6 +142,16 @@ test.describe('Step Evaluation foundations — API E2E', () => {
       [0, 'assistant', 'text'],
       [1, 'result', 'success'],
     ]);
+
+    // A member of the run's workspace reads it with a session; a user from
+    // another workspace gets the same 404 as for a run that does not exist.
+    const memberEntries = await getTrajectory(request, agentRun.id, sessionCookieHeaders(callers.member));
+    expect(memberEntries).toEqual(entries);
+
+    const outsiderRes = await request.get(`/api/agent-runs/${agentRun.id}/trajectory`, {
+      headers: sessionCookieHeaders(callers.outsider),
+    });
+    expect(outsiderRes.status(), await outsiderRes.text()).toBe(404);
 
     const unknownRes = await request.get('/api/agent-runs/00000000-0000-4000-8000-000000000000/trajectory', { headers: AUTH_HEADERS });
     expect(unknownRes.status()).toBe(404);
@@ -166,9 +178,8 @@ test.describe('Step Evaluation foundations — API E2E', () => {
 
     const [agentRun] = await pollUntil(
       async () => {
-        const res = await request.get(`/api/agent-runs?runId=${runId}`, { headers: AUTH_HEADERS });
-        const { runs } = (await res.json()) as { runs: AgentRunRow[] };
-        return runs.length > 0 ? runs : null;
+        const runs = await listAgentRuns(request, runId);
+        return runs !== null && runs.length > 0 ? runs : null;
       },
       { description: `agent run in ${runId}` },
     );
@@ -181,7 +192,7 @@ test.describe('Step Evaluation foundations — API E2E', () => {
 
     const scoresRes = await request.get(`/api/scores?agentRunId=${agentRun!.id}`, { headers: AUTH_HEADERS });
     expect(scoresRes.status(), await scoresRes.text()).toBe(200);
-    const { scores } = (await scoresRes.json()) as { scores: Array<Record<string, unknown>> };
+    const { scores } = ListScoresOutputSchema.parse(await scoresRes.json());
     expect(scores).toHaveLength(1);
     expect(scores[0]).toMatchObject({
       subject: { type: 'agent_run', id: agentRun!.id },
@@ -196,7 +207,15 @@ test.describe('Step Evaluation foundations — API E2E', () => {
     });
 
     const byRunRes = await request.get(`/api/scores?runId=${runId}&stepId=grade-aes&name=human_verdict`, { headers: AUTH_HEADERS });
-    expect(((await byRunRes.json()) as { scores: unknown[] }).scores).toHaveLength(1);
+    expect(ListScoresOutputSchema.parse(await byRunRes.json()).scores).toHaveLength(1);
+
+    // Scores are listed through the caller's workspaces: another workspace's
+    // user sees none of them, even when filtering by this Agent Run's id.
+    const outsiderScoresRes = await request.get(`/api/scores?agentRunId=${agentRun!.id}`, {
+      headers: sessionCookieHeaders(callers.outsider),
+    });
+    expect(outsiderScoresRes.status(), await outsiderScoresRes.text()).toBe(200);
+    expect(ListScoresOutputSchema.parse(await outsiderScoresRes.json()).scores).toEqual([]);
 
     const auditRes = await request.get(`/api/processes/${runId}/audit`, { headers: AUTH_HEADERS });
     const { events } = (await auditRes.json()) as { events: Array<{ action: string; entityId: string }> };

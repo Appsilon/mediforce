@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
+import { pollUntil } from '../helpers/poll-until';
 
 /**
  * L3 API E2E for deterministic script-executor plugin dispatch — proves the
@@ -22,23 +23,6 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
 const JSON_HEADERS = { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' };
-
-async function pollUntil<T>(
-  fn: () => Promise<T | null>,
-  {
-    timeoutMs = 25_000,
-    intervalMs = 250,
-    description = 'condition',
-  }: { timeoutMs?: number; intervalMs?: number; description?: string } = {},
-): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const value = await fn();
-    if (value !== null) return value;
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-  throw new Error(`Timed out waiting for ${description} (${timeoutMs}ms)`);
-}
 
 interface StepExecution {
   status: string;
@@ -89,7 +73,7 @@ async function waitForStepResult(
       }
       return latest.status === 'completed' ? latest : null;
     },
-    { description: `step '${stepId}' of ${instanceId} to complete` },
+    { timeoutMs: 25_000, description: `step '${stepId}' of ${instanceId} to complete` },
   );
 }
 

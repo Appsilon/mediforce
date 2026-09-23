@@ -1,5 +1,6 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
+import { pollUntil } from '../helpers/poll-until';
 
 /**
  * End-to-end verification of previous-run-outputs (inputForNextRun) through
@@ -20,24 +21,7 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
  */
 
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
-
-async function pollUntil<T>(
-  fn: () => Promise<T | null>,
-  {
-    timeoutMs = 10_000,
-    intervalMs = 200,
-    description = 'condition',
-  }: { timeoutMs?: number; intervalMs?: number; description?: string } = {},
-): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  let last: T | null = null;
-  while (Date.now() < deadline) {
-    last = await fn();
-    if (last !== null) return last;
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
-  throw new Error(`Timed out waiting for ${description} (${timeoutMs}ms)`);
-}
+const POLL_OPTIONS = { timeoutMs: 10_000, intervalMs: 200 };
 
 test.describe('Previous run outputs — API E2E', () => {
   test('user-typed message round-trips across runs via inputForNextRun', async ({
@@ -121,7 +105,7 @@ test.describe('Previous run outputs — API E2E', () => {
             ) ?? null
           );
         },
-        { description: `pending task on set-next for ${instanceId}` },
+        { ...POLL_OPTIONS, description: `pending task on set-next for ${instanceId}` },
       );
 
       const submitRes = await request.post(`/api/tasks/${task.id}/complete`, {
@@ -139,7 +123,7 @@ test.describe('Previous run outputs — API E2E', () => {
           const body = (await res.json()) as { status: string };
           return body.status === 'completed' ? body : null;
         },
-        { description: `run ${instanceId} to complete` },
+        { ...POLL_OPTIONS, description: `run ${instanceId} to complete` },
       );
 
       return instanceId;
@@ -197,7 +181,7 @@ test.describe('Previous run outputs — API E2E', () => {
           ) ?? null
         );
       },
-      { description: 'pending task on set-next for run 2' },
+      { ...POLL_OPTIONS, description: 'pending task on set-next for run 2' },
     );
     await request.post(`/api/tasks/${run2Task.id}/complete`, {
       headers: { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' },
@@ -208,7 +192,7 @@ test.describe('Previous run outputs — API E2E', () => {
         const res = await fetchInstance(run2Id);
         return res.status === 'completed' ? res : null;
       },
-      { description: 'run 2 completed' },
+      { ...POLL_OPTIONS, description: 'run 2 completed' },
     );
 
     // -------- 4. Run 3 — chain should advance to run 2's message --------

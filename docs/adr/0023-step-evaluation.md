@@ -85,11 +85,13 @@ Qualification cites them. A newer Evaluator version flags the qualification
 
 **D8 — Agent Trajectories are persisted for every Agent Run.** The tool-call
 record the plugins already produce (today a host temp file) becomes a durable
-platform artifact keyed by `agentRunId`. Content follows ADR-0007 D5: with
-capture off, only shape is kept (tool names, redacted or truncated arguments,
-result sizes). Eval trials capture full content unless the Eval Dataset is
-flagged as containing production data, in which case the deployment setting
-applies.
+platform artifact keyed by `agentRunId`. It is stored in the platform's own
+database and keeps full content: ADR-0007 D5's switch limits what reaches the
+external trace store, and D5 keeps full content in the platform. It is a
+table of its own rather than more `agent_events` rows: those are the live
+per-step progress feed, children of a process instance and keyed by step,
+while a Trajectory belongs to one Agent Run, which an Eval trial needs to read
+without reaching into the run's step events.
 
 **D9 — Only trusted Evaluators count toward Acceptance Criteria.**
 `schema` is active on creation. `code` needs a recorded human approval of its
@@ -119,9 +121,11 @@ Holdout cases are never offered as examples.
 Evaluator marked "also run in production" scores live Agent Runs. `schema` and
 `code` run synchronously; a failing critical one triggers the Step's existing
 `fallbackBehavior`, as low confidence does. `llm_judge` runs asynchronously and
-only writes Scores. Human verdicts on CM3 reviews become Scores automatically.
-`outputSchema` violations, after one retry with the errors, follow the same
-fallback route.
+only writes Scores. Human verdicts on CM3 reviews become Scores automatically,
+best-effort until handlers get a cross-repository transaction (#516): the verdict
+itself is always on the task and its `task.completed` audit event.
+`outputSchema` violations, after one retry with the first violation, follow
+the same fallback route; the retry shares the step's timeout.
 
 **D14 — One Evaluation Assistant, built on the workflow assistant's
 blocks.** A single assistant per Step covers the whole Evaluation: suggest a
@@ -180,6 +184,9 @@ are not reused: priorities belong to the Step, not to a person.
   the assistant is the primary surface from Phase 1b. Rejected by D14.
 - **Trajectories read from the trace store.** Content is off in production by
   default and the store may not exist. Rejected by D8.
+- **Trajectories as `agent_events` rows with an `agentRunId`.** One store
+  fewer, but it mixes the Agent Run's record with the step's progress feed and
+  its instance-scoped lifecycle. Rejected by D8.
 
 ## Consequences
 

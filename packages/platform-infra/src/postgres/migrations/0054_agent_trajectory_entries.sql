@@ -5,8 +5,9 @@
 --
 -- One row per entry, numbered by the runner (the only writer per run), so the
 -- batched appends during a run are plain inserts and a replayed batch is a
--- no-op on the primary key. Content follows MEDIFORCE_OTEL_CAPTURE_CONTENT
--- (ADR-0007 D5): with capture off `entry` holds only the shape.
+-- no-op on the primary key. `entry` always holds full content: this is the
+-- platform's own store, and MEDIFORCE_OTEL_CAPTURE_CONTENT governs only what
+-- exported OTEL spans carry (ADR-0007 D5).
 CREATE TABLE "agent_trajectory_entries" (
   "agent_run_id" uuid NOT NULL REFERENCES "agent_runs"("id") ON DELETE CASCADE,
   "seq" integer NOT NULL,
@@ -16,4 +17,4 @@ CREATE TABLE "agent_trajectory_entries" (
 );--> statement-breakpoint
 
 COMMENT ON TABLE "agent_trajectory_entries" IS
-  'Agent Trajectory entries per Agent Run (ADR-0023 D8). Append-only; redacted to shape when content capture is off.';
+  'Agent Trajectory entries per Agent Run (ADR-0023 D8). Append-only; full content.';

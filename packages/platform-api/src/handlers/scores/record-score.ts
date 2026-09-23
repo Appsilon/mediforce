@@ -14,8 +14,10 @@ const ACTOR_TYPE_BY_SOURCE = {
 } as const;
 
 /**
- * Append a Score and the audit event that records it — every Score write goes
- * through here, so none lands unaudited (ADR-0007 D2, 21 CFR Part 11).
+ * Append a Score, then the `score.created` audit event that records it
+ * (ADR-0007 D2, 21 CFR Part 11). Every Score write goes through here. The two
+ * are separate writes — there is no cross-repository transaction yet (ADR-0005
+ * §7, #516) — so a failed audit append leaves the Score stored unaudited.
  */
 export async function recordScore(input: RecordScoreInput, scope: CallerScope): Promise<Score> {
   const { basis, ...fields } = input;

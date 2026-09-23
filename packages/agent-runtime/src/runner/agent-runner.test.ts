@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentRunner } from './agent-runner';
+import { PluginRunner } from './plugin-runner';
 import {
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
@@ -850,6 +851,65 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
     expect(result.fallbackReason).toBe('low_confidence');
     expect(seenContexts).toHaveLength(1);
   });
+
+  describe('retry budget — both attempts fit inside one step timeout', () => {
+    const STEP_TIMEOUT_MS = 10 * 60_000;
+
+    function makeTimedSchemaStepContext(): WorkflowAgentContext {
+      const context = makeSchemaStepContext('escalate_to_human');
+      return {
+        ...context,
+        step: { ...context.step, agent: { ...context.step.agent, timeoutMinutes: STEP_TIMEOUT_MS / 60_000 } },
+      };
+    }
+
+    /** A plugin whose first attempt takes `firstAttemptMs` of wall-clock time and violates the schema. */
+    function makeSlowViolatingPlugin(firstAttemptMs: number) {
+      const scripted = makeScriptedPlugin([
+        makeValidEnvelope({ result: { summary: 'no findings key' } }),
+        makeValidEnvelope({ result: { findings: [] } }),
+      ]);
+      const run = scripted.plugin.run;
+      let attempts = 0;
+      scripted.plugin.run = async (emit: EmitFn) => {
+        if (attempts === 0) vi.setSystemTime(Date.now() + firstAttemptMs);
+        attempts += 1;
+        await run(emit);
+      };
+      return scripted;
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('gives the retry only the budget the first attempt left', async () => {
+      const execute = vi.spyOn(PluginRunner.prototype, 'execute');
+      const { plugin, seenContexts } = makeSlowViolatingPlugin(4 * 60_000);
+
+      const result = await runner.runWithWorkflowStep(plugin, makeTimedSchemaStepContext());
+
+      expect(seenContexts).toHaveLength(2);
+      expect(result.status).toBe('completed');
+      expect(execute.mock.calls.map((call) => call[2])).toEqual([STEP_TIMEOUT_MS, 6 * 60_000]);
+    });
+
+    it('skips the retry and takes the output_schema fallback when the budget is spent', async () => {
+      const { plugin, seenContexts } = makeSlowViolatingPlugin(STEP_TIMEOUT_MS);
+
+      const result = await runner.runWithWorkflowStep(plugin, makeTimedSchemaStepContext());
+
+      expect(seenContexts).toHaveLength(1);
+      expect(result.fallbackReason).toBe('output_schema');
+      expect(result.status).toBe('escalated');
+      expect(result.errorMessage).toContain('missing required keys: findings');
+    });
+  });
 });
 
 describe('AgentRunner Agent Trajectory (ADR-0023 D8)', () => {
@@ -892,13 +952,15 @@ describe('AgentRunner Agent Trajectory (ADR-0023 D8)', () => {
     ]);
   });
 
-  it('keeps only the shape when content capture is off', async () => {
+  it('keeps full content when span content capture is off — the switch governs exported spans only (ADR-0007 D5)', async () => {
     const { runner, agentRunRepo, trajectoryRepo } = await setup(false);
 
     await runner.runWithWorkflowStep(makeRecordingPlugin(), makeWorkflowContext());
 
     const [agentRun] = await agentRunRepo.getByInstanceId('instance-1');
     const [entry] = (await trajectoryRepo.list(agentRun!.id)) ?? [];
-    expect(entry).toMatchObject({ tool: 'Read', input: { file_path: '[redacted: 12 chars]' }, redacted: true });
+    expect(entry).toEqual({
+      seq: 0, ts: '2026-09-23T08:00:00.000Z', type: 'assistant', subtype: 'tool_call', tool: 'Read', input: { file_path: '/data/ae.csv' },
+    });
   });
 });

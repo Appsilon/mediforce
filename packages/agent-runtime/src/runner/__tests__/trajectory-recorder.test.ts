@@ -35,9 +35,9 @@ const toolCall = {
 };
 
 describe('TrajectoryRecorder', () => {
-  it('numbers entries from 0 across flushes and keeps full content when capture is on', async () => {
+  it('numbers entries from 0 across flushes and keeps full content', async () => {
     const repo = await setup();
-    const recorder = new TrajectoryRecorder(repo, AGENT_RUN_ID, { captureContent: true });
+    const recorder = new TrajectoryRecorder(repo, AGENT_RUN_ID);
 
     recorder.record([toolCall]);
     await recorder.flush();
@@ -50,28 +50,9 @@ describe('TrajectoryRecorder', () => {
     expect(entries?.[1]?.text).toBe('Grade 3 neutropenia');
   });
 
-  it('keeps only the shape when capture is off (ADR-0007 D5)', async () => {
-    const repo = await setup();
-    const recorder = new TrajectoryRecorder(repo, AGENT_RUN_ID, { captureContent: false });
-
-    recorder.record([toolCall]);
-    await recorder.flush();
-
-    const [entry] = (await repo.list(AGENT_RUN_ID)) ?? [];
-    expect(entry).toEqual({
-      seq: 0,
-      ts: toolCall.ts,
-      type: 'assistant',
-      subtype: 'tool_call',
-      tool: 'Read',
-      input: { file_path: '[redacted: 21 chars]' },
-      redacted: true,
-    });
-  });
-
   it('flushes on its own after the interval', async () => {
     const repo = await setup();
-    const recorder = new TrajectoryRecorder(repo, AGENT_RUN_ID, { captureContent: true, flushIntervalMs: 5 });
+    const recorder = new TrajectoryRecorder(repo, AGENT_RUN_ID, { flushIntervalMs: 5 });
 
     recorder.record([toolCall]);
     await new Promise((resolve) => setTimeout(resolve, 30));
@@ -87,7 +68,7 @@ describe('TrajectoryRecorder', () => {
       list: async () => null,
       listInNamespaces: async () => null,
     };
-    const recorder = new TrajectoryRecorder(failing, AGENT_RUN_ID, { captureContent: true });
+    const recorder = new TrajectoryRecorder(failing, AGENT_RUN_ID);
 
     recorder.record([toolCall]);
     await expect(recorder.flush()).resolves.toBeUndefined();

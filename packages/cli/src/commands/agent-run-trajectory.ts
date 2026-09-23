@@ -6,9 +6,13 @@ export const agentRunTrajectoryCommand = defineCommand({
   description: 'Print an agent run\'s Agent Trajectory: its tool calls, tool results and text, in order.',
   args: {
     agentRunId: { type: 'positional', required: true, description: 'Agent run id' },
+    'after-seq': { type: 'string', description: 'Only entries with a greater seq (incremental read)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
-    const trajectory = await mediforce.agentRuns.trajectory({ agentRunId: args.agentRunId });
+    const trajectory = await mediforce.agentRuns.trajectory({
+      agentRunId: args.agentRunId,
+      ...(args['after-seq'] !== undefined ? { afterSeq: Number(args['after-seq']) } : {}),
+    });
     if (jsonMode) {
       printJson(output, trajectory);
       return 0;
@@ -26,9 +30,6 @@ export const agentRunTrajectoryCommand = defineCommand({
       output.stdout(
         `${String(entry.seq).padStart(4)}  ${entry.ts}  ${kind}${tool !== undefined ? `  ${tool}` : ''}${detail !== '' ? `  ${detail.slice(0, 160)}` : ''}`,
       );
-    }
-    if (trajectory.entries.some((entry) => entry.redacted === true)) {
-      output.stdout('\nContent capture is off on this deployment: values show their size only.');
     }
     return 0;
   },

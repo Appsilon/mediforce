@@ -41,6 +41,32 @@ describe('getAgentTrajectory handler', () => {
     });
   });
 
+  it('returns only the entries after the `afterSeq` cursor', async () => {
+    await agentTrajectoryRepo.append(AGENT_RUN_ID, [
+      { seq: 1, ts: '2026-09-23T08:00:01.000Z', type: 'user', subtype: 'tool_result', content: 'match' },
+      { seq: 2, ts: '2026-09-23T08:00:02.000Z', type: 'result', subtype: 'success' },
+    ]);
+    const scope = createTestScope({
+      instanceRepo, agentRunRepo, agentTrajectoryRepo, caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    const delta = await getAgentTrajectory({ agentRunId: AGENT_RUN_ID, afterSeq: 0 }, scope);
+    const caughtUp = await getAgentTrajectory({ agentRunId: AGENT_RUN_ID, afterSeq: 2 }, scope);
+
+    expect(delta.entries.map((entry) => entry.seq)).toEqual([1, 2]);
+    expect(caughtUp.entries).toEqual([]);
+  });
+
+  it('is 404 behind the cursor too, for a run in another workspace', async () => {
+    const outsider = createTestScope({
+      instanceRepo, agentRunRepo, agentTrajectoryRepo, caller: userCaller('u-2', ['team-beta']),
+    });
+
+    await expect(
+      getAgentTrajectory({ agentRunId: AGENT_RUN_ID, afterSeq: 0 }, outsider),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
   it('is 404 for a run in another workspace, the same as for no run at all', async () => {
     const outsider = createTestScope({
       instanceRepo, agentRunRepo, agentTrajectoryRepo, caller: userCaller('u-2', ['team-beta']),
