@@ -308,6 +308,27 @@ export function latestTodos(entries: LogEntry[]): TodoItem[] | null {
  * the stream carries no id on the result side. Task-list writes are dropped;
  * {@link latestTodos} renders them, and their result echoes the call verbatim.
  */
+/**
+ * Narrows already-built groups to a query, keeping a call and its result
+ * together. Filtering the flat entries first would drop a call while keeping
+ * its result, and `buildGroups` pairs by position — so the orphaned result
+ * would be shown under whichever call came next.
+ */
+export function filterGroups(groups: LogGroup[], query: string): LogGroup[] {
+  if (query.trim() === '') return groups;
+  return groups.flatMap<LogGroup>((group) => {
+    if (group.kind === 'single') {
+      return entryMatches(group.entry, query) ? [group] : [];
+    }
+    const calls = group.calls.filter(
+      (pair) =>
+        entryMatches(pair.call, query)
+        || (pair.result !== null && entryMatches(pair.result, query)),
+    );
+    return calls.length > 0 ? [{ ...group, calls }] : [];
+  });
+}
+
 export function buildGroups(entries: LogEntry[]): LogGroup[] {
   const groups: LogGroup[] = [];
   let pending: CallWithResult[] = [];
@@ -426,8 +447,8 @@ async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawC
   }
 }
 
-function AgentTabContent({ section, isRunning }: { section: AgentLogSection; isRunning: boolean }) {
-  const groups = buildGroups(section.entries);
+function AgentTabContent({ section, isRunning, query }: { section: AgentLogSection; isRunning: boolean; query: string }) {
+  const groups = filterGroups(buildGroups(section.entries), query);
   const todos = latestTodos(section.entries);
   const isEmpty = groups.length === 0 && todos === null && !section.rawContent;
 
@@ -490,11 +511,13 @@ function isStillWorking(section: AgentLogSection, runningStepIds: Set<string> | 
 
 /** The whole run, step by step, in definition order — the default view. Reading
  *  down it is reading what the run did. */
-export function AgentLogSections({ sections, runningStepIds, openStepId }: {
+export function AgentLogSections({ sections, runningStepIds, openStepId, query = '' }: {
   sections: AgentLogSection[];
   runningStepIds?: Set<string>;
   /** Opened on mount — the step the reader arrived from. */
   openStepId?: string | null;
+  /** Narrows what each step shows, applied after calls and results are paired. */
+  query?: string;
 }) {
   const single = sections.length === 1;
   // What the reader has opened or closed by hand. Without this, `open` would be
@@ -540,7 +563,7 @@ export function AgentLogSections({ sections, runningStepIds, openStepId }: {
             {/* Everything the step did hangs off a rail under its own header,
                 so depth is visible rather than inferred from type size. */}
             <div className="ml-[9px] border-l pl-4 pt-3 pb-2 min-w-0 overflow-hidden">
-              <AgentTabContent section={section} isRunning={isRunning} />
+              <AgentTabContent section={section} isRunning={isRunning} query={query} />
               {isStillWorking(section, runningStepIds) && <ThinkingIndicator />}
             </div>
           </details>
@@ -680,13 +703,14 @@ export function AgentLogViewer({ logFiles, initialStepId, runningStepIds, runAct
     setTimeout(() => setCopied(false), 2000);
   }, [sections]);
 
-  // Searching narrows the entries inside each step, and a step with nothing
-  // left is dropped: a result page of empty headings answers nothing.
+  // Searching drops a step with nothing left — a page of empty headings answers
+  // nothing. The entries themselves are kept whole and narrowed at the group
+  // level, so a matching result never lands under someone else's call.
   const shown = React.useMemo(() => {
     if (query.trim() === '') return sections;
-    return sections
-      .map((section) => ({ ...section, entries: section.entries.filter((entry) => entryMatches(entry, query)) }))
-      .filter((section) => section.entries.length > 0);
+    return sections.filter(
+      (section) => filterGroups(buildGroups(section.entries), query).length > 0,
+    );
   }, [sections, query]);
 
   // Every hook is above this line: an early return between them changes the
@@ -744,6 +768,7 @@ export function AgentLogViewer({ logFiles, initialStepId, runningStepIds, runAct
             sections={shown}
             runningStepIds={runningStepIds}
             openStepId={initialStepId ?? null}
+            query={query}
           />
         )}
       </div>

@@ -15,7 +15,7 @@ import userEvent from '@testing-library/user-event';
 const apiFetchMock = vi.fn();
 vi.mock('@/lib/api-fetch', () => ({ apiFetch: (...args: unknown[]) => apiFetchMock(...args) }));
 
-const { AgentLogSections, AgentLogViewer, shouldStopPolling, buildGroups, latestTodos, callSummary, resultSummary, entryMatches } = await import('../agent-log-viewer');
+const { AgentLogSections, AgentLogViewer, shouldStopPolling, buildGroups, filterGroups, latestTodos, callSummary, resultSummary, entryMatches } = await import('../agent-log-viewer');
 type AgentLogSection = import('../agent-log-viewer').AgentLogSection;
 
 function section(stepId: string, texts: string[], overrides: Partial<AgentLogSection> = {}): AgentLogSection {
@@ -587,5 +587,40 @@ describe('AgentLogViewer with no log files', () => {
     rerender(<AgentLogViewer logFiles={[{ stepId: 'extract', file: 'extract.jsonl', executor: 'agent' }]} />);
 
     await waitFor(() => expect(screen.getByText('first line')).toBeInTheDocument());
+  });
+});
+
+describe('filterGroups', () => {
+  const call = (tool: string, ts: string) => ({ ts, type: 'assistant', subtype: 'tool_call', tool });
+  const result = (text: string, ts: string) => ({ ts, type: 'tool_result', content: text });
+
+  it('keeps a result with its own call, not the next one', () => {
+    // Two calls issued together; only the second matches the query. Filtering
+    // the flat entries first dropped call B and left its result to be paired
+    // with call A by position.
+    const groups = buildGroups([
+      call('Read', '1'),
+      call('Grep', '2'),
+      result('contents of the file', '3'),
+      result('matched the pattern', '4'),
+    ] as never);
+
+    const filtered = filterGroups(groups, 'Grep');
+    const calls = filtered.flatMap((group) => (group.kind === 'calls' ? group.calls : []));
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.call.tool).toBe('Grep');
+    expect(String(calls[0]!.result?.content)).toBe('matched the pattern');
+  });
+
+  it('finds a call by what its result said', () => {
+    const groups = buildGroups([call('Read', '1'), result('Hy\u2019s Law', '2')] as never);
+    const calls = filterGroups(groups, "hy’s law").flatMap((g) => (g.kind === 'calls' ? g.calls : []));
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.call.tool).toBe('Read');
+  });
+
+  it('is the identity for an empty query', () => {
+    const groups = buildGroups([call('Read', '1'), result('x', '2')] as never);
+    expect(filterGroups(groups, '  ')).toEqual(groups);
   });
 });

@@ -197,9 +197,14 @@ A build that happens before the container exists is bracketed with `stage`
 entries, so a cold image build reads as progress instead of an empty log.
 
 A script step uses `raw`, since its stdout has no event structure. When caller
-and worker are on different machines (the `inputFiles` case), the worker's live
-writes land on its own disk, so the queued strategy rebuilds the log from
-buffered stdout after exit — that topology cannot stream through a file at all.
+and worker are on different machines the worker's live writes land on its own
+disk, so the queued strategy rebuilds the log from buffered stdout after exit —
+that topology cannot stream through a file at all. Whether they share a disk is
+settled by measuring: the strategy records the log's size before enqueueing and
+rebuilds only if the file did not grow while the job ran. It must not be
+inferred from `inputFiles`, which is never empty — a step ships at least its own
+`input.json` — so that test rebuilt on every queued run and wrote every entry
+twice on the shared-disk topology prod actually uses.
 
 The agent's result envelope is still assembled from buffered stdout after exit;
 only the activity log streams.
