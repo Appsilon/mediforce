@@ -9,6 +9,7 @@ import {
   type StepConfig,
   type AgentRunRepository,
   type AgentTrajectoryRepository,
+  type OutputSchemaShape,
   type WorkflowStep,
 } from '@mediforce/platform-core';
 import { randomUUID } from 'crypto';
@@ -42,6 +43,12 @@ interface AttemptOutcome {
   errorMessage: string | null;
   /** The `validateOutputSchema` message when `fallbackReason` is `output_schema`. */
   outputSchemaViolation: string | null;
+}
+
+/** What a result must satisfy to be accepted without a fallback. */
+interface AttemptChecks {
+  outputSchema: OutputSchemaShape | undefined;
+  confidenceThreshold: number;
 }
 
 export class AgentRunner {
@@ -133,29 +140,42 @@ export class AgentRunner {
       }
 
       const timeoutMs = resolveStepTimeoutMinutes(context.step) * 60_000;
-      // Content follows the same switch as traces (ADR-0007 D5).
       const trajectory = this.agentTrajectoryRepository === undefined
         ? undefined
-        : new TrajectoryRecorder(this.agentTrajectoryRepository, runId, {
-            captureContent: this.tracingOptions.captureContent === true,
-          });
+        : new TrajectoryRecorder(this.agentTrajectoryRepository, runId);
       const runContext: WorkflowAgentContext = trajectory === undefined ? context : { ...context, trajectory };
-      let attempt = await this.runAttempt(plugin, runContext, timeoutMs);
+      const checks: AttemptChecks = {
+        outputSchema: context.step.agent?.outputSchema,
+        confidenceThreshold: context.step.agent?.confidenceThreshold ?? 0,
+      };
+      let attempt = await this.runAttempt(plugin, runContext, timeoutMs, checks);
 
       if (attempt.outputSchemaViolation !== null) {
-        await this.eventLog.write(processInstanceId, stepId, {
-          type: 'status',
-          payload: `result does not match agent.outputSchema (${attempt.outputSchemaViolation}) — retrying once with the validation error`,
-          timestamp: new Date().toISOString(),
-        });
-        // A retry is fresh activity: keep the heartbeat's stranded sweep from
-        // reading the doubled step time as a dead driver.
-        await this.instanceRepository.update(processInstanceId, { updatedAt: new Date().toISOString() });
-        attempt = await this.runAttempt(
-          plugin,
-          { ...runContext, outputSchemaViolation: attempt.outputSchemaViolation },
-          timeoutMs,
-        );
+        // Both attempts share one step timeout: the run route's reap guard
+        // measures a step execution from its start against a single timeout.
+        const retryBudgetMs = timeoutMs - (Date.now() - startedAt);
+        if (retryBudgetMs > 0) {
+          await this.eventLog.write(processInstanceId, stepId, {
+            type: 'status',
+            payload: `result does not match agent.outputSchema (${attempt.outputSchemaViolation}) — retrying once with the validation error`,
+            timestamp: new Date().toISOString(),
+          });
+          // A retry is fresh activity: keep the heartbeat's stranded sweep from
+          // reading the longer step as a dead driver.
+          await this.instanceRepository.update(processInstanceId, { updatedAt: new Date().toISOString() });
+          attempt = await this.runAttempt(
+            plugin,
+            { ...runContext, outputSchemaViolation: attempt.outputSchemaViolation },
+            retryBudgetMs,
+            checks,
+          );
+        } else {
+          await this.eventLog.write(processInstanceId, stepId, {
+            type: 'status',
+            payload: `result does not match agent.outputSchema (${attempt.outputSchemaViolation}) — no time left in the step timeout to retry`,
+            timestamp: new Date().toISOString(),
+          });
+        }
       }
       await trajectory?.flush();
 
@@ -194,8 +214,9 @@ export class AgentRunner {
    *  its self-assessed confidence either. */
   private async runAttempt(
     plugin: StepExecutorPlugin,
-    context: WorkflowAgentContext,
+    context: AgentContext | WorkflowAgentContext,
     timeoutMs: number,
+    checks: AttemptChecks,
   ): Promise<AttemptOutcome> {
     const { resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(
       plugin, context, timeoutMs,
@@ -210,10 +231,9 @@ export class AgentRunner {
     if (!parseResult.success) return failed('error');
     const envelope = parseResult.data;
 
-    const outputSchema = context.step.agent?.outputSchema;
-    const violation = outputSchema === undefined
+    const violation = checks.outputSchema === undefined
       ? null
-      : validateOutputSchema(envelope.result ?? {}, outputSchema);
+      : validateOutputSchema(envelope.result ?? {}, checks.outputSchema);
     if (violation !== null) {
       return {
         envelope,
@@ -223,10 +243,9 @@ export class AgentRunner {
       };
     }
 
-    const threshold = context.step.agent?.confidenceThreshold ?? 0;
     return {
       envelope,
-      fallbackReason: envelope.confidence < threshold ? 'low_confidence' : null,
+      fallbackReason: envelope.confidence < checks.confidenceThreshold ? 'low_confidence' : null,
       errorMessage: null,
       outputSchemaViolation: null,
     };
@@ -328,31 +347,10 @@ export class AgentRunner {
     }
 
     const timeoutMs = (stepConfig.timeoutMinutes ?? 30) * 60_000;
-    const { resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(
-      plugin, context, timeoutMs,
-    );
-
-    let fallbackReason: AgentFallbackReason | null = null;
-    let envelope: AgentOutputEnvelope | null = null;
-
-    if (timedOut) {
-      fallbackReason = 'timeout';
-    } else if (errorMessage !== null) {
-      fallbackReason = 'error';
-    } else if (resultPayload === null) {
-      fallbackReason = 'error';
-    } else {
-      const parseResult = AgentOutputEnvelopeSchema.safeParse(resultPayload);
-      if (!parseResult.success) {
-        fallbackReason = 'error';
-      } else {
-        envelope = parseResult.data;
-        const threshold = stepConfig.confidenceThreshold ?? 0;
-        if (envelope.confidence < threshold) {
-          fallbackReason = 'low_confidence';
-        }
-      }
-    }
+    const { envelope, fallbackReason, errorMessage } = await this.runAttempt(plugin, context, timeoutMs, {
+      outputSchema: undefined,
+      confidenceThreshold: stepConfig.confidenceThreshold ?? 0,
+    });
 
     if (fallbackReason) {
       const partialWork = this.eventLog.getPartialWork(processInstanceId, stepId);

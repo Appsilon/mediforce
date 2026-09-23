@@ -62,20 +62,14 @@ describe('recordHumanVerdictScore', () => {
     expect(recheck).toMatchObject({ value: 0.5, label: 'recheck', comment: null });
   });
 
-  it('falls back to the step\'s latest Agent Run for a task that predates agentRunId', async () => {
+  it('records nothing for a review task that carries no agentRunId, even when the step has Agent Runs', async () => {
     await agentRunRepo.create(buildAgentRun({
       id: AGENT_RUN_ID, processInstanceId: 'inst-a', stepId: 'grade-aes', startedAt: '2026-09-23T09:00:00.000Z',
-    }));
-    await agentRunRepo.create(buildAgentRun({
-      id: 'older-run', processInstanceId: 'inst-a', stepId: 'grade-aes', startedAt: '2026-09-23T08:00:00.000Z',
-    }));
-    await agentRunRepo.create(buildAgentRun({
-      id: 'other-step', processInstanceId: 'inst-a', stepId: 'extract', startedAt: '2026-09-23T10:00:00.000Z',
     }));
 
     const score = await recordHumanVerdictScore(
       {
-        task: reviewTask({ completionData: { reviewType: 'agent_output_review', agentOutput: {} } }),
+        task: reviewTask({ completionData: { reviewType: 'agent_output_review', agentOutput: { agentRunId: null } } }),
         payload: { kind: 'verdict', verdict: 'revise', comment: 'Recheck the grade' },
         actorId: 'u-1',
         namespace: 'team-alpha',
@@ -83,7 +77,8 @@ describe('recordHumanVerdictScore', () => {
       scope(),
     );
 
-    expect(score).toMatchObject({ subject: { type: 'agent_run', id: AGENT_RUN_ID }, value: 0.5 });
+    expect(score).toBeNull();
+    expect(await scoreRepo.list({ limit: 10 })).toEqual([]);
   });
 
   it('records nothing when there is no Agent Run to attach the verdict to', async () => {

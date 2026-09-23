@@ -1,5 +1,4 @@
 import {
-  redactTrajectoryEntry,
   type AgentTrajectoryEntry,
   type AgentTrajectoryRepository,
   type StoredAgentTrajectoryEntry,
@@ -15,7 +14,6 @@ const DEFAULT_FLUSH_INTERVAL_MS = 1_000;
  * about the run, never a reason to fail it.
  */
 export class TrajectoryRecorder {
-  private readonly captureContent: boolean;
   private readonly flushIntervalMs: number;
   private pending: StoredAgentTrajectoryEntry[] = [];
   private nextSeq = 0;
@@ -25,16 +23,14 @@ export class TrajectoryRecorder {
   constructor(
     private readonly repository: AgentTrajectoryRepository,
     private readonly agentRunId: string,
-    options: { captureContent: boolean; flushIntervalMs?: number },
+    options: { flushIntervalMs?: number } = {},
   ) {
-    this.captureContent = options.captureContent;
     this.flushIntervalMs = options.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS;
   }
 
   record(entries: readonly AgentTrajectoryEntry[]): void {
     for (const entry of entries) {
-      const kept = this.captureContent ? entry : redactTrajectoryEntry(entry);
-      this.pending.push({ ...kept, seq: this.nextSeq });
+      this.pending.push({ ...entry, seq: this.nextSeq });
       this.nextSeq += 1;
     }
     if (this.pending.length > 0 && this.timer === null) {

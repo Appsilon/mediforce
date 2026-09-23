@@ -1,5 +1,8 @@
 import type { AgentRunRepository } from '../interfaces/agent-run-repository';
-import type { AgentTrajectoryRepository } from '../interfaces/agent-trajectory-repository';
+import type {
+  AgentTrajectoryReadOptions,
+  AgentTrajectoryRepository,
+} from '../interfaces/agent-trajectory-repository';
 import type { StoredAgentTrajectoryEntry } from '../schemas/agent-trajectory';
 
 export class InMemoryAgentTrajectoryRepository implements AgentTrajectoryRepository {
@@ -15,22 +18,28 @@ export class InMemoryAgentTrajectoryRepository implements AgentTrajectoryReposit
     this.entriesByRun.set(agentRunId, bySeq);
   }
 
-  async list(agentRunId: string): Promise<StoredAgentTrajectoryEntry[] | null> {
+  async list(
+    agentRunId: string,
+    options: AgentTrajectoryReadOptions = {},
+  ): Promise<StoredAgentTrajectoryEntry[] | null> {
     if ((await this.agentRuns.getById(agentRunId)) === null) return null;
-    return this.sorted(agentRunId);
+    return this.sorted(agentRunId, options);
   }
 
   async listInNamespaces(
     agentRunId: string,
     allowed: readonly string[],
+    options: AgentTrajectoryReadOptions = {},
   ): Promise<StoredAgentTrajectoryEntry[] | null> {
     if ((await this.agentRuns.getByIdInNamespaces(agentRunId, allowed)) === null) return null;
-    return this.sorted(agentRunId);
+    return this.sorted(agentRunId, options);
   }
 
-  private sorted(agentRunId: string): StoredAgentTrajectoryEntry[] {
+  private sorted(agentRunId: string, { afterSeq }: AgentTrajectoryReadOptions): StoredAgentTrajectoryEntry[] {
     const bySeq = this.entriesByRun.get(agentRunId);
     if (bySeq === undefined) return [];
-    return [...bySeq.values()].sort((left, right) => left.seq - right.seq);
+    return [...bySeq.values()]
+      .filter((entry) => afterSeq === undefined || entry.seq > afterSeq)
+      .sort((left, right) => left.seq - right.seq);
   }
 }

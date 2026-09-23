@@ -1,4 +1,5 @@
 import type {
+  AgentTrajectoryReadOptions,
   AgentTrajectoryRepository,
   StoredAgentTrajectoryEntry,
 } from '@mediforce/platform-core';
@@ -18,8 +19,11 @@ export class AuthorizedAgentTrajectoryRepository extends AuthorizedScope {
     super(caller);
   }
 
-  list = async (agentRunId: string): Promise<StoredAgentTrajectoryEntry[] | null> =>
+  list = async (
+    agentRunId: string,
+    options: AgentTrajectoryReadOptions = {},
+  ): Promise<StoredAgentTrajectoryEntry[] | null> =>
     this.caller.isSystemActor
-      ? this.raw.list(agentRunId)
-      : this.raw.listInNamespaces(agentRunId, [...this.caller.namespaces]);
+      ? this.raw.list(agentRunId, options)
+      : this.raw.listInNamespaces(agentRunId, [...this.caller.namespaces], options);
 }

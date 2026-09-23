@@ -163,7 +163,6 @@ export { listAgentRuns } from './agent-runs/list-agent-runs';
 export { getAgentRunCardStatusCounts } from './agent-runs/get-agent-run-card-status-counts';
 export { getAgentTrajectory } from './agent-runs/get-agent-trajectory';
 export { listScores } from './scores/list-scores';
-export { recordScore, type RecordScoreInput } from './scores/record-score';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 
 export { getConfig, getConfigByPrefix } from './config/index';

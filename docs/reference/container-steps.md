@@ -108,16 +108,21 @@ checks `result` against it after the run: a violation records a `status` event
 and runs the plugin once more with the error in the prompt; a second violation
 goes to `fallbackBehavior` with `fallbackReason: output_schema`
 ([`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts),
-ADR-0023 D13). The retry refreshes the run's `updatedAt`, so the heartbeat does
-not read the doubled step time as a dead driver.
+ADR-0023 D13). Both attempts share the one step timeout — the retry gets what the
+first attempt left, and with nothing left the violation goes straight to
+`fallbackBehavior` — so the run route's reap guard never reads a live retry as
+stranded. The retry refreshes the run's `updatedAt` for the heartbeat's
+stranded sweep. `agent.outputSchema` is valid on `executor: agent` steps only;
+definition validation rejects it anywhere else.
 
 Each plugin maps its CLI's stdout lines to Agent Trajectory entries
 (`processOutputLine`); `TrajectoryRecorder` numbers them and writes them in
 batches to `agent_trajectory_entries`, keyed by the Agent Run — live on the
 local strategy, after exit on the queued one, both attempts of a retry in one
 trajectory ([`trajectory-recorder.ts`](../../packages/agent-runtime/src/runner/trajectory-recorder.ts),
-ADR-0023 D8). Content follows `MEDIFORCE_OTEL_CAPTURE_CONTENT`: off, an entry
-keeps tool names and argument keys and every value becomes its size. Read it with
+ADR-0023 D8). Entries always keep full content: the trajectory lives in the
+platform's own Postgres, and `MEDIFORCE_OTEL_CAPTURE_CONTENT` governs only what
+exported OTEL spans carry (ADR-0007 D5). Read it with
 `GET /api/agent-runs/:id/trajectory` or `mediforce agent-run trajectory`.
 Script steps have no Agent Run; their stdout lines are `assistant` agent events,
 which the run view's log shows instead.

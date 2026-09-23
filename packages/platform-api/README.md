@@ -87,6 +87,10 @@ rather than resolving credentials that do not exist. Every other handler in
 through `CallerScope` — is intact; the one it suspends is that a caller was
 authenticated, and only these two may do that.
 
+**Scores have no write route yet.** In ADR-0023's phase 1a a Score is written
+in-process only (`handlers/scores/record-score.ts`, reached from task completion
+for Control Mode 3 verdicts); `listScores` is the only exposed Score API.
+
 **`getPlatformServices()` is the only composition root.** It wires repositories,
 the workflow engine, the plugin registry and the action registry. It lives here —
 not in `platform-ui`, whose `src/lib/platform-services.ts` is a re-export shim
