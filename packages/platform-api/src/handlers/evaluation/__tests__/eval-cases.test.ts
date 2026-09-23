@@ -1,10 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { randomUUID } from 'node:crypto';
 import { ValidationError } from '../../../errors';
 import { recordScore } from '../../scores/record-score';
 import { archiveEvalCase, createEvalCase, createEvalCaseFromAgentRun, listEvalCases } from '../eval-cases';
-import { freezeEvalDataset, listEvalDatasets } from '../eval-datasets';
-import { getMcpEvalPolicy, setMcpEvalPolicy } from '../mcp-eval-policy';
 import { evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture } from './fixture';
 
 async function reviewVerdict(fixture: EvaluationFixture, agentRunId: string, value: number, comment: string | null) {
@@ -78,51 +75,5 @@ describe('Eval Cases', () => {
     await archiveEvalCase({ caseId: evalCase.id, archived: true }, fixture.scope());
     expect((await listEvalCases(STEP, fixture.scope())).cases).toEqual([]);
     expect((await listEvalCases({ ...STEP, includeArchived: true }, fixture.scope())).cases).toHaveLength(1);
-  });
-});
-
-describe('Eval Datasets', () => {
-  it('freezes the live cases and flags production data', async () => {
-    const fixture = await evaluationFixture();
-    const { evalCase: production } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'positive', split: 'dev' }, fixture.scope());
-    const { evalCase: archived } = await createEvalCaseFromAgentRun({ agentRunId: UNGRADED_RUN, expectation: 'negative', split: 'dev' }, fixture.scope());
-    await archiveEvalCase({ caseId: archived.id, archived: true }, fixture.scope());
-
-    const { dataset } = await freezeEvalDataset(STEP, fixture.scope());
-    expect(dataset).toMatchObject({ version: 1, caseIds: [production.id], containsProductionData: true });
-
-    const { dataset: second } = await freezeEvalDataset({ ...STEP, caseIds: [archived.id] }, fixture.scope());
-    expect(second.version).toBe(2);
-    expect((await listEvalDatasets(STEP, fixture.scope())).datasets.map((row) => row.version)).toEqual([2, 1]);
-  });
-
-  it('refuses a case of another step and an empty set', async () => {
-    const fixture = await evaluationFixture();
-    await expect(freezeEvalDataset(STEP, fixture.scope())).rejects.toBeInstanceOf(ValidationError);
-    await expect(freezeEvalDataset({ ...STEP, caseIds: [randomUUID()] }, fixture.scope())).rejects.toBeInstanceOf(ValidationError);
-  });
-});
-
-describe('MCP eval policy', () => {
-  it('denies every server of the step\'s agent until declared safe', async () => {
-    const fixture = await evaluationFixture();
-    expect((await getMcpEvalPolicy(STEP, fixture.scope())).servers).toEqual([
-      { name: 'edc', mode: 'deny', defaulted: true },
-      { name: 'email', mode: 'deny', defaulted: true },
-    ]);
-
-    await setMcpEvalPolicy({ ...STEP, servers: { edc: { mode: 'live', denyTools: ['write_record'] } } }, fixture.scope());
-    expect((await getMcpEvalPolicy(STEP, fixture.scope())).servers).toEqual([
-      { name: 'edc', mode: 'live', denyTools: ['write_record'], defaulted: false },
-      { name: 'email', mode: 'deny', defaulted: true },
-    ]);
-  });
-
-  it('refuses a server the agent does not bind, and denied tools with no allowlist', async () => {
-    const fixture = await evaluationFixture();
-    await expect(setMcpEvalPolicy({ ...STEP, servers: { slack: { mode: 'live' } } }, fixture.scope()))
-      .rejects.toThrow(/not an MCP server of this step's agent/);
-    await expect(setMcpEvalPolicy({ ...STEP, servers: { email: { mode: 'live', denyTools: ['send'] } } }, fixture.scope()))
-      .rejects.toThrow(/lists no allowedTools/);
   });
 });

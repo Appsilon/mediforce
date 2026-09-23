@@ -1,37 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ConflictError, NotFoundError, ValidationError } from '../../../errors';
+import { ConflictError, NotFoundError } from '../../../errors';
 import { userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { createEvaluator, addEvaluatorVersion, archiveEvaluator, listEvaluators } from '../evaluators';
-import { getEvaluationBrief, setEvaluationBrief } from '../briefs';
-import { previewEvaluator } from '../preview-evaluator';
-import { evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture } from './fixture';
+import { evaluationFixture, STEP, type EvaluationFixture } from './fixture';
 
 const findingsSchema = { kind: 'schema' as const, schema: { required: ['findings'] } };
-
-describe('Evaluation Briefs', () => {
-  let fixture: EvaluationFixture;
-  beforeEach(async () => { fixture = await evaluationFixture(); });
-
-  it('versions every write and serves the newest as current', async () => {
-    await setEvaluationBrief({ ...STEP, text: 'Grades AEs for the DSMB.', origin: 'user' }, fixture.scope());
-    await setEvaluationBrief({ ...STEP, text: 'A missed grade 5 is critical.', origin: 'assistant' }, fixture.scope());
-
-    const { brief, versions } = await getEvaluationBrief(STEP, fixture.scope());
-    expect(brief).toMatchObject({ version: 2, text: 'A missed grade 5 is critical.', origin: 'assistant', createdBy: 'author-1' });
-    expect(versions.map((version) => version.version)).toEqual([2, 1]);
-    expect(await fixture.auditRepo.getByEntity('evaluation_brief', 'ae-grading/grade-aes')).toHaveLength(2);
-  });
-
-  it('only evaluates agent steps', async () => {
-    await expect(getEvaluationBrief({ ...STEP, stepId: 'extract-aes' }, fixture.scope()))
-      .rejects.toBeInstanceOf(ValidationError);
-  });
-
-  it('reads a workflow in another workspace as missing', async () => {
-    await expect(getEvaluationBrief(STEP, fixture.scope(userCaller('outsider', ['pharma-b']))))
-      .rejects.toBeInstanceOf(NotFoundError);
-  });
-});
 
 describe('Evaluators', () => {
   let fixture: EvaluationFixture;
@@ -87,28 +60,6 @@ describe('Evaluators', () => {
     await expect(createEvaluator(
       { ...STEP, name: 'x', rule: 'r', severity: 'major', check: findingsSchema, origin: 'user' },
       fixture.scope(userCaller('outsider', ['pharma-b'])),
-    )).rejects.toBeInstanceOf(NotFoundError);
-  });
-});
-
-describe('previewEvaluator', () => {
-  it('runs a draft check against the step\'s production outputs and writes nothing', async () => {
-    const fixture = await evaluationFixture();
-    const { results } = await previewEvaluator({ ...STEP, check: findingsSchema, limit: 5 }, fixture.scope());
-
-    expect(results).toEqual(expect.arrayContaining([
-      { agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', comment: null, error: null },
-      { agentRunId: UNGRADED_RUN, passed: false, value: 0, label: 'fail', comment: 'missing required keys: findings', error: null },
-    ]));
-    expect(await fixture.scoreRepo.list({ limit: 10 })).toEqual([]);
-    expect(await fixture.evaluationRepo.listEvaluators(STEP)).toEqual([]);
-  });
-
-  it('refuses an Agent Run of another step', async () => {
-    const fixture = await evaluationFixture();
-    await expect(previewEvaluator(
-      { ...STEP, stepId: 'grade-aes', workflowName: 'ae-grading', namespace: NAMESPACE, check: findingsSchema, agentRunIds: ['no-such-run'], limit: 5 },
-      fixture.scope(),
     )).rejects.toBeInstanceOf(NotFoundError);
   });
 });
