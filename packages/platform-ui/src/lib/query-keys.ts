@@ -200,6 +200,15 @@ export const queryKeys = {
    *  keyset-paginated, server-side filtered by action set + actor +
    *  date range. Each tab passes its own `actions` slice, so the two
    *  tabs' pages don't share a cache entry. */
+  /** A Step's Evaluation (ADR-0023). `step` is the prefix every write invalidates. */
+  evaluation: {
+    step: (namespace: string, workflowName: string, stepId: string) =>
+      ['evaluation', namespace, workflowName, stepId] as const,
+    section: (namespace: string, workflowName: string, stepId: string, section: string) =>
+      ['evaluation', namespace, workflowName, stepId, section] as const,
+  },
+  /** One Eval Run with its trials and report — its own domain so it polls alone while running. */
+  evalRun: (evalRunId: string) => ['eval-run', evalRunId] as const,
   namespaceAuditEvents: (
     handle: string,
     filters: { actions: readonly string[]; actorId?: string; fromDate?: string; toDate?: string },
