@@ -17,7 +17,10 @@ import {
   type StepExecutorServices,
 } from '@mediforce/agent-runtime';
 import {
+  mcpEvalRestrictions,
+  type AgentDefinitionRepository,
   type AgentOAuthTokenRepository,
+  type EvaluationRepository,
   type OAuthProviderRepository,
   type ResolvedMcpConfig,
   type WorkflowDefinition,
@@ -70,6 +73,7 @@ export async function executeAgentStep(
     oauthProviderRepo,
     agentOAuthTokenRepo,
     modelRegistryRepo,
+    evaluationRepo,
   } = getPlatformServices();
 
   const instance = await instanceRepo.getById(instanceId);
@@ -144,9 +148,12 @@ export async function executeAgentStep(
   // Pre-resolve MCP configuration from the agent definition + step restrictions
   // + tool catalog. undefined when step.agentId is unset. Namespace-scoped
   // catalog lookups use the workflow's namespace.
+  const mcpStep = reapTimedOut || instance.evalRunId === undefined
+    ? workflowStep
+    : await withMcpEvalPolicy(workflowStep, instance.evalRunId, evaluationRepo, agentDefinitionRepo);
   const resolvedMcpConfig = reapTimedOut
     ? undefined
-    : (await resolveMcpForStep(workflowStep, {
+    : (await resolveMcpForStep(mcpStep, {
         agentDefinitionRepo,
         toolCatalogRepo,
         namespace: workflowDefinition.namespace,
@@ -192,6 +199,9 @@ export async function executeAgentStep(
     resolvedMcpConfig,
     ...(instance.previousRun !== undefined
       ? { previousRun: instance.previousRun }
+      : {}),
+    ...(instance.workspaceStartCommit !== undefined
+      ? { workspaceStartCommit: instance.workspaceStartCommit }
       : {}),
     oauthTokens,
     agentIdentityPrompt,
@@ -252,6 +262,27 @@ export async function executeAgentStep(
     status: currentInstance?.status ?? executionResult.status,
     currentStepId: currentInstance?.currentStepId ?? null,
     agentRunStatus: executionResult.status,
+  };
+}
+
+/**
+ * An eval trial's step as its MCP servers see it (ADR-0023 D6): every server of
+ * the step's agent runs under the Eval Run's frozen policy — denied unless the
+ * author declared it live — on top of the step's own restrictions.
+ */
+async function withMcpEvalPolicy(
+  step: WorkflowStep,
+  evalRunId: string,
+  evaluationRepo: EvaluationRepository,
+  agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>,
+): Promise<WorkflowStep> {
+  if (step.agentId === undefined) return step;
+  const evalRun = await evaluationRepo.getEvalRun(evalRunId);
+  if (evalRun === null) throw new Error(`Eval Run '${evalRunId}' of this trial not found`);
+  const agent = await agentDefinitionRepo.getById(step.agentId);
+  return {
+    ...step,
+    mcpRestrictions: mcpEvalRestrictions(Object.keys(agent?.mcpServers ?? {}), evalRun.mcpPolicy, step.mcpRestrictions),
   };
 }
 

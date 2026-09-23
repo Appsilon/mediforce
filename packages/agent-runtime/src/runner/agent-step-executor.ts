@@ -139,6 +139,25 @@ export class AgentStepExecutor implements StepExecutor {
       }
     }
 
+    // Eval trial (ADR-0023 D4): the step has run and the trial ends here —
+    // what it produced is scored from its Agent Run, so no review task,
+    // escalation or transition follows.
+    if (guardInstance?.evalRunId !== undefined) {
+      const trialFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
+      const finished = await engine.finishEvalTrial(instanceId, stepId, {
+        failed: trialFailed,
+        error: trialFailed ? `Agent step '${stepId}' ${runResult.fallbackReason}: ${runResult.errorMessage ?? 'no detail'}` : null,
+      });
+      return {
+        status: trialFailed ? 'failed' : 'completed',
+        envelope,
+        appliedToWorkflow: false,
+        fallbackReason: runResult.fallbackReason,
+        executorType: 'agent',
+        instanceState: { status: finished.status, currentStepId: finished.currentStepId },
+      };
+    }
+
     // Helper: create a human review task for L3 escalation
     const createAgentReviewHumanTask = async (
       escalationReason: AgentFallbackReason | 'iterations_limit' | null,

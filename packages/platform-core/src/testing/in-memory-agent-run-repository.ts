@@ -95,9 +95,20 @@ export class InMemoryAgentRunRepository implements AgentRunRepository {
 
   async list(opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> {
     const kept = opts.namespace === undefined
-      ? [...this.byId.values()]
+      ? await this.withoutEvalTrials([...this.byId.values()])
       : await this.filterByResolvedNamespace([...this.byId.values()], (ns) => ns === opts.namespace);
     return this.pageOf(this.applyFilters(kept, opts), opts);
+  }
+
+  /** Agents history leaves eval trials out (ADR-0023 D4); with no parent repo there is nothing to tell them by. */
+  private async withoutEvalTrials(runs: AgentRun[]): Promise<AgentRun[]> {
+    if (this.parents === undefined) return runs;
+    const kept: AgentRun[] = [];
+    for (const run of runs) {
+      const parent = await this.parents.getById(run.processInstanceId);
+      if (parent?.evalRunId === undefined) kept.push(run);
+    }
+    return kept;
   }
 
   async listInNamespaces(
@@ -125,7 +136,7 @@ export class InMemoryAgentRunRepository implements AgentRunRepository {
     for (const run of runs) {
       const parent = await parents.getById(run.processInstanceId);
       if (!parent || typeof parent.namespace !== 'string') continue;
-      if (!predicate(parent.namespace)) continue;
+      if (!predicate(parent.namespace) || parent.evalRunId !== undefined) continue;
       kept.push(run);
     }
     return kept;
@@ -150,7 +161,7 @@ export class InMemoryAgentRunRepository implements AgentRunRepository {
   async countByCardStatus(
     opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status'>,
   ): Promise<AgentRunCardStatusCounts> {
-    return this.tallyCardStatus(this.applyFilters([...this.byId.values()], opts));
+    return this.tallyCardStatus(this.applyFilters(await this.withoutEvalTrials([...this.byId.values()]), opts));
   }
 
   async countByCardStatusInNamespaces(
@@ -163,7 +174,7 @@ export class InMemoryAgentRunRepository implements AgentRunRepository {
     for (const run of this.byId.values()) {
       const parent = await parents.getById(run.processInstanceId);
       if (!parent || typeof parent.namespace !== 'string') continue;
-      if (!allowedSet.has(parent.namespace)) continue;
+      if (!allowedSet.has(parent.namespace) || parent.evalRunId !== undefined) continue;
       kept.push(run);
     }
     return this.tallyCardStatus(this.applyFilters(kept, opts));

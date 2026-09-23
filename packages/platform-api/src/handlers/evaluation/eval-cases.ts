@@ -114,6 +114,9 @@ export async function createEvalCaseFromAgentRun(
     stepId: subject.agentRun.stepId,
   };
   await loadEvaluatedStep(scope, step, 'edit');
+  if (subject.instance.evalRunId !== undefined) {
+    throw new ValidationError(`Agent Run '${input.agentRunId}' is an eval trial, not a production run`);
+  }
 
   const [verdict] = await scope.scores.list({ agentRunId: input.agentRunId, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 });
   const expectation = input.expectation ?? verdictExpectation(verdict?.value);

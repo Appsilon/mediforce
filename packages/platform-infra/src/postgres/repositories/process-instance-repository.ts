@@ -145,6 +145,8 @@ export class PostgresProcessInstanceRepository
           parsed.totalCostUsd !== undefined ? String(parsed.totalCostUsd) : null,
         createdBy: parsed.createdBy,
         dryRun: parsed.dryRun === true,
+        evalRunId: parsed.evalRunId ?? null,
+        workspaceStartCommit: parsed.workspaceStartCommit ?? null,
         archivedAt: parsed.archived === true ? new Date() : null,
         deletedAt: parsed.deleted === true ? new Date() : null,
         createdAt: new Date(parsed.createdAt),
@@ -193,7 +195,7 @@ export class PostgresProcessInstanceRepository
   }
 
   async listAll(options: ListInstancesOptions): Promise<ProcessInstance[]> {
-    const conditions = [isNull(processInstances.deletedAt)];
+    const conditions = [isNull(processInstances.deletedAt), isNull(processInstances.evalRunId)];
     if (options.definitionName !== undefined) {
       conditions.push(eq(processInstances.definitionName, options.definitionName));
     }
@@ -222,6 +224,7 @@ export class PostgresProcessInstanceRepository
     if (allowed.length === 0) return [];
     const conditions = [
       isNull(processInstances.deletedAt),
+      isNull(processInstances.evalRunId),
       inArray(processInstances.workspace, [...allowed]),
     ];
     if (options.definitionName !== undefined) {
@@ -386,7 +389,7 @@ export class PostgresProcessInstanceRepository
     options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
     allowed: readonly string[] | undefined,
   ): SQL[] {
-    const conditions: SQL[] = [isNull(processInstances.deletedAt)];
+    const conditions: SQL[] = [isNull(processInstances.deletedAt), isNull(processInstances.evalRunId)];
     if (allowed !== undefined) {
       conditions.push(inArray(processInstances.workspace, [...allowed]));
     }
@@ -550,6 +553,7 @@ export class PostgresProcessInstanceRepository
           eq(processInstances.definitionName, name),
           eq(processInstances.status, 'completed'),
           isNull(processInstances.deletedAt),
+          isNull(processInstances.evalRunId),
         ),
       )
       .orderBy(desc(processInstances.updatedAt))
@@ -801,6 +805,8 @@ function toInstance(row: typeof processInstances.$inferSelect): ProcessInstance 
     previousRunSourceId: row.previousRunSourceId ?? undefined,
     totalCostUsd: row.totalCostUsd !== null ? Number(row.totalCostUsd) : undefined,
     dryRun: row.dryRun === true,
+    ...(row.evalRunId === null ? {} : { evalRunId: row.evalRunId }),
+    ...(row.workspaceStartCommit === null ? {} : { workspaceStartCommit: row.workspaceStartCommit }),
   });
 }
 

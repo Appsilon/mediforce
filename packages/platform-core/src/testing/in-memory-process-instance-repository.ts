@@ -224,7 +224,7 @@ export class InMemoryProcessInstanceRepository
     rows: ProcessInstance[],
     options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
   ): ProcessInstance[] {
-    let results = rows.filter((i) => i.deleted !== true);
+    let results = rows.filter((i) => i.deleted !== true && i.evalRunId === undefined);
     if (options.namespace !== undefined) {
       results = results.filter((i) => i.namespace === options.namespace);
     }
@@ -265,7 +265,7 @@ export class InMemoryProcessInstanceRepository
     rows: ProcessInstance[],
     options: ListInstancesOptions,
   ): ProcessInstance[] {
-    let results = rows.filter((i) => i.deleted !== true);
+    let results = rows.filter((i) => i.deleted !== true && i.evalRunId === undefined);
     if (options.namespace !== undefined) {
       results = results.filter((i) => i.namespace === options.namespace);
     }
@@ -319,7 +319,8 @@ export class InMemoryProcessInstanceRepository
       (i) =>
         i.definitionName === name &&
         i.status === 'completed' &&
-        i.deleted === false,
+        i.deleted === false &&
+        i.evalRunId === undefined,
     );
     if (matching.length === 0) return null;
     matching.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));

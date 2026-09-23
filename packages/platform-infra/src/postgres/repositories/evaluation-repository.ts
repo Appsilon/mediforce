@@ -1,5 +1,11 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import {
+  EvalRunSchema,
+  EvalTrialSchema,
+  type EvalRun,
+  type EvalRunStatus,
+  type EvalTrial,
+  type EvalTrialStatus,
   EvalCaseSchema,
   EvalDatasetVersionSchema,
   EvaluationBriefSchema,
@@ -22,6 +28,8 @@ import type { Database } from '../client';
 import {
   evalCases,
   evalDatasetVersions,
+  evalRuns,
+  evalTrials,
   evaluationBriefs,
   evaluatorVersions,
   evaluators,
@@ -121,6 +129,45 @@ function toPolicy(row: typeof mcpEvalPolicies.$inferSelect): McpEvalPolicy {
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt.toISOString(),
   });
+}
+
+function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
+  return EvalRunSchema.parse({
+    ...stepFields(row),
+    id: row.id,
+    definitionVersion: row.definitionVersion,
+    datasetVersionId: row.datasetVersionId,
+    caseIds: row.caseIds,
+    trialsPerCase: row.trialsPerCase,
+    concurrency: row.concurrency,
+    evaluators: row.evaluators,
+    mcpPolicy: row.mcpPolicy,
+    estimate: row.estimate,
+    budgetUsd: row.budgetUsd,
+    spentUsd: row.spentUsd,
+    status: row.status,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt.toISOString(),
+    startedAt: row.startedAt?.toISOString() ?? null,
+    completedAt: row.completedAt?.toISOString() ?? null,
+  });
+}
+
+function toTrial(row: typeof evalTrials.$inferSelect): EvalTrial {
+  return EvalTrialSchema.parse({
+    ...row,
+    startedAt: row.startedAt?.toISOString() ?? null,
+    completedAt: row.completedAt?.toISOString() ?? null,
+  });
+}
+
+function trialValues(trial: Partial<EvalTrial>): Partial<typeof evalTrials.$inferInsert> {
+  const { startedAt, completedAt, ...rest } = trial;
+  return {
+    ...rest,
+    ...(startedAt === undefined ? {} : { startedAt: startedAt === null ? null : new Date(startedAt) }),
+    ...(completedAt === undefined ? {} : { completedAt: completedAt === null ? null : new Date(completedAt) }),
+  };
 }
 
 /** Postgres-backed Evaluation domain storage (ADR-0023). */
@@ -297,6 +344,102 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
       })
       .returning();
     return toPolicy(row!);
+  }
+  async createEvalRun(run: EvalRun, trials: readonly EvalTrial[]): Promise<void> {
+    const parsed = EvalRunSchema.parse(run);
+    await this.db.transaction(async (tx) => {
+      await tx.insert(evalRuns).values({
+        id: parsed.id,
+        workspace: parsed.namespace,
+        workflowName: parsed.workflowName,
+        stepId: parsed.stepId,
+        definitionVersion: parsed.definitionVersion,
+        datasetVersionId: parsed.datasetVersionId,
+        caseIds: parsed.caseIds,
+        trialsPerCase: parsed.trialsPerCase,
+        concurrency: parsed.concurrency,
+        evaluators: parsed.evaluators,
+        mcpPolicy: parsed.mcpPolicy,
+        estimate: parsed.estimate,
+        budgetUsd: parsed.budgetUsd,
+        spentUsd: parsed.spentUsd,
+        status: parsed.status,
+        createdBy: parsed.createdBy,
+        createdAt: new Date(parsed.createdAt),
+        startedAt: parsed.startedAt === null ? null : new Date(parsed.startedAt),
+        completedAt: parsed.completedAt === null ? null : new Date(parsed.completedAt),
+      });
+      if (trials.length > 0) {
+        await tx.insert(evalTrials).values(trials.map((trial) => {
+          const parsedTrial = EvalTrialSchema.parse(trial);
+          return trialValues(parsedTrial) as typeof evalTrials.$inferInsert;
+        }));
+      }
+    });
+  }
+
+  async getEvalRun(id: string): Promise<EvalRun | null> {
+    const [row] = await this.db.select().from(evalRuns).where(eq(evalRuns.id, id)).limit(1);
+    return row === undefined ? null : toEvalRun(row);
+  }
+
+  async listEvalRuns(step: EvaluatedStep): Promise<EvalRun[]> {
+    const rows = await this.db.select().from(evalRuns)
+      .where(onStep(evalRuns, step))
+      .orderBy(desc(evalRuns.createdAt), desc(evalRuns.id));
+    return rows.map(toEvalRun);
+  }
+
+  async listEvalRunIdsByStatus(status: EvalRunStatus): Promise<string[]> {
+    const rows = await this.db.select({ id: evalRuns.id }).from(evalRuns).where(eq(evalRuns.status, status));
+    return rows.map((row) => row.id);
+  }
+
+  async transitionEvalRun(
+    id: string,
+    from: EvalRunStatus,
+    patch: Partial<Pick<EvalRun, 'status' | 'startedAt' | 'completedAt'>>,
+  ): Promise<boolean> {
+    const rows = await this.db.update(evalRuns)
+      .set({
+        ...(patch.status === undefined ? {} : { status: patch.status }),
+        ...(patch.startedAt === undefined ? {} : { startedAt: patch.startedAt === null ? null : new Date(patch.startedAt) }),
+        ...(patch.completedAt === undefined ? {} : { completedAt: patch.completedAt === null ? null : new Date(patch.completedAt) }),
+      })
+      .where(and(eq(evalRuns.id, id), eq(evalRuns.status, from)))
+      .returning({ id: evalRuns.id });
+    return rows.length === 1;
+  }
+
+  async addEvalRunSpend(id: string, usd: number): Promise<void> {
+    await this.db.update(evalRuns)
+      .set({ spentUsd: sql`${evalRuns.spentUsd} + ${usd}` })
+      .where(eq(evalRuns.id, id));
+  }
+
+  async listTrials(evalRunId: string): Promise<EvalTrial[]> {
+    const rows = await this.db.select().from(evalTrials)
+      .where(eq(evalTrials.evalRunId, evalRunId))
+      .orderBy(asc(evalTrials.caseId), asc(evalTrials.trialIndex));
+    return rows.map(toTrial);
+  }
+
+  async getTrialByInstanceId(processInstanceId: string): Promise<EvalTrial | null> {
+    const [row] = await this.db.select().from(evalTrials)
+      .where(eq(evalTrials.processInstanceId, processInstanceId)).limit(1);
+    return row === undefined ? null : toTrial(row);
+  }
+
+  async transitionTrial(
+    id: string,
+    from: EvalTrialStatus,
+    patch: Partial<Omit<EvalTrial, 'id' | 'evalRunId' | 'caseId' | 'trialIndex'>>,
+  ): Promise<boolean> {
+    const rows = await this.db.update(evalTrials)
+      .set(trialValues(patch))
+      .where(and(eq(evalTrials.id, id), eq(evalTrials.status, from)))
+      .returning({ id: evalTrials.id });
+    return rows.length === 1;
   }
 }
 

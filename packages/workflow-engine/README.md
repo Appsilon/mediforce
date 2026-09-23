@@ -12,7 +12,7 @@ lets the same engine drive an HTTP request, a cron tick, and a test.
 
 | Directory | Holds |
 |---|---|
-| `src/engine/` | `WorkflowEngine` (advance/pause/resume/abort), `StepExecutor`, `transition-resolver.ts`, `complete-human-task.ts`, typed errors |
+| `src/engine/` | `WorkflowEngine` (advance/pause/resume/abort, and `createEvalTrial`/`finishEvalTrial` for single-step eval trials), `StepExecutor`, `transition-resolver.ts`, `complete-human-task.ts`, typed errors |
 | `src/expressions/` | The `when:` DSL evaluator — `${variables.field} == "value"` |
 | `src/review/` | `ReviewTracker` — verdict accumulation against review constraints |
 | `src/triggers/` | `ManualTrigger`, `CronTrigger`, `WebhookRouter`, cron schedule utilities |
@@ -39,6 +39,13 @@ go is a bug in the definition, and the engine's job is to say so loudly.
 `InvalidTransitionError`, `MaxIterationsExceededError` — route on the type.
 `MaxIterationsExceededError` in particular is the loop guard; raising the cap to
 make a workflow pass is treating the symptom.
+
+**An eval trial runs one step and stops** ([ADR-0023](../../docs/adr/0023-step-evaluation.md)
+D4). `createEvalTrial` creates a run already `running` at the target step with
+seeded variables, so the auto-runner executes it like any other;
+`finishEvalTrial` ends it after that step. The agent step executor calls it for
+any run carrying `evalRunId` instead of routing — nothing downstream of the
+evaluated step ever runs.
 
 ## Testing
 

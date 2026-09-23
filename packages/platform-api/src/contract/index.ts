@@ -654,6 +654,20 @@ export {
   type GetMcpEvalPolicyOutput,
   type SetMcpEvalPolicyInput,
   type SetMcpEvalPolicyOutput,
+  PrepareEvalRunInputSchema,
+  StartEvalRunInputSchema,
+  GetEvalRunInputSchema,
+  CancelEvalRunInputSchema,
+  EvalRunOutputSchema,
+  ListEvalRunsInputSchema,
+  ListEvalRunsOutputSchema,
+  type PrepareEvalRunInput,
+  type StartEvalRunInput,
+  type GetEvalRunInput,
+  type CancelEvalRunInput,
+  type EvalRunOutput,
+  type ListEvalRunsInput,
+  type ListEvalRunsOutput,
 } from './evaluation';
 
 export {

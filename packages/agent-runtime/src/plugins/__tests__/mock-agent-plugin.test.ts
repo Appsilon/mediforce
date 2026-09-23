@@ -56,3 +56,27 @@ describe('MockAgentPlugin', () => {
     });
   });
 });
+
+describe('MockAgentPlugin trajectory', () => {
+  it('names the MCP servers the step would have run with', async () => {
+    const recorded: Array<{ text?: string }> = [];
+    const plugin = new MockAgentPlugin();
+    await plugin.initialize({
+      stepId: 'grade-aes',
+      processInstanceId: 'run-1',
+      runNamespace: 'test',
+      definitionVersion: '1',
+      stepInput: {},
+      autonomyLevel: 'L4',
+      workflowDefinition: buildWorkflowDefinition({ steps: [], transitions: [] }),
+      step: { id: 'grade-aes', name: 'Grade', type: 'creation', executor: 'agent' },
+      llm: { complete: async () => ({ content: '', model: 'mock', usage: { promptTokens: 0, completionTokens: 0 } }) },
+      getPreviousStepOutputs: async () => ({}),
+      resolvedMcpConfig: { servers: { meddra: { type: 'http', url: 'https://mcp.example.com/meddra' } } },
+      trajectory: { record: (entries: Array<{ text?: string }>) => { recorded.push(...entries); }, flush: async () => {} },
+    } as unknown as WorkflowAgentContext);
+    await plugin.run(async () => {});
+
+    expect(recorded[0]?.text).toBe("Mock agent working on step 'grade-aes' with MCP servers: meddra.");
+  });
+});
