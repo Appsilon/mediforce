@@ -96,6 +96,8 @@ export interface WorkflowAgentContext {
    * or all previous failed). Undefined when the WD declares no carry-over.
    */
   previousRun?: Record<string, unknown>;
+  /** Commit the run branch starts from instead of the default branch (an eval trial's workspace seed). */
+  workspaceStartCommit?: string;
   /** Pre-loaded OAuth tokens keyed by MCP server name. Populated by
    *  platform-ui's executeAgentStep for every HTTP binding whose auth
    *  config is `{ type: 'oauth', ... }`. Consumed by writeMcpConfig to

@@ -101,6 +101,18 @@ describe('WorkspaceManager', () => {
       expect(text).toBe('hello');
     });
 
+    it('starts a new run branch from a given commit — an eval trial\'s workspace seed', async () => {
+      const wd = { name: 'wd-seeded', workspace: {} as WorkflowWorkspace };
+      const production = await manager.createRunWorkspace(wd, 'run-production');
+      await writeFile(join(production.path, 'adae.csv'), 'USUBJID,AETOXGR\n01-701-1015,5\n');
+      const { commitSha } = await manager.commitStep(production, { stepId: 'extract-aes' });
+
+      const trial = await manager.createRunWorkspace(wd, 'run-trial', { startCommit: commitSha });
+
+      expect(trial.startCommit).toBe(commitSha);
+      expect(await readFile(join(trial.path, 'adae.csv'), 'utf-8')).toContain('01-701-1015');
+    });
+
     it('supports parallel runs on independent branches', async () => {
       const wd = { name: 'wd-parallel', workspace: {} as WorkflowWorkspace };
       const [r1, r2] = await Promise.all([
