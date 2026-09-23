@@ -81,6 +81,14 @@ export const ProcessInstanceSchema = z.object({
   parentInstanceId: z.string().min(1).optional(),
   parentDefinitionName: z.string().min(1).optional(),
   dryRun: z.boolean().default(false),
+  /**
+   * Set on an eval trial (ADR-0023 D4): a single-step run an Eval Run started
+   * at its target Step. Run lists, monitoring, Agents history and carry-over
+   * leave these out.
+   */
+  evalRunId: z.string().min(1).optional(),
+  /** Commit on the workflow's bare repo the run branch starts from, instead of the default branch. */
+  workspaceStartCommit: z.string().min(1).optional(),
 });
 
 export type InstanceStatus = z.infer<typeof InstanceStatusSchema>;

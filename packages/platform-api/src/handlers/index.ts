@@ -184,6 +184,13 @@ export {
   freezeEvalDataset,
   getMcpEvalPolicy,
   setMcpEvalPolicy,
+  prepareEvalRun,
+  startEvalRun,
+  getEvalRun,
+  listEvalRuns,
+  cancelEvalRun,
+  advanceEvalRunOfInstance,
+  driveRunningEvalRuns,
 } from './evaluation/index';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 

@@ -6,3 +6,12 @@ export { listStepAgentRuns } from './step-agent-runs';
 export { listEvalCases, createEvalCase, createEvalCaseFromAgentRun, archiveEvalCase } from './eval-cases';
 export { listEvalDatasets, freezeEvalDataset } from './eval-datasets';
 export { getMcpEvalPolicy, setMcpEvalPolicy } from './mcp-eval-policy';
+export {
+  prepareEvalRun,
+  startEvalRun,
+  getEvalRun,
+  listEvalRuns,
+  cancelEvalRun,
+  advanceEvalRunOfInstance,
+  driveRunningEvalRuns,
+} from './eval-runs';

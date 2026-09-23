@@ -386,6 +386,109 @@ export class WorkflowEngine {
     return this.loadInstance(instanceId);
   }
 
+  /**
+   * Start an eval trial (ADR-0023 D4): a real Workflow Run that enters one Step
+   * directly with seeded state and runs nothing after it. It is created
+   * `running` at `stepId`, so the auto-runner picks it up like any other run;
+   * {@link finishEvalTrial} ends it once the step has run.
+   */
+  async createEvalTrial(input: {
+    namespace: string;
+    definitionName: string;
+    version: number;
+    stepId: string;
+    evalRunId: string;
+    triggerPayload: Record<string, unknown>;
+    /** The outputs of the steps before it, as `instance.variables` held them. */
+    variables: Record<string, unknown>;
+    previousRun?: Record<string, unknown>;
+    workspaceStartCommit: string | null;
+    createdBy: string;
+  }): Promise<ProcessInstance> {
+    const definition = await this.processRepository.getWorkflowDefinition(input.namespace, input.definitionName, input.version);
+    if (!definition) {
+      throw new Error(`Workflow definition '${input.definitionName}' version '${input.version}' not found`);
+    }
+    if (!definition.steps.some((step) => step.id === input.stepId)) {
+      throw new Error(`Step '${input.stepId}' not found in '${input.definitionName}' v${input.version}`);
+    }
+
+    const now = new Date().toISOString();
+    const instance: ProcessInstance = {
+      id: crypto.randomUUID(),
+      definitionName: input.definitionName,
+      definitionVersion: String(input.version),
+      status: 'running',
+      currentStepId: input.stepId,
+      variables: input.variables,
+      triggerType: 'manual',
+      triggerPayload: input.triggerPayload,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: input.createdBy,
+      pauseReason: null,
+      error: null,
+      assignedRoles: definition.roles ?? [],
+      deleted: false,
+      archived: false,
+      namespace: definition.namespace,
+      ...(input.previousRun === undefined ? {} : { previousRun: input.previousRun }),
+      dryRun: false,
+      evalRunId: input.evalRunId,
+      ...(input.workspaceStartCommit === null ? {} : { workspaceStartCommit: input.workspaceStartCommit }),
+    };
+    await this.instanceRepository.create(instance);
+
+    await this.auditRepository.append({
+      actorId: input.createdBy,
+      actorType: 'user',
+      actorRole: 'evaluator',
+      action: 'instance.created',
+      description: `Created eval trial of '${input.definitionName}' v${input.version} at step '${input.stepId}'`,
+      timestamp: now,
+      inputSnapshot: { definitionName: input.definitionName, version: input.version, stepId: input.stepId, evalRunId: input.evalRunId },
+      outputSnapshot: { instanceId: instance.id },
+      basis: `Eval Run '${input.evalRunId}' trial (ADR-0023 D4)`,
+      entityType: 'processInstance',
+      entityId: instance.id,
+      processInstanceId: instance.id,
+      processDefinitionVersion: String(input.version),
+    });
+    return instance;
+  }
+
+  /**
+   * End an eval trial after its one step, whatever the step did: completed
+   * when the Agent Run finished (fallbacks included — the trial's job was to
+   * produce an output to score), failed when it errored or timed out. No
+   * transition, review task, handoff or notification follows.
+   */
+  async finishEvalTrial(instanceId: string, stepId: string, outcome: { failed: boolean; error: string | null }): Promise<ProcessInstance> {
+    const now = new Date().toISOString();
+    await this.instanceRepository.update(instanceId, {
+      status: outcome.failed ? 'failed' : 'completed',
+      currentStepId: null,
+      pauseReason: null,
+      ...(outcome.error === null ? {} : { error: outcome.error }),
+      updatedAt: now,
+    });
+    await this.auditRepository.append({
+      actorId: 'engine',
+      actorType: 'system',
+      actorRole: 'orchestrator',
+      action: outcome.failed ? 'instance.failed' : 'instance.completed',
+      description: `Eval trial '${instanceId}' finished after step '${stepId}'`,
+      timestamp: now,
+      inputSnapshot: { stepId },
+      outputSnapshot: { failed: outcome.failed, ...(outcome.error === null ? {} : { error: outcome.error }) },
+      basis: 'An eval trial stops after its target step (ADR-0023 D4)',
+      entityType: 'processInstance',
+      entityId: instanceId,
+      processInstanceId: instanceId,
+    });
+    return this.loadInstance(instanceId);
+  }
+
   async startInstance(instanceId: string): Promise<ProcessInstance> {
     const instance = await this.loadInstance(instanceId);
 

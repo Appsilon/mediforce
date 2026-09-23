@@ -343,6 +343,30 @@ function contract(
       expect(last?.id).not.toBe(tombstoned.id);
     });
 
+    it('keeps eval trials out of run lists, counts and carry-over (ADR-0023 D4)', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      const production = await repo.create(
+        instanceFor('ws-1', { status: 'completed', updatedAt: '2026-05-26T00:00:00.000Z' }),
+      );
+      const trial = await repo.create(
+        instanceFor('ws-1', {
+          status: 'completed',
+          updatedAt: '2026-05-27T00:00:00.000Z',
+          evalRunId: 'eval-run-1',
+          workspaceStartCommit: 'a1b2c3d4e5f6',
+        }),
+      );
+
+      expect(await repo.getById(trial.id)).toMatchObject({ evalRunId: 'eval-run-1', workspaceStartCommit: 'a1b2c3d4e5f6' });
+      expect((await repo.getById(production.id))?.evalRunId).toBeUndefined();
+      expect((await repo.getLastCompletedByDefinitionName('supply-chain-review'))?.id).toBe(production.id);
+      expect((await repo.listAll({ namespace: 'ws-1' })).map((row) => row.id)).toEqual([production.id]);
+      expect((await repo.listPage({ namespace: 'ws-1', limit: 20 })).items.map((row) => row.id)).toEqual([production.id]);
+      const counts = await repo.countByDisplayStatus({ namespace: 'ws-1' });
+      expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(1);
+    });
+
     it('addStepExecution + getStepExecutions ordered by startedAt asc', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');

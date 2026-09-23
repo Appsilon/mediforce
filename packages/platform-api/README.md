@@ -102,6 +102,12 @@ output (`_lib/run-evaluator-check.ts`). Nothing here approves a `code` check's
 source or labels an output on anyone's behalf: both record the person who did
 it, and an API key must name them.
 
+An Eval Run is driven by `driveEvalRun` (`_lib/drive-eval-run.ts`), which is
+idempotent and moves trials only by conditional transitions — so the start
+handler, the auto-runner (when a trial's run ends) and the heartbeat can all
+call it without starting or scoring a trial twice. Its report is computed from
+the Scores on read, never stored.
+
 **Assistants share building blocks.** `src/assistant-core/` holds the pieces
 the workflow editor assistant and the Evaluation Assistant both use
 ([ADR-0023](../../docs/adr/0023-step-evaluation.md) D14): one prompt audit event

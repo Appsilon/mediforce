@@ -81,6 +81,9 @@ export const processInstances = pgTable(
     createdBy: text('created_by'),
 
     dryRun: boolean('dry_run').notNull().default(false),
+    // Eval trial (ADR-0023 D4): the Eval Run that started this single-step run.
+    evalRunId: text('eval_run_id'),
+    workspaceStartCommit: text('workspace_start_commit'),
 
     // Tombstones — null when not set.
     archivedAt: timestamp('archived_at', { withTimezone: true }),

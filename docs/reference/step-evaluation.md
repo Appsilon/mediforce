@@ -70,3 +70,38 @@ A version never changes.
 Per MCP server of the Step's agent: `live`, `live` with named tools denied, or
 `deny`. A server the policy does not name is denied in eval trials.
 `mcp-policy-get` shows what each server does, defaults included.
+
+## Eval Runs
+
+An Eval Run runs the Step, as its runnable Definition version has it, over a
+frozen Dataset version: every case, `trialsPerCase` times.
+
+1. **Prepare** (`run-prepare`, `POST /api/evaluation/runs`) freezes the Dataset
+   version (the newest unless named), the latest version of every live
+   Evaluator — and whether each one counts — and the MCP eval policy, and
+   estimates the cost: the Step's mean cost over its recent production runs, or
+   its model's registry price for a nominal turn when it has none, plus one call
+   per `llm_judge`. The budget cap defaults to 1.5× the estimate; with no
+   estimate it must be given.
+2. **Start** (`run-start --confirm-budget <usd>`) needs the budget echoed back —
+   the person confirming what the run may spend. Without it the start is
+   refused, which is also how an assistant's attempt to start one ends.
+3. Each **trial** is a real Workflow Run flagged with the Eval Run's id. It
+   enters the Step directly with the case's trigger payload and earlier step
+   outputs, its workspace branched from the case's seed commit, and stops after
+   the Step: no review task, no escalation, no next step. MCP servers the policy
+   does not declare `live` are removed from the agent's config. Run lists,
+   monitoring, the Agents history and carry-over (`inputForNextRun`) leave
+   trials out.
+4. When a trial's run ends, every frozen Evaluator grades its Agent Run and
+   writes a Score (`source: deterministic` or `llm_judge`, `metadata.evalRunId`).
+   Trials start `concurrency` at a time; once spend reaches the budget the rest
+   are skipped and the run ends `budget_exceeded`. The heartbeat moves any
+   running Eval Run on, so a restart does not strand one.
+
+The **report** (`mediforce eval report <id>`, `GET /api/evaluation/runs/:id`)
+is computed from those Scores. Per Evaluator: pass rate with its Wilson 95%
+interval, pass@k (a case passes if any of its k trials does), pass^k (all of
+them do), flakiness (its trials disagree), and checks that could not grade a
+trial as errors. Evaluators that do not count are marked so. Cost, tokens and
+duration come from the trials' runs.

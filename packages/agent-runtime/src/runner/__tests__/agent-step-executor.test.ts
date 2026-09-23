@@ -20,6 +20,7 @@ const mockInstanceRepo = {
 const mockEngine = {
   advanceStep: vi.fn(),
   submitReviewVerdict: vi.fn(),
+  finishEvalTrial: vi.fn(),
 };
 const mockHumanTaskRepo = { create: vi.fn() };
 const mockModelRegistryRepo = { getById: vi.fn().mockResolvedValue(null) };
@@ -96,6 +97,47 @@ describe('AgentStepExecutor', () => {
     mockEngine.advanceStep.mockResolvedValue({
       status: 'running',
       currentStepId: 'done',
+    });
+  });
+
+  describe('eval trial (ADR-0023 D4)', () => {
+    beforeEach(() => {
+      mockInstanceRepo.getById.mockResolvedValue({
+        status: 'paused',
+        currentStepId: 'analyze-data',
+        definitionVersion: '1',
+        variables: {},
+        evalRunId: 'eval-run-1',
+      });
+      mockEngine.finishEvalTrial.mockResolvedValue({ status: 'completed', currentStepId: null });
+    });
+
+    it('ends the trial after the step: no review task and no transition, even at L3', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused', envelope: defaultEnvelope, appliedToWorkflow: false, fallbackReason: null,
+      });
+
+      const result = await executor.execute(mockPlugin, makeContext({ autonomyLevel: 'L3' }), services, meta);
+
+      expect(mockEngine.finishEvalTrial).toHaveBeenCalledWith('inst-001', 'analyze-data', { failed: false, error: null });
+      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
+      expect(mockEngine.advanceStep).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ status: 'completed', instanceState: { status: 'completed', currentStepId: null } });
+    });
+
+    it('fails the trial when the agent errored', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'escalated', envelope: null, appliedToWorkflow: false, fallbackReason: 'error', errorMessage: 'container exited 1',
+      });
+      mockEngine.finishEvalTrial.mockResolvedValue({ status: 'failed', currentStepId: null });
+
+      const result = await executor.execute(mockPlugin, makeContext({ autonomyLevel: 'L4' }), services, meta);
+
+      expect(mockEngine.finishEvalTrial).toHaveBeenCalledWith('inst-001', 'analyze-data', {
+        failed: true,
+        error: "Agent step 'analyze-data' error: container exited 1",
+      });
+      expect(result.status).toBe('failed');
     });
   });
 
