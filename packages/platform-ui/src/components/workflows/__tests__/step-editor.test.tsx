@@ -488,6 +488,22 @@ describe('StepEditor', () => {
     expect(screen.getByText('Agent Prompt')).toBeInTheDocument();
   });
 
+  it('[DATA] drops an uncommitted outputSchema draft when another agent step is selected', () => {
+    const extract = buildStep({ id: 'extract', executor: 'agent' });
+    const summarise = buildStep({ id: 'summarise', executor: 'agent' });
+    const { rerender } = render(<StepEditor step={extract} allSteps={[extract, summarise]} onChange={noop} />);
+    expandCard('Prompt & model');
+    const draftBox = () => screen.getByPlaceholderText(/"required": \[\]/) as HTMLTextAreaElement;
+    fireEvent.change(draftBox(), { target: { value: '{ not json' } });
+    fireEvent.blur(draftBox());
+
+    rerender(<StepEditor step={summarise} allSteps={[extract, summarise]} onChange={noop} />);
+    expandCard('Prompt & model');
+
+    expect(draftBox().value).toBe('');
+    expect(screen.queryByText('Invalid JSON')).toBeNull();
+  });
+
   it('[DATA] agent ID selects a saved agent definition', async () => {
     agentState.response = {
       agents: [
