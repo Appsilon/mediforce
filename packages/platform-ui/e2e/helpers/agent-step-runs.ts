@@ -22,13 +22,14 @@ export function agentStepWorkflow(name: string, step: Record<string, unknown>): 
   };
 }
 
-/** Registers the workflow in the test workspace and starts a run; returns the run id. */
+/** Registers the workflow in a workspace (the test one by default) and starts a run; returns the run id. */
 export async function startRun(
   request: APIRequestContext,
   wd: Record<string, unknown>,
   payload: Record<string, unknown> = {},
+  namespace: string = TEST_ORG_HANDLE,
 ): Promise<string> {
-  const createWdRes = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+  const createWdRes = await request.post(`/api/workflow-definitions?namespace=${namespace}`, {
     headers: JSON_HEADERS,
     data: wd,
   });
@@ -36,7 +37,7 @@ export async function startRun(
 
   const triggerRes = await request.post('/api/processes', {
     headers: JSON_HEADERS,
-    data: { namespace: TEST_ORG_HANDLE, definitionName: wd.name, triggeredBy: 'e2e-test', triggerName: 'Start', payload },
+    data: { namespace, definitionName: wd.name, triggeredBy: 'e2e-test', triggerName: 'Start', payload },
   });
   expect(triggerRes.status(), await triggerRes.text()).toBe(201);
   const { run } = (await triggerRes.json()) as { run: { id: string } };

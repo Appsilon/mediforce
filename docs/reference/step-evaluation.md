@@ -18,6 +18,27 @@ access to the workflow; changing anything needs its `edit` verb. A Step that
 still declares MCP servers inline on `agent.mcpServers` cannot be evaluated —
 an eval policy cannot deny them, so move them onto its agent first.
 
+## The Evaluation Assistant
+
+The **Evaluation** tab of a workflow shows one agent step at a time — its
+Brief, Evaluators, Eval Cases, MCP eval policy and Eval Runs — beside the
+Evaluation Assistant (`mediforce eval ask`, `POST /api/evaluation/assistant`).
+Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
+
+- **Runs freely:** reading the step (config, agent prompt, SKILL.md, MCP
+  servers), its production runs and their trajectories, Evaluators, cases,
+  Eval Runs and reports, and `preview_evaluator` — it tries a check on real
+  outputs before proposing it.
+- **Proposes:** Evaluators, Eval Cases and Brief drafts come back as cards to
+  accept, edit or reject. Accepting one is the same write the forms make,
+  recorded with `origin: assistant`.
+- **Prepares:** it can prepare an Eval Run; the run starts only when the person
+  confirms its budget on the card. Its own start attempt is refused.
+- **Never:** approving a `code` check's source, labelling outputs, signing.
+  There is no tool for these.
+
+The step's Brief is sent to the assistant on every turn.
+
 ## Evaluation Brief
 
 A short text per Step — what it is for, who relies on its output, which

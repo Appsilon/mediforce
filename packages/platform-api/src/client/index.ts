@@ -626,6 +626,12 @@ import {
   type ListEvalRunsInput,
   type ListEvalRunsOutput,
 } from '../contract/evaluation';
+import {
+  AskEvaluationAssistantInputSchema,
+  AskEvaluationAssistantOutputSchema,
+  type AskEvaluationAssistantInput,
+  type AskEvaluationAssistantOutput,
+} from '../contract/evaluation-assistant';
 import { BUILD_CONTEXT_MEDIA_TYPE } from '@mediforce/platform-core';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
@@ -1028,6 +1034,8 @@ export class Mediforce {
     getRun: (input: GetEvalRunInput) => Promise<EvalRunOutput>;
     listRuns: (input: ListEvalRunsInput) => Promise<ListEvalRunsOutput>;
     cancelRun: (input: CancelEvalRunInput) => Promise<EvalRunOutput>;
+    // `signal` aborts the request: an assistant turn is long enough that a person will want to stop it.
+    askAssistant: (input: AskEvaluationAssistantInput, options?: { signal?: AbortSignal }) => Promise<AskEvaluationAssistantOutput>;
   };
 
   readonly monitoring: {
@@ -2530,6 +2538,10 @@ export class Mediforce {
         return this.sendJson('POST', `/api/evaluation/runs/${encodeURIComponent(evalRunId)}/cancel`, undefined,
           EvalRunOutputSchema, 'mediforce.evaluation.cancelRun');
       },
+      askAssistant: async (input, options) => this.sendJson(
+        'POST', '/api/evaluation/assistant', AskEvaluationAssistantInputSchema.parse(input),
+        AskEvaluationAssistantOutputSchema, 'mediforce.evaluation.askAssistant', options?.signal,
+      ),
     };
 
     this.scores = {

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, EyeOff, Copy, Link2, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, EyeOff, Copy, Link2, ShieldCheck, FlaskConical } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
@@ -30,6 +30,7 @@ import { collectSecretReferences } from '@/lib/preflight-checks';
 import { WorkflowAccessPanel } from '@/components/workflows/workflow-access-panel';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
+import { EvaluationTab } from '@/components/evaluation/evaluation-tab';
 import { TriggersPanel } from './TriggersPanel';
 
 export default function ProcessDefinitionPage() {
@@ -60,6 +61,7 @@ const WORKFLOW_TAB_TOURS: Record<string, string> = {
   triggers: 'workflow-tab-triggers',
   secrets: 'workflow-tab-secrets',
   access: 'workflow-tab-access',
+  evaluation: 'workflow-tab-evaluation',
 };
 
 function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: string }) {
@@ -247,7 +249,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
 
   const tabParam = searchParams.get('tab');
   const initialTab =
-    tabParam === 'secrets' || tabParam === 'triggers' || tabParam === 'access' ? tabParam : 'runs';
+    tabParam === 'secrets' || tabParam === 'triggers' || tabParam === 'access' || tabParam === 'evaluation' ? tabParam : 'runs';
   const setupParam = searchParams.get('setup');
   const [activeTab, setActiveTab] = React.useState(initialTab);
   // Lifted out of AllRunsPanel (controlled props) so the header/tab run count
@@ -661,7 +663,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
       {/* Tabs */}
       <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex flex-1 flex-col">
         <Tabs.List className="flex border-b px-6 gap-0" data-tour="workflow-tabs">
-          {['runs', 'definitions', 'triggers', 'secrets', 'access'].map((tab) => (
+          {['runs', 'definitions', 'triggers', 'secrets', 'access', 'evaluation'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
@@ -671,7 +673,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 'text-muted-foreground border-transparent',
                 'data-[state=active]:text-foreground data-[state=active]:border-primary',
                 'hover:text-foreground',
-                (tab === 'secrets' || tab === 'triggers' || tab === 'access') && 'flex items-center gap-1.5',
+                (tab === 'secrets' || tab === 'triggers' || tab === 'access' || tab === 'evaluation') && 'flex items-center gap-1.5',
               )}
             >
               {tab === 'runs'
@@ -682,7 +684,9 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                     ? <><Clock className="h-3.5 w-3.5" />Triggers</>
                     : tab === 'access'
                       ? <><ShieldCheck className="h-3.5 w-3.5" />Access</>
-                      : 'Definitions'}
+                      : tab === 'evaluation'
+                        ? <><FlaskConical className="h-3.5 w-3.5" />Evaluation</>
+                        : 'Definitions'}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
@@ -748,6 +752,10 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
           <div className="max-w-2xl">
             <WorkflowAccessPanel handle={handle} workflowName={decodedName} />
           </div>
+        </Tabs.Content>
+        {/* Evaluation tab */}
+        <Tabs.Content value="evaluation" className="flex-1 p-6">
+          <EvaluationTab handle={handle} workflowName={decodedName} steps={runnable?.steps ?? []} mayEdit={mayEdit} />
         </Tabs.Content>
       </Tabs.Root>
 

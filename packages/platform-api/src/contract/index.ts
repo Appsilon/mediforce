@@ -671,6 +671,15 @@ export {
 } from './evaluation';
 
 export {
+  AskEvaluationAssistantInputSchema,
+  AskEvaluationAssistantOutputSchema,
+  PreparedEvalRunSchema,
+  type AskEvaluationAssistantInput,
+  type AskEvaluationAssistantOutput,
+  type PreparedEvalRun,
+} from './evaluation-assistant';
+
+export {
   MonitoringSummaryInputSchema,
   MonitoringSummarySchema,
   GetMonitoringSummaryOutputSchema,

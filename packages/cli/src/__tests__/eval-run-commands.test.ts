@@ -59,3 +59,27 @@ describe('mediforce eval runs', () => {
     expect(JSON.parse(String(init?.body))).toEqual({ confirmedBudgetUsd: 0.9 });
   });
 });
+
+describe('mediforce eval ask', () => {
+  it('sends the question for the step and prints proposals without applying them', async () => {
+    const { evalAskCommand } = await import('../commands/eval-ask');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      reply: 'Start with a schema check.',
+      proposals: [{ tool: 'propose_brief', arguments: { text: 'Grades AEs for the DSMB.' } }],
+      preparedEvalRuns: [],
+    }));
+    const output = captureOutput();
+    const code = await evalAskCommand({
+      argv: ['What should I check?', '--namespace', 'pharma-a', '--workflow', 'ae-grading', '--step', 'grade-aes', ...BASE],
+      env: ENV,
+      output,
+    });
+
+    expect(code).toBe(0);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe('http://localhost:5555/api/evaluation/assistant');
+    expect(JSON.parse(String(init?.body))).toMatchObject({ stepId: 'grade-aes', messages: [{ role: 'user', content: 'What should I check?' }] });
+    expect(output.stdoutLines.join('\n')).toContain('proposal propose_brief');
+  });
+});
