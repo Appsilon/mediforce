@@ -63,4 +63,26 @@ describe('validateOutputSchema', () => {
     expect(validateOutputSchema({ raw: '42' }, schema))
       .toBe('output is not valid JSON');
   });
+
+  it.each([
+    ['boolean', 'yes', 'property "flag" expected boolean, got string'],
+    ['integer', 2.5, 'property "flag" expected integer, got number'],
+    ['integer', '3', 'property "flag" expected integer, got string'],
+    ['null', 0, 'property "flag" expected null, got number'],
+    ['number', null, 'property "flag" expected number, got null'],
+    ['object', [], 'property "flag" expected object, got array'],
+  ])('rejects a %s property holding %j', (type, value, message) => {
+    const typedSchema = { type: 'object', properties: { flag: { type } } };
+    expect(validateOutputSchema({ flag: value }, typedSchema)).toBe(message);
+  });
+
+  it.each([
+    ['boolean', false],
+    ['integer', 3],
+    ['null', null],
+    ['number', 2.5],
+  ])('accepts a %s property holding %j', (type, value) => {
+    const typedSchema = { type: 'object', properties: { flag: { type } } };
+    expect(validateOutputSchema({ flag: value }, typedSchema)).toBeNull();
+  });
 });

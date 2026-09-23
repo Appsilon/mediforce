@@ -1,4 +1,24 @@
-import type { OutputSchemaShape } from '@mediforce/platform-core';
+import {
+  OutputSchemaPropertyTypeSchema,
+  type OutputSchemaPropertyType,
+  type OutputSchemaShape,
+} from '@mediforce/platform-core';
+
+const TYPE_CHECKS: Record<OutputSchemaPropertyType, (value: unknown) => boolean> = {
+  string: (value) => typeof value === 'string',
+  number: (value) => typeof value === 'number',
+  integer: (value) => Number.isInteger(value),
+  boolean: (value) => typeof value === 'boolean',
+  null: (value) => value === null,
+  array: (value) => Array.isArray(value),
+  object: (value) => typeof value === 'object' && value !== null && Array.isArray(value) === false,
+};
+
+function jsonTypeOf(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
 
 /** Checks an output against the structural JSON Schema subset shared by cowork
  *  artifacts and `agent.outputSchema`. Returns the first violation, or `null`. */
@@ -31,21 +51,13 @@ export function validateOutputSchema(
   const properties = schema.properties ?? {};
   for (const [key, spec] of Object.entries(properties)) {
     if (!(key in data)) continue;
-    const value = data[key];
-    const expectedType = spec.type;
-    if (!expectedType) continue;
+    // Cowork's looser schema can name a type outside the subset; it goes unchecked.
+    const expectedType = OutputSchemaPropertyTypeSchema.safeParse(spec.type);
+    if (expectedType.success === false) continue;
 
-    if (expectedType === 'array' && !Array.isArray(value)) {
-      return `property "${key}" expected array, got ${typeof value}`;
-    }
-    if (expectedType === 'object' && (typeof value !== 'object' || value === null || Array.isArray(value))) {
-      return `property "${key}" expected object, got ${Array.isArray(value) ? 'array' : typeof value}`;
-    }
-    if (expectedType === 'string' && typeof value !== 'string') {
-      return `property "${key}" expected string, got ${typeof value}`;
-    }
-    if (expectedType === 'number' && typeof value !== 'number') {
-      return `property "${key}" expected number, got ${typeof value}`;
+    const value = data[key];
+    if (TYPE_CHECKS[expectedType.data](value) === false) {
+      return `property "${key}" expected ${expectedType.data}, got ${jsonTypeOf(value)}`;
     }
   }
 

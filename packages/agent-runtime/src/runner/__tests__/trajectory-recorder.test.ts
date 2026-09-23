@@ -68,9 +68,41 @@ describe('TrajectoryRecorder', () => {
       list: async () => null,
       listInNamespaces: async () => null,
     };
-    const recorder = new TrajectoryRecorder(failing, AGENT_RUN_ID);
+    const recorder = new TrajectoryRecorder(failing, AGENT_RUN_ID, { retryDelayMs: 1 });
 
     recorder.record([toolCall]);
     await expect(recorder.flush()).resolves.toBeUndefined();
+  });
+
+  it('retries a failed batch before anything later, writing the backlog as one batch', async () => {
+    const repo = await setup();
+    const appendedSeqs: number[][] = [];
+    let failuresLeft = 1;
+    const flaky: AgentTrajectoryRepository = {
+      append: async (agentRunId, entries) => {
+        appendedSeqs.push(entries.map((entry) => entry.seq));
+        if (failuresLeft > 0) {
+          failuresLeft -= 1;
+          throw new Error('connection reset');
+        }
+        await repo.append(agentRunId, entries);
+      },
+      list: (agentRunId, options) => repo.list(agentRunId, options),
+      listInNamespaces: (agentRunId, allowed, options) => repo.listInNamespaces(agentRunId, allowed, options),
+    };
+    const recorder = new TrajectoryRecorder(flaky, AGENT_RUN_ID, { retryDelayMs: 20 });
+    const text = (body: string) => ({ ts: '2026-09-23T08:00:01.000Z', type: 'assistant', subtype: 'text', text: body });
+
+    recorder.record([toolCall]);
+    const first = recorder.flush();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(appendedSeqs).toEqual([[0]]);
+    recorder.record([text("Hy's Law case")]);
+    const second = recorder.flush();
+    recorder.record([text('Grade 4 hepatotoxicity')]);
+    await Promise.all([first, second, recorder.flush()]);
+
+    expect(appendedSeqs).toEqual([[0], [0], [1, 2]]);
+    expect((await repo.list(AGENT_RUN_ID))?.map((entry) => entry.seq)).toEqual([0, 1, 2]);
   });
 });

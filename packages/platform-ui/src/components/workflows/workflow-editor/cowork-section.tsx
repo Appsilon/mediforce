@@ -154,6 +154,7 @@ export function CoworkSection({
 
         <FieldRow label="cowork.outputSchema" tooltip={TIP.outputSchema} alignStart>
           <OutputSchemaEditor
+            key={`cowork-output-schema-${step.id}`}
             value={cowork.outputSchema}
             onChange={(schema) => patchCowork({ outputSchema: schema })}
             schema={COWORK_OUTPUT_SCHEMA}

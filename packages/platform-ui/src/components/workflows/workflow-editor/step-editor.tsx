@@ -858,6 +858,7 @@ export function StepEditor({
 
           <FieldRow label="agent.outputSchema" tooltip={TIP.agentOutputSchema} alignStart>
             <OutputSchemaEditor
+              key={`agent-output-schema-${step.id}`}
               value={step.agent?.outputSchema}
               onChange={(outputSchema) => updateAgent({ outputSchema })}
               schema={AgentOutputSchemaSchema}
