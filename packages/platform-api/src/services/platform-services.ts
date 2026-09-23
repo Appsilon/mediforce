@@ -16,6 +16,8 @@ import {
   PostgresAgentOAuthTokenRepository,
   PostgresTriggerRepository,
   PostgresAgentRunRepository,
+  PostgresAgentTrajectoryRepository,
+  PostgresScoreRepository,
   PostgresHumanTaskRepository,
   PostgresTaskAttachmentRepository,
   FilesystemBlobStore,
@@ -39,6 +41,8 @@ import type {
   AgentEventRepository,
   AgentOAuthTokenRepository,
   AgentRunRepository,
+  AgentTrajectoryRepository,
+  ScoreRepository,
   AuditRepository,
   BlobStore,
   CoworkSessionRepository,
@@ -131,6 +135,8 @@ export interface PlatformServices {
   auditRepo: AuditRepository;
   agentEventRepo: AgentEventRepository;
   agentRunRepo: AgentRunRepository;
+  agentTrajectoryRepo: AgentTrajectoryRepository;
+  scoreRepo: ScoreRepository;
   humanTaskRepo: HumanTaskRepository;
   taskAttachmentRepo: TaskAttachmentRepository;
   blobStore: BlobStore;
@@ -259,6 +265,8 @@ export function getPlatformServices(): PlatformServices {
   const auditRepo: AuditRepository = new PostgresAuditRepository(pg, instanceRepo);
   const agentEventRepo: AgentEventRepository = new PostgresAgentEventRepository(instanceRepo);
   const agentRunRepo: AgentRunRepository = new PostgresAgentRunRepository(pg, instanceRepo);
+  const agentTrajectoryRepo: AgentTrajectoryRepository = new PostgresAgentTrajectoryRepository(pg);
+  const scoreRepo: ScoreRepository = new PostgresScoreRepository(pg);
   const humanTaskRepo: HumanTaskRepository = new PostgresHumanTaskRepository(pg, instanceRepo);
   const taskAttachmentRepo: TaskAttachmentRepository = new PostgresTaskAttachmentRepository(pg);
   const blobStore: BlobStore = new FilesystemBlobStore();
@@ -355,6 +363,7 @@ export function getPlatformServices(): PlatformServices {
     eventLog,
     agentRunRepo,
     otelTracingOptions,
+    agentTrajectoryRepo,
   );
 
   const scriptStepExecutor = new ScriptStepExecutor(pluginRunner);
@@ -430,6 +439,8 @@ export function getPlatformServices(): PlatformServices {
     auditRepo,
     agentEventRepo,
     agentRunRepo,
+    agentTrajectoryRepo,
+    scoreRepo,
     humanTaskRepo,
     taskAttachmentRepo,
     blobStore,

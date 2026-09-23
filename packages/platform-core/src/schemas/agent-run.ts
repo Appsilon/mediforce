@@ -16,6 +16,18 @@ export const AgentRunStatusSchema = z.enum([
   'interrupted',
 ]);
 
+/**
+ * Why a run left the happy path and went to the step's `fallbackBehavior`.
+ * `output_schema` is a `result` that still broke `agent.outputSchema` after
+ * one retry with the validation error (ADR-0023 D13).
+ */
+export const AgentFallbackReasonSchema = z.enum([
+  'timeout',
+  'low_confidence',
+  'error',
+  'output_schema',
+]);
+
 export const AgentRunSchema = z.object({
   id: z.string(),
   processInstanceId: z.string(),
@@ -32,6 +44,7 @@ export const AgentRunSchema = z.object({
 });
 
 export type AgentRunStatus = z.infer<typeof AgentRunStatusSchema>;
+export type AgentFallbackReason = z.infer<typeof AgentFallbackReasonSchema>;
 export type AgentRun = z.infer<typeof AgentRunSchema>;
 
 /**

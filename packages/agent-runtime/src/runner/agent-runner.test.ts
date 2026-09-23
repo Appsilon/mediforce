@@ -4,6 +4,7 @@ import {
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
   InMemoryAgentRunRepository,
+  InMemoryAgentTrajectoryRepository,
   type WorkflowStep,
 } from '@mediforce/platform-core';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
@@ -746,5 +747,158 @@ describe('AgentRunner.markStepRunsInterrupted (issue #907)', () => {
 
     const count = await runner.markStepRunsInterrupted('instance-1', 'step-1');
     expect(count).toBe(0);
+  });
+});
+
+describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
+  const outputSchema = { type: 'object', required: ['findings'], properties: { findings: { type: 'array' } } };
+
+  function makeSchemaStepContext(
+    fallbackBehavior: 'escalate_to_human' | 'continue_with_flag' | 'pause',
+  ): WorkflowAgentContext {
+    const base = makeWorkflowContext({ autonomyLevel: 'L4' });
+    return {
+      ...base,
+      step: { ...base.step, agent: { ...base.step.agent, outputSchema, fallbackBehavior } },
+    };
+  }
+
+  /** Emits each envelope in turn — one per attempt — and records the context each attempt saw. */
+  function makeScriptedPlugin(envelopes: AgentOutputEnvelope[]) {
+    const seenContexts: WorkflowAgentContext[] = [];
+    let attempt = 0;
+    const plugin: StepExecutorPlugin = {
+      initialize: async (context) => {
+        seenContexts.push(context as WorkflowAgentContext);
+      },
+      run: async (emit: EmitFn) => {
+        const envelope = envelopes[Math.min(attempt, envelopes.length - 1)]!;
+        attempt += 1;
+        await emit({ type: 'result', payload: envelope, timestamp: new Date().toISOString() });
+      },
+    };
+    return { plugin, seenContexts };
+  }
+
+  let instanceRepository: InMemoryProcessInstanceRepository;
+  let eventLog: InMemoryAgentEventLog;
+  let runner: AgentRunner;
+
+  beforeEach(async () => {
+    instanceRepository = new InMemoryProcessInstanceRepository();
+    eventLog = new InMemoryAgentEventLog();
+    runner = new AgentRunner(instanceRepository, new InMemoryAuditRepository(), eventLog);
+    await createTestInstance(instanceRepository);
+  });
+
+  it('accepts a conforming result on the first attempt without retrying', async () => {
+    const { plugin, seenContexts } = makeScriptedPlugin([makeValidEnvelope({ result: { findings: [] } })]);
+
+    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext('continue_with_flag'));
+
+    expect(result.status).toBe('completed');
+    expect(result.fallbackReason).toBeNull();
+    expect(seenContexts).toHaveLength(1);
+  });
+
+  it('retries once with the validation error and accepts a corrected result', async () => {
+    const { plugin, seenContexts } = makeScriptedPlugin([
+      makeValidEnvelope({ result: { summary: 'no findings key' } }),
+      makeValidEnvelope({ result: { findings: ['AE grade 3'] } }),
+    ]);
+
+    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext('continue_with_flag'));
+
+    expect(result.status).toBe('completed');
+    expect(result.envelope?.result).toEqual({ findings: ['AE grade 3'] });
+    expect(seenContexts).toHaveLength(2);
+    expect(seenContexts[0]!.outputSchemaViolation).toBeUndefined();
+    expect(seenContexts[1]!.outputSchemaViolation).toBe('missing required keys: findings');
+    const statuses = eventLog.getEvents('instance-1', 'step-1')
+      .filter((event) => event.type === 'status')
+      .map((event) => String(event.payload));
+    expect(statuses.some((payload) => payload.includes('missing required keys: findings'))).toBe(true);
+  });
+
+  it('routes a second violation to fallbackBehavior with reason output_schema', async () => {
+    const { plugin, seenContexts } = makeScriptedPlugin([
+      makeValidEnvelope({ result: { summary: 'still wrong' } }),
+    ]);
+
+    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext('escalate_to_human'));
+
+    expect(seenContexts).toHaveLength(2);
+    expect(result.status).toBe('escalated');
+    expect(result.fallbackReason).toBe('output_schema');
+    expect(result.errorMessage).toContain('missing required keys: findings');
+    const instance = await instanceRepository.getById('instance-1');
+    expect(instance?.pauseReason).toBe('agent_escalated');
+  });
+
+  it('does not retry a non-schema failure', async () => {
+    const { plugin, seenContexts } = makeScriptedPlugin([
+      makeValidEnvelope({ confidence: 0.2, result: { findings: [] } }),
+    ]);
+    const context = makeSchemaStepContext('continue_with_flag');
+    const lowThresholdContext = {
+      ...context,
+      step: { ...context.step, agent: { ...context.step.agent, confidenceThreshold: 0.8 } },
+    };
+
+    const result = await runner.runWithWorkflowStep(plugin, lowThresholdContext);
+
+    expect(result.fallbackReason).toBe('low_confidence');
+    expect(seenContexts).toHaveLength(1);
+  });
+});
+
+describe('AgentRunner Agent Trajectory (ADR-0023 D8)', () => {
+  function makeRecordingPlugin(): StepExecutorPlugin {
+    let context: WorkflowAgentContext | null = null;
+    return {
+      initialize: async (ctx) => {
+        context = ctx as WorkflowAgentContext;
+      },
+      run: async (emit: EmitFn) => {
+        context?.trajectory?.record([
+          { ts: '2026-09-23T08:00:00.000Z', type: 'assistant', subtype: 'tool_call', tool: 'Read', input: { file_path: '/data/ae.csv' } },
+        ]);
+        await emit({ type: 'result', payload: makeValidEnvelope(), timestamp: new Date().toISOString() });
+      },
+    };
+  }
+
+  async function setup(captureContent: boolean) {
+    const instanceRepository = new InMemoryProcessInstanceRepository();
+    await createTestInstance(instanceRepository);
+    const agentRunRepo = new InMemoryAgentRunRepository();
+    const trajectoryRepo = new InMemoryAgentTrajectoryRepository(agentRunRepo);
+    const runner = new AgentRunner(
+      instanceRepository, new InMemoryAuditRepository(), new InMemoryAgentEventLog(), agentRunRepo,
+      { captureContent }, trajectoryRepo,
+    );
+    return { runner, agentRunRepo, trajectoryRepo };
+  }
+
+  it('stores what the plugin recorded under the Agent Run id, flushed before the run returns', async () => {
+    const { runner, agentRunRepo, trajectoryRepo } = await setup(true);
+
+    await runner.runWithWorkflowStep(makeRecordingPlugin(), makeWorkflowContext());
+
+    const [agentRun] = await agentRunRepo.getByInstanceId('instance-1');
+    const entries = await trajectoryRepo.list(agentRun!.id);
+    expect(entries).toEqual([
+      { seq: 0, ts: '2026-09-23T08:00:00.000Z', type: 'assistant', subtype: 'tool_call', tool: 'Read', input: { file_path: '/data/ae.csv' } },
+    ]);
+  });
+
+  it('keeps only the shape when content capture is off', async () => {
+    const { runner, agentRunRepo, trajectoryRepo } = await setup(false);
+
+    await runner.runWithWorkflowStep(makeRecordingPlugin(), makeWorkflowContext());
+
+    const [agentRun] = await agentRunRepo.getByInstanceId('instance-1');
+    const [entry] = (await trajectoryRepo.list(agentRun!.id)) ?? [];
+    expect(entry).toMatchObject({ tool: 'Read', input: { file_path: '[redacted: 12 chars]' }, redacted: true });
   });
 });

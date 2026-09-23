@@ -6,8 +6,8 @@
  * the local path writes live, instead of the orchestrator rebuilding them all
  * after exit.
  */
-import { describe, it, expect } from 'vitest';
-import { formatAgentLogLine, stageLogEntry, AgentLogFormatSchema } from '../agent-log-format';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { agentLogEntries, formatAgentLogLine, stageLogEntry, AgentLogFormatSchema } from '../agent-log-format';
 
 describe('formatAgentLogLine', () => {
   it('formats a claude stream-json assistant tool call', () => {
@@ -50,6 +50,29 @@ describe('formatAgentLogLine', () => {
     for (const format of AgentLogFormatSchema.options) {
       expect(() => formatAgentLogLine(format, '{}')).not.toThrow();
     }
+  });
+});
+
+describe('agentLogEntries', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('yields the entries the activity log writes, so the Agent Trajectory and the log agree', () => {
+    vi.useFakeTimers({ now: new Date('2026-09-24T10:00:00.000Z') });
+    const line = JSON.stringify({
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'checking' }, { type: 'tool_use', name: 'Read', input: { file_path: 'a.csv' } }] },
+    });
+
+    const logged = formatAgentLogLine('claude-stream-json', line).map((e) => JSON.parse(e));
+
+    expect(agentLogEntries('claude-stream-json', line)).toEqual(logged);
+  });
+
+  it('yields nothing for raw script output, which has no event structure', () => {
+    expect(agentLogEntries('raw', 'plain text')).toEqual([]);
+    expect(formatAgentLogLine('raw', 'plain text')).toEqual(['plain text']);
   });
 });
 

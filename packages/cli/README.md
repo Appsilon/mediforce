@@ -33,7 +33,7 @@ src/errors.ts            Exit-code mapping
 ```
 
 Sixty-plus commands across workflows, runs, tasks, agents, namespaces,
-users, secrets, models, cowork, config, images and system.
+users, secrets, models, scores, cowork, config, images and system.
 
 `mediforce images` and `mediforce system images` are different things and the
 names are close enough to be worth stating: `images` is the per-namespace

@@ -566,7 +566,18 @@ export {
   type GetAgentRunOutput,
   type GetAgentRunCardStatusCountsInput,
   type GetAgentRunCardStatusCountsOutput,
+  GetAgentTrajectoryInputSchema,
+  GetAgentTrajectoryOutputSchema,
+  type GetAgentTrajectoryInput,
+  type GetAgentTrajectoryOutput,
 } from './agent-runs';
+
+export {
+  ListScoresInputSchema,
+  ListScoresOutputSchema,
+  type ListScoresInput,
+  type ListScoresOutput,
+} from './scores';
 
 export {
   MonitoringSummaryInputSchema,

@@ -102,10 +102,31 @@ export {
   AgentRunStatusSchema,
   AgentRunSchema,
   AgentRunCardStatusSchema,
+  AgentFallbackReasonSchema,
   type AgentRunStatus,
   type AgentRun,
   type AgentRunCardStatus,
+  type AgentFallbackReason,
 } from './agent-run';
+
+export {
+  AgentTrajectoryEntrySchema,
+  StoredAgentTrajectoryEntrySchema,
+  AgentTrajectorySchema,
+  redactTrajectoryEntry,
+  type AgentTrajectoryEntry,
+  type StoredAgentTrajectoryEntry,
+  type AgentTrajectory,
+} from './agent-trajectory';
+
+export {
+  ScoreSubjectSchema,
+  ScoreSourceSchema,
+  ScoreSchema,
+  type ScoreSubject,
+  type ScoreSource,
+  type Score,
+} from './score';
 
 export {
   CreationReasonSchema,
@@ -204,6 +225,7 @@ export {
 export {
   ContainerSchema,
   WorkflowAgentConfigSchema,
+  AgentOutputSchemaSchema,
   ScriptStepConfigSchema,
   DatabricksJobConfigSchema,
   WorkflowCoworkConfigSchema,

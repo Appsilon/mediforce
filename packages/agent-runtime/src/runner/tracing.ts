@@ -1,5 +1,6 @@
 import { SpanStatusCode, trace, type Attributes, type Span } from '@opentelemetry/api';
 import type { LlmMessage, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
+import type { AgentFallbackReason } from '@mediforce/platform-core';
 
 const TRACER_NAME = '@mediforce/agent-runtime';
 
@@ -10,7 +11,7 @@ export interface OpenTelemetryTracingOptions {
 interface AgentRunSpanResult {
   status: string;
   appliedToWorkflow: boolean;
-  fallbackReason: 'timeout' | 'low_confidence' | 'error' | null;
+  fallbackReason: AgentFallbackReason | null;
   envelopeModel?: string | null;
   /** Envelope result to record as output.value — only pass when content
    *  capture is enabled (ADR-0007 D5: may contain patient data). */

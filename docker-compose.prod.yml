@@ -150,6 +150,10 @@ services:
       # NEXT_PUBLIC_APP_URL if unset; falls back to request URL only as
       # a last resort, which is wrong behind Docker/reverse proxies.
       - APP_BASE_URL=${APP_BASE_URL:-${NEXT_PUBLIC_APP_URL:-}}
+      # Content capture (ADR-0007 D5): traces and Agent Trajectories keep
+      # prompts, tool arguments and results only when `true`. Unset = off —
+      # the run view's agent log then shows tool names and sizes, no content.
+      - MEDIFORCE_OTEL_CAPTURE_CONTENT=${MEDIFORCE_OTEL_CAPTURE_CONTENT:-}
       # Shared secret for the container-worker's HTTP routes that act on the
       # host daemon (image delete, image capability probe). Both sides read the
       # same var; unset on both means the worker enforces no header, which is

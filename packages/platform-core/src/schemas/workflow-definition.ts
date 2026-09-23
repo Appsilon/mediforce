@@ -141,6 +141,17 @@ export const ContainerSchema = z.object({
   repoAuth: z.string().optional(),
 });
 
+/**
+ * JSON Schema an agent step's `result` must satisfy. The same structural subset
+ * cowork enforces (`type`, `required`, per-property `type`); other keywords pass
+ * through to the prompt as guidance but are not checked.
+ */
+export const AgentOutputSchemaSchema = z.looseObject({
+  type: z.string().optional(),
+  required: z.array(z.string()).optional(),
+  properties: z.record(z.string(), z.looseObject({ type: z.string().optional() })).optional(),
+});
+
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
   skill: z.string().optional(),
@@ -150,6 +161,9 @@ export const WorkflowAgentConfigSchema = z.object({
   timeoutMinutes: z.number().optional(),
   confidenceThreshold: z.number().min(0).max(1).optional(),
   fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
+  /** Shown to the agent in its prompt and checked against `result` after the
+   *  run: one retry with the validation error, then `fallbackBehavior`. */
+  outputSchema: AgentOutputSchemaSchema.optional(),
   /** @deprecated Step-level MCP configuration is being removed.
    *  Move servers onto the agent via AgentDefinition.mcpServers and
    *  narrow them at the step via WorkflowStep.mcpRestrictions.

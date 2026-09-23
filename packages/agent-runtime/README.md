@@ -34,6 +34,16 @@ out of the workflow definition, where it is auditable, and buried it in code.
 The same rule covers timeouts and errors: they are envelope outcomes handled by
 `FallbackHandler`, not exceptions a plugin swallows.
 
+`agent.outputSchema` is the runner's check too: it validates `result`, reruns
+the plugin once with the violation in `context.outputSchemaViolation`, then
+falls back with reason `output_schema` (ADR-0023 D13).
+
+**Plugins record what the agent did through `context.trajectory`, never a file.**
+The runner hands each Agent Run a `TrajectoryRecorder`; a plugin maps its CLI's
+stdout to entries (`processOutputLine`) and the recorder persists them, redacted
+to shape when content capture is off (ADR-0023 D8). A host log file dies with
+the container and no other replica, CLI or API caller can read it.
+
 ## Rules
 
 **Register plugins in one place.** `PluginRegistry` is populated in

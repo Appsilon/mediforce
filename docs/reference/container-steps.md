@@ -1,7 +1,7 @@
 ---
 status: living
 audience: engineers
-last_reviewed: 2026-08-19
+last_reviewed: 2026-09-23
 ---
 
 # Container step execution
@@ -99,6 +99,28 @@ data and installed dependencies belong in an image.
 
 Containers run `--rm -i`, capped at 8 GB / 2 CPUs, named
 `mediforce-<runId>-<stepId>`. Network is unrestricted.
+
+## Result and Agent Trajectory
+
+An agent step's `result.json` becomes the envelope's `result`. When the step
+sets `agent.outputSchema`, the schema is added to the prompt and `AgentRunner`
+checks `result` against it after the run: a violation records a `status` event
+and runs the plugin once more with the error in the prompt; a second violation
+goes to `fallbackBehavior` with `fallbackReason: output_schema`
+([`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts),
+ADR-0023 D13). The retry refreshes the run's `updatedAt`, so the heartbeat does
+not read the doubled step time as a dead driver.
+
+Each plugin maps its CLI's stdout lines to Agent Trajectory entries
+(`processOutputLine`); `TrajectoryRecorder` numbers them and writes them in
+batches to `agent_trajectory_entries`, keyed by the Agent Run — live on the
+local strategy, after exit on the queued one, both attempts of a retry in one
+trajectory ([`trajectory-recorder.ts`](../../packages/agent-runtime/src/runner/trajectory-recorder.ts),
+ADR-0023 D8). Content follows `MEDIFORCE_OTEL_CAPTURE_CONTENT`: off, an entry
+keeps tool names and argument keys and every value becomes its size. Read it with
+`GET /api/agent-runs/:id/trajectory` or `mediforce agent-run trajectory`.
+Script steps have no Agent Run; their stdout lines are `assistant` agent events,
+which the run view's log shows instead.
 
 ## Commits
 
