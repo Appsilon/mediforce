@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AgentRunSchema, AgentRunStatusSchema, AgentRunCardStatusSchema } from '@mediforce/platform-core';
+import { AgentRunSchema, AgentRunStatusSchema, AgentRunCardStatusSchema, AgentTrajectorySchema } from '@mediforce/platform-core';
 
 /**
  * Contract for `GET /api/agent-runs` and `GET /api/agent-runs/:agentRunId`.
@@ -102,3 +102,19 @@ export const GetAgentRunOutputSchema = z.object({
 
 export type GetAgentRunInput = z.infer<typeof GetAgentRunInputSchema>;
 export type GetAgentRunOutput = z.infer<typeof GetAgentRunOutputSchema>;
+
+/**
+ * Contract for `GET /api/agent-runs/:agentRunId/trajectory` — the Agent
+ * Trajectory (ADR-0023 D8): the run's tool calls, tool results and text in
+ * `seq` order. Entries carry `redacted: true` when content capture was off.
+ * An Agent Run that recorded nothing answers `entries: []`; an unknown or
+ * out-of-workspace run is 404.
+ */
+export const GetAgentTrajectoryInputSchema = z.object({
+  agentRunId: z.uuid(),
+});
+
+export const GetAgentTrajectoryOutputSchema = AgentTrajectorySchema;
+
+export type GetAgentTrajectoryInput = z.infer<typeof GetAgentTrajectoryInputSchema>;
+export type GetAgentTrajectoryOutput = z.infer<typeof GetAgentTrajectoryOutputSchema>;

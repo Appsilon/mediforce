@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-08-28
+last_reviewed: 2026-09-23
 ---
 
 # Workflow capabilities
@@ -205,12 +205,19 @@ that *enforces* each one — the behaviour is not visible from the schema.
 | Autonomy L0–L4 — silent / shadow / annotate / human-review / autopilot | `autonomyLevel` | [`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts) decides `appliedToWorkflow` + pause/escalate per level |
 | Confidence gate | `agent.confidenceThreshold` (0–1) | [`fallback-handler.ts`](../../packages/agent-runtime/src/runner/fallback-handler.ts) |
 | What happens below threshold / on failure | `agent.fallbackBehavior` = `escalate_to_human` \| `continue_with_flag` \| `pause` | [`fallback-handler.ts`](../../packages/agent-runtime/src/runner/fallback-handler.ts) |
+| Typed output | `agent.outputSchema` (inline JSON Schema; `type`, `required` and per-property `type` are checked) | shown to the agent in its prompt; [`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts) validates `result`, retries once with the error, then applies `fallbackBehavior` with reason `output_schema` ([ADR-0023](../adr/0023-step-evaluation.md) D13) |
 | Built-in approve/revise loop | `review` (`type`: `human`/`agent`/`none`, `maxIterations`, `timeBoxDays`) + L3 | iteration cap enforced by [`review-tracker.ts`](../../packages/workflow-engine/src/review/review-tracker.ts) + [`workflow-engine.ts`](../../packages/workflow-engine/src/engine/workflow-engine.ts); L3 task creation in [`agent-step-executor.ts`](../../packages/agent-runtime/src/runner/agent-step-executor.ts) |
 | **Internet / extra tools** | `agent.allowedTools` | base set is `Bash, Read, Write, Edit, Glob, Grep`; add `WebSearch`/`WebFetch` (or any built-in tool) here — merged in [`claude-code-agent-plugin.ts`](../../packages/agent-runtime/src/plugins/claude-code-agent-plugin.ts) |
 | Fail-soft (advance despite a step error) | `continueOnError` — **`action` steps only** | the only runtime branch honouring it is the action-executor catch in [`run/route.ts`](../../packages/platform-ui/src/app/api/processes/[instanceId]/run/route.ts): marks the step `failed`, logs a warning + audit entry, advances with `{}`. Agent/script/human/cowork steps ignore it — for `agent`, the equivalent is `fallbackBehavior: continue_with_flag` |
 
 `review.timeBoxDays` is accepted by the schema but **not enforced at runtime** —
 only `maxIterations` is checked. Treat it as declarative-only.
+
+Every agent step's Agent Run keeps its **Agent Trajectory** — the tool calls and
+results the agent made — readable with `mediforce agent-run trajectory <id>`,
+and a verdict on an L3 review becomes a `human_verdict` **Score** on that run
+(`mediforce score list`). Neither is configured per step. See
+[`container-steps.md`](container-steps.md#result-and-agent-trajectory).
 
 Which runtime actually runs an `agent`/`script` step is the registered plugin
 (via `step.plugin` / Agent Definition `runtimeId`): `claude-code-agent` is the

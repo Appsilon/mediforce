@@ -28,12 +28,14 @@ import type { AuthorizedAgentDefinitionRepository } from './authorized-agent-def
 import type { AuthorizedAgentEventRepository } from './authorized-agent-event-repository';
 import type { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository';
 import type { AuthorizedAgentRunRepository } from './authorized-agent-run-repository';
+import type { AuthorizedAgentTrajectoryRepository } from './authorized-agent-trajectory-repository';
 import type { AuthorizedAuditEventRepository } from './authorized-audit-event-repository';
 import type { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-repository';
 import type { AuthorizedHandoffRepository } from './authorized-handoff-repository';
 import type { AuthorizedHumanTaskRepository } from './authorized-human-task-repository';
 import type { AuthorizedImageCatalogRepository } from './authorized-image-catalog-repository';
 import type { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
+import type { AuthorizedScoreRepository } from './authorized-score-repository';
 import type { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import type { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
 import type { AuthorizedTriggerRepository } from './authorized-trigger-repository';
@@ -74,6 +76,8 @@ export interface CallerScope {
   readonly coworkSessions: AuthorizedCoworkSessionRepository;
   readonly agentRuns: AuthorizedAgentRunRepository;
   readonly agentEvents: AuthorizedAgentEventRepository;
+  readonly agentTrajectories: AuthorizedAgentTrajectoryRepository;
+  readonly scores: AuthorizedScoreRepository;
   readonly auditEvents: AuthorizedAuditEventRepository;
   readonly handoffs: AuthorizedHandoffRepository;
   readonly toolCatalog: AuthorizedToolCatalogRepository;

@@ -44,6 +44,14 @@ export {
   AgentRunStatusSchema,
   AgentRunSchema,
   AgentRunCardStatusSchema,
+  AgentFallbackReasonSchema,
+  AgentTrajectoryEntrySchema,
+  StoredAgentTrajectoryEntrySchema,
+  AgentTrajectorySchema,
+  redactTrajectoryEntry,
+  ScoreSubjectSchema,
+  ScoreSourceSchema,
+  ScoreSchema,
   HumanTaskStatusSchema,
   HumanTaskSchema,
   HandoffStatusSchema,
@@ -53,6 +61,7 @@ export {
   PluginCapabilityMetadataSchema,
   ContainerSchema,
   WorkflowAgentConfigSchema,
+  AgentOutputSchemaSchema,
   ScriptStepConfigSchema,
   DatabricksJobConfigSchema,
   resolveStepTimeoutMinutes,
@@ -228,6 +237,13 @@ export type {
   AgentRunStatus,
   AgentRun,
   AgentRunCardStatus,
+  AgentFallbackReason,
+  AgentTrajectoryEntry,
+  StoredAgentTrajectoryEntry,
+  AgentTrajectory,
+  ScoreSubject,
+  ScoreSource,
+  Score,
 } from './types/index';
 
 export type {
@@ -376,6 +392,9 @@ export type {
   ListAgentRunsOptions,
   ListAgentRunsPage,
   AgentRunCardStatusCounts,
+  AgentTrajectoryRepository,
+  ScoreRepository,
+  ListScoresFilter,
   CoworkSessionRepository,
   TriggerRepository,
   TriggerUpdate,
@@ -494,6 +513,8 @@ export {
   InMemoryOAuthProviderRepository,
   InMemoryAgentOAuthTokenRepository,
   InMemoryAgentRunRepository,
+  InMemoryAgentTrajectoryRepository,
+  InMemoryScoreRepository,
   InMemoryPlatformSettingsRepository,
   InMemoryUserDirectoryService,
   // Test factories
@@ -680,6 +701,6 @@ export {
   type StepUiComponent,
 } from './schemas/step-ui-config';
 
-export { formatAgentLogLine, stageLogEntry, appendStageEntry, AgentLogFormatSchema, type AgentLogFormat } from './utils/agent-log-format';
+export { agentLogEntries, formatAgentLogLine, stageLogEntry, appendStageEntry, AgentLogFormatSchema, type AgentLogFormat } from './utils/agent-log-format';
 
 export { auditSignificance, type AuditSignificance } from './schemas/audit-significance';
