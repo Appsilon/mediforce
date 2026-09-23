@@ -37,7 +37,7 @@ export const SchemaCheckSchema = z.object({
 /**
  * A script run in the `script-container` sandbox with the step's workspace
  * commit read-only at `/workspace` and `/output/input.json` holding `result`,
- * `trajectory` and the Eval Case. It writes `/output/result.json` as
+ * `stepInput`, `trajectory` and the Eval Case. It writes `/output/result.json` as
  * `{ "passed": boolean, "comment"?: string }`.
  */
 export const CodeCheckSchema = z.object({

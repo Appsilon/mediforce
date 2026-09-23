@@ -19,17 +19,17 @@ const CODE_CHECK_TIMEOUT_MS = 2 * 60_000;
 const JUDGE_MAX_OUTPUT_TOKENS = 1000;
 
 /** The judge's model, through the platform's OpenRouter seam (mockable via `OPENROUTER_BASE_URL`). */
-function openRouterJudgeClient(apiKey: string): LlmClient {
+function openRouterJudgeClient(apiKey: string, model: string): LlmClient {
   return {
-    complete: async (messages, model) => {
+    complete: async (messages) => {
       const response = await callOpenRouter({
-        model: model!,
+        model,
         apiKey,
         messages,
         temperature: 0,
         maxTokens: JUDGE_MAX_OUTPUT_TOKENS,
       });
-      return { content: response.content, model: model!, usage: { promptTokens: 0, completionTokens: 0 } };
+      return { content: response.content, model, usage: response.usage };
     },
   };
 }
@@ -96,7 +96,7 @@ export async function runEvaluatorCheck(
           processInstanceId: agentRun.processInstanceId,
           executorOutput: envelope,
           iterationNumber: 0,
-          llm: openRouterJudgeClient(apiKey),
+          llm: openRouterJudgeClient(apiKey, check.model),
         });
         return {
           agentRunId: agentRun.id,

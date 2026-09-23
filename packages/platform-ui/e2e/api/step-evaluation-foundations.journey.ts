@@ -4,7 +4,14 @@ import {
   GetAgentTrajectoryOutputSchema,
   ListScoresOutputSchema,
 } from '@mediforce/platform-api/contract';
-import { agentStepWorkflow, awaitFinishedAgentRun, listAgentRuns, startRun } from '../helpers/agent-step-runs';
+import {
+  AUTH_HEADERS,
+  JSON_HEADERS,
+  agentStepWorkflow,
+  awaitFinishedAgentRun,
+  listAgentRuns,
+  startRun,
+} from '../helpers/agent-step-runs';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
@@ -26,9 +33,6 @@ import {
  * agent's result is `{ mock, summary }` and it records two trajectory entries
  * per attempt, which is what these assertions lean on.
  */
-
-const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
-const AUTH_HEADERS = { 'X-Api-Key': API_KEY };
 
 async function getTrajectory(
   request: APIRequestContext,
@@ -140,7 +144,7 @@ test.describe('Step Evaluation foundations — API E2E', () => {
     );
 
     const completeRes = await request.post(`/api/tasks/${task.id}/complete`, {
-      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+      headers: JSON_HEADERS,
       data: { kind: 'verdict', verdict: 'approve', comment: 'Grades match CTCAE v5' },
     });
     expect(completeRes.status(), await completeRes.text()).toBe(200);

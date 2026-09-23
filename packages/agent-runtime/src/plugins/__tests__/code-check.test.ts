@@ -1,9 +1,22 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { DockerSpawnRequest } from '../docker-spawn-strategy';
 import { runCodeCheck } from '../code-check';
+
+const spawnedRequests: Array<{ request: DockerSpawnRequest; outputFiles: string[] }> = [];
+
+vi.mock('../docker-spawn-strategy', () => ({
+  getDockerSpawnStrategy: () => ({
+    spawn: async (request: DockerSpawnRequest) => {
+      spawnedRequests.push({ request, outputFiles: await readdir(request.outputDir) });
+      await writeFile(join(request.outputDir, 'result.json'), JSON.stringify({ passed: true }));
+      return { stdout: '', stderr: '', exitCode: 0, signal: null };
+    },
+  }),
+}));
 
 // Local mode (ALLOW_LOCAL_AGENTS) — the path dev and the L3 suite take; the
 // Docker path is the script-container spawn, covered by its own L5 tests.
@@ -101,5 +114,64 @@ describe('runCodeCheck (local mode)', () => {
       timeoutMs: 30_000,
       label: 'test',
     })).rejects.toThrow('code check result.json must be { "passed": boolean, "comment"?: string }');
+  });
+});
+
+describe('runCodeCheck (container)', () => {
+  let root: string;
+  let bareRepoPath: string;
+  let commit: string;
+
+  beforeAll(async () => {
+    root = await mkdtemp(join(tmpdir(), 'code-check-container-test-'));
+    const worktree = join(root, 'work');
+    bareRepoPath = join(root, 'repo.git');
+    execFileSync('git', ['init', '-q', '-b', 'main', worktree]);
+    await writeFile(join(worktree, 'adae.csv'), 'USUBJID,AETERM,AETOXGR\n01-701-1015,SEPSIS,5\n');
+    execFileSync('git', ['-C', worktree, 'add', '-A']);
+    execFileSync('git', ['-C', worktree, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'step output']);
+    commit = execFileSync('git', ['-C', worktree, 'rev-parse', 'HEAD'], { encoding: 'utf-8' }).trim();
+    execFileSync('git', ['clone', '-q', '--bare', worktree, bareRepoPath]);
+  });
+
+  afterAll(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    spawnedRequests.length = 0;
+  });
+
+  const check = () => runCodeCheck({
+    runtime: 'python',
+    source: 'pass',
+    input: { result: {} },
+    workspace: { bareRepoPath, commit },
+    timeoutMs: 30_000,
+    label: 'agent-run-1',
+  });
+
+  it('keeps the workspace out of the output directory, which the queued strategy ships through Redis', async () => {
+    await check();
+    const [{ request, outputFiles }] = spawnedRequests;
+    expect(outputFiles.sort()).toEqual(['check.py', 'input.json']);
+    const workspaceMount = request.dockerArgs.find((arg) => arg.endsWith(':/workspace:ro'));
+    expect(workspaceMount).toBeDefined();
+    expect(workspaceMount!.startsWith(request.outputDir)).toBe(false);
+  });
+
+  it('runs unapproved code without capabilities, privilege escalation or unbounded processes', async () => {
+    await check();
+    const args = spawnedRequests[0]!.request.dockerArgs.join(' ');
+    expect(args).toContain('--network none');
+    expect(args).toContain('--cap-drop ALL');
+    expect(args).toContain('--security-opt no-new-privileges');
+    expect(args).toMatch(/--pids-limit \d+/);
+  });
+
+  it('names each container uniquely, so two checks of one run do not collide', async () => {
+    await Promise.all([check(), check()]);
+    const [first, second] = spawnedRequests.map((spawned) => spawned.request.containerName);
+    expect(first).not.toBe(second);
   });
 });

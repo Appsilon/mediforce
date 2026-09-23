@@ -26,6 +26,7 @@ export const GRADED_RUN = 'agent-run-graded';
 export const UNGRADED_RUN = 'agent-run-ungraded';
 
 export interface EvaluationFixture {
+  readonly processRepo: InMemoryProcessRepository;
   readonly instanceRepo: InMemoryProcessInstanceRepository;
   readonly agentRunRepo: InMemoryAgentRunRepository;
   readonly scoreRepo: InMemoryScoreRepository;
@@ -103,6 +104,7 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
   }
 
   return {
+    processRepo,
     instanceRepo,
     agentRunRepo,
     scoreRepo,
