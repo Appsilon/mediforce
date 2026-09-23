@@ -14,7 +14,9 @@ context of use. The design and its reasons are
 Everything below belongs to one agent Step, keyed by
 `(namespace, workflowName, stepId)`, and lives outside the Workflow
 Definition: adding a check never mints a definition version. Reading needs only
-access to the workflow; changing anything needs its `edit` verb.
+access to the workflow; changing anything needs its `edit` verb. A Step that
+still declares MCP servers inline on `agent.mcpServers` cannot be evaluated —
+an eval policy cannot deny them, so move them onto its agent first.
 
 ## Evaluation Brief
 
@@ -44,8 +46,10 @@ version. A judge is calibrated against human labels: `evaluator-label
 runs the judge over the labelled runs and stores the agreement.
 
 `evaluator-preview` (`POST /api/evaluation/evaluators/preview`) runs a draft
-check against the Step's recent production outputs and writes nothing — try a
-check on real outputs before saving it.
+check against the Step's recent production outputs (dry runs left out) and
+writes nothing — try a check on real outputs before saving it. It runs check
+code and spends the workspace's model key, so it needs the workflow's `run`
+verb.
 
 ## Eval Cases and Datasets
 
@@ -54,7 +58,8 @@ steps before it, and the workspace commit it starts from — plus whether its
 output should be accepted (`positive`) or not (`negative`), with notes on what
 it must or must not contain. `case-from-run <agentRunId>` harvests one from a
 production run: an approved run is positive, a rejected one negative with the
-reviewer's comment; an unreviewed run needs `--expectation`. Cases are `dev` or
+reviewer's comment; a run nobody reviewed, or one sent back for revision or a
+recheck, needs `--expectation`. Cases are `dev` or
 `holdout` and carry a *contains production data* flag.
 
 `dataset-freeze` freezes the live cases into a numbered Eval Dataset version.
