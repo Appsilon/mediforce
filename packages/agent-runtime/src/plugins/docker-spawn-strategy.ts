@@ -8,9 +8,19 @@
  * The queued strategy is activated when REDIS_URL is set.
  */
 import { spawn } from 'node:child_process';
-import { appendFile, mkdir } from 'node:fs/promises';
+import { appendFile, mkdir, stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { ensureImage } from './docker-image-builder';
+
+/** Bytes currently in the step's log, or 0 when there is no log to compare. */
+async function logFileSize(logFile: string | null): Promise<number> {
+  if (logFile === null) return 0;
+  try {
+    return (await stat(logFile)).size;
+  } catch {
+    return 0;
+  }
+}
 import { appendStageEntry, createLineStreamReader, formatAgentLogLine } from '@mediforce/platform-core';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
@@ -295,6 +305,8 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
   async spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
     const { enqueueDockerJob, encodeFilePayload, decodeFilePayload } = await import('@mediforce/container-worker');
 
+    const logSizeBefore = await logFileSize(request.logFile);
+
     // Collect all files from outputDir (base64, nested paths included) to send through Redis
     let inputFiles: Record<string, string> = {};
     try {
@@ -349,12 +361,14 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
       reader.flush();
     }
 
-    // Split filesystem: the worker wrote the log live, but to its own disk,
-    // where this process cannot read it. `inputFiles` is what says the two are
-    // not the same machine — the same condition that made us ship the files.
-    // The log is reconstructed here after exit; on a shared filesystem (the
-    // supported prod topology) the worker's live writes are the only ones.
-    if (request.logFile !== null && Object.keys(inputFiles).length > 0) {
+    // The worker writes the log live, but to its own disk. Whether this process
+    // shares that disk is answered by looking: if the file grew while the job
+    // ran, the worker's writes landed here and repeating them would double
+    // every entry. Only a log that did not grow is reconstructed from stdout.
+    // `inputFiles` used to stand in for this and was always non-empty — a step
+    // ships at least its own `input.json`, so every queued run duplicated.
+    const workerLogLanded = (await logFileSize(request.logFile)) > logSizeBefore;
+    if (request.logFile !== null && !workerLogLanded) {
       const entries = result.stdout
         .split('\n')
         .flatMap((line) => formatAgentLogLine(request.lineFormat ?? 'none', line));
