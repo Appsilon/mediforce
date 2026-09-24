@@ -26,7 +26,7 @@ test.describe('Step Evaluation tab', () => {
       { toolCalls: [{ name: 'preview_evaluator', arguments: { check } }] },
       {
         toolCalls: [
-          { name: 'propose_brief', arguments: { text: 'Grades adverse events for the DSMB; a missed grade 5 is critical.' } },
+          { name: 'propose_brief', arguments: { text: 'Grades **adverse events** for the DSMB; a missed grade 5 is critical.' } },
           { name: 'propose_evaluator', arguments: { name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical', check } },
         ],
       },
@@ -38,6 +38,9 @@ test.describe('Step Evaluation tab', () => {
     await expect(page.getByText('No Evaluators yet.')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/No Brief yet/)).toBeVisible();
 
+    await page.getByRole('button', { name: 'Assistant settings' }).click();
+    await expect(page.getByLabel('Evaluation Assistant Model')).toBeVisible();
+
     await page.getByTestId('evaluation-assistant-input').fill(question);
     await page.getByTestId('evaluation-assistant-send').click();
     await expect(page.getByText('The summary check passed on the recent run.')).toBeVisible({ timeout: 20_000 });
@@ -46,6 +49,7 @@ test.describe('Step Evaluation tab', () => {
     await expect(cards).toHaveCount(2);
     const briefCard = cards.filter({ hasText: 'Proposed Evaluation Brief' });
     const evaluatorCard = cards.filter({ hasText: 'Proposed Evaluator' });
+    await expect(briefCard.getByText('adverse events')).toBeVisible();
 
     await briefCard.getByRole('button', { name: 'Reject' }).click();
     await expect(briefCard.getByText('Rejected')).toBeVisible();

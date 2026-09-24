@@ -7,6 +7,7 @@ import type { EvaluatorView, PreparedEvalRun } from '@mediforce/platform-api/con
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { useEvalRun, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { EvalRunReport } from './eval-run-report';
 
@@ -66,7 +67,7 @@ export function BriefSection({ step, data, mayEdit }: { step: EvaluatedStep; dat
         <p className="text-sm text-muted-foreground">No Brief yet — the step&apos;s context of use is unstated. The assistant can draft one.</p>
       ) : (
         <div className="space-y-1">
-          <p className="text-sm whitespace-pre-wrap">{brief.text}</p>
+          <MarkdownPresentation content={brief.text} />
           <p className="text-xs text-muted-foreground">v{brief.version} · {brief.origin === 'assistant' ? 'drafted by the assistant' : 'written'} by {brief.createdBy}</p>
         </div>
       )}
