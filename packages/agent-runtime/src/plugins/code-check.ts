@@ -149,6 +149,7 @@ async function runInContainer(
     processInstanceId: request.label,
     stepId: 'code-check',
     outputDir,
+    logFile: null,
   });
   if (result.exitCode !== 0 && result.stderr.trim().length > 0) {
     throw new Error(`code check failed: ${result.stderr.trim().slice(0, 2000)}`);
