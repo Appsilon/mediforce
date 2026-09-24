@@ -5,6 +5,7 @@ import {
   resolveCarriedBuild,
   resolveMcpForStep,
   resolveStepImage,
+  type ResolveMcpForStepDeps,
 } from '@mediforce/agent-runtime';
 import {
   STEP_FINGERPRINT_COMPONENTS,
@@ -13,7 +14,12 @@ import {
   type WorkflowDefinition,
   type WorkflowStep,
 } from '@mediforce/platform-core';
-import type { CallerScope } from '../../../repositories/index';
+
+/** The repositories a Fingerprint reads the step's agent and tools from — a CallerScope, or the runtime's own. */
+export interface StepFingerprintRepos {
+  agentDefinitions: ResolveMcpForStepDeps['agentDefinitionRepo'];
+  toolCatalog: ResolveMcpForStepDeps['toolCatalogRepo'];
+}
 
 /** JSON with object keys sorted at every depth, so equal values hash equally. */
 export function canonicalJson(value: unknown): string {
@@ -96,14 +102,14 @@ function imageIdentity(definition: WorkflowDefinition, step: WorkflowStep): unkn
  * policy is not part of it (D6); a Step Qualification states it instead.
  */
 export async function computeStepFingerprint(
-  scope: CallerScope,
+  repos: StepFingerprintRepos,
   definition: WorkflowDefinition,
   step: WorkflowStep,
 ): Promise<StepFingerprint> {
-  const agent = step.agentId === undefined ? null : await scope.agentDefinitions.getById(step.agentId);
+  const agent = step.agentId === undefined ? null : await repos.agentDefinitions.getById(step.agentId);
   const mcpServers = await resolveMcpForStep(step, {
-    agentDefinitionRepo: scope.agentDefinitions,
-    toolCatalogRepo: scope.toolCatalog,
+    agentDefinitionRepo: repos.agentDefinitions,
+    toolCatalogRepo: repos.toolCatalog,
     namespace: definition.namespace,
   }).then(
     (config) => ({ servers: config?.servers ?? null }),

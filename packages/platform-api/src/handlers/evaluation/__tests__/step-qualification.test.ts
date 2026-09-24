@@ -70,8 +70,8 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     return built;
   }
 
-  /** Runs every trial of a fresh Eval Run to a scored result with findings. */
-  async function finishedRun(): Promise<string> {
+  /** Runs every trial of a fresh Eval Run to a scored result with findings — but the first `failing`, which end without an Agent Run. */
+  async function finishedRun(failing = 0): Promise<string> {
     const kicksBefore = kicker.kicks.length;
     const { evalRun } = await prepareEvalRun({
       ...STEP, trialsPerCase: 1, concurrency: 4, budgetUsd: 5,
@@ -79,7 +79,12 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
     const kicked = kicker.kicks.slice(kicksBefore);
-    for (const { instanceId } of kicked) {
+    for (const [index, { instanceId }] of kicked.entries()) {
+      if (index < failing) {
+        await fixture.instanceRepo.update(instanceId, { status: 'failed', currentStepId: null, error: 'Container exited 137' });
+        await advanceEvalRunOfInstance(scope, instanceId);
+        continue;
+      }
       const startedAt = new Date().toISOString();
       await fixture.instanceRepo.addStepExecution(instanceId, buildStepExecution({ instanceId, stepId: 'grade-aes', startedAt }));
       await fixture.agentRunRepo.create(buildAgentRun({
@@ -182,6 +187,18 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
       deviations: [majorDeviation, { severity: 'critical', justification: 'Just in case.' }],
     }, scope)).rejects.toThrow(/critical criterion was met/);
     expect((await getStepQualification(STEP, scope)).status).toBe('not_qualified');
+  });
+
+  it('needs a justification for a criterion the scored trials met while some trial failed', async () => {
+    const evalRunId = await finishedRun(1);
+    const [failed] = (await scope.evaluation.listTrials(evalRunId)).filter((trial) => trial.status === 'failed');
+    const signing = { evalRunId, variantId: failed!.variantId, password: PASSWORD };
+
+    await expect(signStepQualification({ ...signing, deviations: [majorDeviation] }, scope))
+      .rejects.toThrow(/critical criterion was not judged \(1 of 2 trials failed or were skipped/);
+    const criticalDeviation = { severity: 'critical' as const, justification: 'The one trial lost to an OOM kill is re-run in the next Eval Run.' };
+    const { qualification } = await signStepQualification({ ...signing, deviations: [majorDeviation, criticalDeviation] }, scope);
+    expect(qualification.verdicts.map((verdict) => verdict.status)).toEqual(['not_evaluable', 'not_evaluable']);
   });
 
   it('asks the signer for their password again, and refuses an API key', async () => {
