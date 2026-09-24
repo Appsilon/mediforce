@@ -137,7 +137,10 @@ assistant's design — an OpenRouter tool-calling loop, Zod tool registries in
 `platform-core`, *mutation* tools returned as proposals versus *platform* tools
 run server-side as the caller through `CallerScope`, one audit event per
 request. That loop moves into a shared assistant core in `platform-api` that
-both assistants use. Heavy work is exposed as platform tools, never done by the
+both assistants use. The building blocks move first (audit, tool definitions,
+argument parsing, the caller-scoped platform-tool runner); the workflow
+assistant keeps its own loop until it can move onto the shared one without
+losing its canvas gates and truncation salvage. Heavy work is exposed as platform tools, never done by the
 model itself: `preview_evaluator` runs a draft check (in `script-container`
 for `code`) against existing outputs of the Step so the assistant sees a check
 fail on real outputs before proposing it. Every tool wraps a headless handler

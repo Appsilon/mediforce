@@ -26,20 +26,25 @@ import type {
   WorkflowAssistantToolCall,
 } from '../../contract/workflow-assistant';
 import type { CallerScope } from '../../repositories/index';
-import { actorFromCaller } from '../_helpers';
 import { HandlerError, ValidationError } from '../../errors';
 import { callOpenRouter, type OpenRouterChatMessage, type OpenRouterToolDefinition } from '../../services/openrouter-client';
 import { PlanQuestionSchema } from '../../contract/workflow-assistant';
 import { buildWorkflowAssistantSystemPrompt } from './_lib/system-prompt';
 import { callerInstructionMessages } from './_lib/caller-instructions';
-import { runPlatformTool } from './_lib/run-platform-tool';
+import { runWorkflowPlatformTool } from './_lib/run-platform-tool';
+import { LIST_MODELS_TOOL_NAME, runListModelsTool } from './_lib/list-models-tool';
+import { requireOpenRouterApiKey } from '../../services/openrouter-key';
 import { parseModelJson } from './_lib/parse-model-json';
+import {
+  parseToolArguments,
+  recordAssistantPrompt,
+  toolDefinitions,
+  type ToolIssueHint,
+} from '../../assistant-core';
 
 interface AskScopedInput extends AskWorkflowAssistantInput {
   namespace: string;
 }
-
-const LIST_MODELS_TOOL_NAME = 'list_models';
 
 // A large build spans several turns: each turn produces as many steps as fit in
 // the output budget, then a length-cutoff is treated as a chunk boundary and the
@@ -54,63 +59,33 @@ const MAX_TOOL_LOOP_ITERATIONS = 12;
 const ASSISTANT_MAX_OUTPUT_TOKENS = 8000;
 
 function buildToolDefinitions(options: { canSchedule: boolean }): OpenRouterToolDefinition[] {
-  const mutationTools = (
-    Object.entries(WORKFLOW_ASSISTANT_TOOLS) as [WorkflowAssistantToolName, z.ZodType][]
-  ).map(([name, schema]) => ({
-    type: 'function',
-    function: { name, parameters: z.toJSONSchema(schema, { io: 'input' }) },
-  }));
   // Platform tools run here, as the caller, and their results come back into
   // this same conversation — unlike the canvas tools, which the browser applies.
-  const platformTools = Object.entries(WORKFLOW_ASSISTANT_PLATFORM_TOOLS)
-    // A schedule attaches to a saved workflow, so on a canvas that has never been saved the tool is not offered at all.
-    .filter(([name]) => name !== 'create_cron_trigger' || options.canSchedule)
-    .map(([name, schema]) => ({
-    type: 'function',
-    function: { name, parameters: z.toJSONSchema(schema as z.ZodType, { io: 'input' }) },
-  }));
-  return [
-    ...mutationTools,
+  // A schedule attaches to a saved workflow, so on a canvas that has never been saved the tool is not offered at all.
+  const platformTools = Object.fromEntries(
+    Object.entries(WORKFLOW_ASSISTANT_PLATFORM_TOOLS).filter(([name]) => name !== 'create_cron_trigger' || options.canSchedule),
+  );
+  return toolDefinitions({
+    ...WORKFLOW_ASSISTANT_TOOLS,
     ...platformTools,
-    {
-      type: 'function',
-      function: {
-        name: LIST_MODELS_TOOL_NAME,
-        parameters: z.toJSONSchema(ListModelsToolSchema, { io: 'input' }),
-      },
-    },
-  ];
-}
-
-async function runListModelsTool(scope: CallerScope): Promise<unknown> {
-  const models = await scope.models.list();
-  return models
-    .filter((m) => m.retiredAt === null)
-    .sort((a, b) => (a.pricing.input + a.pricing.output) - (b.pricing.input + b.pricing.output))
-    .slice(0, 40)
-    .map((m) => ({
-      id: m.id,
-      name: m.name,
-      contextLength: m.contextLength,
-      inputPricePerToken: m.pricing.input,
-      outputPricePerToken: m.pricing.output,
-      supportsTools: m.supportsTools,
-      supportsVision: m.supportsVision,
-    }));
+    [LIST_MODELS_TOOL_NAME]: ListModelsToolSchema,
+  });
 }
 
 type ParsedMutationCall =
   | { ok: true; toolCall: WorkflowAssistantToolCall }
   | { ok: false; error: string };
 
-function getValueAtPath(input: unknown, path: readonly PropertyKey[]): unknown {
-  let current = input;
-  for (const key of path) {
-    if (current === null || typeof current !== 'object') return undefined;
-    current = (current as Record<PropertyKey, unknown>)[key];
+const workflowIssueHint: ToolIssueHint = (issue, received) => {
+  const field = issue.path[issue.path.length - 1];
+  if (issue.code === 'invalid_type' && issue.expected === 'object' && field === 'action') {
+    return ` — must be a nested object like { kind: "email", config: { ... } }, not a plain string`;
   }
-  return current;
-}
+  if (field === 'type' && received === 'terminal') {
+    return ` — terminal steps are not added or edited through these tools; the canvas keeps exactly one terminal automatically. To end a path, point that step's transition (or a verdict target) at the existing terminal step's id from the current canvas state instead.`;
+  }
+  return '';
+};
 
 export function parseMutationToolCall(toolName: string, parsedArguments: unknown): ParsedMutationCall {
   // Driven off the registry that `buildToolDefinitions` advertises to the
@@ -122,36 +97,14 @@ export function parseMutationToolCall(toolName: string, parsedArguments: unknown
     const valid = [
       ...Object.keys(WORKFLOW_ASSISTANT_TOOLS),
       ...Object.keys(WORKFLOW_ASSISTANT_PLATFORM_TOOLS),
-      'list_models',
+      LIST_MODELS_TOOL_NAME,
     ].join(', ');
     return { ok: false, error: `Unknown tool '${toolName}'. Valid tools: ${valid}.` };
   }
-  const result = schema.safeParse(parsedArguments);
-  if (!result.success) {
-    const issues = result.error.issues.map((i) => {
-      const path = i.path.join('.') || '(root)';
-      const field = i.path[i.path.length - 1];
-      let received = getValueAtPath(parsedArguments, i.path);
-      let describedPath = path;
-      if (received === undefined && i.path.length > 0) {
-        const parentPath = i.path.slice(0, -1);
-        const parent = getValueAtPath(parsedArguments, parentPath);
-        if (parent !== undefined) {
-          received = parent;
-          describedPath = parentPath.join('.') || '(root)';
-        }
-      }
-      const hint = i.code === 'invalid_type' && i.expected === 'object' && field === 'action'
-        ? ` — must be a nested object like { kind: "email", config: { ... } }, not a plain string`
-        : field === 'type' && received === 'terminal'
-          ? ` — terminal steps are not added or edited through these tools; the canvas keeps exactly one terminal automatically. To end a path, point that step's transition (or a verdict target) at the existing terminal step's id from the current canvas state instead.`
-          : '';
-      const gotSuffix = received !== undefined ? ` (you sent for '${describedPath}': ${JSON.stringify(received)})` : '';
-      return `${path}: ${i.message}${hint}${gotSuffix}`;
-    }).join('; ');
-    return { ok: false, error: `Invalid arguments for '${toolName}': ${issues}` };
-  }
-  return { ok: true, toolCall: { tool: toolName, arguments: result.data } as WorkflowAssistantToolCall };
+  const parsed = parseToolArguments(toolName, schema, parsedArguments, workflowIssueHint);
+  return parsed.ok
+    ? { ok: true, toolCall: { tool: toolName, arguments: parsed.data } as WorkflowAssistantToolCall }
+    : parsed;
 }
 
 type Transitions = WorkflowDefinition['transitions'];
@@ -325,31 +278,20 @@ export async function askWorkflowAssistant(
     throw new ValidationError('Missing required query parameter: namespace');
   }
 
-  const secrets = await scope.workspaceSecrets.getSecrets(input.namespace);
-  const apiKey = secrets['OPENROUTER_API_KEY'];
-  if (!apiKey) {
-    throw new HandlerError('validation', 'OPENROUTER_API_KEY not configured in workspace secrets');
-  }
-
+  const apiKey = await requireOpenRouterApiKey(scope, input.namespace);
   const model = input.model ?? WORKFLOW_ASSISTANT_DEFAULT_MODEL;
 
-  const latestUserPrompt = [...input.messages].reverse().find((m) => m.role === 'user')?.content ?? '';
-  try {
-    await scope.system.audit.append({
-      ...actorFromCaller(scope),
-      action: 'workflow_assistant.prompt',
-      description: `AI Assistant prompt (model: ${model})`,
-      timestamp: new Date().toISOString(),
-      inputSnapshot: { prompt: latestUserPrompt, model, messageCount: input.messages.length },
-      outputSnapshot: {},
-      basis: 'Workflow designer AI Assistant request',
-      entityType: 'workflow_assistant',
-      entityId: 'workflow-assistant',
-      namespace: input.namespace,
-    });
-  } catch (err) {
-    console.error('[workflow-assistant] failed to write prompt audit entry (non-fatal):', err);
-  }
+  await recordAssistantPrompt(scope, {
+    namespace: input.namespace,
+    model,
+    messages: input.messages,
+    action: 'workflow_assistant.prompt',
+    description: `AI Assistant prompt (model: ${model})`,
+    basis: 'Workflow designer AI Assistant request',
+    entityType: 'workflow_assistant',
+    entityId: 'workflow-assistant',
+    logTag: 'workflow-assistant',
+  });
 
   const tools = buildToolDefinitions({ canSchedule: input.workflowName !== undefined });
   const messages: OpenRouterChatMessage[] = [
@@ -489,7 +431,7 @@ export async function askWorkflowAssistant(
         const result = await runListModelsTool(scope);
         messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify(result) });
       } else if (r.kind === 'platform') {
-        const result = await runPlatformTool(r.toolName, r.arguments, scope, input.namespace, input.workflowName);
+        const result = await runWorkflowPlatformTool(r.toolName, r.arguments, scope, input.namespace, input.workflowName);
         messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify(result) });
       } else if (r.kind === 'error') {
         messages.push({ role: 'tool', tool_call_id: r.call.id, content: JSON.stringify({ error: r.error }) });
