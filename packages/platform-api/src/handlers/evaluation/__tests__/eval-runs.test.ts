@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { WorkflowEngine } from '@mediforce/workflow-engine';
 import { buildAgentOutputEnvelope, buildAgentRun, buildStepExecution } from '@mediforce/platform-core/testing';
 import { noopRunKicker, type NoopRunKicker } from '../../../runtime/run-kicker';
@@ -18,6 +18,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   let previousAllowLocal: string | undefined;
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     if (previousAllowLocal === undefined) delete process.env.ALLOW_LOCAL_AGENTS;
     else process.env.ALLOW_LOCAL_AGENTS = previousAllowLocal;
   });
@@ -157,6 +158,49 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     expect(cancelled.status).toBe('cancelled');
     expect(report.trials.skipped).toBe(2);
     await expect(cancelEvalRun({ evalRunId: evalRun.id }, scope)).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('still scores and charges a trial that was running when the run was cancelled', async () => {
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 1, budgetUsd: 5 }, scope);
+    await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
+    await cancelEvalRun({ evalRunId: evalRun.id }, scope);
+    expect(await fixture.evaluationRepo.listEvalRunIdsToDrive()).toEqual([evalRun.id]);
+
+    await finishTrial(kicker.kicks[0]!.instanceId, { findings: [] }, 0.25);
+
+    const { evalRun: cancelled, report } = await getEvalRun({ evalRunId: evalRun.id }, scope);
+    expect(cancelled.status).toBe('cancelled');
+    expect(cancelled.spentUsd).toBeCloseTo(0.25, 10);
+    expect(report.trials).toMatchObject({ scored: 1, skipped: 3, inProgress: 0 });
+    expect(await fixture.evaluationRepo.listEvalRunIdsToDrive()).toEqual([]);
+    expect(kicker.kicks).toHaveLength(1);
+  });
+
+  it('charges each LLM judge call to its trial and to the run\'s spend', async () => {
+    const judgeModel = 'anthropic/claude-haiku-4.5';
+    await createEvaluator({
+      ...STEP, name: 'grades-present', rule: 'Every AE carries a grade.', severity: 'major', origin: 'user',
+      check: { kind: 'llm_judge', model: judgeModel, rubric: 'Every AE carries a grade.', choices: [{ label: 'graded', value: 1 }, { label: 'ungraded', value: 0 }] },
+    }, scope);
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: '{"reasoning": "Graded.", "choice": "graded"}' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 4000, completion_tokens: 500 },
+    }))));
+    Object.assign(scope, {
+      workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) },
+      models: { list: async () => [{ id: judgeModel, pricing: { input: 0.000001, output: 0.000005 } }] },
+    });
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 2, budgetUsd: 5 }, scope);
+    await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
+
+    for (const kick of kicker.kicks) await finishTrial(kick.instanceId, { findings: [] }, 0.25);
+
+    // 4000 × $0.000001 + 500 × $0.000005 = $0.0065 per judge call.
+    const { evalRun: finished, trials, report } = await getEvalRun({ evalRunId: evalRun.id }, scope);
+    expect(trials).toHaveLength(2);
+    for (const trial of trials) expect(trial.costUsd).toBeCloseTo(0.2565, 10);
+    expect(finished.spentUsd).toBeCloseTo(0.513, 10);
+    expect(report.costUsd).toBeCloseTo(0.513, 10);
   });
 
   it('keeps trial Agent Runs out of the step\'s production runs', async () => {

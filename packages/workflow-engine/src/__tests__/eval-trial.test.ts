@@ -38,8 +38,9 @@ describe('eval trials (ADR-0023 D4)', () => {
     engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo);
   });
 
-  async function trial() {
+  async function trial(id: string = crypto.randomUUID()) {
     return engine.createEvalTrial({
+      id,
       namespace: 'pharma-a',
       definitionName: 'ae-grading',
       version: 2,
@@ -52,9 +53,10 @@ describe('eval trials (ADR-0023 D4)', () => {
     });
   }
 
-  it('enters the target step directly with the seeded state', async () => {
-    const instance = await trial();
+  it('enters the target step directly with the seeded state, under the id the trial was claimed with', async () => {
+    const instance = await trial('trial-run-1');
     expect(instance).toMatchObject({
+      id: 'trial-run-1',
       status: 'running',
       currentStepId: 'grade-aes',
       evalRunId: 'eval-run-1',
@@ -69,7 +71,7 @@ describe('eval trials (ADR-0023 D4)', () => {
 
   it('refuses a step the definition does not have', async () => {
     await expect(engine.createEvalTrial({
-      namespace: 'pharma-a', definitionName: 'ae-grading', version: 2, stepId: 'nope', evalRunId: 'r',
+      id: 'trial-run-2', namespace: 'pharma-a', definitionName: 'ae-grading', version: 2, stepId: 'nope', evalRunId: 'r',
       triggerPayload: {}, variables: {}, workspaceStartCommit: null, createdBy: 'author-1',
     })).rejects.toThrow("Step 'nope' not found");
   });

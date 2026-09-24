@@ -200,7 +200,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       const trials = [0, 1].map((trialIndex) => ({
         id: randomUUID(), evalRunId: run.id, caseId, trialIndex, status: 'pending' as const,
         processInstanceId: null, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null,
-        durationMs: null, error: null, startedAt: null, completedAt: null,
+        durationMs: null, error: null, startedAt: null, scoringStartedAt: null, completedAt: null,
       }));
       await repo.createEvalRun(run, trials);
 
@@ -208,7 +208,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect(await repo.listEvalRuns(step)).toEqual([run]);
       expect(await repo.transitionEvalRun(run.id, 'running', { status: 'completed' })).toBe(false);
       expect(await repo.transitionEvalRun(run.id, 'prepared', { status: 'running', startedAt: '2026-09-23T09:00:00.000Z' })).toBe(true);
-      expect(await repo.listEvalRunIdsByStatus('running')).toEqual([run.id]);
+      expect(await repo.listEvalRunIdsToDrive()).toEqual([run.id]);
       await repo.addEvalRunSpend(run.id, 0.25);
       await repo.addEvalRunSpend(run.id, 0.125);
       expect((await repo.getEvalRun(run.id))?.spentUsd).toBeCloseTo(0.375, 10);
@@ -221,6 +221,19 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect(await repo.transitionTrial(first!.id, 'pending', { status: 'running' })).toBe(false);
       expect(await repo.getTrialByInstanceId('trial-instance-1')).toMatchObject({ id: first!.id, status: 'running' });
       expect((await repo.listTrials(run.id)).map((trial) => [trial.trialIndex, trial.status])).toEqual([[0, 'running'], [1, 'pending']]);
+
+      // A cancelled run is still driven while a trial of it is in flight.
+      await repo.transitionEvalRun(run.id, 'running', { status: 'cancelled' });
+      expect(await repo.listEvalRunIdsToDrive()).toEqual([run.id]);
+
+      await repo.transitionTrial(first!.id, 'running', { status: 'scoring', scoringStartedAt: '2026-09-23T09:10:00.000Z' });
+      expect(await repo.renewScoringClaim(first!.id, '2026-09-23T09:05:00.000Z', '2026-09-23T09:30:00.000Z')).toBe(false);
+      expect(await repo.renewScoringClaim(first!.id, '2026-09-23T09:20:00.000Z', '2026-09-23T09:30:00.000Z')).toBe(true);
+      expect(await repo.renewScoringClaim(first!.id, '2026-09-23T09:20:00.000Z', '2026-09-23T09:31:00.000Z')).toBe(false);
+      expect((await repo.listTrials(run.id))[0]?.scoringStartedAt).toBe('2026-09-23T09:30:00.000Z');
+
+      await repo.transitionTrial(first!.id, 'scoring', { status: 'scored' });
+      expect(await repo.listEvalRunIdsToDrive()).toEqual([]);
     });
 
     it('replaces a step\'s MCP eval policy', async () => {

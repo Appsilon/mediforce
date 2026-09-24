@@ -700,6 +700,7 @@ export class PostgresProcessInstanceRepository
       eq(processInstances.definitionName, name),
       isNull(processInstances.deletedAt),
       isNull(processInstances.archivedAt),
+      isNull(processInstances.evalRunId),
     );
 
     const [activeRow] = await this.db

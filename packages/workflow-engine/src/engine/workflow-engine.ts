@@ -393,6 +393,8 @@ export class WorkflowEngine {
    * {@link finishEvalTrial} ends it once the step has run.
    */
   async createEvalTrial(input: {
+    /** Chosen by the Eval Run when it claims the trial, so the trial names its run before the run exists. */
+    id: string;
     namespace: string;
     definitionName: string;
     version: number;
@@ -415,7 +417,7 @@ export class WorkflowEngine {
 
     const now = new Date().toISOString();
     const instance: ProcessInstance = {
-      id: crypto.randomUUID(),
+      id: input.id,
       definitionName: input.definitionName,
       definitionVersion: String(input.version),
       status: 'running',

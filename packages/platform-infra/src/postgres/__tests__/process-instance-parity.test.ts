@@ -365,6 +365,8 @@ function contract(
       expect((await repo.listPage({ namespace: 'ws-1', limit: 20 })).items.map((row) => row.id)).toEqual([production.id]);
       const counts = await repo.countByDisplayStatus({ namespace: 'ws-1' });
       expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(1);
+      const summary = await repo.summarizeRunsByWorkflow('ws-1', 'supply-chain-review', true);
+      expect({ total: summary.total, latest: summary.latest.map((row) => row.id) }).toEqual({ total: 1, latest: [production.id] });
     });
 
     it('addStepExecution + getStepExecutions ordered by startedAt asc', async () => {
