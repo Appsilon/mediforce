@@ -126,6 +126,7 @@ export async function prepareEvalRun(
       error: null,
       startedAt: null,
       scoringStartedAt: null,
+      scoringAttempts: 0,
       completedAt: null,
     })));
   await scope.evaluation.createEvalRun(run, trials);

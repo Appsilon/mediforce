@@ -98,14 +98,16 @@ frozen Dataset version: every case, `trialsPerCase` times.
    writes a Score (`source: deterministic` or `llm_judge`, `metadata.evalRunId`).
    Trials start `concurrency` at a time; once spend reaches the budget the rest
    are skipped and the run ends `budget_exceeded`. A trial's cost is its Agent
-   Run plus the LLM judge calls that graded it (at the model registry's price),
-   and both count toward the budget. **Cancel** skips the pending trials; the
+   Run plus the LLM judge calls that graded it (at the model registry's price;
+   a judge model it does not price is noted on the trial and not counted), each
+   charged to the budget as it is spent; a judge Score keeps its cost in
+   `metadata.judgeCostUsd`. **Cancel** skips the pending trials; the
    ones already running still finish and are scored. The heartbeat moves on
    every running Eval Run, and any cancelled one with trials in flight, so a
    restart does not strand one: a driver that died after claiming a trial —
    before creating its run, or mid-scoring — leaves a claim that another takes
    over once it is 15 minutes old, without re-running Evaluators that already
-   scored the trial.
+   scored the trial. A trial whose scoring was abandoned three times fails.
 
 The **report** (`mediforce eval report <id>`, `GET /api/evaluation/runs/:id`)
 is computed from those Scores. Per Evaluator: pass rate with its Wilson 95%

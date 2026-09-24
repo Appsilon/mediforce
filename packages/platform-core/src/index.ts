@@ -264,6 +264,7 @@ export {
   wilsonInterval,
   caseReliability,
   type CaseReliability,
+  inlineMcpServerNames,
   mcpEvalRestrictions,
   JUDGE_MIN_LABELS,
   JUDGE_MIN_FAILURE_LABELS,
