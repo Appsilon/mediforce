@@ -140,6 +140,11 @@ summary (up to 2,000 tokens). If that call fails, the cards still return with an
 explicit partial-completion notice. Follow-up messages receive the summary,
 not a persisted tool transcript. Round logs include a request ID, model, tool
 names, token usage and finish reason; tool errors are logged separately.
+`runProposalToolLoop` reports each model round and each tool call (running,
+done or failed) to an optional `onProgress`; the Evaluation Assistant route
+streams those events to a client that asks for them. A proposal identical to
+one already made in the turn is returned once; the model is told it is a
+duplicate.
 Its `get_trajectory` tool returns complete stored entries using zero-based
 `offset` and `limit` (default 50, maximum 150), with `total` and `nextOffset`
 (`null` at the end); it never clips entry contents. The workflow assistant

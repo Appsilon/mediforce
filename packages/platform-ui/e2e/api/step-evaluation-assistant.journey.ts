@@ -4,6 +4,7 @@ import type { APIRequestContext } from '@playwright/test';
 import {
   AskEvaluationAssistantOutputSchema,
   EvalRunOutputSchema,
+  EvaluationAssistantProgressSchema,
   EvaluatorOutputSchema,
   ListEvaluatorsOutputSchema,
 } from '@mediforce/platform-api/contract';
@@ -86,6 +87,32 @@ test.describe('Evaluation Assistant — API E2E', () => {
     expect(EvaluatorOutputSchema.parse(await accepted.json()).evaluator).toMatchObject({
       name: 'findings-present', latest: { origin: 'assistant' }, trust: { trusted: true },
     });
+  });
+
+  test('streams each round and tool call before the result when asked for NDJSON', async ({ request }) => {
+    const question = `Show your work. ${randomUUID()}`;
+    await scriptOpenRouter(question, [
+      { toolCalls: [{ name: 'get_step', arguments: {} }] },
+      { toolCalls: [{ name: 'preview_evaluator', arguments: { check: 'schema check for findings' } }] },
+      { content: 'Read the step.' },
+    ]);
+
+    const res = await request.post('/api/evaluation/assistant', {
+      headers: { ...JSON_HEADERS, Accept: 'application/x-ndjson' },
+      data: { ...step, messages: [{ role: 'user', content: question }] },
+    });
+    expect(res.status(), await res.text()).toBe(200);
+    expect(res.headers()['content-type']).toContain('application/x-ndjson');
+    const lines = (await res.text()).trim().split('\n').map((line) => JSON.parse(line) as Record<string, unknown>);
+
+    const progress = lines.slice(0, -1).map((line) => EvaluationAssistantProgressSchema.parse(line.progress));
+    expect(progress.map((event) => event.type === 'tool' ? `${event.tool}:${event.status}` : `thinking:${event.round}`)).toEqual([
+      'thinking:1', 'get_step:running', 'get_step:done',
+      'thinking:2', 'preview_evaluator:running', 'preview_evaluator:failed',
+      'thinking:3',
+    ]);
+    expect(progress[5]).toMatchObject({ error: 'check: Invalid input: expected object, received string' });
+    expect(AskEvaluationAssistantOutputSchema.parse(lines.at(-1)!.result).reply).toBe('Read the step.');
   });
 
   test('prepares an Eval Run for the person to confirm; its own start_eval_run call is refused', async ({ request }) => {

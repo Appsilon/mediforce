@@ -42,7 +42,10 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 The step's Brief is sent to the assistant on every turn. In the web tab, Brief
 text is rendered as GitHub-Flavored Markdown, and the assistant pane uses the
 same model picker as the workflow editor so the model can be chosen per
-conversation.
+conversation. While it works, the pane lists each step it takes (reading a run,
+previewing a check, drafting a card) as it happens, and keeps that list folded
+under the reply; `mediforce eval ask` prints the same steps to stderr. The pane
+widens by dragging its left edge, and the width is remembered per browser.
 
 Each request allows 32 model/tool rounds and up to 8,000 output tokens per
 model call. These application limits are separate from the model's context

@@ -15,6 +15,11 @@ export const evalAskCommand = defineCommand({
       ...stepFrom(args),
       messages: [{ role: 'user', content: args.message }],
       ...(args.model !== undefined ? { model: args.model } : {}),
+    }, {
+      onProgress: (event) => {
+        if (jsonMode === true || event.type !== 'tool' || event.status === 'done') return;
+        output.stderr(event.status === 'running' ? `… ${event.tool}` : `✗ ${event.tool}: ${event.error ?? 'failed'}`);
+      },
     });
     if (jsonMode) {
       printJson(output, result);

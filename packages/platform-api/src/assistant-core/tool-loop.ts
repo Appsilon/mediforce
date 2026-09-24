@@ -17,7 +17,20 @@ export interface ProposalToolLoopConfig<TPlatform extends string> {
   readonly executePlatformTool: (toolName: TPlatform, args: unknown) => Promise<unknown>;
   readonly maxIterations: number;
   readonly maxTokens: number;
+  /** Told when a model round starts and as each tool call runs, so a person can watch the turn progress. */
+  readonly onProgress?: (event: ToolLoopProgress) => void;
 }
+
+export type ToolLoopProgress =
+  | { readonly type: 'thinking'; readonly round: number }
+  | {
+    readonly type: 'tool';
+    readonly round: number;
+    readonly callId: string;
+    readonly tool: string;
+    readonly status: 'running' | 'done' | 'failed';
+    readonly error?: string;
+  };
 
 export interface ProposalToolLoopResult {
   readonly reply: string;
@@ -30,6 +43,12 @@ export interface ProposalToolLoopResult {
 const PROPOSED = {
   proposed: true,
   note: 'Shown to the person as a card to accept, edit or reject. It does not exist until they accept it.',
+};
+
+const ALREADY_PROPOSED = {
+  proposed: true,
+  duplicate: true,
+  note: 'You already proposed exactly this in this turn; the person sees it once. Do not propose it again.',
 };
 
 const MAX_REPEATED_VALIDATION_ROUNDS = 3;
@@ -54,8 +73,10 @@ export async function runProposalToolLoop<TPlatform extends string>(
   const tools = toolDefinitions({ ...config.proposalTools, ...config.platformTools });
   const proposals: Array<{ tool: string; arguments: unknown }> = [];
   const platformCalls: Array<{ tool: string; result: unknown }> = [];
+  const proposalKeys = new Set<string>();
   const messages = config.messages;
   const requestId = randomUUID();
+  const report = config.onProgress ?? (() => {});
   let validationStreaks = new Map<string, number>();
 
   const finishPartial = async (reason: string): Promise<ProposalToolLoopResult> => {
@@ -82,6 +103,7 @@ export async function runProposalToolLoop<TPlatform extends string>(
 
   for (let iteration = 0; iteration < config.maxIterations; iteration++) {
     let response: Awaited<ReturnType<typeof callOpenRouter>>;
+    report({ type: 'thinking', round: iteration + 1 });
     try {
       response = await callOpenRouter({
         model: config.model,
@@ -117,6 +139,8 @@ export async function runProposalToolLoop<TPlatform extends string>(
     let madeProgress = false;
     for (const call of response.toolCalls) {
       const toolName = call.function.name;
+      const progress = { type: 'tool', round: iteration + 1, callId: call.id, tool: toolName } as const;
+      report({ ...progress, status: 'running' });
       let result: unknown;
       let parsedArguments: unknown;
       try {
@@ -130,11 +154,14 @@ export async function runProposalToolLoop<TPlatform extends string>(
           : `Malformed JSON arguments for '${toolName}'.` };
       } else if (Object.hasOwn(config.proposalTools, toolName)) {
         const parsed = parseToolArguments(toolName, config.proposalTools[toolName]!, parsedArguments);
-        if (parsed.ok) {
+        if (parsed.ok === false) {
+          result = { error: parsed.error, validationError: parsed.validationError, expectedArguments: parsed.expectedArguments };
+        } else if (proposalKeys.has(JSON.stringify([toolName, parsed.data]))) {
+          result = ALREADY_PROPOSED;
+        } else {
+          proposalKeys.add(JSON.stringify([toolName, parsed.data]));
           proposals.push({ tool: toolName, arguments: parsed.data });
           result = PROPOSED;
-        } else {
-          result = { error: parsed.error, validationError: parsed.validationError, expectedArguments: parsed.expectedArguments };
         }
       } else if (Object.hasOwn(config.platformTools, toolName)) {
         result = await runPlatformTool({
@@ -160,8 +187,10 @@ export async function runProposalToolLoop<TPlatform extends string>(
           validationFailures.set(JSON.stringify([toolName, validationError]), { tool: toolName, error: validationError });
         }
         console.warn('[assistant-tool-loop] tool error', { requestId, round: iteration + 1, tool: toolName, error: validationError ?? result.error, detail: typeof result.error === 'string' ? result.error.slice(0, 600) : undefined });
+        report({ ...progress, status: 'failed', error: validationError ?? String(result.error) });
       } else {
         madeProgress = true;
+        report({ ...progress, status: 'done' });
       }
     }
     if (madeProgress === true) {

@@ -673,9 +673,11 @@ export {
 export {
   AskEvaluationAssistantInputSchema,
   AskEvaluationAssistantOutputSchema,
+  EvaluationAssistantProgressSchema,
   PreparedEvalRunSchema,
   type AskEvaluationAssistantInput,
   type AskEvaluationAssistantOutput,
+  type EvaluationAssistantProgress,
   type PreparedEvalRun,
 } from './evaluation-assistant';
 

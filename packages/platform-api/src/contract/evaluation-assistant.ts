@@ -28,6 +28,20 @@ export const AskEvaluationAssistantOutputSchema = z.object({
   preparedEvalRuns: z.array(PreparedEvalRunSchema),
 });
 
+/** One step of a turn in progress, streamed while the assistant works. */
+export const EvaluationAssistantProgressSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('thinking'), round: z.number().int().positive() }),
+  z.object({
+    type: z.literal('tool'),
+    round: z.number().int().positive(),
+    callId: z.string(),
+    tool: z.string(),
+    status: z.enum(['running', 'done', 'failed']),
+    error: z.string().optional(),
+  }),
+]);
+
 export type AskEvaluationAssistantInput = z.infer<typeof AskEvaluationAssistantInputSchema>;
 export type AskEvaluationAssistantOutput = z.infer<typeof AskEvaluationAssistantOutputSchema>;
 export type PreparedEvalRun = z.infer<typeof PreparedEvalRunSchema>;
+export type EvaluationAssistantProgress = z.infer<typeof EvaluationAssistantProgressSchema>;
