@@ -55,6 +55,43 @@ export const evalCaseFromRunCommand = defineCommand({
   },
 });
 
+export const evalCasePerturbCommand = defineCommand({
+  name: 'mediforce eval case-perturb',
+  description: 'Synthesize an Eval Case from a production run with deliberate changes, from a JSON file: '
+    + '{ name, baseAgentRunId, perturbation: { kind, description }, inputChanges?, fileChanges?, expectation, notes, split? }.',
+  args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with the case' } },
+  async run({ args, output, mediforce, jsonMode }) {
+    const body = readJsonFile(args.file) as Record<string, unknown>;
+    const result = await mediforce.evaluation.createPerturbedCase({ ...body, ...stepFrom(args) } as Parameters<typeof mediforce.evaluation.createPerturbedCase>[0]);
+    if (jsonMode) printJson(output, result);
+    else output.stdout(`Eval Case ${result.evalCase.id} added (${result.evalCase.perturbation?.kind}, ${result.evalCase.expectation})`);
+    return 0;
+  },
+});
+
+export const evalCasesFromLabelsCommand = defineCommand({
+  name: 'mediforce eval cases-from-labels',
+  description: 'Turn an Evaluator\'s labelled outputs into Eval Cases — a pass positive, a fail negative.',
+  args: {
+    evaluatorId: { type: 'positional', required: true, description: 'Evaluator id' },
+    split: enumArg(['dev', 'holdout'] as const, { description: 'Default: dev' }),
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.createCasesFromLabels({
+      evaluatorId: args.evaluatorId,
+      ...(args.split !== undefined ? { split: args.split } : {}),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    output.stdout(`${result.cases.length} Eval Case(s) added`);
+    for (const evalCase of result.cases) output.stdout(`  ${evalCase.id}  ${evalCase.expectation.padEnd(8)} from ${evalCase.sourceAgentRunId}`);
+    for (const skipped of result.skipped) output.stdout(`  skipped ${skipped.agentRunId}: ${skipped.reason}`);
+    return 0;
+  },
+});
+
 export const evalCaseArchiveCommand = defineCommand({
   name: 'mediforce eval case-archive',
   description: 'Archive an Eval Case (--restore brings it back).',

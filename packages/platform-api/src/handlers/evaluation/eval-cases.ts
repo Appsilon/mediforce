@@ -1,24 +1,27 @@
 import { randomUUID } from 'node:crypto';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import type { z } from 'zod';
-import type { EvalCase, EvalCaseExpectation } from '@mediforce/platform-core';
+import { JUDGE_PASS_VALUE, type EvalCase, type EvalCaseExpectation } from '@mediforce/platform-core';
 import type {
   ArchiveEvalCaseInputSchema,
   CreateEvalCaseFromAgentRunInputSchema,
   CreateEvalCaseInputSchema,
+  CreateEvalCasesFromLabelsInputSchema,
+  CreateEvalCasesFromLabelsOutput,
+  CreatePerturbedEvalCaseInputSchema,
   EvalCaseOutput,
   ListEvalCasesInputSchema,
   ListEvalCasesOutput,
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
-import { NotFoundError, ValidationError } from '../../errors';
+import { HandlerError, NotFoundError, ValidationError } from '../../errors';
 import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
-import { loadEvaluationSubject } from './_lib/evaluation-subject';
+import { loadCaseSource } from './_lib/case-source';
+import { perturbCase } from './_lib/perturb-case';
+import { commitWorkspaceChanges } from './_lib/workspace-seed';
+import { evaluatorView, loadEvaluator } from './_lib/evaluator-view';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
+import { evaluatorLabels } from './evaluator-trust';
 import { HUMAN_VERDICT_SCORE_NAME } from '../scores/record-human-verdict';
-
-const execFileAsync = promisify(execFile);
 
 export async function listEvalCases(
   input: z.output<typeof ListEvalCasesInputSchema>,
@@ -42,6 +45,7 @@ async function storeCase(scope: CallerScope, evalCase: EvalCase): Promise<EvalCa
       stepId: stored.stepId,
       source: stored.source,
       sourceAgentRunId: stored.sourceAgentRunId,
+      perturbation: stored.perturbation,
       origin: stored.origin,
       expectation: stored.expectation,
       split: stored.split,
@@ -69,6 +73,7 @@ export async function createEvalCase(
     notes: input.notes,
     source: 'manual',
     sourceAgentRunId: null,
+    perturbation: null,
     origin: input.origin,
     split: input.split,
     containsProductionData: input.containsProductionData,
@@ -76,18 +81,6 @@ export async function createEvalCase(
     createdBy: authorId(scope),
     createdAt: new Date().toISOString(),
   });
-}
-
-/** The workspace a step saw: the parent of the commit it produced on the run branch. */
-async function parentCommit(bareRepoPath: string, commitSha: string): Promise<string | null> {
-  try {
-    const { stdout } = await execFileAsync('git', ['--git-dir', bareRepoPath, 'rev-parse', `${commitSha}^`]);
-    return stdout.trim();
-  } catch {
-    // The first commit of a run branch has a parent; a missing repo or commit
-    // means the workspace is gone, and the case starts from an empty one.
-    return null;
-  }
 }
 
 /** Approved (1) is positive, rejected (0) negative; revise and recheck (0.5) are neither. */
@@ -109,17 +102,7 @@ export async function createEvalCaseFromAgentRun(
   input: z.output<typeof CreateEvalCaseFromAgentRunInputSchema>,
   scope: CallerScope,
 ): Promise<EvalCaseOutput> {
-  const subject = await loadEvaluationSubject(scope, input.agentRunId, input.step);
-  const step = {
-    namespace: subject.instance.namespace ?? '',
-    workflowName: subject.instance.definitionName,
-    stepId: subject.agentRun.stepId,
-  };
-  await loadEvaluatedStep(scope, step, 'edit');
-  if (subject.instance.evalRunId !== undefined) {
-    throw new ValidationError(`Agent Run '${input.agentRunId}' is an eval trial, not a production run`);
-  }
-
+  const source = await loadCaseSource(scope, input.agentRunId, input.step, 'edit');
   const [verdict] = await scope.scores.list({ agentRunId: input.agentRunId, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 });
   const expectation = input.expectation ?? verdictExpectation(verdict?.value);
   if (expectation === undefined) {
@@ -129,24 +112,18 @@ export async function createEvalCaseFromAgentRun(
     );
   }
 
-  const variables = subject.stepInput?.steps;
-  const git = subject.agentRun.envelope?.gitMetadata ?? null;
+  const { instance, agentRun } = source.subject;
   return storeCase(scope, {
-    ...step,
+    ...source.step,
     id: randomUUID(),
-    name: input.name ?? `From run ${subject.instance.id.slice(0, 8)} (${subject.agentRun.startedAt.slice(0, 10)})`,
-    input: {
-      triggerPayload: subject.instance.triggerPayload ?? {},
-      previousStepOutputs: typeof variables === 'object' && variables !== null
-        ? variables as Record<string, unknown>
-        : {},
-      ...(subject.instance.previousRun === undefined ? {} : { previousRun: subject.instance.previousRun }),
-    },
-    workspaceSeedCommit: git === null ? null : await parentCommit(git.repoUrl, git.commitSha),
+    name: input.name ?? `From run ${instance.id.slice(0, 8)} (${agentRun.startedAt.slice(0, 10)})`,
+    input: source.input,
+    workspaceSeedCommit: source.workspaceSeedCommit,
     expectation,
     notes: input.notes ?? verdict?.comment ?? null,
     source: 'production',
     sourceAgentRunId: input.agentRunId,
+    perturbation: null,
     origin: input.origin,
     split: input.split,
     containsProductionData: true,
@@ -154,6 +131,97 @@ export async function createEvalCaseFromAgentRun(
     createdBy: authorId(scope),
     createdAt: new Date().toISOString(),
   });
+}
+
+/**
+ * A case synthesized from a production Agent Run (ADR-0023 phase 2): the run's
+ * input with `inputChanges` applied, starting from its workspace with
+ * `fileChanges` applied as a new commit. Built from production data, so it is
+ * flagged as containing it.
+ */
+export async function createPerturbedEvalCase(
+  input: z.output<typeof CreatePerturbedEvalCaseInputSchema>,
+  scope: CallerScope,
+): Promise<EvalCaseOutput> {
+  const step = stepRef(input);
+  const source = await loadCaseSource(scope, input.baseAgentRunId, step, 'edit');
+  const perturbed = await perturbCase(source, input);
+  const id = randomUUID();
+  let workspaceSeedCommit = source.workspaceSeedCommit;
+  if (perturbed.fileContents.size > 0) {
+    // perturbCase refuses file changes on a run without a workspace.
+    workspaceSeedCommit = await commitWorkspaceChanges(source.bareRepoPath!, source.workspaceSeedCommit!, perturbed.fileContents, {
+      message: `Eval Case '${input.name}': ${input.perturbation.kind} — ${input.perturbation.description}`,
+      ref: `refs/mediforce/eval-seeds/${id}`,
+    });
+  }
+
+  return storeCase(scope, {
+    ...step,
+    id,
+    name: input.name,
+    input: perturbed.input,
+    workspaceSeedCommit,
+    expectation: input.expectation,
+    notes: input.notes,
+    source: 'synthesized',
+    sourceAgentRunId: input.baseAgentRunId,
+    perturbation: input.perturbation,
+    origin: input.origin,
+    split: input.split,
+    containsProductionData: true,
+    archived: false,
+    createdBy: authorId(scope),
+    createdAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Seeds Eval Cases from an Evaluator's labels (EvalGen): every labelled
+ * production output that is not already a live case from that run becomes
+ * one — a pass positive, a fail negative, noting the rule and the person's
+ * comment. The newest label per output decides.
+ */
+export async function createEvalCasesFromLabels(
+  input: z.output<typeof CreateEvalCasesFromLabelsInputSchema>,
+  scope: CallerScope,
+): Promise<CreateEvalCasesFromLabelsOutput> {
+  const evaluator = await loadEvaluator(scope, input.evaluatorId);
+  const step = stepRef(evaluator);
+  await loadEvaluatedStep(scope, step, 'edit');
+  const { latest } = await evaluatorView(scope, evaluator);
+  const existing = new Set((await scope.evaluation.listCases(step))
+    .filter((evalCase) => !evalCase.archived && evalCase.source === 'production')
+    .map((evalCase) => evalCase.sourceAgentRunId));
+
+  const cases: EvalCase[] = [];
+  const skipped: CreateEvalCasesFromLabelsOutput['skipped'] = [];
+  for (const label of await evaluatorLabels(scope, evaluator)) {
+    const agentRunId = label.subject.id;
+    if (existing.has(agentRunId)) {
+      skipped.push({ agentRunId, reason: 'already a case' });
+      continue;
+    }
+    try {
+      const passed = label.value >= JUDGE_PASS_VALUE;
+      const verdict = `${passed ? 'Passes' : 'Fails'} '${evaluator.name}': ${latest.rule}`;
+      const notes = [verdict, label.comment].filter((part) => part !== null && part !== '').join(' — ').slice(0, 4000);
+      const { evalCase } = await createEvalCaseFromAgentRun({
+        agentRunId,
+        step,
+        expectation: passed ? 'positive' : 'negative',
+        notes,
+        split: input.split,
+        origin: 'user',
+      }, scope);
+      cases.push(evalCase);
+      existing.add(agentRunId);
+    } catch (err) {
+      if (!(err instanceof HandlerError) || err.code === 'forbidden') throw err;
+      skipped.push({ agentRunId, reason: err.message });
+    }
+  }
+  return { cases, skipped };
 }
 
 export async function archiveEvalCase(
