@@ -6,6 +6,7 @@ import {
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
   InMemoryScoreRepository,
+  InMemoryToolCatalogRepository,
   buildAgentOutputEnvelope,
   buildAgentRun,
   buildProcessInstance,
@@ -47,6 +48,8 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
   const evaluationRepo = new InMemoryEvaluationRepository();
   const auditRepo = new InMemoryAuditRepository(instanceRepo);
   const agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
+  const toolCatalogRepo = new InMemoryToolCatalogRepository();
+  await toolCatalogRepo.upsert(NAMESPACE, { id: 'edc', command: 'edc-mcp' });
 
   await agentDefinitionRepo.upsert('ae-grader', {
     kind: 'plugin',
@@ -90,6 +93,7 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
       evaluationRepo,
       auditRepo,
       agentDefinitionRepo,
+      toolCatalogRepo,
       caller,
     }),
   };

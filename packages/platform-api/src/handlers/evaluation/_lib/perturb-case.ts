@@ -1,7 +1,8 @@
+import { readCommitFile } from '@mediforce/agent-runtime';
 import type { EvalCaseInput, EvalCaseInputChange, WorkspaceFileChange } from '@mediforce/platform-core';
 import { ValidationError } from '../../../errors';
 import type { CaseSource } from './case-source';
-import { readWorkspaceFile, resolveFileChanges } from './workspace-seed';
+import { resolveFileChanges } from './workspace-seed';
 
 type Container = Record<string, unknown> | unknown[];
 
@@ -28,10 +29,10 @@ export function applyInputChanges(input: EvalCaseInput, changes: readonly EvalCa
     for (const key of change.path.slice(0, -1)) {
       container = isContainer(container) ? childOf(container, key) : undefined;
     }
-    if (!isContainer(container)) throw new ValidationError(`${where}: its parent is not an object or array`);
+    if (isContainer(container) === false) throw new ValidationError(`${where}: its parent is not an object or array`);
     const last = change.path[change.path.length - 1]!;
     const isIndex = Array.isArray(container) && /^\d+$/.test(last);
-    if (Array.isArray(container) && !isIndex) throw new ValidationError(`${where}: '${last}' is not an array index`);
+    if (Array.isArray(container) && isIndex === false) throw new ValidationError(`${where}: '${last}' is not an array index`);
 
     if (change.op === 'set') {
       if (Array.isArray(container)) container[Number(last)] = change.value;
@@ -47,8 +48,12 @@ export function applyInputChanges(input: EvalCaseInput, changes: readonly EvalCa
 
 export interface PerturbedCase {
   readonly input: EvalCaseInput;
-  /** What each changed workspace file ends up holding (null: deleted); empty when no file changes. */
-  readonly fileContents: ReadonlyMap<string, string | null>;
+  /** The workspace the file changes apply to, and what each changed file ends up holding (null: deleted); null when no file changes. */
+  readonly workspaceChange: {
+    readonly bareRepoPath: string;
+    readonly baseCommit: string;
+    readonly contents: ReadonlyMap<string, string | null>;
+  } | null;
 }
 
 /**
@@ -62,14 +67,14 @@ export async function perturbCase(
 ): Promise<PerturbedCase> {
   const input = applyInputChanges(source.input, changes.inputChanges ?? []);
   const fileChanges = changes.fileChanges ?? [];
-  if (fileChanges.length === 0) return { input, fileContents: new Map() };
+  if (fileChanges.length === 0) return { input, workspaceChange: null };
   const { bareRepoPath, workspaceSeedCommit } = source;
   if (bareRepoPath === null || workspaceSeedCommit === null) {
     throw new ValidationError(`Agent Run '${source.subject.agentRun.id}' has no workspace to change files in`);
   }
-  const fileContents = await resolveFileChanges(
-    (path) => readWorkspaceFile(bareRepoPath, workspaceSeedCommit, path),
+  const contents = await resolveFileChanges(
+    (path) => readCommitFile(bareRepoPath, workspaceSeedCommit, path),
     fileChanges,
   );
-  return { input, fileContents };
+  return { input, workspaceChange: { bareRepoPath, baseCommit: workspaceSeedCommit, contents } };
 }

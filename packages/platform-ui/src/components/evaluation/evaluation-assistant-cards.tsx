@@ -22,7 +22,7 @@ export type ProposalStatus = 'open' | 'accepted' | 'rejected';
 type Proposal<Tool extends ProposalView['tool']> = Extract<ProposalView, { tool: Tool }>;
 
 /** The proposals a person accepts or rejects as they stand; a plan and a labelling queue are worked through instead. */
-export type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_outputs_to_label' }>;
+type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_outputs_to_label' }>;
 
 export function isDecidable(proposal: ProposalView): proposal is DecidableProposal {
   return proposal.tool !== 'propose_evaluation_plan' && proposal.tool !== 'propose_outputs_to_label';
@@ -176,7 +176,7 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
         <div className="mt-2 flex gap-1.5">
           <InstantTooltip label={editReason}>
             <span className="inline-flex">
-              <button type="button" data-testid="proposal-accept" className={primaryButtonClass} disabled={!mayEdit || accept.isPending} onClick={onAccept}>
+              <button type="button" data-testid="proposal-accept" className={primaryButtonClass} disabled={mayEdit === false || accept.isPending} onClick={onAccept}>
                 <Check className="h-3 w-3" />Accept
               </button>
             </span>
@@ -204,8 +204,8 @@ const SEVERITY_CLASSES = {
 } as const;
 
 /**
- * A risk-ranked evaluation plan. It creates nothing: the person picks a risk
- * and the assistant drafts, previews and proposes its check.
+ * An evaluation plan, its risks highest first. It creates nothing: the person
+ * picks a risk and the assistant drafts, previews and proposes its check.
  */
 export function PlanCard({ plan, onDraft, busy }: {
   plan: Proposal<'propose_evaluation_plan'>['arguments'];
@@ -227,8 +227,8 @@ export function PlanCard({ plan, onDraft, busy }: {
             </div>
             <p className="mt-0.5 text-muted-foreground">{risk.why}</p>
             <p className="mt-0.5"><span className="text-muted-foreground">Check ({risk.check.kind}):</span> {risk.check.rule}</p>
-            {(risk.cases?.length ?? 0) > 0 && (
-              <ul className="mt-0.5 list-disc pl-4 text-muted-foreground">{risk.cases!.map((evalCase) => <li key={evalCase}>{evalCase}</li>)}</ul>
+            {risk.cases !== undefined && risk.cases.length > 0 && (
+              <ul className="mt-0.5 list-disc pl-4 text-muted-foreground">{risk.cases.map((evalCase) => <li key={evalCase}>{evalCase}</li>)}</ul>
             )}
             <button
               type="button"
@@ -311,7 +311,8 @@ export function LabellingCard({ step, proposal, mayEdit, editReason }: {
   const evaluator = evaluators.data?.evaluators.find((candidate) => candidate.id === proposal.evaluatorId);
   const [refining, setRefining] = React.useState<{ rule: string; rubric: string } | null>(null);
   const refine = useStepEvaluationMutation(step, (draft: { rule: string; rubric: string }) => {
-    const check = evaluator!.latest.check;
+    if (evaluator === undefined) throw new Error('That Evaluator is no longer live.');
+    const check = evaluator.latest.check;
     return mediforce.evaluation.addEvaluatorVersion({
       evaluatorId: proposal.evaluatorId,
       rule: draft.rule,
@@ -326,9 +327,13 @@ export function LabellingCard({ step, proposal, mayEdit, editReason }: {
   }
   const byRun = new Map((labels.data?.labels ?? []).map((score) => [score.subject.id, { passed: score.value >= JUDGE_PASS_VALUE, comment: score.comment }]));
   const all = [...byRun.values()];
-  const failures = all.filter((label) => !label.passed).length;
+  const failures = all.filter((label) => label.passed === false).length;
   const check = evaluator.latest.check;
   const calibration = evaluator.latest.calibration;
+  const actionError = calibrate.error ?? seed.error;
+  const refinedUnchanged = refining !== null
+    && refining.rule.trim() === evaluator.latest.rule
+    && (check.kind !== 'llm_judge' || refining.rubric === check.rubric);
 
   return (
     <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="labelling-card">
@@ -353,7 +358,7 @@ export function LabellingCard({ step, proposal, mayEdit, editReason }: {
             <button
               type="button"
               className={primaryButtonClass}
-              disabled={refining.rule.trim() === '' || refine.isPending}
+              disabled={refining.rule.trim() === '' || refinedUnchanged || refine.isPending}
               onClick={() => refine.mutate(refining, { onSuccess: () => setRefining(null) })}
             >Save as v{evaluator.latest.version + 1}</button>
             <button type="button" className={buttonClass} onClick={() => setRefining(null)}>Cancel</button>
@@ -378,20 +383,27 @@ export function LabellingCard({ step, proposal, mayEdit, editReason }: {
           {evaluator.trust.trusted ? ' — counts' : ` — not counted: ${evaluator.trust.reason}`}
         </p>
       )}
-      {(calibrate.data?.disagreements.length ?? 0) > 0 && (
+      {calibrate.data !== undefined && calibrate.data.disagreements.length > 0 && (
         <p className="mt-0.5 text-muted-foreground">
-          Disagrees with you on {calibrate.data!.disagreements.map((miss) => miss.agentRunId.slice(0, 8)).join(', ')} — refine the rule, or ask the assistant why.
+          Disagrees with you on {calibrate.data.disagreements.map((miss) => miss.agentRunId.slice(0, 8)).join(', ')} — refine the rule, or ask the assistant why.
         </p>
       )}
       {seed.data !== undefined && (
-        <p className="mt-0.5 text-muted-foreground">{seed.data.cases.length} Eval Case(s) added{seed.data.skipped.length > 0 ? `, ${seed.data.skipped.length} already cases or not production runs` : ''}.</p>
+        <div className="mt-0.5 text-muted-foreground" data-testid="cases-from-labels-result">
+          <p>{seed.data.cases.length} Eval Case(s) added{seed.data.skipped.length > 0 ? `, ${seed.data.skipped.length} skipped:` : '.'}</p>
+          {seed.data.skipped.length > 0 && (
+            <ul className="list-disc pl-4">
+              {seed.data.skipped.map((skipped) => <li key={skipped.agentRunId}><span className="font-mono">{skipped.agentRunId.slice(0, 8)}</span> — {skipped.reason}</li>)}
+            </ul>
+          )}
+        </div>
       )}
-      {(calibrate.error ?? seed.error) !== null && <p className="mt-0.5 text-destructive">{(calibrate.error ?? seed.error)!.message}</p>}
+      {actionError !== null && <p className="mt-0.5 text-destructive">{actionError.message}</p>}
       <div className="mt-2 flex flex-wrap gap-1.5">
         {check.kind === 'llm_judge' && (
           <InstantTooltip label={editReason}>
             <span className="inline-flex">
-              <button type="button" className={primaryButtonClass} disabled={!mayEdit || all.length === 0 || calibrate.isPending} onClick={() => calibrate.mutate(undefined)}>
+              <button type="button" className={primaryButtonClass} disabled={mayEdit === false || all.length === 0 || calibrate.isPending} onClick={() => calibrate.mutate(undefined)}>
                 {calibrate.isPending ? 'Calibrating…' : 'Calibrate'}
               </button>
             </span>
@@ -399,7 +411,7 @@ export function LabellingCard({ step, proposal, mayEdit, editReason }: {
         )}
         <InstantTooltip label={editReason}>
           <span className="inline-flex">
-            <button type="button" className={buttonClass} disabled={!mayEdit || all.length === 0 || seed.isPending} onClick={() => seed.mutate(undefined)}>
+            <button type="button" className={buttonClass} disabled={mayEdit === false || all.length === 0 || seed.isPending} onClick={() => seed.mutate(undefined)}>
               Add labelled outputs as Eval Cases
             </button>
           </span>

@@ -9,7 +9,7 @@ last_reviewed: 2026-09-24
 How an author checks that one agent Workflow Step can be trusted for its
 context of use. The design and its reasons are
 [ADR-0023](../adr/0023-step-evaluation.md); the vocabulary is `CONTEXT.md`
-§ Evaluation domain. This page is what exists today (phase 2).
+§ Evaluation domain. This page is what exists today.
 
 Everything below belongs to one agent Step, keyed by
 `(namespace, workflowName, stepId)`, and lives outside the Workflow
@@ -28,8 +28,10 @@ Evaluation Assistant (`mediforce eval ask`, `POST /api/evaluation/assistant`).
 Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 
 - **Runs freely:** reading the step (config, agent prompt and system prompt,
-  input and output descriptions, `outputSchema`, allowed tools, MCP servers as
-  production and trials see them, SKILL.md, the steps upstream of it), its
+  input and output descriptions, `outputSchema`, the tools it allows beyond
+  the runtime's defaults, MCP servers as production resolves them — a
+  configuration production refuses shows as such — and as trials see them,
+  SKILL.md, the steps upstream of it), its
   production runs with the reviewer's verdict and their trajectories, the
   workspace files a run started from, Evaluators with their labels and
   calibration, cases, Eval Runs and reports, and `preview_evaluator` — it
@@ -58,8 +60,11 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   outputs before the card is shown (reusing the assistant's own preview of the
   same check), and the card shows what it did. A check that errors on every
   output goes back to the assistant instead of to the person; for a person
-  without the `run` verb the card says it was not tried. A refined rule is a
-  proposed new version of the Evaluator.
+  without the `run` verb the card says it was not tried. The try runs the check
+  on up to 5 outputs, so it is not free: a `code` check starts a sandbox per
+  output, and an `llm_judge` pays for a model call per output — a turn that
+  proposes a judge the assistant did not preview takes longer and costs more. A
+  refined rule is a proposed new version of the Evaluator.
 - **Calibration help.** For a judge, it picks the outputs most worth labelling
   — ones reviewers rejected, ones its preview failed, ones unlike those already
   labelled — and returns them as a labelling card. The person labels each pass
@@ -68,9 +73,11 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   and turns the labelled outputs into Eval Cases.
 - **Case synthesis.** It proposes a case built from a real production run with
   a deliberate change — an instruction injected into the data, an edge value,
-  renamed columns, a missing or extra file — usually negative, with notes on
-  what the output must not do. A change that does not apply to that run goes
-  back to the assistant instead of to the person.
+  renamed columns, a missing or extra file — usually positive (a correct
+  output exists and should be accepted), with notes on what it must not do;
+  negative only when the input is so broken no output should be accepted. A
+  change that does not apply to that run goes back to the assistant instead of
+  to the person.
 
 Every proposal is checked against the platform before it is shown: an Evaluator
 name already taken, an Evaluator or run of another step, and an eval trial

@@ -121,13 +121,34 @@ describe('executeEvaluationTool', () => {
     expect(result).toMatchObject({
       agent: { name: 'AE grader', inputDescription: 'Extracted AEs', outputDescription: 'Graded AEs' },
       outputSchema: { required: ['findings'] },
-      allowedTools: { additional: ['WebFetch'] },
+      additionalTools: ['WebFetch'],
       mcpServers: [
         { name: 'edc', inProduction: ['read_record'], inEvalTrials: { mode: 'deny', defaulted: true } },
         { name: 'email', inProduction: 'all tools', inEvalTrials: { mode: 'deny', defaulted: true } },
       ],
       upstreamSteps: [{ id: 'extract-aes', name: 'Extract AEs', executor: 'script' }],
     });
+  });
+
+  it('reports MCP access exactly as production resolves it, refusals included', async () => {
+    const { scope, context } = await setup();
+    const mcpServersWith = async (mcpRestrictions: Record<string, { disable?: boolean; denyTools?: string[] }>) =>
+      ((await executeEvaluationTool('get_step', {}, scope, { ...context, workflowStep: { ...context.workflowStep, mcpRestrictions } })) as {
+        mcpServers: Array<{ name: string; inProduction: unknown }>;
+      }).mcpServers.map(({ name, inProduction }) => [name, inProduction]);
+
+    expect(await mcpServersWith({ edc: { denyTools: ['read_record', 'write_record'] }, email: { disable: true } })).toEqual([
+      ['edc', 'none — disabled, or every tool denied, for this step'],
+      ['email', 'none — disabled, or every tool denied, for this step'],
+    ]);
+    expect(await mcpServersWith({ email: { denyTools: ['send'] } })).toEqual([
+      ['edc', expect.stringMatching(/^the step does not start: .*email.*no allowedTools/)],
+      ['email', expect.stringMatching(/^the step does not start: /)],
+    ]);
+    expect(await mcpServersWith({ githuub: { disable: true } })).toEqual([
+      ['edc', expect.stringContaining('"githuub" which is not defined on the agent')],
+      ['email', expect.stringContaining('"githuub" which is not defined on the agent')],
+    ]);
   });
 
   it('lists runs with the reviewer\'s verdict, so the outputs worth labelling can be picked', async () => {

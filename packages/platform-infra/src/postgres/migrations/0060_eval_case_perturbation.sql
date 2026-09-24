@@ -1,3 +1,3 @@
 -- A synthesized Eval Case records what it changed about its source run's
--- input (ADR-0023 phase 2 case synthesis); null on every other case.
+-- input — the kind of change and why; null on every other case.
 ALTER TABLE "eval_cases" ADD COLUMN "perturbation" jsonb;

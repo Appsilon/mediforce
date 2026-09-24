@@ -136,7 +136,7 @@ export const EvalCaseExpectationSchema = z.enum(['positive', 'negative']);
 /** `synthesized`: a production run's input with a deliberate change — see `perturbation`. */
 export const EvalCaseSourceSchema = z.enum(['production', 'manual', 'synthesized']);
 
-/** The kinds of change a synthesized case makes to a real input (ADR-0023 phase 2). */
+/** The kinds of change a synthesized case makes to a real production input. */
 export const EvalCasePerturbationKindSchema = z.enum([
   'missing_file',
   'extra_file',
@@ -166,7 +166,7 @@ export const EvalCaseInputChangeSchema = z.discriminatedUnion('op', [
 
 /** A workspace-relative file path: no leading slash, no `.` or `..` segments, nothing under `.git`. */
 export const WorkspaceFilePathSchema = z.string().min(1).max(500).refine(
-  (path) => !path.startsWith('/')
+  (path) => path.startsWith('/') === false
     && path.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..')
     && path.split('/')[0] !== '.git',
   { message: 'a relative path inside the workspace, without . or .. segments, not under .git' },

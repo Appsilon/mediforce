@@ -134,27 +134,27 @@ export async function createEvalCaseFromAgentRun(
 }
 
 /**
- * A case synthesized from a production Agent Run (ADR-0023 phase 2): the run's
- * input with `inputChanges` applied, starting from its workspace with
- * `fileChanges` applied as a new commit. Built from production data, so it is
- * flagged as containing it.
+ * A case synthesized from a production Agent Run: the run's input with
+ * `inputChanges` applied, starting from its workspace with `fileChanges`
+ * applied as a new commit. Built from production data, so it is flagged as
+ * containing it.
  */
 export async function createPerturbedEvalCase(
   input: z.output<typeof CreatePerturbedEvalCaseInputSchema>,
   scope: CallerScope,
 ): Promise<EvalCaseOutput> {
   const step = stepRef(input);
+  await loadEvaluatedStep(scope, step, 'edit');
   const source = await loadCaseSource(scope, input.baseAgentRunId, step, 'edit');
   const perturbed = await perturbCase(source, input);
   const id = randomUUID();
-  let workspaceSeedCommit = source.workspaceSeedCommit;
-  if (perturbed.fileContents.size > 0) {
-    // perturbCase refuses file changes on a run without a workspace.
-    workspaceSeedCommit = await commitWorkspaceChanges(source.bareRepoPath!, source.workspaceSeedCommit!, perturbed.fileContents, {
+  const { workspaceChange } = perturbed;
+  const workspaceSeedCommit = workspaceChange === null
+    ? source.workspaceSeedCommit
+    : await commitWorkspaceChanges(workspaceChange.bareRepoPath, workspaceChange.baseCommit, workspaceChange.contents, {
       message: `Eval Case '${input.name}': ${input.perturbation.kind} — ${input.perturbation.description}`,
       ref: `refs/mediforce/eval-seeds/${id}`,
     });
-  }
 
   return storeCase(scope, {
     ...step,
@@ -191,7 +191,7 @@ export async function createEvalCasesFromLabels(
   await loadEvaluatedStep(scope, step, 'edit');
   const { latest } = await evaluatorView(scope, evaluator);
   const existing = new Set((await scope.evaluation.listCases(step))
-    .filter((evalCase) => !evalCase.archived && evalCase.source === 'production')
+    .filter((evalCase) => evalCase.archived === false && evalCase.source === 'production')
     .map((evalCase) => evalCase.sourceAgentRunId));
 
   const cases: EvalCase[] = [];
@@ -217,7 +217,7 @@ export async function createEvalCasesFromLabels(
       cases.push(evalCase);
       existing.add(agentRunId);
     } catch (err) {
-      if (!(err instanceof HandlerError) || err.code === 'forbidden') throw err;
+      if (err instanceof HandlerError === false || err.code === 'forbidden') throw err;
       skipped.push({ agentRunId, reason: err.message });
     }
   }

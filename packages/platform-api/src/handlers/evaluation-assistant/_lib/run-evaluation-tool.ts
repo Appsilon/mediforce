@@ -6,13 +6,13 @@ import {
   JUDGE_MIN_FAILURE_LABELS,
   JUDGE_MIN_LABELS,
   JUDGE_PASS_VALUE,
-  type AgentDefinition,
   type Evaluator,
   type EvaluatedStep,
   type EvaluationAssistantPlatformToolName,
   type WorkflowDefinition,
   type WorkflowStep,
 } from '@mediforce/platform-core';
+import { listCommitFiles, readCommitFile, resolveMcpForStep } from '@mediforce/agent-runtime';
 import type { CallerScope } from '../../../repositories/index';
 import { NotFoundError } from '../../../errors';
 import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
@@ -20,7 +20,7 @@ import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
 import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
 import { evaluatorView, loadEvaluator } from '../../evaluation/_lib/evaluator-view';
-import { isBinary, listWorkspaceFiles, readWorkspaceFile } from '../../evaluation/_lib/workspace-seed';
+import { isBinary } from '../../evaluation/_lib/workspace-seed';
 import { evaluatorLabels } from '../../evaluation/evaluator-trust';
 import { HUMAN_VERDICT_SCORE_NAME } from '../../scores/record-human-verdict';
 import { listEvaluators } from '../../evaluation/evaluators';
@@ -57,7 +57,7 @@ function upstreamSteps(definition: WorkflowDefinition, stepId: string): Workflow
   let frontier = [stepId];
   while (frontier.length > 0) {
     const previous = definition.transitions
-      .filter((transition) => frontier.includes(transition.to) && !seen.has(transition.from))
+      .filter((transition) => frontier.includes(transition.to) && seen.has(transition.from) === false)
       .map((transition) => transition.from);
     frontier = [...new Set(previous)];
     for (const id of frontier) {
@@ -70,24 +70,31 @@ function upstreamSteps(definition: WorkflowDefinition, stepId: string): Workflow
 }
 
 /**
- * The tools the step's agent may call in production, per MCP server — the
- * binding's `allowedTools` less the step's `mcpRestrictions` — beside what the
- * eval policy lets a trial do with the server.
+ * What the step's agent may call on each MCP server in production — resolved
+ * the way the runtime resolves it at spawn — beside what the eval policy lets
+ * a trial do with the server. A configuration production refuses is reported
+ * as such: the step does not start.
  */
-async function effectiveMcpServers(scope: CallerScope, step: EvaluatedStep, workflowStep: WorkflowStep, agent: AgentDefinition | null) {
-  const { servers } = await getMcpEvalPolicy(step, scope);
-  const restrictions = workflowStep.mcpRestrictions ?? {};
+async function effectiveMcpServers(scope: CallerScope, step: EvaluatedStep, workflowStep: WorkflowStep) {
+  const [{ servers }, production] = await Promise.all([
+    getMcpEvalPolicy(step, scope),
+    resolveMcpForStep(workflowStep, {
+      agentDefinitionRepo: scope.agentDefinitions,
+      toolCatalogRepo: scope.toolCatalog,
+      namespace: step.namespace,
+    }).then(
+      (config) => ({ config, refusal: null }),
+      (error: unknown) => ({ config: null, refusal: error instanceof Error ? error.message : String(error) }),
+    ),
+  ]);
   return servers.map(({ name, ...evalPolicy }) => {
-    const restriction = restrictions[name];
-    const denied = new Set(restriction?.denyTools ?? []);
-    const allowed = agent?.mcpServers?.[name]?.allowedTools;
-    return {
-      name,
-      inProduction: restriction?.disable === true
-        ? 'disabled for this step'
-        : allowed === undefined ? 'all tools' : allowed.filter((tool) => !denied.has(tool)),
-      inEvalTrials: evalPolicy,
-    };
+    const resolved = production.config?.servers[name];
+    const inProduction = production.refusal !== null
+      ? `the step does not start: ${production.refusal}`
+      : resolved === undefined
+        ? 'none — disabled, or every tool denied, for this step'
+        : resolved.allowedTools ?? 'all tools';
+    return { name, inProduction, inEvalTrials: evalPolicy };
   });
 }
 
@@ -136,8 +143,8 @@ export async function executeEvaluationTool(
           systemPrompt: clip(agent.systemPrompt, 4000),
         },
         outputSchema: workflowStep.agent?.outputSchema ?? null,
-        allowedTools: { default: ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep'], additional: workflowStep.agent?.allowedTools ?? [] },
-        mcpServers: await effectiveMcpServers(scope, step, workflowStep, agent),
+        additionalTools: workflowStep.agent?.allowedTools ?? [],
+        mcpServers: await effectiveMcpServers(scope, step, workflowStep),
         upstreamSteps: upstreamSteps(definition, workflowStep.id).map((upstream) => ({
           id: upstream.id,
           name: upstream.name,
@@ -150,15 +157,17 @@ export async function executeEvaluationTool(
     case 'list_step_runs': {
       const { limit } = args as Args<'list_step_runs'>;
       const { runs } = await listStepAgentRuns({ ...step, limit: limit ?? 10 }, scope);
-      const verdicts = await Promise.all(runs.map(async (run) =>
-        (await scope.scores.list({ agentRunId: run.id, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 }))[0] ?? null));
+      const reviewed = await Promise.all(runs.map(async (run) => ({
+        run,
+        verdict: (await scope.scores.list({ agentRunId: run.id, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 }))[0] ?? null,
+      })));
       return {
-        runs: runs.map((run, index) => ({
+        runs: reviewed.map(({ run, verdict }) => ({
           agentRunId: run.id,
           status: run.status,
           fallbackReason: run.fallbackReason,
           startedAt: run.startedAt,
-          reviewVerdict: verdicts[index] === null ? null : { verdict: verdicts[index]!.label, comment: verdicts[index]!.comment },
+          reviewVerdict: verdict === null ? null : { verdict: verdict.label, comment: verdict.comment },
           result: clip(run.envelope?.result ?? null, 600),
         })),
       };
@@ -194,7 +203,7 @@ export async function executeEvaluationTool(
       if (source.bareRepoPath === null || source.workspaceSeedCommit === null) {
         return { files: [], note: 'This run had no workspace; a case from it starts from an empty one.' };
       }
-      const files = await listWorkspaceFiles(source.bareRepoPath, source.workspaceSeedCommit);
+      const files = await listCommitFiles(source.bareRepoPath, source.workspaceSeedCommit);
       return { commit: source.workspaceSeedCommit, files: files.slice(0, MAX_LISTED_FILES), total: files.length };
     }
     case 'read_workspace_file': {
@@ -202,7 +211,7 @@ export async function executeEvaluationTool(
       const source = await loadCaseSource(scope, agentRunId, step, 'read');
       const content = source.bareRepoPath === null || source.workspaceSeedCommit === null
         ? null
-        : await readWorkspaceFile(source.bareRepoPath, source.workspaceSeedCommit, path);
+        : await readCommitFile(source.bareRepoPath, source.workspaceSeedCommit, path);
       if (content === null) throw new NotFoundError(`The workspace of Agent Run '${agentRunId}' has no file '${path}'`);
       if (isBinary(content)) return { path, size: content.length, binary: true };
       return { path, size: content.length, content: clip(content.toString('utf-8'), 20_000) };

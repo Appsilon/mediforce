@@ -6,7 +6,7 @@ import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 
-type Section = 'brief' | 'evaluators' | 'cases' | 'datasets' | 'mcp-policy' | 'runs' | 'agent-runs';
+type Section = 'brief' | 'evaluators' | 'cases' | 'datasets' | 'mcp-policy' | 'runs' | 'agent-runs' | `labels:${string}`;
 
 function sectionKey(step: EvaluatedStep, section: Section) {
   return queryKeys.evaluation.section(step.namespace, step.workflowName, step.stepId, section);
@@ -24,7 +24,7 @@ export function useStepEvaluators(step: EvaluatedStep) {
 /** The person's labels on one Evaluator's outputs; refreshed by every write on the Step. */
 export function useEvaluatorLabels(step: EvaluatedStep, evaluatorId: string) {
   return useQuery({
-    queryKey: queryKeys.evaluation.section(step.namespace, step.workflowName, step.stepId, `labels:${evaluatorId}`),
+    queryKey: sectionKey(step, `labels:${evaluatorId}`),
     queryFn: () => mediforce.evaluation.listLabels({ evaluatorId }),
     retry: stopRetryOn4xx,
   });
