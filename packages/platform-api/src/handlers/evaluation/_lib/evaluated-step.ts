@@ -31,7 +31,7 @@ export async function loadEvaluatedStep(
   let pinned = version;
   if (pinned === undefined) {
     const resolution = await resolveRunnableVersion(scope.workflowDefinitions, ref.namespace, ref.workflowName);
-    if (!resolution.ok) throw new NotFoundError(`Workflow '${ref.workflowName}' not found`);
+    if (resolution.ok === false) throw new NotFoundError(`Workflow '${ref.workflowName}' not found`);
     pinned = resolution.def.version;
   }
   const definition = await scope.workflowDefinitions.get(ref.namespace, ref.workflowName, pinned);
@@ -59,4 +59,9 @@ export async function loadEvaluatedStep(
 
 export function stepRef(row: EvaluatedStep): EvaluatedStep {
   return { namespace: row.namespace, workflowName: row.workflowName, stepId: row.stepId };
+}
+
+/** Whether a row belongs to this Step. */
+export function isSameStep(row: EvaluatedStep, step: EvaluatedStep): boolean {
+  return row.namespace === step.namespace && row.workflowName === step.workflowName && row.stepId === step.stepId;
 }

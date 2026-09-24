@@ -136,7 +136,7 @@ describe('buildEvalRunReport', () => {
       { lower: 0.8, upper: 1, count: 12, passRate: 1 },
     ] });
     expect(champion!.criteria[0]!.status).toBe('missed');
-    expect(champion!.recommendation).toMatchObject({ controlMode: 'CM4', confidenceThreshold: 0.95, coverage: 0.6 });
+    expect(champion!.recommendation).toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.95, coverage: 0.6 });
   });
 
   it('recommends nothing for a variant still running', async () => {

@@ -200,7 +200,7 @@ export default function StepDetailPage() {
               <Bot className="h-3 w-3" /> Agent
             </span>
           )}
-          {executorType === 'agent' && handle !== undefined && runVersion !== null && !Number.isNaN(runVersion) && (
+          {executorType === 'agent' && handle !== undefined && runVersion !== null && Number.isNaN(runVersion) === false && (
             <StepQualificationBadge step={{ namespace: handle, workflowName: decodedName, stepId: decodedStepId }} definitionVersion={runVersion} />
           )}
         </div>

@@ -27,7 +27,7 @@ function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void 
     if (variant.confidence !== null) output.stdout(`confidence: ECE ${variant.confidence.ece.toFixed(3)} over ${variant.confidence.count} trial(s)`);
     if (variant.recommendation !== null) {
       const threshold = variant.recommendation.confidenceThreshold === null ? '' : ` above confidence ${variant.recommendation.confidenceThreshold}`;
-      output.stdout(`routing: ${variant.recommendation.controlMode}${threshold} — ${variant.recommendation.reason}`);
+      output.stdout(`routing: ${variant.recommendation.autonomyLevel}${threshold} — ${variant.recommendation.reason}`);
     }
   }
   for (const comparison of report.comparison) {

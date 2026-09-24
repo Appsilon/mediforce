@@ -35,7 +35,7 @@ describe('driveEvalRun', () => {
   });
 
   it('never starts more than the concurrency, however often it is called', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 3, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 3, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
     await driveEvalRun(scope, evalRun.id);
     await driveEvalRun(scope, evalRun.id);
@@ -44,7 +44,7 @@ describe('driveEvalRun', () => {
   });
 
   it('fails a trial whose run ended without an Agent Run, with the run\'s error', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
     const instanceId = kicker.kicks[0]!.instanceId;
     await fixture.instanceRepo.update(instanceId, { status: 'paused', pauseReason: 'missing_env', error: 'OPENROUTER_API_KEY missing' });
@@ -57,7 +57,7 @@ describe('driveEvalRun', () => {
   });
 
   it('creates each trial\'s run under the id it claimed the trial with', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
 
     const [trial] = await fixture.evaluationRepo.listTrials(evalRun.id);
@@ -75,7 +75,7 @@ describe('driveEvalRun', () => {
         },
       },
     });
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
 
     const [trial] = await fixture.evaluationRepo.listTrials(evalRun.id);
@@ -84,7 +84,7 @@ describe('driveEvalRun', () => {
   });
 
   it('fails a claimed trial whose run was never created once its claim goes stale, and waits while it is fresh', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 1, budgetUsd: 5 }, scope);
     await fixture.evaluationRepo.transitionEvalRun(evalRun.id, 'prepared', { status: 'running' });
     const [stale, fresh] = await fixture.evaluationRepo.listTrials(evalRun.id);
     // Two drivers died between claiming a trial and creating its run.
@@ -99,7 +99,7 @@ describe('driveEvalRun', () => {
   });
 
   it('takes over a scoring claim whose driver died, without scoring an Evaluator twice', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
     const [trial] = await fixture.evaluationRepo.listTrials(evalRun.id);
     const instanceId = trial!.processInstanceId!;
@@ -123,7 +123,7 @@ describe('driveEvalRun', () => {
   });
 
   it('fails a trial whose scoring was abandoned too often rather than pay for its judges again', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
     const [trial] = await fixture.evaluationRepo.listTrials(evalRun.id);
     await fixture.evaluationRepo.transitionTrial(trial!.id, 'running', { status: 'scoring', scoringStartedAt: AN_HOUR_AGO(), scoringAttempts: 3 });
@@ -135,7 +135,7 @@ describe('driveEvalRun', () => {
   });
 
   it('leaves a fresh scoring claim to the driver holding it', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
     const [trial] = await fixture.evaluationRepo.listTrials(evalRun.id);
     await fixture.evaluationRepo.transitionTrial(trial!.id, 'running', { status: 'scoring', scoringStartedAt: new Date().toISOString() });
@@ -146,7 +146,7 @@ describe('driveEvalRun', () => {
   });
 
   it('leaves a run that is not running alone', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await driveEvalRun(scope, evalRun.id);
     expect(kicker.kicks).toEqual([]);
   });

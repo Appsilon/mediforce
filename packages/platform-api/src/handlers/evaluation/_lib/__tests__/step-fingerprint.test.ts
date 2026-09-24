@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import { loadEvaluatedStep } from '../evaluated-step';
 import { canonicalJson, changedFingerprintComponents, computeStepFingerprint } from '../step-fingerprint';
@@ -47,6 +47,15 @@ describe('computeStepFingerprint', () => {
     const agent = (await fixture.agentDefinitionRepo.getById('ae-grader'))!;
     await fixture.agentDefinitionRepo.upsert('ae-grader', { ...agent, systemPrompt: 'You grade adverse events by CTCAE v5.' });
     expect(changedFingerprintComponents(base, await fingerprint({}))).toEqual(['systemPrompt']);
+  });
+
+  it('does not hash why MCP resolution failed, only that it did', async () => {
+    const { scope, fingerprint } = await loaded();
+    const getById = vi.spyOn(scope.toolCatalog, 'getById');
+    getById.mockRejectedValueOnce(new Error('connection reset'));
+    const first = await fingerprint({});
+    getById.mockRejectedValueOnce(new Error('statement timeout'));
+    expect(await fingerprint({})).toEqual(first);
   });
 
   it('covers the skill files the workflow carries', async () => {
