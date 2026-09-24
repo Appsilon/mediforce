@@ -629,8 +629,10 @@ import {
 import {
   AskEvaluationAssistantInputSchema,
   AskEvaluationAssistantOutputSchema,
+  EvaluationAssistantProgressSchema,
   type AskEvaluationAssistantInput,
   type AskEvaluationAssistantOutput,
+  type EvaluationAssistantProgress,
 } from '../contract/evaluation-assistant';
 import { BUILD_CONTEXT_MEDIA_TYPE } from '@mediforce/platform-core';
 // SDK consumers reach for one path:
@@ -638,7 +640,7 @@ import { BUILD_CONTEXT_MEDIA_TYPE } from '@mediforce/platform-core';
 // Server-side handlers throw `HandlerError` (or subclasses) imported from
 // `@mediforce/platform-api/errors`; the wire envelope is the only shared
 // surface, so the client just exposes `code`/`details` on `ApiError` directly.
-import { ApiErrorEnvelopeSchema, type ApiErrorCode } from '../errors';
+import { ApiErrorCodeSchema, ApiErrorEnvelopeSchema, httpStatusForApiErrorCode, type ApiErrorCode } from '../errors';
 export type { ApiErrorCode };
 
 /**
@@ -1035,7 +1037,11 @@ export class Mediforce {
     listRuns: (input: ListEvalRunsInput) => Promise<ListEvalRunsOutput>;
     cancelRun: (input: CancelEvalRunInput) => Promise<EvalRunOutput>;
     // `signal` aborts the request: an assistant turn is long enough that a person will want to stop it.
-    askAssistant: (input: AskEvaluationAssistantInput, options?: { signal?: AbortSignal }) => Promise<AskEvaluationAssistantOutput>;
+    // `onProgress` streams the turn's model rounds and tool calls as they happen.
+    askAssistant: (
+      input: AskEvaluationAssistantInput,
+      options?: { signal?: AbortSignal; onProgress?: (event: EvaluationAssistantProgress) => void },
+    ) => Promise<AskEvaluationAssistantOutput>;
   };
 
   readonly monitoring: {
@@ -2538,10 +2544,15 @@ export class Mediforce {
         return this.sendJson('POST', `/api/evaluation/runs/${encodeURIComponent(evalRunId)}/cancel`, undefined,
           EvalRunOutputSchema, 'mediforce.evaluation.cancelRun');
       },
-      askAssistant: async (input, options) => this.sendJson(
-        'POST', '/api/evaluation/assistant', AskEvaluationAssistantInputSchema.parse(input),
-        AskEvaluationAssistantOutputSchema, 'mediforce.evaluation.askAssistant', options?.signal,
-      ),
+      askAssistant: async (input, options) => {
+        const body = AskEvaluationAssistantInputSchema.parse(input);
+        const ctx = 'mediforce.evaluation.askAssistant';
+        if (options?.onProgress === undefined) {
+          return this.sendJson('POST', '/api/evaluation/assistant', body, AskEvaluationAssistantOutputSchema, ctx, options?.signal);
+        }
+        return this.sendWithProgress('/api/evaluation/assistant', body, AskEvaluationAssistantOutputSchema,
+          EvaluationAssistantProgressSchema, options.onProgress, ctx, options.signal);
+      },
     };
 
     this.scores = {
@@ -2830,6 +2841,62 @@ export class Mediforce {
     }
     const res = await this.request(path, init);
     return outputSchema.parse(await parseJsonOrThrow(res, ctx));
+  }
+
+  /**
+   * POST to a route built with `createProgressRouteAdapter`, asking for its
+   * NDJSON stream: each `{ progress }` line goes to `onProgress`, the
+   * `{ result }` line is returned, and an `{ error }` line throws as the JSON
+   * route would. An error before the stream opens is an ordinary JSON error.
+   */
+  private async sendWithProgress<TOut, TProgress>(
+    path: string,
+    body: unknown,
+    outputSchema: { parse: (b: unknown) => TOut },
+    progressSchema: { parse: (b: unknown) => TProgress },
+    onProgress: (event: TProgress) => void,
+    ctx: string,
+    signal?: AbortSignal,
+  ): Promise<TOut> {
+    const init: RequestInit = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+      body: JSON.stringify(body),
+    };
+    if (signal !== undefined) init.signal = signal;
+    const res = await this.request(path, init);
+    if (res.ok === false || res.body === null || res.headers.get('Content-Type')?.startsWith('application/x-ndjson') !== true) {
+      return outputSchema.parse(await parseJsonOrThrow(res, ctx));
+    }
+
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffered = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      buffered += value ?? '';
+      const lines = buffered.split('\n');
+      buffered = done ? '' : lines.pop()!;
+      for (const line of lines) {
+        if (line.trim() === '') continue;
+        const message = JSON.parse(line) as Record<string, unknown>;
+        if ('progress' in message) {
+          onProgress(progressSchema.parse(message.progress));
+        } else if ('result' in message) {
+          return outputSchema.parse(message.result);
+        } else {
+          const extracted = extractErrorEnvelope(message);
+          const code = ApiErrorCodeSchema.safeParse(extracted.code);
+          throw new ApiError(
+            code.success ? httpStatusForApiErrorCode(code.data) : 500,
+            extracted.message ?? `${ctx} failed`,
+            message,
+            extracted.code,
+            extracted.details,
+          );
+        }
+      }
+      if (done) throw new ApiError(502, `${ctx} ended without a result`, null);
+    }
   }
 
   /** Query helper — `request(path)` → `parseJsonOrThrow` → `outputSchema.parse(body)`. */
