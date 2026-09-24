@@ -52,6 +52,9 @@ the API read.
 **Register plugins in one place.** `PluginRegistry` is populated in
 `packages/platform-api/src/services/platform-services.ts` — that is the
 composition root for the whole platform. Nothing self-registers on import.
+Register a factory, not an instance: `get()` builds a fresh plugin per run,
+because plugins keep run state on `this` between `initialize` and `run` and a
+shared instance lets concurrent runs overwrite each other's context.
 
 **Spawn strategy is chosen for you.** `LocalDockerSpawnStrategy` by default;
 setting `REDIS_URL` switches to `QueuedDockerSpawnStrategy`, which hands work to

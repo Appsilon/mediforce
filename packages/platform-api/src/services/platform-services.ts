@@ -304,12 +304,12 @@ export function getPlatformServices(): PlatformServices {
   }
   pluginRegistry.register(
     'claude-code-agent',
-    useMockAgent ? new MockAgentPlugin() : new ClaudeCodeAgentPlugin(),
+    () => (useMockAgent ? new MockAgentPlugin() : new ClaudeCodeAgentPlugin()),
   );
 
-  pluginRegistry.register('opencode-agent', new OpenCodeAgentPlugin());
-  pluginRegistry.register('script-container', new ScriptContainerPlugin());
-  pluginRegistry.register('databricks-job', new DatabricksJobPlugin());
+  pluginRegistry.register('opencode-agent', () => new OpenCodeAgentPlugin());
+  pluginRegistry.register('script-container', () => new ScriptContainerPlugin());
+  pluginRegistry.register('databricks-job', () => new DatabricksJobPlugin());
 
   const otelTracingOptions = {
     captureContent: process.env.MEDIFORCE_OTEL_CAPTURE_CONTENT === 'true',

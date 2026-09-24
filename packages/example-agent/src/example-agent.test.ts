@@ -26,7 +26,7 @@ describe('ExampleAgent integration', () => {
     instanceRepo = new InMemoryProcessInstanceRepository();
     runner = new AgentRunner(instanceRepo, auditRepo, eventLog);
 
-    registry.register('@mediforce/example-agent', new ExampleAgent());
+    registry.register('@mediforce/example-agent', () => new ExampleAgent());
   });
 
   it('registers and retrieves ExampleAgent by name', () => {
