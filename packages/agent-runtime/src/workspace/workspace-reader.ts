@@ -1,7 +1,9 @@
 /**
- * Read-only access to Output Files committed on run branches, straight from
- * the bare repo — no worktree required, so it works after the worktree has
- * been swept. Consumed by @mediforce/platform-api for listing and download.
+ * Read-only access to files committed on a workflow's bare repo — Output
+ * Files on run branches, and any commit's tree — straight from git, no
+ * worktree required, so it works after the worktree has been swept. Consumed
+ * by @mediforce/platform-api for listing and download, and for the workspace
+ * an Eval Case starts from.
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -43,6 +45,64 @@ function assertOutputFilePath(path: string): void {
   }
 }
 
+export interface CommitFileEntry {
+  /** Repo-relative path. */
+  path: string;
+  /** Blob size in bytes. */
+  size: number;
+}
+
+/**
+ * Every file of a revision (a commit or branch) on a bare repo, with its
+ * size, via `git ls-tree -r -l`; only those under `pathPrefix` when given.
+ * Returns [] when the repo, revision, or path doesn't exist.
+ */
+export async function listCommitFiles(bareRepoPath: string, revision: string, pathPrefix?: string): Promise<CommitFileEntry[]> {
+  let stdout: string;
+  try {
+    const result = await execFileAsync(
+      'git',
+      ['--git-dir', bareRepoPath, 'ls-tree', '-r', '-l', '-z', revision, ...(pathPrefix === undefined ? [] : ['--', pathPrefix])],
+      { encoding: 'utf-8', maxBuffer: gitMaxBuffer() },
+    );
+    stdout = result.stdout;
+  } catch {
+    return [];
+  }
+
+  const entries: CommitFileEntry[] = [];
+  for (const record of stdout.split('\0')) {
+    if (record === '') continue;
+    const tabIndex = record.indexOf('\t');
+    if (tabIndex < 0) continue;
+    // Record format: `<mode> <type> <object> <size>\t<path>` (size padded).
+    const [, objectType, , sizeText] = record.slice(0, tabIndex).trim().split(/\s+/);
+    if (objectType !== 'blob') continue;
+    entries.push({ path: record.slice(tabIndex + 1), size: Number(sizeText) });
+  }
+  return entries;
+}
+
+/**
+ * One file's bytes at a revision via `git cat-file blob <revision>:<path>` —
+ * binary-safe (stdout captured as a Buffer). Returns null when the repo,
+ * revision, or file is missing, or when the path names a tree (`git show`
+ * would render a textual directory listing instead; `cat-file blob` refuses
+ * non-blobs).
+ */
+export async function readCommitFile(bareRepoPath: string, revision: string, path: string): Promise<Buffer | null> {
+  try {
+    const { stdout } = await execFileAsync(
+      'git',
+      ['--git-dir', bareRepoPath, 'cat-file', 'blob', `${revision}:${path}`],
+      { encoding: 'buffer', maxBuffer: gitMaxBuffer() },
+    );
+    return stdout;
+  } catch {
+    return null;
+  }
+}
+
 export class WorkspaceReader {
   private readonly dataDir: string;
 
@@ -56,28 +116,9 @@ export class WorkspaceReader {
    * Returns [] when the repo, branch, or directory doesn't exist.
    */
   async listOutputFiles(workflow: WorkflowIdentity, runId: string): Promise<OutputFileEntry[]> {
-    const bareRepoPath = bareRepoPathFor(this.dataDir, workflow);
-    let stdout: string;
-    try {
-      const result = await execFileAsync(
-        'git',
-        ['ls-tree', '-r', '-l', '-z', runBranchName(runId), '--', OUTPUT_FILES_PATH_PREFIX],
-        { cwd: bareRepoPath, encoding: 'utf-8', maxBuffer: gitMaxBuffer() },
-      );
-      stdout = result.stdout;
-    } catch {
-      return [];
-    }
-
+    const files = await listCommitFiles(bareRepoPathFor(this.dataDir, workflow), runBranchName(runId), OUTPUT_FILES_PATH_PREFIX);
     const entries: OutputFileEntry[] = [];
-    for (const record of stdout.split('\0')) {
-      if (record === '') continue;
-      const tabIndex = record.indexOf('\t');
-      if (tabIndex < 0) continue;
-      // Record format: `<mode> <type> <object> <size>\t<path>` (size padded).
-      const [, objectType, , sizeText] = record.slice(0, tabIndex).trim().split(/\s+/);
-      if (objectType !== 'blob') continue;
-      const repoPath = record.slice(tabIndex + 1);
+    for (const { path: repoPath, size } of files) {
       if (repoPath.startsWith(OUTPUT_FILES_PATH_PREFIX) === false) continue;
       const stepRelativePath = repoPath.slice(OUTPUT_FILES_PATH_PREFIX.length);
       const slashIndex = stepRelativePath.indexOf('/');
@@ -86,7 +127,7 @@ export class WorkspaceReader {
         stepId: stepRelativePath.slice(0, slashIndex),
         name: stepRelativePath.slice(slashIndex + 1),
         path: repoPath,
-        size: Number(sizeText),
+        size,
       });
     }
     return entries;
@@ -101,17 +142,7 @@ export class WorkspaceReader {
    */
   async readOutputFile(workflow: WorkflowIdentity, runId: string, path: string): Promise<Buffer | null> {
     assertOutputFilePath(path);
-    const bareRepoPath = bareRepoPathFor(this.dataDir, workflow);
-    try {
-      const { stdout } = await execFileAsync(
-        'git',
-        ['cat-file', 'blob', `${runBranchName(runId)}:${path}`],
-        { cwd: bareRepoPath, encoding: 'buffer', maxBuffer: gitMaxBuffer() },
-      );
-      return stdout;
-    } catch {
-      return null;
-    }
+    return readCommitFile(bareRepoPathFor(this.dataDir, workflow), runBranchName(runId), path);
   }
 
   /**

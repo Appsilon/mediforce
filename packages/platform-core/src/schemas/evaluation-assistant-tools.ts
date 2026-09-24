@@ -4,8 +4,12 @@ import {
   EvalCaseInputSchema,
   EvalCaseSplitSchema,
   EvaluatorCheckSchema,
+  EvaluatorKindSchema,
   EvaluatorSchema,
   EvaluatorSeveritySchema,
+  PerturbedEvalCaseSpecSchema,
+  WorkspaceFilePathSchema,
+  hasPerturbationChange,
 } from './evaluation';
 
 /**
@@ -59,19 +63,90 @@ export const ProposeBriefToolSchema = z.object({
   text: z.string().min(1).max(4000),
 });
 
+/** A minimum pass rate, judged on its Wilson 95% lower bound (D10). */
+const PassRateFloorSchema = z.number().min(0).max(1);
+
+/**
+ * An evaluation plan for the step: what could go wrong, the cheapest check
+ * that would catch it, and the cases to try it on — plus the Acceptance
+ * Criteria it suggests. `risks` is ranked by its order, highest risk first;
+ * `severity` says how bad each one is. Nothing is created from a plan: each
+ * check is drafted, previewed and proposed on its own.
+ */
+export const ProposeEvaluationPlanToolSchema = z.object({
+  summary: z.string().min(1).max(2000),
+  risks: z.array(z.object({
+    /** What could go wrong, in the step's own terms. */
+    failure: z.string().min(1).max(500),
+    severity: EvaluatorSeveritySchema,
+    /** Why it matters — the Brief, the step's config, what its runs show. */
+    why: z.string().min(1).max(1000),
+    check: z.object({ kind: EvaluatorKindSchema, rule: z.string().min(1).max(2000) }),
+    /** Inputs worth running it on, in words. */
+    cases: z.array(z.string().min(1).max(500)).max(5).optional(),
+  })).min(1).max(12),
+  acceptanceCriteria: z.object({
+    critical: PassRateFloorSchema,
+    major: PassRateFloorSchema,
+    minor: PassRateFloorSchema,
+  }),
+});
+
+/** Propose a new version of an existing Evaluator — a refined rule, rubric or severity. */
+export const ProposeEvaluatorVersionToolSchema = z.object({
+  evaluatorId: z.uuid(),
+  rule: z.string().min(1).max(2000).optional(),
+  severity: EvaluatorSeveritySchema.optional(),
+  check: EvaluatorCheckSchema.optional(),
+  /** What changed and why — a calibration disagreement, a preview. */
+  rationale: z.string().max(1000).optional(),
+}).refine((value) => value.rule !== undefined || value.severity !== undefined || value.check !== undefined, {
+  message: 'change at least one of rule, severity or check',
+});
+
+/**
+ * The outputs most worth a person's pass/fail label for an Evaluator — the
+ * ground truth a judge is calibrated against (D9, EvalGen). The person labels
+ * them; the assistant never does.
+ */
+export const ProposeOutputsToLabelToolSchema = z.object({
+  evaluatorId: z.uuid(),
+  outputs: z.array(z.object({
+    agentRunId: z.string().min(1),
+    /** Why this output is worth labelling. */
+    why: z.string().min(1).max(300),
+  })).min(1).max(20)
+    .refine((outputs) => new Set(outputs.map((output) => output.agentRunId)).size === outputs.length, {
+      message: 'each agentRunId once',
+    }),
+});
+
+/** Propose a case synthesized from a production run by changing its input or workspace. */
+export const ProposePerturbedCaseToolSchema = PerturbedEvalCaseSpecSchema.extend({
+  rationale: z.string().max(1000).optional(),
+}).refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' });
+
 export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
+  propose_evaluation_plan: ProposeEvaluationPlanToolSchema,
   propose_evaluator: ProposeEvaluatorToolSchema,
+  propose_evaluator_version: ProposeEvaluatorVersionToolSchema,
   propose_eval_case: ProposeEvalCaseToolSchema,
+  propose_perturbed_case: ProposePerturbedCaseToolSchema,
+  propose_outputs_to_label: ProposeOutputsToLabelToolSchema,
   propose_brief: ProposeBriefToolSchema,
 } as const;
 
 const NoArguments = z.object({});
 
 export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
-  /** The step as it runs: config, agent prompt and MCP servers with their eval policy, SKILL.md. */
+  /**
+   * The step as it runs: config, agent prompt, input/output descriptions,
+   * allowed tools, effective MCP servers with their eval policy, SKILL.md, and
+   * the steps upstream of it.
+   */
   get_step: NoArguments,
-  /** Recent finished production Agent Runs of the step. */
-  list_step_runs: z.object({ limit: z.number().int().min(1).max(20).optional() }),
+  /** Recent finished production Agent Runs of the step, with the reviewer's verdict where there was one. */
+  list_step_runs: z.object({ limit: z.number().int().min(1).max(50).optional() }),
   /** One Agent Run: status, fallback, input it was given and the result it produced. */
   get_agent_run: z.object({ agentRunId: z.string().min(1) }),
   /** The tool calls and results of one Agent Run. */
@@ -82,7 +157,13 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
     limit: z.number().int().min(1).max(150).default(50)
       .describe('Maximum number of complete entries per page (1–150; default 50). Use a smaller limit for large tool payloads.'),
   }).describe('Read an Agent Run trajectory in stored order, including system and thinking entries, without truncating entry content. Returns { entries, total, nextOffset }; total is the full entry count. Request subsequent pages using nextOffset as offset until nextOffset is null. An offset at or beyond total returns an empty page with nextOffset null.'),
+  /** Files of the workspace an Agent Run started from — what a case from it would start from. */
+  list_workspace_files: z.object({ agentRunId: z.string().min(1) }),
+  /** One text file of that workspace. */
+  read_workspace_file: z.object({ agentRunId: z.string().min(1), path: WorkspaceFilePathSchema }),
   list_evaluators: NoArguments,
+  /** An Evaluator's human labels and its latest calibration: agreement, κ, what it still needs to count. */
+  get_calibration: z.object({ evaluatorId: z.uuid() }),
   list_eval_cases: NoArguments,
   list_eval_runs: NoArguments,
   /** One Eval Run's report, to explain it. */
@@ -106,8 +187,12 @@ export type EvaluationAssistantPlatformToolName = keyof typeof EVALUATION_ASSIST
 
 /** What the assistant proposed this turn, for the person to accept, edit or reject. */
 export const EvaluationAssistantProposalSchema = z.discriminatedUnion('tool', [
+  z.object({ tool: z.literal('propose_evaluation_plan'), arguments: ProposeEvaluationPlanToolSchema }),
   z.object({ tool: z.literal('propose_evaluator'), arguments: ProposeEvaluatorToolSchema }),
+  z.object({ tool: z.literal('propose_evaluator_version'), arguments: ProposeEvaluatorVersionToolSchema }),
   z.object({ tool: z.literal('propose_eval_case'), arguments: ProposeEvalCaseToolSchema }),
+  z.object({ tool: z.literal('propose_perturbed_case'), arguments: ProposePerturbedCaseToolSchema }),
+  z.object({ tool: z.literal('propose_outputs_to_label'), arguments: ProposeOutputsToLabelToolSchema }),
   z.object({ tool: z.literal('propose_brief'), arguments: ProposeBriefToolSchema }),
 ]);
 

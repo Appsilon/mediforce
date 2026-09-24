@@ -6,10 +6,13 @@ import { createTestScope } from '../../../../repositories/__tests__/create-test-
 import { loadEvaluatedStep } from '../../../evaluation/_lib/evaluated-step';
 import { createEvalCase } from '../../../evaluation/eval-cases';
 import { createEvaluator } from '../../../evaluation/evaluators';
+import { labelEvaluatorOutput } from '../../../evaluation/evaluator-trust';
 import { freezeEvalDataset } from '../../../evaluation/eval-datasets';
 import { prepareEvalRun } from '../../../evaluation/eval-runs';
+import { recordScore } from '../../../scores/record-score';
 import { executeEvaluationTool } from '../run-evaluation-tool';
-import { evaluationFixture, GRADED_RUN, STEP } from '../../../evaluation/__tests__/fixture';
+import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN } from '../../../evaluation/__tests__/fixture';
+import { gitWorkspace } from '../../../evaluation/__tests__/git-workspace';
 
 async function setup(entries?: StoredAgentTrajectoryEntry[]) {
   const fixture = await evaluationFixture();
@@ -20,7 +23,7 @@ async function setup(entries?: StoredAgentTrajectoryEntry[]) {
     scope = createTestScope({ ...fixture, agentTrajectoryRepo, caller: scope.caller });
   }
   const { definition, step } = await loadEvaluatedStep(scope, STEP, 'read');
-  return { scope, context: { step: STEP, definition, workflowStep: step } };
+  return { fixture, scope, context: { step: STEP, definition, workflowStep: step } };
 }
 
 describe('executeEvaluationTool', () => {
@@ -106,13 +109,105 @@ describe('executeEvaluationTool', () => {
     });
   });
 
-  it('describes the step with its agent and its MCP servers as a trial would see them', async () => {
+  it('describes what an evaluation plan reads: agent, I/O, tools, MCP servers in production and in trials, upstream steps', async () => {
     const { scope, context } = await setup();
-    const result = await executeEvaluationTool('get_step', {}, scope, context) as {
-      agent: { name: string }; mcpServers: Array<{ name: string; mode: string }>;
+    const workflowStep = {
+      ...context.workflowStep,
+      agent: { ...context.workflowStep.agent, allowedTools: ['WebFetch'], outputSchema: { required: ['findings'] } },
+      mcpRestrictions: { edc: { denyTools: ['write_record'] } },
     };
-    expect(result.agent.name).toBe('AE grader');
-    expect(result.mcpServers.map((server) => [server.name, server.mode])).toEqual([['edc', 'deny'], ['email', 'deny']]);
+    const result = await executeEvaluationTool('get_step', {}, scope, { ...context, workflowStep });
+
+    expect(result).toMatchObject({
+      agent: { name: 'AE grader', inputDescription: 'Extracted AEs', outputDescription: 'Graded AEs' },
+      outputSchema: { required: ['findings'] },
+      additionalTools: ['WebFetch'],
+      mcpServers: [
+        { name: 'edc', inProduction: ['read_record'], inEvalTrials: { mode: 'deny', defaulted: true } },
+        { name: 'email', inProduction: 'all tools', inEvalTrials: { mode: 'deny', defaulted: true } },
+      ],
+      upstreamSteps: [{ id: 'extract-aes', name: 'Extract AEs', executor: 'script' }],
+    });
+  });
+
+  it('reports MCP access exactly as production resolves it, refusals included', async () => {
+    const { scope, context } = await setup();
+    const mcpServersWith = async (mcpRestrictions: Record<string, { disable?: boolean; denyTools?: string[] }>) =>
+      ((await executeEvaluationTool('get_step', {}, scope, { ...context, workflowStep: { ...context.workflowStep, mcpRestrictions } })) as {
+        mcpServers: Array<{ name: string; inProduction: unknown }>;
+      }).mcpServers.map(({ name, inProduction }) => [name, inProduction]);
+
+    expect(await mcpServersWith({ edc: { denyTools: ['read_record', 'write_record'] }, email: { disable: true } })).toEqual([
+      ['edc', 'none — disabled, or every tool denied, for this step'],
+      ['email', 'none — disabled, or every tool denied, for this step'],
+    ]);
+    expect(await mcpServersWith({ email: { denyTools: ['send'] } })).toEqual([
+      ['edc', expect.stringMatching(/^the step does not start: .*email.*no allowedTools/)],
+      ['email', expect.stringMatching(/^the step does not start: /)],
+    ]);
+    expect(await mcpServersWith({ githuub: { disable: true } })).toEqual([
+      ['edc', expect.stringContaining('"githuub" which is not defined on the agent')],
+      ['email', expect.stringContaining('"githuub" which is not defined on the agent')],
+    ]);
+  });
+
+  it('lists runs with the reviewer\'s verdict, so the outputs worth labelling can be picked', async () => {
+    const { scope, context } = await setup();
+    await recordScore({
+      subject: { type: 'agent_run', id: UNGRADED_RUN }, name: 'human_verdict', value: 0, label: 'reject', comment: 'No grades.',
+      source: 'human', createdBy: 'reviewer-1', metadata: null, namespace: NAMESPACE, processInstanceId: null,
+      stepId: 'grade-aes', evaluatorId: null, supersedes: null, basis: 'test',
+    }, scope);
+    const { runs } = await executeEvaluationTool('list_step_runs', {}, scope, context) as { runs: Array<{ agentRunId: string; reviewVerdict: unknown }> };
+    expect(runs.map((run) => [run.agentRunId, run.reviewVerdict])).toEqual([
+      [UNGRADED_RUN, { verdict: 'reject', comment: 'No grades.' }],
+      [GRADED_RUN, null],
+    ]);
+  });
+
+  it('lists and reads the workspace a run started from', async () => {
+    const { fixture, scope, context } = await setup();
+    const workspace = gitWorkspace({ 'data/ae.csv': 'AETERM,AETOXGR\nSepsis,5\n' });
+    try {
+      await addStepRun(fixture, {
+        instanceId: 'run-with-files', agentRunId: 'agent-run-with-files', result: {}, at: '2026-09-22T11:00:00.000Z',
+        gitMetadata: { repoUrl: workspace.repoPath, commitSha: workspace.stepCommit },
+      });
+      expect(await executeEvaluationTool('list_workspace_files', { agentRunId: 'agent-run-with-files' }, scope, context))
+        .toEqual({ commit: workspace.seedCommit, files: [{ path: 'data/ae.csv', size: 24 }], total: 1 });
+      expect(await executeEvaluationTool('read_workspace_file', { agentRunId: 'agent-run-with-files', path: 'data/ae.csv' }, scope, context))
+        .toEqual({ path: 'data/ae.csv', size: 24, content: 'AETERM,AETOXGR\nSepsis,5\n' });
+      await expect(executeEvaluationTool('read_workspace_file', { agentRunId: 'agent-run-with-files', path: 'graded.json' }, scope, context))
+        .rejects.toThrow("has no file 'graded.json'");
+      expect(await executeEvaluationTool('list_workspace_files', { agentRunId: GRADED_RUN }, scope, context))
+        .toMatchObject({ files: [], note: expect.stringContaining('no workspace') });
+    } finally {
+      workspace.remove();
+    }
+  });
+
+  it('shows a judge\'s labels and what it still needs to count', async () => {
+    const { scope, context } = await setup();
+    const { evaluator } = await createEvaluator({
+      ...STEP, name: 'grades-justified', rule: 'Every grade is justified.', severity: 'major',
+      check: { kind: 'llm_judge', model: 'm', rubric: 'r', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
+      origin: 'user',
+    }, scope);
+    await labelEvaluatorOutput({ evaluatorId: evaluator.id, agentRunId: UNGRADED_RUN, passed: false, comment: 'No grades.' }, scope);
+
+    expect(await executeEvaluationTool('get_calibration', { evaluatorId: evaluator.id }, scope, context)).toEqual({
+      name: 'grades-justified',
+      version: 1,
+      kind: 'llm_judge',
+      rule: 'Every grade is justified.',
+      labels: [{ agentRunId: UNGRADED_RUN, passed: false, comment: 'No grades.' }],
+      needs: { labels: 10, failureLabels: 2, agreement: 0.8 },
+      calibration: null,
+      counts: false,
+      notCountedBecause: 'not calibrated',
+    });
+    await expect(executeEvaluationTool('get_calibration', { evaluatorId: evaluator.id }, scope, { ...context, step: { ...STEP, stepId: 'extract-aes' } }))
+      .rejects.toThrow('is not an Evaluator of this step');
   });
 
   it('reads a production run\'s input and result', async () => {

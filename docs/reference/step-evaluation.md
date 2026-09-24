@@ -9,7 +9,7 @@ last_reviewed: 2026-09-24
 How an author checks that one agent Workflow Step can be trusted for its
 context of use. The design and its reasons are
 [ADR-0023](../adr/0023-step-evaluation.md); the vocabulary is `CONTEXT.md`
-§ Evaluation domain. This page is what exists today (phase 1b).
+§ Evaluation domain. This page is what exists today.
 
 Everything below belongs to one agent Step, keyed by
 `(namespace, workflowName, stepId)`, and lives outside the Workflow
@@ -27,21 +27,64 @@ Brief, Evaluators, Eval Cases, MCP eval policy and Eval Runs — beside the
 Evaluation Assistant (`mediforce eval ask`, `POST /api/evaluation/assistant`).
 Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 
-- **Runs freely:** reading the step (config, agent prompt, SKILL.md, MCP
-  servers), its production runs and their trajectories, Evaluators, cases,
-  Eval Runs and reports, and `preview_evaluator` — it tries a check on real
-  outputs before proposing it.
-- **Proposes:** Evaluators, Eval Cases and Brief drafts come back as cards to
-  accept, edit or reject. Accepting one is the same write the forms make,
-  recorded with `origin: assistant`.
+- **Runs freely:** reading the step (config, agent prompt and system prompt,
+  input and output descriptions, `outputSchema`, the tools it allows beyond
+  the runtime's defaults, MCP servers as production resolves them — a
+  configuration production refuses shows as such — and as trials see them,
+  SKILL.md, the steps upstream of it), its
+  production runs with the reviewer's verdict and their trajectories, the
+  workspace files a run started from, Evaluators with their labels and
+  calibration, cases, Eval Runs and reports, and `preview_evaluator` — it
+  tries a check on real outputs before proposing it.
+- **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
+  written or synthesized) and Brief drafts come back as cards to accept, edit
+  or reject. Accepting one is the same write the forms make, recorded with
+  `origin: assistant`.
 - **Prepares:** it can prepare an Eval Run; the run starts only when the person
   confirms its budget on the card. Its own start attempt is refused.
 - **Never:** approving a `code` check's source, labelling outputs, signing.
   There is no tool for these.
 
-The step's Brief is sent to the assistant on every turn. In the web tab, Brief
-text is rendered as GitHub-Flavored Markdown, and the assistant pane uses the
-same model picker as the workflow editor so the model can be chosen per
+The step's Brief is sent to the assistant on every turn. What it can help with:
+
+- **Evaluation plan.** It reads the step, a few of its runs and the Brief, and
+  returns a plan card: the risks, highest first — what could go wrong, how bad,
+  why, the cheapest check that would catch it, the inputs worth trying it on —
+  and suggested Acceptance Criteria (minimum pass rates per severity, on the
+  Wilson 95% lower bound). A plan creates nothing; **Draft this check** on a
+  risk asks the assistant to draft it. The suggested criteria are not stored:
+  Eval Runs do not judge against criteria yet.
+- **Rule to check.** A plain-language rule becomes the cheapest reliable kind —
+  `schema`, then `code`, a judge only when a script cannot decide it. Every
+  proposed check is tried by the platform on the step's recent production
+  outputs before the card is shown (reusing the assistant's own preview of the
+  same check), and the card shows what it did. A check that errors on every
+  output goes back to the assistant instead of to the person; for a person
+  without the `run` verb the card says it was not tried. The try runs the check
+  on up to 5 outputs, so it is not free: a `code` check starts a sandbox per
+  output, and an `llm_judge` pays for a model call per output — a turn that
+  proposes a judge the assistant did not preview takes longer and costs more. A
+  refined rule is a proposed new version of the Evaluator.
+- **Calibration help.** For a judge, it picks the outputs most worth labelling
+  — ones reviewers rejected, ones its preview failed, ones unlike those already
+  labelled — and returns them as a labelling card. The person labels each pass
+  or fail, can refine the rule and rubric as a new version while labelling,
+  calibrates (agreement and Cohen's κ, with the outputs the judge disagreed on),
+  and turns the labelled outputs into Eval Cases.
+- **Case synthesis.** It proposes a case built from a real production run with
+  a deliberate change — an instruction injected into the data, an edge value,
+  renamed columns, a missing or extra file — usually positive (a correct
+  output exists and should be accepted), with notes on what it must not do;
+  negative only when the input is so broken no output should be accepted. A
+  change that does not apply to that run goes back to the assistant instead of
+  to the person.
+
+Every proposal is checked against the platform before it is shown: an Evaluator
+name already taken, an Evaluator or run of another step, and an eval trial
+offered for labelling are refused the same way.
+
+In the web tab, Brief text is rendered as GitHub-Flavored Markdown, and the
+assistant pane uses the same model picker as the workflow editor so the model can be chosen per
 conversation. While it works, the pane lists each step it takes (reading a run,
 previewing a check, drafting a card) as it happens, and keeps that list folded
 under the reply; `mediforce eval ask` prints the same steps to stderr. The pane
@@ -92,8 +135,14 @@ output.
 
 Every change is a new immutable version; approval and calibration attach to one
 version. A judge is calibrated against human labels: `evaluator-label
---pass|--fail` records a human Score on an Agent Run, `evaluator-calibrate`
-runs the judge over the labelled runs and stores the agreement.
+--pass|--fail` records a human Score on an Agent Run (`evaluator-labels` lists
+the newest per run), `evaluator-calibrate` runs the judge over the labelled
+runs and stores the agreement and Cohen's κ — agreement beyond what the
+pass/fail mix gives by chance. Labels belong to the Evaluator, not a version,
+so a refined rule is recalibrated against the same labels. Only agreement
+decides whether a judge counts. `cases-from-labels <evaluatorId>` turns every
+labelled production output that is not yet a case into one — a pass positive,
+a fail negative, noting the rule and the person's comment.
 
 `evaluator-preview` (`POST /api/evaluation/evaluators/preview`) runs a draft
 check against the Step's recent production outputs (dry runs left out) and
@@ -112,6 +161,19 @@ reviewer's comment; a run nobody reviewed, or one sent back for revision or a
 recheck, needs `--expectation`. Cases are `dev` or
 `holdout`, carry a *contains production data* flag, and an `origin` — `user`,
 or `assistant` for an accepted Evaluation Assistant proposal.
+
+A **synthesized** case (`case-perturb --file`, `POST /api/evaluation/cases/perturbed`)
+is a production run's case with deliberate changes, and records what kind
+(`missing_file`, `extra_file`, `renamed_columns`, `edge_values`,
+`injected_instruction`, `other`) and why. `inputChanges` set or remove values
+under the trigger payload, the earlier steps' outputs or the carry-over;
+`fileChanges` write, delete or edit (replace the first occurrence of a text in)
+files of the workspace the run started from, and are written as a new commit on
+the workflow's bare repo, kept by the ref `refs/mediforce/eval-seeds/<caseId>`,
+which the case starts from. A change that does not apply — removing what is not
+there, editing a file that is missing or binary, file changes on a run with no
+workspace — is refused. It is built from production data, so it is flagged as
+containing it.
 
 `dataset-freeze` freezes the live cases into a numbered Eval Dataset version.
 A version never changes.

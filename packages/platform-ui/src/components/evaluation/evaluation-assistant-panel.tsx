@@ -6,25 +6,27 @@ import { EVALUATION_ASSISTANT_DEFAULT_MODEL } from '@mediforce/platform-core';
 import type {
   EvaluatedStep,
   EvaluationAssistantPlatformToolName,
-  EvaluationAssistantProposal,
   EvaluationAssistantProposalToolName,
 } from '@mediforce/platform-core';
-import type { EvaluationAssistantProgress, PreparedEvalRun } from '@mediforce/platform-api/contract';
+import type { EvaluationAssistantProgress, PreparedEvalRun, ProposalView } from '@mediforce/platform-api/contract';
 import { useQueryClient } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
-import { useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
-import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { StartEvalRunCard } from './step-evaluation-sections';
-
-type ProposalStatus = 'open' | 'accepted' | 'rejected';
+import {
+  LabellingCard,
+  PlanCard,
+  ProposalCard,
+  isDecidable,
+  type ProposalStatus,
+} from './evaluation-assistant-cards';
 
 interface ProposalState {
-  readonly proposal: EvaluationAssistantProposal;
+  readonly proposal: ProposalView;
   readonly status: ProposalStatus;
 }
 
@@ -57,15 +59,22 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   list_step_runs: 'Listing recent runs',
   get_agent_run: 'Reading an agent run',
   get_trajectory: 'Reading a run trajectory',
+  list_workspace_files: 'Listing a run\'s workspace files',
+  read_workspace_file: 'Reading a workspace file',
   list_evaluators: 'Listing evaluators',
+  get_calibration: 'Reading a judge\'s calibration',
   list_eval_cases: 'Listing eval cases',
   list_eval_runs: 'Listing eval runs',
   get_eval_run_report: 'Reading an eval run report',
   preview_evaluator: 'Previewing a check on real runs',
   prepare_eval_run: 'Preparing an eval run',
   start_eval_run: 'Starting an eval run',
+  propose_evaluation_plan: 'Drafting an evaluation plan',
   propose_evaluator: 'Drafting an evaluator',
+  propose_evaluator_version: 'Drafting a new evaluator version',
   propose_eval_case: 'Drafting an eval case',
+  propose_perturbed_case: 'Synthesizing an eval case',
+  propose_outputs_to_label: 'Picking outputs to label',
   propose_brief: 'Drafting the brief',
 };
 
@@ -112,111 +121,12 @@ function StepsSummary({ steps }: { steps: ActivityStep[] }) {
   );
 }
 
-const TITLES: Record<EvaluationAssistantProposal['tool'], string> = {
-  propose_evaluator: 'Evaluator',
-  propose_eval_case: 'Eval Case',
-  propose_brief: 'Evaluation Brief',
-};
-
-/** Accepting a proposal is the same write a person's own form makes, marked as the assistant's. */
-async function acceptProposal(step: EvaluatedStep, proposal: EvaluationAssistantProposal): Promise<unknown> {
-  switch (proposal.tool) {
-    case 'propose_evaluator': {
-      const { rationale: _rationale, ...evaluator } = proposal.arguments;
-      return mediforce.evaluation.createEvaluator({ ...step, ...evaluator, origin: 'assistant' });
-    }
-    case 'propose_eval_case': {
-      const { agentRunId, input, name, expectation, notes, split } = proposal.arguments;
-      return agentRunId !== undefined
-        ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, step, name, expectation, notes, split, origin: 'assistant' })
-        : mediforce.evaluation.createCase({ ...step, name, input: input!, expectation, notes: notes ?? null, split, origin: 'assistant' });
-    }
-    case 'propose_brief':
-      return mediforce.evaluation.setBrief({ ...step, text: proposal.arguments.text, origin: 'assistant' });
-  }
-}
-
-function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
-  step: EvaluatedStep;
-  state: ProposalState;
-  mayEdit: boolean;
-  editReason: string | undefined;
-  onDecided: (status: ProposalStatus) => void;
-}) {
-  const [editing, setEditing] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const accept = useStepEvaluationMutation(step, (proposal: EvaluationAssistantProposal) => acceptProposal(step, proposal));
-  const { proposal } = state;
-  const summary = proposal.tool === 'propose_brief'
-    ? proposal.arguments.text
-    : proposal.tool === 'propose_evaluator'
-      ? `${proposal.arguments.name} (${proposal.arguments.check.kind}, ${proposal.arguments.severity}) — ${proposal.arguments.rule}`
-      : `${proposal.arguments.name} — ${proposal.arguments.expectation}`;
-
-  const onAccept = () => {
-    let decided = proposal;
-    if (editing !== null) {
-      try {
-        decided = { tool: proposal.tool, arguments: JSON.parse(editing) } as EvaluationAssistantProposal;
-      } catch {
-        setError('Not valid JSON.');
-        return;
-      }
-    }
-    setError(null);
-    accept.mutate(decided, {
-      onSuccess: () => onDecided('accepted'),
-      onError: (err) => setError(err.message),
-    });
-  };
-
-  return (
-    <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="proposal-card">
-      <div className="mb-1 font-medium">Proposed {TITLES[proposal.tool]}</div>
-      {editing === null ? (
-        proposal.tool === 'propose_brief'
-          ? <MarkdownPresentation content={summary} />
-          : <p className="whitespace-pre-wrap text-muted-foreground">{summary}</p>
-      ) : (
-        <textarea className="w-full min-h-32 rounded border bg-background p-1.5 font-mono" value={editing} onChange={(event) => setEditing(event.target.value)} />
-      )}
-      {error !== null && <p className="mt-1 text-destructive">{error}</p>}
-      {state.status === 'open' ? (
-        <div className="mt-2 flex gap-1.5">
-          <InstantTooltip label={editReason}>
-            <span className="inline-flex">
-              <button
-                type="button"
-                data-testid="proposal-accept"
-                className="inline-flex items-center gap-1 rounded bg-primary px-2 py-0.5 text-primary-foreground disabled:opacity-50 disabled:pointer-events-none"
-                disabled={!mayEdit || accept.isPending}
-                onClick={onAccept}
-              >
-                <Check className="h-3 w-3" />Accept
-              </button>
-            </span>
-          </InstantTooltip>
-          {mayEdit && editing === null && (
-            <button type="button" className="rounded border px-2 py-0.5" onClick={() => setEditing(JSON.stringify(proposal.arguments, null, 2))}>Edit</button>
-          )}
-          <button type="button" className="inline-flex items-center gap-1 rounded border px-2 py-0.5" onClick={() => onDecided('rejected')}>
-            <X className="h-3 w-3" />Reject
-          </button>
-        </div>
-      ) : (
-        <p className={cn('mt-1.5 font-medium', state.status === 'accepted' ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground')}>
-          {state.status === 'accepted' ? 'Accepted' : 'Rejected'}
-        </p>
-      )}
-    </div>
-  );
-}
-
 /**
  * The Evaluation Assistant (ADR-0023 D14–D15) beside the Step's evaluation.
  * It reads and previews on its own; everything it would change arrives as a
- * card, and an Eval Run it prepares starts only when the person confirms the
- * budget on the card.
+ * card — a plan to draft checks from, outputs for the person to label, or a
+ * proposal to accept — and an Eval Run it prepares starts only when the
+ * person confirms the budget on the card.
  */
 export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, runReason }: {
   step: EvaluatedStep;
@@ -251,12 +161,13 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
     }));
   };
 
-  const send = async () => {
-    const content = input.trim();
+  /** Sends a message; one from a card leaves whatever the person is typing in the input. */
+  const send = async (message: string, from: 'input' | 'card') => {
+    const content = message.trim();
     if (content === '' || pending) return;
     const thread: PanelMessage[] = [...messages, { role: 'user', content }];
     setMessages(thread);
-    setInput('');
+    if (from === 'input') setInput('');
     setPending(true);
     setActivity(IDLE_ACTIVITY);
     setError(null);
@@ -265,7 +176,10 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
     try {
       const result = await mediforce.evaluation.askAssistant({
         ...step,
-        messages: thread.map((message) => ({ role: message.role, content: message.content })),
+        messages: thread.map((message) => ({
+          role: message.role,
+          content: [message.content, ...(message.proposals ?? []).map(({ proposal }) => `[proposal: ${JSON.stringify(proposal)}]`)].join('\n'),
+        })),
         ...(assistantModel === undefined ? {} : { model: assistantModel }),
       }, {
         onProgress: (event) => {
@@ -331,8 +245,8 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
       >
         {messages.length === 0 && (
           <p className="text-xs text-muted-foreground">
-            Ask what to check, have it draft Evaluators and cases from real runs, prepare an Eval Run or explain a report.
-            It proposes; you decide.
+            Ask for an evaluation plan, turn a rule into a check tried on real runs, pick outputs for you to label,
+            synthesize edge cases, prepare an Eval Run or explain a report. It proposes; you decide.
           </p>
         )}
         {messages.map((message, index) => (
@@ -347,9 +261,25 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
                   {message.role === 'user' ? message.content : <MarkdownPresentation content={message.content} />}
                 </div>
               )}
-              {message.proposals?.map((state, proposalIndex) => (
-                <ProposalCard key={proposalIndex} step={step} state={state} mayEdit={mayEdit} editReason={editReason} onDecided={(status) => decide(index, proposalIndex, status)} />
-              ))}
+              {message.proposals?.map((state, proposalIndex) => {
+                const { proposal } = state;
+                if (proposal.tool === 'propose_evaluation_plan') {
+                  return <PlanCard key={proposalIndex} plan={proposal.arguments} busy={pending} onDraft={(draft) => void send(draft, 'card')} />;
+                }
+                if (proposal.tool === 'propose_outputs_to_label') {
+                  return <LabellingCard key={proposalIndex} step={step} proposal={proposal.arguments} mayEdit={mayEdit} editReason={editReason} />;
+                }
+                return isDecidable(proposal) && (
+                  <ProposalCard
+                    key={proposalIndex}
+                    step={step}
+                    state={{ proposal, status: state.status }}
+                    mayEdit={mayEdit}
+                    editReason={editReason}
+                    onDecided={(status) => decide(index, proposalIndex, status)}
+                  />
+                );
+              })}
               {message.prepared?.map((prepared) => <StartEvalRunCard key={prepared.evalRunId} step={step} prepared={prepared} mayRun={mayRun} runReason={runReason} />)}
             </div>
           </div>
@@ -381,13 +311,13 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
+            if (event.key === 'Enter' && event.shiftKey === false) {
               event.preventDefault();
-              void send();
+              void send(input, 'input');
             }
           }}
         />
-        <button type="button" data-testid="evaluation-assistant-send" aria-label="Send" className="rounded-md bg-primary px-2.5 text-primary-foreground disabled:opacity-50" disabled={pending || input.trim() === ''} onClick={() => void send()}>
+        <button type="button" data-testid="evaluation-assistant-send" aria-label="Send" className="rounded-md bg-primary px-2.5 text-primary-foreground disabled:opacity-50" disabled={pending || input.trim() === ''} onClick={() => void send(input, 'input')}>
           <Send className="h-4 w-4" />
         </button>
       </div>

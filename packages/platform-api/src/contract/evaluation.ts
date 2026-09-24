@@ -18,7 +18,9 @@ import {
   EvaluatorVersionSchema,
   McpEvalPolicySchema,
   McpEvalServerPolicySchema,
+  PerturbedEvalCaseSpecSchema,
   ScoreSchema,
+  hasPerturbationChange,
 } from '@mediforce/platform-core';
 
 /**
@@ -109,6 +111,10 @@ export const LabelEvaluatorOutputInputSchema = z.object({
 });
 export const LabelEvaluatorOutputOutputSchema = z.object({ score: ScoreSchema });
 
+/** The person's labels on this Evaluator's outputs — the newest per Agent Run, newest first. */
+export const ListEvaluatorLabelsInputSchema = z.object({ evaluatorId: z.uuid() });
+export const ListEvaluatorLabelsOutputSchema = z.object({ labels: z.array(ScoreSchema) });
+
 export const CalibrateEvaluatorInputSchema = z.object({
   evaluatorId: z.uuid(),
   /** Defaults to the latest version. */
@@ -180,6 +186,39 @@ export const CreateEvalCaseFromAgentRunInputSchema = z.object({
   origin: EvaluationOriginSchema.default('user'),
 });
 export const EvalCaseOutputSchema = z.object({ evalCase: EvalCaseSchema });
+
+/**
+ * A case synthesized from a production Agent Run: its input and starting
+ * workspace with deliberate changes (a missing or extra file, renamed columns,
+ * edge values, an injected instruction). File changes are written as a new
+ * commit on the workflow's bare repo, which the case starts from.
+ */
+export const CreatePerturbedEvalCaseInputSchema = EvaluatedStepSchema
+  .extend(PerturbedEvalCaseSpecSchema.shape)
+  .extend({
+    name: z.string().trim().min(1).max(200),
+    notes: z.string().trim().min(1).max(4000),
+    inputChanges: PerturbedEvalCaseSpecSchema.shape.inputChanges.unwrap().default([]),
+    fileChanges: PerturbedEvalCaseSpecSchema.shape.fileChanges.unwrap().default([]),
+    split: EvalCaseSplitSchema.default('dev'),
+    origin: EvaluationOriginSchema.default('user'),
+  })
+  .refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' });
+
+/**
+ * Seeds Eval Cases from an Evaluator's labels (EvalGen): each labelled
+ * production output that is not a case yet becomes one — a pass positive, a
+ * fail negative — so calibrating a check also builds the dataset.
+ */
+export const CreateEvalCasesFromLabelsInputSchema = z.object({
+  evaluatorId: z.uuid(),
+  split: EvalCaseSplitSchema.default('dev'),
+});
+export const CreateEvalCasesFromLabelsOutputSchema = z.object({
+  cases: z.array(EvalCaseSchema),
+  /** Labelled outputs that did not become a case, and why. */
+  skipped: z.array(z.object({ agentRunId: z.string(), reason: z.string() })),
+});
 
 export const ArchiveEvalCaseInputSchema = z.object({
   caseId: z.uuid(),
@@ -265,6 +304,8 @@ export type ArchiveEvaluatorInput = z.input<typeof ArchiveEvaluatorInputSchema>;
 export type ApproveEvaluatorSourceInput = z.infer<typeof ApproveEvaluatorSourceInputSchema>;
 export type LabelEvaluatorOutputInput = z.infer<typeof LabelEvaluatorOutputInputSchema>;
 export type LabelEvaluatorOutputOutput = z.infer<typeof LabelEvaluatorOutputOutputSchema>;
+export type ListEvaluatorLabelsInput = z.infer<typeof ListEvaluatorLabelsInputSchema>;
+export type ListEvaluatorLabelsOutput = z.infer<typeof ListEvaluatorLabelsOutputSchema>;
 export type CalibrateEvaluatorInput = z.infer<typeof CalibrateEvaluatorInputSchema>;
 export type CalibrateEvaluatorOutput = z.infer<typeof CalibrateEvaluatorOutputSchema>;
 export type EvaluatorOutcome = z.infer<typeof EvaluatorOutcomeSchema>;
@@ -277,6 +318,9 @@ export type ListEvalCasesOutput = z.infer<typeof ListEvalCasesOutputSchema>;
 export type CreateEvalCaseInput = z.input<typeof CreateEvalCaseInputSchema>;
 export type CreateEvalCaseFromAgentRunInput = z.input<typeof CreateEvalCaseFromAgentRunInputSchema>;
 export type EvalCaseOutput = z.infer<typeof EvalCaseOutputSchema>;
+export type CreatePerturbedEvalCaseInput = z.input<typeof CreatePerturbedEvalCaseInputSchema>;
+export type CreateEvalCasesFromLabelsInput = z.input<typeof CreateEvalCasesFromLabelsInputSchema>;
+export type CreateEvalCasesFromLabelsOutput = z.infer<typeof CreateEvalCasesFromLabelsOutputSchema>;
 export type ArchiveEvalCaseInput = z.input<typeof ArchiveEvalCaseInputSchema>;
 export type ListEvalDatasetsInput = z.infer<typeof ListEvalDatasetsInputSchema>;
 export type ListEvalDatasetsOutput = z.infer<typeof ListEvalDatasetsOutputSchema>;

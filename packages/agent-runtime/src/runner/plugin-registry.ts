@@ -9,20 +9,32 @@ export class PluginNotFoundError extends Error {
   }
 }
 
-export class PluginRegistry {
-  private plugins = new Map<string, StepExecutorPlugin>();
+/** Plugins keep run state on `this` between `initialize` and `run`, so every
+ *  run needs its own instance — a shared one lets concurrent runs overwrite
+ *  each other's context. Factories must be cheap and side-effect free:
+ *  `register` calls one once to read the plugin's metadata. */
+export type PluginFactory = () => StepExecutorPlugin;
 
-  register(name: string, plugin: StepExecutorPlugin): void {
+interface RegisteredPlugin {
+  create: PluginFactory;
+  metadata?: PluginCapabilityMetadata;
+}
+
+export class PluginRegistry {
+  private plugins = new Map<string, RegisteredPlugin>();
+
+  register(name: string, create: PluginFactory): void {
     if (this.plugins.has(name)) {
       throw new Error(`Plugin "${name}" is already registered. Duplicate registration is not allowed.`);
     }
-    this.plugins.set(name, plugin);
+    this.plugins.set(name, { create, metadata: create().metadata });
   }
 
+  /** Returns a fresh plugin instance for one run. */
   get(name: string): StepExecutorPlugin {
-    const plugin = this.plugins.get(name);
-    if (!plugin) throw new PluginNotFoundError(name);
-    return plugin;
+    const registered = this.plugins.get(name);
+    if (!registered) throw new PluginNotFoundError(name);
+    return registered.create();
   }
 
   has(name: string): boolean {
@@ -38,9 +50,9 @@ export class PluginRegistry {
   }
 
   list(): Array<{ name: string; metadata?: PluginCapabilityMetadata }> {
-    return Array.from(this.plugins.entries()).map(([name, plugin]) => ({
+    return Array.from(this.plugins.entries()).map(([name, registered]) => ({
       name,
-      metadata: plugin.metadata,
+      metadata: registered.metadata,
     }));
   }
 }

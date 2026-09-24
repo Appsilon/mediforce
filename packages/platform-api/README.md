@@ -100,7 +100,11 @@ only to see the workflow; writes need its `edit` verb (`_lib/evaluated-step.ts`)
 An Evaluator check that cannot run comes back as `error`, never as a failed
 output (`_lib/run-evaluator-check.ts`). Nothing here approves a `code` check's
 source or labels an output on anyone's behalf: both record the person who did
-it, and an API key must name them.
+it, and an API key must name them. A synthesized Eval Case's file changes are the
+one write outside Postgres: a commit on the workflow's bare repo, kept by the
+ref `refs/mediforce/eval-seeds/<caseId>` (`_lib/workspace-seed.ts`); the
+workspace it changes is read with agent-runtime's `listCommitFiles` and
+`readCommitFile`, the same git reads as Output Files.
 
 An Eval Run is driven by `driveEvalRun` (`_lib/drive-eval-run.ts`), which is
 idempotent and moves trials only by conditional transitions — so the start
@@ -126,7 +130,10 @@ client applies; *platform* tools run here through `CallerScope`. The workspace
 `OPENROUTER_API_KEY` check is `services/openrouter-key.ts`, since non-assistant
 LLM calls need it too. `runProposalToolLoop` is the loop for an assistant whose
 changes are all proposals — the Evaluation Assistant
-(`handlers/evaluation-assistant/`) runs on it. The workflow assistant
+(`handlers/evaluation-assistant/`) runs on it. Its `reviewProposal` hook checks
+each proposal against the platform before the person sees it: a refusal goes
+back to the model as a tool error, and what the review found (the Evaluation
+Assistant's self-test of a proposed check) travels with the proposal. The workflow assistant
 (`handlers/workflow-assistant/ask-workflow-assistant.ts`) keeps its own loop,
 interleaved with its graph-completeness gates and truncation salvage. The
 cowork chat (`handlers/cowork/`) is a separate OpenRouter loop and does not use
