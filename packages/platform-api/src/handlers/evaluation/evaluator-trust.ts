@@ -94,13 +94,18 @@ export async function labelEvaluatorOutput(
   return { score };
 }
 
-/** The newest human label per Agent Run, newest first. */
+/**
+ * The newest human label per Agent Run, newest first. A relabel supersedes
+ * the label before it, so a superseded label never counts — even when both
+ * carry the same timestamp.
+ */
 export async function evaluatorLabels(scope: CallerScope, evaluator: Evaluator): Promise<Score[]> {
   const scores = await scope.scores.list({ evaluatorId: evaluator.id, source: 'human', limit: 1000 });
+  const superseded = new Set(scores.map((score) => score.supersedes).filter((id) => id !== null));
   const seen = new Set<string>();
   const latest: Score[] = [];
   for (const score of scores) {
-    if (seen.has(score.subject.id)) continue;
+    if (superseded.has(score.id) || seen.has(score.subject.id)) continue;
     seen.add(score.subject.id);
     latest.push(score);
   }

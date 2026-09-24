@@ -11,7 +11,7 @@ import {
 } from '../eval-cases';
 import { createEvaluator } from '../evaluators';
 import { labelEvaluatorOutput } from '../evaluator-trust';
-import { listWorkspaceFiles, readWorkspaceFile } from '../_lib/workspace-seed';
+import { listCommitFiles, readCommitFile } from '@mediforce/agent-runtime';
 import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture } from './fixture';
 import { gitWorkspace } from './git-workspace';
 
@@ -170,8 +170,8 @@ describe('Eval Cases', () => {
       const seed = evalCase.workspaceSeedCommit!;
       expect(workspace.git('rev-parse', `${seed}^`)).toBe(workspace.seedCommit);
       expect(workspace.git('rev-parse', `refs/mediforce/eval-seeds/${evalCase.id}`)).toBe(seed);
-      expect((await listWorkspaceFiles(workspace.repoPath, seed)).map((file) => file.path)).toEqual(['data/ae.csv']);
-      expect((await readWorkspaceFile(workspace.repoPath, seed, 'data/ae.csv'))?.toString()).toBe('AE_TERM,AETOXGR\nSepsis,5\n');
+      expect((await listCommitFiles(workspace.repoPath, seed)).map((file) => file.path)).toEqual(['data/ae.csv']);
+      expect((await readCommitFile(workspace.repoPath, seed, 'data/ae.csv'))?.toString()).toBe('AE_TERM,AETOXGR\nSepsis,5\n');
     } finally {
       workspace.remove();
     }

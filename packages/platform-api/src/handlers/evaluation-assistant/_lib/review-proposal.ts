@@ -97,7 +97,7 @@ export async function reviewEvaluationProposal(
           const subject = await loadEvaluationSubject(scope, agentRunId, step);
           if (subject.instance.evalRunId !== undefined) refused.push(`${agentRunId} (an eval trial)`);
         } catch (err) {
-          if (!(err instanceof HandlerError)) throw err;
+          if (err instanceof HandlerError === false) throw err;
           refused.push(`${agentRunId} (${err.message})`);
         }
       }
