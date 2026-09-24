@@ -110,6 +110,11 @@ export async function reviewEvaluationProposal(
       await perturbCase(await loadCaseSource(scope, proposal.baseAgentRunId, step, 'read'), proposal);
       return { ok: true };
     }
+    case 'propose_eval_case': {
+      const { agentRunId } = args as Args<'propose_eval_case'>;
+      if (agentRunId !== undefined) await loadCaseSource(scope, agentRunId, step, 'read');
+      return { ok: true };
+    }
     default:
       return { ok: true };
   }

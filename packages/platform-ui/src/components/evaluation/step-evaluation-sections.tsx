@@ -219,7 +219,7 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
     mediforce.evaluation.createCaseFromAgentRun(input));
   const freeze = useStepEvaluationMutation(step, () => mediforce.evaluation.freezeDataset(step));
   const cases = evaluation.cases.data?.cases ?? [];
-  const harvested = new Set(cases.map((evalCase) => evalCase.sourceAgentRunId));
+  const harvested = new Set(cases.filter((evalCase) => evalCase.source === 'production').map((evalCase) => evalCase.sourceAgentRunId));
   const runs = (evaluation.agentRuns.data?.runs ?? []).filter((run) => !harvested.has(run.id));
   const [latest] = evaluation.datasets.data?.datasets ?? [];
 
@@ -279,7 +279,8 @@ export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep;
       server.name,
       { mode: server.mode, ...(server.denyTools === undefined ? {} : { denyTools: server.denyTools }) },
     ]));
-    next[name] = { mode };
+    const denyTools = servers.find((server) => server.name === name)?.denyTools;
+    next[name] = { mode, ...(denyTools === undefined ? {} : { denyTools }) };
     save.mutate(next);
   };
   return (

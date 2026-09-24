@@ -50,6 +50,20 @@ function skillContent(definition: WorkflowDefinition, step: WorkflowStep): strin
   return found?.contents ?? null;
 }
 
+/** Where a step's SKILL.md lives when the workflow does not carry it: the external repo the runtime fetches, which the assistant cannot read. */
+function externalSkillLocation(definition: WorkflowDefinition, step: WorkflowStep) {
+  const repo = definition.externalSkillsRepo;
+  const skill = step.agent?.skill;
+  const skillsDir = step.agent?.skillsDir;
+  if (repo?.url === undefined || repo.commit === undefined || skill === undefined || skill === '' || skillsDir === undefined || skillsDir === '') return null;
+  return {
+    unreadable: 'the step uses a skill fetched from an external repository at run time; its SKILL.md is not visible here',
+    repo: repo.url,
+    commit: repo.commit,
+    path: posix.normalize(posix.join(skillsDir, skill, 'SKILL.md')),
+  };
+}
+
 /** The steps whose outputs reach this one, nearest first, following transitions back. */
 function upstreamSteps(definition: WorkflowDefinition, stepId: string): WorkflowStep[] {
   const found: WorkflowStep[] = [];
@@ -151,7 +165,9 @@ export async function executeEvaluationTool(
           executor: upstream.executor,
           description: upstream.description ?? null,
         })),
-        skill: skill === null ? null : clip(skill, 8000),
+        skill: skill !== null
+          ? clip(skill, 8000)
+          : externalSkillLocation(definition, workflowStep),
       };
     }
     case 'list_step_runs': {

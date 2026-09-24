@@ -170,7 +170,7 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
       ) : (
         <textarea className="w-full min-h-32 rounded border bg-background p-1.5 font-mono" value={editing} onChange={(event) => setEditing(event.target.value)} />
       )}
-      {proposal.selfTest !== undefined && <SelfTestSummary selfTest={proposal.selfTest} />}
+      {proposal.selfTest !== undefined && (editing === null || editing === JSON.stringify(proposal.arguments, null, 2)) && <SelfTestSummary selfTest={proposal.selfTest} />}
       {error !== null && <p className="mt-1 text-destructive">{error}</p>}
       {state.status === 'open' ? (
         <div className="mt-2 flex gap-1.5">
