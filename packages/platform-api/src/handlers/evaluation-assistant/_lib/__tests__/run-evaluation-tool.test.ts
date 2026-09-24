@@ -9,6 +9,7 @@ import { createEvaluator } from '../../../evaluation/evaluators';
 import { labelEvaluatorOutput } from '../../../evaluation/evaluator-trust';
 import { freezeEvalDataset } from '../../../evaluation/eval-datasets';
 import { prepareEvalRun } from '../../../evaluation/eval-runs';
+import { setAcceptanceCriteria } from '../../../evaluation/acceptance-criteria';
 import { recordScore } from '../../../scores/record-score';
 import { executeEvaluationTool } from '../run-evaluation-tool';
 import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN } from '../../../evaluation/__tests__/fixture';
@@ -261,5 +262,53 @@ describe('executeEvaluationTool', () => {
     await expect(executeEvaluationTool('get_eval_run_report', { evalRunId: evalRun.id }, scope, {
       ...context, step: { ...STEP, namespace: 'pharma-b' },
     })).rejects.toThrow('is not a run of this step');
+  });
+
+  it('prepares a run with challengers, and compares each against the champion', async () => {
+    const { scope, context } = await setup();
+    await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.9 } }, origin: 'user' }, scope);
+    await createEvaluator({ ...STEP, name: 'findings-present', rule: 'The result lists findings.', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
+    await createEvalCase({
+      ...STEP,
+      name: 'Grade 5 sepsis',
+      input: { triggerPayload: {}, previousStepOutputs: {} },
+      workspaceSeedCommit: null,
+      expectation: 'positive',
+      notes: null,
+      split: 'dev',
+      containsProductionData: false,
+      origin: 'user',
+    }, scope);
+    await freezeEvalDataset(STEP, scope);
+
+    const prepared = z.object({ prepared: z.object({ evalRunId: z.string(), trials: z.number(), variants: z.array(z.object({ id: z.string() })) }) })
+      .parse(await executeEvaluationTool('prepare_eval_run', {
+        trialsPerCase: 2, budgetUsd: 2, challengers: [{ label: 'GPT-5', patch: { model: 'openai/gpt-5' } }],
+      }, scope, context));
+    expect(prepared.prepared).toMatchObject({ trials: 4, variants: [{ id: 'champion' }, { id: 'challenger-1' }] });
+
+    const compared = await executeEvaluationTool('compare_variants', { evalRunId: prepared.prepared.evalRunId }, scope, context);
+    expect(compared).toMatchObject({
+      status: 'prepared',
+      acceptanceCriteria: { critical: { minPassRate: 0.9 } },
+      variants: [
+        { id: 'champion', trials: { total: 2, inProgress: 2 }, criteria: [{ severity: 'critical', status: 'not_evaluable' }], recommendation: null },
+        { id: 'challenger-1', label: 'GPT-5', patch: { model: 'openai/gpt-5' } },
+      ],
+      comparison: [{ variantId: 'challenger-1', evaluators: [{ name: 'findings-present', verdict: 'no_clear_difference' }] }],
+    });
+  });
+
+  it('reads the step\'s qualification and the Acceptance Criteria set now', async () => {
+    const { scope, context } = await setup();
+    await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.95, minPassHatK: 0.9 } }, origin: 'user' }, scope);
+
+    expect(await executeEvaluationTool('get_qualification', {}, scope, context)).toEqual({
+      status: 'not_qualified',
+      changedSinceQualified: [],
+      evaluatorsChanged: [],
+      qualification: null,
+      acceptanceCriteria: { version: 1, critical: { minPassRate: 0.95, minPassHatK: 0.9 } },
+    });
   });
 });

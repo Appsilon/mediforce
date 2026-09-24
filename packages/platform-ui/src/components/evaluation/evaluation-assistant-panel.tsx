@@ -18,6 +18,7 @@ import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker
 import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { StartEvalRunCard } from './step-evaluation-sections';
 import {
+  ControlSettingsCard,
   LabellingCard,
   PlanCard,
   ProposalCard,
@@ -69,6 +70,8 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   preview_evaluator: 'Previewing a check on real runs',
   prepare_eval_run: 'Preparing an eval run',
   start_eval_run: 'Starting an eval run',
+  compare_variants: 'Comparing variants',
+  get_qualification: 'Reading the step\'s qualification',
   propose_evaluation_plan: 'Drafting an evaluation plan',
   propose_evaluator: 'Drafting an evaluator',
   propose_evaluator_version: 'Drafting a new evaluator version',
@@ -76,6 +79,8 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   propose_perturbed_case: 'Synthesizing an eval case',
   propose_outputs_to_label: 'Picking outputs to label',
   propose_brief: 'Drafting the brief',
+  propose_acceptance_criteria: 'Drafting Acceptance Criteria',
+  propose_control_settings: 'Recommending routing',
 };
 
 function toolLabel(tool: string): string {
@@ -264,7 +269,20 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
               {message.proposals?.map((state, proposalIndex) => {
                 const { proposal } = state;
                 if (proposal.tool === 'propose_evaluation_plan') {
-                  return <PlanCard key={proposalIndex} plan={proposal.arguments} busy={pending} onDraft={(draft) => void send(draft, 'card')} />;
+                  return (
+                    <PlanCard
+                      key={proposalIndex}
+                      step={step}
+                      plan={proposal.arguments}
+                      busy={pending}
+                      onDraft={(draft) => void send(draft, 'card')}
+                      mayEdit={mayEdit}
+                      editReason={editReason}
+                    />
+                  );
+                }
+                if (proposal.tool === 'propose_control_settings') {
+                  return <ControlSettingsCard key={proposalIndex} proposal={proposal.arguments} />;
                 }
                 if (proposal.tool === 'propose_outputs_to_label') {
                   return <LabellingCard key={proposalIndex} step={step} proposal={proposal.arguments} mayEdit={mayEdit} editReason={editReason} />;

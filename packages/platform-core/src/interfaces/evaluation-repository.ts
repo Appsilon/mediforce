@@ -1,5 +1,7 @@
 import type { EvalRun, EvalRunStatus, EvalTrial, EvalTrialStatus } from '../schemas/eval-run';
+import type { StepQualification } from '../schemas/step-qualification';
 import type {
+  AcceptanceCriteriaVersion,
   EvalCase,
   EvalDatasetVersion,
   EvaluatedStep,
@@ -13,13 +15,15 @@ import type {
 
 /**
  * Storage for the Evaluation domain (ADR-0023): Briefs, Evaluators and their
- * versions, Eval Cases, frozen Eval Dataset versions and MCP eval policies.
+ * versions, Eval Cases, frozen Eval Dataset versions, MCP eval policies,
+ * Acceptance Criteria, Eval Runs and Step Qualifications.
  * Every row carries its Step's namespace, so the authorized wrapper gates each
  * call on the namespace it names or the row it returns.
  *
- * Versioned rows are append-only: a Brief or Evaluator change is a new version,
- * and the only in-place writes are the ones that do not change what was
- * checked — archiving, a source approval, a calibration result.
+ * Versioned rows are append-only: a Brief, Acceptance Criteria or Evaluator
+ * change is a new version, and the only in-place writes are the ones that do
+ * not change what was checked — archiving, a source approval, a calibration
+ * result. A signed Step Qualification is never changed.
  */
 export interface EvaluationRepository {
   appendBrief(brief: EvaluationBrief): Promise<EvaluationBrief>;
@@ -50,6 +54,14 @@ export interface EvaluationRepository {
   getMcpPolicy(step: EvaluatedStep): Promise<McpEvalPolicy | null>;
   putMcpPolicy(policy: McpEvalPolicy): Promise<McpEvalPolicy>;
 
+  appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion>;
+  /** Newest first. */
+  listAcceptanceCriteria(step: EvaluatedStep): Promise<AcceptanceCriteriaVersion[]>;
+
+  createQualification(qualification: StepQualification): Promise<StepQualification>;
+  /** Newest first. */
+  listQualifications(step: EvaluatedStep): Promise<StepQualification[]>;
+
   createEvalRun(run: EvalRun, trials: readonly EvalTrial[]): Promise<void>;
   getEvalRun(id: string): Promise<EvalRun | null>;
   /** Newest first. */
@@ -68,7 +80,7 @@ export interface EvaluationRepository {
   /** Atomically adds a trial's cost to the run's spend. */
   addEvalRunSpend(id: string, usd: number): Promise<void>;
 
-  /** By case, then trial index. */
+  /** By case, then variant, then trial index. */
   listTrials(evalRunId: string): Promise<EvalTrial[]>;
   getTrialByInstanceId(processInstanceId: string): Promise<EvalTrial | null>;
   /** Applies `patch` only while the trial is in `from`; true when it did. */

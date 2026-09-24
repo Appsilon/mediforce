@@ -3,7 +3,7 @@ import { EVALUATION_ASSISTANT_SYSTEM_PROMPT, briefMessage } from '../system-prom
 
 describe('Evaluation Assistant prompt', () => {
   it('states the authority tiers of ADR-0023 D15', () => {
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Never approve a code check\'s source, label outputs for calibration, or sign anything');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Never approve a code check\'s source, label outputs for calibration, or sign a Step Qualification');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('start_eval_run is refused without the person\'s confirmation');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('run it with preview_evaluator on real outputs');
   });
@@ -13,6 +13,12 @@ describe('Evaluation Assistant prompt', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Choose the cheapest reliable kind');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('The person labels them pass or fail on the card, never you.');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('most synthesized cases are positive, with notes on what the output must NOT do');
+  });
+
+  it('covers Acceptance Criteria set before a run, variant comparison without overclaiming, and routing', () => {
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Propose them with propose_acceptance_criteria');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('otherwise say there is no clear difference at this sample size');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Propose it with propose_control_settings');
   });
 
   it('carries the step\'s Brief every turn, or asks for one', () => {

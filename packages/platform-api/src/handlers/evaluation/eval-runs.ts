@@ -1,8 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
-import { evaluatorTrust, type EvalRun, type EvalRunEvaluator, type EvalTrial, type McpEvalServerPolicy } from '@mediforce/platform-core';
+import {
+  CHAMPION_VARIANT_ID,
+  applyStepVariant,
+  evaluatorTrust,
+  isEmptyVariantPatch,
+  variantPatchProblem,
+  type EvalRun,
+  type EvalRunEvaluator,
+  type EvalTrial,
+  type EvalVariant,
+  type McpEvalServerPolicy,
+  type WorkflowDefinition,
+  type WorkflowStep,
+} from '@mediforce/platform-core';
 import type {
   CancelEvalRunInput,
+  EvalChallenger,
   EvalRunOutput,
   GetEvalRunInput,
   ListEvalRunsInput,
@@ -17,6 +31,7 @@ import { appendEvaluationAudit, authorId } from './_lib/audit';
 import { estimateEvalRun } from './_lib/estimate-eval-run';
 import { buildEvalRunReport } from './_lib/eval-run-report';
 import { driveEvalRun } from './_lib/drive-eval-run';
+import { computeStepFingerprint } from './_lib/step-fingerprint';
 
 async function loadEvalRun(scope: CallerScope, evalRunId: string): Promise<EvalRun> {
   const run = await scope.evaluation.getEvalRun(evalRunId);
@@ -36,13 +51,53 @@ function defaultBudget(totalUsd: number): number {
 }
 
 /**
- * Prepares an Eval Run (ADR-0023 D4, D10): the Step at its runnable Definition
- * version, a frozen Dataset version, the Step's live Evaluator versions with
- * whether each counts, the MCP eval policy the trials will run under, and a
- * cost estimate. Nothing runs yet — a person confirms the budget with `start`.
+ * The run's variants (D5): the champion — the Step as its Definition version
+ * has it — then each challenger, a patch over it, each with its Step
+ * Fingerprint. A challenger must change something the Fingerprint sees, and
+ * no two variants may be the same Step.
+ */
+async function buildVariants(
+  scope: CallerScope,
+  definition: WorkflowDefinition,
+  workflowStep: WorkflowStep,
+  agentServers: readonly string[],
+  challengers: readonly EvalChallenger[],
+): Promise<EvalVariant[]> {
+  const champion: EvalVariant = {
+    id: CHAMPION_VARIANT_ID,
+    label: 'Current step',
+    patch: {},
+    fingerprint: await computeStepFingerprint(scope, definition, workflowStep),
+  };
+  const variants = [champion];
+  for (const [index, challenger] of challengers.entries()) {
+    const label = `Challenger '${challenger.label}'`;
+    if (isEmptyVariantPatch(challenger.patch)) throw new ValidationError(`${label} changes nothing about the step`);
+    const problem = variantPatchProblem(definition, challenger.patch);
+    if (problem !== null) throw new ValidationError(`${label}: ${problem}`);
+    const unknownServers = Object.keys(challenger.patch.mcpRestrictions ?? {}).filter((name) => agentServers.includes(name) === false);
+    if (unknownServers.length > 0) {
+      throw new ValidationError(`${label} restricts MCP servers the step's agent does not bind: ${unknownServers.join(', ')}`);
+    }
+    const patched = applyStepVariant(definition, workflowStep, challenger.patch);
+    const fingerprint = await computeStepFingerprint(scope, patched.definition, patched.step);
+    const same = variants.find((variant) => variant.fingerprint?.hash === fingerprint.hash);
+    if (same !== undefined) throw new ValidationError(`${label} runs the same step as '${same.label}'`);
+    variants.push({ id: `challenger-${index + 1}`, label: challenger.label, patch: challenger.patch, fingerprint });
+  }
+  return variants;
+}
+
+/**
+ * Prepares an Eval Run (ADR-0023 D4, D5, D10): the Step at its runnable
+ * Definition version and any challengers patched over it, a frozen Dataset
+ * version, the Step's live Evaluator versions with whether each counts, the
+ * MCP eval policy the trials will run under, the Acceptance Criteria and
+ * Brief version it will be judged against, and a cost estimate. Nothing runs
+ * yet — a person confirms the budget with `start`.
  */
 export async function prepareEvalRun(
-  input: z.output<typeof PrepareEvalRunInputSchema>,
+  input: Omit<z.output<typeof PrepareEvalRunInputSchema>, 'challengers'> & { challengers?: readonly EvalChallenger[] },
   scope: CallerScope,
 ): Promise<EvalRunOutput> {
   const step = stepRef(input);
@@ -78,13 +133,18 @@ export async function prepareEvalRun(
   if (frozenEvaluators.length === 0) throw new ValidationError(`Step '${step.stepId}' has no Evaluators to run`);
 
   const agent = workflowStep.agentId === undefined ? null : await scope.agentDefinitions.getById(workflowStep.agentId);
+  const agentServers = Object.keys(agent?.mcpServers ?? {});
   const policy = await scope.evaluation.getMcpPolicy(step);
   const mcpPolicy: Record<string, McpEvalServerPolicy> = Object.fromEntries(
-    Object.keys(agent?.mcpServers ?? {}).map((name) => [name, policy?.servers[name] ?? { mode: 'deny' as const }]),
+    agentServers.map((name) => [name, policy?.servers[name] ?? { mode: 'deny' as const }]),
   );
+  const variants = await buildVariants(scope, definition, workflowStep, agentServers, input.challengers ?? []);
+  const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
+  const [brief] = await scope.evaluation.listBriefs(step);
 
-  const trialCount = dataset.caseIds.length * input.trialsPerCase;
-  const estimate = await estimateEvalRun(scope, step, workflowStep, frozenEvaluators, trialCount);
+  const trialsPerVariant = dataset.caseIds.length * input.trialsPerCase;
+  const trialCount = trialsPerVariant * variants.length;
+  const estimate = await estimateEvalRun(scope, step, workflowStep, frozenEvaluators, variants, trialsPerVariant);
   const budgetUsd = input.budgetUsd ?? (estimate.totalUsd === null ? undefined : defaultBudget(estimate.totalUsd));
   if (budgetUsd === undefined) {
     throw new ValidationError('No cost history or model price for this step — set budgetUsd to cap the run');
@@ -100,6 +160,9 @@ export async function prepareEvalRun(
     trialsPerCase: input.trialsPerCase,
     concurrency: input.concurrency,
     evaluators: frozenEvaluators.map(({ frozen }) => frozen),
+    variants,
+    acceptanceCriteria: criteria?.criteria ?? null,
+    briefVersion: brief?.version ?? null,
     mcpPolicy,
     estimate,
     budgetUsd,
@@ -110,11 +173,12 @@ export async function prepareEvalRun(
     startedAt: null,
     completedAt: null,
   };
-  const trials: EvalTrial[] = dataset.caseIds.flatMap((caseId) =>
+  const trials: EvalTrial[] = dataset.caseIds.flatMap((caseId) => variants.flatMap((variant) =>
     Array.from({ length: input.trialsPerCase }, (_unused, trialIndex) => ({
       id: randomUUID(),
       evalRunId: run.id,
       caseId,
+      variantId: variant.id,
       trialIndex,
       status: 'pending' as const,
       processInstanceId: null,
@@ -123,21 +187,30 @@ export async function prepareEvalRun(
       inputTokens: null,
       outputTokens: null,
       durationMs: null,
+      confidence: null,
       error: null,
       startedAt: null,
       scoringStartedAt: null,
       scoringAttempts: 0,
       completedAt: null,
-    })));
+    }))));
   await scope.evaluation.createEvalRun(run, trials);
   await appendEvaluationAudit(scope, {
     action: 'eval_run.prepared',
-    description: `Eval Run prepared for step '${step.stepId}': ${trialCount} trial(s), budget $${budgetUsd}`,
+    description: `Eval Run prepared for step '${step.stepId}': ${variants.length} variant(s), ${trialCount} trial(s), budget $${budgetUsd}`,
     namespace: step.namespace,
     entityType: 'eval_run',
     entityId: run.id,
     inputSnapshot: { ...step, definitionVersion: run.definitionVersion, datasetVersionId: dataset.id, trialsPerCase: input.trialsPerCase },
-    outputSnapshot: { evaluators: run.evaluators, mcpPolicy, estimate, budgetUsd },
+    outputSnapshot: {
+      evaluators: run.evaluators,
+      variants,
+      acceptanceCriteria: run.acceptanceCriteria,
+      briefVersion: run.briefVersion,
+      mcpPolicy,
+      estimate,
+      budgetUsd,
+    },
     basis: 'Eval Run prepared with a cost estimate for a person to confirm (ADR-0023 D15)',
   });
   return evalRunOutput(scope, run.id);
