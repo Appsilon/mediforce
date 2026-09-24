@@ -43,6 +43,17 @@ describe('driveEvalRun', () => {
     expect(kicker.kicks).toHaveLength(1);
   });
 
+  it('starts trials round by round, the champion before its challengers', async () => {
+    const { evalRun } = await prepareEvalRun({
+      ...STEP, trialsPerCase: 2, concurrency: 3, budgetUsd: 5,
+      challengers: [{ label: 'GPT-5', patch: { model: 'openai/gpt-5' } }, { label: 'Sonnet', patch: { model: 'anthropic/claude-sonnet-5' } }],
+    }, scope);
+    await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
+
+    const started = (await fixture.evaluationRepo.listTrials(evalRun.id)).filter((trial) => trial.status === 'running');
+    expect(started.map((trial) => [trial.variantId, trial.trialIndex])).toEqual([['challenger-1', 0], ['challenger-2', 0], ['champion', 0]]);
+  });
+
   it('fails a trial whose run ended without an Agent Run, with the run\'s error', async () => {
     const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
