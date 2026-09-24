@@ -7,6 +7,7 @@ import {
 import type {
   AskEvaluationAssistantInput,
   AskEvaluationAssistantOutput,
+  EvaluationAssistantProgress,
   PreparedEvalRun,
 } from '../../contract/evaluation-assistant';
 import type { CallerScope } from '../../repositories/index';
@@ -31,11 +32,12 @@ function preparedRun(result: unknown): PreparedEvalRun | null {
  * shared assistant core. Reads and `preview_evaluator` run as the caller;
  * Evaluators, cases and Brief drafts come back as proposals; a prepared Eval
  * Run comes back for the person to confirm. The Step's Evaluation Brief is
- * sent every turn.
+ * sent every turn. `onProgress` hears each model round and tool call as it runs.
  */
 export async function askEvaluationAssistant(
   input: AskEvaluationAssistantInput,
   scope: CallerScope,
+  onProgress?: (event: EvaluationAssistantProgress) => void,
 ): Promise<AskEvaluationAssistantOutput> {
   const step = stepRef(input);
   const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'read');
@@ -69,6 +71,7 @@ export async function askEvaluationAssistant(
     executePlatformTool: (toolName, args) => executeEvaluationTool(toolName, args, scope, { step, definition, workflowStep }),
     maxIterations: MAX_TOOL_LOOP_ITERATIONS,
     maxTokens: ASSISTANT_MAX_OUTPUT_TOKENS,
+    onProgress,
   });
 
   return {

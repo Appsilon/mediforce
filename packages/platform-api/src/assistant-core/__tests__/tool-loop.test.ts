@@ -265,4 +265,40 @@ describe('runProposalToolLoop', () => {
     expect(bodies[1]!.messages.filter((message) => message.role === 'tool')[0]!.content).toContain('truncated');
     expect(result.proposals).toEqual([{ tool: 'propose_note', arguments: { text: 'Complete check.' } }]);
   });
+
+  it('returns an identical proposal once and tells the model it was already proposed', async () => {
+    const bodies = scriptOpenRouter([
+      { toolCalls: [{ name: 'propose_note', arguments: { text: 'Same card.' } }, { name: 'read_count', arguments: { bad: true } }] },
+      { toolCalls: [{ name: 'propose_note', arguments: { text: 'Same card.' } }, { name: 'propose_note', arguments: { text: 'Other card.' } }] },
+      { content: 'Proposed.' },
+    ]);
+    const result = await runProposalToolLoop({
+      ...config, messages: [{ role: 'user', content: 'go' }], executePlatformTool: vi.fn().mockResolvedValue({ count: 3 }),
+    });
+    expect(result.proposals).toEqual([
+      { tool: 'propose_note', arguments: { text: 'Same card.' } },
+      { tool: 'propose_note', arguments: { text: 'Other card.' } },
+    ]);
+    const repeated = JSON.parse(bodies[2]!.messages.filter((message) => message.role === 'tool').at(-2)!.content);
+    expect(repeated).toMatchObject({ proposed: true, duplicate: true });
+  });
+
+  it('reports each model round and each tool call as it happens', async () => {
+    scriptOpenRouter([
+      { toolCalls: [{ name: 'read_count', arguments: {} }, { name: 'propose_note', arguments: { text: '' } }] },
+      { content: 'Done.' },
+    ]);
+    const onProgress = vi.fn();
+    await runProposalToolLoop({
+      ...config, messages: [{ role: 'user', content: 'go' }], executePlatformTool: vi.fn().mockResolvedValue({ count: 3 }), onProgress,
+    });
+    expect(onProgress.mock.calls.map(([event]) => event)).toEqual([
+      { type: 'thinking', round: 1 },
+      { type: 'tool', round: 1, callId: 'call-1-0', tool: 'read_count', status: 'running' },
+      { type: 'tool', round: 1, callId: 'call-1-0', tool: 'read_count', status: 'done' },
+      { type: 'tool', round: 1, callId: 'call-1-1', tool: 'propose_note', status: 'running' },
+      { type: 'tool', round: 1, callId: 'call-1-1', tool: 'propose_note', status: 'failed', error: expect.stringContaining('text') },
+      { type: 'thinking', round: 2 },
+    ]);
+  });
 });

@@ -3,8 +3,13 @@
 import * as React from 'react';
 import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
 import { EVALUATION_ASSISTANT_DEFAULT_MODEL } from '@mediforce/platform-core';
-import type { EvaluatedStep, EvaluationAssistantProposal } from '@mediforce/platform-core';
-import type { PreparedEvalRun } from '@mediforce/platform-api/contract';
+import type {
+  EvaluatedStep,
+  EvaluationAssistantPlatformToolName,
+  EvaluationAssistantProposal,
+  EvaluationAssistantProposalToolName,
+} from '@mediforce/platform-core';
+import type { EvaluationAssistantProgress, PreparedEvalRun } from '@mediforce/platform-api/contract';
 import { useQueryClient } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
@@ -23,11 +28,88 @@ interface ProposalState {
   readonly status: ProposalStatus;
 }
 
+interface ActivityStep {
+  readonly callId: string;
+  readonly tool: string;
+  readonly status: 'running' | 'done' | 'failed';
+  readonly error?: string;
+}
+
+interface Activity {
+  readonly steps: ActivityStep[];
+  readonly thinking: boolean;
+}
+
 interface PanelMessage {
   readonly role: 'user' | 'assistant';
   readonly content: string;
   readonly proposals?: ProposalState[];
   readonly prepared?: PreparedEvalRun[];
+  readonly steps?: ActivityStep[];
+}
+
+const IDLE_ACTIVITY: Activity = { steps: [], thinking: true };
+// How close to the bottom (px) still counts as reading the latest message.
+const FOLLOW_LATEST_THRESHOLD = 48;
+
+const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssistantProposalToolName, string> = {
+  get_step: 'Reading the step',
+  list_step_runs: 'Listing recent runs',
+  get_agent_run: 'Reading an agent run',
+  get_trajectory: 'Reading a run trajectory',
+  list_evaluators: 'Listing evaluators',
+  list_eval_cases: 'Listing eval cases',
+  list_eval_runs: 'Listing eval runs',
+  get_eval_run_report: 'Reading an eval run report',
+  preview_evaluator: 'Previewing a check on real runs',
+  prepare_eval_run: 'Preparing an eval run',
+  start_eval_run: 'Starting an eval run',
+  propose_evaluator: 'Drafting an evaluator',
+  propose_eval_case: 'Drafting an eval case',
+  propose_brief: 'Drafting the brief',
+};
+
+function toolLabel(tool: string): string {
+  return Object.hasOwn(TOOL_LABELS, tool) ? TOOL_LABELS[tool as keyof typeof TOOL_LABELS] : tool;
+}
+
+function applyProgress(activity: Activity, event: EvaluationAssistantProgress): Activity {
+  if (event.type === 'thinking') return { ...activity, thinking: true };
+  if (event.status === 'running') {
+    return { thinking: false, steps: [...activity.steps, { callId: event.callId, tool: event.tool, status: 'running' }] };
+  }
+  return {
+    ...activity,
+    steps: activity.steps.map((step) => step.callId === event.callId ? { ...step, status: event.status, error: event.error } : step),
+  };
+}
+
+function ActivityRow({ step }: { step: ActivityStep }) {
+  return (
+    <li className="flex min-w-0 items-start gap-1.5" data-testid="assistant-activity-step">
+      {step.status === 'running' && <Loader2 className="mt-0.5 h-3 w-3 shrink-0 animate-spin" />}
+      {step.status === 'done' && <Check className="mt-0.5 h-3 w-3 shrink-0 text-green-700 dark:text-green-400" />}
+      {step.status === 'failed' && <X className="mt-0.5 h-3 w-3 shrink-0 text-destructive" />}
+      <span className="min-w-0">
+        {toolLabel(step.tool)}
+        {step.error !== undefined && <span className="block truncate text-destructive" title={step.error}>{step.error}</span>}
+      </span>
+    </li>
+  );
+}
+
+function StepsSummary({ steps }: { steps: ActivityStep[] }) {
+  const failed = steps.filter((step) => step.status === 'failed').length;
+  return (
+    <details className="text-xs text-muted-foreground">
+      <summary className="cursor-pointer select-none">
+        {steps.length} {steps.length === 1 ? 'step' : 'steps'}{failed > 0 ? ` · ${failed} failed` : ''}
+      </summary>
+      <ul className="mt-1 space-y-0.5 pl-1">
+        {steps.map((step) => <ActivityRow key={step.callId} step={step} />)}
+      </ul>
+    </details>
+  );
 }
 
 const TITLES: Record<EvaluationAssistantProposal['tool'], string> = {
@@ -146,17 +228,21 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
   const [messages, setMessages] = React.useState<PanelMessage[]>([]);
   const [input, setInput] = React.useState('');
   const [pending, setPending] = React.useState(false);
+  const [activity, setActivity] = React.useState<Activity>(IDLE_ACTIVITY);
   const [error, setError] = React.useState<string | null>(null);
   const [assistantModel, setAssistantModel] = React.useState<string | undefined>(undefined);
   const [assistantSettingsOpen, setAssistantSettingsOpen] = React.useState(false);
   const assistantScrollRef = React.useRef<HTMLDivElement>(null);
+  const followLatest = React.useRef(true);
   const queryClient = useQueryClient();
 
+  // Follow new messages and steps only while the person is at the bottom; deciding
+  // on a proposal changes a message in place and must not move the view.
   React.useEffect(() => {
     const element = assistantScrollRef.current;
-    if (element === null) return;
-    element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
-  }, [messages, pending]);
+    if (element === null || followLatest.current === false) return;
+    element.scrollTo({ top: element.scrollHeight });
+  }, [messages.length, pending, activity]);
 
   const decide = (messageIndex: number, proposalIndex: number, status: ProposalStatus) => {
     setMessages((current) => current.map((message, index) => index !== messageIndex ? message : {
@@ -172,12 +258,20 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
     setMessages(thread);
     setInput('');
     setPending(true);
+    setActivity(IDLE_ACTIVITY);
     setError(null);
+    followLatest.current = true;
+    let turnActivity = IDLE_ACTIVITY;
     try {
       const result = await mediforce.evaluation.askAssistant({
         ...step,
         messages: thread.map((message) => ({ role: message.role, content: message.content })),
         ...(assistantModel === undefined ? {} : { model: assistantModel }),
+      }, {
+        onProgress: (event) => {
+          turnActivity = applyProgress(turnActivity, event);
+          setActivity(turnActivity);
+        },
       });
       if (result.preparedEvalRuns.length > 0) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId) });
@@ -187,6 +281,7 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
         content: result.reply,
         proposals: result.proposals.map((proposal) => ({ proposal, status: 'open' as const })),
         prepared: result.preparedEvalRuns,
+        steps: turnActivity.steps,
       }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The assistant did not answer.');
@@ -226,7 +321,14 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
           />
         </div>
       )}
-      <div ref={assistantScrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+      <div
+        ref={assistantScrollRef}
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3"
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          followLatest.current = element.scrollHeight - element.scrollTop - element.clientHeight < FOLLOW_LATEST_THRESHOLD;
+        }}
+      >
         {messages.length === 0 && (
           <p className="text-xs text-muted-foreground">
             Ask what to check, have it draft Evaluators and cases from real runs, prepare an Eval Run or explain a report.
@@ -239,6 +341,7 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
               {message.role === 'user' ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
             </div>
             <div className="flex min-w-0 max-w-[88%] flex-col gap-1.5">
+              {message.steps !== undefined && message.steps.length > 0 && <StepsSummary steps={message.steps} />}
               {message.content !== '' && (
                 <div className={cn('rounded-lg px-3 py-2 break-words', message.role === 'user' ? 'bg-primary/10 whitespace-pre-wrap' : 'bg-muted')}>
                   {message.role === 'user' ? message.content : <MarkdownPresentation content={message.content} />}
@@ -251,7 +354,22 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
             </div>
           </div>
         ))}
-        {pending && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Working…</div>}
+        {pending && (
+          <div className="flex gap-2 text-sm" data-testid="evaluation-assistant-activity">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <Bot className="h-3 w-3" />
+            </div>
+            <ul className="min-w-0 max-w-[88%] space-y-0.5 pt-1 text-xs text-muted-foreground">
+              {activity.steps.map((activityStep) => <ActivityRow key={activityStep.callId} step={activityStep} />)}
+              {activity.thinking && (
+                <li className="flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+                  {activity.steps.length === 0 ? 'Thinking…' : 'Deciding the next step…'}
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
         {error !== null && <p className="text-xs text-destructive">{error}</p>}
       </div>
       <div className="flex shrink-0 gap-2 border-t p-2">
