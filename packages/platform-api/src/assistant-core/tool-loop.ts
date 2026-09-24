@@ -56,6 +56,9 @@ export async function runProposalToolLoop<TPlatform extends string>(
       maxTokens: config.maxTokens,
     });
     if (response.toolCalls.length === 0) {
+      if (response.finishReason === 'length') {
+        throw new HandlerError('validation', 'Assistant response was truncated — try a shorter request.');
+      }
       return { reply: response.content, proposals, platformCalls };
     }
 

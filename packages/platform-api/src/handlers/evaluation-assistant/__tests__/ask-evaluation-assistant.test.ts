@@ -82,7 +82,7 @@ describe('askEvaluationAssistant', () => {
   it('prepares an Eval Run for the person to confirm; its own start is refused', async () => {
     Object.assign(scope.system, { engine: new WorkflowEngine(fixture.processRepo, fixture.instanceRepo, fixture.auditRepo) });
     await createEvaluator({ ...STEP, name: 'findings-present', rule: 'r', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
-    await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'positive', split: 'dev' }, scope);
+    await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'positive', split: 'dev', origin: 'user' }, scope);
     await freezeEvalDataset(STEP, scope);
     const requests = scriptOpenRouter([
       () => ({ toolCalls: [{ name: 'prepare_eval_run', arguments: { trialsPerCase: 2, budgetUsd: 2 } }] }),

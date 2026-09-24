@@ -6,6 +6,7 @@ import type { EvaluatedStep, EvaluatorCheck } from '@mediforce/platform-core';
 import type { EvaluatorView, PreparedEvalRun } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { useEvalRun, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { EvalRunReport } from './eval-run-report';
 
@@ -132,6 +133,7 @@ export function EvaluatorsSection({ step, data, mayEdit }: { step: EvaluatedStep
   const [name, setName] = React.useState('');
   const [rule, setRule] = React.useState('');
   const [severity, setSeverity] = React.useState<'critical' | 'major' | 'minor'>('major');
+  const [kind, setKind] = React.useState<EvaluatorCheck['kind']>('schema');
   const [checkText, setCheckText] = React.useState(CHECK_TEMPLATES.schema);
   const [error, setError] = React.useState<string | null>(null);
   const create = useStepEvaluationMutation(step, (check: EvaluatorCheck) =>
@@ -147,7 +149,13 @@ export function EvaluatorsSection({ step, data, mayEdit }: { step: EvaluatedStep
     }
     setError(null);
     create.mutate(check, {
-      onSuccess: () => { setAdding(false); setName(''); setRule(''); },
+      onSuccess: () => {
+        setAdding(false);
+        setName('');
+        setRule('');
+        setKind('schema');
+        setCheckText(CHECK_TEMPLATES.schema);
+      },
       onError: (err) => setError(err.message),
     });
   };
@@ -172,7 +180,12 @@ export function EvaluatorsSection({ step, data, mayEdit }: { step: EvaluatedStep
             <select
               className={inputClass}
               aria-label="Kind"
-              onChange={(event) => setCheckText(CHECK_TEMPLATES[event.target.value as EvaluatorCheck['kind']])}
+              value={kind}
+              onChange={(event) => {
+                const selected = event.target.value as EvaluatorCheck['kind'];
+                setKind(selected);
+                setCheckText(CHECK_TEMPLATES[selected]);
+              }}
             >
               <option value="schema">schema</option>
               <option value="code">code</option>
@@ -217,7 +230,7 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
             <li key={evalCase.id} className="flex items-center gap-2">
               <span className={cn('rounded px-1.5 text-[11px]', evalCase.expectation === 'positive' ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-700 dark:text-red-400')}>{evalCase.expectation}</span>
               <span className="truncate">{evalCase.name}</span>
-              <span className="ml-auto shrink-0 text-xs text-muted-foreground">{evalCase.split} · {evalCase.source}</span>
+              <span className="ml-auto shrink-0 text-xs text-muted-foreground">{evalCase.split} · {evalCase.source}{evalCase.origin === 'assistant' ? ' · from the assistant' : ''}</span>
             </li>
           ))}
         </ul>
@@ -292,7 +305,12 @@ export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep;
  * The card a prepared Eval Run waits on: the person starts it by confirming
  * the budget shown (D15). The only place `confirmedBudgetUsd` is sent from.
  */
-export function StartEvalRunCard({ step, prepared }: { step: EvaluatedStep; prepared: PreparedEvalRun }) {
+export function StartEvalRunCard({ step, prepared, mayRun, runReason }: {
+  step: EvaluatedStep;
+  prepared: PreparedEvalRun;
+  mayRun: boolean;
+  runReason: string | undefined;
+}) {
   const start = useStepEvaluationMutation(step, () =>
     mediforce.evaluation.startRun({ evalRunId: prepared.evalRunId, confirmedBudgetUsd: prepared.budgetUsd }));
   return (
@@ -302,9 +320,18 @@ export function StartEvalRunCard({ step, prepared }: { step: EvaluatedStep; prep
         {prepared.estimatedUsd === null ? ' — no cost estimate' : ` — estimated $${prepared.estimatedUsd}`}.
       </p>
       <div className="mt-2 flex items-center gap-2">
-        <button type="button" className={primaryButtonClass} disabled={start.isPending || start.isSuccess} onClick={() => start.mutate(undefined)}>
-          {start.isSuccess ? 'Started' : `Start — spend up to $${prepared.budgetUsd}`}
-        </button>
+        <InstantTooltip label={runReason}>
+          <span className="inline-flex">
+            <button
+              type="button"
+              className={primaryButtonClass}
+              disabled={!mayRun || start.isPending || start.isSuccess}
+              onClick={() => start.mutate(undefined)}
+            >
+              {start.isSuccess ? 'Started' : `Start — spend up to $${prepared.budgetUsd}`}
+            </button>
+          </span>
+        </InstantTooltip>
         {start.error !== null && <span className="text-xs text-destructive">{start.error.message}</span>}
       </div>
     </div>
@@ -321,11 +348,12 @@ function EvalRunRow({ evalRunId, onOpen, open }: { evalRunId: string; onOpen: ()
   );
 }
 
-/** Prepare, confirm and read the Step's Eval Runs. */
-export function EvalRunsSection({ step, data, mayEdit }: {
+/** Prepare, confirm and read the Step's Eval Runs. Preparing and starting one is the workflow's `run` verb. */
+export function EvalRunsSection({ step, data, mayRun, runReason }: {
   step: EvaluatedStep;
   data: StepEvaluation['runs'];
-  mayEdit: boolean;
+  mayRun: boolean;
+  runReason: string | undefined;
 }) {
   const [trials, setTrials] = React.useState(3);
   const [budget, setBudget] = React.useState('');
@@ -346,7 +374,7 @@ export function EvalRunsSection({ step, data, mayEdit }: {
 
   return (
     <Section title="Eval Runs">
-      {mayEdit && (
+      {mayRun && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <label className="flex items-center gap-1">Trials per case
             <input type="number" min={1} max={10} className={cn(inputClass, 'w-16')} value={trials} onChange={(event) => setTrials(Number(event.target.value))} />
@@ -363,7 +391,7 @@ export function EvalRunsSection({ step, data, mayEdit }: {
           {prepare.error !== null && <span className="text-destructive">{prepare.error.message}</span>}
         </div>
       )}
-      {waiting.map((run) => <StartEvalRunCard key={run.evalRunId} step={step} prepared={run} />)}
+      {waiting.map((run) => <StartEvalRunCard key={run.evalRunId} step={step} prepared={run} mayRun={mayRun} runReason={runReason} />)}
       {data.isLoading ? <Loading /> : runs.length === 0 ? (
         <p className="text-sm text-muted-foreground">No Eval Runs yet.</p>
       ) : (

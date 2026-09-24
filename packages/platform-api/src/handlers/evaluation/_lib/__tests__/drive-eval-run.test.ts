@@ -29,7 +29,7 @@ describe('driveEvalRun', () => {
     await createEvaluator({ ...STEP, name: 'findings-present', rule: 'r', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
     await createEvalCase({
       ...STEP, name: 'case', input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: null,
-      expectation: 'positive', notes: null, split: 'dev', containsProductionData: false,
+      expectation: 'positive', notes: null, split: 'dev', containsProductionData: false, origin: 'user',
     }, scope);
     await freezeEvalDataset(STEP, scope);
   });

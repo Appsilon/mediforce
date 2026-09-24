@@ -98,6 +98,7 @@ export const evalCases = pgTable(
     notes: text('notes'),
     source: text('source').notNull(),
     sourceAgentRunId: text('source_agent_run_id'),
+    origin: text('origin').notNull().default('user'),
     split: text('split').notNull(),
     containsProductionData: boolean('contains_production_data').notNull(),
     archived: boolean('archived').notNull().default(false),

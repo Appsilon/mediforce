@@ -755,7 +755,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
         </Tabs.Content>
         {/* Evaluation tab */}
         <Tabs.Content value="evaluation" className="flex-1 p-6">
-          <EvaluationTab handle={handle} workflowName={decodedName} steps={runnable?.steps ?? []} mayEdit={mayEdit} />
+          <EvaluationTab handle={handle} workflowName={decodedName} steps={runnable?.steps ?? []} mayEdit={mayEdit} editReason={editReason} />
         </Tabs.Content>
       </Tabs.Root>
 

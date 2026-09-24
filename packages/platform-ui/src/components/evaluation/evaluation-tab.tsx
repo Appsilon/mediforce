@@ -3,6 +3,7 @@
 import * as React from 'react';
 import type { EvaluatedStep, WorkflowStep } from '@mediforce/platform-core';
 import { useStepEvaluation } from '@/hooks/use-step-evaluation';
+import { useWorkflowRunGate } from '@/hooks/use-workflow-access';
 import { EvaluationAssistantPanel } from './evaluation-assistant-panel';
 import {
   BriefSection,
@@ -12,7 +13,13 @@ import {
   McpPolicySection,
 } from './step-evaluation-sections';
 
-function StepEvaluation({ step, mayEdit }: { step: EvaluatedStep; mayEdit: boolean }) {
+function StepEvaluation({ step, mayEdit, editReason, mayRun, runReason }: {
+  step: EvaluatedStep;
+  mayEdit: boolean;
+  editReason: string | undefined;
+  mayRun: boolean;
+  runReason: string | undefined;
+}) {
   const evaluation = useStepEvaluation(step);
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -21,9 +28,9 @@ function StepEvaluation({ step, mayEdit }: { step: EvaluatedStep; mayEdit: boole
         <EvaluatorsSection step={step} data={evaluation.evaluators} mayEdit={mayEdit} />
         <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
         <McpPolicySection step={step} data={evaluation.mcpPolicy} mayEdit={mayEdit} />
-        <EvalRunsSection step={step} data={evaluation.runs} mayEdit={mayEdit} />
+        <EvalRunsSection step={step} data={evaluation.runs} mayRun={mayRun} runReason={runReason} />
       </div>
-      <EvaluationAssistantPanel step={step} />
+      <EvaluationAssistantPanel step={step} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
     </div>
   );
 }
@@ -34,13 +41,15 @@ function StepEvaluation({ step, mayEdit }: { step: EvaluatedStep; mayEdit: boole
  * Evaluation Assistant. Everything here lives outside the definition, so no
  * change on this tab mints a version.
  */
-export function EvaluationTab({ handle, workflowName, steps, mayEdit }: {
+export function EvaluationTab({ handle, workflowName, steps, mayEdit, editReason }: {
   handle: string;
   workflowName: string;
   steps: readonly WorkflowStep[];
   mayEdit: boolean;
+  editReason: string | undefined;
 }) {
   const agentSteps = steps.filter((step) => step.executor === 'agent');
+  const { mayRun, reason: runReason } = useWorkflowRunGate(handle, workflowName);
   const [stepId, setStepId] = React.useState<string | null>(null);
   const selected = agentSteps.find((step) => step.id === stepId) ?? agentSteps[0];
 
@@ -60,7 +69,7 @@ export function EvaluationTab({ handle, workflowName, steps, mayEdit }: {
           {agentSteps.map((step) => <option key={step.id} value={step.id}>{step.name}</option>)}
         </select>
       </label>
-      <StepEvaluation key={selected.id} step={{ namespace: handle, workflowName, stepId: selected.id }} mayEdit={mayEdit} />
+      <StepEvaluation key={selected.id} step={{ namespace: handle, workflowName, stepId: selected.id }} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { z } from 'zod';
 import { runProposalToolLoop } from '../tool-loop';
 
-type ScriptedTurn = { content?: string; toolCalls?: Array<{ name: string; arguments: unknown }> };
+type ScriptedTurn = { content?: string; toolCalls?: Array<{ name: string; arguments: unknown }>; finishReason?: string };
 
 /** Fakes OpenRouter at `fetch`, one scripted turn per request, and keeps each request body. */
 function scriptOpenRouter(turns: ScriptedTurn[]) {
@@ -20,7 +20,7 @@ function scriptOpenRouter(turns: ScriptedTurn[]) {
             function: { name: call.name, arguments: typeof call.arguments === 'string' ? call.arguments : JSON.stringify(call.arguments) },
           })),
         },
-        finish_reason: 'stop',
+        finish_reason: turn.finishReason ?? 'stop',
       }],
     }));
   }));
@@ -77,6 +77,16 @@ describe('runProposalToolLoop', () => {
     expect(errors[0]).toContain("Invalid arguments for 'propose_note'");
     expect(errors[1]).toBe("Malformed JSON arguments for 'propose_note'.");
     expect(errors[2]).toBe("Unknown tool 'sign_qualification'. Valid tools: propose_note, read_count.");
+  });
+
+  it('refuses a final answer cut off at the token limit rather than returning it as the reply', async () => {
+    scriptOpenRouter([
+      { toolCalls: [{ name: 'propose_note', arguments: { text: 'Check grade 5 first.' } }] },
+      { content: 'The first thing to check is', finishReason: 'length' },
+    ]);
+    await expect(runProposalToolLoop({
+      ...config, messages: [{ role: 'user', content: 'go' }], executePlatformTool: vi.fn(),
+    })).rejects.toThrow('truncated');
   });
 
   it('gives up after the iteration cap', async () => {
