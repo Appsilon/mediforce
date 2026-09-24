@@ -1,4 +1,4 @@
-import { ImageCatalogEntrySchema } from '@mediforce/platform-core';
+import { daemonRepositoryName, ImageCatalogEntrySchema } from '@mediforce/platform-core';
 import { assertNamespaceAccess } from '../../auth';
 import { HandlerError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
@@ -10,6 +10,7 @@ import { actorFromCaller } from '../_helpers';
 import { fetchDaemonImages } from '../system/_docker';
 import { canonicalizeSource, deriveImageCatalogEntryId } from './_source';
 import { refreshEntryCapabilities } from './_capabilities';
+import { assertReferenceNotAnotherWorkspaces } from './_referenced-version';
 import { toEntryView } from './_view';
 
 export async function createImageCatalogEntry(
@@ -32,6 +33,10 @@ export async function createImageCatalogEntry(
       parsed.error.issues[0]?.message ?? 'Invalid input',
       parsed.error.issues,
     );
+  }
+
+  if (canonical.kind === 'referenced') {
+    await assertReferenceNotAnotherWorkspaces(daemonRepositoryName(canonical.reference), namespace, scope);
   }
 
   const existing = await scope.imageCatalog.getById(namespace, id);

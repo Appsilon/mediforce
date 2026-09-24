@@ -2,14 +2,14 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle, Loader2, X } from 'lucide-react';
-import { isDefaultEngineImageSource } from '@mediforce/platform-core';
+import { isImageVersionOwnedBy } from '@mediforce/platform-core';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { useDeleteImageEntry } from '@/hooks/use-image-catalog';
 import { useArchiveWorkflowVersion } from '@/hooks/use-archive-workflow-version';
 import { useWorkflowsByImage, type WorkflowImageMatch } from '@/hooks/use-workflows-by-image';
 
 /**
- * Retire an entry and the images behind it.
+ * Retire an entry and the images behind it that this workspace produced.
  *
  * One act, not two: an entry is an offer *for* images, and a record whose
  * images stay on the daemon achieves nothing — for anything this workspace
@@ -17,6 +17,11 @@ import { useWorkflowsByImage, type WorkflowImageMatch } from '@/hooks/use-workfl
  * description", losing only the sentence somebody wrote. So delete means both,
  * and when the daemon holds no image for the entry it simply removes the
  * record.
+ *
+ * Cataloguing an image does not make it the workspace's, though: an image
+ * adopted through **Existing image**, another workspace's build of the same
+ * repo, or an engine default stays on the shared daemon, and is listed as
+ * kept (`isImageVersionOwnedBy`).
  *
  * That makes it destructive and deployment-wide, which is why it is
  * admin-gated and why this dialog leads with what pins those images:
@@ -60,13 +65,18 @@ export function DeleteImageEntryDialog({
 }) {
   const remove = useDeleteImageEntry(handle);
   const archive = useArchiveWorkflowVersion();
-  const tags = entry.versions.map((version) => version.imageTag);
-  // An image the engine falls back to when a step names none is not this
-  // workspace's to destroy: the daemon is shared by every workspace, and a step
-  // that names no image pins nothing for the scan below to find (#1376). The
-  // row is still the workspace's own, so the delete stays — it stops at the
-  // record, and the handler refuses the image half anyway.
-  const removesImages = tags.length > 0 && isDefaultEngineImageSource(entry.source) === false;
+  // Only what this workspace produced leaves the shared daemon; the rest stays
+  // and is listed, so nobody reads the delete as reclaiming it. The handler
+  // applies the same rule, whatever this dialog sends.
+  const isOwned = (version: ImageCatalogEntryView['versions'][number]) =>
+    isImageVersionOwnedBy(handle, entry.source, version);
+  const tags = [...new Set(entry.versions.filter(isOwned).map((version) => version.imageTag))];
+  const keptTags = [
+    ...new Set(
+      entry.versions.filter((version) => isOwned(version) === false).map((version) => version.imageTag),
+    ),
+  ];
+  const removesImages = tags.length > 0;
   // `all`, not the default: every version and archived workflows included. The
   // narrow answer would hide exactly the history this delete destroys.
   const usage = useWorkflowsByImage(tags, open && removesImages, 'all');
@@ -106,9 +116,9 @@ export function DeleteImageEntryDialog({
               <Dialog.Description className="mt-1 text-sm text-muted-foreground">
                 {removesImages === false ? (
                   <>
-                    {tags.length === 0
+                    {keptTags.length === 0
                       ? 'No image for this entry is on the daemon, so this removes the record and nothing else.'
-                      : 'This is an image the engine falls back to when a step names none, so it stays on the shared daemon — this removes the record alone.'}{' '}
+                      : 'This workspace did not produce the images behind this entry, so they stay on the shared daemon — this removes the record alone.'}{' '}
                     The source can be catalogued again.
                   </>
                 ) : (
@@ -141,6 +151,25 @@ export function DeleteImageEntryDialog({
                 </p>
                 <ul className="max-h-32 divide-y overflow-y-auto rounded-md border bg-muted/20">
                   {tags.map((tag) => (
+                    <li key={tag} className="break-all px-3 py-1.5 font-mono text-[11px]">
+                      {tag}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {keptTags.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  {keptTags.length} version{keptTags.length === 1 ? '' : 's'} kept on the daemon
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Adopted, built by another workspace, or an image the engine falls back to — not
+                  this workspace&apos;s to remove.
+                </p>
+                <ul className="max-h-32 divide-y overflow-y-auto rounded-md border bg-muted/20">
+                  {keptTags.map((tag) => (
                     <li key={tag} className="break-all px-3 py-1.5 font-mono text-[11px]">
                       {tag}
                     </li>

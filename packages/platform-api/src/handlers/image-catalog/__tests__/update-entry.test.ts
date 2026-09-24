@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   InMemoryAuditRepository,
   InMemoryImageCatalogRepository,
+  InMemoryNamespaceRepository,
 } from '@mediforce/platform-core/testing';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../../errors';
 import {
@@ -35,6 +36,24 @@ describe('updateImageCatalogEntry handler', () => {
 
   const scopeFor = (uid: string, namespaces: string[]) =>
     createTestScope({ imageCatalogRepo: repo, auditRepo, caller: userCaller(uid, namespaces) });
+
+  it("refuses to re-key an entry onto a name another workspace owns", async () => {
+    const namespaceRepo = new InMemoryNamespaceRepository();
+    await namespaceRepo.createNamespaceWithOwner({
+      namespace: { handle: 'beta', type: 'organization', displayName: 'beta', createdAt: new Date().toISOString() },
+      ownerMember: { uid: 'u-beta-owner', role: 'owner', joinedAt: new Date().toISOString() },
+    });
+    const scope = createTestScope({ imageCatalogRepo: repo, auditRepo, namespaceRepo, caller: userCaller('u-member', ['alpha']) });
+    const created = await createImageCatalogEntry({ namespace: 'alpha', ...TEALFLOW }, scope);
+
+    await expect(
+      updateImageCatalogEntry(
+        { namespace: 'alpha', id: created.entry.id, source: { kind: 'referenced', reference: 'beta/agent' } },
+        scope,
+      ),
+    ).rejects.toThrow(/belongs to workspace "beta"/);
+    expect(await repo.getById('alpha', created.entry.id)).not.toBeNull();
+  });
 
   it('rewrites the intent and leaves the key alone', async () => {
     const scope = scopeFor('u-member', ['alpha']);

@@ -47,8 +47,10 @@ function groupByRepository(images: readonly DockerImageInfo[]): RepositoryCandid
  * every tag the daemon has for it, including ones added later, resolves as
  * one of its versions.
  *
- * Every daemon repository no `referenced` entry already claims, and the
- * platform did not build, is offered. `initialRepository` starts on one — Admin
+ * Every daemon repository no `referenced` entry already claims, the platform
+ * did not build, and no other workspace uploaded, is offered. Cataloguing one
+ * does not make it this workspace's: deleting the entry leaves an image this
+ * workspace did not produce on the daemon (`isImageVersionOwnedBy`). `initialRepository` starts on one — Admin
  * → Infrastructure's `+` on a row with no catalog match.
  */
 export function CatalogueExistingImageForm({
@@ -75,12 +77,25 @@ export function CatalogueExistingImageForm({
       ),
     [entries],
   );
+  // Another workspace's upload carries its namespace: that repository is
+  // theirs, and cataloguing it here is refused.
+  const otherWorkspacesRepositories = useMemo(
+    () =>
+      new Set(
+        images
+          .filter((image) => image.buildNamespace !== undefined && image.buildNamespace !== handle)
+          .map((image) => image.repository),
+      ),
+    [images, handle],
+  );
   const candidates = useMemo(
     () =>
       groupByRepository(images).filter(
-        (candidate) => referencedRepositories.has(candidate.repository) === false,
+        (candidate) =>
+          referencedRepositories.has(candidate.repository) === false &&
+          otherWorkspacesRepositories.has(candidate.repository) === false,
       ),
-    [images, referencedRepositories],
+    [images, referencedRepositories, otherWorkspacesRepositories],
   );
 
   const [selectedRepository, setSelectedRepository] = useState<string | null>(initialRepository ?? null);

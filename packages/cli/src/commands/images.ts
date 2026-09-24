@@ -301,7 +301,7 @@ export const imagesUpdateCommand = defineCommand({
 export const imagesDeleteCommand = defineCommand({
   name: 'mediforce images delete',
   description:
-    "Delete an entry and the images behind it. Admin/owner only. Refused while a live workflow version still pins one of them — superseded and archived versions do not block.",
+    "Delete an entry and the images behind it that this namespace produced — an adopted or pulled image, another namespace's build or an engine default stays on the daemon. Admin/owner only. Refused while a live workflow version still pins one of them — superseded and archived versions do not block.",
   args: {
     entryId: {
       type: 'positional',
@@ -312,7 +312,7 @@ export const imagesDeleteCommand = defineCommand({
     'keep-images': {
       type: 'boolean',
       description:
-        'Remove only the catalog record, leaving the images on the daemon. Rarely what you want: anything this namespace built is re-derived on the next read as an undescribed entry',
+        'Remove only the catalog record, leaving every image on the daemon. Rarely what you want: anything this namespace built is re-derived on the next read as an undescribed entry',
     },
   },
   async run({ args, output, mediforce, jsonMode }) {
@@ -332,7 +332,10 @@ export const imagesDeleteCommand = defineCommand({
     for (const tag of result.deletedImages) {
       output.stdout(`  Removed ${tag} from the daemon.`);
     }
-    if (withImages && result.deletedImages.length === 0) {
+    for (const tag of result.keptImages) {
+      output.stdout(`  Kept ${tag} on the daemon: "${args.namespace}" did not produce it.`);
+    }
+    if (withImages && result.deletedImages.length === 0 && result.keptImages.length === 0) {
       output.stdout('  No image for this entry was on the daemon.');
     }
     return 0;

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   InMemoryAuditRepository,
   InMemoryImageCatalogRepository,
+  InMemoryNamespaceRepository,
 } from '@mediforce/platform-core/testing';
 import { ForbiddenError, HandlerError } from '../../../errors';
 import {
@@ -37,6 +38,58 @@ describe('createImageCatalogEntry handler', () => {
 
   const scopeFor = (uid: string, namespaces: string[]) =>
     createTestScope({ imageCatalogRepo: repo, auditRepo, caller: userCaller(uid, namespaces) });
+
+  it("refuses to catalogue a name another workspace owns", async () => {
+    const namespaceRepo = new InMemoryNamespaceRepository();
+    await namespaceRepo.createNamespaceWithOwner({
+      namespace: { handle: 'beta', type: 'organization', displayName: 'beta', createdAt: new Date().toISOString() },
+      ownerMember: { uid: 'u-beta-owner', role: 'owner', joinedAt: new Date().toISOString() },
+    });
+    const scope = createTestScope({ imageCatalogRepo: repo, auditRepo, namespaceRepo, caller: userCaller('u-member', ['alpha']) });
+
+    // `beta/agent` is what `beta` uploads: **Existing image** must not let
+    // `alpha` adopt it and then own its delete.
+    await expect(
+      createImageCatalogEntry(
+        {
+          namespace: 'alpha',
+          name: 'Agent',
+          intent: 'Borrowed.',
+          source: { kind: 'referenced', reference: 'beta/agent' },
+        },
+        scope,
+      ),
+    ).rejects.toThrow(/belongs to workspace "beta"/);
+    // Spelled with its registry host, it is the same name on the daemon.
+    await expect(
+      createImageCatalogEntry(
+        {
+          namespace: 'alpha',
+          name: 'Agent',
+          intent: 'Borrowed.',
+          source: { kind: 'referenced', reference: 'docker.io/beta/agent' },
+        },
+        scope,
+      ),
+    ).rejects.toThrow(/belongs to workspace "beta"/);
+    expect(await repo.list('alpha')).toEqual([]);
+
+    // An engine default is every workspace's to catalogue, whatever handles exist.
+    await namespaceRepo.createNamespaceWithOwner({
+      namespace: { handle: 'rocker', type: 'organization', displayName: 'rocker', createdAt: new Date().toISOString() },
+      ownerMember: { uid: 'u-rocker-owner', role: 'owner', joinedAt: new Date().toISOString() },
+    });
+    await createImageCatalogEntry(
+      { namespace: 'alpha', name: 'R runtime', intent: 'R.', source: { kind: 'referenced', reference: 'rocker/r-ver' } },
+      scope,
+    );
+
+    // A first segment no workspace has is an ordinary registry name.
+    await createImageCatalogEntry(
+      { namespace: 'alpha', name: 'Tool', intent: 'A tool.', source: { kind: 'referenced', reference: 'someorg/tool' } },
+      scope,
+    );
+  });
 
   it('creates an entry for a plain workspace member and writes audit', async () => {
     const scope = scopeFor('u-member', ['alpha']);

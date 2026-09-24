@@ -87,20 +87,14 @@ test.describe('A new workspace is born with a catalog — API E2E', () => {
     if (pythonRuntime === undefined) throw new Error('expected a seeded python entry');
 
     // The daemon is deployment-wide and a `runtime: python` step pins nothing,
-    // so the live-pin check cannot see what this would break.
+    // so the live-pin check cannot see what removing the image would break: it
+    // stays, and the row — the workspace's own (decision 3) — goes.
     const withImages = await request.delete(
       `/api/image-catalog/${pythonRuntime.id}?namespace=${ORG_HANDLE}&withImages=true`,
       { headers: sessionCookieHeaders(owner) },
     );
-    expect(withImages.status(), await withImages.text()).toBe(409);
-    expect(await withImages.text()).toContain('--keep-images');
-
-    // The row itself is the workspace's own (decision 3) and still goes.
-    const rowOnly = await request.delete(
-      `/api/image-catalog/${pythonRuntime.id}?namespace=${ORG_HANDLE}`,
-      { headers: sessionCookieHeaders(owner) },
-    );
-    expect(rowOnly.status(), await rowOnly.text()).toBe(200);
+    expect(withImages.status(), await withImages.text()).toBe(200);
+    expect(((await withImages.json()) as { deletedImages: string[] }).deletedImages).toEqual([]);
     expect(
       (await listCatalog(request, ORG_HANDLE)).some((entry) => entry.id === pythonRuntime.id),
     ).toBe(false);

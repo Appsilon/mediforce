@@ -64,7 +64,7 @@ vi.mock('@/hooks/use-namespace-role', () => ({
 // The real hook reads a context this page's test tree does not mount — the
 // "Existing image" tab's picker is what exercises it here.
 const dockerImages = {
-  value: { images: [] as { repository: string; tag: string; id: string; size: string; created: string; buildRepo?: string; buildArtifacts?: string }[], disk: null, isAvailable: true, isLoading: false, refresh: () => {} },
+  value: { images: [] as { repository: string; tag: string; id: string; size: string; created: string; buildRepo?: string; buildArtifacts?: string; buildNamespace?: string }[], disk: null, isAvailable: true, isLoading: false, refresh: () => {} },
 };
 vi.mock('@/hooks/use-docker-images', () => ({
   useDockerImages: () => dockerImages.value,
@@ -118,6 +118,7 @@ const TEALFLOW: ImageCatalogEntryView = {
       imageTag: 'mediforce-built:aaaa1111',
       imageId: 'sha256:teal-new',
       commit: 'c0ffee1234567',
+      namespace: 'acme',
       created: '2 days ago',
       size: '2.4GB',
       capabilities: { status: 'known', agentCapable: true, runtimes: ['Rscript', 'bash', 'claude'] },
@@ -130,6 +131,7 @@ const TEALFLOW: ImageCatalogEntryView = {
       imageTag: 'mediforce-built:bbbb2222',
       imageId: 'sha256:teal-old',
       commit: 'deadbee7654321',
+      namespace: 'acme',
       created: '3 weeks ago',
       size: '2.4GB',
       capabilities: { status: 'unknown' },
@@ -680,7 +682,7 @@ describe('ImagesPage', () => {
   it('does not offer a repository the platform builds into, which every workspace shares', async () => {
     dockerImages.value = {
       images: [
-        { repository: 'mediforce-built', tag: 'aaaaaaaaaaaa', id: 'sha256:built', size: '900MB', created: '1 day ago', buildRepo: 'git@github.com:acme/agent.git' },
+        { repository: 'mediforce-built', tag: 'aaaaaaaaaaaa', id: 'sha256:built', size: '900MB', created: '1 day ago', buildRepo: 'git@github.com:acme/agent.git', buildNamespace: 'beta' },
         { repository: 'mediforce-built', tag: 'bbbbbbbbbbbb', id: 'sha256:built-2', size: '900MB', created: '2 days ago' },
         { repository: 'mediforce-artifacts', tag: 'cccccccccccc', id: 'sha256:carried', size: '80MB', created: '1 hour ago', buildArtifacts: 'cccccccccccc' },
         { repository: 'acme/legacy', tag: 'v2', id: 'sha256:legacy', size: '512MB', created: '2 months ago' },
@@ -701,6 +703,28 @@ describe('ImagesPage', () => {
     expect(within(picker).queryByText(/mediforce-built/)).not.toBeInTheDocument();
     expect(within(picker).queryByText(/mediforce-artifacts/)).not.toBeInTheDocument();
     expect(within(picker).getByText('acme/legacy:v2')).toBeInTheDocument();
+  });
+
+  it("does not offer another workspace's upload, whose name is that workspace's", async () => {
+    dockerImages.value = {
+      images: [
+        { repository: 'beta/agent', tag: '20260911-120000', id: 'sha256:beta', size: '40MB', created: '1 hour ago', buildNamespace: 'beta' },
+        { repository: 'acme/agent', tag: '20260911-120000', id: 'sha256:acme', size: '40MB', created: '1 hour ago', buildNamespace: 'acme' },
+      ],
+      disk: null,
+      isAvailable: true,
+      isLoading: false,
+      refresh: () => {},
+    };
+    listMock.mockResolvedValue({ entries: [GOLDEN] });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Add image/ }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Existing image' }));
+
+    const picker = screen.getByLabelText('Image');
+    expect(within(picker).queryByText(/beta\/agent/)).not.toBeInTheDocument();
+    expect(within(picker).getByText('acme/agent:20260911-120000')).toBeInTheDocument();
   });
 
   it('pulls a registry image and catalogues it, named from the reference', async () => {
@@ -1190,6 +1214,34 @@ describe('ImagesPage', () => {
     // No `withImages`: there is nothing on the daemon to remove, so the
     // destructive half is not claimed.
     expect(deleteMock).toHaveBeenCalledWith({ namespace: 'acme', id: 'tealflow' });
+  });
+
+  it('keeps an adopted image on the daemon and removes only the record', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    const ADOPTED: ImageCatalogEntryView = {
+      ...UPLOADED,
+      id: 'postgres-1a2b3c4d',
+      name: 'Postgres',
+      source: { kind: 'referenced', reference: 'postgres' },
+      declaredSource: undefined,
+      versions: [{ ...UPLOADED.versions[0], imageTag: 'postgres:16', imageId: 'sha256:pg' }],
+    };
+    listMock.mockResolvedValue({ entries: [ADOPTED] });
+    getMock.mockResolvedValue({ entry: ADOPTED });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-postgres-1a2b3c4d');
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+
+    // Cataloguing `postgres` described it; it did not make it this workspace's
+    // to take off a daemon every workspace shares.
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/did not produce the images behind this entry/)).toBeInTheDocument();
+    expect(within(dialog).getByText('postgres:16')).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Delete entry' }));
+
+    expect(deleteMock).toHaveBeenCalledWith({ namespace: 'acme', id: 'postgres-1a2b3c4d' });
   });
 
   it('keeps the dialog open and explains a refusal from the daemon', async () => {

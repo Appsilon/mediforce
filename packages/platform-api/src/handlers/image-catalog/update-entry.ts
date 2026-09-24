@@ -1,3 +1,4 @@
+import { daemonRepositoryName } from '@mediforce/platform-core';
 import { assertNamespaceAccess } from '../../auth';
 import { ConflictError, NotFoundError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
@@ -10,6 +11,7 @@ import { fetchDaemonImages } from '../system/_docker';
 import { toEntryView } from './_view';
 import { canonicalizeSource, deriveImageCatalogEntryId } from './_source';
 import { refreshEntryCapabilities } from './_capabilities';
+import { assertReferenceNotAnotherWorkspaces } from './_referenced-version';
 
 export async function updateImageCatalogEntry(
   input: UpdateImageCatalogEntryInputApi,
@@ -32,6 +34,10 @@ export async function updateImageCatalogEntry(
     patch.source === undefined ? existing.source : canonicalizeSource(patch.source);
   const nextId = deriveImageCatalogEntryId(source);
   const rekeyed = nextId !== id;
+
+  if (rekeyed && source.kind === 'referenced') {
+    await assertReferenceNotAnotherWorkspaces(daemonRepositoryName(source.reference), namespace, scope);
+  }
 
   if (rekeyed) {
     // Upserting blind would overwrite the occupant's own sentence and then
