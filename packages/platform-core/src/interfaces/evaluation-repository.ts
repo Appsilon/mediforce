@@ -77,6 +77,6 @@ export interface EvaluationRepository {
     from: EvalTrialStatus,
     patch: Partial<Omit<EvalTrial, 'id' | 'evalRunId' | 'caseId' | 'trialIndex'>>,
   ): Promise<boolean>;
-  /** Takes over a `scoring` claim made before `staleBefore`, restamping it `now`; true when it did. */
+  /** Takes over a `scoring` claim made before `staleBefore`, restamping it `now` and counting the attempt; true when it did. */
   renewScoringClaim(id: string, staleBefore: string, now: string): Promise<boolean>;
 }

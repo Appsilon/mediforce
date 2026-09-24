@@ -122,6 +122,18 @@ describe('driveEvalRun', () => {
     expect((await fixture.evaluationRepo.getEvalRun(evalRun.id))?.status).toBe('completed');
   });
 
+  it('fails a trial whose scoring was abandoned too often rather than pay for its judges again', async () => {
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
+    const [trial] = await fixture.evaluationRepo.listTrials(evalRun.id);
+    await fixture.evaluationRepo.transitionTrial(trial!.id, 'running', { status: 'scoring', scoringStartedAt: AN_HOUR_AGO(), scoringAttempts: 3 });
+
+    await driveEvalRun(scope, evalRun.id);
+
+    expect((await fixture.evaluationRepo.listTrials(evalRun.id))[0]).toMatchObject({ status: 'failed', error: 'Scoring did not finish in 3 attempts' });
+    expect((await fixture.evaluationRepo.getEvalRun(evalRun.id))?.status).toBe('completed');
+  });
+
   it('leaves a fresh scoring claim to the driver holding it', async () => {
     const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);

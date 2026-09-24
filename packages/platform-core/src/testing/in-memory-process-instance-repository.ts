@@ -37,6 +37,11 @@ const TERMINAL_STATUSES: ReadonlySet<InstanceStatus> = new Set([
  * Uses Maps for instances and step execution subcollections.
  * Reusable by any package that needs test doubles for process instance operations.
  */
+/** A run the listings show: not deleted, and not an eval trial (ADR-0023 D4). */
+function isListedRun(instance: ProcessInstance): boolean {
+  return instance.deleted !== true && instance.evalRunId === undefined;
+}
+
 export class InMemoryProcessInstanceRepository
   implements ProcessInstanceRepository
 {
@@ -224,7 +229,7 @@ export class InMemoryProcessInstanceRepository
     rows: ProcessInstance[],
     options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
   ): ProcessInstance[] {
-    let results = rows.filter((i) => i.deleted !== true && i.evalRunId === undefined);
+    let results = rows.filter(isListedRun);
     if (options.namespace !== undefined) {
       results = results.filter((i) => i.namespace === options.namespace);
     }
@@ -265,7 +270,7 @@ export class InMemoryProcessInstanceRepository
     rows: ProcessInstance[],
     options: ListInstancesOptions,
   ): ProcessInstance[] {
-    let results = rows.filter((i) => i.deleted !== true && i.evalRunId === undefined);
+    let results = rows.filter(isListedRun);
     if (options.namespace !== undefined) {
       results = results.filter((i) => i.namespace === options.namespace);
     }
@@ -320,7 +325,7 @@ export class InMemoryProcessInstanceRepository
         i.definitionName === name &&
         i.status === 'completed' &&
         i.deleted === false &&
-        i.evalRunId === undefined,
+        isListedRun(i),
     );
     if (matching.length === 0) return null;
     matching.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
@@ -406,9 +411,8 @@ export class InMemoryProcessInstanceRepository
       (i) =>
         i.namespace === namespace &&
         i.definitionName === name &&
-        i.deleted !== true &&
-        i.archived !== true &&
-        i.evalRunId === undefined,
+        isListedRun(i) &&
+        i.archived !== true,
     );
     const active = scoped.filter((i) => ACTIVE_STATUSES.has(i.status)).length;
     const counted = includeCompleted

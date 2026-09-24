@@ -176,11 +176,11 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     expect(kicker.kicks).toHaveLength(1);
   });
 
-  it('charges each LLM judge call to its trial and to the run\'s spend', async () => {
-    const judgeModel = 'anthropic/claude-haiku-4.5';
+  /** Adds an LLM judge Evaluator whose every call spends 4000 tokens in and 500 out, priced as `prices` says. */
+  async function withJudge(prices: ReadonlyArray<{ id: string; pricing: { input: number; output: number } }>) {
     await createEvaluator({
       ...STEP, name: 'grades-present', rule: 'Every AE carries a grade.', severity: 'major', origin: 'user',
-      check: { kind: 'llm_judge', model: judgeModel, rubric: 'Every AE carries a grade.', choices: [{ label: 'graded', value: 1 }, { label: 'ungraded', value: 0 }] },
+      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Every AE carries a grade.', choices: [{ label: 'graded', value: 1 }, { label: 'ungraded', value: 0 }] },
     }, scope);
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({
       choices: [{ message: { content: '{"reasoning": "Graded.", "choice": "graded"}' }, finish_reason: 'stop' }],
@@ -188,8 +188,12 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     }))));
     Object.assign(scope, {
       workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) },
-      models: { list: async () => [{ id: judgeModel, pricing: { input: 0.000001, output: 0.000005 } }] },
+      models: { list: async () => prices },
     });
+  }
+
+  it('charges each LLM judge call to its trial and to the run\'s spend, and keeps it on the Score', async () => {
+    await withJudge([{ id: 'anthropic/claude-haiku-4.5', pricing: { input: 0.000001, output: 0.000005 } }]);
     const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 2, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
 
@@ -201,6 +205,20 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     for (const trial of trials) expect(trial.costUsd).toBeCloseTo(0.2565, 10);
     expect(finished.spentUsd).toBeCloseTo(0.513, 10);
     expect(report.costUsd).toBeCloseTo(0.513, 10);
+    const [judgeScore] = await fixture.scoreRepo.list({ name: 'grades-present', limit: 50 });
+    expect(judgeScore?.metadata?.judgeCostUsd).toBeCloseTo(0.0065, 10);
+  });
+
+  it('says so on the trial when the judge\'s model has no registry price', async () => {
+    await withJudge([]);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
+
+    await finishTrial(kicker.kicks[0]!.instanceId, { findings: [] }, 0.25);
+
+    const [trial] = (await getEvalRun({ evalRunId: evalRun.id }, scope)).trials.filter((candidate) => candidate.status === 'scored');
+    expect(trial?.costUsd).toBeCloseTo(0.25, 10);
+    expect(trial?.error).toContain("grades-present: judge model 'anthropic/claude-haiku-4.5' has no registry price");
   });
 
   it('keeps trial Agent Runs out of the step\'s production runs', async () => {

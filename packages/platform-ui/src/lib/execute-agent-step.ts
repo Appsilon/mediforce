@@ -17,6 +17,7 @@ import {
   type StepExecutorServices,
 } from '@mediforce/agent-runtime';
 import {
+  inlineMcpServerNames,
   mcpEvalRestrictions,
   type AgentDefinitionRepository,
   type AgentOAuthTokenRepository,
@@ -278,10 +279,10 @@ async function withMcpEvalPolicy(
   evaluationRepo: EvaluationRepository,
   agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>,
 ): Promise<WorkflowStep> {
-  const inlineServers = step.agent?.mcpServers ?? [];
+  const inlineServers = inlineMcpServerNames(step);
   if (inlineServers.length > 0) {
     throw new Error(
-      `Step '${step.id}' declares MCP servers inline (${inlineServers.map((server) => server.name).join(', ')}); `
+      `Step '${step.id}' declares MCP servers inline (${inlineServers.join(', ')}); `
       + 'an eval trial cannot run them under its MCP eval policy',
     );
   }
