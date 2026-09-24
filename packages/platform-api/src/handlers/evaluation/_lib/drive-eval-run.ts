@@ -25,6 +25,18 @@ function claimIsStale(claimedAt: string | null, staleBefore: string): boolean {
   return claimedAt !== null && Date.parse(claimedAt) < Date.parse(staleBefore);
 }
 
+/**
+ * The order pending trials start in: round by round — each case's k-th trial
+ * of every variant, the champion first — so a budget that runs out leaves
+ * every variant, and the baseline above all, with a comparable share.
+ */
+function schedulingOrder(run: EvalRun, trials: readonly EvalTrial[]): EvalTrial[] {
+  const variantIndex = new Map(run.variants.map((variant, index) => [variant.id, index]));
+  return [...trials].sort((left, right) => left.caseId.localeCompare(right.caseId)
+    || left.trialIndex - right.trialIndex
+    || (variantIndex.get(left.variantId) ?? 0) - (variantIndex.get(right.variantId) ?? 0));
+}
+
 /** What the trial's step execution recorded of its Agent Run: cost, tokens, duration. */
 async function trialAgentOutput(scope: CallerScope, run: EvalRun, instanceId: string): Promise<AgentOutputSnapshot | null> {
   const execution = (await scope.runs.getStepExecutions(instanceId))
@@ -250,7 +262,7 @@ export async function driveEvalRun(scope: CallerScope, evalRunId: string): Promi
   const run = (await scope.evaluation.getEvalRun(evalRunId))!;
   if (run.status !== 'running') return;
   const trials = await scope.evaluation.listTrials(evalRunId);
-  const pending = trials.filter((trial) => trial.status === 'pending');
+  const pending = schedulingOrder(run, trials.filter((trial) => trial.status === 'pending'));
   const inFlight = trials.filter((trial) => trial.status === 'running' || trial.status === 'scoring').length;
   const budgetReached = run.spentUsd >= run.budgetUsd;
 

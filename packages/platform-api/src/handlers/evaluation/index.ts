@@ -24,3 +24,4 @@ export {
 } from './eval-runs';
 export { getAcceptanceCriteria, setAcceptanceCriteria } from './acceptance-criteria';
 export { getStepQualification, signStepQualification } from './step-qualification';
+export { computeStepFingerprint, changedFingerprintComponents } from './_lib/step-fingerprint';
