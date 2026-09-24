@@ -1,6 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
-import { HandlerError } from '../errors';
-import { callOpenRouter, type OpenRouterChatMessage } from '../services/openrouter-client';
+import { callOpenRouter, OpenRouterNetworkError, type OpenRouterChatMessage } from '../services/openrouter-client';
 import { toolDefinitions } from './tool-definitions';
 import { parseToolArguments } from './tool-arguments';
 import { runPlatformTool } from './platform-tools';
@@ -32,6 +32,15 @@ const PROPOSED = {
   note: 'Shown to the person as a card to accept, edit or reject. It does not exist until they accept it.',
 };
 
+const MAX_REPEATED_VALIDATION_ROUNDS = 3;
+// ~15k tokens. Keeps one tool result (a check comment, a trajectory page) from
+// pushing the conversation past the provider's request-size or context limit.
+const MAX_TOOL_RESULT_CHARS = 60_000;
+
+function capToolResult(content: string): string {
+  return `${content.slice(0, MAX_TOOL_RESULT_CHARS)}… [truncated: this tool result was ${String(content.length)} characters; only the first ${String(MAX_TOOL_RESULT_CHARS)} are shown. Ask for less — a smaller get_trajectory limit, or a check whose comment is a short summary rather than dumped data.]`;
+}
+
 /**
  * The tool loop of an assistant whose changes are proposals (ADR-0023 D14):
  * call the model; run platform tools as the caller and feed their results
@@ -46,23 +55,66 @@ export async function runProposalToolLoop<TPlatform extends string>(
   const proposals: Array<{ tool: string; arguments: unknown }> = [];
   const platformCalls: Array<{ tool: string; result: unknown }> = [];
   const messages = config.messages;
+  const requestId = randomUUID();
+  let validationStreaks = new Map<string, number>();
+
+  const finishPartial = async (reason: string): Promise<ProposalToolLoopResult> => {
+    const notice = `${reason} Any completed proposals and prepared runs are included below; unfinished work can be continued in another message.`;
+    let reply = notice;
+    try {
+      const summary = await callOpenRouter({
+        model: config.model,
+        apiKey: config.apiKey,
+        maxTokens: Math.min(config.maxTokens, 2000),
+        messages: [...messages, {
+          role: 'user',
+          content: `${reason} Stop using tools. Briefly summarize the verified findings, completed proposals and anything still unfinished. Include the relevant run IDs, files, preview outcomes and next trajectory offset so a follow-up can continue from this summary. Do not claim the request is complete if work remains. Proposals still require the person's acceptance.`,
+        }],
+      });
+      if (summary.finishReason !== 'length' && summary.toolCalls.length === 0 && summary.content.trim() !== '') {
+        reply = `${notice}\n\n${summary.content}`;
+      }
+    } catch {
+      console.warn('[assistant-tool-loop] summary failed', { requestId, model: config.model });
+    }
+    return { reply, proposals, platformCalls };
+  };
 
   for (let iteration = 0; iteration < config.maxIterations; iteration++) {
-    const response = await callOpenRouter({
+    let response: Awaited<ReturnType<typeof callOpenRouter>>;
+    try {
+      response = await callOpenRouter({
+        model: config.model,
+        apiKey: config.apiKey,
+        messages,
+        tools,
+        maxTokens: config.maxTokens,
+      });
+    } catch (error) {
+      if (error instanceof OpenRouterNetworkError) {
+        console.warn('[assistant-tool-loop] model connection failed', { requestId, round: iteration + 1, error: error.message });
+        return finishPartial('The connection to the model was interrupted.');
+      }
+      throw error;
+    }
+    console.info('[assistant-tool-loop] round', {
+      requestId,
       model: config.model,
-      apiKey: config.apiKey,
-      messages,
-      tools,
-      maxTokens: config.maxTokens,
+      round: iteration + 1,
+      finishReason: response.finishReason,
+      ...response.usage,
+      tools: response.toolCalls.map((call) => call.function.name),
     });
     if (response.toolCalls.length === 0) {
       if (response.finishReason === 'length') {
-        throw new HandlerError('validation', 'Assistant response was truncated — try a shorter request.');
+        return finishPartial('The assistant response was truncated at its output-token limit.');
       }
       return { reply: response.content, proposals, platformCalls };
     }
 
     messages.push({ role: 'assistant', content: response.content, tool_calls: response.toolCalls });
+    const validationFailures = new Map<string, { tool: string; error: string }>();
+    let madeProgress = false;
     for (const call of response.toolCalls) {
       const toolName = call.function.name;
       let result: unknown;
@@ -73,14 +125,16 @@ export async function runProposalToolLoop<TPlatform extends string>(
         parsedArguments = undefined;
       }
       if (parsedArguments === undefined) {
-        result = { error: `Malformed JSON arguments for '${toolName}'.` };
+        result = { error: response.finishReason === 'length'
+          ? `Arguments for '${toolName}' were truncated at the output-token limit. Retry with a shorter check, one proposal at a time. Do not repeat successful calls.`
+          : `Malformed JSON arguments for '${toolName}'.` };
       } else if (Object.hasOwn(config.proposalTools, toolName)) {
         const parsed = parseToolArguments(toolName, config.proposalTools[toolName]!, parsedArguments);
         if (parsed.ok) {
           proposals.push({ tool: toolName, arguments: parsed.data });
           result = PROPOSED;
         } else {
-          result = { error: parsed.error };
+          result = { error: parsed.error, validationError: parsed.validationError, expectedArguments: parsed.expectedArguments };
         }
       } else if (Object.hasOwn(config.platformTools, toolName)) {
         result = await runPlatformTool({
@@ -94,12 +148,37 @@ export async function runProposalToolLoop<TPlatform extends string>(
         const valid = [...Object.keys(config.proposalTools), ...Object.keys(config.platformTools)].join(', ');
         result = { error: `Unknown tool '${toolName}'. Valid tools: ${valid}.` };
       }
-      messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
+      let content = JSON.stringify(result);
+      if (content.length > MAX_TOOL_RESULT_CHARS) {
+        console.warn('[assistant-tool-loop] tool result truncated', { requestId, round: iteration + 1, tool: toolName, chars: content.length });
+        content = capToolResult(content);
+      }
+      messages.push({ role: 'tool', tool_call_id: call.id, content });
+      if (result !== null && typeof result === 'object' && 'error' in result) {
+        const validationError = 'validationError' in result && typeof result.validationError === 'string' ? result.validationError : undefined;
+        if (validationError !== undefined) {
+          validationFailures.set(JSON.stringify([toolName, validationError]), { tool: toolName, error: validationError });
+        }
+        console.warn('[assistant-tool-loop] tool error', { requestId, round: iteration + 1, tool: toolName, error: validationError ?? result.error, detail: typeof result.error === 'string' ? result.error.slice(0, 600) : undefined });
+      } else {
+        madeProgress = true;
+      }
+    }
+    if (madeProgress === true) {
+      validationStreaks.clear();
+    } else {
+      const nextStreaks = new Map<string, number>();
+      for (const [signature, failure] of validationFailures) {
+        const count = (validationStreaks.get(signature) ?? 0) + 1;
+        nextStreaks.set(signature, count);
+        if (count >= MAX_REPEATED_VALIDATION_ROUNDS) {
+          console.warn('[assistant-tool-loop] repeated validation failure', { requestId, round: iteration + 1, ...failure, count });
+          return finishPartial(`The assistant stopped after ${count} consecutive rounds with the same invalid arguments for '${failure.tool}': ${failure.error}. The invalid calls were not executed.`);
+        }
+      }
+      validationStreaks = nextStreaks;
     }
   }
 
-  throw new HandlerError(
-    'internal',
-    `The assistant reached its ${String(config.maxIterations)}-round tool-use limit before finishing — try a narrower request.`,
-  );
+  return finishPartial(`The assistant reached its ${String(config.maxIterations)}-round tool-use limit.`);
 }
