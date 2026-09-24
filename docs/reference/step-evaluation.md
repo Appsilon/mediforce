@@ -39,12 +39,16 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 - **Never:** approving a `code` check's source, labelling outputs, signing.
   There is no tool for these.
 
-The step's Brief is sent to the assistant on every turn.
+The step's Brief is sent to the assistant on every turn. In the web tab, Brief
+text is rendered as GitHub-Flavored Markdown, and the assistant pane uses the
+same model picker as the workflow editor so the model can be chosen per
+conversation.
 
 ## Evaluation Brief
 
 A short text per Step — what it is for, who relies on its output, which
-failures matter most. Every write is a new version.
+failures matter most. Every write is a new version. The web tab displays the
+text as Markdown; the stored value remains the original text.
 `mediforce eval brief-get|brief-set`, `GET|POST /api/evaluation/briefs`.
 
 ## Evaluators

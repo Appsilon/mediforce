@@ -98,5 +98,8 @@ export async function runProposalToolLoop<TPlatform extends string>(
     }
   }
 
-  throw new HandlerError('internal', 'The assistant did not finish after several rounds of tool use — try a narrower request.');
+  throw new HandlerError(
+    'internal',
+    `The assistant reached its ${String(config.maxIterations)}-round tool-use limit before finishing — try a narrower request.`,
+  );
 }
