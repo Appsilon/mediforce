@@ -33,7 +33,7 @@ async function storeCase(scope: CallerScope, evalCase: EvalCase): Promise<EvalCa
   const stored = await scope.evaluation.createCase(evalCase);
   await appendEvaluationAudit(scope, {
     action: 'eval_case.created',
-    description: `Eval Case '${stored.name}' (${stored.source}, ${stored.expectation}) added to step '${stored.stepId}'`,
+    description: `Eval Case '${stored.name}' (${stored.source}, ${stored.expectation}) added to step '${stored.stepId}'${stored.origin === 'assistant' ? ' from an Evaluation Assistant proposal' : ''}`,
     namespace: stored.namespace,
     entityType: 'eval_case',
     entityId: stored.id,
@@ -42,6 +42,7 @@ async function storeCase(scope: CallerScope, evalCase: EvalCase): Promise<EvalCa
       stepId: stored.stepId,
       source: stored.source,
       sourceAgentRunId: stored.sourceAgentRunId,
+      origin: stored.origin,
       expectation: stored.expectation,
       split: stored.split,
       containsProductionData: stored.containsProductionData,
@@ -68,6 +69,7 @@ export async function createEvalCase(
     notes: input.notes,
     source: 'manual',
     sourceAgentRunId: null,
+    origin: input.origin,
     split: input.split,
     containsProductionData: input.containsProductionData,
     archived: false,
@@ -107,7 +109,7 @@ export async function createEvalCaseFromAgentRun(
   input: z.output<typeof CreateEvalCaseFromAgentRunInputSchema>,
   scope: CallerScope,
 ): Promise<EvalCaseOutput> {
-  const subject = await loadEvaluationSubject(scope, input.agentRunId);
+  const subject = await loadEvaluationSubject(scope, input.agentRunId, input.step);
   const step = {
     namespace: subject.instance.namespace ?? '',
     workflowName: subject.instance.definitionName,
@@ -145,6 +147,7 @@ export async function createEvalCaseFromAgentRun(
     notes: input.notes ?? verdict?.comment ?? null,
     source: 'production',
     sourceAgentRunId: input.agentRunId,
+    origin: input.origin,
     split: input.split,
     containsProductionData: true,
     archived: false,

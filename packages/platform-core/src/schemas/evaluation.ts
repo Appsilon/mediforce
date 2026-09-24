@@ -141,6 +141,7 @@ export const EvalCaseSchema = EvaluatedStepSchema.extend({
   notes: z.string().max(4000).nullable(),
   source: EvalCaseSourceSchema,
   sourceAgentRunId: z.string().nullable(),
+  origin: EvaluationOriginSchema,
   split: EvalCaseSplitSchema,
   containsProductionData: z.boolean(),
   archived: z.boolean(),

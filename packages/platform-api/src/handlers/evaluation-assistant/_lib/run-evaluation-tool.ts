@@ -1,3 +1,4 @@
+import { posix } from 'node:path';
 import type { z } from 'zod';
 import {
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
@@ -25,13 +26,16 @@ function clip(value: unknown, maxChars: number): unknown {
   return text.length <= maxChars ? value : `${text.slice(0, maxChars)}… (truncated, ${text.length} chars)`;
 }
 
-/** The step's SKILL.md when the workflow carries it (`artifacts`). */
+/**
+ * The SKILL.md the runtime loads for the step — `<skillsDir>/<skill>/SKILL.md`,
+ * read only when both are set — when the workflow carries it (`artifacts`).
+ */
 function skillContent(definition: WorkflowDefinition, step: WorkflowStep): string | null {
   const skill = step.agent?.skill;
-  const artifacts = definition.artifacts ?? [];
-  const found = skill === undefined
-    ? artifacts.find((artifact) => artifact.path.endsWith('SKILL.md'))
-    : artifacts.find((artifact) => artifact.path.endsWith(`${skill}/SKILL.md`));
+  const skillsDir = step.agent?.skillsDir;
+  if (skill === undefined || skill === '' || skillsDir === undefined || skillsDir === '') return null;
+  const skillPath = posix.normalize(posix.join(skillsDir, skill, 'SKILL.md'));
+  const found = (definition.artifacts ?? []).find((artifact) => posix.normalize(artifact.path) === skillPath);
   return found?.contents ?? null;
 }
 
@@ -143,7 +147,11 @@ export async function executeEvaluationTool(
     case 'get_eval_run_report': {
       const { evalRunId } = args as Args<'get_eval_run_report'>;
       const { evalRun, trials, report } = await getEvalRun({ evalRunId }, scope);
-      if (evalRun.stepId !== step.stepId || evalRun.workflowName !== step.workflowName) {
+      if (
+        evalRun.namespace !== step.namespace
+        || evalRun.workflowName !== step.workflowName
+        || evalRun.stepId !== step.stepId
+      ) {
         throw new NotFoundError(`Eval Run '${evalRunId}' is not a run of this step`);
       }
       return {

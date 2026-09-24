@@ -10,6 +10,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
 import { useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { StartEvalRunCard } from './step-evaluation-sections';
 
 type ProposalStatus = 'open' | 'accepted' | 'rejected';
@@ -42,15 +43,21 @@ async function acceptProposal(step: EvaluatedStep, proposal: EvaluationAssistant
     case 'propose_eval_case': {
       const { agentRunId, input, name, expectation, notes, split } = proposal.arguments;
       return agentRunId !== undefined
-        ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, name, expectation, notes, split })
-        : mediforce.evaluation.createCase({ ...step, name, input: input!, expectation, notes: notes ?? null, split });
+        ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, step, name, expectation, notes, split, origin: 'assistant' })
+        : mediforce.evaluation.createCase({ ...step, name, input: input!, expectation, notes: notes ?? null, split, origin: 'assistant' });
     }
     case 'propose_brief':
       return mediforce.evaluation.setBrief({ ...step, text: proposal.arguments.text, origin: 'assistant' });
   }
 }
 
-function ProposalCard({ step, state, onDecided }: { step: EvaluatedStep; state: ProposalState; onDecided: (status: ProposalStatus) => void }) {
+function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
+  step: EvaluatedStep;
+  state: ProposalState;
+  mayEdit: boolean;
+  editReason: string | undefined;
+  onDecided: (status: ProposalStatus) => void;
+}) {
   const [editing, setEditing] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const accept = useStepEvaluationMutation(step, (proposal: EvaluationAssistantProposal) => acceptProposal(step, proposal));
@@ -89,10 +96,20 @@ function ProposalCard({ step, state, onDecided }: { step: EvaluatedStep; state: 
       {error !== null && <p className="mt-1 text-destructive">{error}</p>}
       {state.status === 'open' ? (
         <div className="mt-2 flex gap-1.5">
-          <button type="button" data-testid="proposal-accept" className="inline-flex items-center gap-1 rounded bg-primary px-2 py-0.5 text-primary-foreground disabled:opacity-50" disabled={accept.isPending} onClick={onAccept}>
-            <Check className="h-3 w-3" />Accept
-          </button>
-          {editing === null && (
+          <InstantTooltip label={editReason}>
+            <span className="inline-flex">
+              <button
+                type="button"
+                data-testid="proposal-accept"
+                className="inline-flex items-center gap-1 rounded bg-primary px-2 py-0.5 text-primary-foreground disabled:opacity-50 disabled:pointer-events-none"
+                disabled={!mayEdit || accept.isPending}
+                onClick={onAccept}
+              >
+                <Check className="h-3 w-3" />Accept
+              </button>
+            </span>
+          </InstantTooltip>
+          {mayEdit && editing === null && (
             <button type="button" className="rounded border px-2 py-0.5" onClick={() => setEditing(JSON.stringify(proposal.arguments, null, 2))}>Edit</button>
           )}
           <button type="button" className="inline-flex items-center gap-1 rounded border px-2 py-0.5" onClick={() => onDecided('rejected')}>
@@ -114,7 +131,13 @@ function ProposalCard({ step, state, onDecided }: { step: EvaluatedStep; state: 
  * card, and an Eval Run it prepares starts only when the person confirms the
  * budget on the card.
  */
-export function EvaluationAssistantPanel({ step }: { step: EvaluatedStep }) {
+export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, runReason }: {
+  step: EvaluatedStep;
+  mayEdit: boolean;
+  editReason: string | undefined;
+  mayRun: boolean;
+  runReason: string | undefined;
+}) {
   const [messages, setMessages] = React.useState<PanelMessage[]>([]);
   const [input, setInput] = React.useState('');
   const [pending, setPending] = React.useState(false);
@@ -179,9 +202,9 @@ export function EvaluationAssistantPanel({ step }: { step: EvaluatedStep }) {
                 </div>
               )}
               {message.proposals?.map((state, proposalIndex) => (
-                <ProposalCard key={proposalIndex} step={step} state={state} onDecided={(status) => decide(index, proposalIndex, status)} />
+                <ProposalCard key={proposalIndex} step={step} state={state} mayEdit={mayEdit} editReason={editReason} onDecided={(status) => decide(index, proposalIndex, status)} />
               ))}
-              {message.prepared?.map((prepared) => <StartEvalRunCard key={prepared.evalRunId} step={step} prepared={prepared} />)}
+              {message.prepared?.map((prepared) => <StartEvalRunCard key={prepared.evalRunId} step={step} prepared={prepared} mayRun={mayRun} runReason={runReason} />)}
             </div>
           </div>
         ))}

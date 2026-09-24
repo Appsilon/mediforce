@@ -14,9 +14,11 @@ context of use. The design and its reasons are
 Everything below belongs to one agent Step, keyed by
 `(namespace, workflowName, stepId)`, and lives outside the Workflow
 Definition: adding a check never mints a definition version. Reading needs only
-access to the workflow; changing anything needs its `edit` verb. A Step that
-still declares MCP servers inline on `agent.mcpServers` cannot be evaluated —
-an eval policy cannot deny them, so move them onto its agent first.
+access to the workflow; changing anything needs its `edit` verb, and
+previewing checks or preparing, starting and cancelling Eval Runs its `run`
+verb. A Step that still declares MCP servers inline on `agent.mcpServers`
+cannot be evaluated — an eval policy cannot deny them, so move them onto its
+agent first.
 
 ## The Evaluation Assistant
 
@@ -81,7 +83,8 @@ it must or must not contain. `case-from-run <agentRunId>` harvests one from a
 production run: an approved run is positive, a rejected one negative with the
 reviewer's comment; a run nobody reviewed, or one sent back for revision or a
 recheck, needs `--expectation`. Cases are `dev` or
-`holdout` and carry a *contains production data* flag.
+`holdout`, carry a *contains production data* flag, and an `origin` — `user`,
+or `assistant` for an accepted Evaluation Assistant proposal.
 
 `dataset-freeze` freezes the live cases into a numbered Eval Dataset version.
 A version never changes.

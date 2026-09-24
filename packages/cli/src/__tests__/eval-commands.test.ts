@@ -20,7 +20,7 @@ describe('mediforce eval', () => {
       evalCase: {
         namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes',
         id: '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'From run', input: { triggerPayload: {}, previousStepOutputs: {} },
-        workspaceSeedCommit: null, expectation: 'negative', notes: null, source: 'production', sourceAgentRunId: 'ar-1',
+        workspaceSeedCommit: null, expectation: 'negative', notes: null, source: 'production', sourceAgentRunId: 'ar-1', origin: 'user',
         split: 'holdout', containsProductionData: true, archived: false, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
       },
     }, 201));
@@ -30,7 +30,7 @@ describe('mediforce eval', () => {
     expect(code).toBe(0);
     const [url, init] = fetchSpy.mock.calls[0]!;
     expect(url).toBe('http://localhost:5555/api/evaluation/cases/from-agent-run');
-    expect(JSON.parse(String(init?.body))).toEqual({ agentRunId: 'ar-1', expectation: 'negative', split: 'holdout' });
+    expect(JSON.parse(String(init?.body))).toEqual({ agentRunId: 'ar-1', expectation: 'negative', split: 'holdout', origin: 'user' });
     expect(output.stdoutLines.join('\n')).toContain('(negative, holdout)');
   });
 
