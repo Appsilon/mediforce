@@ -79,6 +79,22 @@ describe('runProposalToolLoop', () => {
     expect(errors[2]).toBe("Unknown tool 'sign_qualification'. Valid tools: propose_note, read_count.");
   });
 
+  it('treats a tool named after an Object builtin as unknown, not as a tool', async () => {
+    const bodies = scriptOpenRouter([
+      { toolCalls: [{ name: 'constructor', arguments: {} }, { name: 'toString', arguments: {} }] },
+      { content: 'Sorry.' },
+    ]);
+
+    const result = await runProposalToolLoop({ ...config, messages: [{ role: 'user', content: 'go' }], executePlatformTool: vi.fn() });
+
+    expect(result).toEqual({ reply: 'Sorry.', proposals: [], platformCalls: [] });
+    const errors = bodies[1]!.messages.filter((message) => message.role === 'tool').map((message) => JSON.parse(message.content).error);
+    expect(errors).toEqual([
+      "Unknown tool 'constructor'. Valid tools: propose_note, read_count.",
+      "Unknown tool 'toString'. Valid tools: propose_note, read_count.",
+    ]);
+  });
+
   it('refuses a final answer cut off at the token limit rather than returning it as the reply', async () => {
     scriptOpenRouter([
       { toolCalls: [{ name: 'propose_note', arguments: { text: 'Check grade 5 first.' } }] },
