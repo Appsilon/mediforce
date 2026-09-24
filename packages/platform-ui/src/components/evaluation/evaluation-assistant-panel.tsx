@@ -161,12 +161,13 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
     }));
   };
 
-  const send = async (message: string) => {
+  /** Sends a message; one from a card leaves whatever the person is typing in the input. */
+  const send = async (message: string, from: 'input' | 'card') => {
     const content = message.trim();
     if (content === '' || pending) return;
     const thread: PanelMessage[] = [...messages, { role: 'user', content }];
     setMessages(thread);
-    setInput('');
+    if (from === 'input') setInput('');
     setPending(true);
     setActivity(IDLE_ACTIVITY);
     setError(null);
@@ -260,7 +261,7 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
               {message.proposals?.map((state, proposalIndex) => {
                 const { proposal } = state;
                 if (proposal.tool === 'propose_evaluation_plan') {
-                  return <PlanCard key={proposalIndex} plan={proposal.arguments} busy={pending} onDraft={(draft) => void send(draft)} />;
+                  return <PlanCard key={proposalIndex} plan={proposal.arguments} busy={pending} onDraft={(draft) => void send(draft, 'card')} />;
                 }
                 if (proposal.tool === 'propose_outputs_to_label') {
                   return <LabellingCard key={proposalIndex} step={step} proposal={proposal.arguments} mayEdit={mayEdit} editReason={editReason} />;
@@ -307,13 +308,13 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
+            if (event.key === 'Enter' && event.shiftKey === false) {
               event.preventDefault();
-              void send(input);
+              void send(input, 'input');
             }
           }}
         />
-        <button type="button" data-testid="evaluation-assistant-send" aria-label="Send" className="rounded-md bg-primary px-2.5 text-primary-foreground disabled:opacity-50" disabled={pending || input.trim() === ''} onClick={() => void send(input)}>
+        <button type="button" data-testid="evaluation-assistant-send" aria-label="Send" className="rounded-md bg-primary px-2.5 text-primary-foreground disabled:opacity-50" disabled={pending || input.trim() === ''} onClick={() => void send(input, 'input')}>
           <Send className="h-4 w-4" />
         </button>
       </div>

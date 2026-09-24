@@ -67,10 +67,11 @@ export const ProposeBriefToolSchema = z.object({
 const PassRateFloorSchema = z.number().min(0).max(1);
 
 /**
- * A risk-ranked evaluation plan for the step, highest risk first: what could
- * go wrong, the cheapest check that would catch it, and the cases to try it on
- * — plus the Acceptance Criteria it suggests. Nothing is created from a plan:
- * each check is drafted, previewed and proposed on its own.
+ * An evaluation plan for the step: what could go wrong, the cheapest check
+ * that would catch it, and the cases to try it on — plus the Acceptance
+ * Criteria it suggests. `risks` is ranked by its order, highest risk first;
+ * `severity` says how bad each one is. Nothing is created from a plan: each
+ * check is drafted, previewed and proposed on its own.
  */
 export const ProposeEvaluationPlanToolSchema = z.object({
   summary: z.string().min(1).max(2000),

@@ -102,7 +102,9 @@ output (`_lib/run-evaluator-check.ts`). Nothing here approves a `code` check's
 source or labels an output on anyone's behalf: both record the person who did
 it, and an API key must name them. A synthesized Eval Case's file changes are the
 one write outside Postgres: a commit on the workflow's bare repo, kept by the
-ref `refs/mediforce/eval-seeds/<caseId>` (`_lib/workspace-seed.ts`).
+ref `refs/mediforce/eval-seeds/<caseId>` (`_lib/workspace-seed.ts`); the
+workspace it changes is read with agent-runtime's `listCommitFiles` and
+`readCommitFile`, the same git reads as Output Files.
 
 An Eval Run is driven by `driveEvalRun` (`_lib/drive-eval-run.ts`), which is
 idempotent and moves trials only by conditional transitions — so the start

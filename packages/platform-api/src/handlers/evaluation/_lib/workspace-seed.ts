@@ -8,9 +8,9 @@ import { ValidationError } from '../../../errors';
 
 /**
  * The workspace an Eval Case starts from is a commit on the workflow's bare
- * repo (ADR-0023 D4). These read it without a worktree, and write a changed
- * copy of it for a synthesized case with git plumbing, the way the workspace
- * manager seeds `main`.
+ * repo (ADR-0023 D4), read with agent-runtime's `listCommitFiles` and
+ * `readCommitFile`. These find it, and write a changed copy of it for a
+ * synthesized case with git plumbing, the way the workspace manager seeds `main`.
  */
 
 const execFileAsync = promisify(execFile);
@@ -39,39 +39,6 @@ export async function parentCommit(bareRepoPath: string, commitSha: string): Pro
   } catch {
     // The first commit of a run branch has a parent; a missing repo or commit
     // means the workspace is gone, and the case starts from an empty one.
-    return null;
-  }
-}
-
-export interface WorkspaceFileEntry {
-  readonly path: string;
-  readonly size: number;
-}
-
-/** Every file of a commit, with its size. */
-export async function listWorkspaceFiles(bareRepoPath: string, commit: string): Promise<WorkspaceFileEntry[]> {
-  const stdout = await git(bareRepoPath, ['ls-tree', '-r', '-l', '-z', commit]);
-  const entries: WorkspaceFileEntry[] = [];
-  for (const record of stdout.split('\0')) {
-    const tabIndex = record.indexOf('\t');
-    if (tabIndex < 0) continue;
-    // `<mode> <type> <object> <size>\t<path>`, size padded.
-    const [, objectType, , sizeText] = record.slice(0, tabIndex).trim().split(/\s+/);
-    if (objectType !== 'blob') continue;
-    entries.push({ path: record.slice(tabIndex + 1), size: Number(sizeText) });
-  }
-  return entries;
-}
-
-/** One file of a commit; null when it has no such file. */
-export async function readWorkspaceFile(bareRepoPath: string, commit: string, path: string): Promise<Buffer | null> {
-  try {
-    const { stdout } = await execFileAsync('git', ['--git-dir', bareRepoPath, 'cat-file', 'blob', `${commit}:${path}`], {
-      encoding: 'buffer',
-      maxBuffer: GIT_MAX_BUFFER,
-    });
-    return stdout;
-  } catch {
     return null;
   }
 }
@@ -114,7 +81,7 @@ export async function resolveFileChanges(
       case 'replace': {
         const text = await current(change.path, index);
         if (text === null) throw new ValidationError(`fileChanges[${index}]: there is no file '${change.path}' to change`);
-        if (!text.includes(change.search)) {
+        if (text.includes(change.search) === false) {
           throw new ValidationError(`fileChanges[${index}]: '${change.path}' does not contain the text to replace`);
         }
         contents.set(change.path, text.replace(change.search, () => change.replace));

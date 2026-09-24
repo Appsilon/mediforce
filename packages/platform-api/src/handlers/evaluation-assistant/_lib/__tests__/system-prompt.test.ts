@@ -8,11 +8,11 @@ describe('Evaluation Assistant prompt', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('run it with preview_evaluator on real outputs');
   });
 
-  it('covers phase 2: the plan, the cheapest reliable check, labels only the person gives, negative cases', () => {
+  it('covers the plan, the cheapest reliable check, labels only the person gives, and cases synthesized as positive', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('call propose_evaluation_plan');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Choose the cheapest reliable kind');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('The person labels them pass or fail on the card, never you.');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('say in notes what the output must NOT do');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('most synthesized cases are positive, with notes on what the output must NOT do');
   });
 
   it('carries the step\'s Brief every turn, or asks for one', () => {
