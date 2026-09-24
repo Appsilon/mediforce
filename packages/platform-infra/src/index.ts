@@ -59,6 +59,7 @@ export { PostgresTriggerRepository } from './postgres/repositories/trigger-repos
 export { PostgresAgentRunRepository } from './postgres/repositories/agent-run-repository';
 export { PostgresAgentTrajectoryRepository } from './postgres/repositories/agent-trajectory-repository';
 export { PostgresScoreRepository } from './postgres/repositories/score-repository';
+export { PostgresEvaluationRepository } from './postgres/repositories/evaluation-repository';
 export { PostgresAgentEventRepository } from './postgres/repositories/agent-event-repository';
 export { PostgresHumanTaskRepository } from './postgres/repositories/human-task-repository';
 export { PostgresTaskAttachmentRepository } from './postgres/repositories/task-attachment-repository';

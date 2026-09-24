@@ -448,6 +448,16 @@ function contract(
       expect((await repo.getById(theirs.id))?.deleted).toBe(false);
     });
 
+    it('getIdsByDefinitionName leaves out dry runs when asked', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-mine');
+      const production = await repo.create(instanceFor('ws-mine', { definitionName: 'graded' }));
+      const dry = await repo.create(instanceFor('ws-mine', { definitionName: 'graded', dryRun: true }));
+
+      expect((await repo.getIdsByDefinitionName('ws-mine', 'graded')).sort()).toEqual([production.id, dry.id].sort());
+      expect(await repo.getIdsByDefinitionName('ws-mine', 'graded', { excludeDryRuns: true })).toEqual([production.id]);
+    });
+
     it('summarizeRunsByWorkflow counts active + scopes total/latest', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-sum');

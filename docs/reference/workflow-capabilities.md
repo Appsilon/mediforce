@@ -218,6 +218,8 @@ results the agent made — readable with `mediforce agent-run trajectory <id>`,
 and a verdict on an L3 review becomes a `human_verdict` **Score** on that run
 (`mediforce score list`). Neither is configured per step. See
 [`container-steps.md`](container-steps.md#result-and-agent-trajectory).
+Evaluators, Eval Cases and the MCP eval policy of an agent step live outside
+the definition — see [`step-evaluation.md`](step-evaluation.md).
 
 Which runtime actually runs an `agent`/`script` step is the registered plugin
 (via `step.plugin` / Agent Definition `runtimeId`): `claude-code-agent` is the

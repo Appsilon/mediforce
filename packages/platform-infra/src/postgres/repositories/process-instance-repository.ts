@@ -652,7 +652,11 @@ export class PostgresProcessInstanceRepository
       );
   }
 
-  async getIdsByDefinitionName(namespace: string, name: string): Promise<string[]> {
+  async getIdsByDefinitionName(
+    namespace: string,
+    name: string,
+    options: { excludeDryRuns?: boolean } = {},
+  ): Promise<string[]> {
     const rows = await this.db
       .select({ id: processInstances.id })
       .from(processInstances)
@@ -660,6 +664,7 @@ export class PostgresProcessInstanceRepository
         and(
           eq(processInstances.workspace, namespace),
           eq(processInstances.definitionName, name),
+          options.excludeDryRuns === true ? eq(processInstances.dryRun, false) : undefined,
         ),
       );
     return rows.map((r) => r.id);

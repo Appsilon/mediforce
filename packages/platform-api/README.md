@@ -87,9 +87,20 @@ rather than resolving credentials that do not exist. Every other handler in
 through `CallerScope` — is intact; the one it suspends is that a caller was
 authenticated, and only these two may do that.
 
-**Scores have no write route yet.** In ADR-0023's phase 1a a Score is written
-in-process only (`handlers/scores/record-score.ts`, reached from task completion
-for Control Mode 3 verdicts); `listScores` is the only exposed Score API.
+**Every Score goes through `recordScore`** (`handlers/scores/record-score.ts`),
+which appends its `score.created` audit event. There is no generic Score write
+route: Scores arrive from task completion (Control Mode 3 verdicts) and from a
+person labelling an output for an Evaluator (`labelEvaluatorOutput`).
+
+**Evaluation belongs to a Step, not a definition.** `handlers/evaluation/`
+([ADR-0023](../../docs/adr/0023-step-evaluation.md)) keys every Brief, Evaluator,
+Eval Case, Dataset version and MCP eval policy by `(namespace, workflowName,
+stepId)` and reaches it through the one `scope.evaluation` wrapper. Reads need
+only to see the workflow; writes need its `edit` verb (`_lib/evaluated-step.ts`).
+An Evaluator check that cannot run comes back as `error`, never as a failed
+output (`_lib/run-evaluator-check.ts`). Nothing here approves a `code` check's
+source or labels an output on anyone's behalf: both record the person who did
+it, and an API key must name them.
 
 **Assistants share building blocks.** `src/assistant-core/` holds the pieces
 the workflow editor assistant and the Evaluation Assistant both use

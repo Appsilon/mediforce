@@ -98,6 +98,27 @@ import { agentRunListCommand } from './commands/agent-run-list';
 import { agentRunGetCommand } from './commands/agent-run-get';
 import { agentRunTrajectoryCommand } from './commands/agent-run-trajectory';
 import { scoreListCommand } from './commands/score-list';
+import { evalBriefGetCommand, evalBriefSetCommand } from './commands/eval-brief';
+import {
+  evalEvaluatorApproveCommand,
+  evalEvaluatorArchiveCommand,
+  evalEvaluatorCalibrateCommand,
+  evalEvaluatorCreateCommand,
+  evalEvaluatorLabelCommand,
+  evalEvaluatorListCommand,
+  evalEvaluatorPreviewCommand,
+  evalEvaluatorVersionCommand,
+} from './commands/eval-evaluators';
+import {
+  evalCaseAddCommand,
+  evalCaseArchiveCommand,
+  evalCaseFromRunCommand,
+  evalCaseListCommand,
+  evalDatasetFreezeCommand,
+  evalDatasetListCommand,
+  evalMcpPolicyGetCommand,
+  evalMcpPolicySetCommand,
+} from './commands/eval-cases';
 import { namespaceUpdateCommand } from './commands/namespace-update';
 import { namespaceDeleteCommand } from './commands/namespace-delete';
 import { namespaceResetCommand } from './commands/namespace-reset';
@@ -241,6 +262,29 @@ export const TREE: Record<string, BranchEntry> = {
     description: 'Scores — quality judgments on agent runs (list)',
     leaves: {
       list: { description: 'List Scores, newest first', fn: scoreListCommand },
+    },
+  },
+  eval: {
+    description: 'Step Evaluation (ADR-0023) — Briefs, Evaluators, Eval Cases, Datasets, MCP eval policy',
+    leaves: {
+      'brief-get': { description: 'Print a step\'s Evaluation Brief', fn: evalBriefGetCommand },
+      'brief-set': { description: 'Write a new Evaluation Brief version', fn: evalBriefSetCommand },
+      'evaluator-list': { description: 'List a step\'s Evaluators', fn: evalEvaluatorListCommand },
+      'evaluator-create': { description: 'Create an Evaluator from a JSON file', fn: evalEvaluatorCreateCommand },
+      'evaluator-version': { description: 'Add an Evaluator version from a JSON file', fn: evalEvaluatorVersionCommand },
+      'evaluator-approve': { description: 'Approve a code Evaluator\'s source', fn: evalEvaluatorApproveCommand },
+      'evaluator-label': { description: 'Label an output pass/fail for an Evaluator', fn: evalEvaluatorLabelCommand },
+      'evaluator-calibrate': { description: 'Calibrate an llm_judge against the labels', fn: evalEvaluatorCalibrateCommand },
+      'evaluator-preview': { description: 'Run a draft check against recent outputs', fn: evalEvaluatorPreviewCommand },
+      'evaluator-archive': { description: 'Archive or restore an Evaluator', fn: evalEvaluatorArchiveCommand },
+      'case-list': { description: 'List a step\'s Eval Cases', fn: evalCaseListCommand },
+      'case-add': { description: 'Add a hand-written Eval Case', fn: evalCaseAddCommand },
+      'case-from-run': { description: 'Add a production Agent Run to the eval set', fn: evalCaseFromRunCommand },
+      'case-archive': { description: 'Archive or restore an Eval Case', fn: evalCaseArchiveCommand },
+      'dataset-list': { description: 'List frozen Eval Dataset versions', fn: evalDatasetListCommand },
+      'dataset-freeze': { description: 'Freeze the live cases as a Dataset version', fn: evalDatasetFreezeCommand },
+      'mcp-policy-get': { description: 'Show the step\'s MCP eval policy', fn: evalMcpPolicyGetCommand },
+      'mcp-policy-set': { description: 'Replace the step\'s MCP eval policy', fn: evalMcpPolicySetCommand },
     },
   },
   model: {

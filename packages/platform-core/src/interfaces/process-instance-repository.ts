@@ -215,8 +215,9 @@ export interface ProcessInstanceRepository {
    * Cascade companions for workflow-definition soft-delete. Scoped by
    * (`namespace`, `definitionName`): workflow names are unique per workspace,
    * not globally, so a name-only match would tombstone a stranger's runs.
+   * `excludeDryRuns` leaves out runs whose output never reached production.
    */
-  getIdsByDefinitionName(namespace: string, name: string): Promise<string[]>;
+  getIdsByDefinitionName(namespace: string, name: string, options?: { excludeDryRuns?: boolean }): Promise<string[]>;
   setDeletedByDefinitionName(
     namespace: string,
     name: string,

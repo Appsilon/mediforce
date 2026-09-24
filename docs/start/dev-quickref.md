@@ -191,6 +191,7 @@ Run a workflow with an agent step, then open http://localhost:6006 — spans
 | Every authenticated journey redirects to `/login`  | `AUTH_SECRET` missing — NextAuth can't sign the session. `playwright.config.ts` carries a fixed test-only fallback. |
 | Playwright: "chromium executable not found"        | `npx playwright install --with-deps chromium`. Binary must match the `@playwright/test` version. |
 | Stale E2E server on 9007                           | `fuser -k 9007/tcp`.                                             |
+| E2E server won't start: `Email is enabled but APP_BASE_URL is not set` | Your `.env` turns email on and the E2E server inherits it. Run with `MEDIFORCE_DISABLE_EMAIL=true`. |
 
 ## Gotchas
 

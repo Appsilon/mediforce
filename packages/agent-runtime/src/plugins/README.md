@@ -48,6 +48,18 @@ and secrets are deliberately not an interpolation source — a token must never
 reach Databricks run parameters or an audit snapshot. v1 supports single-task
 jobs only.
 
+## Code checks
+
+`code-check.ts` runs a `code` Evaluator (ADR-0023) with the same runtime
+images and spawn strategy as an inline script, but it is not a step: no run
+worktree, no commit, `--network none`, no capabilities beyond `DAC_OVERRIDE`,
+`no-new-privileges`, a process limit, and the step's workspace commit exported
+read-only (`git archive`) at `/workspace`. The workspace sits beside the output
+directory, never inside it, because the queued strategy ships the output
+directory through Redis. A check that crashes or writes no
+valid `result.json` throws — an Evaluator's defect is never scored as the
+agent's.
+
 ## Shared machinery
 
 `base-container-agent-plugin.ts` (spawn, mounts, git, MCP, output),
