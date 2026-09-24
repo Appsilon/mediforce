@@ -68,17 +68,18 @@ export type Placement = { top: number; left: number; placement: 'above' | 'below
  * A spotlight never leaves the screen. A target taller than the viewport — the
  * workflow grid, a long run history — would otherwise draw a ring with its top
  * or bottom edge somewhere off-screen, which reads as a broken highlight
- * rather than as a highlight of something large.
+ * rather than as a highlight of something large. A target with nothing on
+ * screen at all (a late layout shift pushed it past the fold after the step
+ * scrolled to it) has no spotlight, so the card falls back to centring instead
+ * of being placed relative to a box outside the viewport.
  */
-export function clampToViewport(box: Box, viewport: Size): Box {
+export function clampToViewport(box: Box, viewport: Size): Box | null {
   const top = Math.max(box.top, 0);
   const left = Math.max(box.left, 0);
-  return {
-    top,
-    left,
-    width: Math.min(box.left + box.width, viewport.width) - left,
-    height: Math.min(box.top + box.height, viewport.height) - top,
-  };
+  const width = Math.min(box.left + box.width, viewport.width) - left;
+  const height = Math.min(box.top + box.height, viewport.height) - top;
+  if (width <= 0 || height <= 0) return null;
+  return { top, left, width, height };
 }
 
 /** Whether the target is already on screen, so a step need not scroll at all. */
