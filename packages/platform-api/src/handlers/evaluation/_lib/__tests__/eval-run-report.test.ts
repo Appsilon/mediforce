@@ -23,7 +23,7 @@ function trial(evalRunId: string, caseId: string, trialIndex: number, overrides:
   return {
     id: randomUUID(), evalRunId, caseId, trialIndex, status: 'scored', processInstanceId: `trial-${caseId}-${trialIndex}`,
     agentRunId: `agent-${caseId}-${trialIndex}`, costUsd: 0.1, inputTokens: 100, outputTokens: 10, durationMs: 1000,
-    error: null, startedAt: null, scoringStartedAt: null, completedAt: null, ...overrides,
+    error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, ...overrides,
   };
 }
 
@@ -38,14 +38,14 @@ describe('buildEvalRunReport', () => {
       const scored = trials[index]!;
       await recordScore({
         subject: { type: 'agent_run', id: scored.agentRunId! }, name: 'findings-present', value, label: null, comment: null,
-        source: 'deterministic', createdBy: null, metadata: { evalRunId: evalRun.id }, namespace: NAMESPACE,
+        source: 'deterministic', createdBy: null, metadata: { evalRunId: evalRun.id, trialId: scored.id }, namespace: NAMESPACE,
         processInstanceId: scored.processInstanceId, stepId: STEP.stepId, evaluatorId: EVALUATOR, supersedes: null, basis: 'test',
       }, scope);
     }
     // A Score from another Eval Run on the same trial run is not this report's.
     await recordScore({
       subject: { type: 'agent_run', id: 'x' }, name: 'findings-present', value: 1, label: null, comment: null,
-      source: 'deterministic', createdBy: null, metadata: { evalRunId: 'another-run' }, namespace: NAMESPACE,
+      source: 'deterministic', createdBy: null, metadata: { evalRunId: 'another-run', trialId: trials[3]!.id }, namespace: NAMESPACE,
       processInstanceId: trials[3]!.processInstanceId, stepId: STEP.stepId, evaluatorId: EVALUATOR, supersedes: null, basis: 'test',
     }, scope);
 
@@ -71,7 +71,7 @@ describe('buildEvalRunReport', () => {
     const trials = [passing, trial(evalRun.id, CASE_A, 1, { status: 'failed', agentRunId: null, costUsd: null })];
     await recordScore({
       subject: { type: 'agent_run', id: passing.agentRunId! }, name: 'findings-present', value: 1, label: null, comment: null,
-      source: 'deterministic', createdBy: null, metadata: { evalRunId: evalRun.id }, namespace: NAMESPACE,
+      source: 'deterministic', createdBy: null, metadata: { evalRunId: evalRun.id, trialId: passing.id }, namespace: NAMESPACE,
       processInstanceId: passing.processInstanceId, stepId: STEP.stepId, evaluatorId: EVALUATOR, supersedes: null, basis: 'test',
     }, scope);
 

@@ -108,10 +108,12 @@ handler, the auto-runner (when a trial's run ends) and the heartbeat can all
 call it without starting or scoring a trial twice. Claiming a trial names the
 Workflow Run it creates, and a claim held past its lease — a driver that died
 before creating that run, or mid-scoring — is taken over, skipping Evaluators
-that already scored it. A cancelled Eval Run starts nothing more but is still
-driven until its in-flight trials are scored. A trial's cost is its Agent Run
-plus the LLM judge calls that scored it, and both count toward the budget. Its
-report is computed from the Scores on read, never stored.
+that already scored it; after three attempts the trial fails instead. A
+cancelled Eval Run starts nothing more but is still driven until its in-flight
+trials are scored. A trial's cost is its Agent Run — charged to the budget when
+it is claimed for scoring — plus each LLM judge call, charged as it is made and
+kept on the Score it produced (`_lib/model-prices.ts` prices those). An Eval
+Run's report is computed from the Scores on read, never stored.
 
 **Assistants share building blocks.** `src/assistant-core/` holds the pieces
 the workflow editor assistant and the Evaluation Assistant both use

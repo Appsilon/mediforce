@@ -213,7 +213,7 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     const trial = this.trials.get(id);
     if (trial === undefined || trial.status !== 'scoring' || trial.scoringStartedAt === null) return false;
     if (Date.parse(trial.scoringStartedAt) >= Date.parse(staleBefore)) return false;
-    this.trials.set(id, { ...trial, scoringStartedAt: now });
+    this.trials.set(id, { ...trial, scoringStartedAt: now, scoringAttempts: trial.scoringAttempts + 1 });
     return true;
   }
 

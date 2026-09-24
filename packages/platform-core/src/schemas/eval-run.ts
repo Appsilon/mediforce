@@ -89,6 +89,8 @@ export const EvalTrialSchema = z.object({
   startedAt: z.iso.datetime().nullable(),
   /** When a driver claimed it for scoring; a stale claim is taken over. */
   scoringStartedAt: z.iso.datetime().nullable(),
+  /** How many drivers have claimed it for scoring. */
+  scoringAttempts: z.number().int().nonnegative(),
   completedAt: z.iso.datetime().nullable(),
 });
 

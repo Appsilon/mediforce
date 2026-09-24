@@ -1,22 +1,16 @@
 import type { EvalRunEstimate, EvalRunEvaluator, EvaluatedStep, EvaluatorVersion, WorkflowStep } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
+import { loadModelPrices } from './model-prices';
 import { listStepProductionAgentRuns } from './step-agent-runs';
 
 /** A nominal agent turn budget, for when the Step has no cost history. */
-const NOMINAL_AGENT_TOKENS = { input: 50_000, output: 5_000 };
+const NOMINAL_AGENT_TOKENS = { inputTokens: 50_000, outputTokens: 5_000 };
 /** What one judge call costs, roughly: the output and rubric in, the reasoning out. */
-const NOMINAL_JUDGE_TOKENS = { input: 4_000, output: 500 };
+const NOMINAL_JUDGE_TOKENS = { inputTokens: 4_000, outputTokens: 500 };
 const HISTORY_SAMPLE = 20;
 
 function round(usd: number): number {
   return Math.round(usd * 10_000) / 10_000;
-}
-
-/** What `tokens` cost at the model registry's price; null for a model it does not price. */
-export async function priceOf(scope: CallerScope, model: string | undefined, tokens: { input: number; output: number }): Promise<number | null> {
-  if (model === undefined) return null;
-  const entry = (await scope.models.list()).find((candidate) => candidate.id === model);
-  return entry === undefined ? null : entry.pricing.input * tokens.input + entry.pricing.output * tokens.output;
 }
 
 /** Mean cost of the Step's recent production runs, from what each execution recorded. */
@@ -46,6 +40,7 @@ export async function estimateEvalRun(
   trialCount: number,
 ): Promise<EvalRunEstimate> {
   const history = await historicalCosts(scope, step);
+  const priceOf = await loadModelPrices(scope);
   let basis: EvalRunEstimate['basis'] = 'unknown';
   let agentCost: number | null = null;
   if (history.length > 0) {
@@ -54,7 +49,7 @@ export async function estimateEvalRun(
   } else {
     const agent = workflowStep.agentId === undefined ? null : await scope.agentDefinitions.getById(workflowStep.agentId);
     const model = workflowStep.agent?.model ?? agent?.foundationModel;
-    agentCost = await priceOf(scope, model, NOMINAL_AGENT_TOKENS);
+    agentCost = priceOf(model, NOMINAL_AGENT_TOKENS);
     if (agentCost !== null) basis = 'model_pricing';
   }
   if (agentCost === null) return { perTrialUsd: null, totalUsd: null, basis, sampleSize: 0 };
@@ -62,7 +57,7 @@ export async function estimateEvalRun(
   let judgeCost = 0;
   for (const { version } of evaluators) {
     if (version.check.kind !== 'llm_judge') continue;
-    judgeCost += (await priceOf(scope, version.check.model, NOMINAL_JUDGE_TOKENS)) ?? 0;
+    judgeCost += priceOf(version.check.model, NOMINAL_JUDGE_TOKENS) ?? 0;
   }
   const perTrial = agentCost + judgeCost;
   return {

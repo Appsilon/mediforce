@@ -8,17 +8,12 @@ import {
   type Score,
 } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
+import { scoresOfTrial } from './trial-scores';
 
-/** The Scores the run's Evaluators gave its trials, by trial id. */
+/** The Scores the run's Evaluators gave its scored trials, by trial id. */
 async function trialScores(scope: CallerScope, run: EvalRun, trials: readonly EvalTrial[]): Promise<Map<string, Score[]>> {
-  const byTrial = new Map<string, Score[]>();
-  await Promise.all(trials.map(async (trial) => {
-    if (trial.processInstanceId === null || trial.status !== 'scored') return;
-    const scores = await scope.scores.list({ processInstanceId: trial.processInstanceId, stepId: run.stepId, limit: 1000 });
-    byTrial.set(trial.id, scores.filter((score) =>
-      score.source !== 'human' && score.metadata?.evalRunId === run.id));
-  }));
-  return byTrial;
+  const scored = trials.filter((trial) => trial.status === 'scored');
+  return new Map(await Promise.all(scored.map(async (trial) => [trial.id, await scoresOfTrial(scope, run, trial)] as const)));
 }
 
 function mean(values: readonly number[]): number | null {

@@ -196,6 +196,7 @@ export const evalTrials = pgTable(
     error: text('error'),
     startedAt: timestamp('started_at', { withTimezone: true }),
     scoringStartedAt: timestamp('scoring_started_at', { withTimezone: true }),
+    scoringAttempts: integer('scoring_attempts').notNull().default(0),
     completedAt: timestamp('completed_at', { withTimezone: true }),
   },
   (table) => ({

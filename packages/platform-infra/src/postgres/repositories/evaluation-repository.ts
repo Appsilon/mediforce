@@ -452,7 +452,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
 
   async renewScoringClaim(id: string, staleBefore: string, now: string): Promise<boolean> {
     const rows = await this.db.update(evalTrials)
-      .set({ scoringStartedAt: new Date(now) })
+      .set({ scoringStartedAt: new Date(now), scoringAttempts: sql`${evalTrials.scoringAttempts} + 1` })
       .where(and(eq(evalTrials.id, id), eq(evalTrials.status, 'scoring'), lt(evalTrials.scoringStartedAt, new Date(staleBefore))))
       .returning({ id: evalTrials.id });
     return rows.length === 1;

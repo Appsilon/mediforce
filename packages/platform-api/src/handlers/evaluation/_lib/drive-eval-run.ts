@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import type { EvalCase, EvalRun, EvalTrial } from '@mediforce/platform-core';
+import type { AgentOutputSnapshot, EvalCase, EvalRun, EvalTrial, Score } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { recordScore } from '../../scores/record-score';
 import { loadEvaluationSubject } from './evaluation-subject';
-import { priceOf } from './estimate-eval-run';
+import { loadModelPrices } from './model-prices';
 import { runEvaluatorCheck, type JudgeUsage } from './run-evaluator-check';
+import { scoresOfTrial } from './trial-scores';
 
 /**
  * How long a driver may hold a trial — between claiming it and creating its
@@ -12,6 +13,8 @@ import { runEvaluatorCheck, type JudgeUsage } from './run-evaluator-check';
  * decides it died.
  */
 const CLAIM_LEASE_MS = 15 * 60_000;
+/** Drivers that may claim one trial for scoring before it fails rather than pay for its judges again. */
+const MAX_SCORING_ATTEMPTS = 3;
 
 /** A trial's run is done when nothing will move it any further. */
 function runIsDone(status: string): boolean {
@@ -22,20 +25,40 @@ function claimIsStale(claimedAt: string | null, staleBefore: string): boolean {
   return claimedAt !== null && Date.parse(claimedAt) < Date.parse(staleBefore);
 }
 
-/** What the judge calls cost, at the model registry's prices; a model it does not price adds nothing. */
-async function judgeCostUsd(scope: CallerScope, usages: readonly JudgeUsage[]): Promise<number> {
-  let total = 0;
-  for (const usage of usages) {
-    total += (await priceOf(scope, usage.model, { input: usage.promptTokens, output: usage.completionTokens })) ?? 0;
-  }
-  return total;
+/** What the trial's step execution recorded of its Agent Run: cost, tokens, duration. */
+async function trialAgentOutput(scope: CallerScope, run: EvalRun, instanceId: string): Promise<AgentOutputSnapshot | null> {
+  const execution = (await scope.runs.getStepExecutions(instanceId))
+    .filter((candidate) => candidate.stepId === run.stepId)
+    .sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0];
+  return execution?.agentOutput ?? null;
+}
+
+function judgeCostOf(score: Score): number {
+  const cost = score.metadata?.judgeCostUsd;
+  return typeof cost === 'number' ? cost : 0;
+}
+
+/**
+ * Claims a finished trial for scoring and charges its Agent Run's cost to the
+ * run — once: a driver that later takes the claim over does not charge it
+ * again. Returns the claimed trial, or null when another driver claimed it.
+ */
+async function claimForScoring(scope: CallerScope, run: EvalRun, trial: EvalTrial): Promise<EvalTrial | null> {
+  const costUsd = (await trialAgentOutput(scope, run, trial.processInstanceId!))?.estimatedCostUsd ?? null;
+  const patch = { status: 'scoring' as const, scoringStartedAt: new Date().toISOString(), scoringAttempts: 1, costUsd };
+  const claimed = await scope.evaluation.transitionTrial(trial, 'running', patch);
+  if (claimed === false) return null;
+  if (costUsd !== null) await scope.evaluation.addEvalRunSpend(run.id, costUsd);
+  return { ...trial, ...patch };
 }
 
 /**
  * Applies the run's frozen Evaluator versions to one finished trial the caller
  * holds the `scoring` claim on, and records a Score per Evaluator that could
  * grade it. An Evaluator that already scored this trial — before a driver died
- * mid-scoring — is not run again.
+ * mid-scoring — is not run again. Each judge call is charged to the run as it
+ * is made, and a Score keeps what its judge cost, so a trial's cost survives
+ * a takeover.
  */
 async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, evalCase: EvalCase | null): Promise<void> {
   const instanceId = trial.processInstanceId!;
@@ -43,28 +66,22 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
   const agentRun = (await scope.agentRuns.getByInstanceId(instanceId))
     .filter((candidate) => candidate.stepId === run.stepId && candidate.status !== 'running')
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0];
-  const completedAt = new Date().toISOString();
 
   if (agentRun === undefined) {
     await scope.evaluation.transitionTrial(trial, 'scoring', {
       status: 'failed',
       error: instance?.error ?? 'The trial ended without an Agent Run',
-      completedAt,
+      completedAt: new Date().toISOString(),
     });
     return;
   }
 
-  const execution = (await scope.runs.getStepExecutions(instanceId))
-    .filter((candidate) => candidate.stepId === run.stepId)
-    .sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0];
-  const agentOutput = execution?.agentOutput ?? null;
+  const agentOutput = await trialAgentOutput(scope, run, instanceId);
   const subject = await loadEvaluationSubject(scope, agentRun.id);
-  const alreadyScored = new Set(
-    (await scope.scores.list({ processInstanceId: instanceId, stepId: run.stepId, limit: 1000 }))
-      .filter((score) => score.metadata?.trialId === trial.id)
-      .map((score) => score.evaluatorId),
-  );
-  const judgeUsages: JudgeUsage[] = [];
+  const priceOf = await loadModelPrices(scope);
+  const earlier = await scoresOfTrial(scope, run, trial);
+  const alreadyScored = new Set(earlier.map((score) => score.evaluatorId));
+  let judgeCostUsd = earlier.reduce((sum, score) => sum + judgeCostOf(score), 0);
   const errors: string[] = [];
   for (const frozen of run.evaluators) {
     if (alreadyScored.has(frozen.evaluatorId)) continue;
@@ -76,7 +93,19 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
       errors.push(`${frozen.name}: version ${frozen.version} not found`);
       continue;
     }
+    const judgeUsages: JudgeUsage[] = [];
     const outcome = await runEvaluatorCheck(scope, version.check, subject, evalCase, (usage) => judgeUsages.push(usage));
+    const prices = judgeUsages.map((usage) =>
+      priceOf(usage.model, { inputTokens: usage.promptTokens, outputTokens: usage.completionTokens }));
+    const checkCostUsd = prices.reduce<number>((sum, price) => sum + (price ?? 0), 0);
+    const unpriced = judgeUsages.find((_usage, index) => prices[index] === null);
+    if (unpriced !== undefined) {
+      errors.push(`${frozen.name}: judge model '${unpriced.model}' has no registry price, so its calls are not counted`);
+    }
+    if (checkCostUsd > 0) {
+      await scope.evaluation.addEvalRunSpend(run.id, checkCostUsd);
+      judgeCostUsd += checkCostUsd;
+    }
     if (outcome.passed === null || outcome.value === null) {
       errors.push(`${frozen.name}: ${outcome.error ?? 'no verdict'}`);
       continue;
@@ -95,6 +124,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
         caseId: trial.caseId,
         evaluatorVersion: frozen.version,
         counted: frozen.counted,
+        ...(judgeUsages.length === 0 ? {} : { judgeCostUsd: checkCostUsd }),
       },
       namespace: run.namespace,
       processInstanceId: instanceId,
@@ -105,20 +135,17 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
     }, scope);
   }
 
-  const agentCostUsd = agentOutput?.estimatedCostUsd ?? null;
-  const judgesUsd = await judgeCostUsd(scope, judgeUsages);
-  const costUsd = agentCostUsd === null && judgesUsd === 0 ? null : (agentCostUsd ?? 0) + judgesUsd;
-  const scored = await scope.evaluation.transitionTrial(trial, 'scoring', {
+  const agentCostUsd = trial.costUsd;
+  await scope.evaluation.transitionTrial(trial, 'scoring', {
     status: 'scored',
     agentRunId: agentRun.id,
-    costUsd,
+    costUsd: agentCostUsd === null && judgeCostUsd === 0 ? null : (agentCostUsd ?? 0) + judgeCostUsd,
     inputTokens: agentOutput?.tokenUsage?.inputTokens ?? null,
     outputTokens: agentOutput?.tokenUsage?.outputTokens ?? null,
     durationMs: agentOutput?.duration_ms === null || agentOutput?.duration_ms === undefined ? null : Math.round(agentOutput.duration_ms),
     error: errors.length === 0 ? null : errors.join('; '),
-    completedAt,
+    completedAt: new Date().toISOString(),
   });
-  if (scored === true && costUsd !== null) await scope.evaluation.addEvalRunSpend(run.id, costUsd);
 }
 
 /**
@@ -189,6 +216,14 @@ export async function driveEvalRun(scope: CallerScope, evalRunId: string): Promi
   for (const trial of await scope.evaluation.listTrials(evalRunId)) {
     if (trial.status === 'scoring') {
       if (claimIsStale(trial.scoringStartedAt, staleBefore) === false) continue;
+      if (trial.scoringAttempts >= MAX_SCORING_ATTEMPTS) {
+        await scope.evaluation.transitionTrial(trial, 'scoring', {
+          status: 'failed',
+          error: `Scoring did not finish in ${trial.scoringAttempts} attempts`,
+          completedAt: new Date().toISOString(),
+        });
+        continue;
+      }
       const takenOver = await scope.evaluation.renewScoringClaim(trial, staleBefore, new Date().toISOString());
       if (takenOver === true) await scoreTrial(scope, initial, trial, await caseFor(trial.caseId));
       continue;
@@ -206,9 +241,9 @@ export async function driveEvalRun(scope: CallerScope, evalRunId: string): Promi
       continue;
     }
     if (runIsDone(instance.status) === false) continue;
-    const claimed = await scope.evaluation.transitionTrial(trial, 'running', { status: 'scoring', scoringStartedAt: new Date().toISOString() });
-    if (claimed === false) continue;
-    await scoreTrial(scope, initial, trial, await caseFor(trial.caseId));
+    const claimed = await claimForScoring(scope, initial, trial);
+    if (claimed === null) continue;
+    await scoreTrial(scope, initial, claimed, await caseFor(trial.caseId));
   }
 
   const run = (await scope.evaluation.getEvalRun(evalRunId))!;
