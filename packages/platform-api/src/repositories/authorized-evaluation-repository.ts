@@ -118,9 +118,9 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   listEvalRuns = async (step: EvaluatedStep): Promise<EvalRun[]> =>
     this.canSeeNamespace(step.namespace) ? this.raw.listEvalRuns(step) : [];
 
-  /** Every Eval Run in `status` across workspaces — system actors only (the heartbeat). */
-  listEvalRunIdsByStatus = async (status: EvalRunStatus): Promise<string[]> =>
-    this.caller.isSystemActor ? this.raw.listEvalRunIdsByStatus(status) : [];
+  /** The Eval Runs the heartbeat moves on, across workspaces — system actors only. */
+  listEvalRunIdsToDrive = async (): Promise<string[]> =>
+    this.caller.isSystemActor ? this.raw.listEvalRunIdsToDrive() : [];
 
   transitionEvalRun = async (
     id: string,
@@ -152,6 +152,11 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   ): Promise<boolean> => {
     await this.writableRun(trial.evalRunId);
     return this.raw.transitionTrial(trial.id, from, patch);
+  };
+
+  renewScoringClaim = async (trial: Pick<EvalTrial, 'id' | 'evalRunId'>, staleBefore: string, now: string): Promise<boolean> => {
+    await this.writableRun(trial.evalRunId);
+    return this.raw.renewScoringClaim(trial.id, staleBefore, now);
   };
 
   private async writableRun(id: string): Promise<void> {

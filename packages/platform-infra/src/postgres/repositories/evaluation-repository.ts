@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import {
   EvalRunSchema,
   EvalTrialSchema,
@@ -157,16 +157,22 @@ function toTrial(row: typeof evalTrials.$inferSelect): EvalTrial {
   return EvalTrialSchema.parse({
     ...row,
     startedAt: row.startedAt?.toISOString() ?? null,
+    scoringStartedAt: row.scoringStartedAt?.toISOString() ?? null,
     completedAt: row.completedAt?.toISOString() ?? null,
   });
 }
 
+function toDate(value: string | null): Date | null {
+  return value === null ? null : new Date(value);
+}
+
 function trialValues(trial: Partial<EvalTrial>): Partial<typeof evalTrials.$inferInsert> {
-  const { startedAt, completedAt, ...rest } = trial;
+  const { startedAt, scoringStartedAt, completedAt, ...rest } = trial;
   return {
     ...rest,
-    ...(startedAt === undefined ? {} : { startedAt: startedAt === null ? null : new Date(startedAt) }),
-    ...(completedAt === undefined ? {} : { completedAt: completedAt === null ? null : new Date(completedAt) }),
+    ...(startedAt === undefined ? {} : { startedAt: toDate(startedAt) }),
+    ...(scoringStartedAt === undefined ? {} : { scoringStartedAt: toDate(scoringStartedAt) }),
+    ...(completedAt === undefined ? {} : { completedAt: toDate(completedAt) }),
   };
 }
 
@@ -390,9 +396,11 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     return rows.map(toEvalRun);
   }
 
-  async listEvalRunIdsByStatus(status: EvalRunStatus): Promise<string[]> {
-    const rows = await this.db.select({ id: evalRuns.id }).from(evalRuns).where(eq(evalRuns.status, status));
-    return rows.map((row) => row.id);
+  async listEvalRunIdsToDrive(): Promise<string[]> {
+    const running = await this.db.select({ id: evalRuns.id }).from(evalRuns).where(eq(evalRuns.status, 'running'));
+    const inFlight = await this.db.selectDistinct({ id: evalTrials.evalRunId }).from(evalTrials)
+      .where(inArray(evalTrials.status, ['running', 'scoring']));
+    return [...new Set([...running, ...inFlight].map((row) => row.id))];
   }
 
   async transitionEvalRun(
@@ -438,6 +446,14 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     const rows = await this.db.update(evalTrials)
       .set(trialValues(patch))
       .where(and(eq(evalTrials.id, id), eq(evalTrials.status, from)))
+      .returning({ id: evalTrials.id });
+    return rows.length === 1;
+  }
+
+  async renewScoringClaim(id: string, staleBefore: string, now: string): Promise<boolean> {
+    const rows = await this.db.update(evalTrials)
+      .set({ scoringStartedAt: new Date(now) })
+      .where(and(eq(evalTrials.id, id), eq(evalTrials.status, 'scoring'), lt(evalTrials.scoringStartedAt, new Date(staleBefore))))
       .returning({ id: evalTrials.id });
     return rows.length === 1;
   }

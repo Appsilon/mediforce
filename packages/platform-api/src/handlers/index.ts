@@ -190,7 +190,7 @@ export {
   listEvalRuns,
   cancelEvalRun,
   advanceEvalRunOfInstance,
-  driveRunningEvalRuns,
+  driveOpenEvalRuns,
 } from './evaluation/index';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 

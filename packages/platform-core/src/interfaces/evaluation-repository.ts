@@ -54,8 +54,11 @@ export interface EvaluationRepository {
   getEvalRun(id: string): Promise<EvalRun | null>;
   /** Newest first. */
   listEvalRuns(step: EvaluatedStep): Promise<EvalRun[]>;
-  /** Every Eval Run in `status`, across workspaces — the heartbeat's sweep. */
-  listEvalRunIdsByStatus(status: EvalRunStatus): Promise<string[]>;
+  /**
+   * Every Eval Run the heartbeat must move on, across workspaces: the running
+   * ones, and any other — a cancelled one — with a trial still running or scoring.
+   */
+  listEvalRunIdsToDrive(): Promise<string[]>;
   /** Applies `patch` only while the run is in `from`; true when it did. */
   transitionEvalRun(
     id: string,
@@ -74,4 +77,6 @@ export interface EvaluationRepository {
     from: EvalTrialStatus,
     patch: Partial<Omit<EvalTrial, 'id' | 'evalRunId' | 'caseId' | 'trialIndex'>>,
   ): Promise<boolean>;
+  /** Takes over a `scoring` claim made before `staleBefore`, restamping it `now`; true when it did. */
+  renewScoringClaim(id: string, staleBefore: string, now: string): Promise<boolean>;
 }

@@ -23,16 +23,16 @@ function trial(evalRunId: string, caseId: string, trialIndex: number, overrides:
   return {
     id: randomUUID(), evalRunId, caseId, trialIndex, status: 'scored', processInstanceId: `trial-${caseId}-${trialIndex}`,
     agentRunId: `agent-${caseId}-${trialIndex}`, costUsd: 0.1, inputTokens: 100, outputTokens: 10, durationMs: 1000,
-    error: null, startedAt: null, completedAt: null, ...overrides,
+    error: null, startedAt: null, scoringStartedAt: null, completedAt: null, ...overrides,
   };
 }
 
 describe('buildEvalRunReport', () => {
-  it('counts each trial\'s Score for the Evaluator, and a trial with none as an error', async () => {
+  it('counts each trial\'s Score for the Evaluator, and a trial with none as an error that still counts toward k', async () => {
     const fixture = await evaluationFixture();
     const scope = fixture.scope();
     const evalRun = run();
-    // Case A: pass, fail (flaky). Case B: pass, and one trial the check could not grade.
+    // Case A: pass, fail (flaky). Case B: pass, and one trial the check could not grade — so not all k passed.
     const trials = [trial(evalRun.id, CASE_A, 0), trial(evalRun.id, CASE_A, 1), trial(evalRun.id, CASE_B, 0), trial(evalRun.id, CASE_B, 1, { durationMs: 3000 })];
     for (const [index, value] of [[0, 1], [1, 0], [2, 1]] as const) {
       const scored = trials[index]!;
@@ -53,7 +53,7 @@ describe('buildEvalRunReport', () => {
 
     expect(report.evaluators[0]).toMatchObject({
       passes: 2, failures: 1, errors: 1, passRate: 2 / 3,
-      passAtK: 1, passHatK: 0.5, flakiness: 0.5,
+      passAtK: 1, passHatK: 0, flakiness: 0.5,
     });
     expect(report).toMatchObject({
       k: 2,
@@ -61,5 +61,23 @@ describe('buildEvalRunReport', () => {
       inputTokens: 400, outputTokens: 40, meanDurationMs: 1500, maxDurationMs: 3000,
     });
     expect(report.costUsd).toBeCloseTo(0.4, 10);
+  });
+
+  it('counts a failed trial against its case\'s k, but not in the pass rate', async () => {
+    const fixture = await evaluationFixture();
+    const scope = fixture.scope();
+    const evalRun = run();
+    const passing = trial(evalRun.id, CASE_A, 0);
+    const trials = [passing, trial(evalRun.id, CASE_A, 1, { status: 'failed', agentRunId: null, costUsd: null })];
+    await recordScore({
+      subject: { type: 'agent_run', id: passing.agentRunId! }, name: 'findings-present', value: 1, label: null, comment: null,
+      source: 'deterministic', createdBy: null, metadata: { evalRunId: evalRun.id }, namespace: NAMESPACE,
+      processInstanceId: passing.processInstanceId, stepId: STEP.stepId, evaluatorId: EVALUATOR, supersedes: null, basis: 'test',
+    }, scope);
+
+    const report = await buildEvalRunReport(scope, evalRun, trials);
+
+    expect(report.evaluators[0]).toMatchObject({ passes: 1, failures: 0, errors: 0, passRate: 1, passAtK: 1, passHatK: 0, flakiness: 0 });
+    expect(report.trials).toMatchObject({ scored: 1, failed: 1 });
   });
 });
