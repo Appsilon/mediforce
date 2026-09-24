@@ -96,6 +96,8 @@ import { namespaceListMembersCommand } from './commands/namespace-list-members';
 import { namespaceCreateCommand } from './commands/namespace-create';
 import { agentRunListCommand } from './commands/agent-run-list';
 import { agentRunGetCommand } from './commands/agent-run-get';
+import { agentRunTrajectoryCommand } from './commands/agent-run-trajectory';
+import { scoreListCommand } from './commands/score-list';
 import { namespaceUpdateCommand } from './commands/namespace-update';
 import { namespaceDeleteCommand } from './commands/namespace-delete';
 import { namespaceResetCommand } from './commands/namespace-reset';
@@ -228,10 +230,17 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   'agent-run': {
-    description: 'Agent runs (list, get) — single agent invocations inside workflow runs',
+    description: 'Agent runs (list, get, trajectory) — single agent invocations inside workflow runs',
     leaves: {
       list: { description: 'List recent agent runs', fn: agentRunListCommand },
       get: { description: 'Fetch a single agent run', fn: agentRunGetCommand },
+      trajectory: { description: 'Print an agent run\'s tool calls and results', fn: agentRunTrajectoryCommand },
+    },
+  },
+  score: {
+    description: 'Scores — quality judgments on agent runs (list)',
+    leaves: {
+      list: { description: 'List Scores, newest first', fn: scoreListCommand },
     },
   },
   model: {

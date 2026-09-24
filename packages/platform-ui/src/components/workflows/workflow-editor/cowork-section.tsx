@@ -1,11 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { Trash2 } from 'lucide-react';
+import { z } from 'zod';
 import type { WorkflowStep, McpServerConfig } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { FieldRow, FieldGroup, Section, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
 import { ModelPicker } from './model-picker';
+import { OutputSchemaEditor } from './output-schema-editor';
+
+const COWORK_OUTPUT_SCHEMA = z.record(z.string(), z.unknown());
 
 const VOICE_OPTIONS = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const;
 
@@ -149,9 +153,11 @@ export function CoworkSection({
         </FieldRow>
 
         <FieldRow label="cowork.outputSchema" tooltip={TIP.outputSchema} alignStart>
-          <CoworkOutputSchemaEditor
+          <OutputSchemaEditor
+            key={`cowork-output-schema-${step.id}`}
             value={cowork.outputSchema}
             onChange={(schema) => patchCowork({ outputSchema: schema })}
+            schema={COWORK_OUTPUT_SCHEMA}
           />
         </FieldRow>
       </FieldGroup>
@@ -286,52 +292,5 @@ function McpServerEntry({
         />
       </FieldRow>
     </FieldGroup>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Output schema editor
-// ---------------------------------------------------------------------------
-
-function CoworkOutputSchemaEditor({
-  value,
-  onChange,
-}: {
-  value: Record<string, unknown> | undefined;
-  onChange: (schema: Record<string, unknown> | undefined) => void;
-}) {
-  const [draft, setDraft] = useState(() => value !== undefined ? JSON.stringify(value, null, 2) : '');
-  const [error, setError] = useState<string | null>(null);
-
-  const valueRef = useRef(value);
-  useEffect(() => {
-    if (value !== valueRef.current) {
-      valueRef.current = value;
-      setDraft(value !== undefined ? JSON.stringify(value, null, 2) : '');
-      setError(null);
-    }
-  }, [value]);
-
-  const handleBlur = () => {
-    if (draft.trim() === '') { onChange(undefined); setError(null); return; }
-    try { onChange(JSON.parse(draft)); setError(null); }
-    catch { setError('Invalid JSON'); }
-  };
-
-  return (
-    <div className="w-full">
-      <textarea
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={handleBlur}
-        rows={5}
-        placeholder={'{\n  "type": "object",\n  "required": [],\n  "properties": {}\n}'}
-        className={cn(
-          rt, 'font-mono text-[11px]',
-          error ? 'border-destructive ring-1 ring-destructive' : '',
-        )}
-      />
-      {error && <p className="text-[10px] text-destructive mt-0.5">{error}</p>}
-    </div>
   );
 }

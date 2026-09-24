@@ -95,4 +95,4 @@ appendix can capture what actually shipped vs the original decision body.
 | [0020](./0020-built-in-roles-and-default-workflow-access.md) | Built-in roles carry their privilege as a default, not as an override (extends [0019](./0019-workspace-scoped-roles.md)) | Accepted |
 | [0021](./0021-workspace-join-links.md) | A join link authorizes membership; the mailbox still authorizes the session (amends [0002](./0002-firebase-auth-to-nextauth.md) §4a) | Accepted |
 | [0022](./0022-image-catalog.md) | The Image Catalog is an image the platform offers, keyed on its source | Accepted |
-| [0023](./0023-step-evaluation.md) | Step Evaluation: Evaluators, single-step Eval Runs, Step Qualification (partially supersedes [0007](./0007-llm-evaluation-observability.md) § Deferred) | Proposed |
+| [0023](./0023-step-evaluation.md) | Step Evaluation: Evaluators, single-step Eval Runs, Step Qualification (partially supersedes [0007](./0007-llm-evaluation-observability.md) § Deferred) | Accepted |

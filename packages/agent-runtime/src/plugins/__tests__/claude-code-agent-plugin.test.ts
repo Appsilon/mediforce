@@ -560,6 +560,49 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(promptArg).toContain('100 cases like this');
     });
 
+    it('[DATA] includes agent.outputSchema and the rejected attempt\'s error in the prompt', async () => {
+      const outputSchema = { type: 'object' as const, required: ['findings'] };
+      const context: WorkflowAgentContext = {
+        stepId: 'extract',
+        processInstanceId: 'pi-001',
+        runNamespace: 'test-namespace',
+        definitionVersion: 'v1',
+        stepInput: {},
+        autonomyLevel: 'L2',
+        workflowDefinition: {
+          name: 'protocol-to-tfl',
+          version: 1,
+          namespace: 'test-namespace',
+          visibility: 'private',
+          steps: [],
+          transitions: [],
+        },
+        step: {
+          id: 'extract',
+          name: 'Extract metadata',
+          type: 'creation',
+          executor: 'agent',
+          agent: { prompt: 'Extract findings', image: 'mediforce-agent:protocol-to-tfl', outputSchema },
+        },
+        llm: { complete: vi.fn() },
+        getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
+        outputSchemaViolation: 'missing required keys: findings',
+      };
+      await plugin.initialize(context);
+
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue(
+        { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
+      );
+
+      await plugin.run(buildEmitSpy().emit);
+
+      const promptArg = spawnSpy.mock.calls[0][0] as string;
+      expect(promptArg).toContain('## Output Schema');
+      expect(promptArg).toContain('"required": [\n    "findings"\n  ]');
+      expect(promptArg).toContain('## Previous Attempt Rejected');
+      expect(promptArg).toContain('missing required keys: findings');
+    });
+
     it('[DATA] accepts standalone Docker mode (image only, no repo/commit)', async () => {
       const context = buildMockContext({
         config: {

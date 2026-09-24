@@ -18,6 +18,7 @@ import {
 } from '../../errors';
 import { actorFromCaller, loadOr404 } from '../_helpers';
 import { assertCallerMayActOnTask } from './_role-gate';
+import { recordHumanVerdictScore } from '../scores/record-human-verdict';
 
 export async function completeTask(
   input: CompleteTaskInput,
@@ -26,6 +27,7 @@ export async function completeTask(
   const ctx = await loadTaskContext(scope, input.taskId);
   const result = await runEngineCompletion(scope, input, ctx.actorId);
   await emitAuditEvents(scope, input, result, ctx);
+  await recordReviewScore(scope, input, result, ctx);
   await scope.system.runKicker.kick(result.task.processInstanceId, {
     triggeredBy: ctx.actorId,
   });
@@ -140,6 +142,28 @@ async function emitAuditEvents(
     entityId: updatedTask.processInstanceId,
     processInstanceId: updatedTask.processInstanceId,
   });
+}
+
+/** A CM3 verdict also becomes a `human_verdict` Score, best-effort: the engine
+ *  has already committed the task and no transaction spans the two, so a failed
+ *  Score write is logged, not surfaced. The verdict itself stays on the
+ *  `task.completed` audit event. */
+async function recordReviewScore(
+  scope: CallerScope,
+  input: CompleteTaskInput,
+  result: EngineResult,
+  ctx: TaskContext,
+): Promise<void> {
+  const namespace = result.instance.namespace;
+  if (namespace === undefined) return;
+  try {
+    await recordHumanVerdictScore(
+      { task: ctx.task, payload: input.payload, actorId: ctx.actorId, namespace },
+      scope,
+    );
+  } catch (error) {
+    console.error(`[complete-task] human_verdict Score not recorded for task '${input.taskId}':`, error);
+  }
 }
 
 interface AuditFields {

@@ -34,6 +34,19 @@ out of the workflow definition, where it is auditable, and buried it in code.
 The same rule covers timeouts and errors: they are envelope outcomes handled by
 `FallbackHandler`, not exceptions a plugin swallows.
 
+`agent.outputSchema` is the runner's check too: it validates `result`, reruns
+the plugin once with the violation in `context.outputSchemaViolation` — within
+what is left of the one step timeout — then falls back with reason
+`output_schema` (ADR-0023 D13).
+
+**Every Agent Run keeps an Agent Trajectory through `context.trajectory`.**
+The runner hands each Agent Run a `TrajectoryRecorder`; the base plugin records
+the same entries it writes to the step's activity log (`agentLogEntries` for its
+`logFormat`), and the recorder persists them with full content (ADR-0023 D8) —
+`captureContent` governs exported spans only (ADR-0007 D5). The activity log is
+the live view; the trajectory is the durable record Step Evaluation, the CLI and
+the API read.
+
 ## Rules
 
 **Register plugins in one place.** `PluginRegistry` is populated in

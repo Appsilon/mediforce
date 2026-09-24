@@ -155,6 +155,8 @@ Run a workflow with an agent step, then open http://localhost:6006 — spans
 
 - `MEDIFORCE_OTEL_CAPTURE_CONTENT=true` also records content — step input,
   envelope result, prompt/completion text. Dev/demo only; may contain patient data.
+  It governs exported spans only: Agent Trajectories (ADR-0023 D8) are stored in
+  the platform's Postgres and always keep full content (ADR-0007 D5).
 - `MEDIFORCE_OTEL_EXPORT_ALL_SPANS=true` exports non-`@mediforce/*` spans too
   (Next.js HTTP instrumentation is filtered out by default).
 - Container agents (claude-code, opencode, script) call their LLM **inside** the
