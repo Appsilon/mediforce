@@ -176,7 +176,10 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
     try {
       const result = await mediforce.evaluation.askAssistant({
         ...step,
-        messages: thread.map((message) => ({ role: message.role, content: message.content })),
+        messages: thread.map((message) => ({
+          role: message.role,
+          content: [message.content, ...(message.proposals ?? []).map(({ proposal }) => `[proposal: ${JSON.stringify(proposal)}]`)].join('\n'),
+        })),
         ...(assistantModel === undefined ? {} : { model: assistantModel }),
       }, {
         onProgress: (event) => {

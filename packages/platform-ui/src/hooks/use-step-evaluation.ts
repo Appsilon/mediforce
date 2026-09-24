@@ -66,6 +66,12 @@ export function useStepEvaluationMutation<TInput, TOutput>(
   });
 }
 
+/** A running Eval Run, or a cancelled one whose trials are still running or being scored. */
+function isEvalRunActive({ evalRun, trials }: { evalRun: { status: string }; trials: readonly { status: string }[] }): boolean {
+  return evalRun.status === 'running'
+    || trials.some((trial) => trial.status === 'running' || trial.status === 'scoring');
+}
+
 /** One Eval Run, polled while it has trials in flight. */
 export function useEvalRun(evalRunId: string | null) {
   return useQuery({
@@ -73,6 +79,6 @@ export function useEvalRun(evalRunId: string | null) {
     queryFn: () => mediforce.evaluation.getRun({ evalRunId: evalRunId! }),
     enabled: evalRunId !== null,
     retry: stopRetryOn4xx,
-    refetchInterval: (query) => (query.state.data?.evalRun.status === 'running' ? 3000 : false),
+    refetchInterval: (query) => (query.state.data !== undefined && isEvalRunActive(query.state.data) ? 3000 : false),
   });
 }

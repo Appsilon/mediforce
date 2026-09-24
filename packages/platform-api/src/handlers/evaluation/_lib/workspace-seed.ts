@@ -115,7 +115,9 @@ export async function commitWorkspaceChanges(
       const file = join(scratch, `blob-${index}`);
       await writeFile(file, content, 'utf-8');
       const blob = (await git(bareRepoPath, ['hash-object', '-w', file])).trim();
-      await git(bareRepoPath, ['update-index', '--add', '--cacheinfo', `100644,${blob},${path}`], indexEnv);
+      const existing = (await git(bareRepoPath, ['ls-files', '-s', '--', path], indexEnv)).split(' ')[0];
+      const mode = existing === undefined || existing === '' ? '100644' : existing;
+      await git(bareRepoPath, ['update-index', '--add', '--cacheinfo', `${mode},${blob},${path}`], indexEnv);
     }
     const tree = (await git(bareRepoPath, ['write-tree'], indexEnv)).trim();
     const commit = (await git(bareRepoPath, ['commit-tree', tree, '-p', baseCommit, '-m', options.message], COMMIT_ENV)).trim();
