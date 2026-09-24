@@ -74,7 +74,7 @@ export async function runProposalToolLoop<TPlatform extends string>(
       }
       if (parsedArguments === undefined) {
         result = { error: `Malformed JSON arguments for '${toolName}'.` };
-      } else if (toolName in config.proposalTools) {
+      } else if (Object.hasOwn(config.proposalTools, toolName)) {
         const parsed = parseToolArguments(toolName, config.proposalTools[toolName]!, parsedArguments);
         if (parsed.ok) {
           proposals.push({ tool: toolName, arguments: parsed.data });
@@ -82,7 +82,7 @@ export async function runProposalToolLoop<TPlatform extends string>(
         } else {
           result = { error: parsed.error };
         }
-      } else if (toolName in config.platformTools) {
+      } else if (Object.hasOwn(config.platformTools, toolName)) {
         result = await runPlatformTool({
           toolName,
           rawArguments: parsedArguments,
