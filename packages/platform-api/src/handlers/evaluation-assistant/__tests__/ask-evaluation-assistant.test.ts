@@ -101,4 +101,16 @@ describe('askEvaluationAssistant', () => {
     const run = await fixture.evaluationRepo.getEvalRun(result.preparedEvalRuns[0]!.evalRunId);
     expect(run?.status).toBe('prepared');
   });
+
+  it('allows a longer investigation to finish after ten tool rounds', async () => {
+    const requests = scriptOpenRouter([
+      ...Array.from({ length: 11 }, () => () => ({ toolCalls: [{ name: 'list_evaluators', arguments: {} }] })),
+      () => ({ content: 'I finished reviewing the evaluation setup.' }),
+    ]);
+
+    const result = await askEvaluationAssistant({ ...STEP, messages: [{ role: 'user', content: 'Review the evaluation setup.' }] }, scope);
+
+    expect(result.reply).toBe('I finished reviewing the evaluation setup.');
+    expect(requests).toHaveLength(12);
+  });
 });

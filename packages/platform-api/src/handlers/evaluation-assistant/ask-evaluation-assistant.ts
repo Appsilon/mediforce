@@ -16,7 +16,10 @@ import { loadEvaluatedStep, stepRef } from '../evaluation/_lib/evaluated-step';
 import { EVALUATION_ASSISTANT_SYSTEM_PROMPT, briefMessage } from './_lib/system-prompt';
 import { executeEvaluationTool } from './_lib/run-evaluation-tool';
 
-const MAX_TOOL_LOOP_ITERATIONS = 10;
+// Investigations commonly need several reads before a preview and proposal.
+// Keep this above the workflow assistant's cap so the Evaluation Assistant can
+// inspect a step, runs and trajectories without failing before it can reply.
+const MAX_TOOL_LOOP_ITERATIONS = 16;
 const ASSISTANT_MAX_OUTPUT_TOKENS = 4000;
 
 function preparedRun(result: unknown): PreparedEvalRun | null {

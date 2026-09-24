@@ -109,6 +109,6 @@ describe('runProposalToolLoop', () => {
     scriptOpenRouter(Array.from({ length: 5 }, () => ({ toolCalls: [{ name: 'read_count', arguments: {} }] })));
     await expect(runProposalToolLoop({
       ...config, messages: [{ role: 'user', content: 'go' }], executePlatformTool: vi.fn().mockResolvedValue({}),
-    })).rejects.toThrow('did not finish');
+    })).rejects.toThrow('4-round tool-use limit');
   });
 });

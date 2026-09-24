@@ -22,7 +22,7 @@ function StepEvaluation({ step, mayEdit, editReason, mayRun, runReason }: {
 }) {
   const evaluation = useStepEvaluation(step);
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
       <div className="space-y-4">
         <BriefSection step={step} data={evaluation.brief} mayEdit={mayEdit} />
         <EvaluatorsSection step={step} data={evaluation.evaluators} mayEdit={mayEdit} />
@@ -30,7 +30,9 @@ function StepEvaluation({ step, mayEdit, editReason, mayRun, runReason }: {
         <McpPolicySection step={step} data={evaluation.mcpPolicy} mayEdit={mayEdit} />
         <EvalRunsSection step={step} data={evaluation.runs} mayRun={mayRun} runReason={runReason} />
       </div>
-      <EvaluationAssistantPanel step={step} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
+      <div className="lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
+        <EvaluationAssistantPanel step={step} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
+      </div>
     </div>
   );
 }

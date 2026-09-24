@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { Bot, Check, Loader2, Send, User, X } from 'lucide-react';
+import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
+import { EVALUATION_ASSISTANT_DEFAULT_MODEL } from '@mediforce/platform-core';
 import type { EvaluatedStep, EvaluationAssistantProposal } from '@mediforce/platform-core';
 import type { PreparedEvalRun } from '@mediforce/platform-api/contract';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,6 +12,8 @@ import { cn } from '@/lib/utils';
 import { useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
+import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { StartEvalRunCard } from './step-evaluation-sections';
 
 type ProposalStatus = 'open' | 'accepted' | 'rejected';
@@ -89,7 +92,9 @@ function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
     <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="proposal-card">
       <div className="mb-1 font-medium">Proposed {TITLES[proposal.tool]}</div>
       {editing === null ? (
-        <p className="whitespace-pre-wrap text-muted-foreground">{summary}</p>
+        proposal.tool === 'propose_brief'
+          ? <MarkdownPresentation content={summary} />
+          : <p className="whitespace-pre-wrap text-muted-foreground">{summary}</p>
       ) : (
         <textarea className="w-full min-h-32 rounded border bg-background p-1.5 font-mono" value={editing} onChange={(event) => setEditing(event.target.value)} />
       )}
@@ -142,7 +147,16 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
   const [input, setInput] = React.useState('');
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [assistantModel, setAssistantModel] = React.useState<string | undefined>(undefined);
+  const [assistantSettingsOpen, setAssistantSettingsOpen] = React.useState(false);
+  const assistantScrollRef = React.useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+
+  React.useEffect(() => {
+    const element = assistantScrollRef.current;
+    if (element === null) return;
+    element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
+  }, [messages, pending]);
 
   const decide = (messageIndex: number, proposalIndex: number, status: ProposalStatus) => {
     setMessages((current) => current.map((message, index) => index !== messageIndex ? message : {
@@ -163,6 +177,7 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
       const result = await mediforce.evaluation.askAssistant({
         ...step,
         messages: thread.map((message) => ({ role: message.role, content: message.content })),
+        ...(assistantModel === undefined ? {} : { model: assistantModel }),
       });
       if (result.preparedEvalRuns.length > 0) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId) });
@@ -181,9 +196,37 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
   };
 
   return (
-    <aside className="flex h-full min-h-[480px] flex-col rounded-lg border" data-testid="evaluation-assistant">
-      <div className="flex items-center gap-2 border-b px-3 py-2 text-sm font-semibold"><Bot className="h-4 w-4" />Evaluation Assistant</div>
-      <div className="flex-1 space-y-3 overflow-y-auto p-3">
+    <aside className="flex h-full min-h-0 flex-col rounded-xl border bg-white shadow-lg dark:bg-background" data-testid="evaluation-assistant">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+          <span className="text-sm font-semibold">Evaluation Assistant</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAssistantSettingsOpen((current) => !current)}
+          className={cn('rounded-md p-1 transition-colors hover:bg-muted', assistantSettingsOpen ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}
+          title="Assistant settings"
+          aria-label="Assistant settings"
+        >
+          <Settings className="h-4 w-4" />
+        </button>
+      </div>
+      {assistantSettingsOpen && (
+        <div className="shrink-0 space-y-1.5 border-b px-4 py-2">
+          <span className="text-xs font-medium text-muted-foreground">Model</span>
+          <ModelPicker
+            value={assistantModel}
+            onChange={setAssistantModel}
+            defaultModel={EVALUATION_ASSISTANT_DEFAULT_MODEL}
+            requireToolSupport
+            minContextTokens={32000}
+            ariaLabel="Evaluation Assistant Model"
+            className={selectBase}
+          />
+        </div>
+      )}
+      <div ref={assistantScrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
         {messages.length === 0 && (
           <p className="text-xs text-muted-foreground">
             Ask what to check, have it draft Evaluators and cases from real runs, prepare an Eval Run or explain a report.
@@ -211,7 +254,7 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
         {pending && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Working…</div>}
         {error !== null && <p className="text-xs text-destructive">{error}</p>}
       </div>
-      <div className="flex gap-2 border-t p-2">
+      <div className="flex shrink-0 gap-2 border-t p-2">
         <textarea
           data-testid="evaluation-assistant-input"
           className="min-h-9 flex-1 resize-none rounded-md border bg-background px-2 py-1.5 text-sm"
