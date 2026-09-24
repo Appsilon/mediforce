@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { EvalRunOutputSchema } from '@mediforce/platform-api/contract';
 import { test, expect } from '../helpers/test-fixtures';
+import { TEST_USER_PASSWORD } from '../helpers/constants';
+import { pollUntil } from '../helpers/poll-until';
 import { trackPageErrors } from '../helpers/page-errors';
-import { JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
+import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
 import { EVALUATION_WORKSPACE, seedEvaluationWorkspace } from '../helpers/evaluation-workspace';
 import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
 
@@ -12,13 +15,20 @@ import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
  * draft leaves the Brief unwritten; a plan's risk asks the assistant to draft
  * its check; outputs it picks are labelled by the person and become Eval
  * Cases. The steps the assistant took stay listed under its reply, and the
- * panel widens from its left edge. The model is the scripted mock OpenRouter.
+ * panel widens from its left edge. Acceptance Criteria the assistant proposes
+ * are set on accepting them, and a person signs a Step Qualification from a
+ * finished run's report. The model is the scripted mock OpenRouter.
  */
 test.describe('Step Evaluation tab', () => {
+  // Each worker seeding the workspace's model key at once races on its insert, so the tab's journeys share one worker.
+  test.describe.configure({ mode: 'serial' });
+  test.beforeAll(async () => {
+    await seedEvaluationWorkspace();
+  });
+
   test('the assistant proposes; accepting a proposal creates it, rejecting one does not', async ({ page, request }) => {
     test.setTimeout(90_000);
     trackPageErrors(page);
-    await seedEvaluationWorkspace();
     const workflowName = `e2e-eval-tab-${randomUUID().slice(0, 8)}`;
     const runId = await startRun(request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE);
     await awaitFinishedAgentRun(request, runId);
@@ -83,7 +93,6 @@ test.describe('Step Evaluation tab', () => {
   test('a plan drafts its checks one risk at a time; the person labels the outputs the assistant picks', async ({ page, request }) => {
     test.setTimeout(90_000);
     trackPageErrors(page);
-    await seedEvaluationWorkspace();
     const workflowName = `e2e-eval-label-${randomUUID().slice(0, 8)}`;
     const runId = await startRun(request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE);
     const agentRunId = (await awaitFinishedAgentRun(request, runId)).id;
@@ -138,5 +147,67 @@ test.describe('Step Evaluation tab', () => {
     await expect(plan.getByTestId('plan-risk')).toHaveCount(1);
     await plan.getByRole('button', { name: 'Draft this check' }).click();
     await expect(page.getByText('Drafting the fatal-outcome check now.')).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('accepted criteria judge a run, and the person signs a Step Qualification from its report', async ({ page, request }) => {
+    test.setTimeout(150_000);
+    trackPageErrors(page);
+    const workflowName = `e2e-eval-qualify-${randomUUID().slice(0, 8)}`;
+    const runId = await startRun(request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE);
+    const agentRunId = (await awaitFinishedAgentRun(request, runId)).id;
+    const step = { namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes' };
+    const post = async (path: string, data: Record<string, unknown>) => {
+      const res = await request.post(path, { headers: JSON_HEADERS, data });
+      expect(res.status(), await res.text()).toBeLessThan(300);
+      return res.json();
+    };
+    await post('/api/evaluation/briefs', { ...step, text: 'Grades AEs for the DSMB.' });
+    await post('/api/evaluation/evaluators', { ...step, name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical', check: { kind: 'schema', schema: { required: ['summary'] } } });
+    await post('/api/evaluation/evaluators', { ...step, name: 'findings-present', rule: 'The result lists findings.', severity: 'major', check: { kind: 'schema', schema: { required: ['findings'] } } });
+    await post('/api/evaluation/cases/from-agent-run', { agentRunId, expectation: 'positive' });
+    await post('/api/evaluation/datasets', step);
+
+    const question = `What should the floors be? ${randomUUID()}`;
+    await scriptOpenRouter(question, [
+      {
+        toolCalls: [{
+          name: 'propose_acceptance_criteria',
+          arguments: { criteria: { critical: { minPassRate: 0.1 }, major: { minPassRate: 0.5 } }, rationale: 'A missed summary loses the whole grading.' },
+        }],
+      },
+      { content: 'Here are floors for the critical and major checks.' },
+    ]);
+    await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
+    await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await expect(page.getByTestId('step-qualification-badge')).toHaveAttribute('data-status', 'not_qualified', { timeout: 10_000 });
+    await page.getByTestId('evaluation-assistant-input').fill(question);
+    await page.getByTestId('evaluation-assistant-send').click();
+    const criteriaCard = page.getByTestId('proposal-card').filter({ hasText: 'Proposed Acceptance Criteria' });
+    await criteriaCard.getByTestId('proposal-accept').click();
+    await expect(criteriaCard.getByText('Accepted')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('acceptance-criteria')).toHaveText('critical: lower bound ≥ 0.1; major: lower bound ≥ 0.5');
+
+    // The run is prepared and confirmed over the API; the report is read and signed in the tab.
+    const prepared = EvalRunOutputSchema.parse(await post('/api/evaluation/runs', { ...step, trialsPerCase: 1, budgetUsd: 1 }));
+    await post(`/api/evaluation/runs/${prepared.evalRun.id}/start`, { confirmedBudgetUsd: 1 });
+    await pollUntil(async () => {
+      const res = await request.get(`/api/evaluation/runs/${prepared.evalRun.id}`, { headers: AUTH_HEADERS });
+      return EvalRunOutputSchema.parse(await res.json()).evalRun.status === 'completed' ? true : null;
+    }, { description: 'the Eval Run to complete', timeoutMs: 90_000 });
+
+    await page.reload();
+    await page.getByRole('button', { name: prepared.evalRun.id.slice(0, 8) }).click();
+    const report = page.getByTestId('variant-report');
+    await expect(report.getByTestId('criteria-verdicts')).toContainText('critical met');
+    await expect(report.getByTestId('criteria-verdicts')).toContainText('major missed');
+    await report.getByTestId('sign-qualification').click();
+    const form = page.getByTestId('sign-qualification-form');
+    await expect(form).toContainText('as stated in Evaluation Brief v1');
+    await form.getByLabel('Justification for the major criterion').fill('Findings are listed downstream; a reviewer reads every grade.');
+    await form.getByLabel('Your password').fill(TEST_USER_PASSWORD);
+    await form.getByRole('button', { name: 'Sign' }).click();
+
+    await expect(page.getByTestId('step-qualification-badge')).toHaveAttribute('data-status', 'qualified', { timeout: 10_000 });
+    await expect(page.getByTestId('step-qualification')).toContainText('Deviation (major): Findings are listed downstream');
   });
 });

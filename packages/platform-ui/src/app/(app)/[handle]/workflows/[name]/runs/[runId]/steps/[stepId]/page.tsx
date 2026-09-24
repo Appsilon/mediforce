@@ -17,6 +17,7 @@ import { getAgentOutput, type AgentOutputData } from '@/components/tasks/task-ut
 import { resolveStepView } from '@/components/tasks/resolve-step-view';
 import { HumanStepView } from '@/components/tasks/human-step-view';
 import { AgentOutputDisplay } from '@/components/agents/agent-output-display';
+import { StepQualificationBadge } from '@/components/evaluation/step-qualification-badge';
 import { agentOutputFromEnvelope } from './agent-output-from-envelope';
 import { isEntryStep } from './step-input';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
@@ -198,6 +199,9 @@ export default function StepDetailPage() {
             <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 dark:bg-violet-900/30 px-2 py-0.5 text-xs text-violet-700 dark:text-violet-300">
               <Bot className="h-3 w-3" /> Agent
             </span>
+          )}
+          {executorType === 'agent' && handle !== undefined && runVersion !== null && !Number.isNaN(runVersion) && (
+            <StepQualificationBadge step={{ namespace: handle, workflowName: decodedName, stepId: decodedStepId }} definitionVersion={runVersion} />
           )}
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">

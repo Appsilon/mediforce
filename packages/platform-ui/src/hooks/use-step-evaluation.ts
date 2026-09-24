@@ -6,7 +6,17 @@ import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 
-type Section = 'brief' | 'evaluators' | 'cases' | 'datasets' | 'mcp-policy' | 'runs' | 'agent-runs' | `labels:${string}`;
+type Section =
+  | 'brief'
+  | 'evaluators'
+  | 'cases'
+  | 'datasets'
+  | 'mcp-policy'
+  | 'runs'
+  | 'agent-runs'
+  | 'criteria'
+  | `qualification:${number | 'runnable'}`
+  | `labels:${string}`;
 
 function sectionKey(step: EvaluatedStep, section: Section) {
   return queryKeys.evaluation.section(step.namespace, step.workflowName, step.stepId, section);
@@ -30,6 +40,18 @@ export function useEvaluatorLabels(step: EvaluatedStep, evaluatorId: string) {
   });
 }
 
+/**
+ * The Step's qualification badge (ADR-0023 D11) — for its runnable version, or
+ * for `definitionVersion`, what a run of that version ran.
+ */
+export function useStepQualification(step: EvaluatedStep, definitionVersion?: number) {
+  return useQuery({
+    queryKey: sectionKey(step, `qualification:${definitionVersion ?? 'runnable'}`),
+    queryFn: () => mediforce.evaluation.getQualification({ ...step, ...(definitionVersion === undefined ? {} : { definitionVersion }) }),
+    retry: stopRetryOn4xx,
+  });
+}
+
 /** Every read the Evaluation tab shows for one agent Step (ADR-0023). */
 export function useStepEvaluation(step: EvaluatedStep) {
   const options = { retry: stopRetryOn4xx } as const;
@@ -40,6 +62,8 @@ export function useStepEvaluation(step: EvaluatedStep) {
     datasets: useQuery({ queryKey: sectionKey(step, 'datasets'), queryFn: () => mediforce.evaluation.listDatasets(step), ...options }),
     mcpPolicy: useQuery({ queryKey: sectionKey(step, 'mcp-policy'), queryFn: () => mediforce.evaluation.getMcpPolicy(step), ...options }),
     runs: useQuery({ queryKey: sectionKey(step, 'runs'), queryFn: () => mediforce.evaluation.listRuns(step), ...options }),
+    criteria: useQuery({ queryKey: sectionKey(step, 'criteria'), queryFn: () => mediforce.evaluation.getAcceptanceCriteria(step), ...options }),
+    qualification: useStepQualification(step),
     agentRuns: useQuery({
       queryKey: sectionKey(step, 'agent-runs'),
       queryFn: () => mediforce.evaluation.listStepAgentRuns({ ...step, limit: 10 }),

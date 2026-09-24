@@ -16,14 +16,16 @@ Everything below belongs to one agent Step, keyed by
 Definition: adding a check never mints a definition version. Reading needs only
 access to the workflow; changing anything needs its `edit` verb, and
 previewing checks or preparing, starting and cancelling Eval Runs its `run`
-verb. A Step that still declares MCP servers inline on `agent.mcpServers`
-cannot be evaluated — an eval policy cannot deny them, so move them onto its
+verb. Signing a Step Qualification needs `edit` and a signed-in person. A
+Step that still declares MCP servers inline on `agent.mcpServers` cannot be
+evaluated — an eval policy cannot deny them, so move them onto its
 agent first.
 
 ## The Evaluation Assistant
 
 The **Evaluation** tab of a workflow shows one agent step at a time — its
-Brief, Evaluators, Eval Cases, MCP eval policy and Eval Runs — beside the
+Step Qualification, Brief, Acceptance Criteria, Evaluators, Eval Cases, MCP
+eval policy and Eval Runs — beside the
 Evaluation Assistant (`mediforce eval ask`, `POST /api/evaluation/assistant`).
 Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 
@@ -34,16 +36,21 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   SKILL.md, the steps upstream of it), its
   production runs with the reviewer's verdict and their trajectories, the
   workspace files a run started from, Evaluators with their labels and
-  calibration, cases, Eval Runs and reports, and `preview_evaluator` — it
-  tries a check on real outputs before proposing it.
+  calibration, cases, Eval Runs and reports, each challenger compared with the
+  champion (`compare_variants`), the step's qualification and Acceptance
+  Criteria (`get_qualification`), and `preview_evaluator` — it tries a check
+  on real outputs before proposing it.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
-  written or synthesized) and Brief drafts come back as cards to accept, edit
-  or reject. Accepting one is the same write the forms make, recorded with
-  `origin: assistant`.
-- **Prepares:** it can prepare an Eval Run; the run starts only when the person
-  confirms its budget on the card. Its own start attempt is refused.
-- **Never:** approving a `code` check's source, labelling outputs, signing.
-  There is no tool for these.
+  written or synthesized), Brief drafts and Acceptance Criteria come back as
+  cards to accept, edit or reject. Accepting one is the same write the forms
+  make, recorded with `origin: assistant`. A routing recommendation (Control
+  Mode and `confidenceThreshold`) comes back as a card to apply in the
+  workflow editor.
+- **Prepares:** it can prepare an Eval Run, with challengers; the run starts
+  only when the person confirms its budget on the card. Its own start attempt
+  is refused.
+- **Never:** approving a `code` check's source, labelling outputs, signing a
+  Step Qualification. There is no tool for these.
 
 The step's Brief is sent to the assistant on every turn. What it can help with:
 
@@ -52,8 +59,16 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   why, the cheapest check that would catch it, the inputs worth trying it on —
   and suggested Acceptance Criteria (minimum pass rates per severity, on the
   Wilson 95% lower bound). A plan creates nothing; **Draft this check** on a
-  risk asks the assistant to draft it. The suggested criteria are not stored:
-  Eval Runs do not judge against criteria yet.
+  risk asks the assistant to draft it, and **Use as Acceptance Criteria** sets
+  the suggested floors.
+- **Acceptance Criteria.** From the step's risks and Brief, it proposes floors
+  per severity — with pass^k where the step would run unreviewed — and says
+  how many graded trials a floor needs (30 passes out of 30 have a lower bound
+  of 0.89).
+- **Variants and routing.** It prepares runs with challengers, compares each
+  with the champion without calling a difference the intervals do not show,
+  explains each criterion's verdict, and recommends a Control Mode and
+  `confidenceThreshold` from the run's confidence calibration.
 - **Rule to check.** A plain-language rule becomes the cheapest reliable kind —
   `schema`, then `code`, a judge only when a script cannot decide it. Every
   proposed check is tried by the platform on the step's recent production
@@ -186,21 +201,30 @@ Per MCP server of the Step's agent: `live`, `live` with named tools denied, or
 
 ## Eval Runs
 
-An Eval Run runs the Step, as its runnable Definition version has it, over a
-frozen Dataset version: every case, `trialsPerCase` times.
+An Eval Run runs the Step, as its runnable Definition version has it — the
+**champion** — and up to three **challengers** over a frozen Dataset version:
+every case, `trialsPerCase` times, per variant. A challenger is a patch over
+the champion (`run-prepare --challengers <file>`, `challengers` in
+`POST /api/evaluation/runs`): `model`, `prompt` and `allowedTools` replace the
+step's own, `mcpRestrictions` narrow it (servers the agent binds only),
+`skillCommit` moves the workflow's `externalSkillsRepo` commit. A challenger
+that changes nothing, or runs the same step as another variant, is refused.
+Few-shot examples come with `agent.examples` in phase 4.
 
 1. **Prepare** (`run-prepare`, `POST /api/evaluation/runs`) freezes the Dataset
    version (the newest unless named), the latest version of every live
-   Evaluator — and whether each one counts — and the MCP eval policy, and
-   estimates the cost: the Step's mean cost over its recent production runs, or
-   its model's registry price for a nominal turn when it has none, plus one call
-   per `llm_judge`. The budget cap defaults to 1.5× the estimate; with no
-   estimate it must be given.
+   Evaluator — and whether each one counts — the MCP eval policy, the step's
+   current Acceptance Criteria and Brief version, and each variant's Step
+   Fingerprint, and estimates the cost: the Step's mean cost over its recent
+   production runs, or its model's registry price for a nominal turn when it
+   has none, plus one call per `llm_judge`; a challenger on another model is
+   that model's price for the tokens the step's runs used. The budget cap
+   defaults to 1.5× the estimate; with no estimate it must be given.
 2. **Start** (`run-start --confirm-budget <usd>`) needs the budget echoed back —
    the person confirming what the run may spend. Without it the start is
    refused, which is also how an assistant's attempt to start one ends.
-3. Each **trial** is a real Workflow Run flagged with the Eval Run's id. It
-   enters the Step directly with the case's trigger payload and earlier step
+3. Each **trial** is a real Workflow Run flagged with the Eval Run's id,
+   running its variant's patch. It enters the Step directly with the case's trigger payload and earlier step
    outputs, its workspace branched from the case's seed commit, and stops after
    the Step: no review task, no escalation, no next step. MCP servers the policy
    does not declare `live` are removed from the agent's config; a Step that
@@ -223,11 +247,89 @@ frozen Dataset version: every case, `trialsPerCase` times.
    scored the trial. A trial whose scoring was abandoned three times fails.
 
 The **report** (`mediforce eval report <id>`, `GET /api/evaluation/runs/:id`)
-is computed from those Scores. Per Evaluator: pass rate with its Wilson 95%
+is computed from those Scores, per variant. Per Evaluator: pass rate with its Wilson 95%
 interval, pass@k (a case passes if any of its k trials does), pass^k (all of
 them do), flakiness (its trials disagree), and checks that could not grade a
 trial as errors. A trial that could not be graded, or failed before producing
 an Agent Run, stays out of the pass rate but still counts toward its case's k,
 so it can lower pass@k and pass^k, never lift them. Evaluators that do not
 count are marked so. Tokens and duration come from the trials' runs; cost adds
-the judge calls.
+the judge calls. Then, per variant:
+
+- **Acceptance Criteria.** Each severity the frozen criteria set is `met` when
+  every counted Evaluator of that severity reaches its floor — the pass rate's
+  Wilson 95% lower bound, and pass^k where set — `missed` when one does not,
+  and `not judged` when no counted Evaluator of that severity exists or one
+  graded nothing. A run prepared before any criteria were set judges nothing.
+- **Confidence calibration.** The confidence each trial's agent reported,
+  against whether its output passed every counted Evaluator that graded it:
+  the pass rate in five confidence bins and the expected calibration error.
+- **Routing.** Once the variant's trials are done: Control Mode 4 with a
+  `confidenceThreshold` — the lowest confidence at which the outputs at or
+  above it (at least 5) passed every counted Evaluator with a lower bound of
+  at least the strictest criterion's floor; below it the step's
+  `fallbackBehavior` applies — or Control Mode 3, a person reviewing every
+  output, when there are no criteria, one could not be judged, the agent
+  reported no confidence, or no threshold holds. A recommendation to apply in
+  the workflow editor.
+
+Each challenger is compared with the champion Evaluator by Evaluator: `better`
+or `worse` only when their Wilson intervals do not overlap, otherwise `no
+clear difference`, with the change in mean cost and duration.
+
+## Acceptance Criteria
+
+The floors a step's Eval Runs are judged against, per severity: `minPassRate`
+on the Wilson 95% lower bound, and optionally `minPassHatK`. Every write is a
+new version; an Eval Run freezes the version in force when it is prepared, so
+changing them never rejudges a run. `mediforce eval criteria-get|criteria-set
+--file`, `GET|POST /api/evaluation/acceptance-criteria`.
+
+## Step Fingerprint
+
+A SHA-256 over the parts of the step that shape its behaviour, each hashed on
+its own so two Fingerprints say what differs:
+
+| Component | What is hashed |
+|---|---|
+| `step` | the agent config, plugin, agent id, params, step params, env and MCP restrictions — not its name, display, `autonomyLevel`, `review`, `confidenceThreshold` or `fallbackBehavior` |
+| `model` | the step's model, or its agent's when the step names none |
+| `systemPrompt` | the agent's system prompt |
+| `skill` | every file the workflow carries under `<skillsDir>/<skill>/`, or the external skills repository, commit and path |
+| `image` | the image reference the runtime resolves, the files a carried Dockerfile builds from, and the commit a repository build checks out |
+| `mcpServers` | the MCP servers and tools production resolves for the step |
+| `preamble` | the workflow preamble |
+
+Routing is left out, so applying a recommended Control Mode or
+`confidenceThreshold` keeps a qualification. The MCP eval policy is left out
+too (ADR-0023 D6); a qualification states it instead. The image is its
+reference, not a registry digest: a tag re-pushed under the same name does not
+change the Fingerprint — pin an image by digest (`image@sha256:…`) where that
+matters.
+
+## Step Qualification
+
+A person signs a Step Qualification for one variant of a finished Eval Run —
+**Sign Step Qualification** on that variant in the report (web only; an API key
+cannot sign, so the CLI has no command for it). The run must have Acceptance
+Criteria and a Brief version frozen into it. The signer reads what the
+signature means ("Approved: I reviewed this Eval Run and qualify this Step
+configuration for its context of use as stated in Evaluation Brief vN."),
+writes a justification for each criterion the variant missed or that could not
+be judged — recorded as a deviation; a justification for a criterion that was
+met is refused — and re-enters their password. On a deployment without
+password sign-in the signature is recorded as made from the session; a user
+without a password on one with it must set one first. The qualification cites
+the Eval Run, the variant and its patch, its Fingerprint, the Brief version,
+the Evaluator versions, the MCP eval policy, the criteria and each verdict, and
+is never changed; signing is audited as `step_qualification.signed`.
+
+The badge (`mediforce eval qualification [--version N]`,
+`GET /api/evaluation/qualification`) is **Qualified** when a qualification
+binds the step's Fingerprint as it is now, **Stale** when qualifications exist
+but none does — naming the components that changed — and **Not qualified**
+when none was signed. It shows in the Evaluation tab, and on an agent step of a
+run for the Definition version that run ran. A challenger that was qualified
+becomes Qualified once the step is changed to match it. Evaluators added,
+archived or given a new version since are flagged beside it, without making
+it stale. The badge is informational: nothing is blocked without one.
