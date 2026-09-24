@@ -13,5 +13,5 @@ export {
   listEvalRuns,
   cancelEvalRun,
   advanceEvalRunOfInstance,
-  driveRunningEvalRuns,
+  driveOpenEvalRuns,
 } from './eval-runs';

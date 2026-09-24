@@ -30,31 +30,40 @@ function mean(values: readonly number[]): number | null {
  * received — so its numbers are the Scores' numbers by construction. Per
  * Evaluator: pass rate with its Wilson 95% interval, pass@k, pass^k and
  * flakiness over cases; a trial the check could not grade counts as an error,
- * not a failure.
+ * not a failure. Over cases, an ungraded or failed trial still counts toward
+ * k, so it can lower pass@k and pass^k but never lift them.
  */
 export async function buildEvalRunReport(scope: CallerScope, run: EvalRun, trials: readonly EvalTrial[]): Promise<EvalRunReport> {
   const scores = await trialScores(scope, run, trials);
   const scored = trials.filter((trial) => trial.status === 'scored');
+  const attempted = trials.filter((trial) => trial.status === 'scored' || trial.status === 'failed');
 
   const evaluators = run.evaluators.map((evaluator) => {
     let passes = 0;
     let failures = 0;
     let errors = 0;
-    const passedByCase = new Map<string, boolean[]>();
-    for (const trial of scored) {
+    const outcomesByCase = new Map<string, (boolean | null)[]>();
+    const recordOutcome = (caseId: string, passed: boolean | null) =>
+      outcomesByCase.set(caseId, [...(outcomesByCase.get(caseId) ?? []), passed]);
+    for (const trial of attempted) {
+      if (trial.status === 'failed') {
+        recordOutcome(trial.caseId, null);
+        continue;
+      }
       const score = scores.get(trial.id)?.find((candidate) => candidate.evaluatorId === evaluator.evaluatorId);
       if (score === undefined) {
         errors += 1;
+        recordOutcome(trial.caseId, null);
         continue;
       }
       const passed = score.value >= JUDGE_PASS_VALUE;
       if (passed) passes += 1;
       else failures += 1;
-      passedByCase.set(trial.caseId, [...(passedByCase.get(trial.caseId) ?? []), passed]);
+      recordOutcome(trial.caseId, passed);
     }
     const graded = passes + failures;
     const interval = wilsonInterval(passes, graded);
-    const reliability = caseReliability(passedByCase);
+    const reliability = caseReliability(outcomesByCase);
     return {
       ...evaluator,
       passes,

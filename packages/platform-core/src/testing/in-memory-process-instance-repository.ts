@@ -407,7 +407,8 @@ export class InMemoryProcessInstanceRepository
         i.namespace === namespace &&
         i.definitionName === name &&
         i.deleted !== true &&
-        i.archived !== true,
+        i.archived !== true &&
+        i.evalRunId === undefined,
     );
     const active = scoped.filter((i) => ACTIVE_STATUSES.has(i.status)).length;
     const counted = includeCompleted

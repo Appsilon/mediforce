@@ -268,7 +268,9 @@ export async function executeAgentStep(
 /**
  * An eval trial's step as its MCP servers see it (ADR-0023 D6): every server of
  * the step's agent runs under the Eval Run's frozen policy — denied unless the
- * author declared it live — on top of the step's own restrictions.
+ * author declared it live — on top of the step's own restrictions. Inline
+ * servers bypass the agent's bindings, so no policy can deny them: the trial
+ * fails closed rather than run them.
  */
 async function withMcpEvalPolicy(
   step: WorkflowStep,
@@ -276,6 +278,13 @@ async function withMcpEvalPolicy(
   evaluationRepo: EvaluationRepository,
   agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>,
 ): Promise<WorkflowStep> {
+  const inlineServers = step.agent?.mcpServers ?? [];
+  if (inlineServers.length > 0) {
+    throw new Error(
+      `Step '${step.id}' declares MCP servers inline (${inlineServers.map((server) => server.name).join(', ')}); `
+      + 'an eval trial cannot run them under its MCP eval policy',
+    );
+  }
   if (step.agentId === undefined) return step;
   const evalRun = await evaluationRepo.getEvalRun(evalRunId);
   if (evalRun === null) throw new Error(`Eval Run '${evalRunId}' of this trial not found`);

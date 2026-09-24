@@ -28,6 +28,14 @@ describe('caseReliability', () => {
     expect(reliability).toEqual({ passAtK: 2 / 3, passHatK: 1 / 3, flakiness: 1 / 3 });
   });
 
+  it('keeps a trial that could not be graded in its case\'s k, so it cannot lift pass^k', () => {
+    const reliability = caseReliability(new Map([
+      ['grade-5-sepsis', [true, null]],
+      ['hys-law', [null, null]],
+    ]));
+    expect(reliability).toEqual({ passAtK: 1 / 2, passHatK: 0, flakiness: 0 });
+  });
+
   it('is null with nothing graded', () => {
     expect(caseReliability(new Map([['a', []]]))).toBeNull();
   });

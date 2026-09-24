@@ -125,6 +125,7 @@ export async function prepareEvalRun(
       durationMs: null,
       error: null,
       startedAt: null,
+      scoringStartedAt: null,
       completedAt: null,
     })));
   await scope.evaluation.createEvalRun(run, trials);
@@ -219,9 +220,12 @@ export async function advanceEvalRunOfInstance(scope: CallerScope, processInstan
   if (trial !== null) await driveEvalRun(scope, trial.evalRunId);
 }
 
-/** The heartbeat's sweep: move every running Eval Run on, in case a driver died. */
-export async function driveRunningEvalRuns(scope: CallerScope): Promise<void> {
-  for (const evalRunId of await scope.evaluation.listEvalRunIdsByStatus('running')) {
+/**
+ * The heartbeat's sweep: move on every Eval Run that is running or still has
+ * a trial in flight — a cancelled one included — in case a driver died.
+ */
+export async function driveOpenEvalRuns(scope: CallerScope): Promise<void> {
+  for (const evalRunId of await scope.evaluation.listEvalRunIdsToDrive()) {
     try {
       await driveEvalRun(scope, evalRunId);
     } catch (err) {

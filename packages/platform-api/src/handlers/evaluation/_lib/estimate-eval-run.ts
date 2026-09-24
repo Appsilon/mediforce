@@ -12,7 +12,8 @@ function round(usd: number): number {
   return Math.round(usd * 10_000) / 10_000;
 }
 
-async function priceOf(scope: CallerScope, model: string | undefined, tokens: { input: number; output: number }): Promise<number | null> {
+/** What `tokens` cost at the model registry's price; null for a model it does not price. */
+export async function priceOf(scope: CallerScope, model: string | undefined, tokens: { input: number; output: number }): Promise<number | null> {
   if (model === undefined) return null;
   const entry = (await scope.models.list()).find((candidate) => candidate.id === model);
   return entry === undefined ? null : entry.pricing.input * tokens.input + entry.pricing.output * tokens.output;

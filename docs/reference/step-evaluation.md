@@ -90,18 +90,29 @@ frozen Dataset version: every case, `trialsPerCase` times.
    enters the Step directly with the case's trigger payload and earlier step
    outputs, its workspace branched from the case's seed commit, and stops after
    the Step: no review task, no escalation, no next step. MCP servers the policy
-   does not declare `live` are removed from the agent's config. Run lists,
-   monitoring, the Agents history and carry-over (`inputForNextRun`) leave
-   trials out.
+   does not declare `live` are removed from the agent's config; a Step that
+   declares MCP servers inline cannot be evaluated at all. Run lists, workflow
+   summaries, monitoring, the Agents history and carry-over (`inputForNextRun`)
+   leave trials out.
 4. When a trial's run ends, every frozen Evaluator grades its Agent Run and
    writes a Score (`source: deterministic` or `llm_judge`, `metadata.evalRunId`).
    Trials start `concurrency` at a time; once spend reaches the budget the rest
-   are skipped and the run ends `budget_exceeded`. The heartbeat moves any
-   running Eval Run on, so a restart does not strand one.
+   are skipped and the run ends `budget_exceeded`. A trial's cost is its Agent
+   Run plus the LLM judge calls that graded it (at the model registry's price),
+   and both count toward the budget. **Cancel** skips the pending trials; the
+   ones already running still finish and are scored. The heartbeat moves on
+   every running Eval Run, and any cancelled one with trials in flight, so a
+   restart does not strand one: a driver that died after claiming a trial —
+   before creating its run, or mid-scoring — leaves a claim that another takes
+   over once it is 15 minutes old, without re-running Evaluators that already
+   scored the trial.
 
 The **report** (`mediforce eval report <id>`, `GET /api/evaluation/runs/:id`)
 is computed from those Scores. Per Evaluator: pass rate with its Wilson 95%
 interval, pass@k (a case passes if any of its k trials does), pass^k (all of
 them do), flakiness (its trials disagree), and checks that could not grade a
-trial as errors. Evaluators that do not count are marked so. Cost, tokens and
-duration come from the trials' runs.
+trial as errors. A trial that could not be graded, or failed before producing
+an Agent Run, stays out of the pass rate but still counts toward its case's k,
+so it can lower pass@k and pass^k, never lift them. Evaluators that do not
+count are marked so. Tokens and duration come from the trials' runs; cost adds
+the judge calls.

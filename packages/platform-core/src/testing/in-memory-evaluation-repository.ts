@@ -165,8 +165,11 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     return newestFirst([...this.runs.values()].filter((run) => sameStep(run, step)));
   }
 
-  async listEvalRunIdsByStatus(status: EvalRunStatus): Promise<string[]> {
-    return [...this.runs.values()].filter((run) => run.status === status).map((run) => run.id);
+  async listEvalRunIdsToDrive(): Promise<string[]> {
+    const inFlight = new Set([...this.trials.values()]
+      .filter((trial) => trial.status === 'running' || trial.status === 'scoring')
+      .map((trial) => trial.evalRunId));
+    return [...this.runs.values()].filter((run) => run.status === 'running' || inFlight.has(run.id)).map((run) => run.id);
   }
 
   async transitionEvalRun(
@@ -203,6 +206,14 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     const trial = this.trials.get(id);
     if (trial === undefined || trial.status !== from) return false;
     this.trials.set(id, EvalTrialSchema.parse({ ...trial, ...patch }));
+    return true;
+  }
+
+  async renewScoringClaim(id: string, staleBefore: string, now: string): Promise<boolean> {
+    const trial = this.trials.get(id);
+    if (trial === undefined || trial.status !== 'scoring' || trial.scoringStartedAt === null) return false;
+    if (Date.parse(trial.scoringStartedAt) >= Date.parse(staleBefore)) return false;
+    this.trials.set(id, { ...trial, scoringStartedAt: now });
     return true;
   }
 

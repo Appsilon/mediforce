@@ -19,7 +19,7 @@ import type {
 import type { CallerScope } from '../../repositories/index';
 import { ForbiddenError, PreconditionFailedError } from '../../errors';
 import { resumeWait } from '../processes/resume-wait';
-import { driveRunningEvalRuns } from '../evaluation/eval-runs';
+import { driveOpenEvalRuns } from '../evaluation/eval-runs';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
 
@@ -306,9 +306,9 @@ export async function heartbeat(
     }
   }
 
-  // Sweep: move every running Eval Run on (ADR-0023 D4). A trial's run ending
-  // drives it too; this catches the one whose driver died between trials.
-  await driveRunningEvalRuns(scope);
+  // Sweep: move on every Eval Run with work left (ADR-0023 D4). A trial's run
+  // ending drives it too; this catches the one whose driver died.
+  await driveOpenEvalRuns(scope);
 
   // Sweep: refresh the model registry once it has gone a day without a sync.
   // The heartbeat is the only scheduler every deployment is guaranteed to run,

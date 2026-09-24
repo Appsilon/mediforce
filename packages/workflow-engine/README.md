@@ -41,8 +41,9 @@ go is a bug in the definition, and the engine's job is to say so loudly.
 make a workflow pass is treating the symptom.
 
 **An eval trial runs one step and stops** ([ADR-0023](../../docs/adr/0023-step-evaluation.md)
-D4). `createEvalTrial` creates a run already `running` at the target step with
-seeded variables, so the auto-runner executes it like any other;
+D4). `createEvalTrial` creates a run — under the id the Eval Run claimed the
+trial with — already `running` at the target step with seeded variables, so the
+auto-runner executes it like any other;
 `finishEvalTrial` ends it after that step. The agent step executor calls it for
 any run carrying `evalRunId` instead of routing — nothing downstream of the
 evaluated step ever runs.

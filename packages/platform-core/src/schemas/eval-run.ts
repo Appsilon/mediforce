@@ -79,6 +79,7 @@ export const EvalTrialSchema = z.object({
   status: EvalTrialStatusSchema,
   processInstanceId: z.string().nullable(),
   agentRunId: z.string().nullable(),
+  /** The Agent Run's cost plus the LLM judge calls that scored it. */
   costUsd: z.number().nonnegative().nullable(),
   inputTokens: z.number().int().nonnegative().nullable(),
   outputTokens: z.number().int().nonnegative().nullable(),
@@ -86,6 +87,8 @@ export const EvalTrialSchema = z.object({
   /** Why the trial failed or was skipped, or which Evaluators could not run. */
   error: z.string().nullable(),
   startedAt: z.iso.datetime().nullable(),
+  /** When a driver claimed it for scoring; a stale claim is taken over. */
+  scoringStartedAt: z.iso.datetime().nullable(),
   completedAt: z.iso.datetime().nullable(),
 });
 
