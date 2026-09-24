@@ -124,11 +124,37 @@ as the caller and returns a refusal as a result (`needsAdmin`) instead of
 throwing. Tools that change what the person is editing are *proposals* the
 client applies; *platform* tools run here through `CallerScope`. The workspace
 `OPENROUTER_API_KEY` check is `services/openrouter-key.ts`, since non-assistant
-LLM calls need it too. The tool-calling loop itself is not shared yet: the
-workflow assistant (`handlers/workflow-assistant/ask-workflow-assistant.ts`)
-still runs its own, interleaved with its graph-completeness gates and truncation
-salvage. The cowork chat (`handlers/cowork/`) is a separate OpenRouter loop and
-does not use the core.
+LLM calls need it too. `runProposalToolLoop` is the loop for an assistant whose
+changes are all proposals — the Evaluation Assistant
+(`handlers/evaluation-assistant/`) runs on it. The workflow assistant
+(`handlers/workflow-assistant/ask-workflow-assistant.ts`) keeps its own loop,
+interleaved with its graph-completeness gates and truncation salvage. The
+cowork chat (`handlers/cowork/`) is a separate OpenRouter loop and does not use
+the core.
+
+The Evaluation Assistant allows 32 model/tool rounds with an 8,000-token
+completion budget per call, independent of the selected model's context window.
+On round exhaustion or a truncated text response, the proposal loop keeps all
+validated proposals and platform-call results and attempts one final no-tools
+summary (up to 2,000 tokens). If that call fails, the cards still return with an
+explicit partial-completion notice. Follow-up messages receive the summary,
+not a persisted tool transcript. Round logs include a request ID, model, tool
+names, token usage and finish reason; tool errors are logged separately.
+`runProposalToolLoop` reports each model round and each tool call (running,
+done or failed) to an optional `onProgress`; the Evaluation Assistant route
+streams those events to a client that asks for them. A proposal identical to
+one already made in the turn is returned once; the model is told it is a
+duplicate.
+Its `get_trajectory` tool returns complete stored entries using zero-based
+`offset` and `limit` (default 50, maximum 150), with `total` and `nextOffset`
+(`null` at the end); it never clips entry contents. The workflow assistant
+retains its separate 12-round, 8,000-token loop. Invalid tool arguments return
+`validationError` and the tool's `expectedArguments` JSON Schema (with examples);
+three consecutive rounds with an identical validation failure and no successful
+call stop the loop through the same partial-summary path.
+Each tool result sent back to the model is capped at 60,000 characters, with a
+truncation note that tells the model to ask for less; a dropped connection to
+OpenRouter is retried once and then ends the turn through the partial path.
 
 **`getPlatformServices()` is the only composition root.** It wires repositories,
 the workflow engine, the plugin registry and the action registry. It lives here —

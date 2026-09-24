@@ -260,6 +260,18 @@ export type {
   EvalRunReport,
 } from './schemas/eval-run';
 export {
+  ProposeEvaluatorToolSchema,
+  ProposeEvalCaseToolSchema,
+  ProposeBriefToolSchema,
+  EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
+  EVALUATION_ASSISTANT_PLATFORM_TOOLS,
+  EvaluationAssistantProposalSchema,
+  EVALUATION_ASSISTANT_DEFAULT_MODEL,
+  type EvaluationAssistantProposalToolName,
+  type EvaluationAssistantPlatformToolName,
+  type EvaluationAssistantProposal,
+} from './schemas/evaluation-assistant-tools';
+export {
   evaluatorTrust,
   wilsonInterval,
   caseReliability,

@@ -160,6 +160,7 @@ export const CreateEvalCaseInputSchema = EvaluatedStepSchema.extend({
   notes: z.string().trim().max(4000).nullable().default(null),
   split: EvalCaseSplitSchema.default('dev'),
   containsProductionData: z.boolean().default(false),
+  origin: EvaluationOriginSchema.default('user'),
 });
 
 /**
@@ -167,13 +168,16 @@ export const CreateEvalCaseInputSchema = EvaluatedStepSchema.extend({
  * it and its parent commit become the case. The expectation follows the run's
  * `human_verdict` Score — approved is positive, rejected is negative with the
  * reviewer's comment — and must be given when the run was never reviewed.
+ * With `step`, the run must be a run of that step.
  */
 export const CreateEvalCaseFromAgentRunInputSchema = z.object({
   agentRunId: z.string().min(1),
+  step: EvaluatedStepSchema.optional(),
   name: z.string().trim().min(1).max(200).optional(),
   expectation: EvalCaseExpectationSchema.optional(),
   notes: z.string().trim().max(4000).optional(),
   split: EvalCaseSplitSchema.default('dev'),
+  origin: EvaluationOriginSchema.default('user'),
 });
 export const EvalCaseOutputSchema = z.object({ evalCase: EvalCaseSchema });
 

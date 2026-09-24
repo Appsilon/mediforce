@@ -167,14 +167,19 @@ test.describe('Step Evaluation entities — API E2E', () => {
       headers: JSON_HEADERS, data: { agentRunId },
     });
     expect(unreviewed.status(), await unreviewed.text()).toBe(400);
+    const otherStep = await request.post('/api/evaluation/cases/from-agent-run', {
+      headers: JSON_HEADERS, data: { agentRunId, expectation: 'positive', step: { ...step, stepId: 'another-step' } },
+    });
+    expect(otherStep.status(), await otherStep.text()).toBe(400);
 
     const { evalCase } = EvalCaseOutputSchema.parse(await post(request, '/api/evaluation/cases/from-agent-run', {
-      agentRunId, expectation: 'positive', split: 'holdout',
+      agentRunId, step, expectation: 'positive', split: 'holdout', origin: 'assistant',
     }, 201));
     expect(evalCase).toMatchObject({
       ...step,
       source: 'production',
       sourceAgentRunId: agentRunId,
+      origin: 'assistant',
       expectation: 'positive',
       split: 'holdout',
       containsProductionData: true,

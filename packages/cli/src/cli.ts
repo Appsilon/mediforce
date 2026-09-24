@@ -126,6 +126,7 @@ import {
   evalRunPrepareCommand,
   evalRunStartCommand,
 } from './commands/eval-runs';
+import { evalAskCommand } from './commands/eval-ask';
 import { namespaceUpdateCommand } from './commands/namespace-update';
 import { namespaceDeleteCommand } from './commands/namespace-delete';
 import { namespaceResetCommand } from './commands/namespace-reset';
@@ -297,6 +298,7 @@ export const TREE: Record<string, BranchEntry> = {
       'run-list': { description: 'List a step\'s Eval Runs', fn: evalRunListCommand },
       'run-cancel': { description: 'Cancel an Eval Run', fn: evalRunCancelCommand },
       report: { description: 'Print an Eval Run and its report', fn: evalRunGetCommand },
+      ask: { description: 'Ask the step\'s Evaluation Assistant (proposals are printed, not applied)', fn: evalAskCommand },
     },
   },
   model: {

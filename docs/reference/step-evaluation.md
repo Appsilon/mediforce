@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-09-23
+last_reviewed: 2026-09-24
 ---
 
 # Step Evaluation
@@ -14,14 +14,64 @@ context of use. The design and its reasons are
 Everything below belongs to one agent Step, keyed by
 `(namespace, workflowName, stepId)`, and lives outside the Workflow
 Definition: adding a check never mints a definition version. Reading needs only
-access to the workflow; changing anything needs its `edit` verb. A Step that
-still declares MCP servers inline on `agent.mcpServers` cannot be evaluated —
-an eval policy cannot deny them, so move them onto its agent first.
+access to the workflow; changing anything needs its `edit` verb, and
+previewing checks or preparing, starting and cancelling Eval Runs its `run`
+verb. A Step that still declares MCP servers inline on `agent.mcpServers`
+cannot be evaluated — an eval policy cannot deny them, so move them onto its
+agent first.
+
+## The Evaluation Assistant
+
+The **Evaluation** tab of a workflow shows one agent step at a time — its
+Brief, Evaluators, Eval Cases, MCP eval policy and Eval Runs — beside the
+Evaluation Assistant (`mediforce eval ask`, `POST /api/evaluation/assistant`).
+Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
+
+- **Runs freely:** reading the step (config, agent prompt, SKILL.md, MCP
+  servers), its production runs and their trajectories, Evaluators, cases,
+  Eval Runs and reports, and `preview_evaluator` — it tries a check on real
+  outputs before proposing it.
+- **Proposes:** Evaluators, Eval Cases and Brief drafts come back as cards to
+  accept, edit or reject. Accepting one is the same write the forms make,
+  recorded with `origin: assistant`.
+- **Prepares:** it can prepare an Eval Run; the run starts only when the person
+  confirms its budget on the card. Its own start attempt is refused.
+- **Never:** approving a `code` check's source, labelling outputs, signing.
+  There is no tool for these.
+
+The step's Brief is sent to the assistant on every turn. In the web tab, Brief
+text is rendered as GitHub-Flavored Markdown, and the assistant pane uses the
+same model picker as the workflow editor so the model can be chosen per
+conversation. While it works, the pane lists each step it takes (reading a run,
+previewing a check, drafting a card) as it happens, and keeps that list folded
+under the reply; `mediforce eval ask` prints the same steps to stderr. The pane
+widens by dragging its left edge, and the width is remembered per browser.
+
+Each request allows 32 model/tool rounds and up to 8,000 output tokens per
+model call. These application limits are separate from the model's context
+window. Trajectories are read in pages of complete entries, including generated
+source; the assistant follows `nextOffset` to reach later pages instead of
+seeing only the beginning of a run. If the round or text-output limit is
+reached, completed proposal and prepared-run cards still return with an
+explicit notice and, when available, a summary of unfinished work. A follow-up
+can use that summary, but the full tool transcript is not carried between
+requests. Nothing is accepted or started automatically.
+
+When a tool call fails validation, the assistant gets the exact error, the
+expected argument schema and examples (a `check` is an object such as
+`{"kind":"code","runtime":"python","source":"..."}`, never a string). Three
+consecutive rounds that fail with the same validation error and no successful
+call end the turn early with the cause named in the notice.
+A single tool result the assistant reads — a trajectory page or a preview whose
+check writes a long `comment` — is cut to 60,000 characters with a note to ask
+for less, so one oversized result cannot exceed the model provider's request
+limit.
 
 ## Evaluation Brief
 
 A short text per Step — what it is for, who relies on its output, which
-failures matter most. Every write is a new version.
+failures matter most. Every write is a new version. The web tab displays the
+text as Markdown; the stored value remains the original text.
 `mediforce eval brief-get|brief-set`, `GET|POST /api/evaluation/briefs`.
 
 ## Evaluators
@@ -60,7 +110,8 @@ it must or must not contain. `case-from-run <agentRunId>` harvests one from a
 production run: an approved run is positive, a rejected one negative with the
 reviewer's comment; a run nobody reviewed, or one sent back for revision or a
 recheck, needs `--expectation`. Cases are `dev` or
-`holdout` and carry a *contains production data* flag.
+`holdout`, carry a *contains production data* flag, and an `origin` — `user`,
+or `assistant` for an accepted Evaluation Assistant proposal.
 
 `dataset-freeze` freezes the live cases into a numbered Eval Dataset version.
 A version never changes.

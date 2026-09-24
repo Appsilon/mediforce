@@ -8,8 +8,8 @@ import { evaluationFixture, GRADED_RUN, STEP, UNGRADED_RUN } from './fixture';
 describe('Eval Datasets', () => {
   it('freezes the live cases and flags production data', async () => {
     const fixture = await evaluationFixture();
-    const { evalCase: production } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'positive', split: 'dev' }, fixture.scope());
-    const { evalCase: archived } = await createEvalCaseFromAgentRun({ agentRunId: UNGRADED_RUN, expectation: 'negative', split: 'dev' }, fixture.scope());
+    const { evalCase: production } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'positive', split: 'dev', origin: 'user' }, fixture.scope());
+    const { evalCase: archived } = await createEvalCaseFromAgentRun({ agentRunId: UNGRADED_RUN, expectation: 'negative', split: 'dev', origin: 'user' }, fixture.scope());
     await archiveEvalCase({ caseId: archived.id, archived: true }, fixture.scope());
 
     const { dataset } = await freezeEvalDataset(STEP, fixture.scope());

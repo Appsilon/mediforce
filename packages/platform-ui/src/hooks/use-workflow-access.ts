@@ -120,3 +120,20 @@ export function useWorkflowEditGate(
       ' — see the Access tab',
   };
 }
+
+/**
+ * Whether this caller may start the workflow's runs, and what to say when they
+ * may not (ADR-0019's `run` verb) — the Start counterpart of
+ * `useWorkflowEditGate`, with the same `true` while the read is unresolved.
+ */
+export function useWorkflowRunGate(
+  namespace: string,
+  name: string,
+): { mayRun: boolean; reason: string | undefined } {
+  const { access, caller } = useWorkflowAccess(namespace, name);
+  if (caller === null || caller.mayRun) return { mayRun: true, reason: undefined };
+  return {
+    mayRun: false,
+    reason: `Starting this workflow is restricted to ${describeRoles(access?.run ?? [])} — see the Access tab`,
+  };
+}
