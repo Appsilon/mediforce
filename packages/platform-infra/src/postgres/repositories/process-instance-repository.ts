@@ -44,6 +44,11 @@ const WAITING_FOR_HUMAN_PAUSE_REASONS = [
   'agent_paused',
 ] as const;
 
+/** What makes a run one the listings show: not deleted, and not an eval trial (ADR-0023 D4). */
+function listedRunConditions(): SQL[] {
+  return [isNull(processInstances.deletedAt), isNull(processInstances.evalRunId)];
+}
+
 function displayStatusConditions(): Record<WorkflowDisplayStatus, SQL> {
   const paused = eq(processInstances.status, 'paused');
   const failed = eq(processInstances.status, 'failed');
@@ -145,6 +150,8 @@ export class PostgresProcessInstanceRepository
           parsed.totalCostUsd !== undefined ? String(parsed.totalCostUsd) : null,
         createdBy: parsed.createdBy,
         dryRun: parsed.dryRun === true,
+        evalRunId: parsed.evalRunId ?? null,
+        workspaceStartCommit: parsed.workspaceStartCommit ?? null,
         archivedAt: parsed.archived === true ? new Date() : null,
         deletedAt: parsed.deleted === true ? new Date() : null,
         createdAt: new Date(parsed.createdAt),
@@ -193,7 +200,7 @@ export class PostgresProcessInstanceRepository
   }
 
   async listAll(options: ListInstancesOptions): Promise<ProcessInstance[]> {
-    const conditions = [isNull(processInstances.deletedAt)];
+    const conditions = listedRunConditions();
     if (options.definitionName !== undefined) {
       conditions.push(eq(processInstances.definitionName, options.definitionName));
     }
@@ -221,7 +228,7 @@ export class PostgresProcessInstanceRepository
   ): Promise<ProcessInstance[]> {
     if (allowed.length === 0) return [];
     const conditions = [
-      isNull(processInstances.deletedAt),
+      ...listedRunConditions(),
       inArray(processInstances.workspace, [...allowed]),
     ];
     if (options.definitionName !== undefined) {
@@ -386,7 +393,7 @@ export class PostgresProcessInstanceRepository
     options: Pick<ListInstancesPageOptions, 'namespace' | 'definitionName' | 'dryRun' | 'archived'>,
     allowed: readonly string[] | undefined,
   ): SQL[] {
-    const conditions: SQL[] = [isNull(processInstances.deletedAt)];
+    const conditions = listedRunConditions();
     if (allowed !== undefined) {
       conditions.push(inArray(processInstances.workspace, [...allowed]));
     }
@@ -549,7 +556,7 @@ export class PostgresProcessInstanceRepository
         and(
           eq(processInstances.definitionName, name),
           eq(processInstances.status, 'completed'),
-          isNull(processInstances.deletedAt),
+          ...listedRunConditions(),
         ),
       )
       .orderBy(desc(processInstances.updatedAt))
@@ -694,7 +701,7 @@ export class PostgresProcessInstanceRepository
     const base = and(
       eq(processInstances.workspace, namespace),
       eq(processInstances.definitionName, name),
-      isNull(processInstances.deletedAt),
+      ...listedRunConditions(),
       isNull(processInstances.archivedAt),
     );
 
@@ -801,6 +808,8 @@ function toInstance(row: typeof processInstances.$inferSelect): ProcessInstance 
     previousRunSourceId: row.previousRunSourceId ?? undefined,
     totalCostUsd: row.totalCostUsd !== null ? Number(row.totalCostUsd) : undefined,
     dryRun: row.dryRun === true,
+    ...(row.evalRunId === null ? {} : { evalRunId: row.evalRunId }),
+    ...(row.workspaceStartCommit === null ? {} : { workspaceStartCommit: row.workspaceStartCommit }),
   });
 }
 

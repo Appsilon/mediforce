@@ -19,6 +19,7 @@ const mockInstanceRepo = {
 const mockEngine = {
   advanceStep: vi.fn(),
   submitReviewVerdict: vi.fn(),
+  finishEvalTrial: vi.fn(),
 };
 const mockHumanTaskRepo = { create: vi.fn() };
 const mockModelRegistryRepo = { getById: vi.fn().mockResolvedValue(null) };

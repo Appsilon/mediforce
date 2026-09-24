@@ -171,6 +171,25 @@ export {
 } from './evaluation';
 
 export {
+  EvalRunStatusSchema,
+  EvalRunEvaluatorSchema,
+  EvalRunEstimateSchema,
+  EvalRunSchema,
+  EvalTrialStatusSchema,
+  EvalTrialSchema,
+  EvalRunEvaluatorReportSchema,
+  EvalRunReportSchema,
+  type EvalRunStatus,
+  type EvalRunEvaluator,
+  type EvalRunEstimate,
+  type EvalRun,
+  type EvalTrialStatus,
+  type EvalTrial,
+  type EvalRunEvaluatorReport,
+  type EvalRunReport,
+} from './eval-run';
+
+export {
   CreationReasonSchema,
   HumanTaskStatusSchema,
   HumanTaskSchema,

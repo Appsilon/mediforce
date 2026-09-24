@@ -172,6 +172,70 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       await expect(repo.appendDatasetVersion({ ...base, id: randomUUID(), version: 2, caseIds })).rejects.toThrow();
     });
 
+    it('stores an Eval Run with its trials and moves both only from the expected status', async () => {
+      const dataset = await repo.appendDatasetVersion({
+        ...step, id: randomUUID(), version: 1, caseIds: [randomUUID()], containsProductionData: false,
+        createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z',
+      });
+      const caseId = dataset.caseIds[0]!;
+      const run = {
+        ...step,
+        id: randomUUID(),
+        definitionVersion: 3,
+        datasetVersionId: dataset.id,
+        caseIds: dataset.caseIds,
+        trialsPerCase: 2,
+        concurrency: 2,
+        evaluators: [{ evaluatorId: randomUUID(), name: 'findings-present', version: 1, kind: 'schema' as const, severity: 'critical' as const, counted: true }],
+        mcpPolicy: { edc: { mode: 'deny' as const } },
+        estimate: { perTrialUsd: 0.25, totalUsd: 0.5, basis: 'history' as const, sampleSize: 4 },
+        budgetUsd: 1,
+        spentUsd: 0,
+        status: 'prepared' as const,
+        createdBy: 'author-1',
+        createdAt: '2026-09-23T08:00:00.000Z',
+        startedAt: null,
+        completedAt: null,
+      };
+      const trials = [0, 1].map((trialIndex) => ({
+        id: randomUUID(), evalRunId: run.id, caseId, trialIndex, status: 'pending' as const,
+        processInstanceId: null, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null,
+        durationMs: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null,
+      }));
+      await repo.createEvalRun(run, trials);
+
+      expect(await repo.getEvalRun(run.id)).toEqual(run);
+      expect(await repo.listEvalRuns(step)).toEqual([run]);
+      expect(await repo.transitionEvalRun(run.id, 'running', { status: 'completed' })).toBe(false);
+      expect(await repo.transitionEvalRun(run.id, 'prepared', { status: 'running', startedAt: '2026-09-23T09:00:00.000Z' })).toBe(true);
+      expect(await repo.listEvalRunIdsToDrive()).toEqual([run.id]);
+      await repo.addEvalRunSpend(run.id, 0.25);
+      await repo.addEvalRunSpend(run.id, 0.125);
+      expect((await repo.getEvalRun(run.id))?.spentUsd).toBeCloseTo(0.375, 10);
+
+      const [first] = trials;
+      const claimed = await repo.transitionTrial(first!.id, 'pending', {
+        status: 'running', processInstanceId: 'trial-instance-1', startedAt: '2026-09-23T09:00:00.000Z',
+      });
+      expect(claimed).toBe(true);
+      expect(await repo.transitionTrial(first!.id, 'pending', { status: 'running' })).toBe(false);
+      expect(await repo.getTrialByInstanceId('trial-instance-1')).toMatchObject({ id: first!.id, status: 'running' });
+      expect((await repo.listTrials(run.id)).map((trial) => [trial.trialIndex, trial.status])).toEqual([[0, 'running'], [1, 'pending']]);
+
+      // A cancelled run is still driven while a trial of it is in flight.
+      await repo.transitionEvalRun(run.id, 'running', { status: 'cancelled' });
+      expect(await repo.listEvalRunIdsToDrive()).toEqual([run.id]);
+
+      await repo.transitionTrial(first!.id, 'running', { status: 'scoring', scoringStartedAt: '2026-09-23T09:10:00.000Z', scoringAttempts: 1 });
+      expect(await repo.renewScoringClaim(first!.id, '2026-09-23T09:05:00.000Z', '2026-09-23T09:30:00.000Z')).toBe(false);
+      expect(await repo.renewScoringClaim(first!.id, '2026-09-23T09:20:00.000Z', '2026-09-23T09:30:00.000Z')).toBe(true);
+      expect(await repo.renewScoringClaim(first!.id, '2026-09-23T09:20:00.000Z', '2026-09-23T09:31:00.000Z')).toBe(false);
+      expect((await repo.listTrials(run.id))[0]).toMatchObject({ scoringStartedAt: '2026-09-23T09:30:00.000Z', scoringAttempts: 2 });
+
+      await repo.transitionTrial(first!.id, 'scoring', { status: 'scored' });
+      expect(await repo.listEvalRunIdsToDrive()).toEqual([]);
+    });
+
     it('replaces a step\'s MCP eval policy', async () => {
       expect(await repo.getMcpPolicy(step)).toBeNull();
       await repo.putMcpPolicy({ ...step, servers: { edc: { mode: 'deny' } }, updatedBy: 'author-1', updatedAt: '2026-09-23T08:00:00.000Z' });
@@ -219,7 +283,8 @@ describe.skipIf(skipPg)('PostgresEvaluationRepository (parity)', () => {
   contract('PostgresEvaluationRepository', async () => {
     await testClient.unsafe(
       `TRUNCATE TABLE "${schemaName}"."evaluation_briefs", "${schemaName}"."evaluators", "${schemaName}"."evaluator_versions", ` +
-        `"${schemaName}"."eval_cases", "${schemaName}"."eval_dataset_versions", "${schemaName}"."mcp_eval_policies"`,
+        `"${schemaName}"."eval_cases", "${schemaName}"."eval_dataset_versions", "${schemaName}"."mcp_eval_policies", ` +
+        `"${schemaName}"."eval_runs", "${schemaName}"."eval_trials"`,
     );
     return new PostgresEvaluationRepository(drizzle(testClient, { schema }));
   });

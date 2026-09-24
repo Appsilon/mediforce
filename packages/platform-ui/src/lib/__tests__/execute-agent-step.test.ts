@@ -228,6 +228,16 @@ describe('executeAgentStep', () => {
     ).rejects.toThrow('WorkflowDefinition not found: community-digest v1');
   });
 
+  it('[ERROR] refuses an eval trial of a step with inline MCP servers, which no eval policy can deny', async () => {
+    mockInstanceRepo.getById.mockResolvedValue({ ...defaultInstance, evalRunId: 'eval-run-1' });
+    const inlineStep: WorkflowStep = { ...firstStep, agent: { mcpServers: [{ name: 'edc', command: 'edc-mcp', args: [] }] } };
+
+    await expect(
+      executeAgentStep('inst-wf-001', 'gather-data', inlineStep, {}, 'user-1'),
+    ).rejects.toThrow("declares MCP servers inline (edc)");
+    expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
+  });
+
   // ---- Plugin resolution ----
 
   it('[DATA] uses workflowStep.plugin for plugin lookup when set', async () => {

@@ -18,8 +18,15 @@ import type { EvaluationSubject } from './evaluation-subject';
 const CODE_CHECK_TIMEOUT_MS = 2 * 60_000;
 const JUDGE_MAX_OUTPUT_TOKENS = 1000;
 
+/** The tokens one LLM judge call spent, for whoever pays for it. */
+export interface JudgeUsage {
+  readonly model: string;
+  readonly promptTokens: number;
+  readonly completionTokens: number;
+}
+
 /** The judge's model, through the platform's OpenRouter seam (mockable via `OPENROUTER_BASE_URL`). */
-function openRouterJudgeClient(apiKey: string, model: string): LlmClient {
+function openRouterJudgeClient(apiKey: string, model: string, onUsage: (usage: JudgeUsage) => void): LlmClient {
   return {
     complete: async (messages) => {
       const response = await callOpenRouter({
@@ -29,6 +36,7 @@ function openRouterJudgeClient(apiKey: string, model: string): LlmClient {
         temperature: 0,
         maxTokens: JUDGE_MAX_OUTPUT_TOKENS,
       });
+      onUsage({ model, ...response.usage });
       return { content: response.content, model, usage: response.usage };
     },
   };
@@ -42,13 +50,15 @@ function binary(agentRunId: string, passed: boolean, comment: string | null): Ev
  * Applies one check to one Agent Run's output. A run with no `result` fails
  * every check without running it. A check that cannot run — a crashing
  * script, a judge that names no choice — comes back as `error`, never as a
- * failed output: an Evaluator's defect is not the agent's.
+ * failed output: an Evaluator's defect is not the agent's. `onJudgeUsage`
+ * hears every judge call made, including one whose answer was unusable.
  */
 export async function runEvaluatorCheck(
   scope: CallerScope,
   check: EvaluatorCheck,
   subject: EvaluationSubject,
   evalCase: EvalCase | null,
+  onJudgeUsage: (usage: JudgeUsage) => void = () => {},
 ): Promise<EvaluatorOutcome> {
   const { agentRun } = subject;
   const envelope = agentRun.envelope;
@@ -96,7 +106,7 @@ export async function runEvaluatorCheck(
           processInstanceId: agentRun.processInstanceId,
           executorOutput: envelope,
           iterationNumber: 0,
-          llm: openRouterJudgeClient(apiKey, check.model),
+          llm: openRouterJudgeClient(apiKey, check.model, onJudgeUsage),
         });
         return {
           agentRunId: agentRun.id,

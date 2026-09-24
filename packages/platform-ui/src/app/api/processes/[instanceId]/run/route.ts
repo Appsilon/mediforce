@@ -4,7 +4,8 @@ import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { resolveDefinitionModels } from '@/lib/resolve-agent-defaults';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
-import { checkRetiredModels } from '@mediforce/platform-api/handlers';
+import { advanceEvalRunOfInstance, checkRetiredModels } from '@mediforce/platform-api/handlers';
+import { defaultBuildScope } from '@/lib/route-adapter';
 import { resolveCoworkOutputSchema, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
@@ -965,6 +966,17 @@ export async function POST(
         }
       } finally {
         releaseRunLock(instanceId);
+      }
+
+      // An eval trial's run ended (ADR-0023 D4): score it and start the next
+      // trial of its Eval Run. As the system: the trial belongs to the Eval
+      // Run, not to whoever kicked this request.
+      if (initialInstance.evalRunId !== undefined) {
+        try {
+          await advanceEvalRunOfInstance(defaultBuildScope({ kind: 'apiKey', isSystemActor: true }), instanceId);
+        } catch (err) {
+          console.error(`[auto-runner] Failed to advance the Eval Run of trial '${instanceId}':`, err);
+        }
       }
     });
 

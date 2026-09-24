@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import {
   AgentRunSchema,
   parseRow,
@@ -53,6 +53,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
     const values = {
       id: parsed.id,
       workspace: parent.namespace,
+      evalRunId: parent.evalRunId ?? null,
       processInstanceId: parsed.processInstanceId,
       stepId: parsed.stepId,
       pluginId: parsed.pluginId,
@@ -212,7 +213,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
     opts: Pick<ListAgentRunsOptions, 'namespace' | 'runId' | 'stepId' | 'status' | 'processInstanceIds'>,
     allowed: readonly string[] | undefined,
   ): SQL[] {
-    const conditions: SQL[] = [];
+    const conditions: SQL[] = [isNull(agentRuns.evalRunId)];
     if (allowed !== undefined) {
       conditions.push(inArray(agentRuns.workspace, [...allowed]));
     }

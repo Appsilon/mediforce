@@ -611,6 +611,20 @@ import {
   type SetEvaluationBriefOutput,
   type SetMcpEvalPolicyInput,
   type SetMcpEvalPolicyOutput,
+  PrepareEvalRunInputSchema,
+  StartEvalRunInputSchema,
+  GetEvalRunInputSchema,
+  CancelEvalRunInputSchema,
+  EvalRunOutputSchema,
+  ListEvalRunsInputSchema,
+  ListEvalRunsOutputSchema,
+  type PrepareEvalRunInput,
+  type StartEvalRunInput,
+  type GetEvalRunInput,
+  type CancelEvalRunInput,
+  type EvalRunOutput,
+  type ListEvalRunsInput,
+  type ListEvalRunsOutput,
 } from '../contract/evaluation';
 import { BUILD_CONTEXT_MEDIA_TYPE } from '@mediforce/platform-core';
 // SDK consumers reach for one path:
@@ -1009,6 +1023,11 @@ export class Mediforce {
     freezeDataset: (input: FreezeEvalDatasetInput) => Promise<FreezeEvalDatasetOutput>;
     getMcpPolicy: (input: GetMcpEvalPolicyInput) => Promise<GetMcpEvalPolicyOutput>;
     setMcpPolicy: (input: SetMcpEvalPolicyInput) => Promise<SetMcpEvalPolicyOutput>;
+    prepareRun: (input: PrepareEvalRunInput) => Promise<EvalRunOutput>;
+    startRun: (input: StartEvalRunInput) => Promise<EvalRunOutput>;
+    getRun: (input: GetEvalRunInput) => Promise<EvalRunOutput>;
+    listRuns: (input: ListEvalRunsInput) => Promise<ListEvalRunsOutput>;
+    cancelRun: (input: CancelEvalRunInput) => Promise<EvalRunOutput>;
   };
 
   readonly monitoring: {
@@ -2489,6 +2508,28 @@ export class Mediforce {
         'PUT', '/api/evaluation/mcp-policy', SetMcpEvalPolicyInputSchema.parse(input),
         SetMcpEvalPolicyOutputSchema, 'mediforce.evaluation.setMcpPolicy',
       ),
+      prepareRun: async (input) => this.sendJson(
+        'POST', '/api/evaluation/runs', PrepareEvalRunInputSchema.parse(input),
+        EvalRunOutputSchema, 'mediforce.evaluation.prepareRun',
+      ),
+      startRun: async (input) => {
+        const { evalRunId, ...body } = StartEvalRunInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/runs/${encodeURIComponent(evalRunId)}/start`, body,
+          EvalRunOutputSchema, 'mediforce.evaluation.startRun');
+      },
+      getRun: async (input) => {
+        const { evalRunId } = GetEvalRunInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/runs/${encodeURIComponent(evalRunId)}`, EvalRunOutputSchema, 'mediforce.evaluation.getRun');
+      },
+      listRuns: async (input) => {
+        const step = ListEvalRunsInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/runs${toSearchParams(step)}`, ListEvalRunsOutputSchema, 'mediforce.evaluation.listRuns');
+      },
+      cancelRun: async (input) => {
+        const { evalRunId } = CancelEvalRunInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/runs/${encodeURIComponent(evalRunId)}/cancel`, undefined,
+          EvalRunOutputSchema, 'mediforce.evaluation.cancelRun');
+      },
     };
 
     this.scores = {
