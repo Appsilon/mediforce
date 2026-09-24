@@ -195,7 +195,7 @@ test.describe('Evaluation Assistant — API E2E', () => {
   test('returns actionable validation feedback and previews the corrected object', async ({ request }) => {
     const question = `Recover from a string check. ${randomUUID()}`;
     await scriptOpenRouter(question, [
-      { toolCalls: [{ name: 'preview_evaluator', arguments: { check: JSON.stringify(check), agentRunIds: [agentRunId] } }] },
+      { toolCalls: [{ name: 'preview_evaluator', arguments: { check: 'schema check requiring findings', agentRunIds: [agentRunId] } }] },
       { toolCalls: [{ name: 'preview_evaluator', arguments: { check, agentRunIds: [agentRunId] } }] },
       { content: 'The corrected check ran; the result is missing findings.' },
     ]);
