@@ -102,15 +102,15 @@ describe('askEvaluationAssistant', () => {
     expect(run?.status).toBe('prepared');
   });
 
-  it('allows a longer investigation to finish after ten tool rounds', async () => {
+  it('allows an investigation to finish beyond the old sixteen-round limit', async () => {
     const requests = scriptOpenRouter([
-      ...Array.from({ length: 11 }, () => () => ({ toolCalls: [{ name: 'list_evaluators', arguments: {} }] })),
+      ...Array.from({ length: 17 }, () => () => ({ toolCalls: [{ name: 'list_evaluators', arguments: {} }] })),
       () => ({ content: 'I finished reviewing the evaluation setup.' }),
     ]);
 
     const result = await askEvaluationAssistant({ ...STEP, messages: [{ role: 'user', content: 'Review the evaluation setup.' }] }, scope);
 
     expect(result.reply).toBe('I finished reviewing the evaluation setup.');
-    expect(requests).toHaveLength(12);
+    expect(requests).toHaveLength(18);
   });
 });

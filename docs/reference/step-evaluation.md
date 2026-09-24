@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-09-23
+last_reviewed: 2026-09-24
 ---
 
 # Step Evaluation
@@ -43,6 +43,26 @@ The step's Brief is sent to the assistant on every turn. In the web tab, Brief
 text is rendered as GitHub-Flavored Markdown, and the assistant pane uses the
 same model picker as the workflow editor so the model can be chosen per
 conversation.
+
+Each request allows 32 model/tool rounds and up to 8,000 output tokens per
+model call. These application limits are separate from the model's context
+window. Trajectories are read in pages of complete entries, including generated
+source; the assistant follows `nextOffset` to reach later pages instead of
+seeing only the beginning of a run. If the round or text-output limit is
+reached, completed proposal and prepared-run cards still return with an
+explicit notice and, when available, a summary of unfinished work. A follow-up
+can use that summary, but the full tool transcript is not carried between
+requests. Nothing is accepted or started automatically.
+
+When a tool call fails validation, the assistant gets the exact error, the
+expected argument schema and examples (a `check` is an object such as
+`{"kind":"code","runtime":"python","source":"..."}`, never a string). Three
+consecutive rounds that fail with the same validation error and no successful
+call end the turn early with the cause named in the notice.
+A single tool result the assistant reads — a trajectory page or a preview whose
+check writes a long `comment` — is cut to 60,000 characters with a note to ask
+for less, so one oversized result cannot exceed the model provider's request
+limit.
 
 ## Evaluation Brief
 

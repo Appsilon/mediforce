@@ -20,12 +20,23 @@ import {
  * so there is no tool to call.
  */
 
+const AssistantCheckSchema = EvaluatorCheckSchema.describe(
+  'A JSON object, not a string or JSON-encoded string. For code use {"kind":"code","runtime":"python","source":"...script..."}; only source is a string. Choose schema, code or llm_judge and include that kind\'s required fields.',
+).meta({ examples: [
+  { kind: 'schema', schema: { required: ['findings'] } },
+  {
+    kind: 'code', runtime: 'python',
+    source: 'import json\nwith open("/output/input.json") as handle:\n    data = json.load(handle)\nwith open("/output/result.json", "w") as handle:\n    json.dump({"passed": "findings" in data["result"]}, handle)',
+  },
+  { kind: 'llm_judge', model: 'anthropic/claude-sonnet-4', rubric: 'Does the result explain its findings?', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
+] });
+
 /** Propose an Evaluator for the step. */
 export const ProposeEvaluatorToolSchema = z.object({
   name: EvaluatorSchema.shape.name,
   rule: z.string().min(1).max(2000),
   severity: EvaluatorSeveritySchema,
-  check: EvaluatorCheckSchema,
+  check: AssistantCheckSchema,
   /** Why this check, and what its preview showed. */
   rationale: z.string().max(1000).optional(),
 });
@@ -64,7 +75,13 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
   /** One Agent Run: status, fallback, input it was given and the result it produced. */
   get_agent_run: z.object({ agentRunId: z.string().min(1) }),
   /** The tool calls and results of one Agent Run. */
-  get_trajectory: z.object({ agentRunId: z.string().min(1) }),
+  get_trajectory: z.object({
+    agentRunId: z.string().min(1),
+    offset: z.number().int().nonnegative().default(0)
+      .describe('The zero-based entry offset, not a seq value. Start at 0; use nextOffset from the previous response to continue.'),
+    limit: z.number().int().min(1).max(150).default(50)
+      .describe('Maximum number of complete entries per page (1–150; default 50). Use a smaller limit for large tool payloads.'),
+  }).describe('Read an Agent Run trajectory in stored order, including system and thinking entries, without truncating entry content. Returns { entries, total, nextOffset }; total is the full entry count. Request subsequent pages using nextOffset as offset until nextOffset is null. An offset at or beyond total returns an empty page with nextOffset null.'),
   list_evaluators: NoArguments,
   list_eval_cases: NoArguments,
   list_eval_runs: NoArguments,
@@ -72,7 +89,7 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
   get_eval_run_report: z.object({ evalRunId: z.string().min(1) }),
   /** Run a draft check against existing outputs; writes nothing. */
   preview_evaluator: z.object({
-    check: EvaluatorCheckSchema,
+    check: AssistantCheckSchema,
     agentRunIds: z.array(z.string().min(1)).min(1).max(10).optional(),
   }),
   /** Prepare an Eval Run over the newest Dataset version; the person confirms its cost to start it. */
