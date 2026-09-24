@@ -140,20 +140,20 @@ export const ProposeAcceptanceCriteriaToolSchema = z.object({
 });
 
 /**
- * Recommend how the step's outputs are routed after an Eval Run: Control Mode
- * 4 above a `confidenceThreshold` (below it, `fallbackBehavior` applies), or
- * Control Mode 3, a person reviewing every output. A recommendation card —
+ * Recommend how the step's outputs are routed after an Eval Run: `L4`
+ * (Control Mode 4) above a `confidenceThreshold` (below it, `fallbackBehavior`
+ * applies), or `L3` (Control Mode 3), a person reviewing every output. A recommendation card —
  * the person changes the step in the workflow editor.
  */
 export const ProposeControlSettingsToolSchema = z.object({
   evalRunId: z.uuid(),
   variantId: z.string().min(1),
-  controlMode: z.enum(['CM3', 'CM4']),
+  autonomyLevel: z.enum(['L3', 'L4']),
   confidenceThreshold: z.number().min(0).max(1).optional(),
   /** What in the report supports it: criteria, calibration, coverage. */
   rationale: z.string().min(1).max(2000),
-}).refine((value) => value.controlMode === 'CM3' || value.confidenceThreshold !== undefined, {
-  message: 'CM4 needs a confidenceThreshold',
+}).refine((value) => value.autonomyLevel === 'L3' || value.confidenceThreshold !== undefined, {
+  message: 'L4 needs a confidenceThreshold',
 });
 
 export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {

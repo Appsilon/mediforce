@@ -1,4 +1,4 @@
-import { compare, hash } from 'bcryptjs';
+import { hash } from 'bcryptjs';
 import { emitAudit } from '../../audit-helpers';
 import {
   ForbiddenError,
@@ -8,6 +8,7 @@ import {
 } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import { resolvePersonalNamespace } from '../_helpers';
+import { checkPassword } from './_lib/check-password';
 import type { SetPasswordInput, SetPasswordOutput } from '../../contract/users';
 
 const BCRYPT_COST = 12;
@@ -102,17 +103,17 @@ async function assertReauthenticated(
   // apiKey callers are the admin/system path — no user password to present.
   if (scope.caller.kind !== 'user') return;
 
-  const existingHash = await scope.credentials.getPasswordHash(uid);
+  const check = await checkPassword(scope, uid, input.currentPassword);
   // First-time set (invite, `mustChangePassword` on a seeded account,
   // OAuth-only user adding a password): nothing to re-authenticate against.
-  if (existingHash === null) return;
+  if (check === 'no_password') return;
 
-  if (input.currentPassword === undefined) {
+  if (check === 'not_given') {
     throw new ValidationError(
       'currentPassword is required to replace an existing password',
     );
   }
-  if ((await compare(input.currentPassword, existingHash)) === false) {
+  if (check === 'incorrect') {
     throw new ForbiddenError('Current password is incorrect');
   }
 }

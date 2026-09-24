@@ -26,7 +26,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
-import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
+import { isSameStep, loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
 import { estimateEvalRun } from './_lib/estimate-eval-run';
 import { buildEvalRunReport } from './_lib/eval-run-report';
@@ -97,7 +97,7 @@ async function buildVariants(
  * yet — a person confirms the budget with `start`.
  */
 export async function prepareEvalRun(
-  input: Omit<z.output<typeof PrepareEvalRunInputSchema>, 'challengers'> & { challengers?: readonly EvalChallenger[] },
+  input: z.output<typeof PrepareEvalRunInputSchema>,
   scope: CallerScope,
 ): Promise<EvalRunOutput> {
   const step = stepRef(input);
@@ -109,7 +109,7 @@ export async function prepareEvalRun(
   if (dataset === undefined || dataset === null) {
     throw new ValidationError(`Step '${step.stepId}' has no frozen Eval Dataset — freeze its cases first`);
   }
-  if (dataset.namespace !== step.namespace || dataset.workflowName !== step.workflowName || dataset.stepId !== step.stepId) {
+  if (isSameStep(dataset, step) === false) {
     throw new ValidationError(`Eval Dataset '${dataset.id}' belongs to another step`);
   }
 
@@ -138,7 +138,7 @@ export async function prepareEvalRun(
   const mcpPolicy: Record<string, McpEvalServerPolicy> = Object.fromEntries(
     agentServers.map((name) => [name, policy?.servers[name] ?? { mode: 'deny' as const }]),
   );
-  const variants = await buildVariants(scope, definition, workflowStep, agentServers, input.challengers ?? []);
+  const variants = await buildVariants(scope, definition, workflowStep, agentServers, input.challengers);
   const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
   const [brief] = await scope.evaluation.listBriefs(step);
 

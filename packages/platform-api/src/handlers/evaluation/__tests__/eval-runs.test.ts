@@ -76,9 +76,9 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   }
 
   it('freezes the Evaluators with whether they count, denies MCP by default, and needs a budget without an estimate', async () => {
-    await expect(prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 2 }, scope)).rejects.toThrow(/set budgetUsd/);
+    await expect(prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 2 }, scope)).rejects.toThrow(/set budgetUsd/);
 
-    const { evalRun, trials, report } = await prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 2, budgetUsd: 5 }, scope);
+    const { evalRun, trials, report } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 2, budgetUsd: 5 }, scope);
 
     expect(evalRun).toMatchObject({ status: 'prepared', trialsPerCase: 2, budgetUsd: 5, definitionVersion: 1 });
     expect(evalRun.evaluators.map((evaluator) => [evaluator.name, evaluator.counted, evaluator.reason])).toEqual([
@@ -129,7 +129,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   });
 
   it('refuses to start without the person confirming the budget', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
 
     await expect(startEvalRun({ evalRunId: evalRun.id }, scope)).rejects.toBeInstanceOf(ValidationError);
     await expect(startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 4 }, scope)).rejects.toBeInstanceOf(ValidationError);
@@ -138,7 +138,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   });
 
   it('runs every trial as a single-step run, scores it, and reports the Scores', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 2, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 2, budgetUsd: 5 }, scope);
     const started = await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
 
     expect(started.evalRun.status).toBe('running');
@@ -181,7 +181,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   });
 
   it('stops starting trials once spend reaches the budget', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 1, budgetUsd: 1 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 1, budgetUsd: 1 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 1 }, scope);
 
     await finishTrial(kicker.kicks[0]!.instanceId, { findings: [] }, 0.6);
@@ -194,7 +194,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   });
 
   it('cancels: pending trials are skipped and a cancelled run cannot be cancelled again', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     const { evalRun: cancelled, report } = await cancelEvalRun({ evalRunId: evalRun.id }, scope);
 
     expect(cancelled.status).toBe('cancelled');
@@ -203,7 +203,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   });
 
   it('still scores and charges a trial that was running when the run was cancelled', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
     await cancelEvalRun({ evalRunId: evalRun.id }, scope);
     expect(await fixture.evaluationRepo.listEvalRunIdsToDrive()).toEqual([evalRun.id]);
@@ -236,7 +236,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
 
   it('charges each LLM judge call to its trial and to the run\'s spend, and keeps it on the Score', async () => {
     await withJudge([{ id: 'anthropic/claude-haiku-4.5', pricing: { input: 0.000001, output: 0.000005 } }]);
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 2, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 2, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
 
     for (const kick of kicker.kicks) await finishTrial(kick.instanceId, { findings: [] }, 0.25);
@@ -253,7 +253,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
 
   it('says so on the trial when the judge\'s model has no registry price', async () => {
     await withJudge([]);
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
 
     await finishTrial(kicker.kicks[0]!.instanceId, { findings: [] }, 0.25);
@@ -264,7 +264,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   });
 
   it('keeps trial Agent Runs out of the step\'s production runs', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
     await finishTrial(kicker.kicks[0]!.instanceId, { findings: [] }, 0.1);
 

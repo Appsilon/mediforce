@@ -264,12 +264,12 @@ the judge calls. Then, per variant:
 - **Confidence calibration.** The confidence each trial's agent reported,
   against whether its output passed every counted Evaluator that graded it:
   the pass rate in five confidence bins and the expected calibration error.
-- **Routing.** Once the variant's trials are done: Control Mode 4 with a
-  `confidenceThreshold` — the lowest confidence at which the outputs at or
-  above it (at least 5) passed every counted Evaluator with a lower bound of
-  at least the strictest criterion's floor; below it the step's
-  `fallbackBehavior` applies — or Control Mode 3, a person reviewing every
-  output, when there are no criteria, one could not be judged, the agent
+- **Routing.** Once the variant's trials are done, as the `autonomyLevel` to
+  set: `L4` (Control Mode 4) with a `confidenceThreshold` — the lowest
+  confidence at which the outputs at or above it (at least 5) passed every
+  counted Evaluator with a lower bound of at least the strictest criterion's
+  floor; below it the step's `fallbackBehavior` applies — or `L3` (Control
+  Mode 3), a person reviewing every output, when there are no criteria, one could not be judged, the agent
   reported no confidence, or no threshold holds. A recommendation to apply in
   the workflow editor.
 
@@ -309,7 +309,7 @@ matters.
 
 ## Step Qualification
 
-A person signs a Step Qualification for one variant of a finished Eval Run —
+A person signs a Step Qualification for one variant of a finished Eval Run — not a cancelled one —
 **Sign Step Qualification** on that variant in the report (web only; an API key
 cannot sign, so the CLI has no command for it). The run must have Acceptance
 Criteria and a Brief version frozen into it. The signer reads what the
@@ -317,9 +317,11 @@ signature means ("Approved: I reviewed this Eval Run and qualify this Step
 configuration for its context of use as stated in Evaluation Brief vN."),
 writes a justification for each criterion the variant missed or that could not
 be judged — recorded as a deviation; a justification for a criterion that was
-met is refused — and re-enters their password. On a deployment without
-password sign-in the signature is recorded as made from the session; a user
-without a password on one with it must set one first. The qualification cites
+met is refused — and re-enters their password; a wrong one is refused and
+audited against the Eval Run as `step_qualification.signature_refused`. On a
+deployment without password sign-in the form asks for no password and the
+signature is recorded as made from the session; a user without a password on
+one with it must set one first. The qualification cites
 the Eval Run, the variant and its patch, its Fingerprint, the Brief version,
 the Evaluator versions, the MCP eval policy, the criteria and each verdict, and
 is never changed; signing is audited as `step_qualification.signed`.

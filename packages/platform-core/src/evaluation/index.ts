@@ -7,6 +7,6 @@ export {
 } from './trust';
 export { inlineMcpServerNames, mcpEvalRestrictions } from './mcp-eval-restrictions';
 export { wilsonInterval, caseReliability, cohensKappa, type CaseReliability } from './statistics';
-export { applyStepVariant, isEmptyVariantPatch, narrowMcpRestrictions, variantPatchProblem } from './variant';
+export { applyStepVariant, isEmptyVariantPatch, variantPatchProblem } from './variant';
 export { describeAcceptanceCriteria, judgeAcceptanceCriteria } from './acceptance';
 export { calibrateConfidence, recommendControl, type ConfidenceOutcome } from './confidence-calibration';

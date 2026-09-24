@@ -340,7 +340,6 @@ export {
   type EvaluatorTrust,
   applyStepVariant,
   isEmptyVariantPatch,
-  narrowMcpRestrictions,
   variantPatchProblem,
   judgeAcceptanceCriteria,
   describeAcceptanceCriteria,

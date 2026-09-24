@@ -3,13 +3,16 @@
 import * as React from 'react';
 import { Loader2 } from 'lucide-react';
 import {
+  CHAMPION_VARIANT_ID,
+  EvaluatorSeveritySchema,
   describeAcceptanceCriteria,
   type AcceptanceCriteria,
   type EvaluatedStep,
   type EvaluatorCheck,
   type EvaluatorSeverity,
+  type StepFingerprintComponent,
 } from '@mediforce/platform-core';
-import type { EvalChallenger, EvaluatorView, PreparedEvalRun } from '@mediforce/platform-api/contract';
+import { EvalChallengerSchema, type EvalChallenger, type EvaluatorView, type PreparedEvalRun } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
@@ -17,12 +20,9 @@ import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { useEvalRun, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { EvalRunReport, describePatch } from './eval-run-report';
 import { QualificationStatusChip } from './step-qualification-badge';
+import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 
 type StepEvaluation = ReturnType<typeof useStepEvaluation>;
-
-const buttonClass = 'rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50 disabled:pointer-events-none';
-const primaryButtonClass = 'rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none';
-const inputClass = 'rounded-md border bg-background px-2 py-1 text-sm';
 
 function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
@@ -317,7 +317,7 @@ export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep;
   );
 }
 
-const SEVERITIES: readonly EvaluatorSeverity[] = ['critical', 'major', 'minor'];
+const SEVERITIES = EvaluatorSeveritySchema.options;
 
 type CriteriaDraft = Record<EvaluatorSeverity, { minPassRate: string; minPassHatK: string }>;
 
@@ -399,7 +399,7 @@ export function AcceptanceCriteriaSection({ step, data, mayEdit }: { step: Evalu
   );
 }
 
-const COMPONENT_LABELS: Record<string, string> = {
+const COMPONENT_LABELS: Record<StepFingerprintComponent, string> = {
   step: 'step config',
   model: 'model',
   systemPrompt: 'agent system prompt',
@@ -427,7 +427,7 @@ export function QualificationSection({ data }: { data: StepEvaluation['qualifica
         <div className="space-y-1.5 text-xs" data-testid="step-qualification">
           <p>
             Signed by <span className="font-medium">{qualification.signature.signerName}</span> on {qualification.signature.signedAt.slice(0, 16).replace('T', ' ')}
-            {' '}for {qualification.variantLabel === 'Current step' ? 'the step' : `'${qualification.variantLabel}' (${describePatch(qualification.patch)})`}
+            {' '}for {qualification.variantId === CHAMPION_VARIANT_ID ? 'the step' : `'${qualification.variantLabel}' (${describePatch(qualification.patch)})`}
             {' '}— Eval Run <span className="font-mono">{qualification.evalRunId.slice(0, 8)}</span>, Brief v{qualification.briefVersion},
             {' '}fingerprint <span className="font-mono">{qualification.fingerprint.hash.slice(0, 12)}</span>.
           </p>
@@ -438,7 +438,7 @@ export function QualificationSection({ data }: { data: StepEvaluation['qualifica
           ))}
           {status.status === 'stale' && (
             <p className="text-amber-700 dark:text-amber-300" data-testid="qualification-changed">
-              The step changed since: {status.changed.map((component) => COMPONENT_LABELS[component] ?? component).join(', ')}.
+              The step changed since: {status.changed.map((component) => COMPONENT_LABELS[component]).join(', ')}.
             </p>
           )}
           {status.evaluatorsChanged.length > 0 && (
@@ -536,12 +536,19 @@ export function EvalRunsSection({ step, data, mayRun, runReason, mayEdit, editRe
   const submit = () => {
     let variants: EvalChallenger[] = [];
     if (challengers !== null) {
+      let parsed: unknown;
       try {
-        variants = JSON.parse(challengers) as EvalChallenger[];
+        parsed = JSON.parse(challengers);
       } catch {
         setChallengersError('The challengers are not valid JSON.');
         return;
       }
+      const checked = EvalChallengerSchema.array().safeParse(parsed);
+      if (checked.success === false) {
+        setChallengersError(`The challengers do not fit: ${checked.error.issues.map((issue) => `${issue.path.length === 0 ? 'list' : issue.path.join('.')} — ${issue.message}`).join('; ')}`);
+        return;
+      }
+      variants = checked.data;
     }
     setChallengersError(null);
     prepare.mutate(variants);

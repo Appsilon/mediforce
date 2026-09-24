@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { compare } from 'bcryptjs';
 import type { z } from 'zod';
 import {
   qualificationSignatureMeaning,
   type ElectronicSignature,
+  type EvalRun,
   type EvaluatedStep,
   type StepQualification,
 } from '@mediforce/platform-core';
@@ -18,6 +18,7 @@ import { ConflictError, ForbiddenError, NotFoundError, PreconditionFailedError, 
 import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
 import { appendEvaluationAudit } from './_lib/audit';
 import { buildEvalRunReport } from './_lib/eval-run-report';
+import { checkPassword } from '../users/_lib/check-password';
 import { changedFingerprintComponents, computeStepFingerprint } from './_lib/step-fingerprint';
 
 /** What happened to the Step's Evaluators since a qualification cited them (D7): a flag, never staleness. */
@@ -26,7 +27,7 @@ async function evaluatorChanges(scope: CallerScope, step: EvaluatedStep, qualifi
   const changes: string[] = [];
   for (const evaluator of await scope.evaluation.listEvaluators(step)) {
     const citedVersion = cited.get(evaluator.id);
-    if (evaluator.archived) {
+    if (evaluator.archived === true) {
       if (citedVersion !== undefined) changes.push(`'${evaluator.name}' archived`);
       continue;
     }
@@ -72,22 +73,34 @@ export async function getStepQualification(
 /**
  * The signer proves who they are again at signing (21 CFR 11.200): with their
  * password where password sign-in is enabled, or, on a deployment without it,
- * with the session they sign from — recorded either way.
+ * with the session they sign from — recorded either way. A wrong password is
+ * audited against the run, so failed attempts can be detected (11.300(d)).
  */
-async function reauthenticate(scope: CallerScope, uid: string, password: string | undefined): Promise<ElectronicSignature['reauthentication']> {
+async function reauthenticate(scope: CallerScope, uid: string, password: string | undefined, run: EvalRun): Promise<ElectronicSignature['reauthentication']> {
   if (scope.system.passwordAuthEnabled !== true) return 'session';
-  const passwordHash = await scope.credentials.getPasswordHash(uid);
-  if (passwordHash === null) {
+  const check = await checkPassword(scope, uid, password);
+  if (check === 'no_password') {
     throw new PreconditionFailedError('Set a password for your account to sign: signing asks for it again');
   }
-  if (password === undefined) throw new ValidationError('Enter your password to sign');
-  if ((await compare(password, passwordHash)) === false) throw new ForbiddenError('Password is incorrect');
+  if (check === 'not_given') throw new ValidationError('Enter your password to sign');
+  if (check === 'incorrect') {
+    await appendEvaluationAudit(scope, {
+      action: 'step_qualification.signature_refused',
+      description: `Step Qualification signing refused for step '${run.stepId}' of '${run.workflowName}': password incorrect`,
+      namespace: run.namespace,
+      entityType: 'eval_run',
+      entityId: run.id,
+      inputSnapshot: {},
+      basis: 'A signer failed to re-authenticate (21 CFR 11.300(d))',
+    });
+    throw new ForbiddenError('Password is incorrect');
+  }
   return 'password';
 }
 
 /**
  * A person signs a Step Qualification for one variant of a finished Eval Run
- * (ADR-0023 D10). It binds that variant's Step Fingerprint and cites the run,
+ * (ADR-0023 D10) — not a cancelled one. It binds that variant's Step Fingerprint and cites the run,
  * the Brief version, the Evaluator versions, the MCP eval policy and the
  * Acceptance Criteria frozen into it, with the verdict on each criterion.
  * Signing despite a criterion missed or not judged records a deviation with a
@@ -111,6 +124,7 @@ export async function signStepQualification(
   if (run.status === 'prepared' || run.status === 'running' || inFlight) {
     throw new ConflictError(`Eval Run '${run.id}' has not finished; sign once every trial is scored`);
   }
+  if (run.status === 'cancelled') throw new ConflictError(`Eval Run '${run.id}' was cancelled; qualify a step on a run that finished`);
   const variant = run.variants.find((candidate) => candidate.id === input.variantId);
   if (variant === undefined) throw new NotFoundError(`Eval Run '${run.id}' has no variant '${input.variantId}'`);
   if (variant.fingerprint === null) {
@@ -142,7 +156,7 @@ export async function signStepQualification(
     );
   }
 
-  const reauthentication = await reauthenticate(scope, uid, input.password);
+  const reauthentication = await reauthenticate(scope, uid, input.password, run);
   const metadata = scope.system.userDirectory === null ? null : await scope.system.userDirectory.getUserMetadata(uid).catch(() => null);
   const qualification = await scope.evaluation.createQualification({
     ...step,

@@ -98,7 +98,7 @@ function evaluatorReports(run: EvalRun, trials: readonly EvalTrial[], scores: Re
  * calibrated on. A trial no counted Evaluator graded says nothing.
  */
 function confidenceOutcomes(run: EvalRun, trials: readonly EvalTrial[], scores: ReadonlyMap<string, Score[]>): ConfidenceOutcome[] {
-  const counted = new Set(run.evaluators.filter((evaluator) => evaluator.counted).map((evaluator) => evaluator.evaluatorId));
+  const counted = new Set(run.evaluators.filter((evaluator) => evaluator.counted === true).map((evaluator) => evaluator.evaluatorId));
   return trials.flatMap((trial) => {
     if (trial.status !== 'scored' || trial.confidence === null) return [];
     const graded = (scores.get(trial.id) ?? []).filter((score) => score.evaluatorId !== null && counted.has(score.evaluatorId));

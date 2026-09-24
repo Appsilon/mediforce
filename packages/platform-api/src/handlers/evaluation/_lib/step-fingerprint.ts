@@ -107,7 +107,7 @@ export async function computeStepFingerprint(
     namespace: definition.namespace,
   }).then(
     (config) => ({ servers: config?.servers ?? null }),
-    (error: unknown) => ({ refused: error instanceof Error ? error.message : String(error) }),
+    () => ({ refused: true }),
   );
   const material: Record<StepFingerprintComponent, unknown> = {
     step: behaviouralStep(step),

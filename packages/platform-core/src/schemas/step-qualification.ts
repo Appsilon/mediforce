@@ -63,9 +63,9 @@ export const StepQualificationSchema = EvaluatedStepSchema.extend({
 });
 
 /**
- * The badge (D11): `qualified` when the Step's current Fingerprint is the one
- * its newest qualification signed, `stale` when it differs, `not_qualified`
- * when nothing was ever signed.
+ * The badge (D11): `qualified` when any signed qualification binds the Step's
+ * current Fingerprint, `stale` when qualifications exist but none binds it,
+ * `not_qualified` when nothing was ever signed.
  */
 export const StepQualificationStatusSchema = z.enum(['qualified', 'stale', 'not_qualified']);
 

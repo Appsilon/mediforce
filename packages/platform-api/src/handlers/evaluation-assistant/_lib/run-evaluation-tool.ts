@@ -19,6 +19,7 @@ import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
 import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
 import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
+import { isSameStep } from '../../evaluation/_lib/evaluated-step';
 import { evaluatorView, loadEvaluator } from '../../evaluation/_lib/evaluator-view';
 import { isBinary } from '../../evaluation/_lib/workspace-seed';
 import { evaluatorLabels } from '../../evaluation/evaluator-trust';
@@ -117,7 +118,7 @@ async function effectiveMcpServers(scope: CallerScope, step: EvaluatedStep, work
 /** An Evaluator of this step — any other reads as missing. */
 export async function loadStepEvaluator(scope: CallerScope, step: EvaluatedStep, evaluatorId: string): Promise<Evaluator> {
   const evaluator = await loadEvaluator(scope, evaluatorId);
-  if (evaluator.namespace !== step.namespace || evaluator.workflowName !== step.workflowName || evaluator.stepId !== step.stepId) {
+  if (isSameStep(evaluator, step) === false) {
     throw new NotFoundError(`Evaluator '${evaluatorId}' is not an Evaluator of this step`);
   }
   return evaluator;
@@ -127,7 +128,7 @@ export async function loadStepEvaluator(scope: CallerScope, step: EvaluatedStep,
 async function loadStepEvalRun(scope: CallerScope, step: EvaluatedStep, evalRunId: string) {
   const output = await getEvalRun({ evalRunId }, scope);
   const { evalRun } = output;
-  if (evalRun.namespace !== step.namespace || evalRun.workflowName !== step.workflowName || evalRun.stepId !== step.stepId) {
+  if (isSameStep(evalRun, step) === false) {
     throw new NotFoundError(`Eval Run '${evalRunId}' is not a run of this step`);
   }
   return output;

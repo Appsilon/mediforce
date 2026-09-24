@@ -257,7 +257,7 @@ describe('executeEvaluationTool', () => {
       origin: 'user',
     }, scope);
     await freezeEvalDataset(STEP, scope);
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 1 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 1 }, scope);
 
     await expect(executeEvaluationTool('get_eval_run_report', { evalRunId: evalRun.id }, scope, {
       ...context, step: { ...STEP, namespace: 'pharma-b' },

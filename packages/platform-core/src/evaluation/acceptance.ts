@@ -1,7 +1,7 @@
-import type { AcceptanceCriteria, EvaluatorSeverity } from '../schemas/evaluation';
+import { EvaluatorSeveritySchema, type AcceptanceCriteria } from '../schemas/evaluation';
 import type { AcceptanceCriterionVerdict, EvalRunEvaluatorReport } from '../schemas/eval-run';
 
-const SEVERITIES: readonly EvaluatorSeverity[] = ['critical', 'major', 'minor'];
+const SEVERITIES = EvaluatorSeveritySchema.options;
 
 function percent(value: number): string {
   return `${Math.round(value * 1000) / 10}%`;
@@ -25,7 +25,7 @@ export function judgeAcceptanceCriteria(
     const criterion = criteria[severity];
     if (criterion === undefined) return [];
     const lines = evaluators
-      .filter((evaluator) => evaluator.counted && evaluator.severity === severity)
+      .filter((evaluator) => evaluator.counted === true && evaluator.severity === severity)
       .map((evaluator) => {
         const passRateMet = evaluator.wilsonLower === null ? null : evaluator.wilsonLower >= criterion.minPassRate;
         const passHatKMet = criterion.minPassHatK === undefined

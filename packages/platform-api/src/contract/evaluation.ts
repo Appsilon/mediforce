@@ -332,7 +332,7 @@ export const GetStepQualificationInputSchema = EvaluatedStepSchema.extend({
 });
 export const GetStepQualificationOutputSchema = z.object({
   status: StepQualificationStatusSchema,
-  /** The newest signed qualification; null when there is none. */
+  /** A signed qualification that binds this Fingerprint, else the newest one; null when there is none. */
   qualification: StepQualificationSchema.nullable(),
   definitionVersion: z.number().int().positive(),
   /** The Step's Fingerprint in that version. */

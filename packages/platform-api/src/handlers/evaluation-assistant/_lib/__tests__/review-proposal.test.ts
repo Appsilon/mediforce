@@ -111,9 +111,9 @@ describe('reviewEvaluationProposal', () => {
       expectation: 'positive', notes: null, split: 'dev', containsProductionData: false, origin: 'user',
     }, scope);
     await freezeEvalDataset(STEP, scope);
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 1 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 1 }, scope);
     const propose = (variantId: string, step: EvaluatedStep = STEP) => reviewEvaluationProposal('propose_control_settings', {
-      evalRunId: evalRun.id, variantId, controlMode: 'CM3', rationale: 'Criteria missed.',
+      evalRunId: evalRun.id, variantId, autonomyLevel: 'L3', rationale: 'Criteria missed.',
     }, scope, step, []);
 
     expect(await propose('champion')).toEqual({ ok: true });

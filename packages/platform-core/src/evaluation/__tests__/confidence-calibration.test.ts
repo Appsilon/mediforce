@@ -32,7 +32,7 @@ describe('calibrateConfidence', () => {
 
 describe('recommendControl', () => {
   it('keeps review without criteria, with a criterion it could not judge, or without confidence', () => {
-    expect(recommendControl(outcomes(0.9, 30, 0), [])).toMatchObject({ controlMode: 'CM3', autonomyLevel: 'L3', confidenceThreshold: null });
+    expect(recommendControl(outcomes(0.9, 30, 0), [])).toMatchObject({ autonomyLevel: 'L3', confidenceThreshold: null });
     expect(recommendControl(outcomes(0.9, 30, 0), [verdict('met'), verdict('not_evaluable')]).reason).toMatch(/could not be judged/);
     expect(recommendControl([], [verdict('met')]).reason).toMatch(/no confidence/);
   });
@@ -42,17 +42,17 @@ describe('recommendControl', () => {
       [...outcomes(0.95, 30, 0), ...outcomes(0.6, 10, 10)],
       [verdict('missed', 0.8)],
     );
-    expect(recommendation).toMatchObject({ controlMode: 'CM4', autonomyLevel: 'L4', confidenceThreshold: 0.95, coverage: 0.6 });
+    expect(recommendation).toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.95, coverage: 0.6 });
     expect(recommendation.reason).toMatch(/^Not every criterion was met overall/);
   });
 
   it('lets every output run unreviewed when all of them pass at the floor', () => {
     expect(recommendControl([...outcomes(0.9, 15, 0), ...outcomes(0.7, 15, 0)], [verdict('met', 0.8)]))
-      .toMatchObject({ controlMode: 'CM4', confidenceThreshold: 0.7, coverage: 1 });
+      .toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.7, coverage: 1 });
   });
 
   it('keeps review when no confidence level separates passing outputs over enough trials', () => {
-    expect(recommendControl(outcomes(0.9, 3, 1), [verdict('met', 0.5)]).controlMode).toBe('CM3');
-    expect(recommendControl(outcomes(0.9, 10, 10), [verdict('missed', 0.8)]).controlMode).toBe('CM3');
+    expect(recommendControl(outcomes(0.9, 3, 1), [verdict('met', 0.5)]).autonomyLevel).toBe('L3');
+    expect(recommendControl(outcomes(0.9, 10, 10), [verdict('missed', 0.8)]).autonomyLevel).toBe('L3');
   });
 });
