@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-09-13]
+
 ### Added
 - ADR-0023 designs **Step Evaluation** — Evaluators, single-step Eval Runs, and a signed Step Qualification bound to a Step Fingerprint — taking up ADR-0007's deferred layers 2–4; the research behind it is in `docs/research/step-evaluation.md`.
 - Image capabilities fill in without expanding a card: one probe per image answers every workspace that catalogues it (a default image rebuilt on deploy no longer shows unprobed in all but one workspace), the Images listing queues unanswered versions for a one-at-a-time background probe, and cards say *Probing capabilities…* or *Capabilities unknown* instead of a blanket "not probed" (ADR-0022 decision 9).
