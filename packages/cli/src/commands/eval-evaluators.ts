@@ -107,6 +107,24 @@ export const evalEvaluatorLabelCommand = defineCommand({
   },
 });
 
+export const evalEvaluatorLabelsCommand = defineCommand({
+  name: 'mediforce eval evaluator-labels',
+  description: 'List the pass/fail labels people gave an Evaluator\'s outputs — the newest per Agent Run.',
+  args: { evaluatorId: { type: 'positional', required: true, description: 'Evaluator id' } },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.listLabels({ evaluatorId: args.evaluatorId });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    if (result.labels.length === 0) output.stdout('No labels.');
+    for (const label of result.labels) {
+      output.stdout(`${label.subject.id}  ${(label.label ?? '').padEnd(4)} ${label.createdBy}${label.comment === null ? '' : `  ${label.comment}`}`);
+    }
+    return 0;
+  },
+});
+
 export const evalEvaluatorCalibrateCommand = defineCommand({
   name: 'mediforce eval evaluator-calibrate',
   description: 'Run an llm_judge over the labelled outputs and record its agreement with the labels.',
@@ -131,7 +149,8 @@ export const evalEvaluatorCalibrateCommand = defineCommand({
     const calibration = result.evaluator.latest.calibration;
     output.stdout(describeEvaluator(result.evaluator));
     if (calibration !== null) {
-      output.stdout(`agreement ${calibration.agreement.toFixed(2)} on ${calibration.labelCount} labels (${calibration.failureLabelCount} failures)`);
+      const kappa = typeof calibration.kappa === 'number' ? `, κ ${calibration.kappa.toFixed(2)}` : '';
+      output.stdout(`agreement ${calibration.agreement.toFixed(2)}${kappa} on ${calibration.labelCount} labels (${calibration.failureLabelCount} failures)`);
     }
     for (const miss of result.disagreements) output.stdout(`  disagrees on ${miss.agentRunId}: person ${miss.humanPassed ? 'pass' : 'fail'}, judge ${miss.judgePassed ? 'pass' : 'fail'}`);
     for (const failure of result.errors) output.stdout(`  could not grade ${failure.agentRunId}: ${failure.error}`);

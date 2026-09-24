@@ -147,6 +147,32 @@ describe('runProposalToolLoop', () => {
     expect(errors[2]).toBe("Unknown tool 'sign_qualification'. Valid tools: propose_note, read_count.");
   });
 
+  it('reviews each proposal: a refused one goes back as an error, an accepted one carries its evidence', async () => {
+    const bodies = scriptOpenRouter([
+      { toolCalls: [
+        { name: 'propose_note', arguments: { text: 'duplicate' } },
+        { name: 'propose_note', arguments: { text: 'broken review' } },
+        { name: 'propose_note', arguments: { text: 'Check grade 5 first.' } },
+      ] },
+      { content: 'One note proposed.' },
+    ]);
+    const reviewProposal = vi.fn().mockImplementation(async (_tool: string, args: { text: string }) => {
+      if (args.text === 'duplicate') return { ok: false, error: 'That note exists already.' };
+      if (args.text === 'broken review') throw new Error('Workspace is gone.');
+      return { ok: true, evidence: { checkedOn: 2 } };
+    });
+
+    const result = await runProposalToolLoop({
+      ...config, messages: [{ role: 'user', content: 'go' }], executePlatformTool: vi.fn(), reviewProposal,
+    });
+
+    expect(result.proposals).toEqual([{ tool: 'propose_note', arguments: { text: 'Check grade 5 first.' }, evidence: { checkedOn: 2 } }]);
+    const answers = bodies[1]!.messages.filter((message) => message.role === 'tool').map((message) => JSON.parse(message.content));
+    expect(answers[0]).toEqual({ error: 'That note exists already.' });
+    expect(answers[1]).toEqual({ error: 'Workspace is gone.' });
+    expect(answers[2]).toMatchObject({ proposed: true, checkedOn: 2 });
+  });
+
   it('treats a tool named after an Object builtin as unknown, not as a tool', async () => {
     const bodies = scriptOpenRouter([
       { toolCalls: [{ name: 'constructor', arguments: {} }, { name: 'toString', arguments: {} }] },

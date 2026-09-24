@@ -42,3 +42,20 @@ export function caseReliability(outcomesByCase: ReadonlyMap<string, readonly (bo
     flakiness: share((outcomes) => outcomes.some((passed) => passed === true) && outcomes.some((passed) => passed === false)),
   };
 }
+
+/**
+ * Cohen's κ between two raters' pass/fail verdicts on the same items — the
+ * agreement a judge has with a person beyond what the pass/fail mix alone
+ * would give by chance. Null when it is undefined: no items, or both raters
+ * gave one and the same verdict to everything.
+ */
+export function cohensKappa(pairs: ReadonlyArray<{ readonly first: boolean; readonly second: boolean }>): number | null {
+  if (pairs.length === 0) return null;
+  const total = pairs.length;
+  const observed = pairs.filter((pair) => pair.first === pair.second).length / total;
+  const firstPassRate = pairs.filter((pair) => pair.first).length / total;
+  const secondPassRate = pairs.filter((pair) => pair.second).length / total;
+  const chance = firstPassRate * secondPassRate + (1 - firstPassRate) * (1 - secondPassRate);
+  if (chance === 1) return null;
+  return (observed - chance) / (1 - chance);
+}

@@ -67,6 +67,7 @@ function buildCase(overrides: Partial<EvalCase> = {}): EvalCase {
     notes: 'Reviewer: grade 5 was reported as grade 4.',
     source: 'production',
     sourceAgentRunId: randomUUID(),
+    perturbation: null,
     origin: 'user',
     split: 'dev',
     containsProductionData: true,
@@ -112,7 +113,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         createdAt: '2026-09-23T09:00:00.000Z',
       }));
       const approval = { approvedBy: 'reviewer-1', approvedAt: '2026-09-23T10:00:00.000Z' };
-      const calibration = { agreement: 0.9, labelCount: 10, failureLabelCount: 2, calibratedAt: '2026-09-23T11:00:00.000Z' };
+      const calibration = { agreement: 0.9, kappa: 0.74, labelCount: 10, failureLabelCount: 2, calibratedAt: '2026-09-23T11:00:00.000Z' };
       await repo.setSourceApproval(evaluator.id, 1, approval);
       await repo.setCalibration(evaluator.id, 2, calibration);
 
@@ -154,11 +155,17 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         containsProductionData: false,
         input: { triggerPayload: {}, previousStepOutputs: {}, previousRun: { lastGrade: 3 } },
       });
+      const synthesized = buildCase({
+        createdAt: '2026-09-23T10:00:00.000Z',
+        source: 'synthesized',
+        perturbation: { kind: 'renamed_columns', description: 'AETERM renamed to AE_TERM in ae.csv' },
+      });
       await repo.createCase(older);
       await repo.createCase(newer);
+      await repo.createCase(synthesized);
       await repo.setCaseArchived(older.id, true);
 
-      expect(await repo.listCases(step)).toEqual([newer, { ...older, archived: true }]);
+      expect(await repo.listCases(step)).toEqual([synthesized, newer, { ...older, archived: true }]);
       expect(await repo.getCase(newer.id)).toEqual(newer);
       expect(await repo.listCases(otherStep)).toEqual([]);
     });
