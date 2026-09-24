@@ -12,16 +12,30 @@ function sectionKey(step: EvaluatedStep, section: Section) {
   return queryKeys.evaluation.section(step.namespace, step.workflowName, step.stepId, section);
 }
 
+/** The Step's live Evaluators with whether each counts. */
+export function useStepEvaluators(step: EvaluatedStep) {
+  return useQuery({
+    queryKey: sectionKey(step, 'evaluators'),
+    queryFn: () => mediforce.evaluation.listEvaluators(step),
+    retry: stopRetryOn4xx,
+  });
+}
+
+/** The person's labels on one Evaluator's outputs; refreshed by every write on the Step. */
+export function useEvaluatorLabels(step: EvaluatedStep, evaluatorId: string) {
+  return useQuery({
+    queryKey: queryKeys.evaluation.section(step.namespace, step.workflowName, step.stepId, `labels:${evaluatorId}`),
+    queryFn: () => mediforce.evaluation.listLabels({ evaluatorId }),
+    retry: stopRetryOn4xx,
+  });
+}
+
 /** Every read the Evaluation tab shows for one agent Step (ADR-0023). */
 export function useStepEvaluation(step: EvaluatedStep) {
   const options = { retry: stopRetryOn4xx } as const;
   return {
     brief: useQuery({ queryKey: sectionKey(step, 'brief'), queryFn: () => mediforce.evaluation.getBrief(step), ...options }),
-    evaluators: useQuery({
-      queryKey: sectionKey(step, 'evaluators'),
-      queryFn: () => mediforce.evaluation.listEvaluators(step),
-      ...options,
-    }),
+    evaluators: useStepEvaluators(step),
     cases: useQuery({ queryKey: sectionKey(step, 'cases'), queryFn: () => mediforce.evaluation.listCases(step), ...options }),
     datasets: useQuery({ queryKey: sectionKey(step, 'datasets'), queryFn: () => mediforce.evaluation.listDatasets(step), ...options }),
     mcpPolicy: useQuery({ queryKey: sectionKey(step, 'mcp-policy'), queryFn: () => mediforce.evaluation.getMcpPolicy(step), ...options }),

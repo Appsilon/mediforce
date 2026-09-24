@@ -108,6 +108,13 @@ function EvaluatorRow({ step, evaluator, mayEdit }: { step: EvaluatedStep; evalu
             'mt-1 inline-block rounded px-1.5 py-0.5 text-[11px] font-medium',
             evaluator.trust.trusted ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
           )}>{evaluator.trust.trusted ? 'Counts' : `Not counted — ${evaluator.trust.reason}`}</span>
+          {evaluator.latest.calibration !== null && (
+            <span className="ml-1.5 text-[11px] text-muted-foreground">
+              agreement {evaluator.latest.calibration.agreement.toFixed(2)}
+              {typeof evaluator.latest.calibration.kappa === 'number' && ` · κ ${evaluator.latest.calibration.kappa.toFixed(2)}`}
+              {' '}on {evaluator.latest.calibration.labelCount} labels
+            </span>
+          )}
         </div>
         {mayEdit && (
           <div className="flex shrink-0 gap-1.5">
@@ -231,7 +238,7 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
             <li key={evalCase.id} className="flex items-center gap-2">
               <span className={cn('rounded px-1.5 text-[11px]', evalCase.expectation === 'positive' ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-700 dark:text-red-400')}>{evalCase.expectation}</span>
               <span className="truncate">{evalCase.name}</span>
-              <span className="ml-auto shrink-0 text-xs text-muted-foreground">{evalCase.split} · {evalCase.source}{evalCase.origin === 'assistant' ? ' · from the assistant' : ''}</span>
+              <span className="ml-auto shrink-0 text-xs text-muted-foreground">{evalCase.split} · {evalCase.source}{evalCase.perturbation === null ? '' : ` (${evalCase.perturbation.kind.replace(/_/g, ' ')})`}{evalCase.origin === 'assistant' ? ' · from the assistant' : ''}</span>
             </li>
           ))}
         </ul>

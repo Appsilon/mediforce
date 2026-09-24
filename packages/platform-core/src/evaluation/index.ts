@@ -6,4 +6,4 @@ export {
   type EvaluatorTrust,
 } from './trust';
 export { inlineMcpServerNames, mcpEvalRestrictions } from './mcp-eval-restrictions';
-export { wilsonInterval, caseReliability, type CaseReliability } from './statistics';
+export { wilsonInterval, caseReliability, cohensKappa, type CaseReliability } from './statistics';

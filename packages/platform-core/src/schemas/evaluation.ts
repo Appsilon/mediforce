@@ -80,6 +80,12 @@ export const SourceApprovalSchema = z.object({
 /** How often a judge version agreed with human labels on the same Agent Runs (D9). */
 export const JudgeCalibrationSchema = z.object({
   agreement: z.number().min(0).max(1),
+  /**
+   * Cohen's κ — agreement beyond what the label mix gives by chance. Null when
+   * it is undefined (every label and verdict the same); absent on calibrations
+   * recorded before it was.
+   */
+  kappa: z.number().min(-1).max(1).nullable().optional(),
   labelCount: z.number().int().nonnegative(),
   failureLabelCount: z.number().int().nonnegative(),
   calibratedAt: z.iso.datetime(),
@@ -127,8 +133,76 @@ export const EvalCaseInputSchema = z.object({
 
 /** An approved production output is a positive case; a rejected one is negative. */
 export const EvalCaseExpectationSchema = z.enum(['positive', 'negative']);
-export const EvalCaseSourceSchema = z.enum(['production', 'manual']);
+/** `synthesized`: a production run's input with a deliberate change — see `perturbation`. */
+export const EvalCaseSourceSchema = z.enum(['production', 'manual', 'synthesized']);
+
+/** The kinds of change a synthesized case makes to a real input (ADR-0023 phase 2). */
+export const EvalCasePerturbationKindSchema = z.enum([
+  'missing_file',
+  'extra_file',
+  'renamed_columns',
+  'edge_values',
+  'injected_instruction',
+  'other',
+]);
+
+/** What a synthesized case changed, in words; the change itself is in its input and seed commit. */
+export const EvalCasePerturbationSchema = z.object({
+  kind: EvalCasePerturbationKindSchema,
+  description: z.string().min(1).max(1000),
+});
+
+/** Which part of an Eval Case input a change addresses. */
+export const EvalCaseInputPartSchema = z.enum(['triggerPayload', 'previousStepOutputs', 'previousRun']);
+
+/**
+ * One change to a case input. `path` walks keys (and array indexes, as
+ * digits) below `part`; `set` may add the last key, `remove` needs it to exist.
+ */
+export const EvalCaseInputChangeSchema = z.discriminatedUnion('op', [
+  z.object({ op: z.literal('set'), part: EvalCaseInputPartSchema, path: z.array(z.string().min(1)).min(1), value: z.unknown() }),
+  z.object({ op: z.literal('remove'), part: EvalCaseInputPartSchema, path: z.array(z.string().min(1)).min(1) }),
+]);
+
+/** A workspace-relative file path: no leading slash, no `.` or `..` segments, nothing under `.git`. */
+export const WorkspaceFilePathSchema = z.string().min(1).max(500).refine(
+  (path) => !path.startsWith('/')
+    && path.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..')
+    && path.split('/')[0] !== '.git',
+  { message: 'a relative path inside the workspace, without . or .. segments, not under .git' },
+);
+
+/**
+ * One change to the workspace a case starts from. `replace` swaps the first
+ * occurrence of `search` in a text file and fails when there is none.
+ */
+export const WorkspaceFileChangeSchema = z.discriminatedUnion('op', [
+  z.object({ op: z.literal('write'), path: WorkspaceFilePathSchema, content: z.string().max(200_000) }),
+  z.object({ op: z.literal('delete'), path: WorkspaceFilePathSchema }),
+  z.object({ op: z.literal('replace'), path: WorkspaceFilePathSchema, search: z.string().min(1).max(10_000), replace: z.string().max(10_000) }),
+]);
 export const EvalCaseSplitSchema = z.enum(['dev', 'holdout']);
+
+/**
+ * A case synthesized from a production Agent Run: its input and the workspace
+ * it started from, with deliberate changes — a missing or extra file, renamed
+ * columns, edge values, an instruction injected into the data.
+ */
+export const PerturbedEvalCaseSpecSchema = z.object({
+  name: z.string().min(1).max(200),
+  baseAgentRunId: z.string().min(1),
+  perturbation: EvalCasePerturbationSchema,
+  inputChanges: z.array(EvalCaseInputChangeSchema).max(20).optional(),
+  fileChanges: z.array(WorkspaceFileChangeSchema).max(20).optional(),
+  expectation: EvalCaseExpectationSchema,
+  /** What the output must — or must not — do with the changed input. */
+  notes: z.string().min(1).max(4000),
+  split: EvalCaseSplitSchema.optional(),
+});
+
+export function hasPerturbationChange(spec: { inputChanges?: readonly unknown[]; fileChanges?: readonly unknown[] }): boolean {
+  return (spec.inputChanges?.length ?? 0) + (spec.fileChanges?.length ?? 0) > 0;
+}
 
 export const EvalCaseSchema = EvaluatedStepSchema.extend({
   id: z.uuid(),
@@ -141,6 +215,8 @@ export const EvalCaseSchema = EvaluatedStepSchema.extend({
   notes: z.string().max(4000).nullable(),
   source: EvalCaseSourceSchema,
   sourceAgentRunId: z.string().nullable(),
+  /** Set on a `synthesized` case: what it changed about its source run's input. */
+  perturbation: EvalCasePerturbationSchema.nullable(),
   origin: EvaluationOriginSchema,
   split: EvalCaseSplitSchema,
   containsProductionData: z.boolean(),
@@ -187,6 +263,9 @@ export type Evaluator = z.infer<typeof EvaluatorSchema>;
 export type EvaluatorVersion = z.infer<typeof EvaluatorVersionSchema>;
 export type EvalCaseInput = z.infer<typeof EvalCaseInputSchema>;
 export type EvalCaseExpectation = z.infer<typeof EvalCaseExpectationSchema>;
+export type EvalCasePerturbation = z.infer<typeof EvalCasePerturbationSchema>;
+export type EvalCaseInputChange = z.infer<typeof EvalCaseInputChangeSchema>;
+export type WorkspaceFileChange = z.infer<typeof WorkspaceFileChangeSchema>;
 export type EvalCase = z.infer<typeof EvalCaseSchema>;
 export type EvalDatasetVersion = z.infer<typeof EvalDatasetVersionSchema>;
 export type McpEvalServerPolicy = z.infer<typeof McpEvalServerPolicySchema>;

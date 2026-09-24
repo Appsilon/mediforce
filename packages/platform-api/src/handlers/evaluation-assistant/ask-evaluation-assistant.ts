@@ -2,20 +2,24 @@ import {
   EVALUATION_ASSISTANT_DEFAULT_MODEL,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
-  EvaluationAssistantProposalSchema,
+  type EvaluationAssistantPlatformToolName,
+  type EvaluatorCheck,
 } from '@mediforce/platform-core';
-import type {
-  AskEvaluationAssistantInput,
-  AskEvaluationAssistantOutput,
-  EvaluationAssistantProgress,
-  PreparedEvalRun,
+import {
+  ProposalViewSchema,
+  type AskEvaluationAssistantInput,
+  type AskEvaluationAssistantOutput,
+  type EvaluationAssistantProgress,
+  type PreparedEvalRun,
 } from '../../contract/evaluation-assistant';
+import type { PreviewEvaluatorOutput } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { recordAssistantPrompt, runProposalToolLoop } from '../../assistant-core';
 import { requireOpenRouterApiKey } from '../../services/openrouter-key';
 import { loadEvaluatedStep, stepRef } from '../evaluation/_lib/evaluated-step';
 import { EVALUATION_ASSISTANT_SYSTEM_PROMPT, briefMessage } from './_lib/system-prompt';
 import { executeEvaluationTool } from './_lib/run-evaluation-tool';
+import { reviewEvaluationProposal, type PreviewedCheck } from './_lib/review-proposal';
 
 // Leave room for paged trajectory reads and preview/repair cycles for several checks.
 const MAX_TOOL_LOOP_ITERATIONS = 32;
@@ -30,9 +34,12 @@ function preparedRun(result: unknown): PreparedEvalRun | null {
 /**
  * One turn with a Step's Evaluation Assistant (ADR-0023 D14–D16), on the
  * shared assistant core. Reads and `preview_evaluator` run as the caller;
- * Evaluators, cases and Brief drafts come back as proposals; a prepared Eval
- * Run comes back for the person to confirm. The Step's Evaluation Brief is
- * sent every turn. `onProgress` hears each model round and tool call as it runs.
+ * plans, Evaluators and their new versions, cases (harvested or synthesized),
+ * outputs to label and Brief drafts come back as proposals, each reviewed
+ * against the platform first — a proposed check carries its self-test on
+ * real outputs; a prepared Eval Run comes back for the person to confirm. The
+ * Step's Evaluation Brief is sent every turn. `onProgress` hears each model
+ * round and tool call as it runs.
  */
 export async function askEvaluationAssistant(
   input: AskEvaluationAssistantInput,
@@ -57,6 +64,14 @@ export async function askEvaluationAssistant(
   });
 
   const [brief] = await scope.evaluation.listBriefs(step);
+  const previewed: PreviewedCheck[] = [];
+  const executePlatformTool = async (toolName: EvaluationAssistantPlatformToolName, args: unknown) => {
+    const toolResult = await executeEvaluationTool(toolName, args, scope, { step, definition, workflowStep });
+    if (toolName === 'preview_evaluator') {
+      previewed.push({ check: (args as { check: EvaluatorCheck }).check, results: (toolResult as PreviewEvaluatorOutput).results });
+    }
+    return toolResult;
+  };
   const result = await runProposalToolLoop({
     model,
     apiKey,
@@ -68,7 +83,8 @@ export async function askEvaluationAssistant(
     ],
     proposalTools: EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
     platformTools: EVALUATION_ASSISTANT_PLATFORM_TOOLS,
-    executePlatformTool: (toolName, args) => executeEvaluationTool(toolName, args, scope, { step, definition, workflowStep }),
+    executePlatformTool,
+    reviewProposal: (toolName, args) => reviewEvaluationProposal(toolName, args, scope, step, previewed),
     maxIterations: MAX_TOOL_LOOP_ITERATIONS,
     maxTokens: ASSISTANT_MAX_OUTPUT_TOKENS,
     onProgress,
@@ -76,7 +92,8 @@ export async function askEvaluationAssistant(
 
   return {
     reply: result.reply,
-    proposals: result.proposals.map((proposal) => EvaluationAssistantProposalSchema.parse(proposal)),
+    proposals: result.proposals.map(({ tool, arguments: proposed, evidence }) =>
+      ProposalViewSchema.parse({ tool, arguments: proposed, ...evidence })),
     preparedEvalRuns: result.platformCalls
       .filter((call) => call.tool === 'prepare_eval_run')
       .flatMap((call) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { caseReliability, wilsonInterval } from '../statistics';
+import { caseReliability, cohensKappa, wilsonInterval } from '../statistics';
 
 describe('wilsonInterval', () => {
   it('matches the reference values', () => {
@@ -38,5 +38,25 @@ describe('caseReliability', () => {
 
   it('is null with nothing graded', () => {
     expect(caseReliability(new Map([['a', []]]))).toBeNull();
+  });
+});
+
+describe('cohensKappa', () => {
+  const repeat = (count: number, first: boolean, second: boolean) => Array.from({ length: count }, () => ({ first, second }));
+
+  it('matches the reference value', () => {
+    // 20 both pass, 5 and 10 split, 15 both fail: observed 0.7, chance 0.5, κ 0.4.
+    const pairs = [...repeat(20, true, true), ...repeat(5, true, false), ...repeat(10, false, true), ...repeat(15, false, false)];
+    expect(cohensKappa(pairs)).toBeCloseTo(0.4, 10);
+  });
+
+  it('is 1 on perfect agreement and 0 or below when agreement is only chance', () => {
+    expect(cohensKappa([...repeat(3, true, true), ...repeat(2, false, false)])).toBe(1);
+    expect(cohensKappa([...repeat(1, true, true), ...repeat(1, true, false), ...repeat(1, false, true), ...repeat(1, false, false)])).toBe(0);
+  });
+
+  it('is undefined without items, or when both raters said the same thing to everything', () => {
+    expect(cohensKappa([])).toBeNull();
+    expect(cohensKappa(repeat(4, true, true))).toBeNull();
   });
 });

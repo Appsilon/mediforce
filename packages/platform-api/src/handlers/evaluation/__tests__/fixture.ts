@@ -75,35 +75,7 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
     transitions: [{ from: 'extract-aes', to: 'grade-aes' }, { from: 'grade-aes', to: 'done' }],
   }));
 
-  const runs = [
-    { instanceId: 'run-graded', agentRunId: GRADED_RUN, result: { findings: [{ term: 'Sepsis', grade: 5 }] }, at: '2026-09-22T09:00:00.000Z' },
-    { instanceId: 'run-ungraded', agentRunId: UNGRADED_RUN, result: { summary: 'ungraded' }, at: '2026-09-22T10:00:00.000Z' },
-  ];
-  for (const run of runs) {
-    const extracted = { events: [{ term: 'Sepsis', outcome: 'fatal' }] };
-    await instanceRepo.create(buildProcessInstance({
-      id: run.instanceId,
-      namespace: NAMESPACE,
-      definitionName: WORKFLOW,
-      triggerPayload: { studyId: 'CDISCPILOT01' },
-      variables: { 'extract-aes': extracted },
-    }));
-    await instanceRepo.addStepExecution(run.instanceId, buildStepExecution({
-      instanceId: run.instanceId,
-      stepId: 'grade-aes',
-      input: { ...extracted, steps: { 'extract-aes': extracted } },
-      startedAt: run.at,
-    }));
-    await agentRunRepo.create(buildAgentRun({
-      id: run.agentRunId,
-      processInstanceId: run.instanceId,
-      stepId: 'grade-aes',
-      startedAt: run.at,
-      envelope: buildAgentOutputEnvelope({ result: run.result }),
-    }));
-  }
-
-  return {
+  const fixture: EvaluationFixture = {
     processRepo,
     instanceRepo,
     agentRunRepo,
@@ -121,4 +93,46 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
       caller,
     }),
   };
+  await addStepRun(fixture, { instanceId: 'run-graded', agentRunId: GRADED_RUN, result: { findings: [{ term: 'Sepsis', grade: 5 }] }, at: '2026-09-22T09:00:00.000Z' });
+  await addStepRun(fixture, { instanceId: 'run-ungraded', agentRunId: UNGRADED_RUN, result: { summary: 'ungraded' }, at: '2026-09-22T10:00:00.000Z' });
+  return fixture;
+}
+
+/**
+ * One finished production run of `grade-aes`, fed the extracted AEs by the
+ * step before it. With `gitMetadata`, the commit it produced on the run branch.
+ */
+export async function addStepRun(fixture: EvaluationFixture, run: {
+  instanceId: string;
+  agentRunId: string;
+  result: Record<string, unknown>;
+  at: string;
+  gitMetadata?: { repoUrl: string; commitSha: string };
+}): Promise<void> {
+  const extracted = { events: [{ term: 'Sepsis', outcome: 'fatal' }] };
+  await fixture.instanceRepo.create(buildProcessInstance({
+    id: run.instanceId,
+    namespace: NAMESPACE,
+    definitionName: WORKFLOW,
+    triggerPayload: { studyId: 'CDISCPILOT01' },
+    variables: { 'extract-aes': extracted },
+  }));
+  await fixture.instanceRepo.addStepExecution(run.instanceId, buildStepExecution({
+    instanceId: run.instanceId,
+    stepId: 'grade-aes',
+    input: { ...extracted, steps: { 'extract-aes': extracted } },
+    startedAt: run.at,
+  }));
+  await fixture.agentRunRepo.create(buildAgentRun({
+    id: run.agentRunId,
+    processInstanceId: run.instanceId,
+    stepId: 'grade-aes',
+    startedAt: run.at,
+    envelope: buildAgentOutputEnvelope({
+      result: run.result,
+      ...(run.gitMetadata === undefined ? {} : {
+        gitMetadata: { ...run.gitMetadata, branch: `run/${run.instanceId}`, changedFiles: ['graded.json'] },
+      }),
+    }),
+  }));
 }
