@@ -101,11 +101,14 @@ export async function executeEvaluationTool(
       };
     }
     case 'get_trajectory': {
-      const { agentRunId } = args as Args<'get_trajectory'>;
+      const { agentRunId, offset, limit } = EVALUATION_ASSISTANT_PLATFORM_TOOLS.get_trajectory.parse(args);
       const subject = await loadEvaluationSubject(scope, agentRunId, step);
+      const entries = subject.trajectory.slice(offset, offset + limit);
+      const total = subject.trajectory.length;
       return {
-        entries: subject.trajectory.slice(0, 150).map((entry) => clip(entry, 400)),
-        total: subject.trajectory.length,
+        entries,
+        total,
+        nextOffset: offset + entries.length < total ? offset + entries.length : null,
       };
     }
     case 'list_evaluators': {

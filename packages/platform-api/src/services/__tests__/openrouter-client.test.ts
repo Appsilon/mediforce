@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { callOpenRouter } from '../openrouter-client';
+import { callOpenRouter, OpenRouterNetworkError } from '../openrouter-client';
 
 describe('callOpenRouter', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
@@ -17,6 +17,17 @@ describe('callOpenRouter', () => {
     const result = await callOpenRouter({ model: 'model-x', messages: [{ role: 'user', content: 'hi' }], apiKey: 'key-abc' });
 
     expect(result.usage).toEqual({ promptTokens: 812, completionTokens: 64 });
+  });
+
+  it('retries once when the connection drops, then reports a network error', async () => {
+    const ok = () => new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce(ok());
+    const request = { model: 'model-x', messages: [{ role: 'user' as const, content: 'hi' }], apiKey: 'key-abc' };
+    expect((await callOpenRouter(request)).content).toBe('ok');
+
+    fetchSpy.mockReset().mockRejectedValue(new TypeError('fetch failed'));
+    await expect(callOpenRouter(request)).rejects.toBeInstanceOf(OpenRouterNetworkError);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
   it('returns content and toolCalls from the model response', async () => {

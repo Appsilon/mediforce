@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import postgres from 'postgres';
 import type { APIRequestContext } from '@playwright/test';
 import {
   AskEvaluationAssistantOutputSchema,
@@ -108,5 +109,102 @@ test.describe('Evaluation Assistant — API E2E', () => {
 
     const runRes = await request.get(`/api/evaluation/runs/${answer.preparedEvalRuns[0]!.evalRunId}`, { headers: AUTH_HEADERS });
     expect(EvalRunOutputSchema.parse(await runRes.json()).evalRun.status).toBe('prepared');
+  });
+
+  test('reads complete generated source beyond the first 150 trajectory entries', async ({ request }) => {
+    const source = `${'# generated source\n'.repeat(100)}cards::ard_categorical(adsl, variables = ARM)`;
+    const entries = Array.from({ length: 203 }, (_, index) => ({
+      agent_run_id: agentRunId,
+      seq: 1000 + index,
+      entry: index === 202
+        ? { ts: new Date().toISOString(), type: 'assistant', subtype: 'tool_call', tool: 'Write', input: { file_path: '/workspace/code/driver.R', content: source } }
+        : { ts: new Date().toISOString(), type: 'system', subtype: 'thinking_tokens' },
+    }));
+    const sql = postgres(process.env.DATABASE_URL!, { max: 1 });
+    try {
+      await sql`INSERT INTO agent_trajectory_entries ${sql(entries, 'agent_run_id', 'seq', 'entry')}`;
+    } finally {
+      await sql.end();
+    }
+    const question = `Inspect all generated code. ${randomUUID()}`;
+    await scriptOpenRouter(question, [
+      { toolCalls: [{ name: 'get_trajectory', arguments: { agentRunId, offset: 0, limit: 150 } }] },
+      { toolCalls: [{ name: 'get_trajectory', arguments: { agentRunId, offset: '$tool:nextOffset', limit: 150 } }] },
+      { content: 'The driver calls cards::ard_categorical.' },
+    ]);
+
+    expect((await ask(request, step, question)).reply).toContain('cards::ard_categorical');
+    const requests = await openRouterRequests(question);
+    expect(lastToolResult(requests[1]!.messages)).toMatchObject({ nextOffset: 150 });
+    expect(lastToolResult(requests[2]!.messages)).toMatchObject({
+      nextOffset: null,
+      entries: expect.arrayContaining([expect.objectContaining({
+        seq: 1202, input: { file_path: '/workspace/code/driver.R', content: source },
+      })]),
+    });
+  });
+
+  test('returns the final proposal and a continuation summary when the tool budget is exhausted', async ({ request }) => {
+    const question = `Prepare two checks. ${randomUUID()}`;
+    const proposal = { name: 'partial-check', rule: 'The result lists findings.', severity: 'critical', check };
+    await scriptOpenRouter(question, [
+      ...Array.from({ length: 31 }, () => ({ toolCalls: [{ name: 'list_evaluators', arguments: {} }] })),
+      { toolCalls: [{ name: 'propose_evaluator', arguments: proposal }] },
+      { content: 'One check is proposed. Package usage still needs investigation.' },
+    ]);
+
+    const answer = await ask(request, step, question);
+    expect(answer.proposals).toEqual([{ tool: 'propose_evaluator', arguments: proposal }]);
+    expect(answer.reply).toContain('32-round tool-use limit');
+    expect(answer.reply).toContain('Package usage still needs investigation.');
+    const requests = await openRouterRequests(question);
+    expect(requests).toHaveLength(33);
+    expect(requests[32]).not.toHaveProperty('tools');
+    const listUrl = `/api/evaluation/evaluators?namespace=${step.namespace}&workflowName=${step.workflowName}&stepId=${step.stepId}`;
+    const evaluators = ListEvaluatorsOutputSchema.parse(await (await request.get(listUrl, { headers: AUTH_HEADERS })).json()).evaluators;
+    expect(evaluators.some((evaluator) => evaluator.name === 'partial-check')).toBe(false);
+  });
+
+  test('returns actionable validation feedback and previews the corrected object', async ({ request }) => {
+    const question = `Recover from a string check. ${randomUUID()}`;
+    await scriptOpenRouter(question, [
+      { toolCalls: [{ name: 'preview_evaluator', arguments: { check: JSON.stringify(check), agentRunIds: [agentRunId] } }] },
+      { toolCalls: [{ name: 'preview_evaluator', arguments: { check, agentRunIds: [agentRunId] } }] },
+      { content: 'The corrected check ran; the result is missing findings.' },
+    ]);
+    expect((await ask(request, step, question)).reply).toContain('corrected check ran');
+    const requests = await openRouterRequests(question);
+    expect(lastToolResult(requests[1]!.messages)).toMatchObject({
+      validationError: 'check: Invalid input: expected object, received string',
+      expectedArguments: { properties: { check: {
+        description: expect.stringContaining('not a string'),
+        examples: expect.arrayContaining([expect.objectContaining({ kind: 'code' })]),
+      } } },
+    });
+    expect(lastToolResult(requests[2]!.messages)).toMatchObject({
+      results: [{ agentRunId, passed: false, error: null }],
+    });
+  });
+
+  test('stops repeated string-check failures before the round cap and keeps completed cards', async ({ request }) => {
+    const question = `Stop the invalid-check retry loop. ${randomUUID()}`;
+    const proposal = { name: 'keep-check', rule: 'The result lists findings.', severity: 'critical', check };
+    await scriptOpenRouter(question, [
+      { toolCalls: [{ name: 'preview_evaluator', arguments: { check, agentRunIds: [agentRunId] } }] },
+      { toolCalls: [{ name: 'propose_evaluator', arguments: proposal }] },
+      ...Array.from({ length: 3 }, (_, index) => ({
+        toolCalls: [{ name: 'preview_evaluator', arguments: { check: `rewritten script ${index}`, agentRunIds: [agentRunId] } }],
+      })),
+      { content: 'The additional check could not be previewed because its arguments were invalid.' },
+    ]);
+    const answer = await ask(request, step, question);
+    expect(answer.reply).toContain('3 consecutive rounds');
+    expect(answer.reply).toContain('preview_evaluator');
+    expect(answer.reply).toContain('expected object, received string');
+    expect(answer.reply).not.toContain('tool-use limit');
+    expect(answer.proposals).toEqual([{ tool: 'propose_evaluator', arguments: proposal }]);
+    const requests = await openRouterRequests(question);
+    expect(requests).toHaveLength(6);
+    expect(requests[5]).not.toHaveProperty('tools');
   });
 });
