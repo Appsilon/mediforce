@@ -115,8 +115,9 @@ stranded. The retry refreshes the run's `updatedAt` for the heartbeat's
 stranded sweep. `agent.outputSchema` is valid on `executor: agent` steps only;
 definition validation rejects it anywhere else.
 
-Each plugin maps its CLI's stdout lines to Agent Trajectory entries
-(`processOutputLine`); `TrajectoryRecorder` numbers them and writes them in
+Every agent step's Agent Run also keeps an Agent Trajectory: the same entries
+its activity log gets (`agentLogEntries` for the plugin's `logFormat`, see
+[below](#where-the-container-runs)). `TrajectoryRecorder` numbers them and writes them in
 batches to `agent_trajectory_entries`, keyed by the Agent Run — live on the
 local strategy, after exit on the queued one, both attempts of a retry in one
 trajectory ([`trajectory-recorder.ts`](../../packages/agent-runtime/src/runner/trajectory-recorder.ts),
@@ -124,8 +125,9 @@ ADR-0023 D8). Entries always keep full content: the trajectory lives in the
 platform's own Postgres, and `MEDIFORCE_OTEL_CAPTURE_CONTENT` governs only what
 exported OTEL spans carry (ADR-0007 D5). Read it with
 `GET /api/agent-runs/:id/trajectory` or `mediforce agent-run trajectory`.
-Script steps have no Agent Run; their stdout lines are `assistant` agent events,
-which the run view's log shows instead.
+The trajectory is the durable record Step Evaluation reads; the run view's
+Step Log still shows the activity log. Script steps have no Agent Run and so no
+trajectory.
 
 ## Commits
 
