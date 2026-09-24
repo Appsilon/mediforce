@@ -143,6 +143,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
     inputTokens: agentOutput?.tokenUsage?.inputTokens ?? null,
     outputTokens: agentOutput?.tokenUsage?.outputTokens ?? null,
     durationMs: agentOutput?.duration_ms === null || agentOutput?.duration_ms === undefined ? null : Math.round(agentOutput.duration_ms),
+    confidence: agentRun.envelope?.confidence ?? null,
     error: errors.length === 0 ? null : errors.join('; '),
     completedAt: new Date().toISOString(),
   });

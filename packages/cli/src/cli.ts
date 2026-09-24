@@ -130,6 +130,7 @@ import {
   evalRunStartCommand,
 } from './commands/eval-runs';
 import { evalAskCommand } from './commands/eval-ask';
+import { evalCriteriaGetCommand, evalCriteriaSetCommand, evalQualificationCommand } from './commands/eval-qualification';
 import { namespaceUpdateCommand } from './commands/namespace-update';
 import { namespaceDeleteCommand } from './commands/namespace-delete';
 import { namespaceResetCommand } from './commands/namespace-reset';
@@ -276,7 +277,7 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   eval: {
-    description: 'Step Evaluation (ADR-0023) — Briefs, Evaluators, Eval Cases, Datasets, MCP eval policy, Eval Runs',
+    description: 'Step Evaluation (ADR-0023) — Briefs, Evaluators, Eval Cases, Datasets, MCP eval policy, Acceptance Criteria, Eval Runs, Step Qualification',
     leaves: {
       'brief-get': { description: 'Print a step\'s Evaluation Brief', fn: evalBriefGetCommand },
       'brief-set': { description: 'Write a new Evaluation Brief version', fn: evalBriefSetCommand },
@@ -304,6 +305,9 @@ export const TREE: Record<string, BranchEntry> = {
       'run-list': { description: 'List a step\'s Eval Runs', fn: evalRunListCommand },
       'run-cancel': { description: 'Cancel an Eval Run', fn: evalRunCancelCommand },
       report: { description: 'Print an Eval Run and its report', fn: evalRunGetCommand },
+      'criteria-get': { description: 'Print a step\'s Acceptance Criteria', fn: evalCriteriaGetCommand },
+      'criteria-set': { description: 'Set a step\'s Acceptance Criteria from a JSON file', fn: evalCriteriaSetCommand },
+      qualification: { description: 'Print a step\'s qualification: Qualified, Stale or Not qualified', fn: evalQualificationCommand },
       ask: { description: 'Ask the step\'s Evaluation Assistant (proposals are printed, not applied)', fn: evalAskCommand },
     },
   },

@@ -124,12 +124,13 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
       const res = await request.get(`/api/scores?runId=${trial.processInstanceId}&stepId=grade-aes`, { headers: AUTH_HEADERS });
       return ListScoresOutputSchema.parse(await res.json()).scores;
     }));
-    for (const evaluator of finished.report.evaluators) {
+    const [champion] = finished.report.variants;
+    for (const evaluator of champion!.evaluators) {
       const scores = trialScores.flat().filter((score) => score.evaluatorId === evaluator.evaluatorId);
       expect(evaluator.passes).toBe(scores.filter((score) => score.value >= 0.5).length);
       expect(evaluator.failures).toBe(scores.filter((score) => score.value < 0.5).length);
     }
-    const byName = Object.fromEntries(finished.report.evaluators.map((evaluator) => [evaluator.name, evaluator]));
+    const byName = Object.fromEntries(champion!.evaluators.map((evaluator) => [evaluator.name, evaluator]));
     expect(byName['summary-present']).toMatchObject({ passes: 2, failures: 0, passRate: 1, passAtK: 1, passHatK: 1, flakiness: 0 });
     expect(byName['findings-present']).toMatchObject({ passes: 0, failures: 2, passRate: 0, passAtK: 0, passHatK: 0 });
     expect(byName['summary-present']!.wilsonLower).toBeCloseTo(0.3424, 3);

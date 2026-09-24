@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { AgentOutputSchemaSchema } from './workflow-definition';
+import { CommitShaSchema } from './process-definition';
+import { StepMcpRestrictionSchema } from './agent-mcp-binding';
 
 /**
  * The Evaluation domain of ADR-0023: everything is owned by one agent Workflow
@@ -250,6 +252,48 @@ export const McpEvalPolicySchema = EvaluatedStepSchema.extend({
   updatedAt: z.iso.datetime(),
 });
 
+/**
+ * One Acceptance Criterion (D10): what every counted Evaluator of a severity
+ * must reach — its pass rate's Wilson 95% lower bound, and optionally pass^k,
+ * the share of cases where every trial passed.
+ */
+export const AcceptanceCriterionSchema = z.object({
+  minPassRate: z.number().min(0).max(1),
+  minPassHatK: z.number().min(0).max(1).optional(),
+});
+
+/** Acceptance Criteria per severity; a severity without one is not judged. */
+export const AcceptanceCriteriaSchema = z.object({
+  critical: AcceptanceCriterionSchema.optional(),
+  major: AcceptanceCriterionSchema.optional(),
+  minor: AcceptanceCriterionSchema.optional(),
+}).refine((criteria) => criteria.critical !== undefined || criteria.major !== undefined || criteria.minor !== undefined, {
+  message: 'set a criterion for at least one severity',
+});
+
+/** A Step's Acceptance Criteria, set before an Eval Run and frozen into it. Every write is a new version. */
+export const AcceptanceCriteriaVersionSchema = EvaluatedStepSchema.extend({
+  version: z.number().int().positive(),
+  criteria: AcceptanceCriteriaSchema,
+  origin: EvaluationOriginSchema,
+  createdBy: z.string().min(1),
+  createdAt: z.iso.datetime(),
+});
+
+/**
+ * A variant of the Step (D5): an override patch applied at trial time over
+ * the pinned Definition version. `prompt` and `allowedTools` replace the
+ * step's own; `mcpRestrictions` narrow it further, never widen it;
+ * `skillCommit` moves the workflow's external skills repository.
+ */
+export const StepVariantPatchSchema = z.object({
+  model: z.string().min(1).optional(),
+  prompt: z.string().min(1).max(64_000).optional(),
+  skillCommit: CommitShaSchema.optional(),
+  allowedTools: z.array(z.string().min(1)).max(50).optional(),
+  mcpRestrictions: StepMcpRestrictionSchema.optional(),
+}).strict();
+
 export type EvaluatedStep = z.infer<typeof EvaluatedStepSchema>;
 export type EvaluationOrigin = z.infer<typeof EvaluationOriginSchema>;
 export type EvaluationBrief = z.infer<typeof EvaluationBriefSchema>;
@@ -270,3 +314,7 @@ export type EvalCase = z.infer<typeof EvalCaseSchema>;
 export type EvalDatasetVersion = z.infer<typeof EvalDatasetVersionSchema>;
 export type McpEvalServerPolicy = z.infer<typeof McpEvalServerPolicySchema>;
 export type McpEvalPolicy = z.infer<typeof McpEvalPolicySchema>;
+export type AcceptanceCriterion = z.infer<typeof AcceptanceCriterionSchema>;
+export type AcceptanceCriteria = z.infer<typeof AcceptanceCriteriaSchema>;
+export type AcceptanceCriteriaVersion = z.infer<typeof AcceptanceCriteriaVersionSchema>;
+export type StepVariantPatch = z.infer<typeof StepVariantPatchSchema>;

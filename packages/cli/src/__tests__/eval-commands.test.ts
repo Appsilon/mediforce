@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { evalCaseFromRunCommand, evalCasePerturbCommand, evalCasesFromLabelsCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
 import { evalEvaluatorLabelCommand } from '../commands/eval-evaluators';
+import { evalCriteriaSetCommand, evalQualificationCommand } from '../commands/eval-qualification';
 import { captureOutput, jsonResponse } from './test-helpers';
 
 const ENV = { MEDIFORCE_API_KEY: 'k' };
@@ -103,5 +104,40 @@ describe('mediforce eval', () => {
       namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes',
       servers: { edc: { mode: 'live', denyTools: ['write_record'] } },
     });
+  });
+
+  it('criteria-set posts the criteria from the file for the step', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'eval-cli-'));
+    const file = join(dir, 'criteria.json');
+    const criteria = { critical: { minPassRate: 0.95, minPassHatK: 0.9 }, major: { minPassRate: 0.8 } };
+    writeFileSync(file, JSON.stringify(criteria));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      criteria: {
+        namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', version: 2, criteria,
+        origin: 'user', createdBy: 'u-1', createdAt: '2026-09-24T08:00:00.000Z',
+      },
+    }, 201));
+    const output = captureOutput();
+    const code = await evalCriteriaSetCommand({ argv: [...STEP, '--file', file, ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe('http://localhost:5555/api/evaluation/acceptance-criteria');
+    expect(JSON.parse(String(init?.body))).toEqual({ namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', criteria, origin: 'user' });
+    expect(output.stdoutLines).toEqual(['Acceptance Criteria v2 written: critical: lower bound ≥ 0.95, pass^k ≥ 0.9; major: lower bound ≥ 0.8']);
+  });
+
+  it('qualification asks for the version given and prints the badge', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      status: 'not_qualified', qualification: null, definitionVersion: 3,
+      fingerprint: { hash: 'a'.repeat(64), components: Object.fromEntries(['step', 'model', 'systemPrompt', 'skill', 'image', 'mcpServers', 'preamble'].map((component) => [component, 'b'.repeat(64)])) },
+      changed: [], evaluatorsChanged: [], history: [],
+    }));
+    const output = captureOutput();
+    const code = await evalQualificationCommand({ argv: [...STEP, '--version', '3', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    expect(fetchSpy.mock.calls[0]![0]).toBe('http://localhost:5555/api/evaluation/qualification?namespace=pharma-a&workflowName=ae-grading&stepId=grade-aes&definitionVersion=3');
+    expect(output.stdoutLines).toEqual([`not qualified  (v3, fingerprint ${'a'.repeat(12)})`]);
   });
 });

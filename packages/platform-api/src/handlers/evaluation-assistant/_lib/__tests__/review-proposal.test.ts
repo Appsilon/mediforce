@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import type { EvaluatedStep } from '@mediforce/platform-core';
 import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
 import { createEvaluator } from '../../../evaluation/evaluators';
+import { createEvalCase } from '../../../evaluation/eval-cases';
+import { freezeEvalDataset } from '../../../evaluation/eval-datasets';
+import { prepareEvalRun } from '../../../evaluation/eval-runs';
 import { reviewEvaluationProposal } from '../review-proposal';
 import { evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture } from '../../../evaluation/__tests__/fixture';
 
@@ -97,5 +101,23 @@ describe('reviewEvaluationProposal', () => {
     await expect(reviewEvaluationProposal('propose_perturbed_case', {
       ...proposal, fileChanges: [{ op: 'delete', path: 'data/dm.csv' }],
     }, fixture.scope(), STEP, [])).rejects.toThrow('has no workspace to change files in');
+  });
+
+  it('offers routing only for a run and variant of this step', async () => {
+    const scope = fixture.scope();
+    await createEvaluator({ ...STEP, ...proposeEvaluator(findings), origin: 'user' }, scope);
+    await createEvalCase({
+      ...STEP, name: 'Grade 5 sepsis', input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: null,
+      expectation: 'positive', notes: null, split: 'dev', containsProductionData: false, origin: 'user',
+    }, scope);
+    await freezeEvalDataset(STEP, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 1 }, scope);
+    const propose = (variantId: string, step: EvaluatedStep = STEP) => reviewEvaluationProposal('propose_control_settings', {
+      evalRunId: evalRun.id, variantId, controlMode: 'CM3', rationale: 'Criteria missed.',
+    }, scope, step, []);
+
+    expect(await propose('champion')).toEqual({ ok: true });
+    expect(await propose('challenger-1')).toEqual({ ok: false, error: expect.stringContaining("has no variant 'challenger-1'") });
+    expect(await propose('champion', { ...STEP, stepId: 'extract-aes' })).toEqual({ ok: false, error: expect.stringContaining('is not a run of this step') });
   });
 });
