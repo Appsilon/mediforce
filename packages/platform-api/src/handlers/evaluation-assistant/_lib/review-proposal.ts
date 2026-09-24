@@ -13,6 +13,7 @@ import { HandlerError } from '../../../errors';
 import { previewEvaluator } from '../../evaluation/preview-evaluator';
 import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
+import { isSameStep } from '../../evaluation/_lib/evaluated-step';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
 import { loadStepEvaluator } from './run-evaluation-tool';
 
@@ -114,7 +115,7 @@ export async function reviewEvaluationProposal(
     case 'propose_control_settings': {
       const { evalRunId, variantId } = args as Args<'propose_control_settings'>;
       const run = await scope.evaluation.getEvalRun(evalRunId);
-      if (run === null || run.namespace !== step.namespace || run.workflowName !== step.workflowName || run.stepId !== step.stepId) {
+      if (run === null || isSameStep(run, step) === false) {
         return { ok: false, error: `Eval Run '${evalRunId}' is not a run of this step` };
       }
       if (run.variants.some((variant) => variant.id === variantId) === false) {

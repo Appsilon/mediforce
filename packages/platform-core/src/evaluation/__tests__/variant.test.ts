@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildWorkflowDefinition } from '../../testing/index';
-import { applyStepVariant, isEmptyVariantPatch, narrowMcpRestrictions, variantPatchProblem } from '../variant';
+import { applyStepVariant, isEmptyVariantPatch, variantPatchProblem } from '../variant';
 
 const definition = buildWorkflowDefinition({
   name: 'ae-grading',
@@ -53,13 +53,6 @@ describe('applyStepVariant', () => {
     const carried = { ...definition, externalSkillsRepo: undefined };
     expect(variantPatchProblem(carried, { skillCommit: 'bbbbbbb' })).toMatch(/has none/);
     expect(() => applyStepVariant(carried, step, { skillCommit: 'bbbbbbb' })).toThrow(/has none/);
-  });
-});
-
-describe('narrowMcpRestrictions', () => {
-  it('never re-enables a disabled server', () => {
-    expect(narrowMcpRestrictions({ edc: { disable: true } }, { edc: { denyTools: ['read_record'] } }))
-      .toEqual({ edc: { disable: true, denyTools: ['read_record'] } });
   });
 });
 

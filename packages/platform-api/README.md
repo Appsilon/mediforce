@@ -126,9 +126,9 @@ trial's variant); the driver does not know variants exist.
 **A Step Qualification binds a Step Fingerprint.** `_lib/step-fingerprint.ts`
 hashes each part of a step that shapes its behaviour on its own, so the badge
 (`getStepQualification`) can say which part changed. `signStepQualification`
-is the one handler that re-authenticates: a user caller's password is
-bcrypt-compared as `setPassword` does, an API key is refused, and the record
-it writes is never changed.
+re-authenticates with the same `users/_lib/check-password.ts` as
+`setPassword`, audits a wrong password, refuses an API key and a cancelled run,
+and the record it writes is never changed.
 
 **Assistants share building blocks.** `src/assistant-core/` holds the pieces
 the workflow editor assistant and the Evaluation Assistant both use

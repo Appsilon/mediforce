@@ -34,7 +34,7 @@ export function calibrateConfidence(outcomes: readonly ConfidenceOutcome[]): Con
       upper: bin.upper,
       count: bin.members.length,
       meanConfidence: bin.members.reduce((sum, member) => sum + member.confidence, 0) / bin.members.length,
-      passRate: bin.members.filter((member) => member.passed).length / bin.members.length,
+      passRate: bin.members.filter((member) => member.passed === true).length / bin.members.length,
     }));
   const ece = filled.reduce((sum, bin) => sum + (bin.count / outcomes.length) * Math.abs(bin.passRate - bin.meanConfidence), 0);
   return { count: outcomes.length, bins: filled, ece: Math.min(1, ece) };
@@ -56,7 +56,7 @@ export function recommendControl(
   verdicts: readonly AcceptanceCriterionVerdict[],
 ): ControlRecommendation {
   const review = (reason: string): ControlRecommendation => ({
-    controlMode: 'CM3', autonomyLevel: 'L3', confidenceThreshold: null, coverage: null, reason,
+    autonomyLevel: 'L3', confidenceThreshold: null, coverage: null, reason,
   });
   if (verdicts.length === 0) {
     return review('No Acceptance Criteria were frozen into this run, so there is no floor to run unreviewed against; keep a person reviewing every output.');
@@ -75,11 +75,10 @@ export function recommendControl(
   for (const threshold of thresholds) {
     const covered = outcomes.filter((outcome) => outcome.confidence >= threshold);
     if (covered.length < MIN_COVERED_TRIALS) break;
-    const passes = covered.filter((outcome) => outcome.passed).length;
+    const passes = covered.filter((outcome) => outcome.passed === true).length;
     const lower = wilsonInterval(passes, covered.length)!.lower;
     if (lower >= target) {
       return {
-        controlMode: 'CM4',
         autonomyLevel: 'L4',
         confidenceThreshold: threshold,
         coverage: covered.length / outcomes.length,

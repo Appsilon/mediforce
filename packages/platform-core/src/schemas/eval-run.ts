@@ -217,13 +217,12 @@ export const ConfidenceCalibrationSchema = z.object({
 });
 
 /**
- * What the report recommends for the variant's routing: Control Mode 4 (the
- * agent applies its output) above a `confidenceThreshold`, below which the
- * step's fallback sends it to a person — or Control Mode 3, a person reviews
- * every output.
+ * What the report recommends for the variant's routing: `L4` (Control Mode 4,
+ * the agent applies its output) above a `confidenceThreshold`, below which the
+ * step's fallback sends it to a person — or `L3` (Control Mode 3), a person
+ * reviews every output. Control Mode itself is presentational (ADR-0014).
  */
 export const ControlRecommendationSchema = z.object({
-  controlMode: z.enum(['CM3', 'CM4']),
   autonomyLevel: z.enum(['L3', 'L4']),
   confidenceThreshold: z.number().min(0).max(1).nullable(),
   /** Share of graded trials at or above the threshold — what would run without a person. */

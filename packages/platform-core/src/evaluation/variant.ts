@@ -1,20 +1,6 @@
-import type { StepMcpRestriction } from '../schemas/agent-mcp-binding';
 import type { StepVariantPatch } from '../schemas/evaluation';
 import type { WorkflowDefinition, WorkflowStep } from '../schemas/workflow-definition';
-
-/** `base` narrowed by `extra`: a server either disables stays disabled, and denied tools add up. */
-export function narrowMcpRestrictions(base: StepMcpRestriction = {}, extra: StepMcpRestriction = {}): StepMcpRestriction {
-  const merged: StepMcpRestriction = { ...base };
-  for (const [name, restriction] of Object.entries(extra)) {
-    const existing = merged[name] ?? {};
-    const denyTools = [...new Set([...(existing.denyTools ?? []), ...(restriction.denyTools ?? [])])];
-    merged[name] = {
-      ...((existing.disable === true || restriction.disable === true) ? { disable: true } : {}),
-      ...(denyTools.length === 0 ? {} : { denyTools }),
-    };
-  }
-  return merged;
-}
+import { narrowMcpRestrictions } from './mcp-eval-restrictions';
 
 export function isEmptyVariantPatch(patch: StepVariantPatch): boolean {
   return Object.values(patch).every((value) => value === undefined);

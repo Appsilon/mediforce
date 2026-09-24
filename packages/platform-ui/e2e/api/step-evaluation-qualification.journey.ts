@@ -128,7 +128,7 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     const [champion, challenger] = finished.report.variants;
     expect(champion!.criteria.map((verdict) => [verdict.severity, verdict.status])).toEqual([['critical', 'met'], ['major', 'missed']]);
     expect(challenger!.criteria.map((verdict) => verdict.status)).toEqual(['met', 'missed']);
-    expect(champion!.recommendation).toMatchObject({ controlMode: 'CM3' });
+    expect(champion!.recommendation).toMatchObject({ autonomyLevel: 'L3' });
     expect(finished.report.comparison).toEqual([expect.objectContaining({
       variantId: 'challenger-1',
       evaluators: expect.arrayContaining([expect.objectContaining({ name: 'summary-present', verdict: 'no_clear_difference' })]),

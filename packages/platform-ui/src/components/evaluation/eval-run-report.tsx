@@ -15,11 +15,10 @@ import type { EvalRunOutput } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
+import { useAuth } from '@/contexts/auth-context';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
-
-const buttonClass = 'rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50 disabled:pointer-events-none';
-const primaryButtonClass = 'rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none';
-const inputClass = 'rounded-md border bg-background px-2 py-1 text-sm';
+import { ControlModeBadge } from '@/components/ui/control-mode-badge';
+import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 
 function percent(value: number | null): string {
   return value === null ? '—' : `${Math.round(value * 100)}%`;
@@ -74,11 +73,11 @@ function EvaluatorTable({ variant, k }: { variant: EvalRunVariantReport; k: numb
       </thead>
       <tbody>
         {variant.evaluators.map((evaluator) => (
-          <tr key={evaluator.evaluatorId} className={cn('border-t', !evaluator.counted && 'text-muted-foreground')}>
+          <tr key={evaluator.evaluatorId} className={cn('border-t', evaluator.counted === false && 'text-muted-foreground')}>
             <td className="py-1.5">
               <span className="font-medium">{evaluator.name}</span>
               <span className="ml-1 text-xs text-muted-foreground">v{evaluator.version} · {evaluator.severity}</span>
-              {!evaluator.counted && <div className="text-xs">not counted — {evaluator.reason}</div>}
+              {evaluator.counted === false && <div className="text-xs">not counted — {evaluator.reason}</div>}
             </td>
             <td className="py-1.5">{percent(evaluator.passRate)} <span className="text-xs text-muted-foreground">({evaluator.passes}/{evaluator.passes + evaluator.failures})</span></td>
             <td className="py-1.5 text-xs">{evaluator.wilsonLower === null ? '—' : `${percent(evaluator.wilsonLower)}–${percent(evaluator.wilsonUpper)}`}</td>
@@ -123,7 +122,8 @@ function ConfidenceSection({ variant }: { variant: EvalRunVariantReport }) {
       {recommendation !== null && (
         <p data-testid="control-recommendation">
           <span className="font-medium">
-            Routing: {recommendation.controlMode === 'CM4' ? `Control Mode 4 above confidence ${recommendation.confidenceThreshold}` : 'Control Mode 3'}
+            Routing: <ControlModeBadge executor="agent" autonomyLevel={recommendation.autonomyLevel} showNumber />
+            {recommendation.confidenceThreshold !== null && ` above confidence ${recommendation.confidenceThreshold}`}
           </span>
           {recommendation.coverage !== null && <span className="text-muted-foreground"> ({percent(recommendation.coverage)} of outputs unreviewed)</span>}
           <span className="text-muted-foreground"> — {recommendation.reason}</span>
@@ -136,7 +136,7 @@ function ConfidenceSection({ variant }: { variant: EvalRunVariantReport }) {
 /**
  * Signing a Step Qualification for one variant (ADR-0023 D10): the person
  * reads what the signature means, justifies every criterion the variant did
- * not meet, and re-enters their password.
+ * not meet, and re-enters their password where password sign-in is enabled.
  */
 function SignQualificationForm({ step, evalRunId, briefVersion, variant, onDone }: {
   step: EvaluatedStep;
@@ -148,6 +148,8 @@ function SignQualificationForm({ step, evalRunId, briefVersion, variant, onDone 
   const unmet = variant.criteria.filter((verdict) => verdict.status !== 'met');
   const [justifications, setJustifications] = React.useState<Record<string, string>>({});
   const [password, setPassword] = React.useState('');
+  // Without password sign-in, signing re-authenticates by the session; the server ignores a password.
+  const { passwordAuthEnabled } = useAuth();
   const sign = useStepEvaluationMutation(step, () => mediforce.evaluation.signQualification({
     evalRunId,
     variantId: variant.id,
@@ -172,13 +174,15 @@ function SignQualificationForm({ step, evalRunId, briefVersion, variant, onDone 
           />
         </label>
       ))}
-      <label className="flex items-center gap-2">
-        <span>Your password</span>
-        <input type="password" autoComplete="current-password" className={cn(inputClass, 'text-xs')} value={password} onChange={(event) => setPassword(event.target.value)} />
-      </label>
+      {passwordAuthEnabled !== false && (
+        <label className="flex items-center gap-2">
+          <span>Your password</span>
+          <input type="password" autoComplete="current-password" className={cn(inputClass, 'text-xs')} value={password} onChange={(event) => setPassword(event.target.value)} />
+        </label>
+      )}
       {sign.error !== null && <p className="text-destructive">{sign.error.message}</p>}
       <div className="flex gap-2">
-        <button type="button" className={primaryButtonClass} disabled={!justified || sign.isPending} onClick={() => sign.mutate(undefined, { onSuccess: onDone })}>
+        <button type="button" className={primaryButtonClass} disabled={justified === false || sign.isPending} onClick={() => sign.mutate(undefined, { onSuccess: onDone })}>
           Sign
         </button>
         <button type="button" className={buttonClass} onClick={onDone}>Cancel</button>
@@ -190,7 +194,8 @@ function SignQualificationForm({ step, evalRunId, briefVersion, variant, onDone 
 /** Why a variant of this run cannot be signed for, or null when it can. */
 function signingBlocked(output: EvalRunOutput, variant: EvalRunVariantReport, mayEdit: boolean, editReason: string | undefined): string | null {
   const { evalRun, report } = output;
-  if (!mayEdit) return editReason ?? 'You may not edit this workflow';
+  if (mayEdit === false) return editReason ?? 'You may not edit this workflow';
+  if (evalRun.status === 'cancelled') return 'This run was cancelled; sign on a run that finished';
   if (evalRun.status === 'prepared' || evalRun.status === 'running' || report.trials.inProgress > 0) return 'Sign once every trial is scored';
   if (evalRun.acceptanceCriteria === null) return 'No Acceptance Criteria were frozen into this run';
   if (evalRun.briefVersion === null) return 'The step had no Evaluation Brief when this run was prepared';

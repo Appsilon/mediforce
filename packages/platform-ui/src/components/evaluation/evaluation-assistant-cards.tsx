@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { useAgentRun } from '@/hooks/use-agent-runs';
 import { useEvaluatorLabels, useStepEvaluationMutation, useStepEvaluators } from '@/hooks/use-step-evaluation';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 
 export type ProposalStatus = 'open' | 'accepted' | 'rejected';
@@ -279,7 +280,7 @@ export function PlanCard({ step, plan, onDraft, busy, mayEdit, editReason }: {
 
 /**
  * The assistant's routing recommendation after an Eval Run: a Control Mode
- * and, for CM4, the confidence below which the step's fallback takes over.
+ * and, for Control Mode 4, the confidence below which the step's fallback takes over.
  * The person applies it in the workflow editor; neither setting is part of
  * the Step Fingerprint, so applying it keeps a qualification.
  */
@@ -287,7 +288,7 @@ export function ControlSettingsCard({ proposal }: { proposal: Proposal<'propose_
   return (
     <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="control-settings-card">
       <div className="mb-1 font-medium">
-        Recommended routing: {proposal.controlMode === 'CM4' ? 'Control Mode 4 — the agent applies its output' : 'Control Mode 3 — a person reviews every output'}
+        Recommended routing: <ControlModeBadge executor="agent" autonomyLevel={proposal.autonomyLevel} showNumber />
       </div>
       {proposal.confidenceThreshold !== undefined && (
         <p>Confidence threshold {proposal.confidenceThreshold}: below it, the step&apos;s fallbackBehavior applies.</p>

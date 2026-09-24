@@ -16,7 +16,7 @@ import { setAcceptanceCriteria } from '../acceptance-criteria';
 import { addEvaluatorVersion, createEvaluator } from '../evaluators';
 import { createEvalCase } from '../eval-cases';
 import { freezeEvalDataset } from '../eval-datasets';
-import { advanceEvalRunOfInstance, prepareEvalRun, startEvalRun } from '../eval-runs';
+import { advanceEvalRunOfInstance, cancelEvalRun, prepareEvalRun, startEvalRun } from '../eval-runs';
 import { getStepQualification, signStepQualification } from '../step-qualification';
 import { evaluationFixture, NAMESPACE, STEP, WORKFLOW, type EvaluationFixture } from './fixture';
 
@@ -190,6 +190,11 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
     await expect(signStepQualification(signing, scope)).rejects.toBeInstanceOf(ValidationError);
     await expect(signStepQualification({ ...signing, password: 'wrong' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
+    const refusals = (await fixture.auditRepo.getByEntity('eval_run', evalRunId))
+      .filter((event) => event.action === 'step_qualification.signature_refused');
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toMatchObject({ actorId: 'author-1' });
+    expect(JSON.stringify(refusals[0])).not.toContain('wrong');
     await expect(signStepQualification({ ...signing, password: PASSWORD }, withEngine(fixture.scope({ kind: 'apiKey', isSystemActor: true }))))
       .rejects.toThrow(/signed by a person/);
 
@@ -202,8 +207,15 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
   });
 
   it('signs only a finished run with criteria and a Brief frozen into it', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await expect(signStepQualification({ evalRunId: evalRun.id, variantId: 'champion', deviations: [], password: PASSWORD }, scope))
       .rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('does not sign a cancelled run', async () => {
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    await cancelEvalRun({ evalRunId: evalRun.id }, scope);
+    await expect(signStepQualification({ evalRunId: evalRun.id, variantId: 'champion', deviations: [majorDeviation], password: PASSWORD }, scope))
+      .rejects.toThrow(/cancelled/);
   });
 });
