@@ -84,8 +84,10 @@ Qualification cites them. A newer Evaluator version flags the qualification
 ("evaluators changed since qualification") without making it stale.
 
 **D8 — Agent Trajectories are persisted for every Agent Run.** The tool-call
-record the plugins already produce (today a host temp file) becomes a durable
-platform artifact keyed by `agentRunId`. It is stored in the platform's own
+record the plugins already produce for the step's activity log also becomes a
+durable platform artifact keyed by `agentRunId`. The activity log stays the
+live view of a running step; the Trajectory is recorded from the same
+formatted entries, so the two never disagree. It is stored in the platform's own
 database and keeps full content: ADR-0007 D5's switch limits what reaches the
 external trace store, and D5 keeps full content in the platform. It is a
 table of its own rather than more `agent_events` rows: those are the live
