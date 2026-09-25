@@ -70,6 +70,7 @@ export {
   WorkflowVersionSummarySchema,
   type RegisterWorkflowInput,
   type RegisterWorkflowBody,
+  buildRegisterBody,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
   RegistrationWarningSchema,

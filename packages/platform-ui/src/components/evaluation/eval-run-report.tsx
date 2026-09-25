@@ -226,7 +226,7 @@ function ApplyVariant({ step, evalRunId, variant, blocked }: {
   blocked: string | null;
 }) {
   const [open, setOpen] = React.useState(false);
-  const [setAsDefault, setSetAsDefault] = React.useState(true);
+  const [setAsDefault, setSetAsDefault] = React.useState(false);
   const apply = useStepEvaluationMutation(step, () => mediforce.evaluation.applyVariant({
     ...step,
     evalRunId,

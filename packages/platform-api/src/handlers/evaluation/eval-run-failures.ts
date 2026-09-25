@@ -55,15 +55,13 @@ export async function getEvalRunFailures(
   }
 
   const trials = (await scope.evaluation.listTrials(run.id)).filter((trial) => trial.variantId === variantId);
-  const failing: Array<{ trial: EvalTrial; evaluators: TrialEvaluatorFailure[] }> = [];
-  for (const trial of trials) {
-    if (trial.status !== 'failed' && trial.status !== 'scored') continue;
-    const evaluators = await evaluatorFailures(scope, run, trial);
-    const failed = trial.status === 'failed'
-      || trial.agentRunId === null
-      || evaluators.some((evaluator) => evaluator.outcome === 'errored' || evaluator.counted === true);
-    if (failed) failing.push({ trial, evaluators });
-  }
+  const judged = trials.filter((trial) => trial.status === 'failed' || trial.status === 'scored');
+  const withEvaluators = await Promise.all(
+    judged.map(async (trial) => ({ trial, evaluators: await evaluatorFailures(scope, run, trial) })),
+  );
+  const failing = withEvaluators.filter(({ trial, evaluators }) => trial.status === 'failed'
+    || trial.agentRunId === null
+    || evaluators.some((evaluator) => evaluator.outcome === 'errored' || evaluator.counted === true));
 
   const shown = failing.slice(0, input.limit);
   const cases = new Map(await Promise.all([...new Set(shown.map(({ trial }) => trial.caseId))]

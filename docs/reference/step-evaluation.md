@@ -344,7 +344,7 @@ audited as `step_variant.applied`.
 
 In the web tab, every challenger of a finished run's report has an **Apply to
 step** button (not the champion; `edit` verb). It asks for confirmation and a
-"Make it the default version" checkbox (checked by default), then shows the new
+"Make it the default version" checkbox (unchecked by default, as in the CLI), then shows the new
 version, whether the variant's qualification carries over or which components
 changed, and any warnings. The assistant panel's **Advanced** section takes an
 optional unattended budget (USD) sent as `unattendedBudgetUsd`; runs the

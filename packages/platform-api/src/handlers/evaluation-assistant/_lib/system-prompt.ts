@@ -71,7 +71,6 @@ export function briefMessage(brief: EvaluationBrief | null): string {
     : `The step's Evaluation Brief (v${brief.version}), its context of use:\n${brief.text}`;
 }
 
-
 export function unattendedBudgetMessage(unattendedBudgetUsd: number | undefined): string {
   return unattendedBudgetUsd === undefined
     ? 'No unattended budget was granted for this request: start_eval_run is refused; the person confirms each run on its card.'
