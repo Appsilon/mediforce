@@ -35,6 +35,7 @@ import type {
   WorkflowEngine,
 } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth';
+import { createGitRepoFileReader, type RepoFileReader } from '../runtime/repo-file-reader';
 import type { RunKicker } from '../runtime/run-kicker';
 import type { DockerImagesService } from '../services/docker-images-service';
 import type { InviteNotificationService, InviteService } from '../services/invite-notification';
@@ -95,6 +96,8 @@ export interface CallerScopeServices {
   readonly webhookRouter: WebhookRouter;
   readonly agentRunner: AgentRunner;
   readonly runKicker: RunKicker;
+  /** Optional so every existing caller keeps working; defaults to a real clone. */
+  readonly repoFileReader?: RepoFileReader;
   readonly inviteService: InviteService | null;
   readonly joinLinkService: JoinLinkService | null;
   readonly inviteNotificationService: InviteNotificationService | null;
@@ -176,6 +179,7 @@ export function createCallerScope(
       audit: services.auditRepo,
       imageCatalog: services.imageCatalogRepo,
       runKicker: services.runKicker,
+      repoFileReader: services.repoFileReader ?? createGitRepoFileReader(),
       inviteService: services.inviteService,
       joinLinkService: services.joinLinkService,
       inviteNotificationService: services.inviteNotificationService,
