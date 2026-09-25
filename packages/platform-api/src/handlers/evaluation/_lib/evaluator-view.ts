@@ -1,5 +1,5 @@
-import { evaluatorTrust, type Evaluator } from '@mediforce/platform-core';
-import type { EvaluatorView } from '../../../contract/evaluation';
+import { evaluatorTrust, type Evaluator, type EvaluatorTrust } from '@mediforce/platform-core';
+import type { EvaluatorProduction, EvaluatorView } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { NotFoundError } from '../../../errors';
 
@@ -13,7 +13,16 @@ export async function evaluatorView(scope: CallerScope, evaluator: Evaluator): P
     latest,
     versions,
     trust: trust.trusted ? { trusted: true } : { trusted: false, reason: trust.reason },
+    production: evaluatorProduction(evaluator, trust),
   };
+}
+
+/** A flagged Evaluator scores production runs only while it is live and its latest version counts (D9, D13). */
+export function evaluatorProduction(evaluator: Evaluator, trust: EvaluatorTrust): EvaluatorProduction {
+  if (evaluator.runInProduction === false) return { active: false };
+  if (evaluator.archived === true) return { active: false, reason: 'archived' };
+  if (trust.trusted === false) return { active: false, reason: `in production once it counts (${trust.reason})` };
+  return { active: true };
 }
 
 export async function loadEvaluator(scope: CallerScope, evaluatorId: string): Promise<Evaluator> {

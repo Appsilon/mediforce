@@ -3,7 +3,7 @@ import { Mediforce, ApiError } from '../index';
 
 const step = { namespace: 'acme', workflowName: 'wf', stepId: 'grade-aes' };
 const input = { ...step, messages: [{ role: 'user' as const, content: 'What should I check?' }] };
-const result = { reply: 'Done.', proposals: [], preparedEvalRuns: [] };
+const result = { reply: 'Done.', proposals: [], preparedEvalRuns: [], startedEvalRuns: [] };
 
 function ndjsonResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();

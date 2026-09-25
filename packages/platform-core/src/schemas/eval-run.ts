@@ -102,6 +102,8 @@ export const EvalRunSchema = EvaluatedStepSchema.extend({
   definitionVersion: z.number().int().positive(),
   datasetVersionId: z.uuid(),
   caseIds: z.array(z.uuid()).min(1),
+  /** Cases of the Dataset version left out because a variant's few-shot examples came from them (D12). */
+  exampleCaseIds: z.array(z.uuid()),
   trialsPerCase: z.number().int().min(1).max(10),
   concurrency: z.number().int().min(1).max(8),
   evaluators: z.array(EvalRunEvaluatorSchema).min(1),

@@ -210,4 +210,71 @@ test.describe('Step Evaluation tab', () => {
     await expect(page.getByTestId('step-qualification-badge')).toHaveAttribute('data-status', 'qualified', { timeout: 10_000 });
     await expect(page.getByTestId('step-qualification')).toContainText('Deviation (major): Findings are listed downstream');
   });
+  test('a proposed fix is tried as a challenger, and a finished run applies it to the step', async ({ page, request }) => {
+    test.setTimeout(150_000);
+    trackPageErrors(page);
+    const workflowName = `e2e-eval-fix-${randomUUID().slice(0, 8)}`;
+    const runId = await startRun(request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE);
+    const agentRunId = (await awaitFinishedAgentRun(request, runId)).id;
+    const step = { namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes' };
+    const post = async (path: string, data: Record<string, unknown>) => {
+      const res = await request.post(path, { headers: JSON_HEADERS, data });
+      expect(res.status(), await res.text()).toBeLessThan(300);
+      return res.json();
+    };
+    await post('/api/evaluation/briefs', { ...step, text: 'Grades AEs for the DSMB.' });
+    await post('/api/evaluation/evaluators', { ...step, name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical', check: { kind: 'schema', schema: { required: ['summary'] } } });
+    await post('/api/evaluation/cases/from-agent-run', { agentRunId, expectation: 'positive' });
+    await post('/api/evaluation/datasets', step);
+
+    const fixedPrompt = 'Grade each AE by CTCAE; grade 5 is death.';
+    const prepared = EvalRunOutputSchema.parse(await post('/api/evaluation/runs', {
+      ...step, trialsPerCase: 1, budgetUsd: 1, challengers: [{ label: 'CTCAE grade 5', patch: { prompt: fixedPrompt } }],
+    }));
+    await post(`/api/evaluation/runs/${prepared.evalRun.id}/start`, { confirmedBudgetUsd: 1 });
+    await pollUntil(async () => {
+      const res = await request.get(`/api/evaluation/runs/${prepared.evalRun.id}`, { headers: AUTH_HEADERS });
+      return EvalRunOutputSchema.parse(await res.json()).evalRun.status === 'completed' ? true : null;
+    }, { description: 'the Eval Run to complete', timeoutMs: 90_000 });
+
+    const question = `How do I fix the grade 5 misses? ${randomUUID()}`;
+    await scriptOpenRouter(question, [
+      {
+        toolCalls: [{
+          name: 'propose_fix',
+          arguments: {
+            evalRunId: prepared.evalRun.id,
+            kind: 'instruction',
+            label: 'CTCAE grade 5',
+            addresses: 'Missed grade 5 (death) outcomes',
+            rationale: 'The prompt never says grade 5 is death.',
+            patch: { prompt: fixedPrompt },
+          },
+        }],
+      },
+      { content: 'The prompt never defines grade 5; here is a fix to try.' },
+    ]);
+    await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
+    await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await page.getByTestId('evaluation-assistant-input').fill(question);
+    await page.getByTestId('evaluation-assistant-send').click();
+    const fixCard = page.getByTestId('fix-card');
+    await expect(fixCard).toContainText('CTCAE grade 5');
+    await expect(fixCard.getByTestId('fix-patch')).toContainText('its own prompt');
+    await fixCard.getByTestId('fix-budget').fill('1');
+    await fixCard.getByTestId('fix-try-it').click();
+    await expect(fixCard.getByTestId('fix-prepared')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('start-eval-run-card')).toBeVisible();
+
+    // The finished run's challenger is applied from its report.
+    await page.getByRole('button', { name: prepared.evalRun.id.slice(0, 8) }).click();
+    const challengerReport = page.getByTestId('variant-report').filter({ hasText: 'CTCAE grade 5' });
+    await expect(challengerReport.getByTestId('apply-variant-open')).toBeEnabled();
+    await challengerReport.getByTestId('apply-variant-open').click();
+    const dialog = page.getByTestId('apply-variant-dialog');
+    await expect(dialog.getByTestId('apply-variant-default')).toBeChecked();
+    await dialog.getByTestId('apply-variant-confirm').click();
+    await expect(challengerReport.getByTestId('apply-variant-result')).toContainText('Saved as Workflow Definition version', { timeout: 10_000 });
+    await expect(challengerReport.getByTestId('apply-variant-result')).toContainText("matches this variant's Fingerprint");
+  });
 });

@@ -7,7 +7,7 @@ import { evaluationFixture, STEP } from '../../__tests__/fixture';
 describe('evaluatorView', () => {
   it('pairs an Evaluator with its versions and the trust of the latest', async () => {
     const fixture = await evaluationFixture();
-    const evaluator = { ...STEP, id: randomUUID(), name: 'fatal-flagged', archived: false, createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z' };
+    const evaluator = { ...STEP, id: randomUUID(), name: 'fatal-flagged', archived: false, runInProduction: true, createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z' };
     const version = {
       evaluatorId: evaluator.id, version: 1, rule: 'A fatal AE is flagged.', severity: 'critical' as const,
       check: { kind: 'code' as const, runtime: 'python' as const, source: 'print(1)' }, origin: 'user' as const,
@@ -16,7 +16,12 @@ describe('evaluatorView', () => {
     await fixture.evaluationRepo.createEvaluator(evaluator, version);
 
     const view = await evaluatorView(fixture.scope(), await loadEvaluator(fixture.scope(), evaluator.id));
-    expect(view).toMatchObject({ name: 'fatal-flagged', latest: { version: 1 }, trust: { trusted: false, reason: 'source not approved' } });
+    expect(view).toMatchObject({
+      name: 'fatal-flagged',
+      latest: { version: 1 },
+      trust: { trusted: false, reason: 'source not approved' },
+      production: { active: false, reason: 'in production once it counts (source not approved)' },
+    });
   });
 
   it('reads an unknown Evaluator as missing', async () => {
