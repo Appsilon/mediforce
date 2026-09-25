@@ -29,6 +29,7 @@ import {
   type WorkflowDefinition,
   type WorkflowStep,
 } from '@mediforce/platform-core';
+import { buildProductionOutputGate } from './production-output-gate';
 import { changedFingerprintComponents, computeStepFingerprint } from '@mediforce/platform-api/services';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
@@ -227,6 +228,22 @@ export async function executeAgentStep(
       return result;
     },
   };
+
+  // Production Evaluators (ADR-0023 D13) gate only a real agent run: never a dry run, never an eval trial.
+  const gatesOnProductionEvaluators = workflowStep.executor === 'agent'
+    && reapTimedOut === false
+    && instance.dryRun !== true
+    && instance.evalRunId === undefined;
+  if (gatesOnProductionEvaluators) {
+    const outputGate = await buildProductionOutputGate({
+      namespace: workflowDefinition.namespace,
+      workflowName: workflowDefinition.name,
+      stepId,
+    }, (error) => {
+      console.error(`[execute-agent-step] production Evaluators lookup failed for ${instanceId}/${stepId}; running ungated:`, error);
+    });
+    if (outputGate !== undefined) workflowAgentContext.outputGate = outputGate;
+  }
 
   const services: StepExecutorServices = {
     auditRepo,

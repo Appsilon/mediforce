@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { APIRequestContext } from '@playwright/test';
 import {
+  EvalCaseOutputSchema,
   EvalRunOutputSchema,
   GetAgentTrajectoryOutputSchema,
   ListAgentRunsOutputSchema,
@@ -141,5 +142,47 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
     expect(listed).toEqual([runId]);
     const agentRunsRes = await request.get(`/api/agent-runs?runId=${finished.trials[0]!.processInstanceId}`, { headers: AUTH_HEADERS });
     expect(ListAgentRunsOutputSchema.parse(await agentRunsRes.json()).runs).toEqual([]);
+  });
+
+  test('a challenger\'s few-shot examples leave their case out of the run; holdout cases are never examples (D12)', async ({ request }) => {
+    const workflowName = `e2e-eval-examples-${randomUUID().slice(0, 8)}`;
+    await post(request, `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, agentStepWorkflow(workflowName, {
+      autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' },
+    }), 201);
+    const step = { namespace: TEST_ORG_HANDLE, workflowName, stepId: 'grade-aes' };
+
+    await post(request, '/api/evaluation/evaluators', {
+      ...step, name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical',
+      check: { kind: 'schema', schema: { required: ['summary'] } },
+    }, 201);
+    const addCase = async (name: string, split: 'dev' | 'holdout'): Promise<string> => {
+      const created = EvalCaseOutputSchema.parse(await post(request, '/api/evaluation/cases', {
+        ...step, name, split, expectation: 'positive',
+        input: { triggerPayload: { studyId: 'CDISCPILOT01' }, previousStepOutputs: { 'extract-aes': { events: [{ term: name }] } } },
+      }, 201));
+      return created.evalCase.id;
+    };
+    const sepsis = await addCase('Grade 5 sepsis', 'dev');
+    const neutropenia = await addCase('Grade 4 neutropenia', 'dev');
+    const rash = await addCase('Grade 3 rash', 'holdout');
+    await post(request, '/api/evaluation/datasets', step, 201);
+
+    const prepared = EvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs', {
+      ...step, trialsPerCase: 1, concurrency: 1, budgetUsd: 1,
+      challengers: [{ label: 'Few-shot', patch: { examples: [{ input: 'Sepsis, fatal', output: '{"grade": 5}', caseId: sepsis }] } }],
+    }, 201));
+    expect(prepared.evalRun.exampleCaseIds).toEqual([sepsis]);
+    expect(new Set(prepared.evalRun.caseIds)).toEqual(new Set([neutropenia, rash]));
+    expect(prepared.trials.some((trial) => trial.caseId === sepsis)).toBe(false);
+
+    const leaky = await request.post('/api/evaluation/runs', {
+      headers: JSON_HEADERS,
+      data: {
+        ...step, budgetUsd: 1,
+        challengers: [{ label: 'Leaky', patch: { examples: [{ input: 'Rash', output: '{"grade": 3}', caseId: rash }] } }],
+      },
+    });
+    expect(leaky.status(), await leaky.text()).toBe(400);
+    expect(await leaky.text()).toContain('holdout cases are never offered as examples');
   });
 });

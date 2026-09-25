@@ -547,6 +547,7 @@ import {
   ApproveEvaluatorSourceInputSchema,
   ArchiveEvalCaseInputSchema,
   ArchiveEvaluatorInputSchema,
+  SetEvaluatorProductionInputSchema,
   ListEvaluatorLabelsInputSchema,
   ListEvaluatorLabelsOutputSchema,
   CalibrateEvaluatorInputSchema,
@@ -594,6 +595,7 @@ import {
   type ApproveEvaluatorSourceInput,
   type ArchiveEvalCaseInput,
   type ArchiveEvaluatorInput,
+  type SetEvaluatorProductionInput,
   type ListEvaluatorLabelsInput,
   type ListEvaluatorLabelsOutput,
   type CalibrateEvaluatorInput,
@@ -651,6 +653,14 @@ import {
   type EvalRunOutput,
   type ListEvalRunsInput,
   type ListEvalRunsOutput,
+  GetEvalRunFailuresInputSchema,
+  GetEvalRunFailuresOutputSchema,
+  ApplyStepVariantInputSchema,
+  ApplyStepVariantOutputSchema,
+  type GetEvalRunFailuresInput,
+  type GetEvalRunFailuresOutput,
+  type ApplyStepVariantInput,
+  type ApplyStepVariantOutput,
 } from '../contract/evaluation';
 import {
   AskEvaluationAssistantInputSchema,
@@ -1047,6 +1057,7 @@ export class Mediforce {
     createEvaluator: (input: CreateEvaluatorInput) => Promise<EvaluatorOutput>;
     addEvaluatorVersion: (input: AddEvaluatorVersionInput) => Promise<EvaluatorOutput>;
     archiveEvaluator: (input: ArchiveEvaluatorInput) => Promise<EvaluatorOutput>;
+    setEvaluatorProduction: (input: SetEvaluatorProductionInput) => Promise<EvaluatorOutput>;
     approveEvaluatorSource: (input: ApproveEvaluatorSourceInput) => Promise<EvaluatorOutput>;
     labelOutput: (input: LabelEvaluatorOutputInput) => Promise<LabelEvaluatorOutputOutput>;
     listLabels: (input: ListEvaluatorLabelsInput) => Promise<ListEvaluatorLabelsOutput>;
@@ -1068,6 +1079,8 @@ export class Mediforce {
     getRun: (input: GetEvalRunInput) => Promise<EvalRunOutput>;
     listRuns: (input: ListEvalRunsInput) => Promise<ListEvalRunsOutput>;
     cancelRun: (input: CancelEvalRunInput) => Promise<EvalRunOutput>;
+    getRunFailures: (input: GetEvalRunFailuresInput) => Promise<GetEvalRunFailuresOutput>;
+    applyVariant: (input: ApplyStepVariantInput) => Promise<ApplyStepVariantOutput>;
     getAcceptanceCriteria: (input: GetAcceptanceCriteriaInput) => Promise<GetAcceptanceCriteriaOutput>;
     setAcceptanceCriteria: (input: SetAcceptanceCriteriaInput) => Promise<SetAcceptanceCriteriaOutput>;
     getQualification: (input: GetStepQualificationInput) => Promise<GetStepQualificationOutput>;
@@ -2490,6 +2503,11 @@ export class Mediforce {
         return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/archive`, body,
           EvaluatorOutputSchema, 'mediforce.evaluation.archiveEvaluator');
       },
+      setEvaluatorProduction: async (input) => {
+        const { evaluatorId, ...body } = SetEvaluatorProductionInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/production`, body,
+          EvaluatorOutputSchema, 'mediforce.evaluation.setEvaluatorProduction');
+      },
       approveEvaluatorSource: async (input) => {
         const { evaluatorId, ...body } = ApproveEvaluatorSourceInputSchema.parse(input);
         return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/approve`, body,
@@ -2593,6 +2611,15 @@ export class Mediforce {
         return this.sendJson('POST', `/api/evaluation/runs/${encodeURIComponent(evalRunId)}/cancel`, undefined,
           EvalRunOutputSchema, 'mediforce.evaluation.cancelRun');
       },
+      getRunFailures: async (input) => {
+        const { evalRunId, variantId, limit } = GetEvalRunFailuresInputSchema.parse(input);
+        const qs = toSearchParams({ variantId, limit: String(limit) });
+        return this.getJson(`/api/evaluation/runs/${encodeURIComponent(evalRunId)}/failures${qs}`, GetEvalRunFailuresOutputSchema, 'mediforce.evaluation.getRunFailures');
+      },
+      applyVariant: async (input) => this.sendJson(
+        'POST', '/api/evaluation/variants/apply', ApplyStepVariantInputSchema.parse(input),
+        ApplyStepVariantOutputSchema, 'mediforce.evaluation.applyVariant',
+      ),
       getAcceptanceCriteria: async (input) => {
         const step = GetAcceptanceCriteriaInputSchema.parse(input);
         return this.getJson(`/api/evaluation/acceptance-criteria${toSearchParams(step)}`, GetAcceptanceCriteriaOutputSchema, 'mediforce.evaluation.getAcceptanceCriteria');

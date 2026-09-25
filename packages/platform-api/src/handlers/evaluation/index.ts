@@ -1,5 +1,12 @@
 export { getEvaluationBrief, setEvaluationBrief } from './briefs';
-export { listEvaluators, getEvaluator, createEvaluator, addEvaluatorVersion, archiveEvaluator } from './evaluators';
+export {
+  listEvaluators,
+  getEvaluator,
+  createEvaluator,
+  addEvaluatorVersion,
+  archiveEvaluator,
+  setEvaluatorProduction,
+} from './evaluators';
 export { approveEvaluatorSource, labelEvaluatorOutput, listEvaluatorLabels, calibrateEvaluator } from './evaluator-trust';
 export { previewEvaluator } from './preview-evaluator';
 export { listStepAgentRuns } from './step-agent-runs';
@@ -24,4 +31,6 @@ export {
 } from './eval-runs';
 export { getAcceptanceCriteria, setAcceptanceCriteria } from './acceptance-criteria';
 export { getStepQualification, signStepQualification } from './step-qualification';
+export { getEvalRunFailures } from './eval-run-failures';
+export { applyVariantToStep } from './apply-step-variant';
 export { computeStepFingerprint, changedFingerprintComponents } from './_lib/step-fingerprint';

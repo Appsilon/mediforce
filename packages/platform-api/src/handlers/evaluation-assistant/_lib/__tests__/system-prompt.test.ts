@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { EVALUATION_ASSISTANT_SYSTEM_PROMPT, briefMessage } from '../system-prompt';
+import { EVALUATION_ASSISTANT_SYSTEM_PROMPT, briefMessage, unattendedBudgetMessage } from '../system-prompt';
 
 describe('Evaluation Assistant prompt', () => {
   it('states the authority tiers of ADR-0023 D15', () => {
@@ -19,6 +19,24 @@ describe('Evaluation Assistant prompt', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Propose them with propose_acceptance_criteria');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('otherwise say there is no clear difference at this sample size');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Propose it with propose_control_settings');
+  });
+
+  it('covers the fix loop: failures, diagnosis by root cause, fixes by what expresses them, examples from dev cases only', () => {
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('get_failures gives the variant\'s failing trials');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('propose_diagnosis');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('ambiguous_instruction');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('propose_fix with the patch');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('propose_evaluator with runInProduction true');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('A lower Control Mode is propose_control_settings');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('A wrong Evaluator is propose_evaluator_version');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('A preprocessing step is advice in the diagnosis');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Few-shot examples come from dev cases only — never holdout');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Start such a run only under a granted unattended budget');
+  });
+
+  it('says whether the request carries an unattended budget', () => {
+    expect(unattendedBudgetMessage(undefined)).toContain('start_eval_run is refused');
+    expect(unattendedBudgetMessage(5)).toContain('unattended budget of $5');
   });
 
   it('carries the step\'s Brief every turn, or asks for one', () => {

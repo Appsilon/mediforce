@@ -86,6 +86,11 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     if (row !== undefined) this.evaluators.set(id, { ...row, archived });
   }
 
+  async setEvaluatorRunInProduction(id: string, runInProduction: boolean): Promise<void> {
+    const row = this.evaluators.get(id);
+    if (row !== undefined) this.evaluators.set(id, { ...row, runInProduction });
+  }
+
   async appendEvaluatorVersion(version: EvaluatorVersion): Promise<EvaluatorVersion> {
     const parsed = EvaluatorVersionSchema.parse(version);
     if (this.versions.some((row) => row.evaluatorId === parsed.evaluatorId && row.version === parsed.version)) {

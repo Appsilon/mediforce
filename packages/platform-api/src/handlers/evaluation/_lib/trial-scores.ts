@@ -1,4 +1,4 @@
-import type { EvalRun, EvalTrial, Score } from '@mediforce/platform-core';
+import { JUDGE_PASS_VALUE, type EvalRun, type EvalTrial, type Score } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 
 /** The Scores an Eval Run's Evaluators gave one of its trials. */
@@ -7,4 +7,8 @@ export async function scoresOfTrial(scope: CallerScope, run: EvalRun, trial: Eva
   const scores = await scope.scores.list({ processInstanceId: trial.processInstanceId, stepId: run.stepId, limit: 1000 });
   return scores.filter((score) =>
     score.source !== 'human' && score.metadata?.evalRunId === run.id && score.metadata?.trialId === trial.id);
+}
+
+export function isPass(score: Score): boolean {
+  return score.value >= JUDGE_PASS_VALUE;
 }

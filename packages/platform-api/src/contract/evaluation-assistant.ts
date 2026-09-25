@@ -14,6 +14,12 @@ export const AskEvaluationAssistantInputSchema = EvaluatedStepSchema.extend({
     content: z.string().max(20_000),
   })).min(1).max(100),
   model: z.string().min(1).optional(),
+  /**
+   * An unattended budget the person grants for this request (D15): the
+   * assistant may start prepared Eval Runs of this step whose budgets together
+   * fit it. Without it, starting a run is refused.
+   */
+  unattendedBudgetUsd: z.number().positive().max(10_000).optional(),
 });
 
 export const PreparedEvalRunSchema = z.object({
@@ -21,6 +27,12 @@ export const PreparedEvalRunSchema = z.object({
   budgetUsd: z.number().positive(),
   estimatedUsd: z.number().nonnegative().nullable(),
   trials: z.number().int().nonnegative(),
+});
+
+/** An Eval Run the assistant started under the request's unattended budget. */
+export const StartedEvalRunSchema = z.object({
+  evalRunId: z.uuid(),
+  budgetUsd: z.number().positive(),
 });
 
 /**
@@ -41,6 +53,8 @@ export const AskEvaluationAssistantOutputSchema = z.object({
   reply: z.string(),
   proposals: z.array(ProposalViewSchema),
   preparedEvalRuns: z.array(PreparedEvalRunSchema),
+  /** Runs started under `unattendedBudgetUsd`; empty without one. */
+  startedEvalRuns: z.array(StartedEvalRunSchema),
 });
 
 /** One step of a turn in progress, streamed while the assistant works. */
@@ -59,6 +73,7 @@ export const EvaluationAssistantProgressSchema = z.discriminatedUnion('type', [
 export type AskEvaluationAssistantInput = z.infer<typeof AskEvaluationAssistantInputSchema>;
 export type AskEvaluationAssistantOutput = z.infer<typeof AskEvaluationAssistantOutputSchema>;
 export type PreparedEvalRun = z.infer<typeof PreparedEvalRunSchema>;
+export type StartedEvalRun = z.infer<typeof StartedEvalRunSchema>;
 export type EvaluationAssistantProgress = z.infer<typeof EvaluationAssistantProgressSchema>;
 export type EvaluatorSelfTest = z.infer<typeof EvaluatorSelfTestSchema>;
 export type ProposalView = z.infer<typeof ProposalViewSchema>;

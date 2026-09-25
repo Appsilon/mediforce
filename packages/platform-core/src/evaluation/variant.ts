@@ -16,9 +16,9 @@ export function variantPatchProblem(definition: Pick<WorkflowDefinition, 'extern
 
 /**
  * The Step as one variant of it runs (ADR-0023 D5): the patch applied over
- * the pinned Definition version. `model`, `prompt` and `allowedTools` replace
- * the step's own; `mcpRestrictions` narrow it; `skillCommit` moves the
- * workflow's external skills repository. The returned definition carries the
+ * the pinned Definition version. `model`, `prompt`, `allowedTools` and
+ * `examples` replace the step's own; `mcpRestrictions` narrow it;
+ * `skillCommit` moves the workflow's external skills repository. The returned definition carries the
  * patched step, so everything that reads the step from it sees the variant.
  */
 export function applyStepVariant(
@@ -37,6 +37,7 @@ export function applyStepVariant(
       ...(patch.model === undefined ? {} : { model: patch.model }),
       ...(patch.prompt === undefined ? {} : { prompt: patch.prompt }),
       ...(patch.allowedTools === undefined ? {} : { allowedTools: patch.allowedTools }),
+      ...(patch.examples === undefined ? {} : { examples: patch.examples }),
     },
     ...(patch.mcpRestrictions === undefined ? {} : { mcpRestrictions: narrowMcpRestrictions(step.mcpRestrictions, patch.mcpRestrictions) }),
   };

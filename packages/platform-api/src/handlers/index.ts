@@ -171,6 +171,7 @@ export {
   createEvaluator,
   addEvaluatorVersion,
   archiveEvaluator,
+  setEvaluatorProduction,
   approveEvaluatorSource,
   labelEvaluatorOutput,
   listEvaluatorLabels,
@@ -198,6 +199,8 @@ export {
   setAcceptanceCriteria,
   getStepQualification,
   signStepQualification,
+  getEvalRunFailures,
+  applyVariantToStep,
   computeStepFingerprint,
   changedFingerprintComponents,
 } from './evaluation/index';

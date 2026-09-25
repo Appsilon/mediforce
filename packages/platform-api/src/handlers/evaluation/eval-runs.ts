@@ -10,6 +10,7 @@ import {
   type EvalRunEvaluator,
   type EvalTrial,
   type EvalVariant,
+  type EvaluatedStep,
   type McpEvalServerPolicy,
   type WorkflowDefinition,
   type WorkflowStep,
@@ -32,6 +33,7 @@ import { estimateEvalRun } from './_lib/estimate-eval-run';
 import { buildEvalRunReport } from './_lib/eval-run-report';
 import { driveEvalRun } from './_lib/drive-eval-run';
 import { computeStepFingerprint } from './_lib/step-fingerprint';
+import { exampleCasesProblem } from './_lib/example-cases';
 
 async function loadEvalRun(scope: CallerScope, evalRunId: string): Promise<EvalRun> {
   const run = await scope.evaluation.getEvalRun(evalRunId);
@@ -54,10 +56,12 @@ function defaultBudget(totalUsd: number): number {
  * The run's variants (D5): the champion — the Step as its Definition version
  * has it — then each challenger, a patch over it, each with its Step
  * Fingerprint. A challenger must change something the Fingerprint sees, and
- * no two variants may be the same Step.
+ * no two variants may be the same Step. The few-shot examples a challenger
+ * brings must come from cases it may use (D12).
  */
 async function buildVariants(
   scope: CallerScope,
+  step: EvaluatedStep,
   definition: WorkflowDefinition,
   workflowStep: WorkflowStep,
   agentServers: readonly string[],
@@ -75,6 +79,8 @@ async function buildVariants(
     if (isEmptyVariantPatch(challenger.patch)) throw new ValidationError(`${label} changes nothing about the step`);
     const problem = variantPatchProblem(definition, challenger.patch);
     if (problem !== null) throw new ValidationError(`${label}: ${problem}`);
+    const examplesProblem = await exampleCasesProblem(scope, step, challenger.patch.examples ?? []);
+    if (examplesProblem !== null) throw new ValidationError(`${label}: ${examplesProblem}`);
     const unknownServers = Object.keys(challenger.patch.mcpRestrictions ?? {}).filter((name) => agentServers.includes(name) === false);
     if (unknownServers.length > 0) {
       throw new ValidationError(`${label} restricts MCP servers the step's agent does not bind: ${unknownServers.join(', ')}`);
@@ -91,10 +97,11 @@ async function buildVariants(
 /**
  * Prepares an Eval Run (ADR-0023 D4, D5, D10): the Step at its runnable
  * Definition version and any challengers patched over it, a frozen Dataset
- * version, the Step's live Evaluator versions with whether each counts, the
- * MCP eval policy the trials will run under, the Acceptance Criteria and
- * Brief version it will be judged against, and a cost estimate. Nothing runs
- * yet — a person confirms the budget with `start`.
+ * version less the cases any variant's few-shot examples came from (D12), the
+ * Step's live Evaluator versions with whether each counts, the MCP eval policy
+ * the trials will run under, the Acceptance Criteria and Brief version it will
+ * be judged against, and a cost estimate. Nothing runs yet — a person confirms
+ * the budget with `start`.
  */
 export async function prepareEvalRun(
   input: z.output<typeof PrepareEvalRunInputSchema>,
@@ -138,11 +145,22 @@ export async function prepareEvalRun(
   const mcpPolicy: Record<string, McpEvalServerPolicy> = Object.fromEntries(
     agentServers.map((name) => [name, policy?.servers[name] ?? { mode: 'deny' as const }]),
   );
-  const variants = await buildVariants(scope, definition, workflowStep, agentServers, input.challengers);
+  const variants = await buildVariants(scope, step, definition, workflowStep, agentServers, input.challengers);
+  const exampleSources = new Set([
+    ...(workflowStep.agent?.examples ?? []),
+    ...input.challengers.flatMap((challenger) => challenger.patch.examples ?? []),
+  ].flatMap((example) => example.caseId === undefined ? [] : [example.caseId]));
+  const caseIds = dataset.caseIds.filter((caseId) => exampleSources.has(caseId) === false);
+  const exampleCaseIds = dataset.caseIds.filter((caseId) => exampleSources.has(caseId));
+  if (caseIds.length === 0) {
+    throw new ValidationError(
+      `Every case of Eval Dataset v${dataset.version} is a variant's few-shot example — no case left to score`,
+    );
+  }
   const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
   const [brief] = await scope.evaluation.listBriefs(step);
 
-  const trialsPerVariant = dataset.caseIds.length * input.trialsPerCase;
+  const trialsPerVariant = caseIds.length * input.trialsPerCase;
   const trialCount = trialsPerVariant * variants.length;
   const estimate = await estimateEvalRun(scope, step, workflowStep, frozenEvaluators, variants, trialsPerVariant);
   const budgetUsd = input.budgetUsd ?? (estimate.totalUsd === null ? undefined : defaultBudget(estimate.totalUsd));
@@ -156,7 +174,8 @@ export async function prepareEvalRun(
     id: randomUUID(),
     definitionVersion: definition.version,
     datasetVersionId: dataset.id,
-    caseIds: dataset.caseIds,
+    caseIds,
+    exampleCaseIds,
     trialsPerCase: input.trialsPerCase,
     concurrency: input.concurrency,
     evaluators: frozenEvaluators.map(({ frozen }) => frozen),
@@ -173,7 +192,7 @@ export async function prepareEvalRun(
     startedAt: null,
     completedAt: null,
   };
-  const trials: EvalTrial[] = dataset.caseIds.flatMap((caseId) => variants.flatMap((variant) =>
+  const trials: EvalTrial[] = caseIds.flatMap((caseId) => variants.flatMap((variant) =>
     Array.from({ length: input.trialsPerCase }, (_unused, trialIndex) => ({
       id: randomUUID(),
       evalRunId: run.id,
@@ -205,6 +224,7 @@ export async function prepareEvalRun(
     outputSnapshot: {
       evaluators: run.evaluators,
       variants,
+      exampleCaseIds,
       acceptanceCriteria: run.acceptanceCriteria,
       briefVersion: run.briefVersion,
       mcpPolicy,

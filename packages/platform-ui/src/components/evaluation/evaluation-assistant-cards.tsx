@@ -18,6 +18,7 @@ import { useEvaluatorLabels, useStepEvaluationMutation, useStepEvaluators } from
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
+import { describePatch } from './eval-run-report';
 
 export type ProposalStatus = 'open' | 'accepted' | 'rejected';
 
@@ -28,12 +29,14 @@ type Proposal<Tool extends ProposalView['tool']> = Extract<ProposalView, { tool:
  * labelling queue are worked through instead; a routing recommendation is
  * applied in the workflow editor.
  */
-type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_outputs_to_label' | 'propose_control_settings' }>;
+type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_outputs_to_label' | 'propose_control_settings' | 'propose_diagnosis' | 'propose_fix' }>;
 
 export function isDecidable(proposal: ProposalView): proposal is DecidableProposal {
   return proposal.tool !== 'propose_evaluation_plan'
     && proposal.tool !== 'propose_outputs_to_label'
-    && proposal.tool !== 'propose_control_settings';
+    && proposal.tool !== 'propose_control_settings'
+    && proposal.tool !== 'propose_diagnosis'
+    && proposal.tool !== 'propose_fix';
 }
 
 const buttonClass = 'inline-flex items-center gap-1 rounded border px-2 py-0.5 disabled:opacity-50 disabled:pointer-events-none';
@@ -122,7 +125,12 @@ function ProposalSummary({ step, proposal }: { step: EvaluatedStep; proposal: De
     case 'propose_brief':
       return <>{proposal.arguments.text}</>;
     case 'propose_evaluator':
-      return <>{proposal.arguments.name} ({proposal.arguments.check.kind}, {proposal.arguments.severity}) — {proposal.arguments.rule}</>;
+      return (
+        <>
+          {proposal.arguments.name} ({proposal.arguments.check.kind}, {proposal.arguments.severity}) — {proposal.arguments.rule}
+          {proposal.arguments.runInProduction === true && '\nAlso runs in production once trusted.'}
+        </>
+      );
     case 'propose_evaluator_version': {
       const { evaluatorId, rule, severity, check, rationale } = proposal.arguments;
       const evaluator = evaluators.data?.evaluators.find((candidate) => candidate.id === evaluatorId);
@@ -471,6 +479,108 @@ export function LabellingCard({ step, proposal, mayEdit, editReason }: {
             </button>
           </span>
         </InstantTooltip>
+      </div>
+    </div>
+  );
+}
+
+const ROOT_CAUSE_LABELS = {
+  ambiguous_instruction: 'Ambiguous instruction',
+  missing_context: 'Missing context',
+  tool_problem: 'Tool problem',
+  model_capability: 'Model capability',
+  evaluator_wrong: 'The Evaluator is wrong',
+} as const;
+
+const FIX_KIND_LABELS = {
+  instruction: 'Change the instruction',
+  examples: 'Add examples',
+  guardrail: 'Add a guardrail',
+  model: 'Change the model',
+  tools: 'Change the tools',
+  preprocessing_step: 'Add a preprocessing step',
+  control_mode: 'Change the Control Mode',
+  evaluator: 'Fix the Evaluator',
+} as const;
+
+/**
+ * Failures of an Eval Run clustered by root cause (ADR-0023 D12). Nothing to
+ * accept: a fix that is a variant patch arrives as its own card.
+ */
+export function DiagnosisCard({ diagnosis }: { diagnosis: Proposal<'propose_diagnosis'>['arguments'] }) {
+  return (
+    <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="diagnosis-card">
+      <div className="mb-1 font-medium">
+        Diagnosis of Eval Run <span className="font-mono">{diagnosis.evalRunId.slice(0, 8)}</span>, variant {diagnosis.variantId}
+      </div>
+      <ol className="space-y-2">
+        {diagnosis.clusters.map((cluster, index) => (
+          <li key={index} className="border-t pt-2 first:border-t-0 first:pt-0" data-testid="diagnosis-cluster">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded bg-muted px-1.5 text-[11px]">{ROOT_CAUSE_LABELS[cluster.rootCause]}</span>
+              <span className="font-medium">{cluster.summary}</span>
+            </div>
+            <p className="mt-0.5 whitespace-pre-wrap text-muted-foreground">{cluster.evidence}</p>
+            <p className="mt-0.5 text-muted-foreground">{cluster.trialIds.length} trial(s)</p>
+            <p className="mt-0.5"><span className="text-muted-foreground">{FIX_KIND_LABELS[cluster.fix.kind]}:</span> {cluster.fix.description}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/**
+ * A fix the assistant proposes as a variant patch. "Try it" prepares an Eval
+ * Run of the patch on the newest Dataset version; the person confirms its
+ * budget on the prepared run in the Eval Runs list, and applies the patch to
+ * the step from the finished run's report.
+ */
+export function FixCard({ step, fix, mayRun, runReason }: {
+  step: EvaluatedStep;
+  fix: Proposal<'propose_fix'>['arguments'];
+  mayRun: boolean;
+  runReason: string | undefined;
+}) {
+  const [budget, setBudget] = React.useState('');
+  const prepare = useStepEvaluationMutation(step, () => mediforce.evaluation.prepareRun({
+    ...step,
+    challengers: [{ label: fix.label, patch: fix.patch }],
+    ...(budget === '' ? {} : { budgetUsd: Number(budget) }),
+  }));
+  return (
+    <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="fix-card">
+      <div className="mb-1 font-medium">Proposed fix: {fix.label}</div>
+      <p className="whitespace-pre-wrap text-muted-foreground">Addresses: {fix.addresses}</p>
+      <p className="mt-0.5 whitespace-pre-wrap text-muted-foreground">{fix.rationale}</p>
+      <p className="mt-0.5" data-testid="fix-patch"><span className="text-muted-foreground">Changes:</span> {describePatch(fix.patch)}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <label className="flex items-center gap-1 text-muted-foreground">
+          Budget (USD)
+          <input
+            type="number"
+            min={0}
+            step={0.01}
+            placeholder="auto"
+            className="w-20 rounded-md border bg-background px-1.5 py-0.5 text-xs"
+            data-testid="fix-budget"
+            value={budget}
+            onChange={(event) => setBudget(event.target.value)}
+          />
+        </label>
+        <InstantTooltip label={runReason}>
+          <span className="inline-flex">
+            <button type="button" data-testid="fix-try-it" className={primaryButtonClass} disabled={mayRun === false || prepare.isPending || prepare.isSuccess} onClick={() => prepare.mutate(undefined)}>
+              {prepare.isSuccess ? 'Prepared' : 'Try it'}
+            </button>
+          </span>
+        </InstantTooltip>
+        {prepare.isSuccess && (
+          <span className="text-muted-foreground" data-testid="fix-prepared">
+            Eval Run <span className="font-mono">{prepare.data.evalRun.id.slice(0, 8)}</span> prepared — confirm its budget in the Eval Runs list.
+          </span>
+        )}
+        {prepare.error !== null && <span className="text-destructive">{prepare.error.message}</span>}
       </div>
     </div>
   );

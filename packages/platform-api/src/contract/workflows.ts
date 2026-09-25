@@ -5,6 +5,7 @@ import {
   WorkflowDefinitionBaseSchema,
   WorkflowDefinitionSchema,
   WorkflowVisibilitySchema,
+  type WorkflowDefinition,
 } from '@mediforce/platform-core';
 
 /**
@@ -461,3 +462,33 @@ export const GetManifestOutputSchema = z.object({
 export type ManifestEntry = z.infer<typeof ManifestEntrySchema>;
 export type GetManifestInput = z.infer<typeof GetManifestInputSchema>;
 export type GetManifestOutput = z.infer<typeof GetManifestOutputSchema>;
+
+/**
+ * Builds the register body for a new version of an existing workflow.
+ *
+ * Carries the edited version forward wholesale and lets `edits` override only
+ * what changed, instead of hand-listing the fields to copy: an allowlist
+ * silently drops everything it does not name — `workspace`, `preamble`,
+ * `inputForNextRun`, `triggerInput`, and a non-default `visibility` (AGENTS.md §12).
+ *
+ * The destructured fields are the complement of `WorkflowAuthorableSchema`
+ * within the definition: `version`/`createdAt`/`namespace` are assigned
+ * server-side, and the lifecycle fields belong to the version they were set on
+ * — a new version is neither archived nor a copy nor imported from git.
+ */
+export function buildRegisterBody(
+  definition: WorkflowDefinition,
+  edits: Partial<RegisterWorkflowBody>,
+): RegisterWorkflowBody {
+  const {
+    version: _version,
+    createdAt: _createdAt,
+    namespace: _namespace,
+    copiedFrom: _copiedFrom,
+    source: _source,
+    archived: _archived,
+    deleted: _deleted,
+    ...authorable
+  } = definition;
+  return { ...authorable, ...edits };
+}

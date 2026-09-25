@@ -39,6 +39,14 @@ the plugin once with the violation in `context.outputSchemaViolation` — within
 what is left of the one step timeout — then falls back with reason
 `output_schema` (ADR-0023 D13).
 
+**An optional `context.outputGate` checks a result that passed `outputSchema`.**
+It runs before the confidence and autonomy routing, receives the Agent Run id,
+context and envelope, and returns `{ failure, errors }`. A `failure` falls back
+with reason `production_evaluator`, like low confidence; `errors` (and a gate
+that throws) are only logged to the activity log. The runner stays free of
+platform-api: `executeAgentStep` supplies the gate for real, non-trial runs of
+steps with production Evaluators.
+
 **Every Agent Run keeps an Agent Trajectory through `context.trajectory`.**
 The runner hands each Agent Run a `TrajectoryRecorder`; the base plugin records
 the same entries it writes to the step's activity log (`agentLogEntries` for its

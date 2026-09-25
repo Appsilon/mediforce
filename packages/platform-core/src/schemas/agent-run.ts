@@ -19,13 +19,16 @@ export const AgentRunStatusSchema = z.enum([
 /**
  * Why a run left the happy path and went to the step's `fallbackBehavior`.
  * `output_schema` is a `result` that still broke `agent.outputSchema` after
- * one retry with the validation error (ADR-0023 D13).
+ * one retry with the validation error (ADR-0023 D13). `production_evaluator`
+ * is a critical `schema` or `code` Evaluator marked to run in production that
+ * failed the result (D13).
  */
 export const AgentFallbackReasonSchema = z.enum([
   'timeout',
   'low_confidence',
   'error',
   'output_schema',
+  'production_evaluator',
 ]);
 
 export const AgentRunSchema = z.object({

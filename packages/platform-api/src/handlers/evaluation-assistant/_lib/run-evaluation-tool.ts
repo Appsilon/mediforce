@@ -14,7 +14,7 @@ import {
 } from '@mediforce/platform-core';
 import { listCommitFiles, readCommitFile, resolveMcpForStep } from '@mediforce/agent-runtime';
 import type { CallerScope } from '../../../repositories/index';
-import { NotFoundError } from '../../../errors';
+import { NotFoundError, ValidationError } from '../../../errors';
 import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
 import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
 import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
@@ -27,6 +27,7 @@ import { HUMAN_VERDICT_SCORE_NAME } from '../../scores/record-human-verdict';
 import { listEvaluators } from '../../evaluation/evaluators';
 import { listEvalCases } from '../../evaluation/eval-cases';
 import { getEvalRun, listEvalRuns, prepareEvalRun, startEvalRun } from '../../evaluation/eval-runs';
+import { getEvalRunFailures } from '../../evaluation/eval-run-failures';
 import { previewEvaluator } from '../../evaluation/preview-evaluator';
 import { getAcceptanceCriteria } from '../../evaluation/acceptance-criteria';
 import { getStepQualification } from '../../evaluation/step-qualification';
@@ -136,10 +137,21 @@ async function loadStepEvalRun(scope: CallerScope, step: EvaluatedStep, evalRunI
 
 const MAX_LISTED_FILES = 300;
 
+/**
+ * The unattended budget a person granted for one request (D15), and what it
+ * has paid for so far — the runs started under it, and what is left.
+ */
+export interface UnattendedGrant {
+  remainingUsd: number;
+  readonly started: Array<{ evalRunId: string; budgetUsd: number }>;
+}
+
 export interface EvaluationToolContext {
   readonly step: EvaluatedStep;
   readonly definition: WorkflowDefinition;
   readonly workflowStep: WorkflowStep;
+  /** Present only when the request was granted an unattended budget. */
+  readonly unattended?: UnattendedGrant;
 }
 
 /**
@@ -153,7 +165,7 @@ export async function executeEvaluationTool(
   scope: CallerScope,
   context: EvaluationToolContext,
 ): Promise<unknown> {
-  const { step, definition, workflowStep } = context;
+  const { step, definition, workflowStep, unattended } = context;
   switch (toolName) {
     case 'get_step': {
       const agent = workflowStep.agentId === undefined ? null : await scope.agentDefinitions.getById(workflowStep.agentId);
@@ -311,6 +323,11 @@ export async function executeEvaluationTool(
           .map((trial) => ({ caseId: trial.caseId, trialIndex: trial.trialIndex, agentRunId: trial.agentRunId, error: trial.error })),
       };
     }
+    case 'get_failures': {
+      const { evalRunId, variantId } = args as Args<'get_failures'>;
+      await loadStepEvalRun(scope, step, evalRunId);
+      return getEvalRunFailures({ evalRunId, ...(variantId === undefined ? {} : { variantId }), limit: 50 }, scope);
+    }
     case 'preview_evaluator': {
       const { check, agentRunIds } = args as Args<'preview_evaluator'>;
       return previewEvaluator({ ...step, check, limit: 5, ...(agentRunIds === undefined ? {} : { agentRunIds }) }, scope);
@@ -391,9 +408,28 @@ export async function executeEvaluationTool(
     }
     case 'start_eval_run': {
       const { evalRunId } = args as Args<'start_eval_run'>;
-      // No confirmation is passed — there is none to pass. The handler refuses,
-      // and the refusal is what the model is told.
-      return startEvalRun({ evalRunId }, scope);
+      if (unattended === undefined) {
+        // No confirmation is passed — there is none to pass. The handler refuses,
+        // and the refusal is what the model is told.
+        return startEvalRun({ evalRunId }, scope);
+      }
+      const run = await scope.evaluation.getEvalRun(evalRunId);
+      if (run === null || isSameStep(run, step) === false) {
+        throw new NotFoundError(`Eval Run '${evalRunId}' is not a run of this step`);
+      }
+      if (run.budgetUsd > unattended.remainingUsd) {
+        throw new ValidationError(
+          `This Eval Run may spend up to $${run.budgetUsd}, but only $${unattended.remainingUsd.toFixed(2)} is left of the unattended budget the person granted for this request — prepare a smaller run, or ask the person to confirm this one.`,
+        );
+      }
+      const started = await startEvalRun({ evalRunId, confirmedBudgetUsd: run.budgetUsd }, scope);
+      unattended.remainingUsd = Math.round((unattended.remainingUsd - run.budgetUsd) * 100) / 100;
+      unattended.started.push({ evalRunId, budgetUsd: run.budgetUsd });
+      return {
+        started: { evalRunId, status: started.evalRun.status, budgetUsd: run.budgetUsd },
+        unattendedBudgetLeftUsd: unattended.remainingUsd,
+        note: 'The run is under way. Read its report with get_eval_run_report once it completes.',
+      };
     }
   }
 }

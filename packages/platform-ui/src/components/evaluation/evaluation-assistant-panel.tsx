@@ -8,7 +8,7 @@ import type {
   EvaluationAssistantPlatformToolName,
   EvaluationAssistantProposalToolName,
 } from '@mediforce/platform-core';
-import type { EvaluationAssistantProgress, PreparedEvalRun, ProposalView } from '@mediforce/platform-api/contract';
+import type { EvaluationAssistantProgress, PreparedEvalRun, ProposalView, StartedEvalRun } from '@mediforce/platform-api/contract';
 import { useQueryClient } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
@@ -19,6 +19,8 @@ import { selectBase } from '@/components/workflows/workflow-editor/step-editor-f
 import { StartEvalRunCard } from './step-evaluation-sections';
 import {
   ControlSettingsCard,
+  DiagnosisCard,
+  FixCard,
   LabellingCard,
   PlanCard,
   ProposalCard,
@@ -48,6 +50,7 @@ interface PanelMessage {
   readonly content: string;
   readonly proposals?: ProposalState[];
   readonly prepared?: PreparedEvalRun[];
+  readonly started?: StartedEvalRun[];
   readonly steps?: ActivityStep[];
 }
 
@@ -81,6 +84,9 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   propose_brief: 'Drafting the brief',
   propose_acceptance_criteria: 'Drafting Acceptance Criteria',
   propose_control_settings: 'Recommending routing',
+  get_failures: 'Reading an eval run\'s failures',
+  propose_diagnosis: 'Diagnosing the failures',
+  propose_fix: 'Drafting a fix',
 };
 
 function toolLabel(tool: string): string {
@@ -146,6 +152,7 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
   const [activity, setActivity] = React.useState<Activity>(IDLE_ACTIVITY);
   const [error, setError] = React.useState<string | null>(null);
   const [assistantModel, setAssistantModel] = React.useState<string | undefined>(undefined);
+  const [unattendedBudget, setUnattendedBudget] = React.useState('');
   const [assistantSettingsOpen, setAssistantSettingsOpen] = React.useState(false);
   const assistantScrollRef = React.useRef<HTMLDivElement>(null);
   const followLatest = React.useRef(true);
@@ -186,13 +193,14 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
           content: [message.content, ...(message.proposals ?? []).map(({ proposal }) => `[proposal: ${JSON.stringify(proposal)}]`)].join('\n'),
         })),
         ...(assistantModel === undefined ? {} : { model: assistantModel }),
+        ...(Number(unattendedBudget) > 0 ? { unattendedBudgetUsd: Number(unattendedBudget) } : {}),
       }, {
         onProgress: (event) => {
           turnActivity = applyProgress(turnActivity, event);
           setActivity(turnActivity);
         },
       });
-      if (result.preparedEvalRuns.length > 0) {
+      if (result.preparedEvalRuns.length > 0 || result.startedEvalRuns.length > 0) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId) });
       }
       setMessages([...thread, {
@@ -200,6 +208,7 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
         content: result.reply,
         proposals: result.proposals.map((proposal) => ({ proposal, status: 'open' as const })),
         prepared: result.preparedEvalRuns,
+        started: result.startedEvalRuns,
         steps: turnActivity.steps,
       }]);
     } catch (err) {
@@ -238,6 +247,25 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
             ariaLabel="Evaluation Assistant Model"
             className={selectBase}
           />
+          <details>
+            <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">Advanced</summary>
+            <label className="mt-1.5 block space-y-1 text-xs">
+              <span className="font-medium text-muted-foreground">Unattended budget (USD)</span>
+              <input
+                type="number"
+                min={0}
+                max={10000}
+                step={0.01}
+                data-testid="evaluation-assistant-unattended-budget"
+                className={selectBase}
+                value={unattendedBudget}
+                onChange={(event) => setUnattendedBudget(event.target.value)}
+              />
+              <span className="block text-muted-foreground">
+                Lets the assistant start Eval Runs on its own up to this total, for this request only. Empty: it prepares runs and you confirm each budget.
+              </span>
+            </label>
+          </details>
         </div>
       )}
       <div
@@ -284,6 +312,12 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
                 if (proposal.tool === 'propose_control_settings') {
                   return <ControlSettingsCard key={proposalIndex} proposal={proposal.arguments} />;
                 }
+                if (proposal.tool === 'propose_diagnosis') {
+                  return <DiagnosisCard key={proposalIndex} diagnosis={proposal.arguments} />;
+                }
+                if (proposal.tool === 'propose_fix') {
+                  return <FixCard key={proposalIndex} step={step} fix={proposal.arguments} mayRun={mayRun} runReason={runReason} />;
+                }
                 if (proposal.tool === 'propose_outputs_to_label') {
                   return <LabellingCard key={proposalIndex} step={step} proposal={proposal.arguments} mayEdit={mayEdit} editReason={editReason} />;
                 }
@@ -298,6 +332,11 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
                   />
                 );
               })}
+              {message.started?.map((started) => (
+                <p key={started.evalRunId} className="rounded-md border bg-background p-2.5 text-xs" data-testid="started-eval-run">
+                  Started Eval Run <span className="font-mono">{started.evalRunId.slice(0, 8)}</span> with a budget of ${started.budgetUsd}. Follow it in the Eval Runs list.
+                </p>
+              ))}
               {message.prepared?.map((prepared) => <StartEvalRunCard key={prepared.evalRunId} step={step} prepared={prepared} mayRun={mayRun} runReason={runReason} />)}
             </div>
           </div>

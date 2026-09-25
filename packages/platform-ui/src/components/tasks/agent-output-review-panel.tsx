@@ -82,6 +82,7 @@ function formatEscalationReason(reason: NonNullable<EscalationReason>): string {
     case 'timeout': return 'timeout';
     case 'error': return 'error';
     case 'output_schema': return 'output does not match schema';
+    case 'production_evaluator': return 'failed a production Evaluator';
     case 'iterations_limit': return 'iterations limit reached';
   }
 }

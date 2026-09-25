@@ -40,6 +40,7 @@ describe('computeStepFingerprint', () => {
 
     expect(changedFingerprintComponents(base, await fingerprint({ step: { agent: { ...step.agent, model: 'openai/gpt-5' } } }))).toEqual(['model']);
     expect(changedFingerprintComponents(base, await fingerprint({ step: { agent: { ...step.agent, prompt: 'Grade every AE.' } } }))).toEqual(['step']);
+    expect(changedFingerprintComponents(base, await fingerprint({ step: { agent: { ...step.agent, examples: [{ input: 'Sepsis, fatal', output: '{"grade": 5}' }] } } }))).toEqual(['step']);
     expect(changedFingerprintComponents(base, await fingerprint({ definition: { preamble: 'Study CDISCPILOT01.' } }))).toEqual(['preamble']);
     expect(changedFingerprintComponents(base, await fingerprint({ step: { mcpRestrictions: { email: { disable: true } } } })))
       .toEqual(['step', 'mcpServers']);

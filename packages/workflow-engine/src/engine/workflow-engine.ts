@@ -188,7 +188,9 @@ export class WorkflowEngine {
           ? 'Agent confidence below threshold — please review'
           : agentRunResult.fallbackReason === 'timeout'
             ? 'Agent timed out — please complete this step manually'
-            : 'Agent escalated — please review',
+            : agentRunResult.fallbackReason === 'production_evaluator'
+              ? 'Agent output failed a production Evaluator — please review'
+              : 'Agent escalated — please review',
         payload: {},
         resolution: null,
         createdAt: new Date().toISOString(),

@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-09-24
+last_reviewed: 2026-09-25
 ---
 
 # Step Evaluation
@@ -36,7 +36,8 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   SKILL.md, the steps upstream of it), its
   production runs with the reviewer's verdict and their trajectories, the
   workspace files a run started from, Evaluators with their labels and
-  calibration, cases, Eval Runs and reports, each challenger compared with the
+  calibration, cases, Eval Runs and reports, one variant's failing trials
+  (`get_failures`), each challenger compared with the
   champion (`compare_variants`), the step's qualification and Acceptance
   Criteria (`get_qualification`), and `preview_evaluator` — it tries a check
   on real outputs before proposing it.
@@ -45,10 +46,20 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   cards to accept, edit or reject. Accepting one is the same write the forms
   make, recorded with `origin: assistant`. A routing recommendation (Control
   Mode and `confidenceThreshold`) comes back as a card to apply in the
-  workflow editor.
+  workflow editor. So do a **diagnosis** of an Eval Run's failures
+  (`propose_diagnosis`) and a **fix** to try (`propose_fix`) — see Fix loop
+  below. Nothing is applied to the step by the assistant.
 - **Prepares:** it can prepare an Eval Run, with challengers; the run starts
   only when the person confirms its budget on the card. Its own start attempt
-  is refused.
+  is refused — unless the request carries an **unattended budget**
+  (`unattendedBudgetUsd`, up to 10,000; `mediforce eval ask --unattended-budget
+  <usd>`), which the person grants for that one request. Then `start_eval_run`
+  starts a prepared run of this step whose `budgetUsd` fits what is left of the
+  grant (the sum of the budgets of the runs started in the request is what has
+  been spent), confirming that budget as a person would; a run that does not
+  fit is refused with the amount left. The response lists them as
+  `startedEvalRuns: [{ evalRunId, budgetUsd }]` and the request's audit event
+  records the grant. Without the field nothing changes.
 - **Never:** approving a `code` check's source, labelling outputs, signing a
   Step Qualification. There is no tool for these.
 
@@ -69,6 +80,36 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   with the champion without calling a difference the intervals do not show,
   explains each criterion's verdict, and recommends a Control Mode and
   `confidenceThreshold` from the run's confidence calibration.
+- **Fix loop.** After a run with failures the assistant reads them
+  (`get_failures`: the variant's trials where a counted Evaluator failed, a
+  check errored, or no Agent Run was produced — each with its case, its
+  trial error and the Evaluators that failed or errored; at most 50 listed,
+  with the total; `mediforce eval failures <evalRunId> [--variant <id>]`,
+  `GET /api/evaluation/runs/:id/failures`), then the trajectories and cases,
+  and clusters the failures by root cause in a **diagnosis** card
+  (`propose_diagnosis`): `ambiguous_instruction`, `missing_context`,
+  `tool_problem`, `model_capability` or `evaluator_wrong`, each with its
+  trials, evidence and the kind of fix it points to. Each cluster's fix
+  becomes a proposal by what can express it:
+
+  | Fix kind | Proposal |
+  |---|---|
+  | `instruction`, `examples`, `model`, `tools` | `propose_fix`: a variant patch (`prompt`/`skillCommit`; `examples`; `model`; `allowedTools`/`mcpRestrictions`), labelled, with the cluster it addresses and why |
+  | `guardrail` | `propose_evaluator` with `runInProduction` (a critical `schema` or `code` check) |
+  | `control_mode` | `propose_control_settings` |
+  | `evaluator` | `propose_evaluator_version` |
+  | `preprocessing_step` | advice in the diagnosis: a workflow change made in the workflow editor, not a variant |
+
+  A diagnosis is refused unless the run is this step's and every trial is a
+  trial of that run and variant; a fix unless the run is this step's, the
+  patch changes only its kind's fields, and `variantPatchProblem`, unknown MCP
+  servers and example cases (`agent.examples` must cite live dev cases of this
+  step, never holdout) pass. A fix card offers **Try it** — prepare an Eval Run
+  with the fix as a challenger over the newest Dataset version, which holds the
+  failing cases with the dev and holdout ones, the person confirming the cost on
+  the prepared-run card — and **Apply to step** (`apply-variant`, below), once
+  a run shows it works. Few-shot examples come from dev cases only, and the
+  cases they came from are left out of later runs.
 - **Rule to check.** A plain-language rule becomes the cheapest reliable kind —
   `schema`, then `code`, a judge only when a script cannot decide it. Every
   proposed check is tried by the platform on the step's recent production
@@ -159,11 +200,41 @@ decides whether a judge counts. `cases-from-labels <evaluatorId>` turns every
 labelled production output that is not yet a case into one — a pass positive,
 a fail negative, noting the rule and the person's comment.
 
+`evaluator-archive` archives or restores an Evaluator; `evaluator-production`
+sets whether it also runs in production (see below).
+
 `evaluator-preview` (`POST /api/evaluation/evaluators/preview`) runs a draft
 check against the Step's recent production outputs (dry runs left out) and
 writes nothing — try a check on real outputs before saving it. It runs check
 code and spends the workspace's model key, so it needs the workflow's `run`
 verb.
+
+## Production Evaluators
+
+Off by default. `evaluator-production <evaluatorId> --on|--off`
+(`POST /api/evaluation/evaluators/:id/production`, the "Also run in production"
+toggle in the Evaluation tab, or `runInProduction` when creating one) marks an
+Evaluator to also score the step's live runs (D13). The flag may be set on any
+Evaluator but takes effect only while its latest version counts (D9) and it is
+not archived; the Evaluator view's `production` says `active`, or why not ("in
+production once it counts (source not approved)").
+
+A run is production when it is not a dry run and not an Eval Run trial; those
+are never gated. After the output passes `agent.outputSchema` and before the
+confidence and autonomy routing, `AgentRunner` hands it to the gate
+(`executeAgentStep` installs it only when the step has a flagged Evaluator):
+
+- `schema` and `code` run synchronously and each writes a Score marked
+  `metadata.production: true` (no `evalRunId`). A failing **critical** one fails
+  the run with reason `production_evaluator`: the step's `fallbackBehavior`
+  applies as for low confidence, and the failure message is the run's
+  `errorMessage`, an activity-log line and part of the `agent.run` audit event.
+  Failing `major` and `minor` ones only write Scores.
+- `llm_judge` runs asynchronously after the run has moved on and only writes a
+  Score (`source: llm_judge`, its cost in `metadata.judgeCostUsd`). Its errors
+  are logged and never block or fail the step.
+- A check that cannot run, or a gate that throws, never fails the run; it is
+  recorded in the activity log.
 
 ## Eval Cases and Datasets
 
@@ -207,9 +278,17 @@ every case, `trialsPerCase` times, per variant. A challenger is a patch over
 the champion (`run-prepare --challengers <file>`, `challengers` in
 `POST /api/evaluation/runs`): `model`, `prompt` and `allowedTools` replace the
 step's own, `mcpRestrictions` narrow it (servers the agent binds only),
-`skillCommit` moves the workflow's `externalSkillsRepo` commit. A challenger
+`skillCommit` moves the workflow's `externalSkillsRepo` commit, `examples`
+replaces the step's few-shot `agent.examples` (`[]` means none). A challenger
 that changes nothing, or runs the same step as another variant, is refused.
-Few-shot examples come with `agent.examples` in phase 4.
+
+Few-shot examples (`agent.examples`, up to 20 of `{input, output, note?, caseId?}`)
+are rendered as their own `## Examples` prompt section and are part of the
+Fingerprint. An example cites the Eval Case it came from by `caseId`; that case
+must be a live case of the same Step and never a `holdout` one — holdout cases
+are never offered as examples. Prepare leaves every case cited by the champion's
+or any challenger's examples out of the run (recorded as `exampleCaseIds`, shown
+in the report and by `run-prepare`), and refuses a run with no case left to score.
 
 1. **Prepare** (`run-prepare`, `POST /api/evaluation/runs`) freezes the Dataset
    version (the newest unless named), the latest version of every live
@@ -250,6 +329,32 @@ Few-shot examples come with `agent.examples` in phase 4.
    before creating its run, or mid-scoring — leaves a claim that another takes
    over once it is 15 minutes old, without re-running Evaluators that already
    scored the trial. A trial whose scoring was abandoned three times fails.
+
+**Apply a variant to the step** (`mediforce eval apply-variant --run <id>
+--variant <id> | --patch <file> [--set-default]`,
+`POST /api/evaluation/variants/apply`, `mediforce.evaluation.applyVariant`). A
+challenger of one of the step's runs, or a patch, is applied over the step as its
+runnable Definition version has it and saved as a **new Workflow Definition
+version** through the workflow editor's own save (`registerWorkflow`: the same
+validation, image default, seeding and audit); it becomes the default version
+only with `--set-default` (`setAsDefault`), as with the editor's save dialog —
+otherwise it is the runnable version only when the workflow has no default
+version. Needs the workflow's `edit` verb; the champion, an empty patch, and a
+patch the step cannot take (the checks a challenger passes at prepare) are
+refused. The response is the new version, whether it is now runnable, the
+patched step's Fingerprint and, for a run's variant, whether it equals the one
+frozen with the variant (`matchesFingerprint`, else the `changed` components):
+then a Step Qualification of that variant holds for the new version. Applying is
+audited as `step_variant.applied`.
+
+In the web tab, every challenger of a finished run's report has an **Apply to
+step** button (not the champion; `edit` verb). It asks for confirmation and a
+"Make it the default version" checkbox (unchecked by default, as in the CLI), then shows the new
+version, whether the variant's qualification carries over or which components
+changed, and any warnings. The assistant panel's **Advanced** section takes an
+optional unattended budget (USD) sent as `unattendedBudgetUsd`; runs the
+assistant started under it are listed in its reply. A fix card's **Try it**
+prepares the run, which is then confirmed from the Eval Runs list.
 
 The **report** (`mediforce eval report <id>`, `GET /api/evaluation/runs/:id`)
 is computed from those Scores, per variant. Per Evaluator: pass rate with its Wilson 95%
@@ -300,7 +405,7 @@ its own so two Fingerprints say what differs:
 
 | Component | What is hashed |
 |---|---|
-| `step` | the agent config, plugin, agent id, params, step params, env and MCP restrictions — not its name, display, `autonomyLevel`, `review`, `confidenceThreshold` or `fallbackBehavior` |
+| `step` | the agent config (including `examples`), plugin, agent id, params, step params, env and MCP restrictions — not its name, display, `autonomyLevel`, `review`, `confidenceThreshold` or `fallbackBehavior` |
 | `model` | the step's model, or its agent's when the step names none |
 | `systemPrompt` | the agent's system prompt |
 | `skill` | every file the workflow carries under `<skillsDir>/<skill>/`, or the external skills repository, commit and path |
@@ -340,6 +445,7 @@ binds the step's Fingerprint as it is now, **Stale** when qualifications exist
 but none does — naming the components that changed — and **Not qualified**
 when none was signed. It shows in the Evaluation tab, and on an agent step of a
 run for the Definition version that run ran. A challenger that was qualified
-becomes Qualified once the step is changed to match it. Evaluators added,
+becomes Qualified once the step is changed to match it — applying it
+(`apply-variant`) does exactly that when the new version is the runnable one. Evaluators added,
 archived or given a new version since are flagged beside it, without making
 it stale. The badge is informational: nothing is blocked without one.

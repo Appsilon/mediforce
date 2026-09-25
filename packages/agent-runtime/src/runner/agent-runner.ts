@@ -14,7 +14,12 @@ import {
 } from '@mediforce/platform-core';
 import { randomUUID } from 'crypto';
 import type { Span } from '@opentelemetry/api';
-import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
+import type {
+  AgentOutputGate,
+  StepExecutorPlugin,
+  AgentContext,
+  WorkflowAgentContext,
+} from '../interfaces/step-executor-plugin';
 import type { AgentEventLog } from './agent-event-log';
 import { FallbackHandler } from './fallback-handler';
 import { PluginRunner } from './plugin-runner';
@@ -179,6 +184,22 @@ export class AgentRunner {
       }
       await trajectory?.flush();
 
+      if (
+        context.outputGate !== undefined
+        && attempt.envelope !== null
+        && (attempt.fallbackReason === null || attempt.fallbackReason === 'low_confidence')
+      ) {
+        const gateFailure = await this.runOutputGate(context.outputGate, runId, context, attempt.envelope);
+        if (gateFailure !== null) {
+          const alsoLowConfidence = attempt.fallbackReason === 'low_confidence';
+          attempt = {
+            ...attempt,
+            fallbackReason: 'production_evaluator',
+            errorMessage: alsoLowConfidence ? `${gateFailure} (the result was also below the confidence threshold)` : gateFailure,
+          };
+        }
+      }
+
       const { envelope, fallbackReason, errorMessage } = attempt;
 
       if (fallbackReason) {
@@ -207,6 +228,34 @@ export class AgentRunner {
       );
       return { ...result, agentRunId: runId };
     });
+  }
+
+  /**
+   * Hands a result that passed `outputSchema` to the step's output gate
+   * (ADR-0023 D13). Returns why it failed, or null. A gate that cannot run —
+   * or a check inside it that cannot — is recorded, never a failure.
+   */
+  private async runOutputGate(
+    gate: AgentOutputGate,
+    agentRunId: string,
+    context: WorkflowAgentContext,
+    envelope: AgentOutputEnvelope,
+  ): Promise<string | null> {
+    const { processInstanceId, stepId } = context;
+    const status = (payload: string) => this.eventLog.write(processInstanceId, stepId, {
+      type: 'status',
+      payload,
+      timestamp: new Date().toISOString(),
+    });
+    try {
+      const verdict = await gate({ agentRunId, context, envelope });
+      for (const error of verdict.errors) await status(`production Evaluator could not run: ${error}`);
+      if (verdict.failure !== null) await status(`result failed a production Evaluator — ${verdict.failure}`);
+      return verdict.failure;
+    } catch (err) {
+      await status(`production Evaluators could not run: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
   }
 
   /** Execute the plugin once and classify the outcome. The output-schema check

@@ -1,8 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { Loader2 } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { Loader2, X } from 'lucide-react';
 import {
+  CHAMPION_VARIANT_ID,
   describeAcceptanceCriteria,
   qualificationSignatureMeaning,
   type AcceptanceCriterionVerdict,
@@ -32,6 +34,7 @@ export function describePatch(patch: StepVariantPatch): string {
     patch.skillCommit !== undefined && `skills at ${patch.skillCommit.slice(0, 8)}`,
     patch.allowedTools !== undefined && `tools ${patch.allowedTools.length === 0 ? 'none extra' : patch.allowedTools.join(', ')}`,
     patch.mcpRestrictions !== undefined && `MCP narrowed: ${Object.keys(patch.mcpRestrictions).join(', ')}`,
+    patch.examples !== undefined && (patch.examples.length === 0 ? 'no examples' : `${patch.examples.length} example(s)`),
   ].filter((change) => change !== false);
   return changes.length === 0 ? 'the step as it is' : changes.join('; ');
 }
@@ -203,6 +206,96 @@ function signingBlocked(output: EvalRunOutput, variant: EvalRunVariantReport, ma
   return null;
 }
 
+/** Why a challenger of this run cannot be applied to the step, or null when it can. */
+function applyBlocked(output: EvalRunOutput, mayEdit: boolean, editReason: string | undefined): string | null {
+  const { evalRun, report } = output;
+  if (mayEdit === false) return editReason ?? 'You may not edit this workflow';
+  if (evalRun.status === 'prepared' || evalRun.status === 'running' || evalRun.status === 'cancelled' || report.trials.inProgress > 0) return 'Apply once the run has finished and every trial is scored';
+  return null;
+}
+
+/**
+ * Applying a challenger saves its patch as a new Workflow Definition version
+ * (ADR-0023 D13). The person confirms, chooses whether it becomes the default
+ * version, and is told whether the variant's qualification carries over.
+ */
+function ApplyVariant({ step, evalRunId, variant, blocked }: {
+  step: EvaluatedStep;
+  evalRunId: string;
+  variant: EvalRunVariantReport;
+  blocked: string | null;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [setAsDefault, setSetAsDefault] = React.useState(false);
+  const apply = useStepEvaluationMutation(step, () => mediforce.evaluation.applyVariant({
+    ...step,
+    evalRunId,
+    variantId: variant.id,
+    setAsDefault,
+  }));
+  const applied = apply.data;
+  return (
+    <div className="space-y-1" data-testid="apply-variant">
+      <InstantTooltip label={blocked ?? undefined}>
+        <span className="inline-flex">
+          <button type="button" className={buttonClass} disabled={blocked !== null || applied !== undefined} onClick={() => setOpen(true)} data-testid="apply-variant-open">
+            {applied === undefined ? 'Apply to step' : 'Applied'}
+          </button>
+        </span>
+      </InstantTooltip>
+      {applied !== undefined && (
+        <div className="space-y-0.5 text-xs" data-testid="apply-variant-result">
+          <p className="font-medium text-green-700 dark:text-green-400">
+            Saved as Workflow Definition version {applied.definitionVersion}
+            {applied.runnable ? ', which runs now use.' : '; it is not the default version, so runs still use the default.'}
+          </p>
+          {applied.variant !== null && (
+            <p className="text-muted-foreground">
+              {applied.variant.matchesFingerprint
+                ? "It matches this variant's Fingerprint: its qualification carries over."
+                : `It differs from this variant's Fingerprint (${applied.variant.changed.join(', ')}): its qualification does not carry over.`}
+            </p>
+          )}
+          {applied.warnings?.map((warning) => (
+            <p key={`${warning.stepName}:${warning.code}`} className="text-amber-700 dark:text-amber-300">{warning.stepName}: {warning.message}</p>
+          ))}
+        </div>
+      )}
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 space-y-3 rounded-lg border bg-background p-6 shadow-lg" data-testid="apply-variant-dialog">
+            <div className="flex items-start justify-between gap-2">
+              <Dialog.Title className="text-base font-semibold">Apply {variant.label} to the step</Dialog.Title>
+              <Dialog.Close asChild>
+                <button type="button" aria-label="Close" className="rounded p-1 hover:bg-muted"><X className="h-4 w-4" /></button>
+              </Dialog.Close>
+            </div>
+            <Dialog.Description className="text-sm text-muted-foreground">
+              This saves a new Workflow Definition version with the variant&apos;s changes ({describePatch(variant.patch)}). Existing versions stay as they are.
+            </Dialog.Description>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" data-testid="apply-variant-default" checked={setAsDefault} onChange={(event) => setSetAsDefault(event.target.checked)} />
+              Make it the default version
+            </label>
+            {apply.error !== null && <p className="text-sm text-destructive" data-testid="apply-variant-error">{apply.error.message}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" className={buttonClass} onClick={() => setOpen(false)}>Cancel</button>
+              <button
+                type="button"
+                className={primaryButtonClass}
+                data-testid="apply-variant-confirm"
+                disabled={apply.isPending}
+                onClick={() => apply.mutate(undefined, { onSuccess: () => setOpen(false) })}
+              >Apply to step</button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </div>
+  );
+}
+
 function VariantReport({ output, variant, step, mayEdit, editReason }: {
   output: EvalRunOutput;
   variant: EvalRunVariantReport;
@@ -237,13 +330,18 @@ function VariantReport({ output, variant, step, mayEdit, editReason }: {
           onDone={() => setSigning(false)}
         />
       ) : (
-        <InstantTooltip label={blocked ?? undefined}>
-          <span className="inline-flex">
-            <button type="button" className={buttonClass} disabled={blocked !== null} onClick={() => setSigning(true)} data-testid="sign-qualification">
-              Sign Step Qualification
-            </button>
-          </span>
-        </InstantTooltip>
+        <div className="flex flex-wrap items-start gap-2">
+          <InstantTooltip label={blocked ?? undefined}>
+            <span className="inline-flex">
+              <button type="button" className={buttonClass} disabled={blocked !== null} onClick={() => setSigning(true)} data-testid="sign-qualification">
+                Sign Step Qualification
+              </button>
+            </span>
+          </InstantTooltip>
+          {variant.id !== CHAMPION_VARIANT_ID && (
+            <ApplyVariant step={step} evalRunId={output.evalRun.id} variant={variant} blocked={applyBlocked(output, mayEdit, editReason)} />
+          )}
+        </div>
       )}
     </div>
   );
@@ -310,6 +408,11 @@ export function EvalRunReport({ output, step, mayEdit, editReason }: {
         )}
         <span>spent ${report.costUsd.toFixed(4)} of ${evalRun.budgetUsd}</span>
         <span>{report.inputTokens + report.outputTokens} tokens</span>
+        {evalRun.exampleCaseIds.length > 0 && (
+          <span data-testid="example-cases-left-out">
+            {evalRun.exampleCaseIds.length} case(s) left out — a variant&apos;s few-shot examples came from them
+          </span>
+        )}
       </div>
       <p className="text-xs text-muted-foreground">
         {evalRun.acceptanceCriteria === null

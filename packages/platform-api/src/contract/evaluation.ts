@@ -11,10 +11,12 @@ import {
   EvalRunReportSchema,
   EvalRunSchema,
   EvalTrialSchema,
+  EvalTrialStatusSchema,
   EvaluatedStepSchema,
   EvaluationBriefSchema,
   EvaluationOriginSchema,
   EvaluatorCheckSchema,
+  EvaluatorKindSchema,
   EvaluatorSchema,
   EvaluatorSeveritySchema,
   EvaluatorVersionSchema,
@@ -30,6 +32,7 @@ import {
   StepVariantPatchSchema,
   hasPerturbationChange,
 } from '@mediforce/platform-core';
+import { RegistrationWarningSchema } from './workflows';
 
 /**
  * Contracts for the Evaluation domain (ADR-0023): Evaluation Briefs,
@@ -62,12 +65,20 @@ export const EvaluatorTrustSchema = z.object({
   reason: z.string().optional(),
 });
 
+/** Whether an Evaluator scores live Agent Runs now (D13): flagged, not archived, and counted. */
+export const EvaluatorProductionSchema = z.object({
+  active: z.boolean(),
+  /** Why a flagged Evaluator is not running in production yet; absent otherwise. */
+  reason: z.string().optional(),
+});
+
 /** An Evaluator with its versions and whether its latest version counts (D9). */
 export const EvaluatorViewSchema = EvaluatorSchema.extend({
   latest: EvaluatorVersionSchema,
   /** Oldest first. */
   versions: z.array(EvaluatorVersionSchema),
   trust: EvaluatorTrustSchema,
+  production: EvaluatorProductionSchema,
 });
 
 export const ListEvaluatorsInputSchema = EvaluatedStepSchema.extend({
@@ -84,6 +95,7 @@ export const CreateEvaluatorInputSchema = EvaluatedStepSchema.extend({
   severity: EvaluatorSeveritySchema,
   check: EvaluatorCheckSchema,
   origin: EvaluationOriginSchema.default('user'),
+  runInProduction: z.boolean().optional(),
 });
 
 /** A new version: whatever is omitted is carried over from the latest one. */
@@ -100,6 +112,12 @@ export const AddEvaluatorVersionInputSchema = z.object({
 export const ArchiveEvaluatorInputSchema = z.object({
   evaluatorId: z.uuid(),
   archived: z.boolean().default(true),
+});
+
+/** Marks an Evaluator to also score live production Agent Runs of its step (D13). */
+export const SetEvaluatorProductionInputSchema = z.object({
+  evaluatorId: z.uuid(),
+  runInProduction: z.boolean(),
 });
 
 /** Records a person's approval of one `code` version's source (D9). */
@@ -323,6 +341,95 @@ export const ListEvalRunsInputSchema = EvaluatedStepSchema;
 export const ListEvalRunsOutputSchema = z.object({ evalRuns: z.array(EvalRunSchema) });
 
 /**
+ * One variant's failing trials in an Eval Run, the material a fix starts from
+ * (ADR-0023 D14): a counted Evaluator failed, a check errored, or the trial
+ * failed before producing an Agent Run. `variantId` defaults to the champion.
+ */
+export const GetEvalRunFailuresInputSchema = z.object({
+  evalRunId: z.uuid(),
+  variantId: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+/** An Evaluator that failed or could not grade one trial. */
+export const TrialEvaluatorFailureSchema = z.object({
+  evaluatorId: z.uuid(),
+  name: z.string(),
+  severity: EvaluatorSeveritySchema,
+  kind: EvaluatorKindSchema,
+  counted: z.boolean(),
+  outcome: z.enum(['failed', 'errored']),
+  /** The check's comment on a failed output. */
+  comment: z.string().nullable(),
+  /** Why the check could not grade it. */
+  error: z.string().nullable(),
+});
+
+export const EvalTrialFailureSchema = z.object({
+  trialId: z.uuid(),
+  trialIndex: z.number().int().nonnegative(),
+  status: EvalTrialStatusSchema,
+  caseId: z.uuid(),
+  /** Null when the case no longer exists. */
+  caseName: z.string().nullable(),
+  split: EvalCaseSplitSchema.nullable(),
+  expectation: EvalCaseExpectationSchema.nullable(),
+  caseNotes: z.string().nullable(),
+  agentRunId: z.string().nullable(),
+  error: z.string().nullable(),
+  evaluators: z.array(TrialEvaluatorFailureSchema),
+});
+
+export const GetEvalRunFailuresOutputSchema = z.object({
+  evalRunId: z.uuid(),
+  variantId: z.string(),
+  variantLabel: z.string(),
+  /** Every failing trial of the variant; `failures` holds the first `limit`. */
+  total: z.number().int().nonnegative(),
+  failures: z.array(EvalTrialFailureSchema),
+});
+
+/**
+ * Applies a variant to the Step (D5): a challenger of one of its Eval Runs, or
+ * a patch, over the Step as its runnable version has it, saved as a new
+ * Workflow Definition version the way the workflow editor saves one —
+ * `setAsDefault` as its save dialog offers. Needs the workflow's `edit` verb.
+ */
+export const ApplyStepVariantInputSchema = EvaluatedStepSchema.extend({
+  evalRunId: z.uuid().optional(),
+  variantId: z.string().min(1).optional(),
+  patch: StepVariantPatchSchema.optional(),
+  setAsDefault: z.boolean().default(false),
+}).refine(
+  (input) => input.patch === undefined
+    ? input.evalRunId !== undefined && input.variantId !== undefined
+    : input.evalRunId === undefined && input.variantId === undefined,
+  { message: 'give either evalRunId and variantId (a challenger of an Eval Run) or patch' },
+);
+
+export const ApplyStepVariantOutputSchema = z.object({
+  definitionVersion: z.number().int().positive(),
+  /** Whether the new version is the one runs now use: the default, or the newest when none is set. */
+  runnable: z.boolean(),
+  /** The patched Step's Fingerprint in the new version. */
+  fingerprint: StepFingerprintSchema,
+  /** The Eval Run variant applied; null for a patch. */
+  variant: z.object({
+    evalRunId: z.uuid(),
+    variantId: z.string(),
+    label: z.string(),
+    /**
+     * The new Fingerprint equals the one frozen with the variant, so a Step
+     * Qualification of that variant holds for the new version.
+     */
+    matchesFingerprint: z.boolean(),
+    /** What differs from the variant's Fingerprint; empty when it matches. */
+    changed: z.array(StepFingerprintComponentSchema),
+  }).nullable(),
+  warnings: z.array(RegistrationWarningSchema).optional(),
+});
+
+/**
  * The Step's qualification badge (D11). By default for the Step as its
  * runnable version has it; with `definitionVersion`, as that version has it —
  * what a run of that version ran.
@@ -375,6 +482,8 @@ export type EvaluatorOutput = z.infer<typeof EvaluatorOutputSchema>;
 export type CreateEvaluatorInput = z.input<typeof CreateEvaluatorInputSchema>;
 export type AddEvaluatorVersionInput = z.input<typeof AddEvaluatorVersionInputSchema>;
 export type ArchiveEvaluatorInput = z.input<typeof ArchiveEvaluatorInputSchema>;
+export type SetEvaluatorProductionInput = z.infer<typeof SetEvaluatorProductionInputSchema>;
+export type EvaluatorProduction = z.infer<typeof EvaluatorProductionSchema>;
 export type ApproveEvaluatorSourceInput = z.infer<typeof ApproveEvaluatorSourceInputSchema>;
 export type LabelEvaluatorOutputInput = z.infer<typeof LabelEvaluatorOutputInputSchema>;
 export type LabelEvaluatorOutputOutput = z.infer<typeof LabelEvaluatorOutputOutputSchema>;
@@ -411,6 +520,12 @@ export type CancelEvalRunInput = z.infer<typeof CancelEvalRunInputSchema>;
 export type EvalRunOutput = z.infer<typeof EvalRunOutputSchema>;
 export type ListEvalRunsInput = z.infer<typeof ListEvalRunsInputSchema>;
 export type ListEvalRunsOutput = z.infer<typeof ListEvalRunsOutputSchema>;
+export type GetEvalRunFailuresInput = z.input<typeof GetEvalRunFailuresInputSchema>;
+export type GetEvalRunFailuresOutput = z.infer<typeof GetEvalRunFailuresOutputSchema>;
+export type EvalTrialFailure = z.infer<typeof EvalTrialFailureSchema>;
+export type TrialEvaluatorFailure = z.infer<typeof TrialEvaluatorFailureSchema>;
+export type ApplyStepVariantInput = z.input<typeof ApplyStepVariantInputSchema>;
+export type ApplyStepVariantOutput = z.infer<typeof ApplyStepVariantOutputSchema>;
 export type GetAcceptanceCriteriaInput = z.infer<typeof GetAcceptanceCriteriaInputSchema>;
 export type GetAcceptanceCriteriaOutput = z.infer<typeof GetAcceptanceCriteriaOutputSchema>;
 export type SetAcceptanceCriteriaInput = z.input<typeof SetAcceptanceCriteriaInputSchema>;
