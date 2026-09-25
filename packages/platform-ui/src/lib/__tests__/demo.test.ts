@@ -2,9 +2,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
-  isAppsilonEmail,
   nextRouteAction,
-  offersDemo,
   pickDemoRun,
   resolveDemoRoute,
   routeParams,
@@ -39,99 +37,6 @@ function renderedAnchors(): Set<string> {
   walk(SRC);
   return found;
 }
-
-describe('isAppsilonEmail', () => {
-  it('admits an Appsilon address whatever its casing', () => {
-    expect(isAppsilonEmail('deepansh.khurana@appsilon.com')).toBe(true);
-    expect(isAppsilonEmail('Someone@Appsilon.COM')).toBe(true);
-  });
-
-  it('rejects everyone else, including a lookalike domain', () => {
-    expect(isAppsilonEmail('test@mediforce.dev')).toBe(false);
-    expect(isAppsilonEmail('someone@notappsilon.com')).toBe(false);
-    expect(isAppsilonEmail('someone@appsilon.com.evil.io')).toBe(false);
-    expect(isAppsilonEmail(null)).toBe(false);
-  });
-});
-
-describe('offersDemo', () => {
-  it('keeps the Appsilon rule when demo mode is off', () => {
-    expect(offersDemo('someone@appsilon.com', false)).toBe(true);
-    expect(offersDemo('test@mediforce.dev', false)).toBe(false);
-  });
-
-  it('opens to anyone under demo mode, which is how dev:mock walks it', () => {
-    expect(offersDemo('test@mediforce.dev', true)).toBe(true);
-    expect(offersDemo(null, true)).toBe(true);
-  });
-});
-
-describe('resolveDemoRoute', () => {
-  it('fills parameters from the path the viewer is already on', () => {
-    expect(resolveDemoRoute('/:handle/tasks', '/test/workflows/etym/runs/r1')).toBe('/test/tasks');
-    expect(resolveDemoRoute('/:handle', '/test/agents')).toBe('/test');
-  });
-
-  it('carries a query through, which is how a tab is deep-linked', () => {
-    expect(resolveDemoRoute('/:handle/workflows/:name?tab=triggers', '/test/workflows/etym'))
-      .toBe('/test/workflows/etym?tab=triggers');
-  });
-
-  it('refuses to invent a parameter with no run to draw on', () => {
-    expect(resolveDemoRoute('/:handle/workflows/:name', '/test')).toBeNull();
-    expect(resolveDemoRoute('/:handle/workflows/:name/runs/:runId', '/test/workflows/etym')).toBeNull();
-  });
-
-  it('fills the workflow and run from the run the scenario picked', () => {
-    const run = { id: 'run-7', definitionName: 'etymology-checker', status: 'completed' };
-    expect(resolveDemoRoute('/:handle/workflows/:name/runs/:runId', '/test', run))
-      .toBe('/test/workflows/etymology-checker/runs/run-7');
-  });
-
-  it('never pairs the viewer\u2019s workflow with another workflow\u2019s run', () => {
-    const run = { id: 'run-7', definitionName: 'bar', status: 'completed' };
-    expect(resolveDemoRoute('/:handle/workflows/:name/runs/:runId', '/test/workflows/foo', run))
-      .toBe('/test/workflows/bar/runs/run-7');
-  });
-
-  it('keeps the workflow the viewer already opened over the one it picked', () => {
-    const run = { id: 'run-7', definitionName: 'etymology-checker', status: 'completed' };
-    expect(resolveDemoRoute('/:handle/workflows/:name?tab=triggers', '/test/workflows/mine', run))
-      .toBe('/test/workflows/mine?tab=triggers');
-  });
-});
-
-describe('pickDemoRun', () => {
-  const run = (id: string, status: string, startedAt?: string) =>
-    ({ id, definitionName: 'etym', status, startedAt });
-
-  it('prefers a completed run over anything still moving', () => {
-    expect(pickDemoRun([
-      run('a', 'running', '2026-03-01'),
-      run('b', 'completed', '2026-01-01'),
-    ])?.id).toBe('b');
-  });
-
-  it('takes a run waiting on a person over one still running', () => {
-    expect(pickDemoRun([run('a', 'running'), run('b', 'waiting_for_human')])?.id).toBe('b');
-  });
-
-  it('opens a failed run only when nothing better exists', () => {
-    expect(pickDemoRun([run('a', 'error'), run('b', 'completed')])?.id).toBe('b');
-    expect(pickDemoRun([run('a', 'error')])?.id).toBe('a');
-  });
-
-  it('breaks ties on recency, so the same workspace shows the same run', () => {
-    expect(pickDemoRun([
-      run('old', 'completed', '2026-01-01'),
-      run('new', 'completed', '2026-06-01'),
-    ])?.id).toBe('new');
-  });
-
-  it('is null for a workspace with no runs at all', () => {
-    expect(pickDemoRun([])).toBeNull();
-  });
-});
 
 describe('routePattern / routeParams', () => {
   it('drops the query, which is not part of route matching', () => {

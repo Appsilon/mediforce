@@ -91,7 +91,6 @@ services:
       args:
         - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
         - NEXT_PUBLIC_GIT_SHA
-        - NEXT_PUBLIC_DEMO_MODE=${NEXT_PUBLIC_DEMO_MODE:-}
     restart: unless-stopped
     mem_limit: ${PLATFORM_UI_MEM_LIMIT:-2g}
     expose:
@@ -106,7 +105,6 @@ services:
       # (replaces __PLACEHOLDER__ values in pre-built registry images).
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
       - NEXT_PUBLIC_GIT_SHA
-      - NEXT_PUBLIC_DEMO_MODE=${NEXT_PUBLIC_DEMO_MODE:-}
       # --- Authentication: NextAuth / Auth.js v5 (ADR-0002) ---
       # Server-side only. `instrumentation-node.ts` refuses to boot without
       # AUTH_SECRET and without at least one provider (Google / password /

@@ -63,12 +63,11 @@ what is missing rather than spotlighting nothing. Every routing decision is one
 pure function, `nextRouteAction` in `src/lib/demo.ts`; keep it that way, because
 the bugs here come from two rules disagreeing about the same pathname.
 
-The button is offered to `@appsilon.com` addresses, or to anyone when
-`NEXT_PUBLIC_DEMO_MODE=true` (which `pnpm dev:mock` sets so the scenarios are
-walkable against the mock seed). Being `NEXT_PUBLIC_*`, the flag is inlined into
-the client bundle, so it is presentation only — the scenarios are static copy
-with no privileged data behind them, and nothing about the gate is a security
-boundary.
+The button is offered to anyone inside a workspace. There is nothing to gate:
+the scenarios are static copy compiled into the client bundle with no
+privileged data behind them, so a gate would have been presentation rather than
+a boundary — and the people most helped by a walkthrough are the ones a gate
+would have excluded.
 
 **Never call `fetch` directly from a client component.** Middleware 401s
 silently because no auth header is attached. Use the typed `mediforce` client

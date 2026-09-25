@@ -3,22 +3,14 @@
 import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Sparkles } from 'lucide-react';
-import { useAuth } from '@/contexts/auth-context';
-import { offersDemo } from '@/lib/demo';
 import { DEMO_SCENARIOS } from '@/lib/demo-content';
 import { useTour } from './tour-provider';
 
-/**
- * The showcase walkthroughs. Normally Appsilon-only; `NEXT_PUBLIC_DEMO_MODE`
- * opens it so `pnpm dev:mock` can walk the scenarios against the mock seed.
- */
+/** The showcase walkthroughs, offered to anyone inside a workspace. */
 export function DemoTrigger() {
-  const { user } = useAuth();
   const { startScenario } = useTour();
   const [open, setOpen] = React.useState(false);
 
-  const demoModeEnabled = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
-  if (offersDemo(user?.email, demoModeEnabled) === false) return null;
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>

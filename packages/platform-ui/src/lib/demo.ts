@@ -33,26 +33,6 @@ export type DemoScenario = {
   steps: DemoStep[];
 };
 
-const DEMO_DOMAIN = 'appsilon.com';
-
-export function isAppsilonEmail(email: string | null | undefined): boolean {
-  const parts = (email ?? '').toLowerCase().split('@');
-  return parts.length === 2 && parts[1] === DEMO_DOMAIN;
-}
-
-/**
- * Whether to offer the demo at all.
- *
- * Normally it is an Appsilon address. `NEXT_PUBLIC_DEMO_MODE` opens it for
- * everyone, which is how `pnpm dev:mock` makes the scenarios walkable against
- * seeded data without holding an Appsilon session. Unset means off, so a
- * deployment that never sets it keeps the domain rule — the flag has to be
- * chosen, never inherited.
- */
-export function offersDemo(email: string | null | undefined, demoModeEnabled: boolean): boolean {
-  return demoModeEnabled || isAppsilonEmail(email);
-}
-
 /**
  * The concrete URL for a step's route, or `null` when it cannot be built.
  *

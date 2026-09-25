@@ -45,18 +45,15 @@ test.describe('Guided Tour Journey', () => {
     await expect(page.getByTestId('tour-overlay')).toHaveCount(0);
   });
 
-  /**
-   * The demo gate is Appsilon-or-flag, and E2E runs a production build as
-   * test@mediforce.dev with `NEXT_PUBLIC_DEMO_MODE` unset — which is exactly
-   * the deployment case, so the button must not be there.
-   */
-  test('Demo is withheld from a non-Appsilon signin', async ({ page }) => {
+  test('Demo offers its scenarios to anyone in a workspace', async ({ page }) => {
     trackPageErrors(page);
 
     await page.goto(`/${TEST_ORG_HANDLE}`);
     await expect(page.getByRole('heading', { name: 'Workflows' })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId('guide-trigger')).toBeVisible();
-    await expect(page.getByTestId('demo-trigger')).toHaveCount(0);
+
+    await page.getByTestId('demo-trigger').click();
+    await expect(page.getByTestId('demo-scenarios')).toBeVisible();
+    await expect(page.getByTestId('demo-scenario-run')).toBeVisible();
   });
 
   /**
