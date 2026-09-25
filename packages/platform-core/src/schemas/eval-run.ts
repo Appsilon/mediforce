@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   AcceptanceCriteriaSchema,
+  BuiltinCheckNameSchema,
   AcceptanceCriterionSchema,
   EvaluatedStepSchema,
   EvaluatorKindSchema,
@@ -32,6 +33,8 @@ export const EvalRunEvaluatorSchema = z.object({
   name: z.string(),
   version: z.number().int().positive(),
   kind: EvaluatorKindSchema,
+  /** Which platform check it is, when `kind` is `builtin`. */
+  builtin: BuiltinCheckNameSchema.optional(),
   severity: EvaluatorSeveritySchema,
   counted: z.boolean(),
   /** Why it does not count, when it does not. */
@@ -182,6 +185,27 @@ export const EvalRunEvaluatorReportSchema = EvalRunEvaluatorSchema.extend({
   flakiness: z.number().min(0).max(1).nullable(),
 });
 
+/** The red-team and robustness suites an Eval Run reports on, one per built-in check. */
+export const EVAL_SUITES = ['prompt_injection', 'robustness', 'phi_leak'] as const;
+export const EvalSuiteSchema = z.enum(EVAL_SUITES);
+
+/**
+ * One suite's pass rate over a variant's trials, summed over the run's
+ * Evaluators that run the suite's built-in check. A trial the check could not
+ * grade — an injection check on a case with no canary — is an error, not in
+ * the rate.
+ */
+export const EvalSuiteReportSchema = z.object({
+  suite: EvalSuiteSchema,
+  evaluators: z.array(z.string()),
+  passes: z.number().int().nonnegative(),
+  failures: z.number().int().nonnegative(),
+  errors: z.number().int().nonnegative(),
+  passRate: z.number().min(0).max(1).nullable(),
+  wilsonLower: z.number().min(0).max(1).nullable(),
+  wilsonUpper: z.number().min(0).max(1).nullable(),
+});
+
 /** How one Acceptance Criterion fared for one variant (D10). */
 export const AcceptanceCriterionVerdictSchema = z.object({
   severity: EvaluatorSeveritySchema,
@@ -244,6 +268,8 @@ const TrialCountsSchema = z.object({
 export const EvalRunVariantReportSchema = EvalVariantSchema.extend({
   trials: TrialCountsSchema,
   evaluators: z.array(EvalRunEvaluatorReportSchema),
+  /** One entry per suite the run has a built-in Evaluator for; empty when it has none. */
+  suites: z.array(EvalSuiteReportSchema),
   /** One verdict per severity the run's criteria set; empty when the run has none. */
   criteria: z.array(AcceptanceCriterionVerdictSchema),
   confidence: ConfidenceCalibrationSchema.nullable(),
@@ -294,6 +320,8 @@ export type EvalRun = z.infer<typeof EvalRunSchema>;
 export type EvalTrialStatus = z.infer<typeof EvalTrialStatusSchema>;
 export type EvalTrial = z.infer<typeof EvalTrialSchema>;
 export type EvalRunEvaluatorReport = z.infer<typeof EvalRunEvaluatorReportSchema>;
+export type EvalSuite = z.infer<typeof EvalSuiteSchema>;
+export type EvalSuiteReport = z.infer<typeof EvalSuiteReportSchema>;
 export type EvalRunReport = z.infer<typeof EvalRunReportSchema>;
 export type EvalVariant = z.infer<typeof EvalVariantSchema>;
 export type StepFingerprintComponent = z.infer<typeof StepFingerprintComponentSchema>;

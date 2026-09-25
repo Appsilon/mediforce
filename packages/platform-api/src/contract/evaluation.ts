@@ -4,6 +4,7 @@ import {
   AcceptanceCriteriaVersionSchema,
   AgentRunSchema,
   EvalCaseExpectationSchema,
+  EvalCaseInputPartSchema,
   EvalCaseInputSchema,
   EvalCaseSchema,
   EvalCaseSplitSchema,
@@ -231,6 +232,27 @@ export const CreatePerturbedEvalCaseInputSchema = EvaluatedStepSchema
     origin: EvaluationOriginSchema.default('user'),
   })
   .refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' });
+
+/**
+ * A red-team or robustness suite of Eval Cases from one production Agent Run
+ * (ADR-0023 phase 5a). `prompt_injection` appends each of the built-in
+ * injected instructions, each naming its own canary, to the string at
+ * `target`; `robustness` rewrites the string (whitespace) or object (key
+ * order) at `target` without changing what it says. Every case expects the
+ * output of the original run.
+ */
+export const RED_TEAM_SUITES = ['prompt_injection', 'robustness'] as const;
+export const CreateRedTeamEvalCasesInputSchema = EvaluatedStepSchema.extend({
+  baseAgentRunId: z.string().min(1),
+  suite: z.enum(RED_TEAM_SUITES),
+  target: z.object({
+    part: EvalCaseInputPartSchema,
+    path: z.array(z.string().min(1)).min(1),
+  }),
+  split: EvalCaseSplitSchema.default('dev'),
+  origin: EvaluationOriginSchema.default('user'),
+});
+export const CreateRedTeamEvalCasesOutputSchema = z.object({ cases: z.array(EvalCaseSchema) });
 
 /**
  * Seeds Eval Cases from an Evaluator's labels (EvalGen): each labelled
@@ -502,6 +524,8 @@ export type CreateEvalCaseInput = z.input<typeof CreateEvalCaseInputSchema>;
 export type CreateEvalCaseFromAgentRunInput = z.input<typeof CreateEvalCaseFromAgentRunInputSchema>;
 export type EvalCaseOutput = z.infer<typeof EvalCaseOutputSchema>;
 export type CreatePerturbedEvalCaseInput = z.input<typeof CreatePerturbedEvalCaseInputSchema>;
+export type CreateRedTeamEvalCasesInput = z.input<typeof CreateRedTeamEvalCasesInputSchema>;
+export type CreateRedTeamEvalCasesOutput = z.infer<typeof CreateRedTeamEvalCasesOutputSchema>;
 export type CreateEvalCasesFromLabelsInput = z.input<typeof CreateEvalCasesFromLabelsInputSchema>;
 export type CreateEvalCasesFromLabelsOutput = z.infer<typeof CreateEvalCasesFromLabelsOutputSchema>;
 export type ArchiveEvalCaseInput = z.input<typeof ArchiveEvalCaseInputSchema>;

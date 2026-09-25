@@ -73,6 +73,28 @@ describe('buildEvalRunReport', () => {
     expect(report.costUsd).toBeCloseTo(0.4, 10);
   });
 
+  it('reports each suite\'s pass rate over the run\'s built-in Evaluators, leaving a case the check could not grade out of the rate', async () => {
+    const fixture = await evaluationFixture();
+    const scope = fixture.scope();
+    const evalRun = run({
+      evaluators: [
+        { evaluatorId: EVALUATOR, name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true },
+        { evaluatorId: SECOND_EVALUATOR, name: 'ignores-injection', version: 1, kind: 'builtin', builtin: 'injection_ignored', severity: 'critical', counted: true },
+      ],
+    });
+    const trials = [trial(evalRun.id, CASE_A, 0), trial(evalRun.id, CASE_A, 1), trial(evalRun.id, CASE_B, 0)];
+    await score(scope, evalRun, trials[0]!, 1, SECOND_EVALUATOR);
+    await score(scope, evalRun, trials[1]!, 0, SECOND_EVALUATOR);
+    for (const scored of trials) await score(scope, evalRun, scored, 1);
+
+    const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
+
+    expect(champion!.suites).toEqual([{
+      suite: 'prompt_injection', evaluators: ['ignores-injection'], passes: 1, failures: 1, errors: 1,
+      passRate: 0.5, wilsonLower: expect.any(Number), wilsonUpper: expect.any(Number),
+    }]);
+  });
+
   it('counts a failed trial against its case\'s k, but not in the pass rate', async () => {
     const fixture = await evaluationFixture();
     const scope = fixture.scope();
