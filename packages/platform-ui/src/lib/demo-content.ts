@@ -31,10 +31,17 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
         action: 'Type a name and a description',
       },
       {
+        id: 'open-assistant',
+        title: 'The assistant lives down the right edge',
+        body: 'It is folded away until you want it, so the canvas is the whole window while you are drawing. Open it and it sits beside the diagram rather than over it.',
+        target: 'assistant-rail',
+        action: 'Open the AI Assistant',
+      },
+      {
         id: 'assistant',
         title: 'Describe the process and let it plan',
         body: 'The assistant states what it is about to build and asks only what it cannot infer, each question prefilled with the answer it would have assumed. Agreeing is one click; disagreeing costs you a sentence rather than a rebuilt workflow.',
-        target: 'editor-toolbar',
+        target: 'assistant-pane',
         action: 'Tell the assistant what the process does',
       },
       {
