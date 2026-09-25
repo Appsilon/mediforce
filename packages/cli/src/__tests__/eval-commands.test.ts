@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { evalCaseFromRunCommand, evalCasePerturbCommand, evalCaseRedTeamCommand, evalCasesFromLabelsCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
-import { evalEvaluatorLabelCommand, evalEvaluatorProductionCommand } from '../commands/eval-evaluators';
+import { evalDriftCommand, evalEvaluatorLabelCommand, evalEvaluatorProductionCommand } from '../commands/eval-evaluators';
 import { evalCriteriaSetCommand, evalQualificationCommand } from '../commands/eval-qualification';
 import { captureOutput, jsonResponse } from './test-helpers';
 
@@ -130,6 +130,41 @@ describe('mediforce eval', () => {
     const output = captureOutput();
     expect(await evalEvaluatorProductionCommand({ argv: ['0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', ...BASE], env: ENV, output })).toBe(2);
     expect(await evalEvaluatorProductionCommand({ argv: ['0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', '--on', '--off', ...BASE], env: ENV, output })).toBe(2);
+  });
+
+  it('drift passes the window and threshold and prints each production Evaluator, alerts first', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      window: 10,
+      threshold: 0.2,
+      evaluators: [
+        {
+          evaluatorId: 'e-1', name: 'grade-5-is-fatal', severity: 'critical', evaluatorVersion: 2,
+          recentMean: 0.6, baselineMean: 0.9, recentCount: 10, baselineCount: 10, drifting: true,
+        },
+        {
+          evaluatorId: 'e-2', name: 'no-phi', severity: 'major', evaluatorVersion: 1,
+          recentMean: 1, baselineMean: null, recentCount: 10, baselineCount: 3, drifting: false,
+        },
+      ],
+    }));
+    const output = captureOutput();
+    const code = await evalDriftCommand({ argv: [...STEP, '--window', '10', '--threshold', '0.2', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    expect(String(fetchSpy.mock.calls[0]![0])).toBe(
+      'http://localhost:5555/api/evaluation/drift?namespace=pharma-a&workflowName=ae-grading&stepId=grade-aes&window=10&threshold=0.2',
+    );
+    expect(output.stdoutLines).toEqual([
+      'window 10, threshold 0.2',
+      'ALERT  grade-5-is-fatal v2 (critical)  recent 0.60, before 0.90',
+      'ok     no-phi v1 (major)  recent 1.00, before 3/10 Scores',
+    ]);
+  });
+
+  it('drift refuses a threshold outside 0–1', async () => {
+    const output = captureOutput();
+    expect(await evalDriftCommand({ argv: [...STEP, '--threshold', '1.5', ...BASE], env: ENV, output })).toBe(2);
+    expect(await evalDriftCommand({ argv: [...STEP, '--window', 'ten', ...BASE], env: ENV, output })).toBe(2);
   });
 
   it('mcp-policy-set sends the servers map from the file', async () => {

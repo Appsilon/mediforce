@@ -15,6 +15,7 @@ type Section =
   | 'runs'
   | 'agent-runs'
   | 'criteria'
+  | 'drift'
   | `qualification:${number | 'runnable'}`
   | `labels:${string}`;
 
@@ -64,6 +65,7 @@ export function useStepEvaluation(step: EvaluatedStep) {
     runs: useQuery({ queryKey: sectionKey(step, 'runs'), queryFn: () => mediforce.evaluation.listRuns(step), ...options }),
     criteria: useQuery({ queryKey: sectionKey(step, 'criteria'), queryFn: () => mediforce.evaluation.getAcceptanceCriteria(step), ...options }),
     qualification: useStepQualification(step),
+    drift: useQuery({ queryKey: sectionKey(step, 'drift'), queryFn: () => mediforce.evaluation.getDrift(step), ...options }),
     agentRuns: useQuery({
       queryKey: sectionKey(step, 'agent-runs'),
       queryFn: () => mediforce.evaluation.listStepAgentRuns({ ...step, limit: 10 }),

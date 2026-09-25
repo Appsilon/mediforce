@@ -103,8 +103,10 @@ export {
   AgentRunSchema,
   AgentRunCardStatusSchema,
   AgentFallbackReasonSchema,
+  AgentRunTraceSchema,
   type AgentRunStatus,
   type AgentRun,
+  type AgentRunTrace,
   type AgentRunCardStatus,
   type AgentFallbackReason,
 } from './agent-run';

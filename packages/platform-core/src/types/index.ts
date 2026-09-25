@@ -57,6 +57,7 @@ export type {
   AgentRun,
   AgentRunCardStatus,
   AgentFallbackReason,
+  AgentRunTrace,
 } from '../schemas/agent-run';
 
 export type {

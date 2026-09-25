@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { BriefSection } from '../step-evaluation-sections';
+import { BriefSection, DriftAlert } from '../step-evaluation-sections';
 
 vi.mock('@/hooks/use-step-evaluation', () => ({
   useStepEvaluationMutation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -36,5 +36,26 @@ describe('BriefSection', () => {
 
     expect(screen.getByText('critical').tagName).toBe('STRONG');
     expect(screen.queryByText('A **critical** check.')).toBeNull();
+  });
+});
+
+describe('DriftAlert', () => {
+  const evaluator = {
+    evaluatorId: 'e-1', name: 'grade-5-is-fatal', severity: 'critical', evaluatorVersion: 2,
+    recentMean: 0.6, baselineMean: 0.9, recentCount: 20, baselineCount: 20, drifting: true,
+  };
+
+  it('names each drifting production Evaluator with its drop', () => {
+    render(<DriftAlert data={{ data: { window: 20, threshold: 0.15, evaluators: [evaluator, { ...evaluator, evaluatorId: 'e-2', name: 'no-phi', drifting: false }] } } as never} />);
+
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain('grade-5-is-fatal v2 (critical): mean 0.60 over the last 20 production Scores, down from 0.90');
+    expect(alert.textContent).not.toContain('no-phi');
+  });
+
+  it('shows nothing while no Evaluator drifts', () => {
+    render(<DriftAlert data={{ data: { window: 20, threshold: 0.15, evaluators: [{ ...evaluator, drifting: false }] } } as never} />);
+
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
