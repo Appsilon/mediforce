@@ -191,7 +191,12 @@ export class AgentRunner {
       ) {
         const gateFailure = await this.runOutputGate(context.outputGate, runId, context, attempt.envelope);
         if (gateFailure !== null) {
-          attempt = { ...attempt, fallbackReason: 'production_evaluator', errorMessage: gateFailure };
+          const alsoLowConfidence = attempt.fallbackReason === 'low_confidence';
+          attempt = {
+            ...attempt,
+            fallbackReason: 'production_evaluator',
+            errorMessage: alsoLowConfidence ? `${gateFailure} (the result was also below the confidence threshold)` : gateFailure,
+          };
         }
       }
 

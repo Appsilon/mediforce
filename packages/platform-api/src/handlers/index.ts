@@ -172,8 +172,6 @@ export {
   addEvaluatorVersion,
   archiveEvaluator,
   setEvaluatorProduction,
-  hasProductionEvaluators,
-  productionEvaluatorGate,
   approveEvaluatorSource,
   labelEvaluatorOutput,
   listEvaluatorLabels,

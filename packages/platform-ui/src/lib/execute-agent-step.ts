@@ -29,8 +29,8 @@ import {
   type WorkflowDefinition,
   type WorkflowStep,
 } from '@mediforce/platform-core';
+import { buildProductionOutputGate } from './production-output-gate';
 import { changedFingerprintComponents, computeStepFingerprint } from '@mediforce/platform-api/services';
-import { buildProductionOutputGate } from './route-adapter';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
 import { applyAgentModel, resolveAgentDefaults } from './resolve-agent-defaults';
@@ -239,6 +239,8 @@ export async function executeAgentStep(
       namespace: workflowDefinition.namespace,
       workflowName: workflowDefinition.name,
       stepId,
+    }, (error) => {
+      console.error(`[execute-agent-step] production Evaluators lookup failed for ${instanceId}/${stepId}; running ungated:`, error);
     });
     if (outputGate !== undefined) workflowAgentContext.outputGate = outputGate;
   }

@@ -6,7 +6,7 @@ import {
   type StepVariantPatch,
 } from '@mediforce/platform-core';
 import type { ApplyStepVariantInput, ApplyStepVariantOutput } from '../../contract/evaluation';
-import type { RegisterWorkflowBody } from '../../contract/workflows';
+import { RegisterWorkflowInputSchema, buildRegisterBody } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError, ValidationError } from '../../errors';
 import { registerWorkflow } from '../workflows/register-workflow';
@@ -37,8 +37,10 @@ export async function applyVariantToStep(
   let patch: StepVariantPatch;
   let applied: { evalRunId: string; variantId: string; label: string; frozen: StepFingerprint | null } | null = null;
   if (input.patch === undefined) {
-    const evalRunId = input.evalRunId!;
-    const variantId = input.variantId!;
+    const { evalRunId, variantId } = input;
+    if (evalRunId === undefined || variantId === undefined) {
+      throw new ValidationError('give either evalRunId and variantId (a challenger of an Eval Run) or patch');
+    }
     if (variantId === CHAMPION_VARIANT_ID) {
       throw new ValidationError('The champion is the step as it is — there is nothing to apply');
     }
@@ -60,18 +62,8 @@ export async function applyVariantToStep(
   if (problem !== null) throw new ValidationError(`Cannot apply to step '${step.stepId}': ${problem}`);
 
   const patched = applyStepVariant(definition, workflowStep, patch);
-  const {
-    version: _version,
-    createdAt: _createdAt,
-    namespace: _namespace,
-    copiedFrom: _copiedFrom,
-    source: _source,
-    archived: _archived,
-    deleted: _deleted,
-    ...authorable
-  } = patched.definition;
   const registered = await registerWorkflow(
-    { ...(authorable as RegisterWorkflowBody), namespace: step.namespace } as Parameters<typeof registerWorkflow>[0],
+    { ...RegisterWorkflowInputSchema.parse(buildRegisterBody(patched.definition, {})), namespace: step.namespace },
     scope,
   );
   if (input.setAsDefault) {
