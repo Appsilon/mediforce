@@ -272,6 +272,20 @@ describe('AgentRunner', () => {
     expect(span.ended).toBe(true);
   });
 
+  it('records the span it ran under on the Agent Run, and none without a tracer provider', async () => {
+    const agentRunRepo = new InMemoryAgentRunRepository();
+    const tracedRunner = new AgentRunner(instanceRepository, auditRepository, eventLog, agentRunRepo);
+
+    await tracedRunner.runWithWorkflowStep(makeSuccessPlugin(makeValidEnvelope()), makeWorkflowContext());
+    trace.setGlobalTracerProvider(new RecordingTracerProvider());
+    await tracedRunner.runWithWorkflowStep(makeSuccessPlugin(makeValidEnvelope()), makeWorkflowContext());
+
+    const traces = (await agentRunRepo.getByInstanceId('instance-1')).map((agentRun) => agentRun.trace);
+    expect(traces).toHaveLength(2);
+    expect(traces).toContainEqual(null);
+    expect(traces).toContainEqual({ traceId: '1'.repeat(32), spanId: '2'.repeat(16) });
+  });
+
   it('does not record run input/output on the span by default (content capture off)', async () => {
     const tracerProvider = new RecordingTracerProvider();
     trace.setGlobalTracerProvider(tracerProvider);

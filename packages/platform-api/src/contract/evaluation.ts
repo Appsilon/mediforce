@@ -478,6 +478,36 @@ export const GetStepQualificationOutputSchema = z.object({
 });
 
 /**
+ * Drift alerts: per production Evaluator of the Step, the mean of its newest
+ * `window` production Scores against the `window` before them, for its latest
+ * version. `window` and `threshold` default to the deployment's settings.
+ */
+export const GetStepDriftInputSchema = EvaluatedStepSchema.extend({
+  window: z.coerce.number().int().min(2).max(500).optional(),
+  threshold: z.coerce.number().gt(0).max(1).optional(),
+});
+export const EvaluatorDriftSchema = z.object({
+  evaluatorId: z.string(),
+  name: z.string(),
+  severity: EvaluatorSeveritySchema,
+  evaluatorVersion: z.number().int().positive(),
+  /** Mean of the newest `window` Scores; null until there are that many. */
+  recentMean: z.number().nullable(),
+  /** Mean of the `window` Scores before them; null until there are that many. */
+  baselineMean: z.number().nullable(),
+  recentCount: z.number().int().nonnegative(),
+  baselineCount: z.number().int().nonnegative(),
+  /** The mean dropped by at least `threshold`: the alert. */
+  drifting: z.boolean(),
+});
+export const GetStepDriftOutputSchema = z.object({
+  window: z.number().int(),
+  threshold: z.number(),
+  /** Every Evaluator scoring the Step's production runs now, drifting ones first. */
+  evaluators: z.array(EvaluatorDriftSchema),
+});
+
+/**
  * A person signs a Step Qualification for one variant of a finished Eval Run
  * (D10). Each criterion the variant missed, or that could not be judged,
  * needs a deviation with a written justification. Where password sign-in is
@@ -559,3 +589,6 @@ export type GetStepQualificationInput = z.input<typeof GetStepQualificationInput
 export type GetStepQualificationOutput = z.infer<typeof GetStepQualificationOutputSchema>;
 export type SignStepQualificationInput = z.input<typeof SignStepQualificationInputSchema>;
 export type SignStepQualificationOutput = z.infer<typeof SignStepQualificationOutputSchema>;
+export type GetStepDriftInput = z.input<typeof GetStepDriftInputSchema>;
+export type GetStepDriftOutput = z.infer<typeof GetStepDriftOutputSchema>;
+export type EvaluatorDrift = z.infer<typeof EvaluatorDriftSchema>;

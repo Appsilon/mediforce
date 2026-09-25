@@ -237,6 +237,43 @@ confidence and autonomy routing, `AgentRunner` hands it to the gate
 - A check that cannot run, or a gate that throws, never fails the run; it is
   recorded in the activity log.
 
+### Drift alerts
+
+For each Evaluator scoring the step's production runs now, the mean of its
+newest `window` production Scores is compared with the mean of the `window`
+before them, over its latest version only, so a changed rule is not read as
+drift. A drop of at least `threshold` is an alert. Until both windows are
+full, nothing is judged. The defaults are a window of 20 and a threshold of
+0.15. A deployment sets its own with `MEDIFORCE_DRIFT_WINDOW` (2–500) and
+`MEDIFORCE_DRIFT_THRESHOLD` (above 0, at most 1); a value outside those ranges
+falls back to the default. A request may override either one.
+
+`mediforce eval drift [--window N] [--threshold X]`
+(`GET /api/evaluation/drift`) lists every such Evaluator, alerts first, with
+both means and counts. The Evaluation tab shows a banner above the Step
+Qualification while any Evaluator drifts. Alerts are computed when read:
+nothing is stored and nothing is sent anywhere, and an alert blocks nothing.
+
+### Score export
+
+Off unless `MEDIFORCE_SCORE_EXPORT` names a target. Each Score of an Agent Run
+is then also written next to that run's trace, one way only: nothing is read
+back. An Agent Run records the trace and span ids of its `mediforce.agent.run`
+span (ADR-0007) when tracing is on. A Score of a run recorded without them
+(tracing off, or a run from before this) is not sent.
+
+| `MEDIFORCE_SCORE_EXPORT` | Written as | Settings |
+|---|---|---|
+| `phoenix` | a span annotation on the run's span (`annotator_kind` `HUMAN`, `LLM` or `CODE` by Score source) | `PHOENIX_BASE_URL`, defaulting to `OTEL_EXPORTER_OTLP_ENDPOINT`; `PHOENIX_API_KEY` when Phoenix requires one |
+| `langfuse` | a numeric score on the trace and the run's observation, with the Score's id, so a resend does not duplicate it | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, all required |
+
+Metadata carries the Score's own metadata, its id, source, Evaluator and label.
+The comment can quote the output, so it is sent only when
+`MEDIFORCE_OTEL_CAPTURE_CONTENT=true`. A target missing its settings, or an
+unknown one, is logged at boot and left off. An export that fails is logged
+and never fails or delays the Score write. In Phoenix, a newer Score of the
+same name on a span replaces the older one there.
+
 ## Red-team and robustness suites
 
 Three `builtin` checks (`{ "kind": "builtin", "name": … }`), each a **suite** the

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import {
   ScoreSchema,
   type ListScoresFilter,
@@ -80,6 +80,10 @@ export class PostgresScoreRepository implements ScoreRepository {
     if (filter.evaluatorId !== undefined) conditions.push(eq(scores.evaluatorId, filter.evaluatorId));
     if (filter.source !== undefined) conditions.push(eq(scores.source, filter.source));
     if (filter.namespace !== undefined) conditions.push(eq(scores.workspace, filter.namespace));
+    if (filter.production !== undefined) {
+      const production = sql`coalesce((${scores.metadata}->>'production')::boolean, false)`;
+      conditions.push(filter.production ? sql`${production}` : sql`not ${production}`);
+    }
     const rows = await this.db
       .select()
       .from(scores)

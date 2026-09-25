@@ -28,6 +28,7 @@ import { TrajectoryRecorder } from './trajectory-recorder';
 import {
   annotateAgentRunSpan,
   withAgentRunSpan,
+  agentRunSpanTrace,
   type OpenTelemetryTracingOptions,
 } from './tracing';
 
@@ -109,6 +110,7 @@ export class AgentRunner {
         fallbackReason: result.fallbackReason,
         startedAt: new Date(startedAt).toISOString(),
         completedAt: new Date().toISOString(),
+        trace: agentRunSpanTrace(span),
       });
     }
   }
@@ -141,6 +143,7 @@ export class AgentRunner {
           fallbackReason: null,
           startedAt: new Date(startedAt).toISOString(),
           completedAt: null,
+          trace: agentRunSpanTrace(span),
         });
       }
 

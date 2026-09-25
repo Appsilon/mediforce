@@ -69,6 +69,8 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
       envelopePayload: payload,
       executorType: parsed.executorType ?? null,
       reviewerType: parsed.reviewerType ?? null,
+      traceId: parsed.trace?.traceId ?? null,
+      spanId: parsed.trace?.spanId ?? null,
       startedAt: new Date(parsed.startedAt),
       completedAt: parsed.completedAt ? new Date(parsed.completedAt) : null,
     };
@@ -126,6 +128,8 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
         envelopePayload: payload,
         executorType: parsed.executorType ?? null,
         reviewerType: parsed.reviewerType ?? null,
+        traceId: parsed.trace?.traceId ?? null,
+        spanId: parsed.trace?.spanId ?? null,
         startedAt: new Date(parsed.startedAt),
         completedAt: parsed.completedAt ? new Date(parsed.completedAt) : null,
       })
@@ -427,5 +431,6 @@ function toAgentRun(row: typeof agentRuns.$inferSelect): AgentRun {
     completedAt: row.completedAt ? row.completedAt.toISOString() : null,
     executorType: row.executorType ?? undefined,
     reviewerType: row.reviewerType ?? undefined,
+    trace: row.traceId !== null && row.spanId !== null ? { traceId: row.traceId, spanId: row.spanId } : null,
   });
 }

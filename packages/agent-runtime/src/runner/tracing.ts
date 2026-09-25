@@ -1,6 +1,6 @@
-import { SpanStatusCode, trace, type Attributes, type Span } from '@opentelemetry/api';
+import { SpanStatusCode, isSpanContextValid, trace, type Attributes, type Span } from '@opentelemetry/api';
 import type { LlmMessage, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
-import type { AgentFallbackReason } from '@mediforce/platform-core';
+import type { AgentFallbackReason, AgentRunTrace } from '@mediforce/platform-core';
 
 const TRACER_NAME = '@mediforce/agent-runtime';
 
@@ -79,6 +79,12 @@ export async function withAgentRunSpan<T>(
       span.end();
     }
   });
+}
+
+/** The span's ids to record on the Agent Run; null when no tracer provider is registered. */
+export function agentRunSpanTrace(span: Span): AgentRunTrace | null {
+  const context = span.spanContext();
+  return isSpanContextValid(context) ? { traceId: context.traceId, spanId: context.spanId } : null;
 }
 
 export function annotateAgentRunSpan(

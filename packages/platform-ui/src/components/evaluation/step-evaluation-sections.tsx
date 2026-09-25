@@ -427,6 +427,27 @@ const COMPONENT_LABELS: Record<StepFingerprintComponent, string> = {
 };
 
 /**
+ * Drift alerts: a production Evaluator whose rolling Score mean dropped by the
+ * threshold. Shown only while one has; nothing is blocked by it.
+ */
+export function DriftAlert({ data }: { data: StepEvaluation['drift'] }) {
+  const drift = data.data;
+  const drifting = drift?.evaluators.filter((evaluator) => evaluator.drifting) ?? [];
+  if (drift === undefined || drifting.length === 0) return null;
+  return (
+    <section role="alert" className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 space-y-1.5 text-xs" data-testid="drift-alert">
+      <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-200">Production Scores are drifting</h3>
+      {drifting.map((evaluator) => (
+        <p key={evaluator.evaluatorId}>
+          <span className="font-medium">{evaluator.name}</span> v{evaluator.evaluatorVersion} ({evaluator.severity}): mean {evaluator.recentMean?.toFixed(2)} over the last {drift.window} production Scores, down from {evaluator.baselineMean?.toFixed(2)} over the {drift.window} before.
+        </p>
+      ))}
+      <p className="text-muted-foreground">An alert is a drop of at least {drift.threshold}. Look at the recent runs, or ask the assistant to diagnose them.</p>
+    </section>
+  );
+}
+
+/**
  * The Step's qualification (D10, D11): whether a signed Step Qualification
  * binds the step as it is now, what it cites, and — when stale — what changed.
  * A person signs one from an Eval Run's report below.
