@@ -1055,7 +1055,10 @@ export function WorkflowEditorCanvas({
         )}
 
         {aiPaneOpen ? (
-          <div className="w-80 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col min-h-0">
+          <div
+            data-tour="assistant-pane"
+            className="w-80 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col min-h-0"
+          >
             <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b">
               <div className="flex items-center gap-2 min-w-0">
                 <Sparkles className="h-4 w-4 text-primary shrink-0" />
@@ -1244,6 +1247,7 @@ export function WorkflowEditorCanvas({
                 ? 'border-primary/40 text-primary hover:bg-primary/5'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted',
             )}
+            data-tour="assistant-rail"
             title={assistantUnread ? 'The AI Assistant has something for you' : 'Expand AI Assistant'}
             aria-label={assistantUnread ? 'Expand AI Assistant — it has something for you' : 'Expand AI Assistant'}
           >

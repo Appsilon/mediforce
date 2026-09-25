@@ -12,6 +12,11 @@ export type TourStep = {
    *  absent still runs — the card centres and narrates — so a guide survives
    *  a page that renders a panel only when there is something to put in it. */
   target?: string;
+  /** Page this step happens on, in `matchesRoute` syntax plus an optional
+   *  `?query`. A guide step has none: it never leaves the page you are on. */
+  route?: string;
+  /** What the viewer is asked to do here. A guide narrates; it does not ask. */
+  action?: string;
 };
 
 export type TourChapter = {

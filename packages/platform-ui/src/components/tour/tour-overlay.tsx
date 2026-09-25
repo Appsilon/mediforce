@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { createPortal } from 'react-dom';
-import { Compass, X } from 'lucide-react';
+import { Compass, Minus, X } from 'lucide-react';
 import {
   cardPlacement,
   clampToViewport,
@@ -93,16 +93,31 @@ function useTargetBox(target: string | undefined): Box | null {
 }
 
 export function TourOverlay({
+  kind,
   title,
   step,
+  action,
+  unreachable,
+  collapsed,
+  autoCollapse,
+  onCollapse,
   index,
   total,
   onNext,
   onBack,
   onClose,
 }: {
+  kind: 'guide' | 'scenario';
   title: string;
   step: TourStep;
+  /** What a demo scenario asks the viewer to do here; a guide step has none. */
+  action?: string;
+  /** Why this step cannot be reached from here, if it cannot be. */
+  unreachable?: string | null;
+  collapsed: boolean;
+  /** Whether touching the page behind should get out of the way on its own. */
+  autoCollapse: boolean;
+  onCollapse: () => void;
   index: number;
   total: number;
   onNext: () => void;
@@ -136,6 +151,17 @@ export function TourOverlay({
     cardRef.current?.focus();
   }, [step.id]);
 
+  // Touching the app is the viewer doing the step, so it folds itself away.
+  React.useEffect(() => {
+    if (autoCollapse === false || collapsed) return;
+    function onPointerDown(event: PointerEvent): void {
+      const inTheCard = event.target instanceof Node && cardRef.current?.contains(event.target) === true;
+      if (!inTheCard) onCollapse();
+    }
+    window.addEventListener('pointerdown', onPointerDown, true);
+    return () => window.removeEventListener('pointerdown', onPointerDown, true);
+  }, [autoCollapse, collapsed, onCollapse]);
+
   React.useEffect(() => {
     const opener = document.activeElement;
     return () => {
@@ -146,6 +172,9 @@ export function TourOverlay({
   const spotlight = box === null ? null : clampToViewport(box, viewport);
   const placed = cardPlacement(spotlight, viewport, { width: CARD_WIDTH, height: cardHeight });
   const isLast = index === total - 1;
+
+  // Folded away it is rendered by `TourPill`, in the top bar, covering nothing.
+  if (collapsed) return null;
 
   return createPortal(
     <div className="pointer-events-none fixed inset-0 z-[100] print:hidden" data-testid="tour-overlay">
@@ -178,10 +207,19 @@ export function TourOverlay({
           <Compass className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Guide · {title}
+              {kind === 'scenario' ? 'Demo' : 'Guide'} · {title}
             </p>
             <h2 className="font-headline text-sm font-semibold leading-snug">{step.title}</h2>
           </div>
+          <button
+            type="button"
+            onClick={onCollapse}
+            aria-label="Get out of the way"
+            data-testid="tour-collapse"
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Minus className="h-3.5 w-3.5" />
+          </button>
           <button
             type="button"
             onClick={onClose}
@@ -192,9 +230,21 @@ export function TourOverlay({
           </button>
         </div>
 
-        <p id="tour-step-body" className="px-4 py-3 text-sm text-muted-foreground">
+        <p id="tour-step-body" className="px-4 pb-3 pt-3 text-sm text-muted-foreground">
           {step.body}
         </p>
+
+        {unreachable !== undefined && unreachable !== null && (
+          <p className="mx-4 mb-3 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+            {unreachable}
+          </p>
+        )}
+
+        {action !== undefined && unreachable == null && (
+          <p className="mx-4 mb-3 rounded-md bg-primary-subtle px-2.5 py-1.5 text-xs font-medium text-primary">
+            {action}
+          </p>
+        )}
 
         <div className="flex items-center justify-between gap-2 border-t px-4 py-2.5">
           <div className="flex items-center gap-2.5">

@@ -44,4 +44,33 @@ test.describe('Guided Tour Journey', () => {
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('tour-overlay')).toHaveCount(0);
   });
+
+  test('Demo offers its scenarios to anyone in a workspace', async ({ page }) => {
+    trackPageErrors(page);
+
+    await page.goto(`/${TEST_ORG_HANDLE}`);
+    await expect(page.getByRole('heading', { name: 'Workflows' })).toBeVisible({ timeout: 15_000 });
+
+    await page.getByTestId('demo-trigger').click();
+    await expect(page.getByTestId('demo-scenarios')).toBeVisible();
+    await expect(page.getByTestId('demo-scenario-run')).toBeVisible();
+  });
+
+  /**
+   * `?tab=` has to drive a mounted page, not just seed its initial state —
+   * otherwise a demo step that deep-links a tab lands on Runs, and so does
+   * every back/forward across tabs.
+   */
+  test('a workflow tab can be deep-linked and survives back/forward', async ({ page }) => {
+    trackPageErrors(page);
+
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review?tab=triggers`);
+    await expect(page.getByRole('heading', { name: 'Input' })).toBeVisible({ timeout: 15_000 });
+
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review?tab=access`);
+    await expect(page.getByRole('heading', { name: 'Access' })).toBeVisible();
+
+    await page.goBack();
+    await expect(page.getByRole('heading', { name: 'Input' })).toBeVisible();
+  });
 });

@@ -128,12 +128,18 @@ export function ProcessDetail({
     /** The report only exists once the run finishes, so its pull announces
      *  itself rather than sitting quietly with the other three. */
     ready?: boolean;
+    /** `data-tour` anchor, so a walkthrough can ring one pull rather than the rail. */
+    tour: string;
   }> => [
-    ...(agentLogFiles.length > 0 ? [{ value: 'agent-log' as const, label: 'Log', Icon: ScrollText }] : []),
-    { value: 'audit' as const, label: 'Audit', Icon: ShieldCheck },
-    ...(definition ? [{ value: 'diagram' as const, label: 'Diagram', Icon: GitBranch }] : []),
+    ...(agentLogFiles.length > 0
+      ? [{ value: 'agent-log' as const, label: 'Log', Icon: ScrollText, tour: 'run-pull-log' }]
+      : []),
+    { value: 'audit' as const, label: 'Audit', Icon: ShieldCheck, tour: 'run-pull-audit' },
+    ...(definition
+      ? [{ value: 'diagram' as const, label: 'Diagram', Icon: GitBranch, tour: 'run-pull-diagram' }]
+      : []),
     ...(instance.status === 'completed'
-      ? [{ value: 'report' as const, label: 'Report', Icon: CheckCircle2, ready: true }]
+      ? [{ value: 'report' as const, label: 'Report', Icon: CheckCircle2, ready: true, tour: 'run-pull-report' }]
       : []),
   ], [agentLogFiles.length, definition, instance.status]);
 
@@ -439,11 +445,12 @@ export function ProcessDetail({
         )}
       >
         <div className="w-8 shrink-0 flex flex-col items-end justify-center gap-1.5">
-          {rightPanels.map(({ value, label, Icon, ready }) => {
+          {rightPanels.map(({ value, label, Icon, ready, tour }) => {
             const active = logsOpen && rightTab === value;
             return (
               <button
                 key={value}
+                data-tour={tour}
                 onClick={() => {
                   if (active) {
                     setLogsOpen(false);

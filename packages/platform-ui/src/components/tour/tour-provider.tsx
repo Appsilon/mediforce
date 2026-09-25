@@ -1,20 +1,35 @@
 'use client';
 
 import * as React from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { isEditableTarget } from '@/components/command-palette/provider';
 import { chapterForPath, type TourStep } from '@/lib/tour';
 import { GUIDE_CHAPTERS } from '@/lib/tour-content';
+import { DEMO_SCENARIOS } from '@/lib/demo-content';
+import { nextRouteAction, routeParams, startingIndex } from '@/lib/demo';
+import { useDemoRun } from '@/hooks/use-demo-run';
 import { TourOverlay } from './tour-overlay';
 
-type TourState = { title: string; steps: readonly TourStep[]; index: number };
+type TourState = {
+  /** Gates five behaviours: ending on navigation, navigating, the run lookup,
+   *  auto-collapse, and advancing on arrival. */
+  kind: 'guide' | 'scenario';
+  title: string;
+  steps: readonly TourStep[];
+  index: number;
+  /** Folded into a pill so the viewer can work, or show someone the screen. */
+  collapsed: boolean;
+};
 
 type TourContextValue = {
   active: TourState | null;
   start: () => void;
+  startScenario: (scenarioId: string) => void;
   stop: () => void;
   next: () => void;
   back: () => void;
+  collapse: () => void;
+  expand: () => void;
 };
 
 const Ctx = React.createContext<TourContextValue | null>(null);
@@ -37,32 +52,106 @@ function isTopmostOverlay(): boolean {
 
 export function TourProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? '/';
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [active, setActive] = React.useState<TourState | null>(null);
 
   const start = React.useCallback(() => {
     const chapter = chapterForPath(GUIDE_CHAPTERS, pathname);
     if (chapter === null) return;
-    setActive({ title: chapter.title, steps: chapter.steps, index: 0 });
+    setActive({ kind: 'guide', title: chapter.title, steps: chapter.steps, index: 0, collapsed: false });
+  }, [pathname]);
+
+  const startScenario = React.useCallback((scenarioId: string) => {
+    const scenario = DEMO_SCENARIOS.find((entry) => entry.id === scenarioId);
+    if (scenario === undefined) return;
+    setActive({
+      kind: 'scenario',
+      title: scenario.title,
+      steps: scenario.steps,
+      // Starting "run it" from a run should not march the viewer back to the
+      // workflow page to work forwards again.
+      index: startingIndex(scenario.steps, pathname),
+      collapsed: false,
+    });
   }, [pathname]);
 
   const stop = React.useCallback(() => setActive(null), []);
+
+  const collapse = React.useCallback(
+    () => setActive((prev) => (prev === null ? null : { ...prev, collapsed: true })),
+    [],
+  );
+  const expand = React.useCallback(
+    () => setActive((prev) => (prev === null ? null : { ...prev, collapsed: false })),
+    [],
+  );
 
   const next = React.useCallback(() => {
     setActive((prev) => {
       if (prev === null) return null;
       if (prev.index >= prev.steps.length - 1) return null;
-      return { ...prev, index: prev.index + 1 };
+      return { ...prev, index: prev.index + 1, collapsed: false };
     });
   }, []);
 
   const back = React.useCallback(() => {
-    setActive((prev) => (prev === null ? null : { ...prev, index: Math.max(0, prev.index - 1) }));
+    setActive((prev) =>
+      prev === null ? null : { ...prev, index: Math.max(0, prev.index - 1), collapsed: false },
+    );
   }, []);
 
-  // The guide explains the page you are on, so leaving that page ends it.
-  React.useEffect(() => setActive(null), [pathname]);
+  const step = active === null ? null : active.steps[active.index] ?? null;
+  const [unreachable, setUnreachable] = React.useState<string | null>(null);
+
+  const needsRun =
+    active?.kind === 'scenario'
+    && active.steps.some((entry) => routeParams(entry).some((param) => param !== ':handle'));
+  // `(app)` also serves `/workspaces`, where the first segment is not a handle.
+  const handle = pathname.split('/')[1] ?? '';
+  const demoRun = useDemoRun(handle === 'workspaces' ? '' : handle, needsRun === true);
+
+  const query = searchParams?.toString() ?? '';
+  const currentUrl = query === '' ? pathname : `${pathname}?${query}`;
+
+  // A guide is about the page you are on, so leaving ends it.
+  React.useEffect(() => {
+    setActive((prev) => (prev === null || prev.kind === 'guide' ? null : prev));
+  }, [pathname]);
+
+  // Arrival is the viewer walking to a later step's page, so it is applied only
+  // when the URL actually changed. Without this, stepping Back re-ran it on the
+  // page you were already on and threw you forward again.
+  const arrivedFrom = React.useRef<string | null>(null);
+
+  // A scenario navigates only; opening the panel or the tab is the viewer's.
+  React.useEffect(() => {
+    if (active === null || active.kind !== 'scenario') {
+      arrivedFrom.current = null;
+      return;
+    }
+    const action = nextRouteAction({
+      steps: active.steps,
+      index: active.index,
+      pathname,
+      currentUrl,
+      run: demoRun,
+    });
+    if (action.kind === 'advance') {
+      const navigated = arrivedFrom.current !== currentUrl;
+      arrivedFrom.current = currentUrl;
+      if (navigated) {
+        setActive((prev) => (prev === null ? null : { ...prev, index: action.index, collapsed: false }));
+      }
+      return;
+    }
+    arrivedFrom.current = currentUrl;
+    if (action.kind === 'navigate') router.push(action.url);
+    setUnreachable(action.kind === 'unreachable' ? action.needs : null);
+  }, [active, pathname, currentUrl, demoRun, router]);
 
   const running = active !== null;
+  const isCollapsed = active?.collapsed === true;
 
   React.useEffect(() => {
     if (!running) return;
@@ -71,9 +160,10 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         if (isTopmostOverlay()) stop();
         return;
       }
-      // The guide sits over a live page, so an arrow key moving a caret must
-      // not also move the guide.
+      // A walkthrough sits over a live page: an arrow key moving a caret must
+      // not also move the step.
       if (isEditableTarget(event.target)) return;
+      if (isCollapsed) return;
       if (event.key === 'ArrowRight') {
         event.preventDefault();
         next();
@@ -85,24 +175,28 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [running, stop, next, back]);
+  }, [running, isCollapsed, stop, next, back]);
 
   const value = React.useMemo<TourContextValue>(
-    () => ({ active, start, stop, next, back }),
-    [active, start, stop, next, back],
+    () => ({ active, start, startScenario, stop, next, back, collapse, expand }),
+    [active, start, startScenario, stop, next, back, collapse, expand],
   );
-
-  const step = active === null ? null : active.steps[active.index] ?? null;
 
   return (
     <Ctx.Provider value={value}>
       {children}
       {active !== null && step !== null && (
         <TourOverlay
+          kind={active.kind}
           title={active.title}
           step={step}
+          action={step.action}
+          unreachable={unreachable}
           index={active.index}
           total={active.steps.length}
+          collapsed={active.collapsed}
+          autoCollapse={active.kind === 'scenario'}
+          onCollapse={collapse}
           onNext={next}
           onBack={back}
           onClose={stop}
