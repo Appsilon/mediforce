@@ -272,7 +272,8 @@ test.describe('Step Evaluation tab', () => {
     await expect(challengerReport.getByTestId('apply-variant-open')).toBeEnabled();
     await challengerReport.getByTestId('apply-variant-open').click();
     const dialog = page.getByTestId('apply-variant-dialog');
-    await expect(dialog.getByTestId('apply-variant-default')).toBeChecked();
+    await expect(dialog.getByTestId('apply-variant-default')).not.toBeChecked();
+    await dialog.getByTestId('apply-variant-default').check();
     await dialog.getByTestId('apply-variant-confirm').click();
     await expect(challengerReport.getByTestId('apply-variant-result')).toContainText('Saved as Workflow Definition version', { timeout: 10_000 });
     await expect(challengerReport.getByTestId('apply-variant-result')).toContainText("matches this variant's Fingerprint");

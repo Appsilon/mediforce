@@ -896,6 +896,22 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
       expect(audit?.outputSnapshot).toMatchObject({ error: expect.stringContaining('grade 4 on a fatal AE') });
     });
 
+    it('keeps a low-confidence signal in the error when the gate fails too', async () => {
+      const gate: AgentOutputGate = async () => ({ failure: "Evaluator 'grade-5-flagged' v1 failed", errors: [] });
+      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ confidence: 0.5, result: { findings: [] } })]);
+      const context = gatedContext(gate);
+      const lowThresholdContext = {
+        ...context,
+        step: { ...context.step, agent: { ...context.step.agent, confidenceThreshold: 0.8 } },
+      };
+
+      const result = await runner.runWithWorkflowStep(plugin, lowThresholdContext);
+
+      expect(result.fallbackReason).toBe('production_evaluator');
+      expect(result.errorMessage).toContain('grade-5-flagged');
+      expect(result.errorMessage).toContain('below the confidence threshold');
+    });
+
     it('never gates a result that still broke outputSchema', async () => {
       const gate = vi.fn<AgentOutputGate>().mockResolvedValue({ failure: null, errors: [] });
       const { plugin } = makeScriptedPlugin([makeValidEnvelope({ result: { summary: 'still wrong' } })]);

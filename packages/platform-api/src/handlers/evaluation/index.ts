@@ -34,4 +34,3 @@ export { getStepQualification, signStepQualification } from './step-qualificatio
 export { computeStepFingerprint, changedFingerprintComponents } from './_lib/step-fingerprint';
 export { getEvalRunFailures } from './eval-run-failures';
 export { applyVariantToStep } from './apply-step-variant';
-export { hasProductionEvaluators, productionEvaluatorGate } from './_lib/production-evaluators';
