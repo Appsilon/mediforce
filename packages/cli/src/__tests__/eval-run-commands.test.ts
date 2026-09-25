@@ -32,6 +32,9 @@ const OUTPUT = {
         evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true,
         passes: 0, failures: 0, errors: 0, passRate: null, wilsonLower: null, wilsonUpper: null, passAtK: null, passHatK: null, flakiness: null,
       }],
+      suites: [{
+        suite: 'phi_leak', evaluators: ['no-phi'], passes: 3, failures: 1, errors: 0, passRate: 0.75, wilsonLower: 0.3, wilsonUpper: 0.95,
+      }],
       criteria: [{
         severity: 'critical', criterion: { minPassRate: 0.9 }, status: 'not_evaluable',
         evaluators: [{ evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', wilsonLower: null, passHatK: null, met: null }],
@@ -70,6 +73,8 @@ describe('mediforce eval runs', () => {
     });
     const printed = output.stdoutLines.join('\n');
     expect(printed).toContain('criterion critical: not evaluable — findings-present graded no trial');
+    expect(printed).toContain('suite phi_leak');
+    expect(printed).toContain('3 passed, 1 failed, 0 not graded');
     expect(printed).toContain(`mediforce eval run-start ${RUN_ID} --confirm-budget 0.9`);
     expect(printed).not.toContain('left out');
   });
