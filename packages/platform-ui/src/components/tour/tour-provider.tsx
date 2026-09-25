@@ -119,9 +119,17 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     setActive((prev) => (prev === null || prev.kind === 'guide' ? null : prev));
   }, [pathname]);
 
+  // Arrival is the viewer walking to a later step's page, so it is applied only
+  // when the URL actually changed. Without this, stepping Back re-ran it on the
+  // page you were already on and threw you forward again.
+  const arrivedFrom = React.useRef<string | null>(null);
+
   // A scenario navigates only; opening the panel or the tab is the viewer's.
   React.useEffect(() => {
-    if (active === null || active.kind !== 'scenario') return;
+    if (active === null || active.kind !== 'scenario') {
+      arrivedFrom.current = null;
+      return;
+    }
     const action = nextRouteAction({
       steps: active.steps,
       index: active.index,
@@ -130,8 +138,14 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       run: demoRun,
     });
     if (action.kind === 'advance') {
-      setActive((prev) => (prev === null ? null : { ...prev, index: action.index, collapsed: false }));
+      const navigated = arrivedFrom.current !== currentUrl;
+      arrivedFrom.current = currentUrl;
+      if (navigated) {
+        setActive((prev) => (prev === null ? null : { ...prev, index: action.index, collapsed: false }));
+      }
+      return;
     }
+    arrivedFrom.current = currentUrl;
     if (action.kind === 'navigate') router.push(action.url);
     setUnreachable(action.kind === 'unreachable' ? action.needs : null);
   }, [active, pathname, currentUrl, demoRun, router]);

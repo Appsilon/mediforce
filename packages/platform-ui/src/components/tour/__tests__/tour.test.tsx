@@ -25,9 +25,14 @@ const { TourPill } = await import('../tour-pill');
 function ScenarioStarter() {
   const { startScenario } = useTour();
   return (
-    <button type="button" onClick={() => startScenario('run')} data-testid="start-run-scenario">
-      run
-    </button>
+    <>
+      <button type="button" onClick={() => startScenario('run')} data-testid="start-run-scenario">
+        run
+      </button>
+      <button type="button" onClick={() => startScenario('build')} data-testid="start-build-scenario">
+        build
+      </button>
+    </>
   );
 }
 
@@ -244,6 +249,18 @@ describe('demo scenarios', () => {
       if (screen.getByTestId('tour-card').textContent?.includes('needs a run') === true) break;
     }
     expect(screen.getByTestId('tour-card').textContent).toContain('Start one, then come back');
+  });
+
+  it('goes back a step and stays there', () => {
+    // Starting on the page a later step covers opens at that step; Back must
+    // not be undone by the arrival that put us there.
+    pathname = '/test/workflows/new';
+    mount();
+    fireEvent.click(screen.getByTestId('start-build-scenario'));
+    expect(screen.getByTestId('tour-card').textContent).toContain('2 of ');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByTestId('tour-card').textContent).toContain('1 of ');
   });
 
   it('shows what the viewer is being asked to do', () => {
