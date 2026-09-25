@@ -7,6 +7,7 @@ import { buildEvalRunReport } from '../eval-run-report';
 import { evaluationFixture, NAMESPACE, STEP } from '../../__tests__/fixture';
 
 const EVALUATOR = '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
+const SECOND_EVALUATOR = '6e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
 const CASE_A = '4e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
 const CASE_B = '5e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
 
@@ -33,11 +34,11 @@ function trial(evalRunId: string, caseId: string, trialIndex: number, overrides:
 }
 
 /** The Evaluator's Score on a trial, as the driver records it. */
-async function score(scope: CallerScope, evalRun: EvalRun, scored: EvalTrial, value: number): Promise<void> {
+async function score(scope: CallerScope, evalRun: EvalRun, scored: EvalTrial, value: number, evaluatorId = EVALUATOR): Promise<void> {
   await recordScore({
     subject: { type: 'agent_run', id: scored.agentRunId! }, name: 'findings-present', value, label: null, comment: null,
     source: 'deterministic', createdBy: null, metadata: { evalRunId: evalRun.id, trialId: scored.id }, namespace: NAMESPACE,
-    processInstanceId: scored.processInstanceId, stepId: STEP.stepId, evaluatorId: EVALUATOR, supersedes: null, basis: 'test',
+    processInstanceId: scored.processInstanceId, stepId: STEP.stepId, evaluatorId, supersedes: null, basis: 'test',
   }, scope);
 }
 
@@ -137,6 +138,43 @@ describe('buildEvalRunReport', () => {
     ] });
     expect(champion!.criteria[0]!.status).toBe('missed');
     expect(champion!.recommendation).toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.95, coverage: 0.6 });
+  });
+
+  it('calibrates confidence only on trials every counted Evaluator graded: a missing Score is not a pass', async () => {
+    const fixture = await evaluationFixture();
+    const scope = fixture.scope();
+    const evalRun = run({
+      trialsPerCase: 20, caseIds: [CASE_A], acceptanceCriteria: { critical: { minPassRate: 0.5 } },
+      evaluators: [
+        { evaluatorId: EVALUATOR, name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true },
+        { evaluatorId: SECOND_EVALUATOR, name: 'grades-match', version: 1, kind: 'schema', severity: 'critical', counted: true },
+      ],
+    });
+    const trials = Array.from({ length: 20 }, (_unused, index) => trial(evalRun.id, CASE_A, index, { confidence: 0.95 }));
+    // The first Evaluator passes every trial; the second errored on the first 12 and passes the rest.
+    for (const [index, scored] of trials.entries()) {
+      await score(scope, evalRun, scored, 1);
+      if (index >= 12) await score(scope, evalRun, scored, 1, SECOND_EVALUATOR);
+    }
+
+    const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
+
+    expect(champion!.confidence).toMatchObject({ count: 8 });
+  });
+
+  it('does not judge a criterion met while some trial failed or was skipped', async () => {
+    const fixture = await evaluationFixture();
+    const scope = fixture.scope();
+    const evalRun = run({ status: 'budget_exceeded', acceptanceCriteria: { critical: { minPassRate: 0.1 } } });
+    const trials = [
+      trial(evalRun.id, CASE_A, 0), trial(evalRun.id, CASE_A, 1), trial(evalRun.id, CASE_B, 0),
+      trial(evalRun.id, CASE_B, 1, { status: 'skipped', agentRunId: null, costUsd: null, durationMs: null }),
+    ];
+    for (const scored of trials.slice(0, 3)) await score(scope, evalRun, scored, 1);
+
+    const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
+
+    expect(champion!.criteria[0]).toMatchObject({ status: 'not_evaluable', reason: '1 of 4 trials failed or were skipped, so the Dataset was not evaluated in full' });
   });
 
   it('recommends nothing for a variant still running', async () => {

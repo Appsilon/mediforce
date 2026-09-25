@@ -25,10 +25,12 @@ import {
   type EvaluationRepository,
   type OAuthProviderRepository,
   type ResolvedMcpConfig,
+  type ToolCatalogRepository,
   type WorkflowDefinition,
   type WorkflowStep,
 } from '@mediforce/platform-core';
 import { buildProductionOutputGate } from './production-output-gate';
+import { changedFingerprintComponents, computeStepFingerprint } from '@mediforce/platform-api/services';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
 import { applyAgentModel, resolveAgentDefaults } from './resolve-agent-defaults';
@@ -101,7 +103,7 @@ export async function executeAgentStep(
   // step and definition from here.
   const evalTrial = reapTimedOut || instance.evalRunId === undefined
     ? null
-    : await evalTrialConfig(storedDefinition, stepFromCaller, instanceId, instance.evalRunId, evaluationRepo, agentDefinitionRepo);
+    : await evalTrialConfig(storedDefinition, stepFromCaller, instanceId, instance.evalRunId, evaluationRepo, agentDefinitionRepo, toolCatalogRepo);
   const workflowDefinition = evalTrial?.definition ?? storedDefinition;
   const workflowStep = evalTrial?.step ?? stepFromCaller;
 
@@ -297,7 +299,9 @@ export async function executeAgentStep(
  * step's agent under the Eval Run's frozen policy, denied unless the author
  * declared it live, on top of the step's own restrictions. Inline servers
  * bypass the agent's bindings, so no policy can deny them: the trial fails
- * closed rather than run them.
+ * closed rather than run them. So does a trial whose step no longer matches
+ * the Fingerprint its variant was prepared with — its agent's model, prompt or
+ * tools edited since — as its Scores would describe a step no one froze.
  */
 async function evalTrialConfig(
   definition: WorkflowDefinition,
@@ -306,6 +310,7 @@ async function evalTrialConfig(
   evalRunId: string,
   evaluationRepo: EvaluationRepository,
   agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>,
+  toolCatalogRepo: Pick<ToolCatalogRepository, 'getById'>,
 ): Promise<{ definition: WorkflowDefinition; step: WorkflowStep; mcpStep: WorkflowStep }> {
   const inlineServers = inlineMcpServerNames(step);
   if (inlineServers.length > 0) {
@@ -322,6 +327,20 @@ async function evalTrialConfig(
   const variant = evalRun.variants.find((candidate) => candidate.id === trial?.variantId);
   if (variant === undefined) throw new Error(`Eval Run '${evalRunId}' has no variant for trial run '${instanceId}'`);
   const patched = applyStepVariant(definition, step, variant.patch);
+  if (variant.fingerprint !== null) {
+    const current = await computeStepFingerprint(
+      { agentDefinitions: agentDefinitionRepo, toolCatalog: toolCatalogRepo },
+      patched.definition,
+      patched.step,
+    );
+    const changed = changedFingerprintComponents(variant.fingerprint, current);
+    if (changed.length > 0) {
+      throw new Error(
+        `Step '${step.id}' changed since Eval Run '${evalRunId}' was prepared (${changed.join(', ')}); `
+        + 'prepare a new Eval Run to evaluate it as it is now',
+      );
+    }
+  }
   if (patched.step.agentId === undefined) return { ...patched, mcpStep: patched.step };
   const agent = await agentDefinitionRepo.getById(patched.step.agentId);
   return {

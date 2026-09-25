@@ -33,3 +33,4 @@ export { getAcceptanceCriteria, setAcceptanceCriteria } from './acceptance-crite
 export { getStepQualification, signStepQualification } from './step-qualification';
 export { getEvalRunFailures } from './eval-run-failures';
 export { applyVariantToStep } from './apply-step-variant';
+export { computeStepFingerprint, changedFingerprintComponents } from './_lib/step-fingerprint';

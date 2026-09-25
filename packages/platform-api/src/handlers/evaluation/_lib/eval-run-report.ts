@@ -4,6 +4,7 @@ import {
   judgeAcceptanceCriteria,
   recommendControl,
   wilsonInterval,
+  type AcceptanceCriterionVerdict,
   type ConfidenceOutcome,
   type EvalRun,
   type EvalRunEvaluatorReport,
@@ -89,16 +90,31 @@ function evaluatorReports(run: EvalRun, trials: readonly EvalTrial[], scores: Re
 
 /**
  * A scored trial that reported a confidence, against whether its output
- * passed every counted Evaluator that graded it — the pairs confidence is
- * calibrated on. A trial no counted Evaluator graded says nothing.
+ * passed every counted Evaluator — the pairs confidence is calibrated on. A
+ * trial some counted Evaluator could not grade says nothing: a missing Score
+ * is not a pass.
  */
 function confidenceOutcomes(run: EvalRun, trials: readonly EvalTrial[], scores: ReadonlyMap<string, Score[]>): ConfidenceOutcome[] {
   const counted = new Set(run.evaluators.filter((evaluator) => evaluator.counted === true).map((evaluator) => evaluator.evaluatorId));
+  if (counted.size === 0) return [];
   return trials.flatMap((trial) => {
     if (trial.status !== 'scored' || trial.confidence === null) return [];
     const graded = (scores.get(trial.id) ?? []).filter((score) => score.evaluatorId !== null && counted.has(score.evaluatorId));
-    return graded.length === 0 ? [] : [{ confidence: trial.confidence, passed: graded.every(isPass) }];
+    const gradedBy = new Set(graded.map((score) => score.evaluatorId));
+    return gradedBy.size < counted.size ? [] : [{ confidence: trial.confidence, passed: graded.every(isPass) }];
   });
+}
+
+/**
+ * A criterion is met on the whole frozen Dataset or not at all: while some
+ * trial failed or was skipped, one the scored trials reached is not judged.
+ */
+function judgedOnEveryTrial(verdicts: AcceptanceCriterionVerdict[], counts: EvalRunReport['trials']): AcceptanceCriterionVerdict[] {
+  const unscored = counts.failed + counts.skipped;
+  if (unscored === 0) return verdicts;
+  return verdicts.map((verdict): AcceptanceCriterionVerdict => (verdict.status === 'met'
+    ? { ...verdict, status: 'not_evaluable', reason: `${unscored} of ${counts.total} trials failed or were skipped, so the Dataset was not evaluated in full` }
+    : verdict));
 }
 
 function variantReport(
@@ -108,9 +124,9 @@ function variantReport(
   scores: ReadonlyMap<string, Score[]>,
 ): EvalRunVariantReport {
   const evaluators = evaluatorReports(run, trials, scores);
-  const criteria = judgeAcceptanceCriteria(run.acceptanceCriteria, evaluators);
-  const outcomes = confidenceOutcomes(run, trials, scores);
   const counts = trialCounts(trials);
+  const criteria = judgedOnEveryTrial(judgeAcceptanceCriteria(run.acceptanceCriteria, evaluators), counts);
+  const outcomes = confidenceOutcomes(run, trials, scores);
   // Routing is recommended on a variant's finished results only.
   const finished = counts.inProgress === 0 && counts.scored > 0;
   const costs = trials.flatMap((trial) => (trial.costUsd === null ? [] : [trial.costUsd]));

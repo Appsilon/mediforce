@@ -307,12 +307,17 @@ in the report and by `run-prepare`), and refuses a run with no case left to scor
    outputs, its workspace branched from the case's seed commit, and stops after
    the Step: no review task, no escalation, no next step. MCP servers the policy
    does not declare `live` are removed from the agent's config; a Step that
-   declares MCP servers inline cannot be evaluated at all. Run lists, workflow
+   declares MCP servers inline cannot be evaluated at all. Just before the
+   agent runs, the trial recomputes its variant's Step Fingerprint; if the
+   step or its agent changed since the run was prepared (model, system prompt,
+   MCP bindings, …), the trial fails naming what changed, so no Score describes
+   a step no one froze. Run lists, workflow
    summaries, monitoring, the Agents history and carry-over (`inputForNextRun`)
    leave trials out.
 4. When a trial's run ends, every frozen Evaluator grades its Agent Run and
    writes a Score (`source: deterministic` or `llm_judge`, `metadata.evalRunId`).
-   Trials start `concurrency` at a time; once spend reaches the budget the rest
+   Trials start `concurrency` at a time, round by round — each case's k-th
+   trial of every variant, the champion first; once spend reaches the budget the rest
    are skipped and the run ends `budget_exceeded`. A trial's cost is its Agent
    Run plus the LLM judge calls that graded it (at the model registry's price;
    a judge model it does not price is noted on the trial and not counted), each
@@ -364,11 +369,14 @@ the judge calls. Then, per variant:
 - **Acceptance Criteria.** Each severity the frozen criteria set is `met` when
   every counted Evaluator of that severity reaches its floor — the pass rate's
   Wilson 95% lower bound, and pass^k where set — `missed` when one does not,
-  and `not judged` when no counted Evaluator of that severity exists or one
-  graded nothing. A run prepared before any criteria were set judges nothing.
+  and `not judged` when no counted Evaluator of that severity exists, one
+  graded nothing, or — for a floor the scored trials reached — some trial of
+  the variant failed or was skipped: a criterion is met on the whole Dataset.
+  A run prepared before any criteria were set judges nothing.
 - **Confidence calibration.** The confidence each trial's agent reported,
-  against whether its output passed every counted Evaluator that graded it:
-  the pass rate in five confidence bins and the expected calibration error.
+  against whether its output passed every counted Evaluator — a trial some
+  counted Evaluator could not grade is left out, since a missing Score is not
+  a pass: the pass rate in five confidence bins and the expected calibration error.
 - **Routing.** Once the variant's trials are done, as the `autonomyLevel` to
   set: `L4` (Control Mode 4) with a `confidenceThreshold` — the lowest
   confidence at which the outputs at or above it (at least 5) passed every
