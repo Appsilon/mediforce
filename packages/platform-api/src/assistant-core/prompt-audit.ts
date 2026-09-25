@@ -11,6 +11,8 @@ export interface AssistantPromptAudit {
   readonly basis: string;
   readonly entityType: string;
   readonly entityId: string;
+  /** Extra facts about the request, recorded beside the prompt. */
+  readonly extraInput?: Readonly<Record<string, unknown>>;
   /** Prefix for the log line when the append fails. */
   readonly logTag: string;
 }
@@ -28,7 +30,7 @@ export async function recordAssistantPrompt(scope: CallerScope, entry: Assistant
       action: entry.action,
       description: entry.description,
       timestamp: new Date().toISOString(),
-      inputSnapshot: { prompt: latestUserPrompt, model: entry.model, messageCount: entry.messages.length },
+      inputSnapshot: { prompt: latestUserPrompt, model: entry.model, messageCount: entry.messages.length, ...entry.extraInput },
       outputSnapshot: {},
       basis: entry.basis,
       entityType: entry.entityType,

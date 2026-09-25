@@ -154,6 +154,18 @@ export const AgentOutputSchemaSchema = z.looseObject({
   properties: z.record(z.string(), z.looseObject({ type: OutputSchemaPropertyTypeSchema.optional() })).optional(),
 });
 
+/**
+ * One few-shot example (ADR-0023 D12): an input and the output wanted for it,
+ * rendered in its own prompt section. `caseId` is the Eval Case it came from;
+ * that case is left out of the Step's later Eval Runs.
+ */
+export const AgentExampleSchema = z.object({
+  input: z.string().min(1).max(20_000),
+  output: z.string().min(1).max(20_000),
+  note: z.string().min(1).max(1000).optional(),
+  caseId: z.uuid().optional(),
+});
+
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
   skill: z.string().optional(),
@@ -166,6 +178,7 @@ export const WorkflowAgentConfigSchema = z.object({
   /** Shown to the agent in its prompt and checked against `result` after the
    *  run: one retry with the validation error, then `fallbackBehavior`. */
   outputSchema: AgentOutputSchemaSchema.optional(),
+  examples: z.array(AgentExampleSchema).max(20).optional(),
   /** @deprecated Step-level MCP configuration is being removed.
    *  Move servers onto the agent via AgentDefinition.mcpServers and
    *  narrow them at the step via WorkflowStep.mcpRestrictions.
@@ -948,6 +961,7 @@ export function parseWorkflowTemplate(input: unknown) {
 
 export type ContainerConfig = z.infer<typeof ContainerSchema>;
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
+export type AgentExample = z.infer<typeof AgentExampleSchema>;
 export type OutputSchemaPropertyType = z.infer<typeof OutputSchemaPropertyTypeSchema>;
 export type ScriptStepConfig = z.infer<typeof ScriptStepConfigSchema>;
 export type DatabricksJobConfig = z.infer<typeof DatabricksJobConfigSchema>;

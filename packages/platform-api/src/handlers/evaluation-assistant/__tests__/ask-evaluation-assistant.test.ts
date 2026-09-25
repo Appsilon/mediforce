@@ -6,6 +6,7 @@ import { createEvalCaseFromAgentRun } from '../../evaluation/eval-cases';
 import { freezeEvalDataset } from '../../evaluation/eval-datasets';
 import { setEvaluationBrief } from '../../evaluation/briefs';
 import { askEvaluationAssistant } from '../ask-evaluation-assistant';
+import { evalScenario } from '../../evaluation/__tests__/finished-eval-run';
 import { evaluationFixture, GRADED_RUN, STEP, UNGRADED_RUN, type EvaluationFixture } from '../../evaluation/__tests__/fixture';
 
 type Request = { messages: Array<{ role: string; content: string }> };
@@ -77,6 +78,7 @@ describe('askEvaluationAssistant', () => {
         selfTest: preview,
       }],
       preparedEvalRuns: [],
+      startedEvalRuns: [],
     });
     expect(requests[0]!.messages.some((message) => message.content.includes('A missed grade 5 is critical.'))).toBe(true);
     expect(await fixture.evaluationRepo.listEvaluators(STEP)).toEqual([]);
@@ -105,6 +107,40 @@ describe('askEvaluationAssistant', () => {
     expect(refusal.error).toContain('a person must confirm that budget');
     const run = await fixture.evaluationRepo.getEvalRun(result.preparedEvalRuns[0]!.evalRunId);
     expect(run?.status).toBe('prepared');
+  });
+
+  it('starts a prepared run under the request\'s unattended budget, and records the grant', async () => {
+    const previous = process.env.ALLOW_LOCAL_AGENTS;
+    process.env.ALLOW_LOCAL_AGENTS = 'true';
+    try {
+      const { scope: engineScope } = await evalScenario(fixture);
+      Object.assign(engineScope, { workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) } });
+      const requests = scriptOpenRouter([
+        () => ({ toolCalls: [{ name: 'prepare_eval_run', arguments: { trialsPerCase: 1, budgetUsd: 2 } }] }),
+        (request) => {
+          const { prepared } = lastToolResult(request) as { prepared: { evalRunId: string } };
+          return { toolCalls: [{ name: 'start_eval_run', arguments: { evalRunId: prepared.evalRunId } }] };
+        },
+        () => ({ toolCalls: [{ name: 'prepare_eval_run', arguments: { trialsPerCase: 1, budgetUsd: 4 } }] }),
+        (request) => {
+          const { prepared } = lastToolResult(request) as { prepared: { evalRunId: string } };
+          return { toolCalls: [{ name: 'start_eval_run', arguments: { evalRunId: prepared.evalRunId } }] };
+        },
+        () => ({ content: 'Started the first run; the second did not fit the grant.' }),
+      ]);
+
+      const result = await askEvaluationAssistant({ ...STEP, messages: [{ role: 'user', content: 'Try it.' }], unattendedBudgetUsd: 3 }, engineScope);
+
+      expect(result.startedEvalRuns).toEqual([{ evalRunId: expect.any(String), budgetUsd: 2 }]);
+      expect((await fixture.evaluationRepo.getEvalRun(result.startedEvalRuns[0]!.evalRunId))?.status).toBe('running');
+      expect(lastToolResult(requests[4]!).error).toContain('only $1.00 is left of the unattended budget');
+      expect(requests[0]!.messages.some((message) => message.content.includes('unattended budget of $3'))).toBe(true);
+      const audit = (await fixture.auditRepo.getByEntity('evaluation_assistant', 'ae-grading/grade-aes'))[0];
+      expect(audit).toMatchObject({ action: 'evaluation_assistant.prompt', inputSnapshot: { unattendedBudgetUsd: 3 } });
+    } finally {
+      if (previous === undefined) delete process.env.ALLOW_LOCAL_AGENTS;
+      else process.env.ALLOW_LOCAL_AGENTS = previous;
+    }
   });
 
   it('allows an investigation to finish beyond the old sixteen-round limit', async () => {
