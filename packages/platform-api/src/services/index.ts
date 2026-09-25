@@ -32,3 +32,4 @@ export {
   type JoinLinkRejection,
   type CreateJoinLinkRecord,
 } from './join-link';
+export { computeStepFingerprint, changedFingerprintComponents } from '../handlers/evaluation/_lib/step-fingerprint';
