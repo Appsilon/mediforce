@@ -29,7 +29,7 @@ import {
   type WorkflowDefinition,
   type WorkflowStep,
 } from '@mediforce/platform-core';
-import { changedFingerprintComponents, computeStepFingerprint } from '@mediforce/platform-api/handlers';
+import { changedFingerprintComponents, computeStepFingerprint } from '@mediforce/platform-api/services';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
 import { applyAgentModel, resolveAgentDefaults } from './resolve-agent-defaults';
