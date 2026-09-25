@@ -29,7 +29,7 @@ import {
  */
 
 const AssistantCheckSchema = EvaluatorCheckSchema.describe(
-  'A JSON object, not a string or JSON-encoded string. For code use {"kind":"code","runtime":"python","source":"...script..."}; only source is a string. Choose schema, code or llm_judge and include that kind\'s required fields.',
+  'A JSON object, not a string or JSON-encoded string. For code use {"kind":"code","runtime":"python","source":"...script..."}; only source is a string. Choose schema, code, llm_judge or builtin (name: injection_ignored, result_stable or phi_leak) and include that kind\'s required fields.',
 ).meta({ examples: [
   { kind: 'schema', schema: { required: ['findings'] } },
   {
@@ -48,7 +48,7 @@ export const ProposeEvaluatorToolSchema = z.object({
   /** Why this check, and what its preview showed. */
   rationale: z.string().max(1000).optional(),
   runInProduction: z.boolean().optional()
-    .describe('Also score live production runs of the step (a guardrail). A failing critical schema or code check sends the run to the step\'s fallbackBehavior; an llm_judge only writes Scores. Counts only once the check is trusted.'),
+    .describe('Also score live production runs of the step (a guardrail). A failing critical schema, code or builtin check sends the run to the step\'s fallbackBehavior; an llm_judge only writes Scores. Counts only once the check is trusted.'),
 });
 
 /** Propose an Eval Case: from a production Agent Run, or written out. */

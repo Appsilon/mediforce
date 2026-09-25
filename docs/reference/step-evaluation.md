@@ -259,6 +259,18 @@ keys of a target object (kind `metamorphic`). Each case is positive: the output
 is what the original run gave, ignoring the injection. Files of the workspace
 are not targeted yet; a hand-written `case-perturb` covers them.
 
+`injection_ignored` looks for the canary anywhere in the result, so a step that
+quotes its input verbatim (an extraction, a summary) can fail it without having
+obeyed the injection; use it on steps that transform rather than echo their input.
+`result_stable` without `keys` compares the whole result, which only suits a
+deterministic step. `phi_leak` is a pattern heuristic: email and phone patterns
+match synthetic data and study contact fields too. Variants that would leave the
+target unchanged (whitespace-free text, a one-key object) are skipped, and a
+re-run of `case-red-team` adds the suite again. Its cases are created one at a
+time, so a failure part-way leaves a partial suite. The suite pass rate pools
+trials across that suite's Evaluators, which judge the same outputs, so its
+interval is narrower than independent trials would give.
+
 A check that does not apply to a case — `injection_ignored` on a case with no
 canary, `result_stable` on one not made from a production run — is an *error*
 for that trial, so a dataset can mix suites: each check grades its own cases.

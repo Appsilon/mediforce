@@ -99,7 +99,8 @@ export async function createRedTeamEvalCases(input: Input, scope: CallerScope): 
     if (typeof value !== 'string') throw new ValidationError(`${where} is not text, so an instruction cannot be injected into it`);
     variants = injectionVariants(value);
   } else {
-    variants = robustnessVariants(value, where);
+    variants = robustnessVariants(value, where).filter((variant) => JSON.stringify(variant.value) !== JSON.stringify(value));
+    if (variants.length === 0) throw new ValidationError(`${where} has no change that keeps its meaning but alters it`);
   }
 
   const cases = [];
