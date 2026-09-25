@@ -30,9 +30,9 @@ describe('createRedTeamEvalCases', () => {
 
   it('rewrites text and objects without changing what they say', async () => {
     const text = await createRedTeamEvalCases({ ...REQUEST, suite: 'robustness', target: TARGET }, fixture.scope());
-    expect(text.cases.map((evalCase) => evalCase.perturbation?.kind)).toEqual(['metamorphic', 'metamorphic']);
+    expect(text.cases.map((evalCase) => evalCase.perturbation?.kind)).toEqual(['metamorphic']);
     const terms = text.cases.map((evalCase) => (evalCase.input.previousStepOutputs['extract-aes'] as { events: { term: string }[] }).events[0]!.term);
-    expect(terms.map((term) => term.trim())).toEqual(['Sepsis', 'Sepsis']);
+    expect(terms).toEqual(['\n\nSepsis\n\n']);
 
     const object = await createRedTeamEvalCases({
       ...REQUEST, suite: 'robustness', target: { part: 'previousStepOutputs', path: ['extract-aes', 'events', '0'] },

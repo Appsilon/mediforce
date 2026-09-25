@@ -1,4 +1,5 @@
 import { RED_TEAM_SUITES } from '@mediforce/platform-api/contract';
+import { EvalCaseInputPartSchema } from '@mediforce/platform-core';
 import { defineCommand, enumArg } from '../define-command';
 import { printJson } from '../output';
 import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
@@ -83,13 +84,18 @@ export const evalCaseRedTeamCommand = defineCommand({
     split: enumArg(['dev', 'holdout'] as const, { description: 'Default: dev' }),
   },
   async run({ args, output, mediforce, jsonMode }) {
-    const [part, ...path] = args.target.split('.');
+    const [rawPart, ...path] = args.target.split('.');
+    const part = EvalCaseInputPartSchema.safeParse(rawPart);
+    if (part.success === false) {
+      output.stderr(`--target must start with ${EvalCaseInputPartSchema.options.join(', ')}, got '${rawPart}'`);
+      return 1;
+    }
     const result = await mediforce.evaluation.createRedTeamCases({
       ...stepFrom(args),
       baseAgentRunId: args.run,
       // `required: true` on the enumArg — citty enforces at parse time.
       suite: args.suite!,
-      target: { part: part as 'triggerPayload' | 'previousStepOutputs' | 'previousRun', path },
+      target: { part: part.data, path },
       ...(args.split !== undefined ? { split: args.split } : {}),
     });
     if (jsonMode) {
