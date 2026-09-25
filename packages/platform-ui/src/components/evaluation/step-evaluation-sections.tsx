@@ -83,6 +83,7 @@ export function BriefSection({ step, data, mayEdit }: { step: EvaluatedStep; dat
 }
 
 const CHECK_TEMPLATES: Record<EvaluatorCheck['kind'], string> = {
+  builtin: JSON.stringify({ kind: 'builtin', name: 'phi_leak' }, null, 2),
   schema: JSON.stringify({ kind: 'schema', schema: { required: [] } }, null, 2),
   code: JSON.stringify({
     kind: 'code',
@@ -148,7 +149,7 @@ function EvaluatorRow({ step, evaluator, mayEdit }: { step: EvaluatedStep; evalu
           </div>
         )}
       </div>
-      {check.kind !== 'schema' && (
+      {(check.kind === 'code' || check.kind === 'llm_judge') && (
         <details className="mt-1 text-xs">
           <summary className="cursor-pointer text-muted-foreground">{check.kind === 'code' ? 'Source' : 'Rubric'}</summary>
           <pre className="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 whitespace-pre-wrap">{check.kind === 'code' ? check.source : check.rubric}</pre>

@@ -98,7 +98,9 @@ Eval Case, Dataset version and MCP eval policy by `(namespace, workflowName,
 stepId)` and reaches it through the one `scope.evaluation` wrapper. Reads need
 only to see the workflow; writes need its `edit` verb (`_lib/evaluated-step.ts`).
 An Evaluator check that cannot run comes back as `error`, never as a failed
-output (`_lib/run-evaluator-check.ts`). Evaluators flagged `runInProduction`
+output (`_lib/run-evaluator-check.ts`; the platform's own red-team checks are
+`_lib/builtin-checks.ts`, their cases `red-team-cases.ts`, and the report's
+per-suite pass rates `_lib/eval-run-report.ts`). Evaluators flagged `runInProduction`
 (`setEvaluatorProduction`) score live runs through `_lib/production-evaluators.ts`,
 the runner's output gate: counted `schema`/`code` ones run inline and a failing
 critical one sends the run to the step's fallback; `llm_judge` ones only write

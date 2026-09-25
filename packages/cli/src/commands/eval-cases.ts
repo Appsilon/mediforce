@@ -1,3 +1,4 @@
+import { RED_TEAM_SUITES } from '@mediforce/platform-api/contract';
 import { defineCommand, enumArg } from '../define-command';
 import { printJson } from '../output';
 import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
@@ -65,6 +66,38 @@ export const evalCasePerturbCommand = defineCommand({
     const result = await mediforce.evaluation.createPerturbedCase({ ...body, ...stepFrom(args) } as Parameters<typeof mediforce.evaluation.createPerturbedCase>[0]);
     if (jsonMode) printJson(output, result);
     else output.stdout(`Eval Case ${result.evalCase.id} added (${result.evalCase.perturbation?.kind}, ${result.evalCase.expectation})`);
+    return 0;
+  },
+});
+
+export const evalCaseRedTeamCommand = defineCommand({
+  name: 'mediforce eval case-red-team',
+  description: 'Add a red-team or robustness suite of Eval Cases from a production run: prompt_injection appends injected '
+    + 'instructions to the text at --target, robustness rewrites it without changing its meaning. Grade them with '
+    + 'builtin Evaluators injection_ignored and result_stable.',
+  args: {
+    ...STEP_ARGS,
+    run: { type: 'string', required: true, description: 'Production Agent Run id the cases are built from' },
+    suite: enumArg(RED_TEAM_SUITES, { required: true, description: 'prompt_injection or robustness' }),
+    target: { type: 'string', required: true, description: 'Input value to change, as part.path.to.value — part is triggerPayload, previousStepOutputs or previousRun' },
+    split: enumArg(['dev', 'holdout'] as const, { description: 'Default: dev' }),
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const [part, ...path] = args.target.split('.');
+    const result = await mediforce.evaluation.createRedTeamCases({
+      ...stepFrom(args),
+      baseAgentRunId: args.run,
+      // `required: true` on the enumArg — citty enforces at parse time.
+      suite: args.suite!,
+      target: { part: part as 'triggerPayload' | 'previousStepOutputs' | 'previousRun', path },
+      ...(args.split !== undefined ? { split: args.split } : {}),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    output.stdout(`${result.cases.length} Eval Case(s) added`);
+    for (const evalCase of result.cases) output.stdout(`  ${evalCase.id}  ${evalCase.name}`);
     return 0;
   },
 });
