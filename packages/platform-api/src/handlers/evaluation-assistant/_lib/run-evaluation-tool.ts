@@ -19,6 +19,7 @@ import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
 import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
 import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
+import { isSameStep } from '../../evaluation/_lib/evaluated-step';
 import { evaluatorView, loadEvaluator } from '../../evaluation/_lib/evaluator-view';
 import { isBinary } from '../../evaluation/_lib/workspace-seed';
 import { evaluatorLabels } from '../../evaluation/evaluator-trust';
@@ -27,6 +28,8 @@ import { listEvaluators } from '../../evaluation/evaluators';
 import { listEvalCases } from '../../evaluation/eval-cases';
 import { getEvalRun, listEvalRuns, prepareEvalRun, startEvalRun } from '../../evaluation/eval-runs';
 import { previewEvaluator } from '../../evaluation/preview-evaluator';
+import { getAcceptanceCriteria } from '../../evaluation/acceptance-criteria';
+import { getStepQualification } from '../../evaluation/step-qualification';
 
 type Tools = typeof EVALUATION_ASSISTANT_PLATFORM_TOOLS;
 type Args<Name extends EvaluationAssistantPlatformToolName> = z.infer<Tools[Name]>;
@@ -115,10 +118,20 @@ async function effectiveMcpServers(scope: CallerScope, step: EvaluatedStep, work
 /** An Evaluator of this step — any other reads as missing. */
 export async function loadStepEvaluator(scope: CallerScope, step: EvaluatedStep, evaluatorId: string): Promise<Evaluator> {
   const evaluator = await loadEvaluator(scope, evaluatorId);
-  if (evaluator.namespace !== step.namespace || evaluator.workflowName !== step.workflowName || evaluator.stepId !== step.stepId) {
+  if (isSameStep(evaluator, step) === false) {
     throw new NotFoundError(`Evaluator '${evaluatorId}' is not an Evaluator of this step`);
   }
   return evaluator;
+}
+
+/** An Eval Run of this step, with its trials and report — any other reads as missing. */
+async function loadStepEvalRun(scope: CallerScope, step: EvaluatedStep, evalRunId: string) {
+  const output = await getEvalRun({ evalRunId }, scope);
+  const { evalRun } = output;
+  if (isSameStep(evalRun, step) === false) {
+    throw new NotFoundError(`Eval Run '${evalRunId}' is not a run of this step`);
+  }
+  return output;
 }
 
 const MAX_LISTED_FILES = 300;
@@ -286,17 +299,12 @@ export async function executeEvaluationTool(
     }
     case 'get_eval_run_report': {
       const { evalRunId } = args as Args<'get_eval_run_report'>;
-      const { evalRun, trials, report } = await getEvalRun({ evalRunId }, scope);
-      if (
-        evalRun.namespace !== step.namespace
-        || evalRun.workflowName !== step.workflowName
-        || evalRun.stepId !== step.stepId
-      ) {
-        throw new NotFoundError(`Eval Run '${evalRunId}' is not a run of this step`);
-      }
+      const { evalRun, trials, report } = await loadStepEvalRun(scope, step, evalRunId);
       return {
         status: evalRun.status,
         mcpPolicy: evalRun.mcpPolicy,
+        acceptanceCriteria: evalRun.acceptanceCriteria,
+        briefVersion: evalRun.briefVersion,
         report,
         failedTrials: trials
           .filter((trial) => trial.status === 'failed' || trial.error !== null)
@@ -307,21 +315,75 @@ export async function executeEvaluationTool(
       const { check, agentRunIds } = args as Args<'preview_evaluator'>;
       return previewEvaluator({ ...step, check, limit: 5, ...(agentRunIds === undefined ? {} : { agentRunIds }) }, scope);
     }
+    case 'compare_variants': {
+      const { evalRunId } = args as Args<'compare_variants'>;
+      const { evalRun, report } = await loadStepEvalRun(scope, step, evalRunId);
+      return {
+        status: evalRun.status,
+        acceptanceCriteria: evalRun.acceptanceCriteria,
+        variants: report.variants.map((variant) => ({
+          id: variant.id,
+          label: variant.label,
+          patch: variant.patch,
+          trials: variant.trials,
+          criteria: variant.criteria.map(({ severity, status, reason }) => ({ severity, status, reason })),
+          evaluators: variant.evaluators.map((evaluator) => ({
+            name: evaluator.name,
+            counted: evaluator.counted,
+            passRate: evaluator.passRate,
+            wilsonLower: evaluator.wilsonLower,
+            passHatK: evaluator.passHatK,
+          })),
+          confidence: variant.confidence === null ? null : { count: variant.confidence.count, ece: variant.confidence.ece },
+          recommendation: variant.recommendation,
+          meanCostUsd: variant.meanCostUsd,
+          meanDurationMs: variant.meanDurationMs,
+        })),
+        comparison: report.comparison,
+      };
+    }
+    case 'get_qualification': {
+      const [qualification, { criteria }] = await Promise.all([
+        getStepQualification(step, scope),
+        getAcceptanceCriteria(step, scope),
+      ]);
+      const shown = qualification.qualification;
+      return {
+        status: qualification.status,
+        changedSinceQualified: qualification.changed,
+        evaluatorsChanged: qualification.evaluatorsChanged,
+        qualification: shown === null ? null : {
+          evalRunId: shown.evalRunId,
+          variant: shown.variantLabel,
+          patch: shown.patch,
+          briefVersion: shown.briefVersion,
+          acceptanceCriteria: shown.acceptanceCriteria,
+          verdicts: shown.verdicts.map(({ severity, status, reason }) => ({ severity, status, reason })),
+          deviations: shown.deviations,
+          signedBy: shown.signature.signerName,
+          signedAt: shown.signature.signedAt,
+        },
+        acceptanceCriteria: criteria === null ? null : { version: criteria.version, ...criteria.criteria },
+      };
+    }
     case 'prepare_eval_run': {
-      const { trialsPerCase, budgetUsd } = args as Args<'prepare_eval_run'>;
+      const { trialsPerCase, budgetUsd, challengers } = args as Args<'prepare_eval_run'>;
       const { evalRun } = await prepareEvalRun({
         ...step,
         trialsPerCase: trialsPerCase ?? 3,
         concurrency: 2,
+        challengers: challengers ?? [],
         ...(budgetUsd === undefined ? {} : { budgetUsd }),
       }, scope);
       return {
         prepared: {
           evalRunId: evalRun.id,
-          trials: evalRun.caseIds.length * evalRun.trialsPerCase,
+          trials: evalRun.caseIds.length * evalRun.trialsPerCase * evalRun.variants.length,
+          variants: evalRun.variants.map((variant) => ({ id: variant.id, label: variant.label, patch: variant.patch })),
           estimate: evalRun.estimate,
           budgetUsd: evalRun.budgetUsd,
           evaluators: evalRun.evaluators.map((evaluator) => ({ name: evaluator.name, counted: evaluator.counted })),
+          acceptanceCriteria: evalRun.acceptanceCriteria,
           mcpPolicy: evalRun.mcpPolicy,
         },
         note: 'The person now sees a card to start this run by confirming its budget. Tell them the estimate and the budget; you cannot start it.',

@@ -117,7 +117,18 @@ cancelled Eval Run starts nothing more but is still driven until its in-flight
 trials are scored. A trial's cost is its Agent Run — charged to the budget when
 it is claimed for scoring — plus each LLM judge call, charged as it is made and
 kept on the Score it produced (`_lib/model-prices.ts` prices those). An Eval
-Run's report is computed from the Scores on read, never stored.
+Run's report is computed from the Scores on read, never stored — per variant,
+with the verdict on each frozen Acceptance Criterion and the confidence
+calibration, from platform-core's pure rules. A variant is a patch the
+runtime applies to its trials (platform-ui's `execute-agent-step.ts` reads the
+trial's variant); the driver does not know variants exist.
+
+**A Step Qualification binds a Step Fingerprint.** `_lib/step-fingerprint.ts`
+hashes each part of a step that shapes its behaviour on its own, so the badge
+(`getStepQualification`) can say which part changed. `signStepQualification`
+re-authenticates with the same `users/_lib/check-password.ts` as
+`setPassword`, audits a wrong password, refuses an API key and a cancelled run,
+and the record it writes is never changed.
 
 **Assistants share building blocks.** `src/assistant-core/` holds the pieces
 the workflow editor assistant and the Evaluation Assistant both use

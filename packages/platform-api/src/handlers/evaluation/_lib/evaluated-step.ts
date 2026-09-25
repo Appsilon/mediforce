@@ -16,20 +16,28 @@ export interface LoadedStep {
 
 /**
  * The agent Step an Evaluation call is about, as it stands in the workflow's
- * runnable version, with the caller's right to act on it checked: `read` needs
- * only to see the workflow, `edit` and `run` ask its Access rows (ADR-0019).
- * `run` gates what executes on the Step's behalf — check code, a paid judge.
- * An invisible workflow reads as missing, never as forbidden.
+ * runnable version — or in `version`, when given — with the caller's right to
+ * act on it checked: `read` needs only to see the workflow, `edit` and `run`
+ * ask its Access rows (ADR-0019). `run` gates what executes on the Step's
+ * behalf — check code, a paid judge. An invisible workflow reads as missing,
+ * never as forbidden.
  */
 export async function loadEvaluatedStep(
   scope: CallerScope,
   ref: EvaluatedStep,
   verb: 'read' | 'edit' | 'run',
+  version?: number,
 ): Promise<LoadedStep> {
-  const resolution = await resolveRunnableVersion(scope.workflowDefinitions, ref.namespace, ref.workflowName);
-  if (!resolution.ok) throw new NotFoundError(`Workflow '${ref.workflowName}' not found`);
-  const definition = await scope.workflowDefinitions.get(ref.namespace, ref.workflowName, resolution.def.version);
-  if (definition === null) throw new NotFoundError(`Workflow '${ref.workflowName}' not found`);
+  let pinned = version;
+  if (pinned === undefined) {
+    const resolution = await resolveRunnableVersion(scope.workflowDefinitions, ref.namespace, ref.workflowName);
+    if (resolution.ok === false) throw new NotFoundError(`Workflow '${ref.workflowName}' not found`);
+    pinned = resolution.def.version;
+  }
+  const definition = await scope.workflowDefinitions.get(ref.namespace, ref.workflowName, pinned);
+  if (definition === null) {
+    throw new NotFoundError(`Workflow '${ref.workflowName}'${version === undefined ? '' : ` v${version}`} not found`);
+  }
   const step = definition.steps.find((candidate) => candidate.id === ref.stepId);
   if (step === undefined) {
     throw new NotFoundError(`Step '${ref.stepId}' not found in '${ref.workflowName}' v${definition.version}`);
@@ -51,4 +59,9 @@ export async function loadEvaluatedStep(
 
 export function stepRef(row: EvaluatedStep): EvaluatedStep {
   return { namespace: row.namespace, workflowName: row.workflowName, stepId: row.stepId };
+}
+
+/** Whether a row belongs to this Step. */
+export function isSameStep(row: EvaluatedStep, step: EvaluatedStep): boolean {
+  return row.namespace === step.namespace && row.workflowName === step.workflowName && row.stepId === step.stepId;
 }

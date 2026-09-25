@@ -1,7 +1,7 @@
-import type { EvalRunOutput } from '@mediforce/platform-api/contract';
+import type { EvalChallenger, EvalRunOutput } from '@mediforce/platform-api/contract';
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson, type OutputSink } from '../output';
-import { STEP_ARGS, stepFrom } from './eval-step-args';
+import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
 
 function percent(value: number | null): string {
   return value === null ? '   -' : `${(value * 100).toFixed(0).padStart(3)}%`;
@@ -9,13 +9,33 @@ function percent(value: number | null): string {
 
 function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void {
   const estimate = evalRun.estimate.totalUsd === null ? 'no estimate' : `est. $${evalRun.estimate.totalUsd} (${evalRun.estimate.basis})`;
-  output.stdout(`${evalRun.id}  ${evalRun.status}  ${evalRun.caseIds.length} case(s) × ${evalRun.trialsPerCase}  budget $${evalRun.budgetUsd}, spent $${evalRun.spentUsd.toFixed(4)}  ${estimate}`);
+  output.stdout(`${evalRun.id}  ${evalRun.status}  ${evalRun.caseIds.length} case(s) × ${evalRun.trialsPerCase} × ${evalRun.variants.length} variant(s)  budget $${evalRun.budgetUsd}, spent $${evalRun.spentUsd.toFixed(4)}  ${estimate}`);
   output.stdout(`trials: ${report.trials.scored} scored, ${report.trials.failed} failed, ${report.trials.skipped} skipped, ${report.trials.inProgress} in progress`);
-  output.stdout('evaluator                 pass   95% CI        pass@k pass^k flaky  errors');
-  for (const evaluator of report.evaluators) {
-    const interval = evaluator.wilsonLower === null ? '      -      ' : `[${percent(evaluator.wilsonLower)}, ${percent(evaluator.wilsonUpper)}]`;
-    const counted = evaluator.counted ? '' : `  not counted (${evaluator.reason})`;
-    output.stdout(`${evaluator.name.padEnd(24)} ${percent(evaluator.passRate)}  ${interval}  ${percent(evaluator.passAtK)}  ${percent(evaluator.passHatK)} ${percent(evaluator.flakiness)}  ${String(evaluator.errors).padStart(3)}${counted}`);
+  if (evalRun.acceptanceCriteria === null) output.stdout('no Acceptance Criteria frozen into this run');
+  for (const variant of report.variants) {
+    const patch = Object.keys(variant.patch).length === 0 ? '' : `  ${JSON.stringify(variant.patch)}`;
+    output.stdout(`\n${variant.id} — ${variant.label}${patch}`);
+    output.stdout('evaluator                 pass   95% CI        pass@k pass^k flaky  errors');
+    for (const evaluator of variant.evaluators) {
+      const interval = evaluator.wilsonLower === null ? '      -      ' : `[${percent(evaluator.wilsonLower)}, ${percent(evaluator.wilsonUpper)}]`;
+      const counted = evaluator.counted ? '' : `  not counted (${evaluator.reason})`;
+      output.stdout(`${evaluator.name.padEnd(24)} ${percent(evaluator.passRate)}  ${interval}  ${percent(evaluator.passAtK)}  ${percent(evaluator.passHatK)} ${percent(evaluator.flakiness)}  ${String(evaluator.errors).padStart(3)}${counted}`);
+    }
+    for (const verdict of variant.criteria) {
+      output.stdout(`criterion ${verdict.severity}: ${verdict.status.replace('_', ' ')} — ${verdict.reason}`);
+    }
+    if (variant.confidence !== null) output.stdout(`confidence: ECE ${variant.confidence.ece.toFixed(3)} over ${variant.confidence.count} trial(s)`);
+    if (variant.recommendation !== null) {
+      const threshold = variant.recommendation.confidenceThreshold === null ? '' : ` above confidence ${variant.recommendation.confidenceThreshold}`;
+      output.stdout(`routing: ${variant.recommendation.autonomyLevel}${threshold} — ${variant.recommendation.reason}`);
+    }
+  }
+  for (const comparison of report.comparison) {
+    output.stdout(`\n${comparison.variantId} vs champion:`);
+    for (const evaluator of comparison.evaluators) {
+      const delta = evaluator.delta === null ? '-' : `${evaluator.delta >= 0 ? '+' : ''}${(evaluator.delta * 100).toFixed(0)}pp`;
+      output.stdout(`  ${evaluator.name.padEnd(24)} ${percent(evaluator.championPassRate)} → ${percent(evaluator.challengerPassRate)}  ${delta}  ${evaluator.verdict.replace(/_/g, ' ')}`);
+    }
   }
 }
 
@@ -28,6 +48,7 @@ export const evalRunPrepareCommand = defineCommand({
     trials: { type: 'string', description: 'Trials per case (default: 3)' },
     concurrency: { type: 'string', description: 'Trials at once (default: 2)' },
     budget: { type: 'string', description: 'Spend cap in USD (default: 1.5× the estimate)' },
+    challengers: { type: 'string', description: 'JSON file with up to 3 challengers: [{ "label": "GPT-5", "patch": { "model": "openai/gpt-5" } }]' },
   },
   async run({ args, output, mediforce, jsonMode }) {
     const trials = parsePositiveIntArg(args.trials);
@@ -42,6 +63,7 @@ export const evalRunPrepareCommand = defineCommand({
       ...(trials !== undefined ? { trialsPerCase: trials } : {}),
       ...(concurrency !== undefined ? { concurrency } : {}),
       ...(args.budget !== undefined ? { budgetUsd: Number(args.budget) } : {}),
+      ...(args.challengers !== undefined ? { challengers: readJsonFile(args.challengers) as EvalChallenger[] } : {}),
     });
     if (jsonMode) {
       printJson(output, result);
@@ -73,7 +95,7 @@ export const evalRunStartCommand = defineCommand({
 
 export const evalRunGetCommand = defineCommand({
   name: 'mediforce eval report',
-  description: 'Print an Eval Run and its report: per Evaluator pass rate, Wilson 95% interval, pass@k, pass^k, flakiness.',
+  description: 'Print an Eval Run and its report: per variant and Evaluator pass rate, Wilson 95% interval, pass@k, pass^k, flakiness; criteria verdicts, routing, and each challenger against the champion.',
   args: { evalRunId: { type: 'positional', required: true, description: 'Eval Run id' } },
   async run({ args, output, mediforce, jsonMode }) {
     const result = await mediforce.evaluation.getRun({ evalRunId: args.evalRunId });

@@ -5,13 +5,15 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { InMemoryEvaluationRepository } from '@mediforce/platform-core';
+import { InMemoryEvaluationRepository, STEP_FINGERPRINT_COMPONENTS, type StepFingerprint } from '@mediforce/platform-core';
 import type {
   EvalCase,
+  EvalRun,
   EvaluatedStep,
   EvaluationRepository,
   Evaluator,
   EvaluatorVersion,
+  StepQualification,
 } from '@mediforce/platform-core';
 import { PostgresEvaluationRepository } from '../repositories/evaluation-repository';
 import * as schema from '../schema/index';
@@ -24,6 +26,13 @@ const skipPg = !DATABASE_URL;
 
 const step: EvaluatedStep = { namespace: 'ws-1', workflowName: 'ae-grading', stepId: 'grade-aes' };
 const otherStep: EvaluatedStep = { ...step, stepId: 'extract-aes' };
+
+function fingerprint(digit: string): StepFingerprint {
+  return {
+    hash: digit.repeat(64),
+    components: Object.fromEntries(STEP_FINGERPRINT_COMPONENTS.map((component) => [component, digit.repeat(64)])) as StepFingerprint['components'],
+  };
+}
 
 function buildEvaluator(overrides: Partial<Evaluator> = {}): Evaluator {
   return {
@@ -196,6 +205,12 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         trialsPerCase: 2,
         concurrency: 2,
         evaluators: [{ evaluatorId: randomUUID(), name: 'findings-present', version: 1, kind: 'schema' as const, severity: 'critical' as const, counted: true }],
+        variants: [
+          { id: 'champion', label: 'Current step', patch: {}, fingerprint: fingerprint('a') },
+          { id: 'challenger-1', label: 'GPT-5', patch: { model: 'openai/gpt-5' }, fingerprint: fingerprint('b') },
+        ],
+        acceptanceCriteria: { critical: { minPassRate: 0.9, minPassHatK: 0.8 } },
+        briefVersion: 2,
         mcpPolicy: { edc: { mode: 'deny' as const } },
         estimate: { perTrialUsd: 0.25, totalUsd: 0.5, basis: 'history' as const, sampleSize: 4 },
         budgetUsd: 1,
@@ -207,9 +222,9 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         completedAt: null,
       };
       const trials = [0, 1].map((trialIndex) => ({
-        id: randomUUID(), evalRunId: run.id, caseId, trialIndex, status: 'pending' as const,
+        id: randomUUID(), evalRunId: run.id, caseId, variantId: 'champion', trialIndex, status: 'pending' as const,
         processInstanceId: null, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null,
-        durationMs: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null,
+        durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null,
       }));
       await repo.createEvalRun(run, trials);
 
@@ -245,6 +260,70 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect(await repo.listEvalRunIdsToDrive()).toEqual([]);
     });
 
+    it('orders trials by case, variant, then trial index, and keeps a trial\'s confidence', async () => {
+      const dataset = await repo.appendDatasetVersion({
+        ...step, id: randomUUID(), version: 1, caseIds: [randomUUID()], containsProductionData: false,
+        createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z',
+      });
+      const run = storedRun(dataset.id, dataset.caseIds);
+      const trials = (['challenger-1', 'champion'] as const).flatMap((variantId) => [1, 0].map((trialIndex) => ({
+        id: randomUUID(), evalRunId: run.id, caseId: dataset.caseIds[0]!, variantId, trialIndex, status: 'pending' as const,
+        processInstanceId: null, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null,
+        durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null,
+      })));
+      await repo.createEvalRun(run, trials);
+      await repo.transitionTrial(trials[0]!.id, 'pending', { status: 'skipped', confidence: 0.75 });
+
+      const listed = await repo.listTrials(run.id);
+      expect(listed.map((trial) => [trial.variantId, trial.trialIndex])).toEqual([
+        ['challenger-1', 0], ['challenger-1', 1], ['champion', 0], ['champion', 1],
+      ]);
+      expect(listed.find((trial) => trial.id === trials[0]!.id)?.confidence).toBe(0.75);
+    });
+
+    it('versions a step\'s Acceptance Criteria, newest first', async () => {
+      const base = { ...step, origin: 'user' as const, createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z' };
+      const first = await repo.appendAcceptanceCriteria({ ...base, version: 1, criteria: { critical: { minPassRate: 0.9 } } });
+      const second = await repo.appendAcceptanceCriteria({
+        ...base, version: 2, origin: 'assistant', criteria: { critical: { minPassRate: 0.95, minPassHatK: 0.9 }, minor: { minPassRate: 0.5 } },
+      });
+
+      expect(await repo.listAcceptanceCriteria(step)).toEqual([second, first]);
+      expect(await repo.listAcceptanceCriteria(otherStep)).toEqual([]);
+      await expect(repo.appendAcceptanceCriteria({ ...base, version: 2, criteria: { major: { minPassRate: 0.8 } } })).rejects.toThrow();
+    });
+
+    it('keeps signed Step Qualifications, newest first', async () => {
+      const dataset = await repo.appendDatasetVersion({
+        ...step, id: randomUUID(), version: 1, caseIds: [randomUUID()], containsProductionData: false,
+        createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z',
+      });
+      const run = storedRun(dataset.id, dataset.caseIds);
+      await repo.createEvalRun(run, []);
+      const qualification = (signedAt: string): StepQualification => ({
+        ...step,
+        id: randomUUID(),
+        evalRunId: run.id,
+        definitionVersion: 3,
+        variantId: 'challenger-1',
+        variantLabel: 'GPT-5',
+        patch: { model: 'openai/gpt-5' },
+        fingerprint: fingerprint('b'),
+        briefVersion: 2,
+        evaluators: run.evaluators,
+        mcpPolicy: run.mcpPolicy,
+        acceptanceCriteria: { critical: { minPassRate: 0.9 } },
+        verdicts: [{ severity: 'critical', criterion: { minPassRate: 0.9 }, status: 'missed', evaluators: [], reason: 'findings-present: lower bound 80% < 90%' }],
+        deviations: [{ severity: 'critical', justification: 'Every miss was a formatting slip a reviewer catches.' }],
+        signature: { signerId: 'author-1', signerName: 'Ada Author', meaning: 'Approval', signedAt, reauthentication: 'password' },
+      });
+      const older = await repo.createQualification(qualification('2026-09-23T10:00:00.000Z'));
+      const newer = await repo.createQualification(qualification('2026-09-23T11:00:00.000Z'));
+
+      expect(await repo.listQualifications(step)).toEqual([newer, older]);
+      expect(await repo.listQualifications(otherStep)).toEqual([]);
+    });
+
     it('replaces a step\'s MCP eval policy', async () => {
       expect(await repo.getMcpPolicy(step)).toBeNull();
       await repo.putMcpPolicy({ ...step, servers: { edc: { mode: 'deny' } }, updatedBy: 'author-1', updatedAt: '2026-09-23T08:00:00.000Z' });
@@ -255,6 +334,34 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect(await repo.getMcpPolicy(otherStep)).toBeNull();
     });
   });
+}
+
+function storedRun(datasetVersionId: string, caseIds: string[]): EvalRun {
+  return {
+    ...step,
+    id: randomUUID(),
+    definitionVersion: 3,
+    datasetVersionId,
+    caseIds,
+    trialsPerCase: 2,
+    concurrency: 2,
+    evaluators: [{ evaluatorId: randomUUID(), name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
+    variants: [
+      { id: 'champion', label: 'Current step', patch: {}, fingerprint: fingerprint('a') },
+      { id: 'challenger-1', label: 'GPT-5', patch: { model: 'openai/gpt-5' }, fingerprint: fingerprint('b') },
+    ],
+    acceptanceCriteria: null,
+    briefVersion: null,
+    mcpPolicy: {},
+    estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
+    budgetUsd: 1,
+    spentUsd: 0,
+    status: 'prepared',
+    createdBy: 'author-1',
+    createdAt: '2026-09-23T08:00:00.000Z',
+    startedAt: null,
+    completedAt: null,
+  };
 }
 
 contract('InMemoryEvaluationRepository', async () => new InMemoryEvaluationRepository());
@@ -293,7 +400,8 @@ describe.skipIf(skipPg)('PostgresEvaluationRepository (parity)', () => {
     await testClient.unsafe(
       `TRUNCATE TABLE "${schemaName}"."evaluation_briefs", "${schemaName}"."evaluators", "${schemaName}"."evaluator_versions", ` +
         `"${schemaName}"."eval_cases", "${schemaName}"."eval_dataset_versions", "${schemaName}"."mcp_eval_policies", ` +
-        `"${schemaName}"."eval_runs", "${schemaName}"."eval_trials"`,
+        `"${schemaName}"."eval_runs", "${schemaName}"."eval_trials", "${schemaName}"."eval_acceptance_criteria", ` +
+        `"${schemaName}"."step_qualifications"`,
     );
     return new PostgresEvaluationRepository(drizzle(testClient, { schema }));
   });

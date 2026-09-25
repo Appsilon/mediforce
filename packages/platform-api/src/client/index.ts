@@ -563,6 +563,14 @@ import {
   FreezeEvalDatasetOutputSchema,
   GetEvaluationBriefInputSchema,
   GetEvaluationBriefOutputSchema,
+  GetAcceptanceCriteriaInputSchema,
+  GetAcceptanceCriteriaOutputSchema,
+  SetAcceptanceCriteriaInputSchema,
+  SetAcceptanceCriteriaOutputSchema,
+  GetStepQualificationInputSchema,
+  GetStepQualificationOutputSchema,
+  SignStepQualificationInputSchema,
+  SignStepQualificationOutputSchema,
   GetEvaluatorInputSchema,
   GetMcpEvalPolicyInputSchema,
   GetMcpEvalPolicyOutputSchema,
@@ -602,6 +610,14 @@ import {
   type FreezeEvalDatasetOutput,
   type GetEvaluationBriefInput,
   type GetEvaluationBriefOutput,
+  type GetAcceptanceCriteriaInput,
+  type GetAcceptanceCriteriaOutput,
+  type SetAcceptanceCriteriaInput,
+  type SetAcceptanceCriteriaOutput,
+  type GetStepQualificationInput,
+  type GetStepQualificationOutput,
+  type SignStepQualificationInput,
+  type SignStepQualificationOutput,
   type GetEvaluatorInput,
   type GetMcpEvalPolicyInput,
   type GetMcpEvalPolicyOutput,
@@ -1019,7 +1035,10 @@ export class Mediforce {
     list: (input?: ListScoresInput) => Promise<ListScoresOutput>;
   };
 
-  /** The Evaluation domain (ADR-0023): Briefs, Evaluators, Eval Cases, Datasets, MCP eval policies. */
+  /**
+   * The Evaluation domain (ADR-0023): Briefs, Evaluators, Eval Cases, Datasets,
+   * MCP eval policies, Acceptance Criteria, Eval Runs and Step Qualifications.
+   */
   readonly evaluation: {
     getBrief: (input: GetEvaluationBriefInput) => Promise<GetEvaluationBriefOutput>;
     setBrief: (input: SetEvaluationBriefInput) => Promise<SetEvaluationBriefOutput>;
@@ -1049,6 +1068,10 @@ export class Mediforce {
     getRun: (input: GetEvalRunInput) => Promise<EvalRunOutput>;
     listRuns: (input: ListEvalRunsInput) => Promise<ListEvalRunsOutput>;
     cancelRun: (input: CancelEvalRunInput) => Promise<EvalRunOutput>;
+    getAcceptanceCriteria: (input: GetAcceptanceCriteriaInput) => Promise<GetAcceptanceCriteriaOutput>;
+    setAcceptanceCriteria: (input: SetAcceptanceCriteriaInput) => Promise<SetAcceptanceCriteriaOutput>;
+    getQualification: (input: GetStepQualificationInput) => Promise<GetStepQualificationOutput>;
+    signQualification: (input: SignStepQualificationInput) => Promise<SignStepQualificationOutput>;
     // `signal` aborts the request: an assistant turn is long enough that a person will want to stop it.
     // `onProgress` streams the turn's model rounds and tool calls as they happen.
     askAssistant: (
@@ -2570,6 +2593,28 @@ export class Mediforce {
         return this.sendJson('POST', `/api/evaluation/runs/${encodeURIComponent(evalRunId)}/cancel`, undefined,
           EvalRunOutputSchema, 'mediforce.evaluation.cancelRun');
       },
+      getAcceptanceCriteria: async (input) => {
+        const step = GetAcceptanceCriteriaInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/acceptance-criteria${toSearchParams(step)}`, GetAcceptanceCriteriaOutputSchema, 'mediforce.evaluation.getAcceptanceCriteria');
+      },
+      setAcceptanceCriteria: async (input) => this.sendJson(
+        'POST', '/api/evaluation/acceptance-criteria', SetAcceptanceCriteriaInputSchema.parse(input),
+        SetAcceptanceCriteriaOutputSchema, 'mediforce.evaluation.setAcceptanceCriteria',
+      ),
+      getQualification: async (input) => {
+        const validated = GetStepQualificationInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflowName: validated.workflowName,
+          stepId: validated.stepId,
+          definitionVersion: validated.definitionVersion === undefined ? undefined : String(validated.definitionVersion),
+        });
+        return this.getJson(`/api/evaluation/qualification${qs}`, GetStepQualificationOutputSchema, 'mediforce.evaluation.getQualification');
+      },
+      signQualification: async (input) => this.sendJson(
+        'POST', '/api/evaluation/qualification', SignStepQualificationInputSchema.parse(input),
+        SignStepQualificationOutputSchema, 'mediforce.evaluation.signQualification',
+      ),
       askAssistant: async (input, options) => {
         const body = AskEvaluationAssistantInputSchema.parse(input);
         const ctx = 'mediforce.evaluation.askAssistant';

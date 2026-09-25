@@ -1,5 +1,9 @@
 import { and, asc, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import {
+  AcceptanceCriteriaVersionSchema,
+  StepQualificationSchema,
+  type AcceptanceCriteriaVersion,
+  type StepQualification,
   EvalRunSchema,
   EvalTrialSchema,
   type EvalRun,
@@ -26,6 +30,7 @@ import {
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import type { Database } from '../client';
 import {
+  evalAcceptanceCriteria,
   evalCases,
   evalDatasetVersions,
   evalRuns,
@@ -34,6 +39,7 @@ import {
   evaluatorVersions,
   evaluators,
   mcpEvalPolicies,
+  stepQualifications,
 } from '../schema/evaluation';
 
 type StepColumns = {
@@ -143,6 +149,9 @@ function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
     trialsPerCase: row.trialsPerCase,
     concurrency: row.concurrency,
     evaluators: row.evaluators,
+    variants: row.variants,
+    acceptanceCriteria: row.acceptanceCriteria,
+    briefVersion: row.briefVersion,
     mcpPolicy: row.mcpPolicy,
     estimate: row.estimate,
     budgetUsd: row.budgetUsd,
@@ -152,6 +161,17 @@ function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
     createdAt: row.createdAt.toISOString(),
     startedAt: row.startedAt?.toISOString() ?? null,
     completedAt: row.completedAt?.toISOString() ?? null,
+  });
+}
+
+function toCriteria(row: typeof evalAcceptanceCriteria.$inferSelect): AcceptanceCriteriaVersion {
+  return AcceptanceCriteriaVersionSchema.parse({
+    ...stepFields(row),
+    version: row.version,
+    criteria: row.criteria,
+    origin: row.origin,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt.toISOString(),
   });
 }
 
@@ -355,6 +375,52 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
       .returning();
     return toPolicy(row!);
   }
+  async appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> {
+    const parsed = AcceptanceCriteriaVersionSchema.parse(criteria);
+    const [row] = await this.db.insert(evalAcceptanceCriteria).values({
+      workspace: parsed.namespace,
+      workflowName: parsed.workflowName,
+      stepId: parsed.stepId,
+      version: parsed.version,
+      criteria: parsed.criteria,
+      origin: parsed.origin,
+      createdBy: parsed.createdBy,
+      createdAt: new Date(parsed.createdAt),
+    }).returning();
+    return toCriteria(row!);
+  }
+
+  async listAcceptanceCriteria(step: EvaluatedStep): Promise<AcceptanceCriteriaVersion[]> {
+    const rows = await this.db.select().from(evalAcceptanceCriteria)
+      .where(onStep(evalAcceptanceCriteria, step))
+      .orderBy(desc(evalAcceptanceCriteria.version));
+    return rows.map(toCriteria);
+  }
+
+  async createQualification(qualification: StepQualification): Promise<StepQualification> {
+    const parsed = StepQualificationSchema.parse(qualification);
+    await this.db.insert(stepQualifications).values({
+      id: parsed.id,
+      workspace: parsed.namespace,
+      workflowName: parsed.workflowName,
+      stepId: parsed.stepId,
+      evalRunId: parsed.evalRunId,
+      variantId: parsed.variantId,
+      fingerprint: parsed.fingerprint.hash,
+      record: parsed,
+      signedBy: parsed.signature.signerId,
+      signedAt: new Date(parsed.signature.signedAt),
+    });
+    return parsed;
+  }
+
+  async listQualifications(step: EvaluatedStep): Promise<StepQualification[]> {
+    const rows = await this.db.select().from(stepQualifications)
+      .where(onStep(stepQualifications, step))
+      .orderBy(desc(stepQualifications.signedAt), desc(stepQualifications.id));
+    return rows.map((row) => StepQualificationSchema.parse(row.record));
+  }
+
   async createEvalRun(run: EvalRun, trials: readonly EvalTrial[]): Promise<void> {
     const parsed = EvalRunSchema.parse(run);
     await this.db.transaction(async (tx) => {
@@ -369,6 +435,9 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
         trialsPerCase: parsed.trialsPerCase,
         concurrency: parsed.concurrency,
         evaluators: parsed.evaluators,
+        variants: parsed.variants,
+        acceptanceCriteria: parsed.acceptanceCriteria,
+        briefVersion: parsed.briefVersion,
         mcpPolicy: parsed.mcpPolicy,
         estimate: parsed.estimate,
         budgetUsd: parsed.budgetUsd,
@@ -432,7 +501,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
   async listTrials(evalRunId: string): Promise<EvalTrial[]> {
     const rows = await this.db.select().from(evalTrials)
       .where(eq(evalTrials.evalRunId, evalRunId))
-      .orderBy(asc(evalTrials.caseId), asc(evalTrials.trialIndex));
+      .orderBy(asc(evalTrials.caseId), asc(evalTrials.variantId), asc(evalTrials.trialIndex));
     return rows.map(toTrial);
   }
 

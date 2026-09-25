@@ -7,6 +7,7 @@ import {
   JUDGE_MIN_FAILURE_LABELS,
   JUDGE_MIN_LABELS,
   JUDGE_PASS_VALUE,
+  describeAcceptanceCriteria,
   type EvaluatedStep,
 } from '@mediforce/platform-core';
 import type { EvaluatorSelfTest, ProposalView } from '@mediforce/platform-api/contract';
@@ -15,17 +16,24 @@ import { cn } from '@/lib/utils';
 import { useAgentRun } from '@/hooks/use-agent-runs';
 import { useEvaluatorLabels, useStepEvaluationMutation, useStepEvaluators } from '@/hooks/use-step-evaluation';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 
 export type ProposalStatus = 'open' | 'accepted' | 'rejected';
 
 type Proposal<Tool extends ProposalView['tool']> = Extract<ProposalView, { tool: Tool }>;
 
-/** The proposals a person accepts or rejects as they stand; a plan and a labelling queue are worked through instead. */
-type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_outputs_to_label' }>;
+/**
+ * The proposals a person accepts or rejects as they stand. A plan and a
+ * labelling queue are worked through instead; a routing recommendation is
+ * applied in the workflow editor.
+ */
+type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_outputs_to_label' | 'propose_control_settings' }>;
 
 export function isDecidable(proposal: ProposalView): proposal is DecidableProposal {
-  return proposal.tool !== 'propose_evaluation_plan' && proposal.tool !== 'propose_outputs_to_label';
+  return proposal.tool !== 'propose_evaluation_plan'
+    && proposal.tool !== 'propose_outputs_to_label'
+    && proposal.tool !== 'propose_control_settings';
 }
 
 const buttonClass = 'inline-flex items-center gap-1 rounded border px-2 py-0.5 disabled:opacity-50 disabled:pointer-events-none';
@@ -37,6 +45,7 @@ const TITLES: Record<DecidableProposal['tool'], string> = {
   propose_eval_case: 'Eval Case',
   propose_perturbed_case: 'synthesized Eval Case',
   propose_brief: 'Evaluation Brief',
+  propose_acceptance_criteria: 'Acceptance Criteria',
 };
 
 /** Accepting a proposal is the same write a person's own form makes, marked as the assistant's. */
@@ -62,6 +71,8 @@ async function acceptProposal(step: EvaluatedStep, proposal: DecidableProposal):
     }
     case 'propose_brief':
       return mediforce.evaluation.setBrief({ ...step, text: proposal.arguments.text, origin: 'assistant' });
+    case 'propose_acceptance_criteria':
+      return mediforce.evaluation.setAcceptanceCriteria({ ...step, criteria: proposal.arguments.criteria, origin: 'assistant' });
   }
 }
 
@@ -128,6 +139,8 @@ function ProposalSummary({ step, proposal }: { step: EvaluatedStep; proposal: De
       return <>{proposal.arguments.name} — {proposal.arguments.expectation}</>;
     case 'propose_perturbed_case':
       return <>{perturbedCaseSummary(proposal.arguments)}</>;
+    case 'propose_acceptance_criteria':
+      return <>{describeAcceptanceCriteria(proposal.arguments.criteria)}{`\n${proposal.arguments.rationale}`}</>;
   }
 }
 
@@ -207,12 +220,20 @@ const SEVERITY_CLASSES = {
  * An evaluation plan, its risks highest first. It creates nothing: the person
  * picks a risk and the assistant drafts, previews and proposes its check.
  */
-export function PlanCard({ plan, onDraft, busy }: {
+export function PlanCard({ step, plan, onDraft, busy, mayEdit, editReason }: {
+  step: EvaluatedStep;
   plan: Proposal<'propose_evaluation_plan'>['arguments'];
   onDraft: (message: string) => void;
   busy: boolean;
+  mayEdit: boolean;
+  editReason: string | undefined;
 }) {
   const { acceptanceCriteria: criteria } = plan;
+  const adopt = useStepEvaluationMutation(step, () => mediforce.evaluation.setAcceptanceCriteria({
+    ...step,
+    criteria: { critical: { minPassRate: criteria.critical }, major: { minPassRate: criteria.major }, minor: { minPassRate: criteria.minor } },
+    origin: 'assistant',
+  }));
   return (
     <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="plan-card">
       <div className="mb-1 font-medium">Evaluation plan</div>
@@ -241,7 +262,41 @@ export function PlanCard({ plan, onDraft, busy }: {
       </ol>
       <p className="mt-2 text-muted-foreground">
         Suggested Acceptance Criteria — minimum pass rate on its Wilson 95% lower bound: critical {criteria.critical}, major {criteria.major}, minor {criteria.minor}.
-        Not stored: Eval Runs do not judge against criteria yet.
+        The next Eval Run prepared is judged against the criteria set then.
+      </p>
+      <div className="mt-1 flex items-center gap-1.5">
+        <InstantTooltip label={editReason}>
+          <span className="inline-flex">
+            <button type="button" className={buttonClass} disabled={mayEdit === false || adopt.isPending || adopt.isSuccess} onClick={() => adopt.mutate(undefined)}>
+              {adopt.isSuccess ? 'Criteria set' : 'Use as Acceptance Criteria'}
+            </button>
+          </span>
+        </InstantTooltip>
+        {adopt.error !== null && <span className="text-destructive">{adopt.error.message}</span>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The assistant's routing recommendation after an Eval Run: a Control Mode
+ * and, for Control Mode 4, the confidence below which the step's fallback takes over.
+ * The person applies it in the workflow editor; neither setting is part of
+ * the Step Fingerprint, so applying it keeps a qualification.
+ */
+export function ControlSettingsCard({ proposal }: { proposal: Proposal<'propose_control_settings'>['arguments'] }) {
+  return (
+    <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="control-settings-card">
+      <div className="mb-1 font-medium">
+        Recommended routing: <ControlModeBadge executor="agent" autonomyLevel={proposal.autonomyLevel} showNumber />
+      </div>
+      {proposal.confidenceThreshold !== undefined && (
+        <p>Confidence threshold {proposal.confidenceThreshold}: below it, the step&apos;s fallbackBehavior applies.</p>
+      )}
+      <p className="mt-0.5 whitespace-pre-wrap text-muted-foreground">{proposal.rationale}</p>
+      <p className="mt-1 text-muted-foreground">
+        From Eval Run <span className="font-mono">{proposal.evalRunId.slice(0, 8)}</span>, variant {proposal.variantId}. Apply it in the workflow editor;
+        Control Mode and confidence threshold are not part of the Step Fingerprint, so a qualification stays valid.
       </p>
     </div>
   );
