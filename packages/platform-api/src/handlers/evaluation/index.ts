@@ -18,6 +18,7 @@ export {
   createEvalCasesFromLabels,
   archiveEvalCase,
 } from './eval-cases';
+export { createRedTeamEvalCases } from './red-team-cases';
 export { listEvalDatasets, freezeEvalDataset } from './eval-datasets';
 export { getMcpEvalPolicy, setMcpEvalPolicy } from './mcp-eval-policy';
 export {
