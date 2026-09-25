@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { evalCaseFromRunCommand, evalCasePerturbCommand, evalCasesFromLabelsCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
-import { evalEvaluatorLabelCommand } from '../commands/eval-evaluators';
+import { evalEvaluatorLabelCommand, evalEvaluatorProductionCommand } from '../commands/eval-evaluators';
 import { evalCriteriaSetCommand, evalQualificationCommand } from '../commands/eval-qualification';
 import { captureOutput, jsonResponse } from './test-helpers';
 
@@ -81,6 +81,36 @@ describe('mediforce eval', () => {
     const output = captureOutput();
     const code = await evalEvaluatorLabelCommand({ argv: ['0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', '--agent-run', 'ar-1', ...BASE], env: ENV, output });
     expect(code).toBe(2);
+  });
+
+  it('evaluator-production --on posts the flag and prints that it waits until it counts', async () => {
+    const evaluatorId = '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
+    const latest = {
+      evaluatorId, version: 1, rule: 'A fatal AE is graded 5.', severity: 'critical', check: { kind: 'code', runtime: 'python', source: 'print(1)' },
+      origin: 'user', sourceApproval: null, calibration: null, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
+    };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      evaluator: {
+        namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', id: evaluatorId, name: 'grade-5-flagged', archived: false,
+        runInProduction: true, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z', latest, versions: [latest],
+        trust: { trusted: false, reason: 'source not approved' },
+        production: { active: false, reason: 'in production once it counts (source not approved)' },
+      },
+    }));
+    const output = captureOutput();
+    const code = await evalEvaluatorProductionCommand({ argv: [evaluatorId, '--on', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe(`http://localhost:5555/api/evaluation/evaluators/${evaluatorId}/production`);
+    expect(JSON.parse(String(init?.body))).toEqual({ runInProduction: true });
+    expect(output.stdoutLines.join('\n')).toContain('production: in production once it counts (source not approved)');
+  });
+
+  it('evaluator-production refuses both or neither of --on and --off', async () => {
+    const output = captureOutput();
+    expect(await evalEvaluatorProductionCommand({ argv: ['0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', ...BASE], env: ENV, output })).toBe(2);
+    expect(await evalEvaluatorProductionCommand({ argv: ['0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', '--on', '--off', ...BASE], env: ENV, output })).toBe(2);
   });
 
   it('mcp-policy-set sends the servers map from the file', async () => {

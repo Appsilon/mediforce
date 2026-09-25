@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ConflictError, NotFoundError } from '../../../errors';
 import { userCaller } from '../../../repositories/__tests__/create-test-scope';
-import { createEvaluator, addEvaluatorVersion, archiveEvaluator, listEvaluators } from '../evaluators';
+import { createEvaluator, addEvaluatorVersion, archiveEvaluator, listEvaluators, setEvaluatorProduction } from '../evaluators';
 import { evaluationFixture, STEP, type EvaluationFixture } from './fixture';
 
 const findingsSchema = { kind: 'schema' as const, schema: { required: ['findings'] } };
@@ -54,6 +54,40 @@ describe('Evaluators', () => {
 
     expect((await listEvaluators(STEP, fixture.scope())).evaluators).toEqual([]);
     expect((await listEvaluators({ ...STEP, includeArchived: true }, fixture.scope())).evaluators).toHaveLength(1);
+  });
+
+  it('starts out of production and runs there once flagged, audited', async () => {
+    const { evaluator } = await createEvaluator(
+      { ...STEP, name: 'findings-present', rule: 'r', severity: 'critical', check: findingsSchema, origin: 'user' },
+      fixture.scope(),
+    );
+    expect(evaluator).toMatchObject({ runInProduction: false, production: { active: false } });
+
+    const { evaluator: flagged } = await setEvaluatorProduction({ evaluatorId: evaluator.id, runInProduction: true }, fixture.scope());
+
+    expect(flagged).toMatchObject({ runInProduction: true, production: { active: true } });
+    expect((await fixture.evaluationRepo.getEvaluator(evaluator.id))?.runInProduction).toBe(true);
+    const events = await fixture.auditRepo.getByEntity('evaluator', evaluator.id);
+    expect(events.map((event) => event.action)).toContain('evaluator.production_enabled');
+  });
+
+  it('says a flagged Evaluator that does not count yet waits for it', async () => {
+    const { evaluator } = await createEvaluator(
+      { ...STEP, name: 'grade-5-flagged', rule: 'r', severity: 'critical', check: { kind: 'code', runtime: 'python', source: 'print(1)' }, origin: 'user', runInProduction: true },
+      fixture.scope(),
+    );
+    expect(evaluator.production).toEqual({ active: false, reason: 'in production once it counts (source not approved)' });
+  });
+
+  it('needs the workflow edit right to flag an Evaluator for production', async () => {
+    const { evaluator } = await createEvaluator(
+      { ...STEP, name: 'findings-present', rule: 'r', severity: 'major', check: findingsSchema, origin: 'user' },
+      fixture.scope(),
+    );
+    await expect(setEvaluatorProduction(
+      { evaluatorId: evaluator.id, runInProduction: true },
+      fixture.scope(userCaller('outsider', ['pharma-b'])),
+    )).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('needs the workspace to write', async () => {

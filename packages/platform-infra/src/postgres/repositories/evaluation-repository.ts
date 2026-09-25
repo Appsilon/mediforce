@@ -77,6 +77,7 @@ function toEvaluator(row: typeof evaluators.$inferSelect): Evaluator {
     id: row.id,
     name: row.name,
     archived: row.archived,
+    runInProduction: row.runInProduction,
     createdBy: row.createdBy,
     createdAt: row.createdAt.toISOString(),
   });
@@ -146,6 +147,7 @@ function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
     definitionVersion: row.definitionVersion,
     datasetVersionId: row.datasetVersionId,
     caseIds: row.caseIds,
+    exampleCaseIds: row.exampleCaseIds,
     trialsPerCase: row.trialsPerCase,
     concurrency: row.concurrency,
     evaluators: row.evaluators,
@@ -235,6 +237,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
         stepId: parsed.stepId,
         name: parsed.name,
         archived: parsed.archived,
+        runInProduction: parsed.runInProduction,
         createdBy: parsed.createdBy,
         createdAt: new Date(parsed.createdAt),
       });
@@ -256,6 +259,10 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
 
   async setEvaluatorArchived(id: string, archived: boolean): Promise<void> {
     await this.db.update(evaluators).set({ archived }).where(eq(evaluators.id, id));
+  }
+
+  async setEvaluatorRunInProduction(id: string, runInProduction: boolean): Promise<void> {
+    await this.db.update(evaluators).set({ runInProduction }).where(eq(evaluators.id, id));
   }
 
   async appendEvaluatorVersion(version: EvaluatorVersion): Promise<EvaluatorVersion> {
@@ -432,6 +439,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
         definitionVersion: parsed.definitionVersion,
         datasetVersionId: parsed.datasetVersionId,
         caseIds: parsed.caseIds,
+        exampleCaseIds: parsed.exampleCaseIds,
         trialsPerCase: parsed.trialsPerCase,
         concurrency: parsed.concurrency,
         evaluators: parsed.evaluators,

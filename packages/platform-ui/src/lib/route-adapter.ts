@@ -6,8 +6,10 @@ import {
   ValidationError,
 } from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
+import { hasProductionEvaluators, productionEvaluatorGate } from '@mediforce/platform-api/handlers';
 import { createCallerScope, type CallerScope } from '@mediforce/platform-api/repositories';
 import { createHttpSelfFetchRunKicker, type RunKicker } from '@mediforce/platform-api/runtime';
+import type { AgentOutputGate } from '@mediforce/agent-runtime';
 import { resolveCallerIdentity } from './api-auth';
 import { getPlatformServices } from './platform-services';
 import { getAppBaseUrl } from './app-base-url';
@@ -277,6 +279,14 @@ export function defaultBuildScope(caller: CallerIdentity): CallerScope {
     { ...getPlatformServices(), runKicker: prodRunKicker },
     caller,
   );
+}
+
+/** The output gate a step's production Evaluators put on its runs (ADR-0023 D13), or undefined when it has none. */
+export async function buildProductionOutputGate(
+  step: { namespace: string; workflowName: string; stepId: string },
+): Promise<AgentOutputGate | undefined> {
+  const systemScope = defaultBuildScope({ kind: 'apiKey', isSystemActor: true });
+  return await hasProductionEvaluators(systemScope, step) ? productionEvaluatorGate(systemScope) : undefined;
 }
 
 export async function defaultResolveCaller(req: NextRequest): Promise<CallerIdentity | NextResponse> {

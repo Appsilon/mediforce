@@ -9,12 +9,19 @@ export const evalAskCommand = defineCommand({
     ...STEP_ARGS,
     message: { type: 'positional', required: true, description: 'What to ask' },
     model: { type: 'string', description: 'OpenRouter model id' },
+    'unattended-budget': { type: 'string', description: 'USD the assistant may spend starting prepared Eval Runs during this request, without asking (default: none — starting a run is refused)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
+    const unattendedBudget = args['unattended-budget'] === undefined ? undefined : Number(args['unattended-budget']);
+    if (unattendedBudget !== undefined && (Number.isFinite(unattendedBudget) === false || unattendedBudget <= 0)) {
+      output.stderr('--unattended-budget must be a positive number of USD');
+      return 2;
+    }
     const result = await mediforce.evaluation.askAssistant({
       ...stepFrom(args),
       messages: [{ role: 'user', content: args.message }],
       ...(args.model !== undefined ? { model: args.model } : {}),
+      ...(unattendedBudget !== undefined ? { unattendedBudgetUsd: unattendedBudget } : {}),
     }, {
       onProgress: (event) => {
         if (jsonMode === true || event.type !== 'tool' || event.status === 'done') return;
@@ -39,6 +46,9 @@ export const evalAskCommand = defineCommand({
     }
     for (const run of result.preparedEvalRuns) {
       output.stdout(`\nprepared Eval Run ${run.evalRunId}: ${run.trials} trial(s), budget $${run.budgetUsd}. Start it with: mediforce eval run-start ${run.evalRunId} --confirm-budget ${run.budgetUsd}`);
+    }
+    for (const run of result.startedEvalRuns) {
+      output.stdout(`\nstarted Eval Run ${run.evalRunId} under the unattended budget (up to $${run.budgetUsd}). Read it with: mediforce eval report ${run.evalRunId}`);
     }
     return 0;
   },

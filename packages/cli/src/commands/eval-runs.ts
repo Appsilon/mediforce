@@ -1,4 +1,4 @@
-import type { EvalChallenger, EvalRunOutput } from '@mediforce/platform-api/contract';
+import type { ApplyStepVariantInput, EvalChallenger, EvalRunOutput } from '@mediforce/platform-api/contract';
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson, type OutputSink } from '../output';
 import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
@@ -10,6 +10,9 @@ function percent(value: number | null): string {
 function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void {
   const estimate = evalRun.estimate.totalUsd === null ? 'no estimate' : `est. $${evalRun.estimate.totalUsd} (${evalRun.estimate.basis})`;
   output.stdout(`${evalRun.id}  ${evalRun.status}  ${evalRun.caseIds.length} case(s) × ${evalRun.trialsPerCase} × ${evalRun.variants.length} variant(s)  budget $${evalRun.budgetUsd}, spent $${evalRun.spentUsd.toFixed(4)}  ${estimate}`);
+  if (evalRun.exampleCaseIds.length > 0) {
+    output.stdout(`${evalRun.exampleCaseIds.length} case(s) left out: a variant's few-shot examples came from them`);
+  }
   output.stdout(`trials: ${report.trials.scored} scored, ${report.trials.failed} failed, ${report.trials.skipped} skipped, ${report.trials.inProgress} in progress`);
   if (evalRun.acceptanceCriteria === null) output.stdout('no Acceptance Criteria frozen into this run');
   for (const variant of report.variants) {
@@ -131,6 +134,80 @@ export const evalRunCancelCommand = defineCommand({
     const result = await mediforce.evaluation.cancelRun({ evalRunId: args.evalRunId });
     if (jsonMode) printJson(output, result);
     else printRun(output, result);
+    return 0;
+  },
+});
+
+export const evalRunFailuresCommand = defineCommand({
+  name: 'mediforce eval failures',
+  description: 'Print one variant\'s failing trials in an Eval Run — the material a fix starts from: each trial\'s case, its error, and the Evaluators that failed or errored.',
+  args: {
+    evalRunId: { type: 'positional', required: true, description: 'Eval Run id' },
+    variant: { type: 'string', description: 'Variant id (default: champion)' },
+    limit: { type: 'string', description: 'Most trials to list (default: 50)' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const limit = parsePositiveIntArg(args.limit);
+    if (limit === 'invalid') {
+      output.stderr('--limit must be a positive integer');
+      return 2;
+    }
+    const result = await mediforce.evaluation.getRunFailures({
+      evalRunId: args.evalRunId,
+      ...(args.variant !== undefined ? { variantId: args.variant } : {}),
+      ...(limit !== undefined ? { limit } : {}),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    output.stdout(`${result.variantId} — ${result.variantLabel}: ${result.total} failing trial(s)${result.total > result.failures.length ? `, showing ${result.failures.length}` : ''}`);
+    for (const failure of result.failures) {
+      output.stdout(`\ntrial ${failure.trialId}  case "${failure.caseName ?? failure.caseId}" (${failure.split ?? '?'}, ${failure.expectation ?? '?'})  ${failure.status}${failure.agentRunId === null ? '' : `  agent run ${failure.agentRunId}`}`);
+      if (failure.caseNotes !== null) output.stdout(`  case notes: ${failure.caseNotes}`);
+      if (failure.error !== null) output.stdout(`  error: ${failure.error}`);
+      for (const evaluator of failure.evaluators) {
+        const counted = evaluator.counted ? 'counted' : 'not counted';
+        output.stdout(`  ${evaluator.outcome} ${evaluator.name} (${evaluator.severity} ${evaluator.kind}, ${counted}): ${evaluator.error ?? evaluator.comment ?? ''}`);
+      }
+    }
+    return 0;
+  },
+});
+
+export const evalApplyVariantCommand = defineCommand({
+  name: 'mediforce eval apply-variant',
+  description: 'Apply a challenger of an Eval Run (--run and --variant), or a patch (--patch <file>), to the step by saving a new Workflow Definition version. Needs the workflow\'s edit verb; refuses the champion and an empty patch.',
+  args: {
+    ...STEP_ARGS,
+    run: { type: 'string', description: 'Eval Run id' },
+    variant: { type: 'string', description: 'Variant id of that run, e.g. challenger-1' },
+    patch: { type: 'string', description: 'JSON file with a variant patch: { "prompt": "...", "model": "..." }' },
+    'set-default': { type: 'boolean', description: 'Also make the new version the default, as the editor\'s save dialog offers' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const fromRun = args.run !== undefined || args.variant !== undefined;
+    if ((fromRun && args.patch !== undefined) || (fromRun === false && args.patch === undefined) || (fromRun && (args.run === undefined || args.variant === undefined))) {
+      output.stderr('give either --run and --variant, or --patch');
+      return 2;
+    }
+    const result = await mediforce.evaluation.applyVariant({
+      ...stepFrom(args),
+      ...(args.patch !== undefined ? { patch: readJsonFile(args.patch) as NonNullable<ApplyStepVariantInput['patch']> } : { evalRunId: args.run, variantId: args.variant }),
+      ...(args['set-default'] === true ? { setAsDefault: true } : {}),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    output.stdout(`saved as v${result.definitionVersion}${result.runnable ? ' (runnable)' : ' (not the default version — repeat with --set-default, or set it in the workflow versions list)'}`);
+    output.stdout(`step fingerprint ${result.fingerprint.hash}`);
+    if (result.variant !== null) {
+      output.stdout(result.variant.matchesFingerprint
+        ? `matches ${result.variant.variantId}'s fingerprint — a qualification of it carries over`
+        : `differs from ${result.variant.variantId}'s fingerprint in: ${result.variant.changed.join(', ') || 'unknown (no frozen fingerprint)'}`);
+    }
+    for (const warning of result.warnings ?? []) output.stderr(`warning: ${warning.message}`);
     return 0;
   },
 });

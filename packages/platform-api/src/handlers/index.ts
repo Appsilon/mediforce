@@ -171,6 +171,9 @@ export {
   createEvaluator,
   addEvaluatorVersion,
   archiveEvaluator,
+  setEvaluatorProduction,
+  hasProductionEvaluators,
+  productionEvaluatorGate,
   approveEvaluatorSource,
   labelEvaluatorOutput,
   listEvaluatorLabels,
@@ -198,6 +201,8 @@ export {
   setAcceptanceCriteria,
   getStepQualification,
   signStepQualification,
+  getEvalRunFailures,
+  applyVariantToStep,
 } from './evaluation/index';
 export { askEvaluationAssistant } from './evaluation-assistant/index';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';

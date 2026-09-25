@@ -1,5 +1,6 @@
 import type {
   AgentEvent,
+  AgentOutputEnvelope,
   AgentTrajectoryEntry,
   ProcessConfig,
   PluginCapabilityMetadata,
@@ -114,7 +115,25 @@ export interface WorkflowAgentContext {
   /** Where a plugin records its Agent Trajectory (ADR-0023 D8). Set by
    *  AgentRunner, keyed to its Agent Run; absent for script steps and in tests. */
   trajectory?: { record(entries: readonly AgentTrajectoryEntry[]): void };
+  /** Checks a result that passed `step.agent.outputSchema`, before autonomy
+   *  applies — production Evaluators (ADR-0023 D13). Set by platform-ui's
+   *  executeAgentStep only for a production run of a step that has them. */
+  outputGate?: AgentOutputGate;
 }
+
+/** What an output gate made of a result. */
+export interface AgentOutputGateVerdict {
+  /** Why the result goes to the step's `fallbackBehavior`; null when it passes. */
+  failure: string | null;
+  /** Checks that could not run — recorded, never a failure. */
+  errors: string[];
+}
+
+export type AgentOutputGate = (input: {
+  agentRunId: string;
+  context: WorkflowAgentContext;
+  envelope: AgentOutputEnvelope;
+}) => Promise<AgentOutputGateVerdict>;
 
 // EmitFn: platform assigns id and sequence — plugin provides type, payload, timestamp
 export type EmitPayload = Omit<AgentEvent, 'id' | 'sequence' | 'processInstanceId' | 'stepId'>;

@@ -81,6 +81,13 @@ export function stripFrontmatter(content: string): string {
   return match ? content.slice(match[0].length) : content;
 }
 
+/** A markdown code block whose fence is longer than any backtick run inside the text. */
+function fenced(text: string): string {
+  const longestRun = Math.max(0, ...(text.match(/`+/g) ?? []).map((run) => run.length));
+  const fence = '`'.repeat(Math.max(3, longestRun + 1));
+  return `${fence}\n${text}\n${fence}`;
+}
+
 export interface FileEntry {
   name: string;
   downloadUrl: string;
@@ -1143,6 +1150,23 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     // 2. Custom prompt
     if (this.agentConfig.prompt) {
       parts.push(this.agentConfig.prompt);
+    }
+
+    // 2b. Few-shot examples (ADR-0023 D12)
+    const examples = isWorkflowAgentContext(this.context) ? this.context.step.agent?.examples ?? [] : [];
+    if (examples.length > 0) {
+      parts.push(
+        `## Examples\n` +
+        `Worked examples of this task: an input and the output wanted for it.\n\n` +
+        examples.map((example, index) => [
+          `### Example ${index + 1}`,
+          ...(example.note === undefined ? [] : [example.note]),
+          'Input:',
+          fenced(example.input),
+          'Output:',
+          fenced(example.output),
+        ].join('\n')).join('\n\n'),
+      );
     }
 
     // 3. Time budget

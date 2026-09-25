@@ -12,7 +12,7 @@ const CASE_B = '5e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
 
 function run(overrides: Partial<EvalRun> = {}): EvalRun {
   return {
-    ...STEP, id: randomUUID(), definitionVersion: 1, datasetVersionId: randomUUID(), caseIds: [CASE_A, CASE_B],
+    ...STEP, id: randomUUID(), definitionVersion: 1, datasetVersionId: randomUUID(), caseIds: [CASE_A, CASE_B], exampleCaseIds: [],
     trialsPerCase: 2, concurrency: 2,
     evaluators: [{ evaluatorId: EVALUATOR, name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
     variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],

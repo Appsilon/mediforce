@@ -1,5 +1,4 @@
 import {
-  JUDGE_PASS_VALUE,
   calibrateConfidence,
   caseReliability,
   judgeAcceptanceCriteria,
@@ -16,7 +15,7 @@ import {
   type VariantComparison,
 } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
-import { scoresOfTrial } from './trial-scores';
+import { isPass, scoresOfTrial } from './trial-scores';
 
 /** The Scores the run's Evaluators gave its scored trials, by trial id. */
 async function trialScores(scope: CallerScope, run: EvalRun, trials: readonly EvalTrial[]): Promise<Map<string, Score[]>> {
@@ -36,10 +35,6 @@ function trialCounts(trials: readonly EvalTrial[]): EvalRunReport['trials'] {
     skipped: trials.filter((trial) => trial.status === 'skipped').length,
     inProgress: trials.filter((trial) => trial.status === 'pending' || trial.status === 'running' || trial.status === 'scoring').length,
   };
-}
-
-function isPass(score: Score): boolean {
-  return score.value >= JUDGE_PASS_VALUE;
 }
 
 /**

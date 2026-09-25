@@ -101,6 +101,8 @@ function EvaluatorRow({ step, evaluator, mayEdit }: { step: EvaluatedStep; evalu
   const approve = useStepEvaluationMutation(step, () =>
     mediforce.evaluation.approveEvaluatorSource({ evaluatorId: evaluator.id, version: evaluator.latest.version }));
   const archive = useStepEvaluationMutation(step, () => mediforce.evaluation.archiveEvaluator({ evaluatorId: evaluator.id }));
+  const production = useStepEvaluationMutation(step, (runInProduction: boolean) =>
+    mediforce.evaluation.setEvaluatorProduction({ evaluatorId: evaluator.id, runInProduction }));
   const check = evaluator.latest.check;
   return (
     <li className="border-t pt-2 first:border-t-0 first:pt-0" data-testid="evaluator-row">
@@ -115,6 +117,20 @@ function EvaluatorRow({ step, evaluator, mayEdit }: { step: EvaluatedStep; evalu
             'mt-1 inline-block rounded px-1.5 py-0.5 text-[11px] font-medium',
             evaluator.trust.trusted ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
           )}>{evaluator.trust.trusted ? 'Counts' : `Not counted — ${evaluator.trust.reason}`}</span>
+          <label className="mt-1.5 flex items-center gap-1.5 text-xs" data-testid="evaluator-production">
+            <input
+              type="checkbox"
+              checked={evaluator.runInProduction}
+              disabled={mayEdit === false || production.isPending}
+              onChange={(event) => production.mutate(event.target.checked)}
+            />
+            <span>Also run in production</span>
+            {evaluator.runInProduction && (
+              <span className="text-muted-foreground" data-testid="evaluator-production-state">
+                {evaluator.production.active ? '— scoring live runs' : `— ${evaluator.production.reason ?? 'not active'}`}
+              </span>
+            )}
+          </label>
           {evaluator.latest.calibration !== null && (
             <span className="ml-1.5 text-[11px] text-muted-foreground">
               agreement {evaluator.latest.calibration.agreement.toFixed(2)}

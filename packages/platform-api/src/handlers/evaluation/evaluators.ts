@@ -8,6 +8,7 @@ import type {
   GetEvaluatorInput,
   ListEvaluatorsInputSchema,
   ListEvaluatorsOutput,
+  SetEvaluatorProductionInput,
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError } from '../../errors';
@@ -43,7 +44,16 @@ export async function createEvaluator(
 
   const now = new Date().toISOString();
   const createdBy = authorId(scope);
-  const evaluator = { ...step, id: randomUUID(), name: input.name, archived: false, createdBy, createdAt: now };
+  const runInProduction = input.runInProduction ?? false;
+  const evaluator = {
+    ...step,
+    id: randomUUID(),
+    name: input.name,
+    archived: false,
+    runInProduction,
+    createdBy,
+    createdAt: now,
+  };
   await scope.evaluation.createEvaluator(evaluator, {
     evaluatorId: evaluator.id,
     version: 1,
@@ -62,7 +72,15 @@ export async function createEvaluator(
     namespace: step.namespace,
     entityType: 'evaluator',
     entityId: evaluator.id,
-    inputSnapshot: { ...step, name: input.name, rule: input.rule, severity: input.severity, check: input.check, origin: input.origin },
+    inputSnapshot: {
+      ...step,
+      name: input.name,
+      rule: input.rule,
+      severity: input.severity,
+      check: input.check,
+      origin: input.origin,
+      runInProduction,
+    },
     outputSnapshot: { version: 1 },
     basis: 'Evaluator added to a Step (ADR-0023 D2)',
   });
@@ -123,4 +141,30 @@ export async function archiveEvaluator(
     basis: 'An archived Evaluator is left out of new Eval Runs; its Scores stay',
   });
   return { evaluator: await evaluatorView(scope, { ...evaluator, archived: input.archived }) };
+}
+
+/**
+ * Marks an Evaluator to also score live production Agent Runs of its step
+ * (D13). The flag may be set on any Evaluator; it takes effect only while
+ * the latest version counts (D9), which the view's `production` states.
+ */
+export async function setEvaluatorProduction(
+  input: SetEvaluatorProductionInput,
+  scope: CallerScope,
+): Promise<EvaluatorOutput> {
+  const evaluator = await loadEvaluator(scope, input.evaluatorId);
+  await loadEvaluatedStep(scope, stepRef(evaluator), 'edit');
+  await scope.evaluation.setEvaluatorRunInProduction(evaluator, input.runInProduction);
+  const view = await evaluatorView(scope, { ...evaluator, runInProduction: input.runInProduction });
+  await appendEvaluationAudit(scope, {
+    action: input.runInProduction === true ? 'evaluator.production_enabled' : 'evaluator.production_disabled',
+    description: `Evaluator '${evaluator.name}' ${input.runInProduction === true ? 'set to' : 'no longer set to'} run in production`,
+    namespace: evaluator.namespace,
+    entityType: 'evaluator',
+    entityId: evaluator.id,
+    inputSnapshot: { runInProduction: input.runInProduction },
+    outputSnapshot: { production: view.production },
+    basis: 'A production Evaluator scores live Agent Runs while it counts; a failing critical deterministic one takes the step\'s fallback (ADR-0023 D13)',
+  });
+  return { evaluator: view };
 }

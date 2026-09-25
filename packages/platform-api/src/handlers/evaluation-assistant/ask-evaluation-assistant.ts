@@ -17,8 +17,8 @@ import type { CallerScope } from '../../repositories/index';
 import { recordAssistantPrompt, runProposalToolLoop } from '../../assistant-core';
 import { requireOpenRouterApiKey } from '../../services/openrouter-key';
 import { loadEvaluatedStep, stepRef } from '../evaluation/_lib/evaluated-step';
-import { EVALUATION_ASSISTANT_SYSTEM_PROMPT, briefMessage } from './_lib/system-prompt';
-import { executeEvaluationTool } from './_lib/run-evaluation-tool';
+import { EVALUATION_ASSISTANT_SYSTEM_PROMPT, briefMessage, unattendedBudgetMessage } from './_lib/system-prompt';
+import { executeEvaluationTool, type UnattendedGrant } from './_lib/run-evaluation-tool';
 import { reviewEvaluationProposal, type PreviewedCheck } from './_lib/review-proposal';
 
 // Leave room for paged trajectory reads and preview/repair cycles for several checks.
@@ -37,7 +37,10 @@ function preparedRun(result: unknown): PreparedEvalRun | null {
  * plans, Evaluators and their new versions, cases (harvested or synthesized),
  * outputs to label and Brief drafts come back as proposals, each reviewed
  * against the platform first — a proposed check carries its self-test on
- * real outputs; a prepared Eval Run comes back for the person to confirm. The
+ * real outputs; a prepared Eval Run comes back for the person to confirm — or
+ * is started by the assistant itself, within `unattendedBudgetUsd` when the
+ * person granted one for the request (D15). Failures are diagnosed and fixes
+ * proposed as cards; nothing is applied to the step. The
  * Step's Evaluation Brief is sent every turn. `onProgress` hears each model
  * round and tool call as it runs.
  */
@@ -55,6 +58,7 @@ export async function askEvaluationAssistant(
     namespace: step.namespace,
     model,
     messages: input.messages,
+    ...(input.unattendedBudgetUsd === undefined ? {} : { extraInput: { unattendedBudgetUsd: input.unattendedBudgetUsd } }),
     action: 'evaluation_assistant.prompt',
     description: `Evaluation Assistant prompt for step '${step.stepId}' (model: ${model})`,
     basis: 'Evaluation Assistant request (ADR-0023 D14)',
@@ -64,9 +68,12 @@ export async function askEvaluationAssistant(
   });
 
   const [brief] = await scope.evaluation.listBriefs(step);
+  const unattended: UnattendedGrant | undefined = input.unattendedBudgetUsd === undefined
+    ? undefined
+    : { remainingUsd: input.unattendedBudgetUsd, started: [] };
   const previewed: PreviewedCheck[] = [];
   const executePlatformTool = async (toolName: EvaluationAssistantPlatformToolName, args: unknown) => {
-    const toolResult = await executeEvaluationTool(toolName, args, scope, { step, definition, workflowStep });
+    const toolResult = await executeEvaluationTool(toolName, args, scope, { step, definition, workflowStep, ...(unattended === undefined ? {} : { unattended }) });
     if (toolName === 'preview_evaluator') {
       previewed.push({ check: (args as { check: EvaluatorCheck }).check, results: (toolResult as PreviewEvaluatorOutput).results });
     }
@@ -79,6 +86,7 @@ export async function askEvaluationAssistant(
       { role: 'system', content: EVALUATION_ASSISTANT_SYSTEM_PROMPT },
       { role: 'system', content: `You are evaluating step '${step.stepId}' ("${workflowStep.name}") of workflow '${step.workflowName}' v${definition.version} in workspace '${step.namespace}'.` },
       { role: 'system', content: briefMessage(brief ?? null) },
+      { role: 'system', content: unattendedBudgetMessage(input.unattendedBudgetUsd) },
       ...input.messages.map((message) => ({ role: message.role, content: message.content })),
     ],
     proposalTools: EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
@@ -100,5 +108,6 @@ export async function askEvaluationAssistant(
         const prepared = preparedRun(call.result);
         return prepared === null ? [] : [prepared];
       }),
+    startedEvalRuns: unattended?.started ?? [],
   };
 }
