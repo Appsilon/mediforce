@@ -99,9 +99,96 @@ describe('deleteImageCatalogEntry handler', () => {
   /** Two versions of the TealFlow entry, so a delete has more than one tag to
    *  remove and cannot pass by handling only the newest. */
   const TWO_VERSIONS = daemonWith([
-    builtImage({ tag: 'aaaaaaaaaaaa', id: 'sha-new' }),
-    builtImage({ tag: 'bbbbbbbbbbbb', id: 'sha-old' }),
+    builtImage({ tag: 'aaaaaaaaaaaa', id: 'sha-new', buildNamespace: 'alpha' }),
+    builtImage({ tag: 'bbbbbbbbbbbb', id: 'sha-old', buildNamespace: 'alpha' }),
   ]);
+
+  /** A deleter that records what it was asked to remove. */
+  const recording = (removed: string[]) => ({
+    delete: async (imageId: string) => {
+      removed.push(imageId);
+      return { deleted: imageId };
+    },
+  });
+
+  it("leaves another workspace's build of the same source on the daemon", async () => {
+    const removed: string[] = [];
+    // A repo names the same files wherever it is built, so `beta`'s build of
+    // TealFlow is a version of `alpha`'s entry too — but not `alpha`'s to destroy.
+    daemon.value = daemonWith([
+      builtImage({ tag: 'aaaaaaaaaaaa', id: 'sha-alpha', buildNamespace: 'alpha' }),
+      builtImage({ tag: 'bbbbbbbbbbbb', id: 'sha-beta', buildNamespace: 'beta' }),
+    ]);
+    const scope = await adminScopeWith(recording(removed));
+    const created = await createImageCatalogEntry({ namespace: 'alpha', ...TEALFLOW }, scope);
+
+    const result = await deleteImageCatalogEntry(
+      { namespace: 'alpha', id: created.entry.id, withImages: true },
+      scope,
+    );
+
+    expect(removed).toEqual(['mediforce-built:aaaaaaaaaaaa']);
+    expect(result).toEqual({
+      success: true,
+      deletedImages: ['mediforce-built:aaaaaaaaaaaa'],
+      keptImages: ['mediforce-built:bbbbbbbbbbbb'],
+    });
+    expect(await repo.getById('alpha', created.entry.id)).toBeNull();
+  });
+
+  it('takes an adopted image off the catalog but never off the daemon', async () => {
+    const removed: string[] = [];
+    // `postgres` was on the daemon before anyone catalogued it; **Existing
+    // image** made it an entry, not this workspace's artifact. A live pin on
+    // it does not block either, since nothing touches the image.
+    daemon.value = daemonWith([
+      builtImage({ repository: 'postgres', tag: '16', id: 'sha-pg', buildRepo: undefined }),
+    ]);
+    const scope = await adminScopeWith(recording(removed), [pinning('postgres:16')]);
+    const created = await createImageCatalogEntry(
+      {
+        namespace: 'alpha',
+        name: 'Postgres',
+        intent: 'A database for steps that need one.',
+        source: { kind: 'referenced', reference: 'postgres' },
+      },
+      scope,
+    );
+
+    const result = await deleteImageCatalogEntry(
+      { namespace: 'alpha', id: created.entry.id, withImages: true },
+      scope,
+    );
+
+    expect(removed).toEqual([]);
+    expect(result).toEqual({ success: true, deletedImages: [], keptImages: ['postgres:16'] });
+    expect(await repo.getById('alpha', created.entry.id)).toBeNull();
+  });
+
+  it('removes an image uploaded under the workspace handle', async () => {
+    const removed: string[] = [];
+    daemon.value = daemonWith([
+      builtImage({ repository: 'alpha/agent', tag: '20260921', id: 'sha-up', buildRepo: undefined, buildNamespace: 'alpha' }),
+    ]);
+    const scope = await adminScopeWith(recording(removed));
+    const created = await createImageCatalogEntry(
+      {
+        namespace: 'alpha',
+        name: 'Agent',
+        intent: 'The agent image this workspace uploads.',
+        source: { kind: 'referenced', reference: 'alpha/agent' },
+      },
+      scope,
+    );
+
+    const result = await deleteImageCatalogEntry(
+      { namespace: 'alpha', id: created.entry.id, withImages: true },
+      scope,
+    );
+
+    expect(removed).toEqual(['alpha/agent:20260921']);
+    expect(result).toEqual({ success: true, deletedImages: ['alpha/agent:20260921'], keptImages: [] });
+  });
 
   it('removes the entry and audits the delete that removed it', async () => {
     const scope = adminScope();
@@ -112,7 +199,7 @@ describe('deleteImageCatalogEntry handler', () => {
       scope,
     );
 
-    expect(result).toEqual({ success: true, deletedImages: [] });
+    expect(result).toEqual({ success: true, deletedImages: [], keptImages: [] });
     expect(await repo.getById('alpha', created.entry.id)).toBeNull();
     const events = await auditRepo.getByEntity('imageCatalogEntry', created.entry.id);
     expect(events.filter((e) => e.action === 'image_catalog_entry.deleted')).toHaveLength(1);
@@ -123,7 +210,7 @@ describe('deleteImageCatalogEntry handler', () => {
 
     await expect(
       deleteImageCatalogEntry({ namespace: 'alpha', id: 'nope-00000000' }, scope),
-    ).resolves.toEqual({ success: true, deletedImages: [] });
+    ).resolves.toEqual({ success: true, deletedImages: [], keptImages: [] });
     expect(await auditRepo.getByEntity('imageCatalogEntry', 'nope-00000000')).toEqual([]);
   });
 
@@ -157,17 +244,40 @@ describe('deleteImageCatalogEntry handler', () => {
     expect(await repo.getById('alpha', created.entry.id)).toBeNull();
   });
 
-  it('refuses to take an engine default off the shared daemon, but drops the row', async () => {
+  it("keeps an image under the workspace handle that the workspace did not produce", async () => {
+    const removed: string[] = [];
+    // A name is not proof: `beta`'s build-mode step can tag `alpha/agent`, and
+    // a pull carries no build label at all.
+    daemon.value = daemonWith([
+      builtImage({ repository: 'alpha/agent', tag: 'v2', id: 'sha-beta', buildRepo: undefined, buildNamespace: 'beta' }),
+      builtImage({ repository: 'alpha/agent', tag: 'pulled', id: 'sha-pull', buildRepo: undefined }),
+    ]);
+    const scope = await adminScopeWith(recording(removed));
+    const created = await createImageCatalogEntry(
+      {
+        namespace: 'alpha',
+        name: 'Agent',
+        intent: 'The agent image this workspace uploads.',
+        source: { kind: 'referenced', reference: 'alpha/agent' },
+      },
+      scope,
+    );
+
+    const result = await deleteImageCatalogEntry(
+      { namespace: 'alpha', id: created.entry.id, withImages: true },
+      scope,
+    );
+
+    expect(removed).toEqual([]);
+    expect(result.keptImages.sort()).toEqual(['alpha/agent:pulled', 'alpha/agent:v2']);
+  });
+
+  it('keeps an engine default on the shared daemon, and drops the row', async () => {
     const removed: string[] = [];
     // The image a `runtime: python` step falls back to, and a step that names
     // no image pins nothing — so the live-pin check has nothing to refuse on.
     daemon.value = daemonWith([builtImage({ repository: 'python', tag: '3.12-slim', id: 'sha-py', buildRepo: undefined })]);
-    const scope = await adminScopeWith({
-      delete: async (imageId) => {
-        removed.push(imageId);
-        return { deleted: imageId };
-      },
-    });
+    const scope = await adminScopeWith(recording(removed));
     const created = await createImageCatalogEntry(
       {
         namespace: 'alpha',
@@ -178,15 +288,42 @@ describe('deleteImageCatalogEntry handler', () => {
       scope,
     );
 
-    await expect(
-      deleteImageCatalogEntry({ namespace: 'alpha', id: created.entry.id, withImages: true }, scope),
-    ).rejects.toBeInstanceOf(ConflictError);
-    expect(removed).toEqual([]);
-    expect(await repo.getById('alpha', created.entry.id)).not.toBeNull();
+    const result = await deleteImageCatalogEntry(
+      { namespace: 'alpha', id: created.entry.id, withImages: true },
+      scope,
+    );
 
-    // The row belongs to the workspace, so removing it alone is ordinary.
-    await deleteImageCatalogEntry({ namespace: 'alpha', id: created.entry.id }, scope);
+    expect(removed).toEqual([]);
+    expect(result).toEqual({ success: true, deletedImages: [], keptImages: ['python:3.12-slim'] });
     expect(await repo.getById('alpha', created.entry.id)).toBeNull();
+  });
+
+  it('keeps an engine default even for a workspace whose handle it starts with', async () => {
+    const removed: string[] = [];
+    daemon.value = daemonWith([builtImage({ repository: 'rocker/r-ver', tag: '4.4.1', id: 'sha-r', buildRepo: undefined })]);
+    const scope = createTestScope({
+      imageCatalogRepo: repo,
+      auditRepo,
+      dockerImages: recording(removed),
+      caller: userCaller('u-admin', ['rocker'], new Map([['rocker', 'admin']])),
+    });
+    const created = await createImageCatalogEntry(
+      {
+        namespace: 'rocker',
+        name: 'R runtime',
+        intent: 'The image the engine runs an R script step in when the step names none.',
+        source: { kind: 'referenced', reference: 'rocker/r-ver' },
+      },
+      scope,
+    );
+
+    const result = await deleteImageCatalogEntry(
+      { namespace: 'rocker', id: created.entry.id, withImages: true },
+      scope,
+    );
+
+    expect(removed).toEqual([]);
+    expect(result.keptImages).toEqual(['rocker/r-ver:4.4.1']);
   });
 
   it('removes every version tag from the daemon, then the entry', async () => {

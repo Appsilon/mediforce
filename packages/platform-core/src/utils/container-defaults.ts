@@ -1,5 +1,5 @@
 import { daemonRepositoryName, untaggedReference } from './image-reference';
-import type { ImageCatalogSource } from '../schemas/image-catalog-entry';
+import { isCatalogReference, type ImageCatalogSource } from '../schemas/image-catalog-entry';
 
 /**
  * Image an agent step falls back to when it names neither an image nor a build
@@ -90,4 +90,29 @@ export function isDefaultEngineImageSource(source: ImageCatalogSource): boolean 
   if (source.kind !== 'referenced') return false;
   const reference = seedReference(source.reference);
   return DEFAULT_IMAGE_CATALOG_ENTRIES.some((entry) => entry.reference === reference);
+}
+
+/**
+ * Whether a namespace may take this version of one of its entries off the
+ * shared daemon: only an image it provably produced (ADR-0022).
+ *
+ * Cataloguing an image describes it; it does not make it the workspace's.
+ * **Existing image** can catalogue anything the daemon holds — `postgres`,
+ * another workspace's upload — and a repo names the same files wherever it is
+ * built, so a `built` entry's versions include every workspace's builds of it.
+ * What proves production is the namespace label the platform stamps on every
+ * image it builds or uploads. A name is not proof: another workspace's
+ * build-mode step can tag `<handle>/…`, and a handle can match a registry
+ * organisation whose images were pulled long before the workspace existed. A
+ * `referenced` image must also sit under the handle, as an upload does. An
+ * engine default is never one workspace's, whatever its labels.
+ */
+export function isImageVersionOwnedBy(
+  namespace: string,
+  source: ImageCatalogSource,
+  version: { namespace?: string },
+): boolean {
+  if (isDefaultEngineImageSource(source)) return false;
+  if (version.namespace !== namespace) return false;
+  return source.kind !== 'referenced' || isCatalogReference(source.reference, namespace);
 }
