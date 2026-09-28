@@ -88,7 +88,7 @@ export default function WorkspaceConfigPage() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div>
-            <h1 className="text-xl font-semibold">Workspace settings</h1>
+            <h1 className="text-xl font-semibold" data-tour="settings-header">Workspace settings</h1>
             <p className="text-sm text-muted-foreground">@{handle}</p>
           </div>
         </div>

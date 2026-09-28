@@ -28,7 +28,7 @@ Deployment is in play.
 
 **Namespace** *(canonical domain term; Workspace is the UI/storage term per ADR-0001)*:
 An isolated scope of work inside a Deployment. Owns workflow definitions,
-workflow runs, agents, OAuth providers, secrets, tool catalog,
+workflow runs, agents, OAuth providers, secrets, tool catalog, image catalog,
 cowork sessions. Identified by a URL-safe `handle`. Two types: `personal`
 (auto-created per user, linked via `linkedUserId`) and `organization`
 (multi-member, shared — e.g. a department inside the customer tenant).
@@ -240,6 +240,83 @@ per-step via Step MCP Restriction (subtractive).
 Admin-curated stdio MCP server definition that agents reference by `catalogId`
 (prevents inline RCE). Namespace-scoped.
 
+**Image Catalog**:
+The per-namespace set of Image Catalog Entries — the curated shelf of container
+images the platform offers for Steps. Sibling of the Tool Catalog, not nested
+inside it: building an image makes it runnable, cataloguing it makes it
+selectable ([ADR-0022](docs/adr/0022-image-catalog.md)). Curating an image never
+restricts one — a Step may still name any image string.
+
+**Image Catalog Entry**:
+One image the platform offers, identified by its **source**: `built`
+`(repo, dockerfile)`, `referenced` (an untagged image reference — also what an
+image built from an **uploaded build context** lands in, named
+`<workspace>/<name>`, and what an image **pulled from a registry** lands in,
+since the platform keeps none of their inputs), or `carried`
+`(workflow, dockerfile)` for a Dockerfile a Workflow Definition carries in its
+files. Deliberately
+**not** keyed on the commit, so a rebuild is another **Version** of a row the
+author already chose rather than a new row — nor on the **build context** a
+`built` source may name, which is how the Dockerfile is built rather than which
+Dockerfile it is. Every fact on it is derived from the Docker daemon; the one
+thing a human writes is its **Intent**. Any Workspace member may create and edit
+one — an entry executes nothing; deleting one takes its images with it and needs
+Workspace admin.
+
+**Discovered Entry** *(of an Image Catalog)*:
+An Image Catalog Entry the platform derived from an image this namespace built
+and nobody has described yet — keyed on the `(repo, dockerfile)` or, for a
+carried Dockerfile, the `(workflow, dockerfile)` the build labelled, carrying every derived fact and an empty **Intent**. Not a stored row:
+it is recomputed from the daemon on every read, and describing it is what
+registers it, at the same id ([ADR-0022](docs/adr/0022-image-catalog.md)
+decision 7). A **Catalogued Entry** is the opposite — one somebody wrote a
+sentence for. The only difference in what the platform derives is where the
+probe result is kept: a memo in the API process rather than a stored column.
+
+**Version** *(of an Image Catalog Entry)*:
+One built artifact of an entry's source: a commit for a `built` entry, a tag for
+a `referenced` one, a content hash for a `carried` one, carrying the image tag that names it on the daemon. Versions
+are derived on read from the daemon's build labels, never stored.
+
+**Capability** *(of an Image Catalog Version)*:
+The derived set of `claude`, `opencode`, `bash`, `sh`, `python3`, `Rscript`, and
+`node` binaries that a bounded, network-isolated probe found. It is cached by
+daemon image ID when the entry is registered, so rendering a catalog or picker
+never starts a container. A **Discovered Entry** has no row to cache into, so
+its probe results are memoised in the API process by image id instead — filled
+on the same single-entry read, lost on restart, never a stored fact. A Version is **agent-capable** only when it has
+`bash` and either agent CLI; an unavailable daemon or timed-out probe is
+explicitly `unknown`, which remains selectable without a suitability claim.
+`sh` and `bash` are two members of the set rather than one, because the engine
+runs a `runtime: bash` step as `sh <script>`: an `alpine` carrying only busybox
+`sh` runs one, and only a step needing bash-only syntax needs `bash`.
+
+**Lineage** *(of an Image Catalog Version)*:
+The ancestry relation between images, computed from `RootFS.Layers` prefix
+containment — image X descends from image P exactly when X's layer array starts
+with the whole of P's — never parsed from a `FROM` string, so it holds for
+images the platform did not build. Recomputed on every read; nothing about it
+is stored.
+
+**Base** *(of an Image Catalog Entry or Version)*:
+The nearest ancestor **in the same namespace's catalog**, or `none` for a root.
+Nearest, not the root of the tree: an image built on one that is itself
+catalogued names the closer of the two, and the catalog view groups entries
+under it, roots first. Nothing is special-cased — an entry for `python3.12-slim`
+collects everything built on it exactly as the golden image collects the
+workflow images. A **layer summary** is the steps a Version adds over its base,
+cut at that boundary and read off `docker history` with build-arg values
+redacted; it is never "the Dockerfile" — no file contents, no comments, no
+multi-stage.
+
+**Intent** *(of an Image Catalog Entry)*:
+The single required human sentence: what the image is *for* — "R-based
+interactive exploration of ADaM datasets". Not a description of its contents;
+contents go stale on the next pin bump, intent does not. Required on every
+stored entry, and empty on exactly one thing: a **Discovered Entry**, which no
+build can write it for.
+Labelled **Description** in the Images view.
+
 ### Identity / auth
 
 **User**:
@@ -372,9 +449,9 @@ Namespace Secret with the same key.
 ### Evaluation domain
 
 *(Layered model and system-of-record split defined in
-[ADR-0007](docs/adr/0007-llm-evaluation-observability.md). Score / Eval
-Dataset / Eval Run are reserved canonical names; their detailed design is
-deliberately deferred until tracing ships.)*
+[ADR-0007](docs/adr/0007-llm-evaluation-observability.md); the design of
+Evaluators, Eval Runs and Step Qualification in
+[ADR-0023](docs/adr/0023-step-evaluation.md).)*
 
 **Trace**:
 The telemetry record of one Agent Run's execution — a tree of spans (LLM
@@ -397,16 +474,71 @@ agent's **self-assessment**, a Score is an **external judgment**. Also avoid
 "evaluation" for a single judgment (an evaluation is a process; a Score is
 one data point).
 
-**Eval Dataset** *(reserved; design deferred)*:
-A curated set of golden / regression cases (input → accepted output) frozen
-from selected production Agent Runs. Namespace-scoped platform entity.
+**Agent Trajectory**:
+The durable, platform-owned record of the tool calls one Agent Run made and
+what they returned; its content is subject to the same capture switch as a
+Trace.
+_Avoid_: confusing with **Trace** (external telemetry, may not exist) and
+"transcript" / "log" (the transient activity log it replaces).
+
+**Evaluation**:
+The activity of measuring whether one agent Workflow Step, in one configuration, is
+trustworthy for its context of use.
+_Avoid_: "validation" — in pharma that means Computer System Validation of
+the platform itself (GAMP 5, 21 CFR Part 11), and here it already names
+schema-shape checking of a Definition.
+
+**Evaluation Assistant**:
+The AI agent a user works with through a Workflow Step's whole Evaluation — suggesting
+what to evaluate, drafting Evaluators and Eval Cases, running and explaining
+Eval Runs, and proposing fixes.
+_Avoid_: "validation assistant", "fix assistant" / "plan assistant" (one
+assistant, not several); confusing with the workflow editor's assistant, which
+edits the Workflow Definition.
+
+**Evaluation Brief**:
+A Workflow Step's short, versioned statement of what it is for, who relies on its
+output, and which failures matter most — its context of use.
+_Avoid_: "priorities", "instructions" (the workflow editor's assistant has
+per-user instructions; a Brief belongs to the Workflow Step).
+
+**Evaluator**:
+One rule a Workflow Step's output must satisfy, stated in plain language and backed by
+an executable check that produces Scores.
+_Avoid_: "validation rule", "assertion", "metric", "grader".
+
+**Eval Case**:
+One input fixture for a Workflow Step plus what its output must — or must not — contain.
+_Avoid_: "test case", "sample", "golden" (a case can be a negative one).
+
+**Eval Dataset**:
+A versioned, frozen set of Eval Cases for one Workflow Step, drawn from production
+Agent Runs, synthesised, or written by hand. Namespace-scoped.
 _Avoid_: "Dataset" alone (collides with generic data-engineering usage),
 "Benchmark" (implies public/academic suites).
 
-**Eval Run** *(reserved; design deferred)*:
-One execution of an Eval Dataset against a configuration (model, prompt,
-agent variant), producing Scores and a champion-vs-challenger comparison.
-Platform entity; fits the existing Run family (Workflow Run, Agent Run).
+**Step Fingerprint**:
+The identity of everything that shapes one agent Workflow Step's behaviour — its
+config, the skill and agent instructions it reads, its image and its
+effective MCP tools — independent of the Workflow Definition version.
+_Avoid_: "step version", "config hash".
+
+**Acceptance Criteria**:
+The pass thresholds an Eval Run is judged against, fixed before it starts;
+signing a Step Qualification despite a missed criterion records a deviation
+with a written justification.
+_Avoid_: "threshold" alone (collides with `confidenceThreshold`), "target".
+
+**Step Qualification**:
+A signed decision that one Step Fingerprint met its acceptance criteria in an
+Eval Run; it goes stale when the Workflow Step's current Fingerprint differs.
+_Avoid_: "validated", "certified", "approved step".
+
+**Eval Run**:
+One execution of an Eval Dataset against one or more variants of a Workflow Step
+(model, prompt, examples), repeated per case, producing Scores and a
+champion-vs-challenger comparison. Fits the existing Run family (Workflow Run,
+Agent Run).
 _Avoid_: "Experiment" (vague, collides with nothing but explains nothing).
 
 ### Audit / observability
@@ -426,7 +558,7 @@ the user-facing immutable log.
 - A **Deployment** contains many **Namespaces**.
 - A **Namespace** owns its **Workflows** (with their **Workflow Definitions**),
   **Workflow Runs**, **Agents**, **OAuth Providers**, **Secrets**,
-  **Tool Catalog**.
+  **Tool Catalog**, **Image Catalog**.
 - A **Workflow** has many versioned **Workflow Definitions**; its `visibility`
   controls cross-Namespace read access.
 - A **Workflow Run** belongs to exactly one **Workflow Definition**
@@ -437,6 +569,20 @@ the user-facing immutable log.
 - An **Agent Run** may produce 0..N **Handoffs**.
 - An **Agent** has many **Agent MCP Bindings** (per server) and
   many **Agent OAuth Tokens** (per server).
+- An agent **Workflow Step** owns 0..N **Evaluators** and 0..N
+  versioned **Eval Datasets**; neither is shared with another Workflow Step (reuse
+  is by copy).
+- An agent **Workflow Step** has 0..1 **Evaluation Brief** (versioned); a **Step
+  Qualification** cites the Brief version it was judged against.
+- An **Evaluation Assistant** proposes **Evaluators**, **Eval Cases** and fixes;
+  a human accepts them, confirms every **Eval Run**, and alone approves code
+  checks, labels calibration outputs and signs a **Step Qualification**.
+- An **Evaluator** has many versions; a version that has produced a **Score**
+  never changes.
+- An **Eval Run** executes one **Eval Dataset** version against 1..N
+  variants of one **Workflow Step**; each trial is a single-step **Workflow Run**.
+- A **Step Qualification** cites exactly one **Eval Run**, one
+  **Step Fingerprint**, and the **Evaluator** versions it was judged by.
 
 ## Flagged ambiguities
 

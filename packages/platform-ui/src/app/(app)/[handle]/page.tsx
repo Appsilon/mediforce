@@ -23,6 +23,7 @@ import { OpenRouterCreditsIndicator } from '@/components/namespace/openrouter-cr
 import { WorkflowSecretKeysProvider } from '@/hooks/use-workflow-secret-keys';
 import { ImportWorkflowDialog, type ImportEntry } from '@/components/workflows/import-workflow-dialog';
 import { cn } from '@/lib/utils';
+import { queryKeys } from '@/lib/query-keys';
 import type { Namespace } from '@mediforce/platform-core';
 import { WorkspaceAccessError } from '@/components/workspace-access-error';
 
@@ -412,7 +413,7 @@ function WorkflowCatalogPublic({ handle }: { handle: string }) {
           </div>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2" data-tour="workflow-list">
           {sorted.map((definition) => (
             <ProcessCard
               key={definition.name}
@@ -488,7 +489,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Workflows</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" data-tour="workflow-actions">
           <DisplayPopover
             showCompleted={showCompleted}
             onToggleCompleted={() => setShowCompleted((prev) => !prev)}
@@ -523,7 +524,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
         entry={importEntry}
         open={importOpen}
         onOpenChange={setImportOpen}
-        onImported={() => void queryClient.invalidateQueries({ queryKey: ['workflows', 'list'] })}
+        onImported={() => void queryClient.invalidateQueries({ queryKey: queryKeys.workflowsListAll() })}
       />
 
       {loading ? (
@@ -571,7 +572,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
           </button>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2" data-tour="workflow-list">
           {sortedDefinitions.map((definition) => (
             <ProcessCard
               key={definition.name}

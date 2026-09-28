@@ -54,6 +54,7 @@ export function AssistantInstructionsField({ namespace }: { namespace: string })
 
   const remaining = WORKFLOW_ASSISTANT_INSTRUCTIONS_MAX_CHARS - draft.length;
   const fieldDisabled = loading || error !== null || setInstructions.isPending;
+  const hasInstructions = instructions.trim().length > 0;
 
   return (
     <div className="space-y-1">
@@ -63,10 +64,17 @@ export function AssistantInstructionsField({ namespace }: { namespace: string })
           onClick={() => setOpen((current) => !current)}
           aria-label={open ? 'Hide your instructions' : 'Show your instructions'}
           aria-expanded={open}
-          className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          className="relative rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           title={open ? 'Hide your instructions' : 'Show your instructions'}
         >
           <FileText className="h-4 w-4" />
+          {hasInstructions && (
+            <span
+              data-testid="assistant-instructions-indicator"
+              aria-hidden="true"
+              className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-green-500 ring-1 ring-background"
+            />
+          )}
         </button>
         {open && setInstructions.isPending && (
           <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />

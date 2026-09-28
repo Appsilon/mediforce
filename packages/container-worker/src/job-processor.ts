@@ -7,7 +7,7 @@ import type { DockerJobResult } from './schemas';
 import { encodeFilePayload, decodeFilePayload } from './file-payload';
 import { ensureImage } from './docker-image-builder';
 import { removeStaleContainer } from './docker-cleanup';
-import { createLineStreamReader } from '@mediforce/platform-core';
+import { appendStageEntry, createLineStreamReader, formatAgentLogLine } from '@mediforce/platform-core';
 
 /**
  * If inputFiles are provided (remote caller), create a local temp dir,
@@ -40,9 +40,18 @@ export async function processDockerJob(rawData: unknown): Promise<DockerJobResul
   const logFile = data.logFile;
   const hasInputFiles = data.inputFiles && Object.keys(data.inputFiles).length > 0;
 
-  // Lazy image build: ensure Docker image exists before running container
+  // Lazy image build: ensure Docker image exists before running container.
+  // Bracketed with stage entries because a cold build is minutes during which
+  // no container exists to emit anything, and the step just looks hung.
   if (data.imageBuild) {
-    await ensureImage(data.imageBuild);
+    await appendStageEntry(logFile, `Preparing container image ${data.imageBuild.image}`);
+    try {
+      await ensureImage(data.imageBuild);
+    } catch (error) {
+      await appendStageEntry(logFile, `Container image failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+    await appendStageEntry(logFile, 'Container image ready');
   }
 
   // A build-only job stops here. A dry run uses it to prove the image compiles
@@ -84,13 +93,17 @@ export async function processDockerJob(rawData: unknown): Promise<DockerJobResul
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
 
-    // Stream stdout lines to log file in realtime via the shared line-buffer helper.
+    // Stream stdout to the log file as formatted entries, in realtime. The
+    // worker is the only process watching the container while it runs, so an
+    // unformatted line here is a line the UI cannot render until the job ends.
     const stdoutReader = createLineStreamReader((line) => {
       const trimmed = line.trim();
       if (!trimmed) return;
       if (logFile && logDirReady) {
+        const entries = formatAgentLogLine(data.lineFormat ?? 'none', trimmed);
+        if (entries.length === 0) return;
         logDirReady.then(() =>
-          appendFile(logFile, trimmed + '\n'),
+          appendFile(logFile, entries.join('\n') + '\n'),
         ).catch(() => {});
       }
     });

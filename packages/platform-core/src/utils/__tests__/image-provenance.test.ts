@@ -1,0 +1,181 @@
+import { describe, it, expect } from 'vitest';
+import {
+  buildProvenanceLabelArgs,
+  carriedImageLabelArgs,
+  readProvenanceLabels,
+  uploadedImageLabelArgs,
+} from '../image-provenance';
+
+/** Value of a `--label key=value` pair in an argument list. */
+function label(args: string[], key: string): string | undefined {
+  return args.find((arg) => arg.startsWith(`${key}=`))?.slice(key.length + 1);
+}
+
+describe('carriedImageLabelArgs', () => {
+  it('records the content, workflow and Dockerfile the image was built from, and blanks the repo labels it would inherit', () => {
+    const args = carriedImageLabelArgs({ artifactsHash: 'abc123def456', dockerfile: 'container/Dockerfile', workflow: 'wf', namespace: 'acme' });
+
+    expect(label(args, 'mediforce.build.artifacts')).toBe('abc123def456');
+    expect(label(args, 'mediforce.build.workflow')).toBe('wf');
+    expect(label(args, 'mediforce.build.namespace')).toBe('acme');
+    // A carried Dockerfile `FROM` a repo-built image would otherwise carry that
+    // repo and commit, and be offered as a version of it.
+    expect(label(args, 'mediforce.build.repo')).toBe('');
+    expect(label(args, 'mediforce.build.commit')).toBe('');
+    expect(label(args, 'org.opencontainers.image.source')).toBe('');
+    // What the Image Catalog keys a carried entry on, beside the workflow.
+    expect(label(args, 'mediforce.build.dockerfile')).toBe('container/Dockerfile');
+    // Written empty when the step named none, so a base's is never inherited.
+    expect(label(args, 'mediforce.build.context')).toBe('');
+  });
+
+  it('reads the content hash back off the image', () => {
+    expect(readProvenanceLabels({ 'mediforce.build.artifacts': 'abc123def456' }).buildArtifacts).toBe('abc123def456');
+    expect(readProvenanceLabels({ 'mediforce.build.artifacts': '' }).buildArtifacts).toBeUndefined();
+  });
+});
+
+describe('uploadedImageLabelArgs', () => {
+  it('blanks every build label it inherits, so an upload never reads as a platform build', () => {
+    const args = uploadedImageLabelArgs('acme');
+    const labels = Object.fromEntries(
+      args
+        .filter((arg) => arg !== '--label')
+        .map((arg) => [arg.slice(0, arg.indexOf('=')), arg.slice(arg.indexOf('=') + 1)]),
+    );
+
+    // Written empty rather than omitted: an upload `FROM` a built image would
+    // otherwise carry its repo and commit and be offered as a version of it.
+    expect(labels).toMatchObject({
+      'mediforce.build.repo': '',
+      'mediforce.build.commit': '',
+      'mediforce.build.dockerfile': '',
+      'mediforce.build.context': '',
+      'mediforce.build.workflow': '',
+    });
+    expect(readProvenanceLabels(labels)).toEqual({
+      buildRepo: undefined,
+      buildCommit: undefined,
+      buildDockerfile: undefined,
+      buildContext: undefined,
+      buildWorkflow: undefined,
+      buildNamespace: 'acme',
+    });
+  });
+});
+
+describe('buildProvenanceLabelArgs', () => {
+  it('emits every known fact plus the OCI equivalents', () => {
+    const args = buildProvenanceLabelArgs({
+      repoUrl: 'git@github.com:owner/repo.git',
+      commit: 'abc123',
+      dockerfile: 'container/Dockerfile',
+      workflow: 'sdtm-mapping',
+      namespace: 'acme',
+    });
+
+    expect(label(args, 'mediforce.build.repo')).toBe('git@github.com:owner/repo.git');
+    expect(label(args, 'mediforce.build.commit')).toBe('abc123');
+    expect(label(args, 'mediforce.build.dockerfile')).toBe('container/Dockerfile');
+    expect(label(args, 'mediforce.build.workflow')).toBe('sdtm-mapping');
+    expect(label(args, 'mediforce.build.namespace')).toBe('acme');
+    expect(label(args, 'org.opencontainers.image.source')).toBe('https://github.com/owner/repo');
+    expect(label(args, 'org.opencontainers.image.revision')).toBe('abc123');
+    // The seven facts, plus the context and artifacts labels every build writes.
+    expect(args.filter((arg) => arg === '--label')).toHaveLength(9);
+  });
+
+  it('omits the facts a build outside a workflow does not have', () => {
+    const args = buildProvenanceLabelArgs({
+      repoUrl: 'git@github.com:owner/repo.git',
+      commit: 'abc123',
+      dockerfile: 'Dockerfile',
+    });
+
+    expect(label(args, 'mediforce.build.workflow')).toBeUndefined();
+    expect(label(args, 'mediforce.build.namespace')).toBeUndefined();
+  });
+
+  it('writes the build context, empty when the build named none', () => {
+    const withContext = buildProvenanceLabelArgs({
+      repoUrl: 'git@github.com:owner/repo.git',
+      commit: 'abc123',
+      dockerfile: 'container/Dockerfile',
+      context: '.',
+    });
+    const withoutContext = buildProvenanceLabelArgs({
+      repoUrl: 'git@github.com:owner/repo.git',
+      commit: 'abc123',
+      dockerfile: 'container/Dockerfile',
+    });
+
+    expect(label(withContext, 'mediforce.build.context')).toBe('.');
+    // Empty, not absent: labels are inherited, so an image built FROM one that
+    // named a context would otherwise claim that context as its own.
+    expect(label(withoutContext, 'mediforce.build.context')).toBe('');
+    expect(readProvenanceLabels({ 'mediforce.build.context': '' }).buildContext).toBeUndefined();
+  });
+
+  it('omits the OCI source for a repo with no browsable HTTPS form', () => {
+    const args = buildProvenanceLabelArgs({
+      repoUrl: '/srv/repos/local.git',
+      commit: 'abc123',
+      dockerfile: 'Dockerfile',
+    });
+
+    expect(label(args, 'mediforce.build.repo')).toBe('/srv/repos/local.git');
+    expect(label(args, 'org.opencontainers.image.source')).toBeUndefined();
+  });
+
+  it('keeps the clone token out of the labels', () => {
+    const args = buildProvenanceLabelArgs({
+      repoUrl: 'https://x-access-token:SECRET@github.com/owner/private.git',
+      commit: 'abc123',
+      dockerfile: 'Dockerfile',
+      repoToken: 'SECRET',
+    });
+
+    expect(args.join(' ')).not.toContain('SECRET');
+  });
+});
+
+describe('readProvenanceLabels', () => {
+  it('picks the platform build labels out of an image label map', () => {
+    expect(
+      readProvenanceLabels({
+        'mediforce.build.repo': 'git@github.com:owner/repo.git',
+        'mediforce.build.commit': 'abc123',
+        'mediforce.build.dockerfile': 'container/Dockerfile',
+        'mediforce.build.context': '.',
+        'mediforce.build.workflow': 'sdtm-mapping',
+        'mediforce.build.namespace': 'acme',
+        'org.opencontainers.image.source': 'https://github.com/owner/repo',
+      }),
+    ).toEqual({
+      buildRepo: 'git@github.com:owner/repo.git',
+      buildCommit: 'abc123',
+      buildDockerfile: 'container/Dockerfile',
+      buildContext: '.',
+      buildWorkflow: 'sdtm-mapping',
+      buildNamespace: 'acme',
+    });
+  });
+
+  it('leaves every field undefined for an image built before the labels existed', () => {
+    const cases: Array<Record<string, string> | null | undefined> = [
+      null,
+      undefined,
+      {},
+      { maintainer: 'someone' },
+    ];
+    for (const labels of cases) {
+      expect(readProvenanceLabels(labels)).toEqual({
+        buildRepo: undefined,
+        buildCommit: undefined,
+        buildDockerfile: undefined,
+        buildWorkflow: undefined,
+        buildNamespace: undefined,
+      });
+    }
+  });
+});

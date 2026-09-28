@@ -14,6 +14,7 @@ const sidebars: SidebarsConfig = {
     'install/index',
     'first-run/index',
     'build/index',
+    'images/index',
     {
       type: 'category',
       label: 'Running workflows',

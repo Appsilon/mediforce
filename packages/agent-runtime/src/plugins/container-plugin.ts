@@ -52,15 +52,23 @@
  * `/output/result.json`. A rename is a breaking change across all those and
  * belongs in its own PR.
  */
-import { existsSync, mkdirSync, cpSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, renameSync } from 'node:fs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
-import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
-import { normalizeRepoUrls, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
-import { artifactsBuildTag, artifactsDir } from './workflow-artifacts';
+import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata, WorkflowArtifact } from '@mediforce/platform-core';
+import {
+  carriedDockerfile,
+  isCatalogReference,
+  catalogDockerfileKey,
+  normalizeBuildContext,
+  normalizeRepoUrls,
+  DEFAULT_AGENT_IMAGE,
+  DOCKER_IMAGE_SETUP_URL,
+} from '@mediforce/platform-core';
+import { artifactsBuildHash, artifactsBuildTag, artifactsDir } from './workflow-artifacts';
 import { cloneRepoAtCommit } from './git-clone';
 import { writeFile } from 'node:fs/promises';
 import type { GitMetadata } from '@mediforce/platform-core';
@@ -103,13 +111,140 @@ export function resolveRepoToken(
  * Derive a deterministic image tag from the build inputs so callers that
  * omit `image` in build mode still get a stable, cacheable tag.
  * Format: `mediforce-built:<12-char-sha256-hex>`.
+ *
+ * A context-less build hashes exactly `repo \0 commit \0 dockerfile`, as
+ * written — the bytes every tag on a daemon or pinned by a registered step was
+ * minted from. A build naming a context hashes the Dockerfile's path from the
+ * repo root and the normalised context instead, so spellings of one build
+ * (`.`, `./`, `/`) land in one cache slot.
  */
-export function deriveBuildTag(repoUrl: string, commit: string, dockerfile?: string): string {
-  const hash = createHash('sha256')
-    .update(`${repoUrl}\0${commit}\0${dockerfile ?? ''}`)
-    .digest('hex')
-    .slice(0, 12);
+export function deriveBuildTag(
+  repoUrl: string,
+  commit: string,
+  dockerfile?: string,
+  context?: string,
+): string {
+  const inputs =
+    context === undefined || context === ''
+      ? `${repoUrl}\0${commit}\0${dockerfile ?? ''}`
+      : `${repoUrl}\0${commit}\0${catalogDockerfileKey(dockerfile ?? '', context)}\0${normalizeBuildContext(context)}`;
+  const hash = createHash('sha256').update(inputs).digest('hex').slice(0, 12);
   return `mediforce-built:${hash}`;
+}
+
+/** Git inputs a build-mode container config resolves to. */
+export interface BuildSource {
+  repoUrl: string;
+  repoRef: string;
+  commit: string;
+  dockerfile?: string;
+  context?: string;
+}
+
+/**
+ * Resolve a container config's build inputs, applying the workflow-level
+ * skills-repo fallback for a step that names only a `dockerfile`.
+ *
+ * Pure and context-free so the `by-image` scan can reach the same answer from
+ * a stored WorkflowDefinition — a step that omits `image` runs under the tag
+ * `deriveBuildTag` mints from exactly these inputs, and nothing else can name it.
+ */
+export function resolveBuildSource(
+  buildConfig: ContainerConfig,
+  workflowRepo?: { url?: string; commit?: string },
+): BuildSource | undefined {
+  const { dockerfile, context, repo, commit } = buildConfig;
+
+  if (repo && commit) {
+    return { repoUrl: normalizeRepoUrls(repo).gitUrl, repoRef: repo, commit, dockerfile, context };
+  }
+
+  if (dockerfile && workflowRepo?.url && workflowRepo?.commit) {
+    const repoRef = repo ?? workflowRepo.url;
+    return {
+      repoUrl: normalizeRepoUrls(repoRef).gitUrl,
+      repoRef,
+      commit: commit ?? workflowRepo.commit,
+      dockerfile,
+      context,
+    };
+  }
+
+  return undefined;
+}
+
+/**
+ * The tag a step with a build source builds under, when it names one: never the
+ * shared golden image, and never a name this workspace's catalog owns.
+ *
+ * Registration used to write the golden image onto a step whose Dockerfile came
+ * from `externalSkillsRepo`, and a registered version cannot be edited, so the
+ * build would replace the golden image on the host for every workflow using it.
+ * Such a step builds under its derived tag instead, as does one whose `image` is
+ * empty and one naming an image the catalog published.
+ */
+function buildTarget(image: string | undefined, namespace?: string): string | undefined {
+  if (image === undefined || image === '') return undefined;
+  const isGolden = image === DEFAULT_AGENT_IMAGE || image === `${DEFAULT_AGENT_IMAGE}:latest`;
+  return isGolden || isCatalogReference(image, namespace) ? undefined : image;
+}
+
+/** The parts of a definition that decide where a step's image comes from. */
+export interface StepImageDefinition {
+  artifacts?: WorkflowArtifact[];
+  externalSkillsRepo?: { url?: string; commit?: string };
+  name?: string;
+  namespace?: string;
+}
+
+/**
+ * A build from a Dockerfile the workflow carries: the files are already on the
+ * host for the /artifacts mount, so the build reads that directory and no clone
+ * happens. The context is always every carried file (`carriedDockerfile`).
+ * `undefined` for a step that builds from anything else.
+ */
+export function resolveCarriedBuild(
+  buildConfig: ContainerConfig,
+  definition: StepImageDefinition | undefined,
+): { tag: string; dockerfile: string; meta: Omit<ImageBuildMeta, 'image'> } | undefined {
+  const artifacts = definition?.artifacts;
+  const dockerfile = carriedDockerfile(buildConfig, artifacts);
+  if (artifacts === undefined || dockerfile === null) return undefined;
+  const build = { dockerfile, workflow: definition?.name, namespace: definition?.namespace };
+  return {
+    tag: artifactsBuildTag(artifacts, build),
+    dockerfile,
+    meta: {
+      contextDir: artifactsDir(artifacts),
+      artifactsHash: artifactsBuildHash(artifacts, build),
+      dockerfile: buildConfig.dockerfile,
+      workflow: definition?.name,
+      namespace: definition?.namespace,
+    },
+  };
+}
+
+/**
+ * The image tag a container config runs under: its explicit `image`, or the
+ * tag derived from its build inputs when it leaves `image` unset.
+ * `undefined` when the config names neither.
+ *
+ * Takes the definition rather than only its skills repo so the answer is the
+ * one `resolveImageBuild` gives at run time — a carried Dockerfile wins over
+ * `externalSkillsRepo` there, and a scan asking which images a version pins
+ * must not name a `mediforce-built:*` tag the runtime never builds.
+ */
+export function resolveStepImage(
+  buildConfig: ContainerConfig | undefined,
+  definition?: StepImageDefinition,
+): string | undefined {
+  if (!buildConfig) return undefined;
+  const carried = resolveCarriedBuild(buildConfig, definition);
+  if (carried !== undefined) return buildTarget(buildConfig.image, definition?.namespace) ?? carried.tag;
+  const source = resolveBuildSource(buildConfig, definition?.externalSkillsRepo);
+  if (source === undefined) return buildConfig.image || undefined;
+  return buildTarget(buildConfig.image, definition?.namespace)
+    ?? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile, source.context);
 }
 
 export function resolveImageBuild(
@@ -118,52 +253,25 @@ export function resolveImageBuild(
   context: AgentContext | WorkflowAgentContext,
   resolvedEnv?: Record<string, string>,
 ): ImageBuildMeta | undefined {
-  const { dockerfile, repo, commit } = buildConfig;
+  const workflowDefinition = isWorkflowAgentContext(context) ? context.workflowDefinition : undefined;
 
-  if (repo && commit) {
-    const repoUrl = normalizeRepoUrls(repo).gitUrl;
-    return {
-      image: image ?? deriveBuildTag(repoUrl, commit, dockerfile),
-      repoUrl,
-      repoRef: repo,
-      commit,
-      dockerfile,
-      repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
-    };
-  }
-
-  // A Dockerfile the workflow carries: the files are already on the host for
-  // the /artifacts mount, so the build context is that directory and no clone
-  // happens. Second to an explicit step-level repo+commit, which said something
+  // Second to an explicit step-level repo+commit, which said something
   // specific, and ahead of the externalSkillsRepo fallback.
-  if (dockerfile && isWorkflowAgentContext(context)) {
-    const artifacts = context.workflowDefinition.artifacts;
-    if (artifacts?.some((artifact) => artifact.path === dockerfile) === true) {
-      return {
-        image: image ?? artifactsBuildTag(artifacts, dockerfile),
-        contextDir: artifactsDir(artifacts),
-        dockerfile,
-      };
-    }
+  const carried = resolveCarriedBuild(buildConfig, workflowDefinition);
+  if (carried !== undefined) {
+    return { ...carried.meta, image: buildTarget(image, workflowDefinition?.namespace) ?? carried.tag };
   }
 
-  if (dockerfile && isWorkflowAgentContext(context)) {
-    const wfRepo = context.workflowDefinition.externalSkillsRepo;
-    if (wfRepo?.url && wfRepo?.commit) {
-      const repoRef = repo ?? wfRepo.url;
-      const repoUrl = normalizeRepoUrls(repoRef).gitUrl;
-      return {
-        image: image ?? deriveBuildTag(repoUrl, commit ?? wfRepo.commit, dockerfile),
-        repoUrl,
-        repoRef,
-        commit: commit ?? wfRepo.commit,
-        dockerfile,
-        repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
-      };
-    }
-  }
+  const source = resolveBuildSource(buildConfig, workflowDefinition?.externalSkillsRepo);
+  if (!source) return undefined;
 
-  return undefined;
+  return {
+    ...source,
+    image: buildTarget(image, workflowDefinition?.namespace) ?? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile, source.context),
+    repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
+    workflow: workflowDefinition?.name,
+    namespace: workflowDefinition?.namespace,
+  };
 }
 
 const SKILLS_CACHE_DIR = join(tmpdir(), 'mediforce-skills-cache');
@@ -402,6 +510,11 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
    * Idempotent: a cache hit is a no-op. Stores nothing on instance state — the
    * cache path is derived on demand by {@link resolveSkillsDir} via
    * {@link skillsCacheDir}, so concurrent steps can't leak or clobber it.
+   *
+   * Populates via a staging dir + rename so a process kill mid-copy (OOM,
+   * step timeout, engine restart) can never leave a half-populated directory
+   * at `cacheDir` — `existsSync(cacheDir)` above would treat that as a
+   * permanent cache hit and every future run would fail to find the skill.
    */
   protected async fetchSkillsFromRepo(
     skillsDir: string,
@@ -417,9 +530,11 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
       return;
     }
 
-    // Cache miss — clone, copy, delete clone
+    // Cache miss — clone, copy into a staging dir, delete clone
     console.log(`[container-plugin] Fetching skills from ${repoRef}@${commit.slice(0, 8)} path=${skillsDir}`);
     const cloneDir = mkdtempSync(join(tmpdir(), 'mediforce-skills-clone-'));
+    mkdirSync(SKILLS_CACHE_DIR, { recursive: true });
+    const stagingDir = mkdtempSync(join(SKILLS_CACHE_DIR, '.staging-'));
 
     try {
       cloneRepoAtCommit(cloneDir, repoRef, commit, repoToken);
@@ -431,11 +546,22 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
         );
       }
 
-      mkdirSync(SKILLS_CACHE_DIR, { recursive: true });
-      cpSync(sourceDir, cacheDir, { recursive: true });
-      console.log(`[container-plugin] Skills cached at ${cacheDir}`);
+      const stagedSkills = join(stagingDir, 'skills');
+      cpSync(sourceDir, stagedSkills, { recursive: true });
+
+      try {
+        renameSync(stagedSkills, cacheDir);
+        console.log(`[container-plugin] Skills cached at ${cacheDir}`);
+      } catch (error) {
+        // A concurrent fetch for the same content-addressed key won the
+        // race and already populated cacheDir — its content is identical
+        // by construction, so this attempt is redundant, not a failure.
+        if (existsSync(cacheDir) === false) throw error;
+        console.log(`[container-plugin] Skills cache populated concurrently for ${skillsDir} (${cacheDir})`);
+      }
     } finally {
       rmSync(cloneDir, { recursive: true, force: true });
+      rmSync(stagingDir, { recursive: true, force: true });
     }
   }
 

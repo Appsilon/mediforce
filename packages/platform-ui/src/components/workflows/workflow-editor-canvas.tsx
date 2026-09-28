@@ -31,6 +31,7 @@ import type { WorkflowSettingsDraft } from './workflow-settings-utils';
 import { unheldStepRoles } from './workflow-editor-utils';
 import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
+import { useImageCatalogEntries } from '@/hooks/use-image-catalog';
 import { mediforce, mediforceSilent, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
@@ -128,6 +129,7 @@ export function WorkflowEditorCanvas({
 
   const { toast } = useToast();
   const { images: dockerImages, isAvailable: dockerAvailable } = useDockerImages();
+  const { entries: catalogEntries } = useImageCatalogEntries(namespace);
   const warningStepIds = useMemo(() => {
     if (!dockerAvailable) return undefined;
     const map = new Map<string, string>();
@@ -938,7 +940,7 @@ export function WorkflowEditorCanvas({
 
       <div className="shrink-0 border-b px-4 py-1.5 flex items-center gap-1.5 flex-wrap bg-white dark:bg-background">
 
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex items-center gap-1.5" data-tour="editor-toolbar">
           <AuthoringPathsPopover />
 
           <button
@@ -1036,6 +1038,7 @@ export function WorkflowEditorCanvas({
               imageWarning={warningStepIds?.get(selectedStep.id)}
               dockerImages={dockerImages}
               workflowArtifacts={settingsDraft?.artifacts}
+              catalogEntries={catalogEntries}
               workflowExternalSkillsRepo={workflowExternalSkillsRepo}
             />
           </div>
@@ -1052,7 +1055,10 @@ export function WorkflowEditorCanvas({
         )}
 
         {aiPaneOpen ? (
-          <div className="w-80 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col min-h-0">
+          <div
+            data-tour="assistant-pane"
+            className="w-80 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col min-h-0"
+          >
             <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b">
               <div className="flex items-center gap-2 min-w-0">
                 <Sparkles className="h-4 w-4 text-primary shrink-0" />
@@ -1241,6 +1247,7 @@ export function WorkflowEditorCanvas({
                 ? 'border-primary/40 text-primary hover:bg-primary/5'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted',
             )}
+            data-tour="assistant-rail"
             title={assistantUnread ? 'The AI Assistant has something for you' : 'Expand AI Assistant'}
             aria-label={assistantUnread ? 'Expand AI Assistant — it has something for you' : 'Expand AI Assistant'}
           >

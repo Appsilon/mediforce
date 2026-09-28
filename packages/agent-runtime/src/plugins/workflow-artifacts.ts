@@ -25,7 +25,7 @@ const COMPLETE_MARKER = '.mediforce-artifacts-complete';
  * worker bind-mount it, which is what makes a host path resolve to the same
  * bytes inside a container.
  */
-export function artifactsDir(artifacts: WorkflowArtifact[]): string {
+export function artifactsDir(artifacts: readonly WorkflowArtifact[]): string {
   const canonical = [...artifacts]
     .sort((a, b) => a.path.localeCompare(b.path))
     .map((artifact) => `${artifact.path}\0${artifact.contents}`)
@@ -34,18 +34,47 @@ export function artifactsDir(artifacts: WorkflowArtifact[]): string {
   return join(ARTIFACTS_CACHE_DIR, hash);
 }
 
+/** What a carried build is: the Dockerfile, from the root of the carried files
+ *  (`carriedDockerfile`), and the workflow they belong to. */
+export interface CarriedBuild {
+  dockerfile: string;
+  workflow?: string;
+  namespace?: string;
+}
+
 /**
  * Image tag for a Dockerfile the workflow carries. Derived from the files, so
  * an edit builds a new image and a rerun of unchanged files finds the one that
- * is already there — the staleness question a commit label answers for a repo
- * build has no equivalent here, because the tag *is* the content.
+ * is already there — the tag *is* the content. A tag the step names itself is
+ * not, which is what the labelled {@link artifactsBuildHash} answers.
  */
-export function artifactsBuildTag(artifacts: WorkflowArtifact[], dockerfile: string): string {
-  const hash = createHash('sha256')
-    .update(`${artifactsDir(artifacts)}\0${dockerfile}`)
+export function artifactsBuildTag(artifacts: readonly WorkflowArtifact[], build: CarriedBuild): string {
+  return `mediforce-artifacts:${artifactsBuildHash(artifacts, build)}`;
+}
+
+/**
+ * The content half of {@link artifactsBuildTag}, labelled on the image so a tag
+ * the step named itself can be checked against the files too.
+ *
+ * Every carried file counts, since the context is all of them. The workflow and
+ * namespace count too, so two workflows carrying identical files build two
+ * images, each labelled truthfully with the workflow the catalog offers it
+ * under (ADR-0022).
+ */
+export function artifactsBuildHash(artifacts: readonly WorkflowArtifact[], build: CarriedBuild): string {
+  const files = [...artifacts]
+    .sort((a, b) => a.path.localeCompare(b.path))
+    .map((artifact) => `${artifact.path}\0${artifact.contents}`)
+    .join('\0\0');
+  return createHash('sha256')
+    .update([
+      build.namespace ?? '',
+      build.workflow ?? '',
+      build.dockerfile,
+      files,
+    ].join('\0\0\0'))
     .digest('hex')
     .slice(0, 12);
-  return `mediforce-artifacts:${hash}`;
 }
 
 /** The same rule `WorkflowArtifactSchema` applies, enforced again at the point

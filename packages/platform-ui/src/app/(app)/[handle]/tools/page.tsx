@@ -229,7 +229,7 @@ export default function ToolsPage() {
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-1.5">
-            <h1 className="text-xl font-headline font-semibold">Tools</h1>
+            <h1 className="text-xl font-headline font-semibold" data-tour="tools-header">Tools</h1>
             <ConceptPopover label="What is a tool?">
               <p>
                 <strong>A tool is an MCP server — an external tool host an agent can call while it runs.</strong>{' '}
@@ -277,7 +277,7 @@ export default function ToolsPage() {
         </div>
       </div>
 
-      <div className="relative mb-6">
+      <div className="relative mb-6" data-tour="tools-search">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="text"
@@ -311,7 +311,7 @@ export default function ToolsPage() {
         <div className="space-y-8">
           {filteredStdio.length > 0 && (
             <section>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3" data-tour="tools-stdio">
                 Stdio servers
                 <span className="ml-2 text-xs font-normal">({filteredStdio.length})</span>
               </h2>
@@ -333,7 +333,7 @@ export default function ToolsPage() {
           )}
           {filteredHttp.length > 0 && (
             <section>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3" data-tour="tools-http">
                 HTTP servers
                 <span className="ml-2 text-xs font-normal">({filteredHttp.length})</span>
               </h2>

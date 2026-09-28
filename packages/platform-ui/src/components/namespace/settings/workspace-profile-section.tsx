@@ -65,7 +65,7 @@ export function WorkspaceProfileSection({ handle, namespace }: WorkspaceProfileS
 
   return (
     <div className="mb-10 space-y-4">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Profile</h2>
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" data-tour="settings-profile">Profile</h2>
 
       {/* Name + bio form */}
       <div className="rounded-lg border bg-card px-4 py-5">

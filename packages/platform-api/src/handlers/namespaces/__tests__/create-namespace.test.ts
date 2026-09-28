@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   InMemoryAuditRepository,
+  InMemoryImageCatalogRepository,
   InMemoryUserDirectoryService,
 } from '@mediforce/platform-core/testing';
+import { DEFAULT_IMAGE_CATALOG_ENTRIES } from '@mediforce/platform-core';
 import type { UserDirectoryService } from '@mediforce/platform-core';
 import { InMemoryNamespaceRepo, createTestScope, stubUserDirectory, userCaller } from '../../../testing/index';
 import { createNamespace } from '../create-namespace';
@@ -54,6 +56,50 @@ describe('createNamespace handler', () => {
     expect(events).toHaveLength(1);
     expect(events[0]?.entityId).toBe('acme');
     expect(events[0]?.actorId).toBe('uid-marek');
+  });
+
+  it('seeds the images a step falls back to, so the catalog is never empty (#1376)', async () => {
+    const imageCatalogRepo = new InMemoryImageCatalogRepository();
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      imageCatalogRepo,
+      caller: userCaller('uid-marek', []),
+    });
+
+    await createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope);
+
+    const seeded = await imageCatalogRepo.list('acme');
+    expect(seeded.map((entry) => entry.source)).toEqual(
+      DEFAULT_IMAGE_CATALOG_ENTRIES.map((seed) => ({ kind: 'referenced', reference: seed.reference })),
+    );
+    // No probe ran, so the rows carry no capabilities — `getImageCatalogEntry`
+    // fills them in on the first single-entry read.
+    expect(seeded.every((entry) => Object.keys(entry.capabilities).length === 0)).toBe(true);
+    const created = auditRepo.getAll().find((e) => e.action === 'namespace.created');
+    expect(created?.outputSnapshot).toMatchObject({
+      seededImageCatalogEntries: DEFAULT_IMAGE_CATALOG_ENTRIES.length,
+    });
+  });
+
+  it('creates the workspace even when the catalog seed fails outright', async () => {
+    const imageCatalogRepo = new InMemoryImageCatalogRepository();
+    imageCatalogRepo.upsert = async () => {
+      throw new Error('image catalog unavailable');
+    };
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      imageCatalogRepo,
+      caller: userCaller('uid-marek', []),
+    });
+
+    const result = await createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope);
+
+    expect(result.namespace.handle).toBe('acme');
+    expect(namespaceRepo.namespaces.get('acme')?.type).toBe('organization');
+    const created = auditRepo.getAll().find((e) => e.action === 'namespace.created');
+    expect(created?.outputSnapshot).toMatchObject({ seededImageCatalogEntries: 0 });
   });
 
   it('grants the owner workflow-manager so the workspace has one from minute one', async () => {

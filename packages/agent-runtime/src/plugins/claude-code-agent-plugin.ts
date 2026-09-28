@@ -1,4 +1,4 @@
-import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
+import type { AgentLogFormat, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import {
   BaseContainerAgentPlugin,
   type SpawnCliOptions,
@@ -48,93 +48,6 @@ interface StreamEvent {
   tool_name?: string;
   tool_input?: unknown;
   [key: string]: unknown;
-}
-
-interface LogEntry {
-  ts: string;
-  type: string;
-  subtype?: string;
-  tool?: string;
-  input?: Record<string, unknown>;
-  text?: string;
-  [key: string]: unknown;
-}
-
-/** Extract log entries from a stream-json event. Returns JSONL strings. */
-function formatLogEntries(event: StreamEvent): string[] {
-  const ts = new Date().toISOString();
-  const entries: LogEntry[] = [];
-
-  if (event.type === 'assistant' && event.message?.content) {
-    for (const block of event.message.content) {
-      if (block.type === 'tool_use' && block.name) {
-        entries.push({
-          ts,
-          type: 'assistant',
-          subtype: 'tool_call',
-          tool: block.name,
-          input: block.input as Record<string, unknown> | undefined,
-        });
-      }
-      if (block.type === 'text' && block.text) {
-        entries.push({ ts, type: 'assistant', subtype: 'text', text: block.text });
-      }
-    }
-    return entries.map((entry) => JSON.stringify(entry));
-  }
-
-  if (event.type === 'tool_result') {
-    entries.push({
-      ts,
-      type: 'tool_result',
-      tool_name: event.tool_name as string | undefined,
-      subtype: event.subtype,
-      content: event.content,
-    });
-    return entries.map((entry) => JSON.stringify(entry));
-  }
-
-  // CLI stream-json sends tool results as `user` messages with tool_result content blocks
-  if (event.type === 'user' && event.message?.content) {
-    for (const block of event.message.content) {
-      if (block.type === 'tool_result') {
-        const resultContent = (block as Record<string, unknown>).content;
-        const preview = typeof resultContent === 'string'
-          ? resultContent.slice(0, 500)
-          : JSON.stringify(resultContent ?? '').slice(0, 500);
-        entries.push({
-          ts,
-          type: 'user',
-          subtype: 'tool_result',
-          tool_use_id: (block as Record<string, unknown>).tool_use_id as string | undefined,
-          content: preview,
-        });
-      }
-    }
-    if (entries.length > 0) {
-      return entries.map((entry) => JSON.stringify(entry));
-    }
-  }
-
-  if (event.type === 'result') {
-    entries.push({
-      ts,
-      type: 'result',
-      subtype: event.subtype,
-      text: typeof event.result === 'string' ? event.result.slice(0, 500) : undefined,
-    });
-    return entries.map((entry) => JSON.stringify(entry));
-  }
-
-  // Generic fallback: capture any event type we don't explicitly handle
-  const { type, subtype, ...rest } = event;
-  entries.push({
-    ts,
-    type,
-    subtype,
-    ...rest,
-  });
-  return entries.map((entry) => JSON.stringify(entry));
 }
 
 /** Context occupancy for one assistant turn: the whole prompt, not just the
@@ -356,14 +269,7 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
     return lastResult;
   }
 
-  protected override processOutputLine(line: string): string[] {
-    try {
-      const event = JSON.parse(line) as StreamEvent;
-      return formatLogEntries(event);
-    } catch {
-      return [];
-    }
-  }
+  protected override readonly logFormat: AgentLogFormat = 'claude-stream-json';
 
   protected override extractErrorFromResult(resultLine: string): string | null {
     return extractErrorDetail(resultLine);

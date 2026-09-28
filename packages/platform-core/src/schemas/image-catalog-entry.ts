@@ -1,0 +1,117 @@
+import { z } from 'zod';
+import { ImageCapabilityCacheSchema } from './image-capabilities';
+import { BuildContextSchema } from '../utils/docker-build-paths';
+
+/**
+ * Where an entry's image comes from. This is the entry's key (ADR-0022
+ * decision 1) — deliberately not the commit, so a rebuild lands as another
+ * version of a row the author already chose rather than as a new row.
+ */
+export const ImageCatalogSourceSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('built'),
+      /** Git repo the platform builds the image from. */
+      repo: z.string().min(1),
+      /**
+       * Dockerfile path inside that repo. The empty string is a value, not an
+       * absence: it is what `deriveBuildTag` folds in for a step that names
+       * none, so two entries differing only in it are two images.
+       */
+      dockerfile: z.string().default(''),
+      /**
+       * Build context directory from the repo root, which makes `dockerfile`
+       * a path from the context. **Not part of the key**: the key is the
+       * Dockerfile's path from the repo root (`catalogDockerfileKey`), so one
+       * file built from two contexts is one entry with versions of both, and
+       * this is the context the entry's Build action uses.
+       */
+      context: BuildContextSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('referenced'),
+      /**
+       * Image reference with no tag — `mediforce-golden-image`,
+       * `registry.example.com/my-agent`. Its versions are tags, not commits.
+       * This is the form for anything the platform did not build and holds no
+       * build inputs for.
+       */
+      reference: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('carried'),
+      /**
+       * Workflow whose carried files hold the Dockerfile. With the namespace
+       * the row lives in, it names the files — a workflow name is unique only
+       * within its namespace. Its versions are content hashes, not commits.
+       */
+      workflow: z.string().min(1),
+      /**
+       * Dockerfile path from the root of the carried files. The key is the
+       * file, not how a step builds it, so the context a step names is not
+       * part of it — the same rule `catalogDockerfileKey` applies to a repo.
+       */
+      dockerfile: z.string().min(1),
+    })
+    .strict(),
+]);
+
+/**
+ * The one place a human may state provenance instead of the platform deriving
+ * it (ADR-0022 decision 2). It exists for a pushed image, where there is no
+ * derivable alternative: OCI labels are inherited from the base image, so a
+ * local image of ours reports `rocker-versioned2` as its source.
+ *
+ * Optional, and every consumer must mark it as **declared, not derived**.
+ */
+export const ImageCatalogDeclaredSourceSchema = z
+  .object({
+    repo: z.string().min(1).optional(),
+    commit: z.string().min(1).optional(),
+    dockerfile: z.string().min(1).optional(),
+  })
+  .strict();
+
+/**
+ * One image the platform offers for steps, per namespace.
+ *
+ * Everything here is either the key or the single declared sentence: versions,
+ * availability and lineage are recomputed on read from the daemon, never
+ * stored. That is what keeps the catalog from becoming a second source of
+ * truth about what an image contains. Capabilities are the one derived fact
+ * that is cached rather than recomputed — reading them costs a container, so
+ * they are keyed by the immutable image ID the daemon reports and a rebuild
+ * under the same tag re-probes rather than reusing the old answer.
+ */
+export const ImageCatalogEntrySchema = z
+  .object({
+    /** Derived from `source`; never supplied by a client. */
+    id: z.string().min(1),
+    /** Human handle, e.g. "TealFlow agent". */
+    name: z.string().min(1),
+    /** One sentence saying what the image is *for*. Not its contents. */
+    intent: z
+      .string()
+      .min(1, 'intent is required: one sentence saying what this image is for'),
+    source: ImageCatalogSourceSchema,
+    declaredSource: ImageCatalogDeclaredSourceSchema.optional(),
+    capabilities: ImageCapabilityCacheSchema.default({}),
+  })
+  .strict();
+
+/**
+ * A name the Image Catalog owns: `<workspace>/<something>`. The daemon is shared
+ * by every workspace, so a workspace publishes and uploads only under its own
+ * handle, and a build must never land on such a name (ADR-0022, #1345).
+ */
+export function isCatalogReference(image: string, namespace: string | undefined): boolean {
+  return typeof namespace === 'string' && namespace.length > 0 && image.startsWith(`${namespace}/`);
+}
+
+export type ImageCatalogSource = z.infer<typeof ImageCatalogSourceSchema>;
+export type ImageCatalogDeclaredSource = z.infer<typeof ImageCatalogDeclaredSourceSchema>;
+export type ImageCatalogEntry = z.infer<typeof ImageCatalogEntrySchema>;

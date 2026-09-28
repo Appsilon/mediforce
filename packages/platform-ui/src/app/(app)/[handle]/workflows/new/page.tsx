@@ -228,7 +228,7 @@ export default function NewWorkflowPage() {
       <div className="border-b px-6 py-3 sticky top-0 z-30 bg-white dark:bg-background">
         <div className="flex items-start justify-between gap-6">
           {/* Left: workflow identity */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0" data-tour="wf-new-identity">
             <div className="flex items-baseline gap-1">
               {!toWorkflowId(workflowName) && (
                 <span className="text-destructive shrink-0" aria-hidden="true" title="Required to save">*</span>
@@ -254,7 +254,7 @@ export default function NewWorkflowPage() {
               />
             </div>
             {/* Secondary metadata row */}
-            <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground/60 flex-wrap">
+            <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground/60 flex-wrap" data-tour="wf-new-namespace">
               <span className="shrink-0">Namespace:</span>
               <select
                 aria-label="Namespace"
@@ -286,7 +286,7 @@ export default function NewWorkflowPage() {
           </div>
 
           {/* Right: save controls */}
-          <div className="flex items-center gap-2 shrink-0 pt-0.5">
+          <div className="flex items-center gap-2 shrink-0 pt-0.5" data-tour="wf-new-actions">
             {saveState.status === 'saved' && (
               <span className="text-sm text-green-600 dark:text-green-400 font-medium">
                 Created — redirecting…

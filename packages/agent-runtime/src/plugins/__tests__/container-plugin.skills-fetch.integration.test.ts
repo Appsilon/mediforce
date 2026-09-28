@@ -1,11 +1,25 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { execSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { ContainerPlugin } from '../container-plugin';
+import { ContainerPlugin, skillsCacheDir } from '../container-plugin';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../../interfaces/step-executor-plugin';
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
+
+// Lets a test act between the copy into staging and the rename into the cache:
+// a process killed there, or a concurrent fetch that got there first.
+const copyHook = vi.hoisted(() => ({ afterCopy: undefined as ((destination: string) => void) | undefined }));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    cpSync: (...args: Parameters<typeof actual.cpSync>) => {
+      actual.cpSync(...args);
+      copyHook.afterCopy?.(String(args[1]));
+    },
+  };
+});
 
 class TestPlugin extends ContainerPlugin {
   readonly metadata = { name: 'test-plugin' } as PluginCapabilityMetadata;
@@ -96,5 +110,40 @@ describe('fetchSkillsFromRepo + resolveSkillsDir [integration, real git]', () =>
     const diskResolved = plugin.resolve('skills', (p) => join('/project', p));
     expect(diskResolved).toBe(join('/project', 'skills'));
     expect(diskResolved).not.toBe(repoResolved);
+  });
+
+  describe('a cache entry is never half-populated', () => {
+    const cacheDir = (): string => skillsCacheDir(repoDir, commit, 'skills');
+
+    afterEach(() => {
+      copyHook.afterCopy = undefined;
+      rmSync(cacheDir(), { recursive: true, force: true });
+    });
+
+    it('[DATA] a fetch killed during the copy leaves no cache entry, so the next run fetches again', async () => {
+      rmSync(cacheDir(), { recursive: true, force: true });
+      copyHook.afterCopy = () => {
+        throw new Error('step timed out mid-copy');
+      };
+
+      await expect(new TestPlugin().populate('skills', repoDir, commit)).rejects.toThrow('step timed out mid-copy');
+      // An empty or partial directory here would read as a cache hit forever.
+      expect(existsSync(cacheDir())).toBe(false);
+
+      copyHook.afterCopy = undefined;
+      await new TestPlugin().populate('skills', repoDir, commit);
+      expect(readFileSync(join(cacheDir(), 'renovate-review', 'SKILL.md'), 'utf-8')).toBe(SKILL_BODY);
+    });
+
+    it('[DATA] a concurrent fetch that populated the entry first wins, and this one is not a failure', async () => {
+      rmSync(cacheDir(), { recursive: true, force: true });
+      copyHook.afterCopy = () => {
+        mkdirSync(join(cacheDir(), 'renovate-review'), { recursive: true });
+        writeFileSync(join(cacheDir(), 'renovate-review', 'SKILL.md'), 'written by the other fetch');
+      };
+
+      await expect(new TestPlugin().populate('skills', repoDir, commit)).resolves.toBeUndefined();
+      expect(readFileSync(join(cacheDir(), 'renovate-review', 'SKILL.md'), 'utf-8')).toBe('written by the other fetch');
+    });
   });
 });

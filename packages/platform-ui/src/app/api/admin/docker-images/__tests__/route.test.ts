@@ -15,6 +15,9 @@ vi.mock('@/lib/platform-services', () => ({
     auditRepo: { append: mockAuditAppend },
     instanceRepo: { getById: vi.fn() },
     namespaceRepo: {},
+    // The handler scans every definition for a live pin on the image before it
+    // destroys anything (#1375), so the route needs a repository to scan.
+    processRepo: { listAllWorkflowDefinitions: async () => ({ definitions: [] }) },
   }),
   getAppBaseUrl: () => 'http://localhost:3000',
 }));

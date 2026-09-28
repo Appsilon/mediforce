@@ -25,10 +25,17 @@ services:
     depends_on:
       - platform-ui
 
+  # Two limits, deliberately different. `mem_limit` is the kernel's: crossing it
+  # is a SIGKILL mid-RDB-save, which leaves orphaned `temp-*.rdb` files behind
+  # and loses the queue. `--maxmemory` sits below it so Redis refuses writes
+  # while the kernel still has room — a visible `OOM command not allowed` on one
+  # enqueue instead of a dead container. The gap is headroom for the RDB save's
+  # copy-on-write. `noeviction` because BullMQ jobs are durable work, not cache.
   redis:
     image: redis:8-alpine
     restart: unless-stopped
-    mem_limit: ${REDIS_MEM_LIMIT:-256m}
+    mem_limit: ${REDIS_MEM_LIMIT:-1g}
+    command: redis-server --maxmemory ${REDIS_MAX_MEMORY:-640mb} --maxmemory-policy noeviction
     volumes:
       - redis-data:/data
     healthcheck:
@@ -143,6 +150,11 @@ services:
       # NEXT_PUBLIC_APP_URL if unset; falls back to request URL only as
       # a last resort, which is wrong behind Docker/reverse proxies.
       - APP_BASE_URL=${APP_BASE_URL:-${NEXT_PUBLIC_APP_URL:-}}
+      # Shared secret for the container-worker's HTTP routes that act on the
+      # host daemon (image delete, image capability probe). Both sides read the
+      # same var; unset on both means the worker enforces no header, which is
+      # every estate that has not opted in.
+      - CONTAINER_WORKER_SECRET=${CONTAINER_WORKER_SECRET:-}
       - MEDIFORCE_ROOT=/repo
       # Per-run worktrees + bare repos live here. Path must be identical
       # in-container and on the host so `docker run -v <wt>:/workspace` from
@@ -199,10 +211,19 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - WORKER_HTTP_PORT=3001
+      # Set it and the worker requires `X-Worker-Secret` on the routes that
+      # touch the host daemon; the platform reads the same var to send it.
+      - CONTAINER_WORKER_SECRET=${CONTAINER_WORKER_SECRET:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp
       - ${DEPLOY_KEY_PATH:-/home/deploy/.ssh/deploy_key}:/root/.ssh/deploy_key:ro
+      # The worker's own Docker CLI reads its credentials here, not the host
+      # user's: `docker login` on the host writes ~/.docker/config.json, which
+      # this container would otherwise never see, so every private-registry
+      # pull would fail with `unauthorized`. An absent directory mounts empty,
+      # which is exactly today's behaviour — public images only.
+      - ${DOCKER_CONFIG_DIR:-/home/deploy/.docker}:/root/.docker:ro
     depends_on:
       redis:
         condition: service_healthy

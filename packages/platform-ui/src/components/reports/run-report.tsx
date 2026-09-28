@@ -4,6 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { secondaryButtonClass } from '@/components/ui/button-styles';
 import {
   ArrowLeft,
   Printer,
@@ -45,6 +46,11 @@ interface RunReportProps {
   auditEvents: AuditEvent[];
   definitionSteps: Step[];
   runDetailHref: string;
+  /** Rendered inside the run's own side panel rather than as its own page:
+   *  drops the page's centred column and the link back to the run you are
+   *  already looking at. Print and the detail toggle stay — they are the
+   *  reason to open it. */
+  embedded?: boolean;
 }
 
 const STEP_STATUS_ICONS: Record<string, React.ReactNode> = {
@@ -113,8 +119,10 @@ export function RunReport({
   auditEvents,
   definitionSteps,
   runDetailHref,
+  embedded = false,
 }: RunReportProps) {
   const [detailLevel, setDetailLevel] = React.useState<DetailLevel>('brief');
+  const reportHref = `${runDetailHref}/report`;
 
   const runDate = format(new Date(instance.createdAt), 'yyyy-MM-dd');
   const slugifiedName = instance.definitionName.replace(/\s+/g, '-').toLowerCase();
@@ -140,23 +148,36 @@ export function RunReport({
   );
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-8">
-      {/* Toolbar */}
-      <div className="print:hidden flex items-center justify-between gap-4">
-        <Link
-          href={runDetailHref}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to run detail
-        </Link>
-
-        <div className="flex items-center gap-3">
-          <DetailLevelToggle value={detailLevel} onChange={setDetailLevel} />
-          <button
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
+    <div
+      data-print-root
+      className={cn(embedded ? 'p-4 space-y-6' : 'max-w-4xl mx-auto p-6 space-y-8')}
+    >
+      {/* Toolbar. Wraps rather than squeezing: in the side panel these three
+          controls have a fraction of the page's width. */}
+      <div className="print:hidden flex flex-wrap items-center justify-between gap-3">
+        {embedded ? (
+          <a
+            href={reportHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
+            <ExternalLink className="h-4 w-4" />
+            Open in new tab
+          </a>
+        ) : (
+          <Link
+            href={runDetailHref}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to run detail
+          </Link>
+        )}
+
+        <div className="flex items-center gap-2 shrink-0">
+          <DetailLevelToggle value={detailLevel} onChange={setDetailLevel} />
+          <button onClick={() => window.print()} className={secondaryButtonClass}>
             <Printer className="h-4 w-4" />
             Print
           </button>
@@ -172,7 +193,7 @@ export function RunReport({
 
       {/* Step Timeline */}
       <section>
-        <h2 className="text-lg font-headline font-semibold mb-4">Step Timeline</h2>
+        <h2 className="text-base print:text-lg font-headline font-semibold mb-3">Step Timeline</h2>
         <ol className="space-y-3">
           {sortedSteps.map((step, index) => (
             <StepCard
@@ -236,26 +257,29 @@ function ReportHeader({
 }) {
   return (
     <header className="space-y-4">
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3">
         <Image
           src="/logo.png"
           alt="Mediforce"
           width={40}
           height={40}
           loading="eager"
+          className="shrink-0"
         />
-        <div className="flex-1 space-y-2">
-          <h1 className="text-2xl font-headline font-semibold">
-            {instance.definitionName} — Run Report
-          </h1>
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <h1 className="text-xl print:text-2xl font-headline font-semibold text-balance min-w-0">
+              {instance.definitionName} — Run Report
+            </h1>
+            <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} error={instance.error} dryRun={instance.dryRun} />
+          </div>
           <p className="text-sm text-muted-foreground">
             Generated: {format(new Date(), 'MMMM d, yyyy')}
           </p>
         </div>
-        <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} error={instance.error} dryRun={instance.dryRun} />
       </div>
 
-      <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
+      <div className="flex flex-wrap gap-x-6 gap-y-1.5 text-sm text-muted-foreground">
         {wallClock !== null && (
           <div className="flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5" />
@@ -452,7 +476,7 @@ function DeliverablesSection({
 
   return (
     <section>
-      <h2 className="text-lg font-headline font-semibold mb-4">Deliverables</h2>
+      <h2 className="text-base print:text-lg font-headline font-semibold mb-3">Deliverables</h2>
       <div className="rounded-lg border bg-card p-4 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

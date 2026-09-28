@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import { BuildImageRequestSchema, BuildUploadedImageRequestSchema } from '@mediforce/platform-core';
+import { ConflictError } from '../../../errors';
 import {
+  buildImageViaContainerWorker,
+  buildUploadedImageViaContainerWorker,
+  fetchContainerWorkerImageHistory,
   fetchFromContainerWorker,
   fetchFromLocalDocker,
+  fetchImagesFromContainerWorker,
+  fetchImagesFromLocalDocker,
+  fetchLocalImageHistory,
+  probeContainerWorkerImageCapabilities,
+  probeLocalImageCapabilities,
 } from '../_docker';
 
 describe('fetchFromLocalDocker', () => {
@@ -45,6 +55,142 @@ describe('fetchFromLocalDocker', () => {
     expect(result.disk.buildCache).toEqual({ size: '0B' });
   });
 
+  it('reads build provenance off the images that carry the labels', async () => {
+    const exec = async (file: string, args: readonly string[]) => {
+      if (args[0] === 'images') {
+        return {
+          stdout: [
+            JSON.stringify({ Repository: 'mediforce-built', Tag: '0a1b2c3d4e5f', ID: 'abc123def456', Size: '6GB', CreatedSince: '2 days ago' }),
+            JSON.stringify({ Repository: 'postgres', Tag: '17', ID: 'def456abc123', Size: '667MB', CreatedSince: '1 week ago' }),
+          ].join('\n'),
+          stderr: '',
+        };
+      }
+      if (args[0] === 'image') {
+        return {
+          stdout: [
+            `sha256:abc123def456000000000000000000000000000000000000000000000000\t${JSON.stringify({
+              'mediforce.build.repo': 'git@github.com:owner/repo.git',
+              'mediforce.build.commit': 'abc123',
+              'mediforce.build.dockerfile': 'container/Dockerfile',
+              'mediforce.build.workflow': 'sdtm-mapping',
+              'mediforce.build.namespace': 'acme',
+            })}`,
+            'sha256:def456abc123000000000000000000000000000000000000000000000000\tnull',
+          ].join('\n'),
+          stderr: '',
+        };
+      }
+      return {
+        stdout: [
+          JSON.stringify({ Type: 'Images', TotalCount: '2', Size: '7GB' }),
+          JSON.stringify({ Type: 'Containers', TotalCount: '0', Active: '0', Size: '0B' }),
+          JSON.stringify({ Type: 'Build Cache', TotalCount: '0', Size: '0B' }),
+        ].join('\n'),
+        stderr: '',
+      };
+    };
+
+    const result = await fetchFromLocalDocker({ exec });
+
+    expect(result.available).toBe(true);
+    if (!result.available) throw new Error('unreachable');
+    // The derived tag says nothing; the labels name the repo, commit and workflow.
+    expect(result.images[0]).toMatchObject({
+      repository: 'mediforce-built',
+      buildRepo: 'git@github.com:owner/repo.git',
+      buildCommit: 'abc123',
+      buildDockerfile: 'container/Dockerfile',
+      buildWorkflow: 'sdtm-mapping',
+      buildNamespace: 'acme',
+    });
+    // An image we did not build lists unannotated rather than dropping out.
+    expect(result.images[1]).toMatchObject({
+      repository: 'postgres',
+      tag: '17',
+      id: 'def456abc123',
+      size: '667MB',
+      created: '1 week ago',
+    });
+    expect(result.images[1].buildRepo).toBeUndefined();
+    expect(result.images[1].ownLabels).toEqual({});
+  });
+
+  it('annotates each row with the base it descends from and the labels it owns', async () => {
+    const base = 'sha256:aaa000000000000000000000000000000000000000000000000000000000';
+    const child = 'sha256:bbb000000000000000000000000000000000000000000000000000000000';
+    const layer = (name: string) => `sha256:${name}`;
+    const exec = async (file: string, args: readonly string[]) => {
+      if (args[0] === 'images') {
+        return {
+          stdout: [
+            JSON.stringify({ Repository: 'mediforce-agent', Tag: 'tealflow', ID: 'bbb000000000', Size: '7GB', CreatedSince: '1 day ago' }),
+            JSON.stringify({ Repository: 'mediforce-golden-image', Tag: 'latest', ID: 'aaa000000000', Size: '6GB', CreatedSince: '2 days ago' }),
+          ].join('\n'),
+          stderr: '',
+        };
+      }
+      if (args[0] === 'image') {
+        return {
+          stdout: [
+            `${base}\t${JSON.stringify({ 'org.opencontainers.image.source': 'https://github.com/rocker-org/rocker-versioned2' })}\t${JSON.stringify([layer('a'), layer('b')])}`,
+            `${child}\t${JSON.stringify({
+              'org.opencontainers.image.source': 'https://github.com/rocker-org/rocker-versioned2',
+              'mediforce.build.commit': 'abc123',
+            })}\t${JSON.stringify([layer('a'), layer('b'), layer('c')])}`,
+          ].join('\n'),
+          stderr: '',
+        };
+      }
+      return {
+        stdout: [
+          JSON.stringify({ Type: 'Images', TotalCount: '2', Size: '13GB' }),
+          JSON.stringify({ Type: 'Containers', TotalCount: '0', Active: '0', Size: '0B' }),
+          JSON.stringify({ Type: 'Build Cache', TotalCount: '0', Size: '0B' }),
+        ].join('\n'),
+        stderr: '',
+      };
+    };
+
+    const result = await fetchFromLocalDocker({ exec });
+    expect(result.available).toBe(true);
+    if (!result.available) throw new Error('unreachable');
+
+    const [derived, golden] = result.images;
+    expect(derived.baseImageId).toBe('aaa000000000');
+    expect(golden.baseImageId).toBeUndefined();
+    // The rocker label is the base's claim, inherited verbatim; only the commit
+    // is this image's own, which is what makes `.source` safe to read (#1296).
+    expect(derived.ownLabels).toEqual({ 'mediforce.build.commit': 'abc123' });
+  });
+
+  it('lists images unannotated when the label inspect fails', async () => {
+    const exec = async (file: string, args: readonly string[]) => {
+      if (args[0] === 'images') {
+        return {
+          stdout: JSON.stringify({ Repository: 'alpine', Tag: 'latest', ID: 'abc123', Size: '7MB', CreatedSince: '2 days ago' }),
+          stderr: '',
+        };
+      }
+      if (args[0] === 'image') throw new Error('Error: No such image: abc123');
+      return {
+        stdout: [
+          JSON.stringify({ Type: 'Images', TotalCount: '1', Size: '7MB' }),
+          JSON.stringify({ Type: 'Containers', TotalCount: '0', Active: '0', Size: '0B' }),
+          JSON.stringify({ Type: 'Build Cache', TotalCount: '0', Size: '0B' }),
+        ].join('\n'),
+        stderr: '',
+      };
+    };
+
+    const result = await fetchFromLocalDocker({ exec });
+
+    expect(result.available).toBe(true);
+    if (!result.available) throw new Error('unreachable');
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0].buildCommit).toBeUndefined();
+  });
+
   it('returns {available: false} when image JSON does not validate', async () => {
     const exec = async (file: string, args: readonly string[]) => {
       if (args[0] === 'images') {
@@ -75,6 +221,58 @@ describe('fetchFromLocalDocker', () => {
     expect(result.available).toBe(true);
     if (!result.available) throw new Error('unreachable');
     expect(result.images).toEqual([]);
+  });
+});
+
+describe('the listing without the disk statistics', () => {
+  it('never runs `docker system df` — the catalog reads the listing only', async () => {
+    const invoked: string[] = [];
+    const exec = async (_file: string, args: readonly string[]) => {
+      invoked.push(args.join(' '));
+      return args[0] === 'images'
+        ? {
+            stdout: JSON.stringify({
+              Repository: 'alpine',
+              Tag: 'latest',
+              ID: 'abc123',
+              Size: '7MB',
+              CreatedSince: '2 days ago',
+            }),
+            stderr: '',
+          }
+        : { stdout: '', stderr: '' };
+    };
+
+    const result = await fetchImagesFromLocalDocker({ exec });
+
+    expect(result.available).toBe(true);
+    expect(result.images.map((image) => image.repository)).toEqual(['alpine']);
+    expect(invoked.some((call) => call.startsWith('system df'))).toBe(false);
+  });
+
+  it('never asks the container worker for /disk', async () => {
+    const requested: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      requested.push(url);
+      return { ok: true, json: async () => [] };
+    }) as unknown as typeof globalThis.fetch;
+
+    const result = await fetchImagesFromContainerWorker({
+      fetch: fetchImpl,
+      baseUrl: 'http://worker:3001',
+    });
+
+    expect(result).toEqual({ available: true, images: [] });
+    expect(requested).toEqual(['http://worker:3001/images']);
+  });
+
+  it('reports an unreachable worker as unavailable with no images, never an error', async () => {
+    const fetchImpl = (async () => ({ ok: false, json: async () => ({}) })) as unknown as
+      typeof globalThis.fetch;
+
+    expect(
+      await fetchImagesFromContainerWorker({ fetch: fetchImpl, baseUrl: 'http://worker:3001' }),
+    ).toEqual({ available: false, images: [] });
   });
 });
 
@@ -134,5 +332,173 @@ describe('fetchFromContainerWorker', () => {
       baseUrl: 'http://worker:3001',
     });
     expect(result.available).toBe(false);
+  });
+});
+
+describe('image capability probes', () => {
+  it('normalises the same probe fixture from local Docker and the worker', async () => {
+    const local = await probeLocalImageCapabilities('mediforce-golden-image:latest', {
+      exec: async () => ({ stdout: '/usr/local/bin/opencode\n/usr/bin/bash\n/usr/bin/node\n', stderr: '' }),
+    });
+    const worker = await probeContainerWorkerImageCapabilities('mediforce-golden-image:latest', {
+      baseUrl: 'http://worker.test',
+      fetch: async () => new Response(
+        JSON.stringify({ status: 'known', agentCapable: true, runtimes: ['opencode', 'bash', 'node'] }),
+      ),
+    });
+
+    expect(worker).toEqual(local);
+  });
+
+  it('turns a timeout or unavailable worker into explicit unknown capability', async () => {
+    const local = await probeLocalImageCapabilities('missing', {
+      exec: async () => { throw new Error('timed out'); },
+    });
+    const worker = await probeContainerWorkerImageCapabilities('missing', {
+      fetch: async () => { throw new Error('connection refused'); },
+    });
+
+    expect(local).toEqual({ status: 'unknown' });
+    expect(worker).toEqual({ status: 'unknown' });
+  });
+});
+
+describe('image history reads', () => {
+  const row = JSON.stringify({ CreatedBy: 'COPY mcp /app/mcp # buildkit', Size: '430kB' });
+
+  it('normalises the same history from local Docker and the worker', async () => {
+    const local = await fetchLocalImageHistory('sha-1', {
+      exec: async () => ({ stdout: row, stderr: '' }),
+    });
+    const worker = await fetchContainerWorkerImageHistory('sha-1', {
+      baseUrl: 'http://worker.test',
+      fetch: async () => new Response(
+        JSON.stringify([{ command: 'COPY mcp /app/mcp', size: '430kB' }]),
+      ),
+    });
+
+    expect(local).toEqual([{ command: 'COPY mcp /app/mcp', size: '430kB' }]);
+    expect(worker).toEqual(local);
+  });
+
+  it('reports a daemon that could not answer as null, never as an image with no steps', async () => {
+    const local = await fetchLocalImageHistory('missing', {
+      exec: async () => { throw new Error('timed out'); },
+    });
+    const refused = await fetchContainerWorkerImageHistory('missing', {
+      fetch: async () => { throw new Error('connection refused'); },
+    });
+    const notFound = await fetchContainerWorkerImageHistory('missing', {
+      fetch: async () => new Response('nope', { status: 404 }),
+    });
+
+    expect(local).toBeNull();
+    expect(refused).toBeNull();
+    expect(notFound).toBeNull();
+  });
+
+  it('bounds the worker request, so a stalled worker degrades instead of hanging the read', async () => {
+    let signal: AbortSignal | undefined;
+    await fetchContainerWorkerImageHistory('sha-1', {
+      baseUrl: 'http://worker.test',
+      fetch: async (_input, init) => {
+        signal = init?.signal ?? undefined;
+        return new Response('[]');
+      },
+    });
+
+    expect(signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+describe('image builds', () => {
+  const request = {
+    image: 'mediforce-built:abc123abc123',
+    repoUrl: 'git@github.com:org/repo.git',
+    commit: 'bf0353b123bee142100ae5605ec15ad7605ceb4f',
+    dockerfile: 'container/Dockerfile',
+    namespace: 'acme',
+  } as const;
+
+  it('surfaces a worker build failure instead of reporting success', async () => {
+    // Unlike the probe and the history read, a build cannot degrade to
+    // `unknown`: the caller asked for an image to exist.
+    await expect(
+      buildImageViaContainerWorker(request, {
+        baseUrl: 'http://worker.test',
+        fetch: async () => new Response(JSON.stringify({ error: 'no such Dockerfile' }), { status: 500 }),
+      }),
+    ).rejects.toThrow('no such Dockerfile');
+  });
+
+  it('sends the build to the worker as the shared request shape', async () => {
+    let sent: unknown;
+    await buildImageViaContainerWorker(request, {
+      baseUrl: 'http://worker.test',
+      fetch: async (_url, init) => {
+        sent = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ image: request.image }));
+      },
+    });
+
+    expect(BuildImageRequestSchema.parse(sent)).toEqual(request);
+  });
+
+  it('sends an uploaded context as the body of the same route, the rest in the query', async () => {
+    const archive = new Uint8Array([1, 2, 3, 4]);
+    let sentUrl = '';
+    let sentInit: RequestInit | undefined;
+    await buildUploadedImageViaContainerWorker(
+      { image: 'acme/agent:v1', dockerfile: 'container/Dockerfile', namespace: 'acme' },
+      archive,
+      {
+        baseUrl: 'http://worker.test',
+        workerSecret: 'worker-secret',
+        fetch: async (url, init) => {
+          sentUrl = String(url);
+          sentInit = init;
+          return new Response(JSON.stringify({ image: 'acme/agent:v1' }));
+        },
+      },
+    );
+
+    const url = new URL(sentUrl);
+    expect(url.pathname).toBe('/images/build');
+    expect(BuildUploadedImageRequestSchema.parse(Object.fromEntries(url.searchParams))).toEqual({
+      image: 'acme/agent:v1',
+      dockerfile: 'container/Dockerfile',
+      namespace: 'acme',
+    });
+    expect(new Headers(sentInit?.headers).get('Content-Type')).toBe('application/x-tar');
+    expect(new Headers(sentInit?.headers).get('X-Worker-Secret')).toBe('worker-secret');
+    expect(sentInit?.body).toBe(archive);
+  });
+
+  it('surfaces a failed upload build instead of reporting success', async () => {
+    await expect(
+      buildUploadedImageViaContainerWorker(
+        { image: 'acme/agent:v1', dockerfile: '', namespace: 'acme' },
+        new Uint8Array(),
+        {
+          baseUrl: 'http://worker.test',
+          fetch: async () =>
+            new Response(JSON.stringify({ error: 'Could not unpack the uploaded build context' }), { status: 500 }),
+        },
+      ),
+    ).rejects.toThrow('Could not unpack');
+  });
+
+  it('reports a tag taken while the upload built as a conflict, not a failed build', async () => {
+    await expect(
+      buildUploadedImageViaContainerWorker(
+        { image: 'acme/agent:v1', dockerfile: '', namespace: 'acme' },
+        new Uint8Array(),
+        {
+          baseUrl: 'http://worker.test',
+          fetch: async () =>
+            new Response(JSON.stringify({ error: '"acme/agent:v1" is already on the daemon.' }), { status: 409 }),
+        },
+      ),
+    ).rejects.toThrow(ConflictError);
   });
 });

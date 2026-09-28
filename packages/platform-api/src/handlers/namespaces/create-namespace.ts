@@ -5,6 +5,7 @@ import type {
   CreateNamespaceInput,
   CreateNamespaceOutput,
 } from '../../contract/namespaces';
+import { seedDefaultImageCatalogEntries } from '../image-catalog/_seed';
 
 /**
  * Create an organization workspace. Atomic write of namespace doc + owner
@@ -74,6 +75,11 @@ export async function createNamespace(
         .then(() => true)
         .catch(() => false);
 
+  // #1376: without this the workspace opens on an empty Image Catalog and a
+  // picker listing every image on the shared daemon. Best-effort for the same
+  // reason as the grant above — the workspace already exists.
+  const seededImageCatalogEntries = await seedDefaultImageCatalogEntries(input.handle, scope);
+
   await scope.system.audit.append({
     actorId: uid,
     actorType: 'user',
@@ -82,7 +88,7 @@ export async function createNamespace(
     description: `User '${uid}' created namespace '${input.handle}'`,
     timestamp: now,
     inputSnapshot: { handle: input.handle, displayName: input.displayName },
-    outputSnapshot: { handle: input.handle, type: 'organization', ownerRoleGranted },
+    outputSnapshot: { handle: input.handle, type: 'organization', ownerRoleGranted, seededImageCatalogEntries },
     basis: 'User created workspace via API',
     entityType: 'namespace',
     entityId: input.handle,

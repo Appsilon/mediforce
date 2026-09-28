@@ -118,4 +118,4 @@ pnpm exec mediforce run start --workflow my-workflow --namespace docs
 
 - [How to create a workflow](create-workflow.md)
 - [Workflow authoring rules](../reference/workflow-authoring-golden-rules.md)
-- [Getting a Docker image onto the platform](docker-image-setup.md)
+- [Creating and registering Docker images](docker-image-setup.md)

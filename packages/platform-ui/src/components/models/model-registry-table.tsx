@@ -135,7 +135,7 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
   return (
     <div className="space-y-4">
       {/* Search + Filters */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3" data-tour="models-filters">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -196,7 +196,7 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
 
       {/* Table */}
       <div className="rounded-md border overflow-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm" data-tour="models-table">
           <thead className="bg-muted/50">
             <tr>
               <th

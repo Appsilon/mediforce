@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AgentLogFormatSchema, BuildContextSchema } from '@mediforce/platform-core';
 
 /**
  * Payload sent from the API process to the worker via BullMQ.
@@ -27,10 +28,25 @@ export const DockerJobDataSchema = z.object({
   outputDir: z.string(),
   /** Host-side log file path for realtime activity streaming (null = no logging). */
   logFile: z.string().nullable(),
+  /** How to turn the container's stdout into activity-log entries. Named rather
+   *  than passed as a function because the job crosses Redis, and the worker is
+   *  the only process that sees a line while the container is still running.
+   *  Optional: a job that produces nothing loggable need not say so. */
+  lineFormat: AgentLogFormatSchema.optional(),
   /** Files from outputDir, keyed by POSIX relative path with base64-encoded
    *  content (see file-payload.ts). Sent through Redis when caller and worker
    *  don't share a filesystem (e.g. Vercel → VPS). */
   inputFiles: z.record(z.string(), z.string()).optional(),
+  /** Redis key holding `inputFiles` when they travel beside the job instead of
+   *  inside it (see file-payload-store.ts). */
+  inputFilesKey: z.string().optional(),
+  /** Redis key holding `stdinPayload` when the prompt is too large to sit in
+   *  the job (see file-payload-store.ts). */
+  stdinPayloadKey: z.string().optional(),
+  /** Set by a caller that understands the `*Key` fields in the result. Absent
+   *  means a platform older than those keys, so the worker keeps text inline
+   *  rather than returning a key the caller would drop on the floor. */
+  payloadKeysSupported: z.boolean().optional(),
   /** Image build metadata — when present, worker ensures image exists before
    *  docker run. Either a repo at a commit, or `contextDir`: a host directory
    *  that already holds the build context (the files a workflow carries,
@@ -42,8 +58,16 @@ export const DockerJobDataSchema = z.object({
     repoRef: z.string().optional(),
     commit: z.string().optional(),
     dockerfile: z.string().optional(),
+    /** Build context from the repo root; `dockerfile` is then read from it. */
+    context: BuildContextSchema.optional(),
     repoToken: z.string().optional(),
     contextDir: z.string().optional(),
+    /** Content hash of the files in `contextDir`; compared with the image's label on reuse. */
+    artifactsHash: z.string().optional(),
+    /** Workflow definition whose step triggered the build; written as an image label. */
+    workflow: z.string().optional(),
+    /** Namespace owning that definition; written as an image label. */
+    namespace: z.string().optional(),
   }).optional(),
 });
 
@@ -58,6 +82,12 @@ export const DockerJobResultSchema = z.object({
    *  POSIX relative path with base64-encoded content (see file-payload.ts).
    *  Returned through Redis so the caller can recreate them locally. */
   outputFiles: z.record(z.string(), z.string()).optional(),
+  /** Redis key holding `outputFiles` when the job's inputs came by key. */
+  outputFilesKey: z.string().optional(),
+  /** Redis keys holding `stdout` / `stderr` when the container wrote more than
+   *  belongs in a retained job hash and its `completed` event. */
+  stdoutKey: z.string().optional(),
+  stderrKey: z.string().optional(),
 });
 
 export type DockerJobResult = z.infer<typeof DockerJobResultSchema>;

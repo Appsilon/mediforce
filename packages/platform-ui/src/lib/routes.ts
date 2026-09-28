@@ -83,6 +83,12 @@ export const routes = {
   tools: (handle: string) => `/${handle}/tools`,
   tool: (handle: string, toolId: string) => `/${handle}/tools/${encode(toolId)}`,
 
+  // ── Images ─────────────────────────────────────────────────────
+  images: (handle: string) => `/${handle}/images`,
+  /** The Images view with one entry already open — how Infrastructure crosses
+   *  from a raw daemon row to the entry that describes it. */
+  image: (handle: string, entryId: string) => `/${handle}/images?entry=${encode(entryId)}`,
+
   // ── Catalog ────────────────────────────────────────────────────
   catalog: (handle: string) => `/${handle}/catalog`,
 
@@ -103,6 +109,7 @@ export const routes = {
     withEntryPoint(`/${handle}/admin/tool-catalog`, params?.from),
   adminOAuthProviders: (handle: string, params?: { from?: AdminEntryPoint }) =>
     withEntryPoint(`/${handle}/admin/oauth-providers`, params?.from),
+  adminInfrastructure: (handle: string) => `/${handle}/admin/infrastructure`,
 
   // ── Orgs ───────────────────────────────────────────────────────
   orgs: () => '/orgs',

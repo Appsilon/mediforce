@@ -60,6 +60,31 @@ export const AGENT_LOG_FIXTURE_CONTENT = [
   { ts: now, type: 'result', subtype: 'completed' },
 ].map((entry) => JSON.stringify(entry)).join('\n');
 
+// A second step's log on the same run, so the execution log has more than one
+// step to show. The all-steps view, the per-step tabs and the stage entries a
+// container build writes are all invisible with a single-step fixture.
+export const AGENT_LOG_SECOND_FILENAME = 'seed-vendor-assessment.jsonl';
+export const AGENT_LOG_SECOND_FIXTURE_CONTENT = [
+  { ts: oneHourAgo, type: 'stage', text: 'Preparing container image mediforce-golden-image' },
+  { ts: oneHourAgo, type: 'stage', text: 'Container image ready' },
+  // Two revisions of one task list, the echo the agent sends back, and a
+  // turn boundary: the three things the viewer has to collapse rather than
+  // print. A fixture without them cannot catch a regression to the old dump.
+  { ts: oneHourAgo, type: 'assistant', subtype: 'tool_call', tool: 'TodoWrite', input: { todos: [
+    { content: 'Collect vendor submissions', status: 'in_progress' },
+    { content: 'Check for missing fields', status: 'pending' },
+  ] } },
+  { ts: oneHourAgo, type: 'user', subtype: 'tool_result', content: '[{"content":"Collect vendor submissions","status":"in_progress"}]' },
+  { ts: oneHourAgo, type: 'result', subtype: 'tool-calls' },
+  { ts: oneHourAgo, type: 'assistant', subtype: 'tool_call', tool: 'Bash', input: { command: 'collect --vendors all' } },
+  { ts: oneHourAgo, type: 'user', subtype: 'tool_result', content: 'collected 12 vendor records' },
+  { ts: oneHourAgo, type: 'assistant', subtype: 'tool_call', tool: 'TodoWrite', input: { todos: [
+    { content: 'Collect vendor submissions', status: 'completed' },
+    { content: 'Check for missing fields', status: 'completed' },
+  ] } },
+  { ts: now, type: 'result', subtype: 'completed' },
+].map((entry) => JSON.stringify(entry)).join('\n');
+
 export interface SeedOptions {
   /** Base URL of the mock OAuth server (from globalSetup). Used to build the
    *  `github-mock` provider fixture so the journey can Connect through it
@@ -1072,6 +1097,14 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       stepId: 'narrative-summary',
       type: 'status',
       payload: `agent activity log: /tmp/mediforce-step-logs/${AGENT_LOG_FILENAME}`,
+      sequence: 0,
+      timestamp: oneHourAgo,
+    },
+    'agent-event-2': {
+      processInstanceId: 'proc-running-1',
+      stepId: 'vendor-assessment',
+      type: 'status',
+      payload: `agent activity log: /tmp/mediforce-step-logs/${AGENT_LOG_SECOND_FILENAME}`,
       sequence: 0,
       timestamp: oneHourAgo,
     },

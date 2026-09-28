@@ -94,4 +94,52 @@ describe('QueuedDockerSpawnStrategy file transport', () => {
     expect(result.exitCode).toBe(3);
     expect(result.signal).toBeNull();
   });
+
+  /**
+   * The worker writes the log live. Whether this process can see those writes
+   * is what decides if the strategy rebuilds the log from buffered stdout —
+   * and it is settled by measuring the file, not by inspecting `inputFiles`,
+   * which is never empty because a step ships at least its own `input.json`.
+   */
+  describe('log reconstruction', () => {
+    const line = JSON.stringify({ type: 'assistant', subtype: 'text', text: 'hello' });
+
+    it('leaves the log alone when the worker shares the disk', async () => {
+      const dir = await mkdtemp(join(tmpdir(), 'queued-log-'));
+      await writeFile(join(dir, 'input.json'), '{}');
+      const logFile = join(dir, 'step.log');
+
+      mockEnqueue.mockImplementation(async () => {
+        await writeFile(logFile, 'hello\n');
+        return buildResult({ stdout: line });
+      });
+
+      await new QueuedDockerSpawnStrategy().spawn({
+        ...buildRequest(dir),
+        logFile,
+        lineFormat: 'claude-stream-json',
+      });
+
+      const written = await readFile(logFile, 'utf-8');
+      expect(written.trim().split('\n')).toHaveLength(1);
+      await rm(dir, { recursive: true, force: true });
+    });
+
+    it('rebuilds the log when the worker wrote to a disk of its own', async () => {
+      const dir = await mkdtemp(join(tmpdir(), 'queued-log-'));
+      await writeFile(join(dir, 'input.json'), '{}');
+      const logFile = join(dir, 'step.log');
+
+      mockEnqueue.mockResolvedValue(buildResult({ stdout: line }));
+
+      await new QueuedDockerSpawnStrategy().spawn({
+        ...buildRequest(dir),
+        logFile,
+        lineFormat: 'claude-stream-json',
+      });
+
+      expect((await readFile(logFile, 'utf-8')).trim()).not.toBe('');
+      await rm(dir, { recursive: true, force: true });
+    });
+  });
 });

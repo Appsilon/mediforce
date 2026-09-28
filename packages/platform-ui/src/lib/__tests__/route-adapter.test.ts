@@ -6,11 +6,12 @@ import {
   HandlerError,
   NotFoundError,
   PreconditionFailedError,
+  ValidationError,
   type ApiErrorCode,
 } from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import type { CallerScope } from '@mediforce/platform-api/repositories';
-import { createRouteAdapter } from '../route-adapter';
+import { createMultipartRouteAdapter, createRouteAdapter } from '../route-adapter';
 
 const InputSchema = z.object({ name: z.string().min(1) });
 
@@ -324,5 +325,71 @@ describe('createRouteAdapter', () => {
         expect(received.instanceId).toBe('inst-a');
       }
     });
+  });
+});
+
+describe('createMultipartRouteAdapter', () => {
+  const options = {
+    resolveCaller: stubCaller(),
+    buildScope,
+    logTag: 'test-upload-route',
+    unreadableBodyMessage: 'Could not read the upload.',
+  };
+
+  function post(init: { contentType?: string; body: BodyInit }): NextRequest {
+    const headers = init.contentType === undefined ? undefined : { 'content-type': init.contentType };
+    return new NextRequest('http://localhost/api/test', { method: 'POST', headers, body: init.body });
+  }
+
+  it('passes the input built from the form to the handler, with the success status', async () => {
+    const handler = vi.fn().mockResolvedValue({ stored: true });
+    const POST = createMultipartRouteAdapter(
+      (form) => ({ name: String(form.get('name')) }),
+      handler,
+      { ...options, successStatus: 201 },
+    );
+    const form = new FormData();
+    form.set('name', 'report.pdf');
+
+    const res = await POST(post({ body: form }), undefined);
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ stored: true });
+    expect(handler).toHaveBeenCalledWith({ name: 'report.pdf' }, expect.objectContaining({ caller: apiKeyCaller }));
+  });
+
+  it('refuses a body that is not multipart with a 400 saying so', async () => {
+    const handler = vi.fn();
+    const POST = createMultipartRouteAdapter(() => ({}), handler, options);
+
+    const res = await POST(post({ contentType: 'application/json', body: '{}' }), undefined);
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.message).toMatch(/multipart\/form-data/);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('reads a multipart body that cannot be parsed as too large: 413', async () => {
+    const POST = createMultipartRouteAdapter(() => ({}), vi.fn(), options);
+
+    const res = await POST(post({ contentType: 'multipart/form-data', body: 'truncated' }), undefined);
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: { code: 'payload_too_large', message: 'Could not read the upload.' } });
+  });
+
+  it('maps a HandlerError thrown while reading the form to its envelope', async () => {
+    const POST = createMultipartRouteAdapter(
+      () => {
+        throw new ValidationError('file field is required');
+      },
+      vi.fn(),
+      options,
+    );
+
+    const res = await POST(post({ body: new FormData() }), undefined);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { code: 'validation', message: 'file field is required' } });
   });
 });

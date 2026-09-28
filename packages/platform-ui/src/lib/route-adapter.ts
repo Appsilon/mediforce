@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { HandlerError } from '@mediforce/platform-api/errors';
+import {
+  HandlerError,
+  PayloadTooLargeError,
+  ValidationError,
+} from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { createCallerScope, type CallerScope } from '@mediforce/platform-api/repositories';
 import { createHttpSelfFetchRunKicker, type RunKicker } from '@mediforce/platform-api/runtime';
@@ -114,6 +118,58 @@ export function createRouteAdapter<
         return jsonErrorResponse(new HandlerError('validation', 'Invalid input', err.issues));
       }
       console.error('[route-adapter] handler error:', err);
+      return jsonErrorResponse(new HandlerError('internal', 'Internal error'));
+    }
+  };
+}
+
+export interface MultipartRouteAdapterOptions
+  extends Pick<RouteAdapterOptions, 'resolveCaller' | 'buildScope' | 'successStatus'> {
+  /** Prefix for the route's server logs, e.g. `task-attachment-upload-route`. */
+  readonly logTag: string;
+  /** The 413 message when the body cannot be parsed. */
+  readonly unreadableBodyMessage: string;
+}
+
+/**
+ * `createRouteAdapter` for a `multipart/form-data` body: the same auth, scope
+ * and error tail, with the form parsed here. `inputFromForm` builds the
+ * handler's input and throws a `HandlerError` for a form it cannot use.
+ *
+ * Next caps every body at `proxyClientMaxBodySize` (next.config.mjs) and
+ * TRUNCATES a larger one before the route runs, which makes the parse fail —
+ * so a parse failure is a 413, the dominant cause, not a generic 500.
+ */
+export function createMultipartRouteAdapter<Input, Output = unknown, Ctx = unknown>(
+  inputFromForm: (form: FormData, req: NextRequest, ctx: Ctx) => Input | Promise<Input>,
+  handler: RouteHandler<Input, Output>,
+  options: MultipartRouteAdapterOptions,
+): (req: NextRequest, ctx: Ctx) => Promise<NextResponse> {
+  const resolveCaller = options.resolveCaller ?? defaultResolveCaller;
+  const buildScope = options.buildScope ?? defaultBuildScope;
+  const successStatus = options.successStatus ?? 200;
+
+  return async (req, ctx) => {
+    const callerOrResponse = await resolveCaller(req);
+    if (callerOrResponse instanceof NextResponse) return callerOrResponse;
+    const scope = buildScope(callerOrResponse);
+
+    try {
+      if (req.headers.get('content-type')?.startsWith('multipart/form-data') !== true) {
+        throw new ValidationError('Send the request as multipart/form-data.');
+      }
+      let form: FormData;
+      try {
+        form = await req.formData();
+      } catch (parseErr) {
+        console.warn(`[${options.logTag}] request body parse failed (likely exceeds the upload size limit):`, parseErr);
+        throw new PayloadTooLargeError(options.unreadableBodyMessage);
+      }
+      const input = await inputFromForm(form, req, ctx);
+      return NextResponse.json(await handler(input, scope), { status: successStatus });
+    } catch (err) {
+      if (err instanceof HandlerError) return jsonErrorResponse(err);
+      console.error(`[${options.logTag}] handler error:`, err);
       return jsonErrorResponse(new HandlerError('internal', 'Internal error'));
     }
   };

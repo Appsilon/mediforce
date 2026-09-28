@@ -1,11 +1,35 @@
 import type { ContainerConfig, WorkflowArtifact } from '../schemas/index';
+import { normalizeRepoPath } from '../utils/docker-build-paths';
+
+/**
+ * The Dockerfile a step builds from when it is one the workflow carries, as a
+ * path from the root of the carried files. The build context is always all of
+ * them, so a `container/Dockerfile` can `COPY scripts/`, and a `context` the
+ * step names is ignored. `null` when the step builds from anything else — an
+ * explicit step-level `repo` + `commit` said something more specific and wins.
+ */
+export function carriedDockerfile(
+  config: ContainerConfig | undefined,
+  artifacts: readonly WorkflowArtifact[] | undefined,
+): string | null {
+  if (config === undefined || artifacts === undefined) return null;
+  const namesRepoAndCommit =
+    typeof config.repo === 'string' && config.repo.length > 0 &&
+    typeof config.commit === 'string' && config.commit.length > 0;
+  if (namesRepoAndCommit === true) return null;
+  if (typeof config.dockerfile !== 'string' || config.dockerfile.length === 0) return null;
+  const dockerfile = normalizeRepoPath(config.dockerfile);
+  if (dockerfile === null || dockerfile === '') return null;
+  return artifacts.some((artifact) => artifact.path === dockerfile) ? dockerfile : null;
+}
 
 /**
  * Whether a step brings its own image build, and so must not be handed a
  * default image or warned about a missing one.
  *
- * Two sources: a git repo pinned to a commit, or a Dockerfile the workflow
- * carries as an artifact. Shared by the register handler (which fills in the
+ * Three sources, as the runtime resolves them: a git repo pinned to a commit, a
+ * Dockerfile the workflow carries as an artifact, or a Dockerfile read from the
+ * workflow's `externalSkillsRepo`. Shared by the register handler (which fills in the
  * golden image), the preflight checks (which warn about an image the instance
  * lacks) and anything else asking the same yes-or-no question — the runtime's
  * `resolveImageBuild` answers the fuller "build it how?" question and is the
@@ -17,7 +41,10 @@ import type { ContainerConfig, WorkflowArtifact } from '../schemas/index';
  */
 export function stepHasBuildSource(
   config: ContainerConfig | undefined,
-  artifacts: WorkflowArtifact[] | undefined,
+  definition: {
+    artifacts?: WorkflowArtifact[];
+    externalSkillsRepo?: { url?: string; commit?: string };
+  } | undefined,
 ): boolean {
   if (config === undefined) return false;
   const hasRepo =
@@ -26,5 +53,8 @@ export function stepHasBuildSource(
   if (hasRepo) return true;
   const dockerfile = config.dockerfile;
   if (typeof dockerfile !== 'string' || dockerfile.length === 0) return false;
-  return artifacts?.some((artifact) => artifact.path === dockerfile) === true;
+  if (carriedDockerfile(config, definition?.artifacts) !== null) return true;
+  const skillsRepo = definition?.externalSkillsRepo;
+  return typeof skillsRepo?.url === 'string' && skillsRepo.url.length > 0 &&
+    typeof skillsRepo.commit === 'string' && skillsRepo.commit.length > 0;
 }

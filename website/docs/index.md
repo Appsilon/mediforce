@@ -18,6 +18,7 @@ you can inspect afterwards.
 | Stand Mediforce up on your own infrastructure | [Install](install/) |
 | Get your first workflow running | [First run](first-run/) |
 | Build a workflow in the editor, or have the assistant build it | [Building workflows](build/) |
+| Get a container image onto the platform for a step | [Container images](images/) |
 | Start runs, handle tasks, read results | [Running workflows](run/) |
 | Know which check answers which question | [Verifying a workflow](run/verify) |
 | Add agents, models and tools | [Agents and models](agents/) |

@@ -1,11 +1,51 @@
 import { z } from 'zod';
 
+/**
+ * One row of the Docker daemon's image list, plus the build provenance the
+ * platform labels its own images with.
+ *
+ * Every `build*` field is optional: an image pulled from a registry, or built
+ * before the labels existed, carries none of them and lists unannotated.
+ */
 export const DockerImageInfoSchema = z.object({
   repository: z.string(),
   tag: z.string(),
   id: z.string(),
   size: z.string(),
   created: z.string(),
+  /** Git repo the image was built from (`mediforce.build.repo`). */
+  buildRepo: z.string().optional(),
+  /** Commit the build context was checked out at (`mediforce.build.commit`). */
+  buildCommit: z.string().optional(),
+  /** Dockerfile path inside that repo (`mediforce.build.dockerfile`). */
+  buildDockerfile: z.string().optional(),
+  /** Build context the step named, if any (`mediforce.build.context`). */
+  buildContext: z.string().optional(),
+  /** Workflow definition whose step triggered the build (`mediforce.build.workflow`). */
+  buildWorkflow: z.string().optional(),
+  /** Namespace owning that definition (`mediforce.build.namespace`). */
+  buildNamespace: z.string().optional(),
+  /** Content hash of the workflow's carried files it was built from
+   *  (`mediforce.build.artifacts`). Absent for any other build. */
+  buildArtifacts: z.string().optional(),
+  /**
+   * The image's nearest ancestor on this daemon, by `RootFS.Layers` prefix
+   * containment — exact, and computed rather than parsed out of a `FROM`
+   * string. Absent for a root: an image whose base is not on this daemon looks
+   * the same as one built from scratch, and the listing does not pretend to
+   * tell them apart.
+   */
+  baseImageId: z.string().optional(),
+  /**
+   * The labels this image sets itself, its base's stripped out. Docker copies
+   * a base's labels onto every child, so the raw set cannot be read as
+   * provenance — a local image of ours carries rocker's
+   * `org.opencontainers.image.source` until we override it.
+   *
+   * Absent, like the fields above it, when the listing could not inspect the
+   * image — an image removed between the two calls, an old daemon.
+   */
+  ownLabels: z.record(z.string(), z.string()).optional(),
 });
 
 export const DockerDiskInfoSchema = z.object({

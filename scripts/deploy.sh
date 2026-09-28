@@ -38,6 +38,14 @@ log "Git SHA: $NEXT_PUBLIC_GIT_SHA"
 log "Pulling platform images from registry"
 docker compose -f "$COMPOSE_FILE" pull --ignore-pull-failures 2>&1 | tee -a "$LOG_FILE" || true
 
+# The worker goes first, on its own. A job carries bulk payloads (workspace
+# files, an oversized prompt) under Redis keys the worker has to know how to
+# read; a platform newer than its worker would enqueue a job the old worker
+# runs with the payload missing and no error. One `up -d` recreates both at
+# once with no ordering between them, so the worker leads by a separate call.
+log "Starting the container worker first (it must not lag the platform)"
+docker compose -f "$COMPOSE_FILE" up -d container-worker
+
 log "Starting services (builds locally if pull missed any image)"
 # --remove-orphans kills containers left over from services that no longer
 # exist in the compose file (prevents stale workers consuming shared queues).

@@ -1,6 +1,6 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { type PluginCapabilityMetadata, normaliseModelId } from '@mediforce/platform-core';
+import { type AgentLogFormat, type PluginCapabilityMetadata, normaliseModelId } from '@mediforce/platform-core';
 export { normaliseModelId };
 import {
   BaseContainerAgentPlugin,
@@ -132,93 +132,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     ];
   }
 
-  protected override processOutputLine(line: string): string[] {
-    // Map OpenCode JSONL events to the log format the AgentLogViewer UI expects.
-    // OpenCode events:
-    //   {"type":"text","part":{"text":"..."}}
-    //   {"type":"tool_use","part":{"tool":"bash","state":{"status":"done|error","input":{...},"output":"...","error":"..."}}}
-    //   {"type":"step_start",...}
-    //   {"type":"step_finish","part":{"cost":...,"tokens":{...}}}
-    const trimmed = line.trim();
-    if (!trimmed.startsWith('{')) return [];
-
-    try {
-      const event = JSON.parse(trimmed) as {
-        type?: string;
-        timestamp?: number;
-        part?: {
-          type?: string;
-          text?: string;
-          tool?: string;
-          callID?: string;
-          state?: {
-            status?: string;
-            input?: Record<string, unknown>;
-            output?: string;
-            error?: string;
-          };
-          cost?: number;
-          tokens?: Record<string, unknown>;
-          reason?: string;
-        };
-      };
-
-      const ts = event.timestamp
-        ? new Date(event.timestamp).toISOString()
-        : new Date().toISOString();
-
-      if (event.type === 'text' && event.part?.text) {
-        return [JSON.stringify({ ts, type: 'assistant', subtype: 'text', text: event.part.text })];
-      }
-
-      if (event.type === 'tool_use' && event.part?.tool) {
-        const entries: string[] = [];
-        const toolName = event.part.tool;
-        const state = event.part.state;
-
-        // Emit tool_call entry
-        entries.push(JSON.stringify({
-          ts,
-          type: 'assistant',
-          subtype: 'tool_call',
-          tool: toolName,
-          input: state?.input,
-        }));
-
-        // If the state already has output/error, emit a tool_result too
-        if (state?.output || state?.error) {
-          entries.push(JSON.stringify({
-            ts,
-            type: 'tool_result',
-            tool_name: toolName,
-            content: state.error
-              ? `[error] ${state.error}`
-              : (state.output ?? '').slice(0, 500),
-          }));
-        }
-
-        return entries;
-      }
-
-      if (event.type === 'step_finish' && event.part) {
-        const cost = event.part.cost;
-        const tokens = event.part.tokens;
-        const reason = event.part.reason;
-        return [JSON.stringify({
-          ts,
-          type: 'result',
-          subtype: reason ?? 'completed',
-          cost,
-          tokens,
-        })];
-      }
-
-      // Skip step_start and other non-interesting events
-      return [];
-    } catch {
-      return [];
-    }
-  }
+  protected override readonly logFormat: AgentLogFormat = 'opencode-jsonl';
 
   parseAgentOutput(rawStdout: string): string {
     // OpenCode with --format json outputs JSONL events.

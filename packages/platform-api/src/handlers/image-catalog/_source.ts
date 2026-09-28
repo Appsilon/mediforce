@@ -1,0 +1,98 @@
+import { createHash } from 'node:crypto';
+import {
+  catalogDockerfileKey,
+  normalizeRepoPath,
+  normalizeRepoUrls,
+  type ImageCatalogSource,
+} from '@mediforce/platform-core';
+
+/**
+ * Canonicalise a source before it becomes a key.
+ *
+ * A built source's repo goes through `normalizeRepoUrls` because that is the
+ * form the builder writes into `mediforce.build.repo`, so an entry catalogued
+ * as `Appsilon/tealflow` and one catalogued as
+ * `git@github.com:Appsilon/tealflow.git` are the same entry — and both match
+ * the images actually on the daemon.
+ */
+export function canonicalizeSource(source: ImageCatalogSource): ImageCatalogSource {
+  if (source.kind === 'referenced') return source;
+  if (source.kind === 'carried') {
+    // `./container/Dockerfile` names the file the builder resolves as
+    // `container/Dockerfile`, and only the second is what images are labelled
+    // with once their context is folded in.
+    return { ...source, dockerfile: normalizeRepoPath(source.dockerfile) ?? source.dockerfile };
+  }
+  // An empty context is no context, and only one of the two may be stored or
+  // two equal sources would read back differently.
+  const context = source.context === undefined || source.context === '' ? {} : { context: source.context };
+  return {
+    kind: 'built',
+    repo: normalizeRepoUrls(source.repo).gitUrl,
+    dockerfile: source.dockerfile,
+    ...context,
+  };
+}
+
+/**
+ * The exact bytes the id hashes, mirroring `deriveBuildTag`'s NUL joining.
+ *
+ * The Dockerfile half is the file, not the recipe: `catalogDockerfileKey` is
+ * the path from the repo root once a context is named, and the context itself
+ * stays out — one Dockerfile built from two contexts is one entry. With no
+ * context the key is the dockerfile as written, so no existing id moves.
+ */
+function sourceFingerprint(source: ImageCatalogSource): string {
+  switch (source.kind) {
+    case 'built':
+      return `built\0${source.repo}\0${catalogDockerfileKey(source.dockerfile, source.context)}`;
+    case 'referenced':
+      return `referenced\0${source.reference}`;
+    case 'carried':
+      return `carried\0${source.workflow}\0${source.dockerfile}`;
+  }
+}
+
+/** What the readable half of an id is made from. */
+function slugSource(source: ImageCatalogSource): string {
+  switch (source.kind) {
+    case 'built':
+      return source.repo;
+    case 'referenced':
+      return source.reference;
+    case 'carried':
+      return source.workflow;
+  }
+}
+
+/** Last path segment, lowercased, non-alphanumeric runs collapsed to '-'. */
+function slugify(value: string): string {
+  const basename = value.split('/').pop() ?? value;
+  return basename
+    .replace(/\.git$/, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * The entry's id, derived from its canonicalised source (ADR-0022 decision 1).
+ *
+ * Readable half plus hash half, and both halves earn their place: the slug is
+ * what a person reads in `mediforce images list` and in a URL, and the hash is
+ * what makes "one entry per source" a property of the primary key rather than
+ * a convention a handler could forget. Two Dockerfiles in one repo slug the
+ * same and differ in the hash, which is correct — they are two images.
+ *
+ * Clients never supply an id. An entry's key is its source, so accepting one
+ * would let two rows describe the same image.
+ */
+export function deriveImageCatalogEntryId(source: ImageCatalogSource): string {
+  const canonical = canonicalizeSource(source);
+  const hash = createHash('sha256')
+    .update(sourceFingerprint(canonical))
+    .digest('hex')
+    .slice(0, 8);
+  const slug = slugify(slugSource(canonical));
+  return slug.length > 0 ? `${slug}-${hash}` : hash;
+}

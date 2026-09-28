@@ -66,7 +66,8 @@ MUST (once you build a custom image or pin sources **from a repository**):
 
 A workflow that carries its own files pins nothing: the Dockerfile, the scripts
 and the skills live on the definition, version with it, and the image tag is
-derived from their content. `repo` + `commit` describe a repository that
+derived from their content. There the build context is always all of the carried
+files, and `dockerfile` is the carried file's own path. `repo` + `commit` describe a repository that
 actually exists — a placeholder SHA (all zeros) or an invented URL is refused at
 registration, because it names a build that can never run.
 - Avoid `latest` image tags outside local development.
@@ -113,7 +114,10 @@ The step fields that select build mode:
 }
 ```
 
-Use `repoAuth` for private Docker build contexts.
+Use `repoAuth` for private Docker build contexts. The build context is the
+Dockerfile's own directory unless the step sets `context` (a directory from the
+repo root, which `dockerfile` is then read from) — set `"context": "."` when a
+`container/Dockerfile` copies `scripts/` from beside `container/`.
 
 ## 4. Wire Skills Explicitly
 

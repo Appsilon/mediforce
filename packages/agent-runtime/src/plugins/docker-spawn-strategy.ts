@@ -8,10 +8,21 @@
  * The queued strategy is activated when REDIS_URL is set.
  */
 import { spawn } from 'node:child_process';
-import { appendFile, mkdir } from 'node:fs/promises';
+import { appendFile, mkdir, stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { ensureImage } from './docker-image-builder';
-import { createLineStreamReader } from '@mediforce/platform-core';
+
+/** Bytes currently in the step's log, or 0 when there is no log to compare. */
+async function logFileSize(logFile: string | null): Promise<number> {
+  if (logFile === null) return 0;
+  try {
+    return (await stat(logFile)).size;
+  } catch {
+    return 0;
+  }
+}
+import { appendStageEntry, createLineStreamReader, formatAgentLogLine } from '@mediforce/platform-core';
+import type { AgentLogFormat } from '@mediforce/platform-core';
 
 /**
  * How to get the image if it is not there. Either a git repo at a commit, or a
@@ -26,12 +37,22 @@ export interface ImageBuildMeta {
   repoRef?: string;
   commit?: string;
   dockerfile?: string;
+  /** Build context from the repo root; `dockerfile` is then read from it. */
+  context?: string;
   /** Resolved token for authenticated HTTPS clones; SSH refs without a token use the deploy key. */
   repoToken?: string;
   /** Host path to build from, instead of a clone. Reachable from the worker as
    *  well as the orchestrator: it lives under the shared temp directory, the
    *  same assumption the skills cache and the `/artifacts` mount already make. */
   contextDir?: string;
+  /** Content hash of the files in `contextDir`, labelled on the image and
+   *  compared on reuse, so a tag the step named is rebuilt after an edit. */
+  artifactsHash?: string;
+  /** Workflow definition whose step triggered the build. Recorded as an image
+   *  label so a derived `mediforce-built:<hash>` tag can name what it is for. */
+  workflow?: string;
+  /** Namespace owning that definition. Recorded as an image label. */
+  namespace?: string;
 }
 
 /** A first image build is minutes of `docker build`, not seconds of container
@@ -48,11 +69,12 @@ export interface DockerSpawnRequest {
   outputDir: string;
   logFile: string | null;
   /**
-   * When provided, each raw stdout line is passed through this function before being written
-   * to the log file. Returns an array of JSONL strings to write (empty = skip the line).
-   * Used by LocalDockerSpawnStrategy to write parsed log entries in real-time.
+   * How to turn each raw stdout line into activity-log entries. Named, not a
+   * function, so the queued path can carry it through Redis and the worker can
+   * write the same entries live — the orchestrator never sees a line until the
+   * container has exited.
    */
-  lineProcessor?: (rawLine: string) => string[];
+  lineFormat?: AgentLogFormat;
   /**
    * When provided, called once for each complete stdout line. The local strategy invokes
    * this live (as the line arrives from the container); the queued strategy invokes it
@@ -109,7 +131,16 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
 
   async spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
     if (request.imageBuild) {
-      await ensureImage(request.imageBuild);
+      // Bracketed with stage entries: a cold build is minutes during which no
+      // container exists to emit anything, and the step just looks hung.
+      await appendStageEntry(request.logFile, `Preparing container image ${request.imageBuild.image}`);
+      try {
+        await ensureImage(request.imageBuild);
+      } catch (error) {
+        await appendStageEntry(request.logFile, `Container image failed: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+      }
+      await appendStageEntry(request.logFile, 'Container image ready');
     }
 
     // Remove any stale container holding this name (crashed/killed/retried
@@ -161,13 +192,9 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
           }
         }
         if (logFile && logDirReady) {
-          if (request.lineProcessor) {
-            const entries = request.lineProcessor(trimmed);
-            if (entries.length > 0) {
-              void logDirReady.then(() => appendFile(logFile, entries.join('\n') + '\n')).catch(() => {});
-            }
-          } else {
-            void logDirReady.then(() => appendFile(logFile, trimmed + '\n')).catch(() => {});
+          const entries = formatAgentLogLine(request.lineFormat ?? 'none', trimmed);
+          if (entries.length > 0) {
+            void logDirReady.then(() => appendFile(logFile, entries.join('\n') + '\n')).catch(() => {});
           }
         }
       };
@@ -270,12 +297,15 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
       stepId: 'build-image',
       outputDir: '',
       logFile: null,
+      lineFormat: 'none',
       imageBuild: build,
     });
   }
 
   async spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
     const { enqueueDockerJob, encodeFilePayload, decodeFilePayload } = await import('@mediforce/container-worker');
+
+    const logSizeBefore = await logFileSize(request.logFile);
 
     // Collect all files from outputDir (base64, nested paths included) to send through Redis
     let inputFiles: Record<string, string> = {};
@@ -296,6 +326,7 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
       stepId: request.stepId,
       outputDir: request.outputDir,
       logFile: request.logFile,
+      lineFormat: request.lineFormat ?? 'none',
       inputFiles,
       imageBuild: request.imageBuild,
     });
@@ -328,6 +359,23 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
       });
       reader.push(result.stderr);
       reader.flush();
+    }
+
+    // The worker writes the log live, but to its own disk. Whether this process
+    // shares that disk is answered by looking: if the file grew while the job
+    // ran, the worker's writes landed here and repeating them would double
+    // every entry. Only a log that did not grow is reconstructed from stdout.
+    // `inputFiles` used to stand in for this and was always non-empty — a step
+    // ships at least its own `input.json`, so every queued run duplicated.
+    const workerLogLanded = (await logFileSize(request.logFile)) > logSizeBefore;
+    if (request.logFile !== null && !workerLogLanded) {
+      const entries = result.stdout
+        .split('\n')
+        .flatMap((line) => formatAgentLogLine(request.lineFormat ?? 'none', line));
+      if (entries.length > 0) {
+        await mkdir(dirname(request.logFile), { recursive: true });
+        await appendFile(request.logFile, entries.join('\n') + '\n');
+      }
     }
 
     // Write output files from worker back to caller's outputDir

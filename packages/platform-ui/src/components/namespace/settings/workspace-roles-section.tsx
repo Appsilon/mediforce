@@ -348,7 +348,7 @@ export function WorkspaceRolesSection({
   return (
     <div className="mb-10">
       <div className="mb-1 flex items-center justify-between gap-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" data-tour="settings-roles">
           Roles
         </h2>
         {canManageMembers && !assigning && (

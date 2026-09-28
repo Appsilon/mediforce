@@ -97,6 +97,12 @@ export const queryKeys = {
   workflowTriggers: (namespace: string, name: string) =>
     ['workflow-triggers', namespace, name] as const,
 
+  /** Workspace-home catalog (workflows.list), one slice per "completed runs"
+   *  toggle. `workflowsListAll` is the prefix a workflow write invalidates. */
+  workflowsList: (includeCompletedRuns: boolean) =>
+    ['workflows', 'list', includeCompletedRuns] as const,
+  workflowsListAll: () => ['workflows', 'list'] as const,
+
   /** Aggregate step-entry view for a process instance (processes.getSteps). */
   processSteps: (instanceId: string) => ['process-steps', instanceId] as const,
 
@@ -173,6 +179,23 @@ export const queryKeys = {
   capabilities: {
     get: () => ['capabilities'] as const,
   },
+  /** Per-namespace Image Catalog (ADR-0022): entries with their versions and
+   *  the capabilities probed for each. */
+  imageCatalog: {
+    list: (handle: string) => ['image-catalog', handle] as const,
+  },
+  /** One catalog entry, annotated against the rest of its namespace. Its own
+   *  domain, not a slice of `image-catalog`, because the single-entry read
+   *  carries the per-version layer summary the listing deliberately omits —
+   *  list-prefix invalidation must not clobber it. */
+  imageCatalogEntry: (handle: string, id: string) => ['image-catalog-entry', handle, id] as const,
+  /** Workflows whose steps pin any of the given images, keyed by the set asked
+   *  for — two entries asking about different versions are two answers.
+   *  `workflowsByImageAll` is the prefix, for the writes that change every
+   *  answer at once (archiving a version changes which pins are live). */
+  workflowsByImage: (images: readonly string[]) =>
+    ['workflows-by-image', [...images].sort().join(' ')] as const,
+  workflowsByImageAll: () => ['workflows-by-image'] as const,
   /** Workspace-wide audit trail (Monitoring → Users / Tasks tabs) —
    *  keyset-paginated, server-side filtered by action set + actor +
    *  date range. Each tab passes its own `actions` slice, so the two

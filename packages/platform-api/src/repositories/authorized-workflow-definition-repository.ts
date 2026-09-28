@@ -79,6 +79,31 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
     return definitions;
   };
 
+  private imageAudit: Promise<WorkflowDefinitionGroup[]> | null = null;
+
+  /**
+   * Every workflow version in the deployment, archived included.
+   *
+   * Deliberately **not** namespace-filtered, unlike `listGroups`, because the
+   * question it exists for is about the shared Docker daemon rather than about
+   * workflows: deleting an image breaks whichever step pins it, in whatever
+   * namespace, so a judgement made from the caller's own workspaces would be
+   * wrong. The caller must redact what it reveals — `deleteImageCatalogEntry`
+   * names only the matches this caller may already see and counts the rest.
+   *
+   * Read once per scope, which is once per request. Deleting a catalog entry
+   * destroys its tags one at a time and the live-pin check runs again under
+   * every one of them, so a ten-tag entry asked this eleven times — an
+   * unfiltered read of every definition in the deployment each time — for an
+   * answer nothing in that request can change.
+   */
+  listGroupsForImageAudit = async (): Promise<WorkflowDefinitionGroup[]> => {
+    this.imageAudit ??= this.raw
+      .listAllWorkflowDefinitions(true)
+      .then(({ definitions }) => definitions);
+    return this.imageAudit;
+  };
+
   save = async (definition: WorkflowDefinition): Promise<void> => {
     this.assertNamespaceWrite(definition.namespace);
     await this.raw.saveWorkflowDefinition(definition);

@@ -50,7 +50,6 @@ describe('useAgentEvents', () => {
     expect(agentEventsMock).toHaveBeenCalledWith({
       instanceId: 'inst-a',
       stepId: undefined,
-      afterSequence: undefined,
     });
     expect(result.current.data.map((e) => e.sequence)).toEqual([0, 1, 2]);
   });
@@ -68,35 +67,34 @@ describe('useAgentEvents', () => {
     });
   });
 
-  it('polls incrementally: first fetch full, then afterSequence cursor, accumulating deltas', async () => {
+  // `sequence` cannot carry a cursor — it restarts at 0 per step, and per worker
+  // lifetime — so every poll re-reads the log and merges by id.
+  it('re-reads the full log on every poll and accumulates by id', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     agentEventsMock
       .mockResolvedValueOnce({
         events: [
-          buildAgentEvent({ id: 'e-1', sequence: 0 }),
-          buildAgentEvent({ id: 'e-2', sequence: 1 }),
+          buildAgentEvent({ id: 'e-1', stepId: 'extract', sequence: 0 }),
+          buildAgentEvent({ id: 'e-2', stepId: 'extract', sequence: 1 }),
         ],
       })
       .mockResolvedValueOnce({
-        events: [buildAgentEvent({ id: 'e-3', sequence: 2 })],
+        events: [buildAgentEvent({ id: 'e-3', stepId: 'extract', sequence: 2 })],
       });
     const { wrapper } = createQueryWrapper();
-    const { result } = renderHook(() => useAgentEvents('inst-a', null, 'running'), { wrapper });
+    const { result } = renderHook(() => useAgentEvents('inst-a', 'extract', 'running'), { wrapper });
 
     await waitFor(() => expect(result.current.data).toHaveLength(2));
     expect(agentEventsMock).toHaveBeenNthCalledWith(1, {
       instanceId: 'inst-a',
-      stepId: undefined,
-      afterSequence: undefined,
+      stepId: 'extract',
     });
 
     await vi.advanceTimersByTimeAsync(2_000);
     await waitFor(() => expect(result.current.data).toHaveLength(3));
-    // Second poll carries the max seen sequence (1) as the cursor.
     expect(agentEventsMock).toHaveBeenNthCalledWith(2, {
       instanceId: 'inst-a',
-      stepId: undefined,
-      afterSequence: 1,
+      stepId: 'extract',
     });
     expect(result.current.data.map((e) => e.sequence)).toEqual([0, 1, 2]);
   });
@@ -123,5 +121,58 @@ describe('useAgentEvents', () => {
     await waitFor(() => expect(agentEventsMock).toHaveBeenCalledTimes(1));
     await vi.advanceTimersByTimeAsync(10_000);
     expect(agentEventsMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * `sequence` is assigned per (instance, step) — `PostgresAgentEventLog.write`
+ * numbers from the length of that step's own events — so every step in a run
+ * starts again at 0. Treating it as an instance-wide cursor loses events:
+ * one step's entries overwrite another's, and a step that starts after an
+ * earlier one has climbed past its sequence numbers is never fetched at all.
+ */
+describe('useAgentEvents across steps sharing sequence numbers', () => {
+  it('keeps both steps\' events when their sequence numbers collide', async () => {
+    agentEventsMock.mockResolvedValue({
+      events: [
+        buildAgentEvent({ id: 'extract-0', stepId: 'extract', sequence: 0 }),
+        buildAgentEvent({ id: 'validate-0', stepId: 'validate', sequence: 0 }),
+        buildAgentEvent({ id: 'validate-1', stepId: 'validate', sequence: 1 }),
+      ],
+    });
+    const { wrapper } = createQueryWrapper();
+    const { result } = renderHook(() => useAgentEvents('inst-a', null, 'running'), { wrapper });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.data.map((e) => e.id).sort()).toEqual(['extract-0', 'validate-0', 'validate-1']);
+  });
+
+  it('picks up a later step whose events restart at sequence 0', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    agentEventsMock.mockResolvedValueOnce({
+      events: [
+        buildAgentEvent({ id: 'extract-0', stepId: 'extract', sequence: 0 }),
+        buildAgentEvent({ id: 'extract-1', stepId: 'extract', sequence: 1 }),
+      ],
+    });
+    const { wrapper } = createQueryWrapper();
+    const { result } = renderHook(() => useAgentEvents('inst-a', null, 'running'), { wrapper });
+    await waitFor(() => expect(result.current.data).toHaveLength(2));
+
+    // A second step begins, numbering from 0 again. An instance-wide cursor of
+    // 1 would have asked for `sequence > 1` and never seen it.
+    agentEventsMock.mockResolvedValue({
+      events: [
+        buildAgentEvent({ id: 'extract-0', stepId: 'extract', sequence: 0 }),
+        buildAgentEvent({ id: 'extract-1', stepId: 'extract', sequence: 1 }),
+        buildAgentEvent({ id: 'validate-0', stepId: 'validate', sequence: 0 }),
+      ],
+    });
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    await waitFor(() => expect(result.current.data).toHaveLength(3));
+    for (const call of agentEventsMock.mock.calls) {
+      expect(call[0] as Record<string, unknown>).not.toHaveProperty('afterSequence');
+    }
   });
 });

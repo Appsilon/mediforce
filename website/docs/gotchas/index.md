@@ -51,7 +51,8 @@ personal one — and then looked for the workflow in the wrong place, reporting
 ## Container steps need an image already on the platform
 
 `script` and `agent` steps run in a container image that must be on the platform
-before the run starts. A missing image fails the run at its first step.
+before the run starts. A missing image fails the run at its first step. See
+[Container images](../images/) for how to get one there.
 
 ## Executors are fixed at creation
 

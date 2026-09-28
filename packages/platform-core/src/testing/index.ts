@@ -10,6 +10,7 @@ export { NoopNotificationService } from './noop-notification-service';
 export { InMemoryCoworkSessionRepository } from './in-memory-cowork-session-repository';
 export { InMemoryTriggerRepository } from './in-memory-trigger-repository';
 export { InMemoryToolCatalogRepository } from './in-memory-tool-catalog-repository';
+export { InMemoryImageCatalogRepository } from './in-memory-image-catalog-repository';
 export { InMemoryOAuthProviderRepository } from './in-memory-oauth-provider-repository';
 export { InMemoryAgentOAuthTokenRepository } from './in-memory-agent-oauth-token-repository';
 export { InMemoryAgentDefinitionRepository } from './in-memory-agent-definition-repository';

@@ -16,11 +16,10 @@ import { stopRetryOn4xx } from '@/lib/retry';
  * Powered by `mediforce.processes.agentEvents` which returns events sorted
  * by `sequence` ascending. Optional `stepId` narrows to one step.
  *
- * Incremental polling: the first fetch pulls the full log; each subsequent
- * poll sends `afterSequence = max(seen sequence)` so the API returns only the
- * delta, which we append to a per-key accumulator. An idle run costs ~1 read
- * per poll instead of re-reading the whole subcollection. Consumers still see
- * the full cumulative list sorted by `sequence` ASC — no behavioural change.
+ * Every poll re-reads the full log and merges by `id`. `sequence` cannot carry
+ * a cursor: it restarts at 0 for every step, and for the same step after a
+ * worker restart. The rows are a few status markers per step, so a full read is
+ * cheap — the log lines live in the step-log file.
  */
 export function useAgentEvents(
   instanceId: string | null | undefined,
@@ -50,14 +49,11 @@ export function useAgentEvents(
         accumulator.current = { key, events: [] };
       }
       const seen = accumulator.current.events;
-      const afterSequence =
-        seen.length > 0 ? seen[seen.length - 1].sequence : undefined;
       const result = await mediforce.processes.agentEvents({
         instanceId,
         stepId: stepId ?? undefined,
-        afterSequence,
       });
-      const merged = mergeBySequence(seen, result.events);
+      const merged = mergeEvents(seen, result.events);
       accumulator.current = { key, events: merged };
       return merged.slice();
     },
@@ -79,18 +75,25 @@ export function useAgentEvents(
 }
 
 /**
- * Append delta events to the accumulated log, de-duped by `sequence` (the
- * monotonic ordering key — see `AgentEventSchema`) and kept sorted ASC. A
- * cursor-based delta should never overlap, but de-duping defends against a
- * retried poll that re-fetches the boundary event.
+ * Merge the freshly-read log into the accumulated one, de-duped by `id`. Not by
+ * `sequence`: two steps of the same run both number from 0, so a sequence key
+ * silently drops one step's event for every collision. Sorted by timestamp,
+ * which is the order a reader of a whole run wants.
  */
-function mergeBySequence(
+function mergeEvents(
   existing: readonly AgentEvent[],
   delta: readonly AgentEvent[],
 ): AgentEvent[] {
   if (delta.length === 0) return existing.slice();
-  const bySequence = new Map<number, AgentEvent>();
-  for (const event of existing) bySequence.set(event.sequence, event);
-  for (const event of delta) bySequence.set(event.sequence, event);
-  return [...bySequence.values()].sort((a, b) => a.sequence - b.sequence);
+  const byId = new Map<string, AgentEvent>();
+  for (const event of existing) byId.set(event.id, event);
+  for (const event of delta) byId.set(event.id, event);
+  return [...byId.values()].sort((a, b) => {
+    const byTime = Date.parse(a.timestamp) - Date.parse(b.timestamp);
+    if (Number.isNaN(byTime) === false && byTime !== 0) return byTime;
+    // Same millisecond: keep a step's own events together and in order, rather
+    // than interleaving two steps by numbers that count different things.
+    if (a.stepId !== b.stepId) return a.stepId < b.stepId ? -1 : 1;
+    return a.sequence - b.sequence;
+  });
 }

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { formatExitInfo, deriveBuildTag, missingExecutableHint, resolveImageBuild } from '../container-plugin';
+import {
+  formatExitInfo,
+  deriveBuildTag,
+  missingExecutableHint,
+  resolveImageBuild,
+  resolveStepImage,
+} from '../container-plugin';
 import { artifactsDir } from '../workflow-artifacts';
 import type { WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
 
@@ -63,6 +69,89 @@ describe('deriveBuildTag', () => {
     const withEmpty = deriveBuildTag('git@github.com:org/repo.git', 'abc1234', '');
     expect(withUndefined).toBe(withEmpty);
   });
+
+  it('[DATA] a build with no context keeps the tag it had before contexts existed', () => {
+    // Pinned, not recomputed: every image already on a daemon and every step
+    // pin already registered names this exact tag.
+    expect(deriveBuildTag('git@github.com:org/repo.git', 'abc1234', 'container/Dockerfile')).toBe(
+      'mediforce-built:848270386ea0',
+    );
+    expect(
+      deriveBuildTag('git@github.com:org/repo.git', 'abc1234', 'container/Dockerfile', ''),
+    ).toBe('mediforce-built:848270386ea0');
+  });
+
+  it('[DATA] a different build context produces a different tag', () => {
+    // Same Dockerfile, different files handed to it — a different image, so a
+    // shared tag would serve one build's binary to the other from the cache.
+    const narrow = deriveBuildTag('git@github.com:org/repo.git', 'abc1234', 'container/Dockerfile');
+    const wide = deriveBuildTag('git@github.com:org/repo.git', 'abc1234', 'container/Dockerfile', '.');
+    expect(wide).not.toBe(narrow);
+    expect(wide).toMatch(/^mediforce-built:[0-9a-f]{12}$/);
+  });
+
+  it('[DATA] spellings of one build context share one tag', () => {
+    const repo = 'git@github.com:org/repo.git';
+    const root = deriveBuildTag(repo, 'abc1234', 'container/Dockerfile', '.');
+
+    // The same `docker build`, so the same cache slot — a step writing `./`
+    // must find the image an entry storing `.` built.
+    expect(deriveBuildTag(repo, 'abc1234', 'container/Dockerfile', './')).toBe(root);
+    expect(deriveBuildTag(repo, 'abc1234', 'container/Dockerfile', '/')).toBe(root);
+    expect(deriveBuildTag(repo, 'abc1234', './container/Dockerfile', '.')).toBe(root);
+    expect(deriveBuildTag(repo, 'abc1234', 'Dockerfile', 'container')).toBe(
+      deriveBuildTag(repo, 'abc1234', '', 'container/'),
+    );
+  });
+});
+
+describe('resolveStepImage', () => {
+  const workflowRepo = { url: 'git@github.com:org/skills.git', commit: 'wf00000' };
+
+  it('[DATA] returns the explicit image when the step names one', () => {
+    expect(resolveStepImage({ image: 'my-agent:v3' })).toBe('my-agent:v3');
+  });
+
+  it('[DATA] derives the tag a build-mode step runs under when it omits image', () => {
+    expect(
+      resolveStepImage({ repo: 'git@github.com:org/repo.git', commit: 'abc1234', dockerfile: 'Dockerfile' }),
+    ).toBe(deriveBuildTag('git@github.com:org/repo.git', 'abc1234', 'Dockerfile'));
+  });
+
+  it('[DATA] normalizes an owner/repo shorthand the way the builder does', () => {
+    expect(resolveStepImage({ repo: 'org/repo', commit: 'abc1234' })).toBe(
+      deriveBuildTag('git@github.com:org/repo.git', 'abc1234', undefined),
+    );
+  });
+
+  it('[DATA] falls back to the workflow skills repo for a step naming only a dockerfile', () => {
+    expect(resolveStepImage({ dockerfile: 'container/Dockerfile' }, { externalSkillsRepo: workflowRepo })).toBe(
+      deriveBuildTag('git@github.com:org/skills.git', 'wf00000', 'container/Dockerfile'),
+    );
+  });
+
+  it('[DATA] folds the build context into the tag a build-mode step runs under', () => {
+    expect(
+      resolveStepImage({
+        repo: 'git@github.com:org/repo.git',
+        commit: 'abc1234',
+        dockerfile: 'container/Dockerfile',
+        context: '.',
+      }),
+    ).toBe(deriveBuildTag('git@github.com:org/repo.git', 'abc1234', 'container/Dockerfile', '.'));
+    expect(
+      resolveStepImage({ dockerfile: 'container/Dockerfile', context: '.' }, { externalSkillsRepo: workflowRepo }),
+    ).toBe(deriveBuildTag('git@github.com:org/skills.git', 'wf00000', 'container/Dockerfile', '.'));
+  });
+
+  it('[DATA] does not apply the workflow fallback when the workflow has no repo', () => {
+    expect(resolveStepImage({ dockerfile: 'container/Dockerfile' })).toBeUndefined();
+  });
+
+  it('[DATA] returns undefined for a step with no container config at all', () => {
+    expect(resolveStepImage(undefined)).toBeUndefined();
+    expect(resolveStepImage({})).toBeUndefined();
+  });
 });
 
 describe('missingExecutableHint', () => {
@@ -96,6 +185,40 @@ describe('missingExecutableHint', () => {
   it('[DATA] returns an empty hint for unrelated failures', () => {
     expect(missingExecutableHint('Traceback (most recent call last): KeyError', 'python:3.12-slim')).toBe('');
     expect(missingExecutableHint('', 'alpine:3.24')).toBe('');
+  });
+});
+
+// Registration used to write the golden image onto a step whose Dockerfile
+// came from `externalSkillsRepo`. Those versions are immutable, so the runtime
+// must not let their build land on the shared tag.
+describe('resolveImageBuild — the golden image is never a build target', () => {
+  const skillsRepo = { url: 'https://github.com/org/skills.git', commit: 'b'.repeat(40) };
+  const context = {
+    workflowDefinition: { externalSkillsRepo: skillsRepo },
+    step: { id: 's1' },
+  } as unknown as WorkflowAgentContext;
+
+  it.each(['mediforce-golden-image', 'mediforce-golden-image:latest'])('builds %s steps under their derived tag', (golden) => {
+    const build = resolveImageBuild(golden, { dockerfile: 'container/Dockerfile' }, context);
+    expect(build?.image).toMatch(/^mediforce-built:[a-f0-9]{12}$/);
+    expect(resolveStepImage({ image: golden, dockerfile: 'container/Dockerfile' }, { externalSkillsRepo: skillsRepo })).toBe(build?.image);
+  });
+
+  it('builds a step with an empty image under its derived tag', () => {
+    expect(resolveImageBuild('', { dockerfile: 'container/Dockerfile' }, context)?.image).toMatch(/^mediforce-built:[a-f0-9]{12}$/);
+  });
+
+  it('builds a golden-stamped carried Dockerfile under its content tag', () => {
+    const carried = {
+      workflowDefinition: { artifacts: [{ path: 'Dockerfile', contents: 'FROM python:3.12-slim\n' }] },
+      step: { id: 's1' },
+    } as unknown as WorkflowAgentContext;
+    expect(resolveImageBuild('mediforce-golden-image', { dockerfile: 'Dockerfile' }, carried)?.image)
+      .toMatch(/^mediforce-artifacts:[a-f0-9]{12}$/);
+  });
+
+  it('keeps any other image the step named', () => {
+    expect(resolveImageBuild('acme/agent:v1', { dockerfile: 'container/Dockerfile' }, context)?.image).toBe('acme/agent:v1');
   });
 });
 
@@ -143,6 +266,18 @@ describe('resolveImageBuild — a Dockerfile the workflow carries', () => {
     expect(build?.contextDir).toBe(artifactsDir(artifacts));
   });
 
+  it('hands the builder the content hash, so an image the step named is rebuilt after an edit', () => {
+    // A named tag says nothing about the files, unlike the derived one; the
+    // builder compares this hash with the one labelled on the image.
+    const derived = resolveImageBuild(undefined, { dockerfile: 'Dockerfile' }, contextFor());
+    const named = resolveImageBuild('my-registry/mine:v2', { dockerfile: 'Dockerfile' }, contextFor());
+    const edited = resolveImageBuild('my-registry/mine:v2', { dockerfile: 'Dockerfile' }, contextFor({
+      artifacts: [{ path: 'Dockerfile', contents: 'FROM python:3.13-slim\n' }],
+    }));
+    expect(named?.artifactsHash).toBe(derived?.image.replace('mediforce-artifacts:', ''));
+    expect(edited?.artifactsHash).not.toBe(named?.artifactsHash);
+  });
+
   it('leaves an explicit repo and commit in charge', () => {
     // A step that names its own build source said something specific; the
     // carried files are the fallback, not an override.
@@ -165,5 +300,117 @@ describe('resolveImageBuild — a Dockerfile the workflow carries', () => {
 
   it('has nothing to build when a step names no Dockerfile', () => {
     expect(resolveImageBuild('some:image', {}, contextFor())).toBeUndefined();
+  });
+
+  it('agrees with the pin scan when the workflow also has a skills repo', () => {
+    // `resolveStepImage` is what decides which images a version pins, so it
+    // must name the tag the runtime builds rather than a `mediforce-built:*`
+    // one from the skills repo the carried Dockerfile outranks.
+    const skillsRepo = { url: 'https://github.com/org/skills.git', commit: 'b'.repeat(40) };
+    const build = resolveImageBuild(undefined, { dockerfile: 'Dockerfile' }, contextFor({ externalSkillsRepo: skillsRepo }));
+    expect(resolveStepImage({ dockerfile: 'Dockerfile' }, { artifacts, externalSkillsRepo: skillsRepo })).toBe(build?.image);
+    expect(build?.image).toMatch(/^mediforce-artifacts:/);
+  });
+});
+
+// A published Image Catalog entry is named `<workspace>/<name>`, and the upload
+// path refuses to replace a tag that exists so a step pinning it cannot start
+// running something else. A build must not walk around that.
+describe('resolveImageBuild — an image the catalog published is never a build target', () => {
+  const artifacts = [{ path: 'container/Dockerfile', contents: 'FROM alpine:3.21\n' }];
+  const contextFor = (namespace: string): WorkflowAgentContext => ({
+    workflowDefinition: { artifacts, name: 'test-artifacts', namespace },
+    step: { id: 's1' },
+  } as unknown as WorkflowAgentContext);
+
+  it('builds the carried files under their own tag, leaving the published image alone', () => {
+    const build = resolveImageBuild(
+      'db/test-artifacts:test-publish-as-image',
+      { dockerfile: 'container/Dockerfile' },
+      contextFor('db'),
+    );
+
+    // Otherwise the run rebuilds the published tag from the carried files: the
+    // image the catalog offers is replaced, and two entries claim one artifact.
+    expect(build?.image).toMatch(/^mediforce-artifacts:[a-f0-9]{12}$/);
+  });
+
+  it('agrees with the pin scan, so "used by" names the tag that actually runs', () => {
+    const build = resolveImageBuild(
+      'db/test-artifacts:test-publish-as-image',
+      { dockerfile: 'container/Dockerfile' },
+      contextFor('db'),
+    );
+    expect(resolveStepImage(
+      { image: 'db/test-artifacts:test-publish-as-image', dockerfile: 'container/Dockerfile' },
+      { artifacts, name: 'test-artifacts', namespace: 'db' },
+    )).toBe(build?.image);
+  });
+
+  it('keeps a name outside this workspace, which the catalog does not own', () => {
+    expect(resolveImageBuild('my-registry/mine:v2', { dockerfile: 'container/Dockerfile' }, contextFor('db'))?.image)
+      .toBe('my-registry/mine:v2');
+    expect(resolveImageBuild('mine:v2', { dockerfile: 'container/Dockerfile' }, contextFor('db'))?.image)
+      .toBe('mine:v2');
+  });
+
+  it('applies to a repo build too, which can overwrite a published image just as easily', () => {
+    const build = resolveImageBuild(
+      'db/test-artifacts:v1',
+      { dockerfile: 'Dockerfile', repo: 'https://github.com/org/agent.git', commit: 'a'.repeat(40) },
+      contextFor('db'),
+    );
+    expect(build?.image).toMatch(/^mediforce-built:[a-f0-9]{12}$/);
+  });
+});
+
+// The whole carried set is always the build context, which is what lets a
+// `container/Dockerfile` `COPY scripts/`, so every carried file counts towards
+// the content hash.
+describe('resolveImageBuild — the context of a carried Dockerfile', () => {
+  const dockerfile = { path: 'container/Dockerfile', contents: 'FROM python:3.12-slim\nCOPY scripts/ /scripts/\n' };
+  const entrypoint = { path: 'container/entrypoint.sh', contents: 'echo hi\n' };
+  const script = { path: 'scripts/poll.py', contents: 'print("poll")\n' };
+  const buildFor = (
+    files: { path: string; contents: string }[],
+    config: { dockerfile: string; context?: string } = { dockerfile: dockerfile.path },
+    definition: { name?: string; namespace?: string } = { name: 'wf', namespace: 'acme' },
+  ) => resolveImageBuild(undefined, config, {
+    workflowDefinition: { artifacts: files, ...definition },
+    step: { id: 's1' },
+  } as unknown as WorkflowAgentContext);
+
+  it('hands the builder the Dockerfile as the step named it, labelled with the workflow', () => {
+    const build = buildFor([dockerfile, entrypoint, script]);
+    expect(build?.dockerfile).toBe('container/Dockerfile');
+    expect(build?.contextDir).toBe(artifactsDir([dockerfile, entrypoint, script]));
+    expect(build?.workflow).toBe('wf');
+    expect(build?.namespace).toBe('acme');
+  });
+
+  it("rebuilds for an edit anywhere in the carried files, since all of them are the context", () => {
+    const before = buildFor([dockerfile, entrypoint, script]);
+    const after = buildFor([dockerfile, entrypoint, { ...script, contents: 'print("edited")\n' }]);
+    expect(after?.artifactsHash).not.toBe(before?.artifactsHash);
+  });
+
+  it('ignores a context the step names, building from every carried file as it always has', () => {
+    // A registered version cannot be edited, so one naming `context` next to a
+    // carried Dockerfile must keep building the way it did before carried
+    // images were catalogued.
+    const files = [dockerfile, entrypoint, script];
+    const plain = buildFor(files);
+    const named = buildFor(files, { dockerfile: dockerfile.path, context: 'container' });
+    expect(named?.context).toBeUndefined();
+    expect(named?.image).toBe(plain?.image);
+    expect(named?.artifactsHash).toBe(plain?.artifactsHash);
+    expect(buildFor([dockerfile, entrypoint], { dockerfile: 'Dockerfile', context: 'container' })).toBeUndefined();
+  });
+
+  it('builds identical files carried by two workflows as two images', () => {
+    // Each image is labelled with the workflow it is offered under in the
+    // Image Catalog, and a shared tag could carry only one of them.
+    expect(buildFor([dockerfile], undefined, { name: 'a', namespace: 'acme' })?.image)
+      .not.toBe(buildFor([dockerfile], undefined, { name: 'b', namespace: 'acme' })?.image);
   });
 });

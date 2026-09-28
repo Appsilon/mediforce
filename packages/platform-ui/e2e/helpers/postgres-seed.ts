@@ -4,7 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TEST_ORG_HANDLE } from './constants';
-import { buildSeedData, AGENT_LOG_FILENAME, AGENT_LOG_FIXTURE_CONTENT, SEEDED_DEFINITION_CREATED_AT } from './seed-data';
+import { buildSeedData, AGENT_LOG_FILENAME, AGENT_LOG_FIXTURE_CONTENT, AGENT_LOG_SECOND_FILENAME, AGENT_LOG_SECOND_FIXTURE_CONTENT, SEEDED_DEFINITION_CREATED_AT } from './seed-data';
 
 // Matches LOGS_DIR in packages/platform-ui/src/app/api/step-logs/route.ts —
 // the AgentLogViewer pipeline reads step logs from this local tmp directory.
@@ -54,7 +54,7 @@ export async function seedPostgresNamespace(
     //   fixture    – test, tenant-a, tenant-b
     //   journeys   – other, acme-labs, invited-personal, bio-clear-labs,
     //                bio-clear-owner, journey-user, bootstrap-journey,
-    //                branding-personal, role-gate-org, role-gate-org-2,
+    //                branding-personal, img-seed, role-gate-org, role-gate-org-2,
     //                member-roles-labs, personal-manager (the workspace
     //                default-workflow-access.journey has GET /api/users/me
     //                bootstrap for it, so each run asserts the write rather
@@ -92,6 +92,7 @@ export async function seedPostgresNamespace(
       'journey-user',
       'bootstrap-journey',
       'branding-personal',
+      'img-seed',
       'role-gate-org',
       'role-gate-org-2',
       'member-roles-labs',
@@ -565,6 +566,7 @@ export async function seedPostgresNamespace(
     }
     await mkdir(STEP_LOGS_DIR, { recursive: true });
     await writeFile(join(STEP_LOGS_DIR, AGENT_LOG_FILENAME), AGENT_LOG_FIXTURE_CONTENT, 'utf-8');
+    await writeFile(join(STEP_LOGS_DIR, AGENT_LOG_SECOND_FILENAME), AGENT_LOG_SECOND_FIXTURE_CONTENT, 'utf-8');
   } finally {
     await sql.end({ timeout: 5 });
   }

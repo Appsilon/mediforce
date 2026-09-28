@@ -101,7 +101,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
     <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
       <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
         <ArrowRight className="h-3.5 w-3.5" />
-        What happened next
+        Up next
       </div>
 
       <div className="flex items-center gap-3">
@@ -253,7 +253,7 @@ function StepDescription({
     parts.push(reason);
   }
 
-  return <>{parts.join(' -- ')}</>;
+  return <>{parts.join(' — ')}</>;
 }
 
 function StepLink({
@@ -280,7 +280,7 @@ function StepLink({
           'bg-primary/10 text-primary hover:bg-primary/20 transition-colors',
         )}
       >
-        View Task
+        View task
         <ArrowRight className="h-3 w-3" />
       </Link>
     );
@@ -295,7 +295,7 @@ function StepLink({
           'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors',
         )}
       >
-        View Run
+        View run
         <ArrowRight className="h-3 w-3" />
       </Link>
     );

@@ -41,10 +41,11 @@ Every engineering doc, what it is for, and how far to trust it.
 | See how the packages fit together | [`concepts/architecture.md`](concepts/architecture.md) | engineers | living |
 | Know how the team operates | [`concepts/how-we-work.md`](concepts/how-we-work.md) | everyone | living |
 | Build a workflow, end to end | [`guides/create-workflow.md`](guides/create-workflow.md) | workflow-authors | living |
-| Build and push step images | [`guides/docker-image-setup.md`](guides/docker-image-setup.md) | workflow-authors | living |
+| Create and register Docker images for steps | [`guides/docker-image-setup.md`](guides/docker-image-setup.md) | workflow-authors | living |
 | Import a workflow from git | [`guides/import-from-git.md`](guides/import-from-git.md) | workflow-authors | living |
 | Pass the four verification gates | [`guides/verify-a-workflow.md`](guides/verify-a-workflow.md) | workflow-authors | living |
 | Onboard a landing zone | [`guides/landing-zone-onboarding.md`](guides/landing-zone-onboarding.md) | operators | living |
+| Keep Redis inside its limits, or recover it | [`guides/redis-operations.md`](guides/redis-operations.md) | operators | living |
 | Look up what a workflow *can* do | [`reference/workflow-capabilities.md`](reference/workflow-capabilities.md) | workflow-authors | living |
 | Know the rules a production workflow must satisfy | [`reference/workflow-authoring-golden-rules.md`](reference/workflow-authoring-golden-rules.md) | workflow-authors | living |
 | Add a handler, contract, or repository | [`reference/api-architecture.md`](reference/api-architecture.md) | engineers | living |
@@ -58,6 +59,7 @@ Every engineering doc, what it is for, and how far to trust it.
 | Know why the code is shaped the way it is | [`adr/README.md`](adr/README.md) | engineers | living |
 | Read the cowork streaming exploration | [`research/cowork-streaming.md`](research/cowork-streaming.md) | engineers | draft |
 | Read the Layer 2 score exploration | [`research/layer2-scores-research.md`](research/layer2-scores-research.md) | engineers | draft |
+| Read the step evaluation plan (ADR-0007 layers 2–4) | [`research/step-evaluation.md`](research/step-evaluation.md) | engineers | draft |
 | Cite finished work | [`archive/`](archive/) | engineers | historical |
 | Change the product docs site | [`../website/README.md`](../website/README.md) | everyone | living |
 

@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronsUpDown, Building2, Check, ChevronRight, Wrench, Database } from 'lucide-react';
+import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronsUpDown, Building2, Check, ChevronRight, Wrench, Layers, Database } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import { BrandTheme } from './brand-theme';
 import { WorkspaceAvatar } from './workspace-avatar';
@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { ThemeToggle } from './theme-toggle';
 import { NewTicketTrigger } from './command-palette';
+import { DemoTrigger, GuideTrigger, TourPill } from './tour';
 import { cn } from '@/lib/utils';
 import { workspaceSwitchHref } from '@/lib/workspace-switch';
 import { useNamespace } from '@/hooks/use-namespace';
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { href: '', label: 'Workflows', icon: GitBranch, badge: null, exact: true },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null, exact: false },
   { href: '/tools', label: 'Tools', icon: Wrench, badge: null, exact: false },
+  { href: '/images', label: 'Images', icon: Layers, badge: null, exact: false },
   { href: '/tasks', label: 'Human actions', icon: User, badge: null, exact: false },
 ] as const;
 
@@ -95,6 +97,7 @@ export function buildBreadcrumbs(pathname: string, handle: string, prefix: strin
   if (s0 === 'monitoring') return [workflows, { label: 'Monitoring', href: null }];
   if (s0 === 'settings') return [{ label: 'Workspace settings', href: null }];
   if (s0 === 'catalog') return [workflows, { label: 'Catalog', href: null }];
+  if (s0 === 'images') return [workflows, { label: 'Images', href: null }];
 
   if (s0 === 'agents') {
     const agents: Crumb = { label: 'Agents', href: `${prefix}/agents` };
@@ -193,6 +196,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               type="button"
               className="flex w-full items-center gap-2 rounded-lg border bg-white dark:bg-background px-2 py-2 text-sm shadow-sm hover:bg-muted/40 transition-colors"
               aria-label="Switch namespace"
+              data-tour="workspace-switcher"
             >
               {(() => {
                 const orgLogo = activeNamespace?.type === 'organization' ? activeNamespace.logo : undefined;
@@ -311,7 +315,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-1 px-3 pb-3">
+      <nav className="flex-1 space-y-1 px-3 pb-3" data-tour="sidebar-nav">
         {ACTION_ITEMS.map((item) => (
           <ActionItem
             key={item.path}
@@ -336,7 +340,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 active={isActive}
               />
               {item.href === '/agents' && (
-                <div className="pl-4">
+                <div className="pl-4" data-tour="nav-models">
                   <NavItem
                     href={`${handlePrefix}/agents/models`}
                     label="Models"
@@ -411,7 +415,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
-            <nav className="flex items-center gap-1 text-sm">
+            <nav className="flex items-center gap-1 text-sm" data-tour="breadcrumbs">
               {breadcrumbs.map((crumb, i) => (
                 <React.Fragment key={i}>
                   {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />}
@@ -428,6 +432,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
+            <TourPill />
+            <DemoTrigger />
+            <GuideTrigger />
             <NewTicketTrigger />
             <ThemeToggle />
             {user && (

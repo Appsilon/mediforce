@@ -87,7 +87,7 @@ function ScopeToggle({
   onChange: (mineOnly: boolean) => void;
 }) {
   return (
-    <div className="inline-flex rounded-md border p-0.5 text-sm">
+    <div className="inline-flex rounded-md border p-0.5 text-sm" data-tour="tasks-scope">
       {[
         { mine: true, label: 'For me' },
         { mine: false, label: 'All in workspace' },
@@ -300,7 +300,7 @@ export default function TasksPage() {
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-headline font-semibold">Human actions</h1>
+          <h1 className="text-xl font-headline font-semibold" data-tour="tasks-header">Human actions</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {mineOnly
               ? 'Actions you can take — assigned to you, or open to a role you hold'
@@ -315,7 +315,7 @@ export default function TasksPage() {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1" data-tour="tasks-filters">
           <ScopeToggle mineOnly={mineOnly} onChange={setMineOnly} />
           <WorkspaceFilter
             workspaces={workspaces}
