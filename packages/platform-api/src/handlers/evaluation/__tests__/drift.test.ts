@@ -84,6 +84,16 @@ describe('getStepDrift', () => {
     expect(drift.evaluators[0]).toMatchObject({ evaluatorVersion: 2, recentMean: 0, baselineMean: null, drifting: false });
   });
 
+  it('fills both windows with the latest version even when older-version Scores land after it', async () => {
+    await addEvaluatorVersion({ evaluatorId, rule: 'The result lists graded findings.', origin: 'user' }, fixture.scope());
+    await score([1, 1, 0, 0], { version: 2 });
+    await score([1, 1, 1, 1], { version: 1 });
+
+    const drift = await getStepDrift({ ...STEP, window: 2, threshold: 0.5 }, fixture.scope());
+
+    expect(drift.evaluators[0]).toMatchObject({ recentMean: 0, baselineMean: 1, drifting: true });
+  });
+
   it('leaves out Evaluators that do not run in production', async () => {
     await createEvaluator(
       { ...STEP, name: 'grade-5-flagged', rule: 'r', severity: 'critical', check: findingsSchema, origin: 'user' },

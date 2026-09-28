@@ -30,7 +30,8 @@ export class InMemoryScoreRepository implements ScoreRepository {
         && (filter.evaluatorId === undefined || score.evaluatorId === filter.evaluatorId)
         && (filter.source === undefined || score.source === filter.source)
         && (filter.namespace === undefined || score.namespace === filter.namespace)
-        && (filter.production === undefined || (score.metadata?.production === true) === filter.production))
+        && (filter.production === undefined || (score.metadata?.production === true) === filter.production)
+        && (filter.evaluatorVersion === undefined || score.metadata?.evaluatorVersion === filter.evaluatorVersion))
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id))
       .slice(0, filter.limit);
   }
