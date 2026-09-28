@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-09-27]
+
 ### Added
 - ADR-0023 designs **Step Evaluation** — Evaluators, single-step Eval Runs, and a signed Step Qualification bound to a Step Fingerprint — taking up ADR-0007's deferred layers 2–4; the research behind it is in `docs/research/step-evaluation.md`.
 - **Demo** in the top bar opens three scenarios — building a workflow, running and exploring one, and deciding on one. Each narrates over the real app, sending you to the page and tab the step is about while you do the clicking, and folds into a pill so you can show somebody the screen.
