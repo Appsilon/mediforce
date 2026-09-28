@@ -22,6 +22,10 @@ describe('mcpEvalRestrictions (ADR-0023 D6)', () => {
     expect(mcpEvalRestrictions(['meddra'], { meddra: { mode: 'live' } })).toEqual({});
   });
 
+  it('keeps a replayed server for the trial to answer from its recordings', () => {
+    expect(mcpEvalRestrictions(['edc'], { edc: { mode: 'replay' } })).toEqual({});
+  });
+
   it('keeps step restrictions on servers the agent no longer binds', () => {
     expect(mcpEvalRestrictions([], {}, { legacy: { disable: true } })).toEqual({ legacy: { disable: true } });
   });

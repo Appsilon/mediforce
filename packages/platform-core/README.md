@@ -18,7 +18,7 @@ makes it the place a shared type belongs and a bad place for anything else.
 | `src/mcp/` | MCP server resolution and tool-catalog validation |
 | `src/validation/` | Cross-field workflow validation, graph and reference checks |
 | `src/collaboration/` | Handoff registry |
-| `src/evaluation/` | Pure Evaluation rules — the Evaluator trust gate (ADR-0023 D9), the MCP eval policy as step restrictions (D6), a variant's patch over a step (D5), Acceptance Criteria verdicts (D10), confidence calibration with its routing recommendation, and drift detection over production Scores |
+| `src/evaluation/` | Pure Evaluation rules — the Evaluator trust gate (ADR-0023 D9), the MCP eval policy as step restrictions and the merging of MCP recordings for a replay (D6), a variant's patch over a step (D5), Acceptance Criteria verdicts (D10), confidence calibration with its routing recommendation, and drift detection over production Scores |
 | `src/testing/` | In-memory repositories and `build*` factories |
 
 Three entry points: `.` for the domain surface, `./testing` for the doubles and

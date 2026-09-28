@@ -239,7 +239,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       const trials = [0, 1].map((trialIndex) => ({
         id: randomUUID(), evalRunId: run.id, caseId, variantId: 'champion', trialIndex, status: 'pending' as const,
         processInstanceId: null, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null,
-        durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null,
+        durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [],
       }));
       await repo.createEvalRun(run, trials);
 
@@ -284,7 +284,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       const trials = (['challenger-1', 'champion'] as const).flatMap((variantId) => [1, 0].map((trialIndex) => ({
         id: randomUUID(), evalRunId: run.id, caseId: dataset.caseIds[0]!, variantId, trialIndex, status: 'pending' as const,
         processInstanceId: null, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null,
-        durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null,
+        durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [],
       })));
       await repo.createEvalRun(run, trials);
       await repo.transitionTrial(trials[0]!.id, 'pending', { status: 'skipped', confidence: 0.75 });
@@ -347,6 +347,37 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
 
       expect(await repo.getMcpPolicy(step)).toEqual(replaced);
       expect(await repo.getMcpPolicy(otherStep)).toBeNull();
+    });
+
+    it('keeps every MCP recording, oldest first, by case and server, and a trial\'s replay misses', async () => {
+      const dataset = await repo.appendDatasetVersion({
+        ...step, id: randomUUID(), version: 1, caseIds: [randomUUID()], containsProductionData: false,
+        createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z',
+      });
+      const caseId = dataset.caseIds[0]!;
+      const run = storedRun(dataset.id, dataset.caseIds);
+      const trialId = randomUUID();
+      await repo.createEvalRun(run, [{
+        id: trialId, evalRunId: run.id, caseId, variantId: 'champion', trialIndex: 0, status: 'scoring',
+        processInstanceId: null, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null,
+        durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [],
+      }]);
+      const recording = (server: string, recordedAt: string, text: string) => ({
+        ...step, id: randomUUID(), caseId, server, evalRunId: run.id, trialId, recordedAt,
+        tape: { tools: [{ name: 'read_record' }], calls: [{ tool: 'read_record', arguments: { subject: '1001' }, result: { content: [{ type: 'text', text }] } }] },
+      });
+      const newer = recording('edc', '2026-09-23T09:00:00.000Z', 'new');
+      const older = recording('edc', '2026-09-23T08:00:00.000Z', 'old');
+      const other = recording('meddra', '2026-09-23T08:30:00.000Z', 'term');
+      for (const row of [newer, older, other]) await repo.appendMcpRecording(row);
+
+      expect(await repo.listMcpRecordings(step, { caseId, server: 'edc' })).toEqual([older, newer]);
+      expect(await repo.listMcpRecordings(step)).toEqual([older, other, newer]);
+      expect(await repo.listMcpRecordings(otherStep)).toEqual([]);
+
+      const miss = { server: 'edc', tool: 'read_record', arguments: { subject: '9999' } };
+      await repo.transitionTrial(trialId, 'scoring', { status: 'scored', mcpReplayMisses: [miss] });
+      expect((await repo.listTrials(run.id))[0]?.mcpReplayMisses).toEqual([miss]);
     });
   });
 }
@@ -417,7 +448,7 @@ describe.skipIf(skipPg)('PostgresEvaluationRepository (parity)', () => {
       `TRUNCATE TABLE "${schemaName}"."evaluation_briefs", "${schemaName}"."evaluators", "${schemaName}"."evaluator_versions", ` +
         `"${schemaName}"."eval_cases", "${schemaName}"."eval_dataset_versions", "${schemaName}"."mcp_eval_policies", ` +
         `"${schemaName}"."eval_runs", "${schemaName}"."eval_trials", "${schemaName}"."eval_acceptance_criteria", ` +
-        `"${schemaName}"."step_qualifications"`,
+        `"${schemaName}"."step_qualifications", "${schemaName}"."eval_mcp_recordings"`,
     );
     return new PostgresEvaluationRepository(drizzle(testClient, { schema }));
   });

@@ -9,6 +9,7 @@ export type {
   AgentOutputGate,
   AgentOutputGateVerdict,
   ResolvedOAuthBinding,
+  McpTapeContext,
   EmitPayload,
   EmitFn,
   StepExecutorPlugin,
@@ -64,6 +65,7 @@ export type { MissingEnvVar, MissingPluginEnv, UnknownModel, RetiredModelRef } f
 export { resolveMcpForStep, AgentDefinitionNotFoundError } from './mcp/resolve-mcp-for-step';
 export type { ResolveMcpForStepDeps } from './mcp/resolve-mcp-for-step';
 export { flattenResolvedMcpToLegacy } from './mcp/flatten-resolved-mcp';
+export { MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from './mcp/mcp-tape';
 
 // OAuth (Step 5)
 export {

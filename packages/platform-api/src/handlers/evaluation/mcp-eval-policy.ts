@@ -21,11 +21,13 @@ async function agentBindings(scope: CallerScope, loaded: LoadedStep): Promise<Re
 export async function getMcpEvalPolicy(input: GetMcpEvalPolicyInput, scope: CallerScope): Promise<GetMcpEvalPolicyOutput> {
   const loaded = await loadEvaluatedStep(scope, input, 'read');
   const policy = await scope.evaluation.getMcpPolicy(stepRef(input));
+  const recordings = await scope.evaluation.listMcpRecordings(stepRef(input));
   const servers = Object.keys(await agentBindings(scope, loaded)).sort().map((name) => {
     const serverPolicy = policy?.servers[name];
+    const recordedCaseIds = [...new Set(recordings.filter((recording) => recording.server === name).map((recording) => recording.caseId))];
     return serverPolicy === undefined
-      ? { name, mode: 'deny' as const, defaulted: true }
-      : { name, ...serverPolicy, defaulted: false };
+      ? { name, mode: 'deny' as const, defaulted: true, recordedCaseIds }
+      : { name, ...serverPolicy, defaulted: false, recordedCaseIds };
   });
   return { policy, servers };
 }
@@ -33,7 +35,8 @@ export async function getMcpEvalPolicy(input: GetMcpEvalPolicyInput, scope: Call
 /**
  * Replaces the Step's MCP eval policy. Only servers the agent binds may be
  * named; `denyTools` on a server whose binding lists no `allowedTools` is
- * refused, as it is for step restrictions — there is no allowlist to subtract from.
+ * refused, as it is for step restrictions — there is no allowlist to subtract
+ * from — and so is `denyTools` on a server that is not `live`.
  */
 export async function setMcpEvalPolicy(input: SetMcpEvalPolicyInput, scope: CallerScope): Promise<SetMcpEvalPolicyOutput> {
   const step = stepRef(input);
@@ -44,6 +47,9 @@ export async function setMcpEvalPolicy(input: SetMcpEvalPolicyInput, scope: Call
     const binding = bindings[name];
     if (binding === undefined) {
       throw new ValidationError(`'${name}' is not an MCP server of this step's agent (${known.join(', ') || 'it has none'})`);
+    }
+    if ((serverPolicy.denyTools?.length ?? 0) > 0 && serverPolicy.mode !== 'live') {
+      throw new ValidationError(`'${name}' is ${serverPolicy.mode}, so it has no tools to deny — denyTools applies to a live server`);
     }
     if ((serverPolicy.denyTools?.length ?? 0) > 0 && binding.allowedTools === undefined) {
       throw new ValidationError(`'${name}' lists no allowedTools, so tools cannot be denied one by one — deny the server or list its tools on the agent`);
@@ -63,7 +69,7 @@ export async function setMcpEvalPolicy(input: SetMcpEvalPolicyInput, scope: Call
     entityType: 'mcp_eval_policy',
     entityId: `${step.workflowName}/${step.stepId}`,
     inputSnapshot: { ...step, servers: input.servers },
-    basis: 'MCP servers are denied in eval trials unless declared safe (ADR-0023 D6)',
+    basis: 'MCP servers are denied in eval trials unless declared live or replayed (ADR-0023 D6)',
   });
   return { policy };
 }

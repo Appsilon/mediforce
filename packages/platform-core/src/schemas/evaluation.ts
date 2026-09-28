@@ -270,11 +270,46 @@ export const EvalDatasetVersionSchema = EvaluatedStepSchema.extend({
 
 /**
  * What an eval trial may do with one MCP server (D6): `live`, optionally with
- * named tools denied, or `deny`. A server the policy does not name is denied.
+ * named tools denied; `replay`, answered from the responses a live pass of the
+ * same Eval Case recorded; or `deny`. A server the policy does not name is denied.
  */
 export const McpEvalServerPolicySchema = z.object({
-  mode: z.enum(['live', 'deny']),
+  mode: z.enum(['live', 'replay', 'deny']),
   denyTools: z.array(z.string().min(1)).optional(),
+});
+
+/** One MCP tool call a live trial made, and the result the server gave it. */
+export const McpTapeCallSchema = z.object({
+  tool: z.string().min(1),
+  arguments: z.record(z.string(), z.unknown()),
+  result: z.record(z.string(), z.unknown()),
+});
+
+/** What one MCP server answered in one live trial: its tool list, then each call in order. */
+export const McpTapeSchema = z.object({
+  tools: z.array(z.record(z.string(), z.unknown())),
+  calls: z.array(McpTapeCallSchema),
+});
+
+/**
+ * One live trial's recording of one MCP server for one Eval Case (D6).
+ * Append-only; a replay merges every recording of the case, newest last.
+ */
+export const McpRecordingSchema = EvaluatedStepSchema.extend({
+  id: z.uuid(),
+  caseId: z.uuid(),
+  server: z.string().min(1),
+  tape: McpTapeSchema,
+  evalRunId: z.uuid(),
+  trialId: z.uuid(),
+  recordedAt: z.iso.datetime(),
+});
+
+/** A call a replayed trial made that no recording answered — it got an error instead. */
+export const McpReplayMissSchema = z.object({
+  server: z.string().min(1),
+  tool: z.string().min(1),
+  arguments: z.record(z.string(), z.unknown()),
 });
 
 export const McpEvalPolicySchema = EvaluatedStepSchema.extend({
@@ -347,6 +382,10 @@ export type EvalCase = z.infer<typeof EvalCaseSchema>;
 export type EvalDatasetVersion = z.infer<typeof EvalDatasetVersionSchema>;
 export type McpEvalServerPolicy = z.infer<typeof McpEvalServerPolicySchema>;
 export type McpEvalPolicy = z.infer<typeof McpEvalPolicySchema>;
+export type McpTapeCall = z.infer<typeof McpTapeCallSchema>;
+export type McpTape = z.infer<typeof McpTapeSchema>;
+export type McpRecording = z.infer<typeof McpRecordingSchema>;
+export type McpReplayMiss = z.infer<typeof McpReplayMissSchema>;
 export type AcceptanceCriterion = z.infer<typeof AcceptanceCriterionSchema>;
 export type AcceptanceCriteria = z.infer<typeof AcceptanceCriteriaSchema>;
 export type AcceptanceCriteriaVersion = z.infer<typeof AcceptanceCriteriaVersionSchema>;

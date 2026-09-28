@@ -3,6 +3,7 @@
 // Covers L0/L1/L2 step advancement (the fix for "stuck on first step"), L3 review routing,
 // L4 autonomous execution, escalation/pause handling, and edge cases.
 
+import { randomUUID } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type {
   AgentDefinition,
@@ -26,6 +27,7 @@ import {
   InMemoryAgentEventLog,
   PluginRunner,
   MockAgentPlugin,
+  type WorkflowAgentContext,
 } from '@mediforce/agent-runtime';
 
 // Mock platform-services module
@@ -261,7 +263,7 @@ describe('executeAgentStep', () => {
     }, [{
       id: '55555555-5555-4555-8555-555555555555', evalRunId, caseId, variantId: 'challenger-1', trialIndex: 0, status: 'running',
       processInstanceId: 'inst-wf-001', agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
-      confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null,
+      confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [],
     }]);
     mockInstanceRepo.getById.mockResolvedValue({ ...defaultInstance, evalRunId });
     mockEngine.finishEvalTrial.mockResolvedValue({ status: 'completed', currentStepId: null });
@@ -298,7 +300,7 @@ describe('executeAgentStep', () => {
       }, [{
         id: trialId, evalRunId, caseId, variantId: 'champion', trialIndex: 0, status: 'running',
         processInstanceId: instanceId, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
-        confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null,
+        confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [],
       }]);
       mockInstanceRepo.getById.mockResolvedValue({ ...defaultInstance, id: instanceId, evalRunId });
       mockEngine.finishEvalTrial.mockResolvedValue({ status: 'completed', currentStepId: null });
@@ -320,6 +322,81 @@ describe('executeAgentStep', () => {
       await executeAgentStep('inst-eval-same', 'gather-data', agentStep, {}, 'user-1');
 
       expect(mockAgentRunner.runWithWorkflowStep).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('an eval trial\'s MCP record/replay (ADR-0023 D6)', () => {
+    const agentStep: WorkflowStep = { ...firstStep, agentId: 'edc-agent' };
+    const evaluatedStep = { namespace: 'test-namespace', workflowName: 'community-digest', stepId: 'gather-data' };
+    const readTape = (text: string) => ({
+      tools: [{ name: 'read_record' }],
+      calls: [{ tool: 'read_record', arguments: { subject: '1001' }, result: { content: [{ type: 'text', text }] } }],
+    });
+
+    async function prepareTrial(instanceId: string, evalRunId: string, trialId: string, caseId: string): Promise<void> {
+      mockAgentDefinitionRepo.getById.mockResolvedValue({
+        id: 'edc-agent', systemPrompt: 'Read the EDC.',
+        mcpServers: {
+          // An OAuth server with no token connected: a replay must never need one.
+          edc: { type: 'http', url: 'https://edc.example.com/mcp', auth: { type: 'oauth', provider: 'edc-idp', headerName: 'Authorization', headerValueTemplate: 'Bearer {token}' } },
+          meddra: { type: 'http', url: 'https://meddra.example.com/mcp' },
+        },
+      });
+      await evaluationRepo.createEvalRun({
+        ...evaluatedStep,
+        id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId], exampleCaseIds: [],
+        trialsPerCase: 1, concurrency: 1,
+        evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
+        variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
+        acceptanceCriteria: null, briefVersion: null, mcpPolicy: { edc: { mode: 'replay' }, meddra: { mode: 'live' } },
+        estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
+        budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null,
+      }, [{
+        id: trialId, evalRunId, caseId, variantId: 'champion', trialIndex: 0, status: 'running',
+        processInstanceId: instanceId, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
+        confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [],
+      }]);
+      mockInstanceRepo.getById.mockResolvedValue({ ...defaultInstance, id: instanceId, evalRunId });
+      mockEngine.finishEvalTrial.mockResolvedValue({ status: 'completed', currentStepId: null });
+    }
+
+    it('[DATA] replays a server from every recording of the case, newest winning, and records a live one', async () => {
+      const evalRunId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+      const trialId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+      const caseId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      await prepareTrial('inst-eval-replay', evalRunId, trialId, caseId);
+      for (const [text, recordedAt] of [['old', '2026-09-23T08:00:00.000Z'], ['new', '2026-09-23T09:00:00.000Z']] as const) {
+        await evaluationRepo.appendMcpRecording({
+          ...evaluatedStep, id: randomUUID(), caseId, server: 'edc', tape: readTape(text), evalRunId, trialId, recordedAt,
+        });
+      }
+
+      await executeAgentStep('inst-eval-replay', 'gather-data', agentStep, {}, 'user-1');
+
+      const context = mockAgentRunner.runWithWorkflowStep.mock.calls[0]![1] as WorkflowAgentContext;
+      expect(context.mcpTapes?.replay).toEqual({ edc: readTape('new') });
+      expect(context.mcpTapes?.record).toEqual(['meddra']);
+      expect(context.oauthTokens).toBeUndefined();
+
+      await context.mcpTapes!.onRecorded('meddra', readTape('meddra answer'));
+      expect(await evaluationRepo.listMcpRecordings(evaluatedStep, { caseId, server: 'meddra' })).toEqual([
+        expect.objectContaining({ tape: readTape('meddra answer'), evalRunId, trialId }),
+      ]);
+    });
+
+    it('[ERROR] fails the trial closed when no live trial of its case recorded a replayed server', async () => {
+      const caseId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+      await prepareTrial('inst-eval-unrecorded', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', caseId);
+      const otherCase = { ...evaluatedStep, stepId: 'another-step' };
+      await evaluationRepo.appendMcpRecording({
+        ...otherCase, id: randomUUID(), caseId, server: 'edc', tape: readTape('elsewhere'),
+        evalRunId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', trialId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', recordedAt: '2026-09-23T08:00:00.000Z',
+      });
+
+      await expect(
+        executeAgentStep('inst-eval-unrecorded', 'gather-data', agentStep, {}, 'user-1'),
+      ).rejects.toThrow(`MCP server 'edc' is replayed, but no live trial of Eval Case '${caseId}' recorded it`);
+      expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
     });
   });
 

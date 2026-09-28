@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { WorkflowEngine } from '@mediforce/workflow-engine';
-import { buildAgentOutputEnvelope, buildAgentRun } from '@mediforce/platform-core/testing';
+import { mcpReplayMissEntry } from '@mediforce/platform-core';
+import { buildAgentOutputEnvelope, buildAgentRun, InMemoryAgentTrajectoryRepository } from '@mediforce/platform-core/testing';
 import { noopRunKicker, type NoopRunKicker } from '../../../../runtime/run-kicker';
 import type { CallerScope } from '../../../../repositories/index';
 import { createEvaluator } from '../../evaluators';
@@ -131,6 +132,31 @@ describe('driveEvalRun', () => {
     expect((await fixture.evaluationRepo.listTrials(evalRun.id))[0]).toMatchObject({ status: 'scored', agentRunId: 'trial-agent-run' });
     expect(await fixture.scoreRepo.list({ processInstanceId: instanceId, limit: 50 })).toHaveLength(1);
     expect((await fixture.evaluationRepo.getEvalRun(evalRun.id))?.status).toBe('completed');
+  });
+
+  it('keeps the calls a replayed MCP server could not answer, from the trial\'s Agent Trajectory', async () => {
+    const agentTrajectoryRepo = new InMemoryAgentTrajectoryRepository(fixture.agentRunRepo);
+    scope = fixture.scope(undefined, { agentTrajectoryRepo });
+    Object.assign(scope.system, { engine: new WorkflowEngine(fixture.processRepo, fixture.instanceRepo, fixture.auditRepo), runKicker: kicker });
+    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
+    const [trial] = await fixture.evaluationRepo.listTrials(evalRun.id);
+    const instanceId = trial!.processInstanceId!;
+    await fixture.agentRunRepo.create(buildAgentRun({
+      id: 'replayed-agent-run', processInstanceId: instanceId, stepId: STEP.stepId, envelope: buildAgentOutputEnvelope({ result: { findings: [] } }),
+    }));
+    await agentTrajectoryRepo.append('replayed-agent-run', [
+      { seq: 0, ts: '2026-09-23T08:00:00.000Z', type: 'assistant', subtype: 'tool_call', tool: 'mcp__edc__read_record', input: { subject: '1001' } },
+      { seq: 1, ...mcpReplayMissEntry({ server: 'edc', tool: 'read_record', arguments: { subject: '1001' } }) },
+    ]);
+    await fixture.instanceRepo.update(instanceId, { status: 'completed', currentStepId: null });
+
+    await driveEvalRun(scope, evalRun.id);
+
+    expect((await fixture.evaluationRepo.listTrials(evalRun.id))[0]).toMatchObject({
+      status: 'scored',
+      mcpReplayMisses: [{ server: 'edc', tool: 'read_record', arguments: { subject: '1001' } }],
+    });
   });
 
   it('fails a trial whose scoring was abandoned too often rather than pay for its judges again', async () => {
