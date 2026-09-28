@@ -26,7 +26,9 @@ import {
   type EvaluatorVersion,
   type JudgeCalibration,
   type McpEvalPolicy,
+  type McpRecordedCase,
   type McpRecording,
+  type McpRecordingFilter,
   type SourceApproval,
 } from '@mediforce/platform-core';
 import type { PgColumn } from 'drizzle-orm/pg-core';
@@ -415,15 +417,22 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     });
   }
 
-  async listMcpRecordings(step: EvaluatedStep, filter: { caseId?: string; server?: string } = {}): Promise<McpRecording[]> {
-    const rows = await this.db.select().from(evalMcpRecordings)
+  async listMcpRecordings(step: EvaluatedStep, filter: McpRecordingFilter = {}): Promise<McpRecording[]> {
+    const query = this.db.select().from(evalMcpRecordings)
       .where(and(
         onStep(evalMcpRecordings, step),
         filter.caseId === undefined ? undefined : eq(evalMcpRecordings.caseId, filter.caseId),
         filter.server === undefined ? undefined : eq(evalMcpRecordings.server, filter.server),
       ))
-      .orderBy(asc(evalMcpRecordings.recordedAt), asc(evalMcpRecordings.id));
-    return rows.map(toRecording);
+      .orderBy(desc(evalMcpRecordings.recordedAt), desc(evalMcpRecordings.id));
+    const rows = filter.limit === undefined ? await query : await query.limit(filter.limit);
+    return rows.reverse().map(toRecording);
+  }
+
+  async listMcpRecordedCases(step: EvaluatedStep): Promise<McpRecordedCase[]> {
+    return this.db.selectDistinct({ server: evalMcpRecordings.server, caseId: evalMcpRecordings.caseId })
+      .from(evalMcpRecordings)
+      .where(onStep(evalMcpRecordings, step));
   }
   async appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> {
     const parsed = AcceptanceCriteriaVersionSchema.parse(criteria);

@@ -3,6 +3,7 @@ import {
   calibrateConfidence,
   caseReliability,
   judgeAcceptanceCriteria,
+  mcpServersByMode,
   recommendControl,
   wilsonInterval,
   type AcceptanceCriterionVerdict,
@@ -154,19 +155,13 @@ function judgedOnEveryTrial(verdicts: AcceptanceCriterionVerdict[], counts: Eval
 
 /** The servers by the mode the run froze for them, and every unanswered replayed call, counted by server and tool. */
 function mcpReport(run: EvalRun, trials: readonly EvalTrial[]): EvalRunMcpReport {
-  const serversIn = (mode: string) => Object.entries(run.mcpPolicy).filter(([, policy]) => policy.mode === mode).map(([name]) => name).sort();
   const counts = new Map<string, EvalRunMcpReport['unrecordedCalls'][number]>();
   for (const miss of trials.flatMap((trial) => trial.mcpReplayMisses)) {
     const key = `${miss.server}\u0000${miss.tool}`;
     const counted = counts.get(key);
     counts.set(key, { server: miss.server, tool: miss.tool, count: (counted?.count ?? 0) + 1 });
   }
-  return {
-    live: serversIn('live'),
-    replayed: serversIn('replay'),
-    denied: serversIn('deny'),
-    unrecordedCalls: [...counts.values()],
-  };
+  return { ...mcpServersByMode(run.mcpPolicy), unrecordedCalls: [...counts.values()] };
 }
 
 function variantReport(

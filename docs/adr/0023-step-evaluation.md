@@ -80,12 +80,11 @@ use carries an eval policy: `live`, `deny`, or `live` with named tools denied.
 Undeclared servers are denied in trials. The policy applies as extra
 subtractive `mcpRestrictions`. It is **not** part of the Fingerprint; the Eval
 Run report and the Step Qualification state it ("qualified with `edc-write`
-denied"). Record/replay of MCP responses is a later phase. Container network
-egress is out of scope — trials inherit production's. _Amended 2026-09-28
+denied"). Container network egress is out of scope — trials inherit production's. _Amended 2026-09-28
 (Phase 5c): a third mode, `replay`. A live trial records, per Eval Case and
 server, the tool list and every tool call with its result, through a proxy the
 trial's MCP config starts in the server's place. A replayed server is answered
-from every recording of that case — the newest recording of each distinct
+from the newest recordings of that case — the newest recording of each distinct
 call, matched on tool and canonical arguments — and is never reached, so a
 side-effecting tool is safe to exercise. An unrecorded call gets an error
 result, is kept on the trial, and is counted in the report; a replayed server

@@ -147,7 +147,7 @@ describe('driveEvalRun', () => {
     }));
     await agentTrajectoryRepo.append('replayed-agent-run', [
       { seq: 0, ts: '2026-09-23T08:00:00.000Z', type: 'assistant', subtype: 'tool_call', tool: 'mcp__edc__read_record', input: { subject: '1001' } },
-      { seq: 1, ...mcpReplayMissEntry({ server: 'edc', tool: 'read_record', arguments: { subject: '1001' } }) },
+      { seq: 1, ...mcpReplayMissEntry({ server: 'edc', tool: 'read_record', arguments: { subject: '1001' } }, '2026-09-23T08:00:01.000Z') },
     ]);
     await fixture.instanceRepo.update(instanceId, { status: 'completed', currentStepId: null });
 

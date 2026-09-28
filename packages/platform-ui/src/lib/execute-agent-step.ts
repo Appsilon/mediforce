@@ -302,14 +302,17 @@ export async function executeAgentStep(
   };
 }
 
+/** How many of a case's newest recordings a replay merges — enough to cover what varies between live trials, bounded as recordings accumulate. */
+const MCP_REPLAY_RECORDINGS = 20;
+
 /**
  * An eval trial's step (ADR-0023 D4–D6): its variant's patch applied over the
  * pinned definition, and — for MCP resolution only — every server of the
  * step's agent under the Eval Run's frozen policy, denied unless the author
  * declared it live or replayed, on top of the step's own restrictions. A live
  * server's answers are recorded for the trial's Eval Case; a replayed one is
- * answered from every recording of that case, and fails the trial closed when
- * there is none. Inline servers
+ * answered from the newest recordings of that case, and fails the trial closed
+ * when there is none. Inline servers
  * bypass the agent's bindings, so no policy can deny them: the trial fails
  * closed rather than run them. So does a trial whose step no longer matches
  * the Fingerprint its variant was prepared with — its agent's model, prompt or
@@ -368,7 +371,7 @@ async function evalTrialConfig(
   const evaluatedStep = { namespace: evalRun.namespace, workflowName: evalRun.workflowName, stepId: evalRun.stepId };
   const replay: McpTapeContext['replay'] = {};
   for (const server of replayed) {
-    const recordings = await evaluationRepo.listMcpRecordings(evaluatedStep, { caseId: trial.caseId, server });
+    const recordings = await evaluationRepo.listMcpRecordings(evaluatedStep, { caseId: trial.caseId, server, limit: MCP_REPLAY_RECORDINGS });
     if (recordings.length === 0) {
       throw new Error(
         `MCP server '${server}' is replayed, but no live trial of Eval Case '${trial.caseId}' recorded it; `
