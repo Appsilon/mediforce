@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-09-25
+last_reviewed: 2026-09-28
 ---
 
 # Step Evaluation
@@ -359,9 +359,31 @@ A version never changes.
 
 ## MCP eval policy
 
-Per MCP server of the Step's agent: `live`, `live` with named tools denied, or
-`deny`. A server the policy does not name is denied in eval trials.
-`mcp-policy-get` shows what each server does, defaults included.
+Per MCP server of the Step's agent: `live`, `live` with named tools denied,
+`replay`, or `deny`. A server the policy does not name is denied in eval trials.
+`mcp-policy-get` shows what each server does, defaults included, and which Eval
+Cases each server has a recording for.
+
+**Record and replay.** Every trial with a `live` server records what that
+server answered: the trial's `mcp-config.json` starts the server behind a small
+proxy (`node /output/mcp-tape/mcp-tape.mjs`, stdio and streamable-HTTP alike)
+that keeps the tool list and each tool call with its result, stored per Eval
+Case and server once the agent exits. A `replay` server is never started: the
+proxy answers the agent from every recording of the trial's case — for each
+distinct call (tool plus arguments, key order ignored) the newest recording of
+it, the n-th identical call getting the n-th recorded result. It needs no OAuth
+token and reaches no network, so tools with side effects are safe to replay.
+
+- A call no recording answered gets an error result. The trial keeps it
+  (`mcpReplayMisses`), its Agent Trajectory records it, and the report counts
+  it per server and tool.
+- A replayed server that no live trial of the case has recorded fails the trial
+  closed. Run the case with the server `live` first.
+- Tool lists and results are recorded in full, like the Agent Trajectory:
+  they stay in the platform's database.
+
+The report states each server's mode and says when no trial made a live MCP
+call (`report.mcp`; one line in the Evaluation tab and in `mediforce eval report`).
 
 ## Eval Runs
 
@@ -399,7 +421,7 @@ in the report and by `run-prepare`), and refuses a run with no case left to scor
    running its variant's patch. It enters the Step directly with the case's trigger payload and earlier step
    outputs, its workspace branched from the case's seed commit, and stops after
    the Step: no review task, no escalation, no next step. MCP servers the policy
-   does not declare `live` are removed from the agent's config; a Step that
+   does not declare `live` or `replay` are removed from the agent's config; a Step that
    declares MCP servers inline cannot be evaluated at all. Just before the
    agent runs, the trial recomputes its variant's Step Fingerprint; if the
    step or its agent changed since the run was prepared (model, system prompt,

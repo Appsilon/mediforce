@@ -17,6 +17,7 @@ import {
   EvaluatorSchema,
   EvaluatorVersionSchema,
   McpEvalPolicySchema,
+  McpRecordingSchema,
   type EvalCase,
   type EvalDatasetVersion,
   type EvaluatedStep,
@@ -25,6 +26,7 @@ import {
   type EvaluatorVersion,
   type JudgeCalibration,
   type McpEvalPolicy,
+  type McpRecording,
   type SourceApproval,
 } from '../schemas/evaluation';
 
@@ -45,6 +47,7 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
   private readonly cases = new Map<string, EvalCase>();
   private readonly datasets: EvalDatasetVersion[] = [];
   private readonly policies: McpEvalPolicy[] = [];
+  private readonly recordings: McpRecording[] = [];
   private readonly criteria: AcceptanceCriteriaVersion[] = [];
   private readonly qualifications: StepQualification[] = [];
   private readonly runs = new Map<string, EvalRun>();
@@ -160,6 +163,18 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     if (index === -1) this.policies.push(parsed);
     else this.policies[index] = parsed;
     return parsed;
+  }
+
+  async appendMcpRecording(recording: McpRecording): Promise<void> {
+    this.recordings.push(McpRecordingSchema.parse(recording));
+  }
+
+  async listMcpRecordings(step: EvaluatedStep, filter: { caseId?: string; server?: string } = {}): Promise<McpRecording[]> {
+    return this.recordings
+      .filter((row) => sameStep(row, step)
+        && (filter.caseId === undefined || row.caseId === filter.caseId)
+        && (filter.server === undefined || row.server === filter.server))
+      .sort((left, right) => left.recordedAt.localeCompare(right.recordedAt));
   }
 
   async appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> {

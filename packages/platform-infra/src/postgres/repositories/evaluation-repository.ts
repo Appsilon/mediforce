@@ -16,6 +16,7 @@ import {
   EvaluatorSchema,
   EvaluatorVersionSchema,
   McpEvalPolicySchema,
+  McpRecordingSchema,
   type EvalCase,
   type EvalDatasetVersion,
   type EvaluatedStep,
@@ -25,6 +26,7 @@ import {
   type EvaluatorVersion,
   type JudgeCalibration,
   type McpEvalPolicy,
+  type McpRecording,
   type SourceApproval,
 } from '@mediforce/platform-core';
 import type { PgColumn } from 'drizzle-orm/pg-core';
@@ -33,6 +35,7 @@ import {
   evalAcceptanceCriteria,
   evalCases,
   evalDatasetVersions,
+  evalMcpRecordings,
   evalRuns,
   evalTrials,
   evaluationBriefs,
@@ -137,6 +140,19 @@ function toPolicy(row: typeof mcpEvalPolicies.$inferSelect): McpEvalPolicy {
     servers: row.servers,
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt.toISOString(),
+  });
+}
+
+function toRecording(row: typeof evalMcpRecordings.$inferSelect): McpRecording {
+  return McpRecordingSchema.parse({
+    ...stepFields(row),
+    id: row.id,
+    caseId: row.caseId,
+    server: row.server,
+    tape: row.tape,
+    evalRunId: row.evalRunId,
+    trialId: row.trialId,
+    recordedAt: row.recordedAt.toISOString(),
   });
 }
 
@@ -381,6 +397,33 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
       })
       .returning();
     return toPolicy(row!);
+  }
+
+  async appendMcpRecording(recording: McpRecording): Promise<void> {
+    const parsed = McpRecordingSchema.parse(recording);
+    await this.db.insert(evalMcpRecordings).values({
+      id: parsed.id,
+      workspace: parsed.namespace,
+      workflowName: parsed.workflowName,
+      stepId: parsed.stepId,
+      caseId: parsed.caseId,
+      server: parsed.server,
+      tape: parsed.tape,
+      evalRunId: parsed.evalRunId,
+      trialId: parsed.trialId,
+      recordedAt: new Date(parsed.recordedAt),
+    });
+  }
+
+  async listMcpRecordings(step: EvaluatedStep, filter: { caseId?: string; server?: string } = {}): Promise<McpRecording[]> {
+    const rows = await this.db.select().from(evalMcpRecordings)
+      .where(and(
+        onStep(evalMcpRecordings, step),
+        filter.caseId === undefined ? undefined : eq(evalMcpRecordings.caseId, filter.caseId),
+        filter.server === undefined ? undefined : eq(evalMcpRecordings.server, filter.server),
+      ))
+      .orderBy(asc(evalMcpRecordings.recordedAt), asc(evalMcpRecordings.id));
+    return rows.map(toRecording);
   }
   async appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> {
     const parsed = AcceptanceCriteriaVersionSchema.parse(criteria);

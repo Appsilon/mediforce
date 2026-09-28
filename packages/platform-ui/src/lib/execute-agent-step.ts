@@ -3,6 +3,7 @@
 // WorkflowStep, then dispatches to the right StepExecutor strategy:
 // AgentStepExecutor (autonomy, review, escalation) or ScriptStepExecutor (direct).
 
+import { randomUUID } from 'node:crypto';
 import { getPlatformServices } from './platform-services';
 import {
   resolveMcpForStep,
@@ -11,6 +12,7 @@ import {
   PluginNotFoundError,
   MockAgentPlugin,
   ensureStepImageBuilt,
+  type McpTapeContext,
   type StepExecutorPlugin,
   type ResolvedOAuthBinding,
   type WorkflowAgentContext,
@@ -20,6 +22,7 @@ import {
   applyStepVariant,
   inlineMcpServerNames,
   mcpEvalRestrictions,
+  mergeMcpTapes,
   type AgentDefinitionRepository,
   type AgentOAuthTokenRepository,
   type EvaluationRepository,
@@ -163,6 +166,7 @@ export async function executeAgentStep(
   // + tool catalog. undefined when step.agentId is unset. Namespace-scoped
   // catalog lookups use the workflow's namespace.
   const mcpStep = evalTrial?.mcpStep ?? workflowStep;
+  const mcpTapes = evalTrial?.mcpTapes;
   const resolvedMcpConfig = reapTimedOut
     ? undefined
     : (await resolveMcpForStep(mcpStep, {
@@ -175,12 +179,16 @@ export async function executeAgentStep(
   // requested OAuth auth. Done here, not in the runtime, so the runtime
   // stays decoupled from Firestore — queued-docker-spawn can serialize
   // the context over BullMQ once this is populated. Refresh failures
-  // bubble up with actionable errors ("Reconnect via UI").
+  // bubble up with actionable errors ("Reconnect via UI"). A replayed server
+  // is never reached, so it needs no token.
   const oauthTokens = !reapTimedOut && workflowStep.agentId !== undefined && resolvedMcpConfig !== undefined
     ? await loadOAuthTokens({
         namespace: workflowDefinition.namespace,
         agentId: workflowStep.agentId,
-        resolvedMcpConfig,
+        resolvedMcpConfig: mcpTapes === undefined ? resolvedMcpConfig : {
+          ...resolvedMcpConfig,
+          servers: Object.fromEntries(Object.entries(resolvedMcpConfig.servers).filter(([name]) => (name in mcpTapes.replay) === false)),
+        },
         oauthProviderRepo,
         agentOAuthTokenRepo,
       })
@@ -217,6 +225,7 @@ export async function executeAgentStep(
       : {}),
     oauthTokens,
     agentIdentityPrompt,
+    ...(mcpTapes === undefined ? {} : { mcpTapes }),
     getPreviousStepOutputs: async () => {
       const executions = await instanceRepo.getStepExecutions(instanceId);
       const result: Record<string, unknown> = {};
@@ -297,7 +306,10 @@ export async function executeAgentStep(
  * An eval trial's step (ADR-0023 D4–D6): its variant's patch applied over the
  * pinned definition, and — for MCP resolution only — every server of the
  * step's agent under the Eval Run's frozen policy, denied unless the author
- * declared it live, on top of the step's own restrictions. Inline servers
+ * declared it live or replayed, on top of the step's own restrictions. A live
+ * server's answers are recorded for the trial's Eval Case; a replayed one is
+ * answered from every recording of that case, and fails the trial closed when
+ * there is none. Inline servers
  * bypass the agent's bindings, so no policy can deny them: the trial fails
  * closed rather than run them. So does a trial whose step no longer matches
  * the Fingerprint its variant was prepared with — its agent's model, prompt or
@@ -311,7 +323,7 @@ async function evalTrialConfig(
   evaluationRepo: EvaluationRepository,
   agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>,
   toolCatalogRepo: Pick<ToolCatalogRepository, 'getById'>,
-): Promise<{ definition: WorkflowDefinition; step: WorkflowStep; mcpStep: WorkflowStep }> {
+): Promise<{ definition: WorkflowDefinition; step: WorkflowStep; mcpStep: WorkflowStep; mcpTapes?: McpTapeContext }> {
   const inlineServers = inlineMcpServerNames(step);
   if (inlineServers.length > 0) {
     throw new Error(
@@ -324,7 +336,8 @@ async function evalTrialConfig(
     evaluationRepo.getTrialByInstanceId(instanceId),
   ]);
   if (evalRun === null) throw new Error(`Eval Run '${evalRunId}' of this trial not found`);
-  const variant = evalRun.variants.find((candidate) => candidate.id === trial?.variantId);
+  if (trial === null) throw new Error(`Eval Run '${evalRunId}' has no trial for run '${instanceId}'`);
+  const variant = evalRun.variants.find((candidate) => candidate.id === trial.variantId);
   if (variant === undefined) throw new Error(`Eval Run '${evalRunId}' has no variant for trial run '${instanceId}'`);
   const patched = applyStepVariant(definition, step, variant.patch);
   if (variant.fingerprint !== null) {
@@ -343,11 +356,43 @@ async function evalTrialConfig(
   }
   if (patched.step.agentId === undefined) return { ...patched, mcpStep: patched.step };
   const agent = await agentDefinitionRepo.getById(patched.step.agentId);
+  const servers = Object.keys(agent?.mcpServers ?? {});
+  const mcpStep = {
+    ...patched.step,
+    mcpRestrictions: mcpEvalRestrictions(servers, evalRun.mcpPolicy, patched.step.mcpRestrictions),
+  };
+  const record = servers.filter((server) => evalRun.mcpPolicy[server]?.mode === 'live');
+  const replayed = servers.filter((server) => evalRun.mcpPolicy[server]?.mode === 'replay');
+  if (record.length === 0 && replayed.length === 0) return { ...patched, mcpStep };
+
+  const evaluatedStep = { namespace: evalRun.namespace, workflowName: evalRun.workflowName, stepId: evalRun.stepId };
+  const replay: McpTapeContext['replay'] = {};
+  for (const server of replayed) {
+    const recordings = await evaluationRepo.listMcpRecordings(evaluatedStep, { caseId: trial.caseId, server });
+    if (recordings.length === 0) {
+      throw new Error(
+        `MCP server '${server}' is replayed, but no live trial of Eval Case '${trial.caseId}' recorded it; `
+        + `run the case with '${server}' live first`,
+      );
+    }
+    replay[server] = mergeMcpTapes(recordings.map((recording) => recording.tape));
+  }
   return {
     ...patched,
-    mcpStep: {
-      ...patched.step,
-      mcpRestrictions: mcpEvalRestrictions(Object.keys(agent?.mcpServers ?? {}), evalRun.mcpPolicy, patched.step.mcpRestrictions),
+    mcpStep,
+    mcpTapes: {
+      replay,
+      record,
+      onRecorded: (server, tape) => evaluationRepo.appendMcpRecording({
+        ...evaluatedStep,
+        id: randomUUID(),
+        caseId: trial.caseId,
+        server,
+        tape,
+        evalRunId,
+        trialId: trial.id,
+        recordedAt: new Date().toISOString(),
+      }),
     },
   };
 }

@@ -11,7 +11,8 @@ import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepo
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { agentLogEntries, createLineStreamReader, formatAgentLogLine, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
+import { agentLogEntries, createLineStreamReader, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
+import { MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
@@ -210,6 +211,14 @@ export async function cleanupTempDir(tempDir: string | null): Promise<void> {
   if (tempDir) {
     await rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+/** Where an eval trial's MCP record/replay files live, inside the output directory. */
+const MCP_TAPE_DIR = 'mcp-tape';
+
+/** A server name as a file name. */
+function tapeFileStem(server: string): string {
+  return server.replace(/[^A-Za-z0-9_-]/g, '_');
 }
 
 /** Build the `headers` map for an HTTP MCP entry based on the resolved
@@ -419,33 +428,66 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     type HttpEntry = { type: 'http'; url: string; headers?: Record<string, string>; allowedTools?: string[] };
     const mcpConfig: Record<string, StdioEntry | HttpEntry> = {};
 
+    const tapes = isWorkflowAgentContext(this.context) ? this.context.mcpTapes : undefined;
+    const taped = entries.some(([name]) => tapes !== undefined && (name in tapes.replay || tapes.record.includes(name)));
+    // The path the agent sees the tape directory at: /output in a container.
+    const tapeDir = this.agentConfig.image ? `/output/${MCP_TAPE_DIR}` : join(outputDir, MCP_TAPE_DIR);
+    const tapeScript = `${tapeDir}/mcp-tape.mjs`;
+    if (taped) {
+      await mkdir(join(outputDir, MCP_TAPE_DIR), { recursive: true });
+      await writeFile(join(outputDir, MCP_TAPE_DIR, 'mcp-tape.mjs'), MCP_TAPE_SCRIPT, 'utf-8');
+    }
+
     for (const [name, server] of entries) {
       const allowedToolsPart = server.allowedTools && server.allowedTools.length > 0
         ? { allowedTools: server.allowedTools }
         : {};
+      const replayTape = tapes?.replay[name];
+      const recorded = tapes?.record.includes(name) === true;
+      const stem = tapeFileStem(name);
 
-      if (server.type === 'stdio') {
+      if (replayTape !== undefined) {
+        await writeFile(join(outputDir, MCP_TAPE_DIR, `${stem}.replay.json`), JSON.stringify(replayTape), 'utf-8');
+        mcpConfig[name] = {
+          type: 'stdio',
+          command: 'node',
+          args: [tapeScript, 'replay', `${tapeDir}/${stem}.replay.json`, `${tapeDir}/${stem}.misses.jsonl`],
+          ...allowedToolsPart,
+        };
+      } else if (server.type === 'stdio') {
         const resolvedEnv: Record<string, string> = {};
         if (server.env) {
           for (const [key, value] of Object.entries(server.env)) {
             resolvedEnv[key] = resolveValue(value, workflowSecrets);
           }
         }
+        const command = recorded ? 'node' : server.command;
+        const args = recorded
+          ? [tapeScript, 'record', `${tapeDir}/${stem}.tape.jsonl`, server.command, ...(server.args ?? [])]
+          : server.args;
         mcpConfig[name] = {
           type: 'stdio',
-          command: server.command,
-          ...(server.args !== undefined && server.args.length > 0 ? { args: server.args } : {}),
+          command,
+          ...(args !== undefined && args.length > 0 ? { args } : {}),
           ...(Object.keys(resolvedEnv).length > 0 ? { env: resolvedEnv } : {}),
           ...allowedToolsPart,
         };
       } else {
         const headers = buildHttpHeaders(name, server.auth, oauthTokens, workflowSecrets);
-        mcpConfig[name] = {
-          type: 'http',
-          url: server.url,
-          ...(headers !== undefined ? { headers } : {}),
-          ...allowedToolsPart,
-        };
+        mcpConfig[name] = recorded
+          ? {
+            type: 'stdio',
+            command: 'node',
+            args: [tapeScript, 'record-http', `${tapeDir}/${stem}.tape.jsonl`, server.url],
+            env: { MCP_TAPE_HEADERS: JSON.stringify(headers ?? {}) },
+            ...allowedToolsPart,
+          }
+          : {
+            type: 'http',
+            url: server.url,
+            ...(headers !== undefined ? { headers } : {}),
+            ...allowedToolsPart,
+          };
       }
     }
 
@@ -459,6 +501,27 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       stepId: this.context.stepId,
       servers: entries.map(([name]) => name),
     });
+  }
+
+  /** Once the agent has exited: hand each recorded server's tape to the
+   *  caller, and put every call a replayed server could not answer into the
+   *  Agent Trajectory. A tape that cannot be stored is logged — recording is
+   *  evidence for a later trial, never a reason to fail this one. */
+  protected async collectMcpTapes(outputDir: string): Promise<void> {
+    const tapes = isWorkflowAgentContext(this.context) ? this.context.mcpTapes : undefined;
+    if (tapes === undefined) return;
+    const dir = join(outputDir, MCP_TAPE_DIR);
+    for (const server of tapes.record) {
+      const tape = await readRecordedTape(join(dir, `${tapeFileStem(server)}.tape.jsonl`));
+      if (tape === null) continue;
+      await tapes.onRecorded(server, tape).catch((error: unknown) => {
+        console.warn(`[mcp-tape] could not store the recording of '${server}' for step ${this.context.stepId}:`, error instanceof Error ? error.message : error);
+      });
+    }
+    for (const server of Object.keys(tapes.replay)) {
+      const misses = await readReplayMisses(join(dir, `${tapeFileStem(server)}.misses.jsonl`), server);
+      if (misses.length > 0 && isWorkflowAgentContext(this.context)) this.context.trajectory?.record(misses.map(mcpReplayMissEntry));
+    }
   }
 
   /** Pre-refactor path: serialize agentConfig.mcpServers (array) directly
@@ -886,6 +949,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           throw dockerErr;
         }
       }
+
+      await this.collectMcpTapes(dockerOutputDir);
 
       // Log injected env vars with source info for audit
       if (spawnResult.injectedEnvVars.length > 0) {

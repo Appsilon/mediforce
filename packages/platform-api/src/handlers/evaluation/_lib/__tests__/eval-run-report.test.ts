@@ -29,7 +29,7 @@ function trial(evalRunId: string, caseId: string, trialIndex: number, overrides:
   return {
     id: randomUUID(), evalRunId, caseId, variantId, trialIndex, status: 'scored', processInstanceId: `trial-${variantId}-${caseId}-${trialIndex}`,
     agentRunId: `agent-${variantId}-${caseId}-${trialIndex}`, costUsd: 0.1, inputTokens: 100, outputTokens: 10, durationMs: 1000,
-    confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, ...overrides,
+    confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], ...overrides,
   };
 }
 
@@ -197,6 +197,20 @@ describe('buildEvalRunReport', () => {
     const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
 
     expect(champion!.criteria[0]).toMatchObject({ status: 'not_evaluable', reason: '1 of 4 trials failed or were skipped, so the Dataset was not evaluated in full' });
+  });
+
+  it('states each MCP server\'s mode, and counts the replayed calls no recording answered', async () => {
+    const fixture = await evaluationFixture();
+    const evalRun = run({ mcpPolicy: { edc: { mode: 'replay' }, email: { mode: 'deny' } } });
+    const miss = { server: 'edc', tool: 'read_record', arguments: { subject: '1001' } };
+    const trials = [trial(evalRun.id, CASE_A, 0, { mcpReplayMisses: [miss, miss] }), trial(evalRun.id, CASE_B, 0, { mcpReplayMisses: [miss] })];
+
+    const report = await buildEvalRunReport(fixture.scope(), evalRun, trials);
+
+    expect(report.mcp).toEqual({
+      live: [], replayed: ['edc'], denied: ['email'],
+      unrecordedCalls: [{ server: 'edc', tool: 'read_record', count: 3 }],
+    });
   });
 
   it('recommends nothing for a variant still running', async () => {

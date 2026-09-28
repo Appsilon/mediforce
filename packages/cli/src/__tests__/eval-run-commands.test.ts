@@ -25,6 +25,7 @@ const OUTPUT = {
   trials: [],
   report: {
     k: 3, trials: { total: 3, scored: 0, failed: 0, skipped: 0, inProgress: 3 },
+    mcp: { live: [], replayed: ['edc'], denied: [], unrecordedCalls: [] },
     variants: [{
       id: 'champion', label: 'Current step', patch: {}, fingerprint: null,
       trials: { total: 3, scored: 0, failed: 0, skipped: 0, inProgress: 3 },
@@ -75,6 +76,7 @@ describe('mediforce eval runs', () => {
     expect(printed).toContain('criterion critical: not evaluable — findings-present graded no trial');
     expect(printed).toContain('suite phi_leak');
     expect(printed).toContain('3 passed, 1 failed, 0 not graded');
+    expect(printed).toContain('MCP servers: edc replayed. No trial made a live MCP call.');
     expect(printed).toContain(`mediforce eval run-start ${RUN_ID} --confirm-budget 0.9`);
     expect(printed).not.toContain('left out');
   });
