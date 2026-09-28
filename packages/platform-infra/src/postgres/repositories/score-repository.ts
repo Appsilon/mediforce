@@ -84,6 +84,9 @@ export class PostgresScoreRepository implements ScoreRepository {
       const production = sql`coalesce((${scores.metadata}->>'production')::boolean, false)`;
       conditions.push(filter.production ? sql`${production}` : sql`not ${production}`);
     }
+    if (filter.evaluatorVersion !== undefined) {
+      conditions.push(sql`(${scores.metadata}->>'evaluatorVersion')::numeric = ${filter.evaluatorVersion}`);
+    }
     const rows = await this.db
       .select()
       .from(scores)

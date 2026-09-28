@@ -248,6 +248,13 @@ full, nothing is judged. The defaults are a window of 20 and a threshold of
 `MEDIFORCE_DRIFT_THRESHOLD` (above 0, at most 1); a value outside those ranges
 falls back to the default. A request may override either one.
 
+This differs from the layer-2 research note, which proposed a 7-day average
+against a 30-day average with a relative drop. Windows are counted in Scores
+rather than days so that a low-traffic step is judged on as many samples as a
+busy one, and a quiet week never produces a mean of two runs. The drop is
+absolute because Scores are already on a 0–1 scale, where a relative drop
+exaggerates changes near zero.
+
 `mediforce eval drift [--window N] [--threshold X]`
 (`GET /api/evaluation/drift`) lists every such Evaluator, alerts first, with
 both means and counts. The Evaluation tab shows a banner above the Step
@@ -260,11 +267,16 @@ Off unless `MEDIFORCE_SCORE_EXPORT` names a target. Each Score of an Agent Run
 is then also written next to that run's trace, one way only: nothing is read
 back. An Agent Run records the trace and span ids of its `mediforce.agent.run`
 span (ADR-0007) when tracing is on. A Score of a run recorded without them
-(tracing off, or a run from before this) is not sent.
+(tracing off, or a run from before this) is not sent. Tracing is on when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set. A backend that needs auth to ingest
+traces, such as Langfuse's OTLP endpoint (`Authorization=Basic <base64
+public:secret>`), also needs `OTEL_EXPORTER_OTLP_HEADERS`; without it the
+Scores arrive but the traces they point at do not. Scores of Eval Runs are
+exported as well as production ones.
 
 | `MEDIFORCE_SCORE_EXPORT` | Written as | Settings |
 |---|---|---|
-| `phoenix` | a span annotation on the run's span (`annotator_kind` `HUMAN`, `LLM` or `CODE` by Score source) | `PHOENIX_BASE_URL`, defaulting to `OTEL_EXPORTER_OTLP_ENDPOINT`; `PHOENIX_API_KEY` when Phoenix requires one |
+| `phoenix` | a span annotation on the run's span (`annotator_kind` `HUMAN`, `LLM` or `CODE` by Score source) | `PHOENIX_BASE_URL`, defaulting to `OTEL_EXPORTER_OTLP_ENDPOINT`, which only works when traces go to Phoenix directly rather than through a collector; `PHOENIX_API_KEY` when Phoenix requires one |
 | `langfuse` | a numeric score on the trace and the run's observation, with the Score's id, so a resend does not duplicate it | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, all required |
 
 Metadata carries the Score's own metadata, its id, source, Evaluator and label.

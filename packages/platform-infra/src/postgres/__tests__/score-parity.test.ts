@@ -85,6 +85,14 @@ function contract(name: string, factory: () => Promise<ScoreRepository>) {
         .toEqual([trial.id, bare.id].sort());
     });
 
+    it('filters by the Evaluator version that recorded the Score', async () => {
+      const current = await repo.create(buildScore({ metadata: { production: true, evaluatorVersion: 2 } }));
+      await repo.create(buildScore({ metadata: { production: true, evaluatorVersion: 1 } }));
+      await repo.create(buildScore({ metadata: null }));
+
+      expect(await repo.list({ evaluatorVersion: 2, limit: 10 })).toEqual([current]);
+    });
+
     it('scopes by workspace', async () => {
       await repo.create(buildScore({ namespace: 'ws-1' }));
       await repo.create(buildScore({ namespace: 'ws-2' }));

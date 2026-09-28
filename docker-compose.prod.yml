@@ -156,6 +156,9 @@ services:
       - MEDIFORCE_OTEL_CAPTURE_CONTENT=${MEDIFORCE_OTEL_CAPTURE_CONTENT:-}
       # OTLP trace export (ADR-0007), e.g. http://phoenix:6006. Unset = no tracing.
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      # Auth headers for that endpoint, e.g. `Authorization=Basic <base64 pk:sk>`
+      # for Langfuse. Unset = no headers.
+      - OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS:-}
       # One-way Score export next to the traces (ADR-0023): `phoenix` or
       # `langfuse`. Unset = off. Phoenix defaults to the OTLP endpoint above;
       # Langfuse needs its URL and both keys, or export stays off. Comments are

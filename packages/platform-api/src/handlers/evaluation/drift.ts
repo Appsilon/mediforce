@@ -27,11 +27,10 @@ export async function getStepDrift(
       evaluatorId: evaluator.id,
       namespace: step.namespace,
       production: true,
+      evaluatorVersion: version.version,
       limit: settings.window * 2,
     });
-    const values = scores
-      .filter((score) => score.metadata?.evaluatorVersion === version.version)
-      .map((score) => score.value);
+    const values = scores.map((score) => score.value);
     evaluators.push({
       evaluatorId: evaluator.id,
       name: evaluator.name,

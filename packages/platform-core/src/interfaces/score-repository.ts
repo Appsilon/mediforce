@@ -11,6 +11,8 @@ export interface ListScoresFilter {
   readonly namespace?: string;
   /** Only Scores of live runs (`metadata.production: true`), or only the others. */
   readonly production?: boolean;
+  /** Only Scores recorded by this Evaluator version (`metadata.evaluatorVersion`). */
+  readonly evaluatorVersion?: number;
   readonly limit: number;
 }
 
