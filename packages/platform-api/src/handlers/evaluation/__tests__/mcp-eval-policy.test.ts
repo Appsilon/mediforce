@@ -40,7 +40,14 @@ describe('MCP eval policy', () => {
       .rejects.toThrow(/not an MCP server of this step's agent/);
     await expect(setMcpEvalPolicy({ ...STEP, servers: { email: { mode: 'live', denyTools: ['send'] } } }, fixture.scope()))
       .rejects.toThrow(/lists no allowedTools/);
-    await expect(setMcpEvalPolicy({ ...STEP, servers: { edc: { mode: 'replay', denyTools: ['write_record'] } } }, fixture.scope()))
-      .rejects.toThrow(/denyTools applies to a live server/);
+  });
+
+  it('drops denied tools from a server that is not live, as a policy saved before replay may carry them', async () => {
+    const fixture = await evaluationFixture();
+    const { policy } = await setMcpEvalPolicy({
+      ...STEP,
+      servers: { edc: { mode: 'replay', denyTools: ['write_record'] }, email: { mode: 'deny', denyTools: ['send'] } },
+    }, fixture.scope());
+    expect(policy.servers).toEqual({ edc: { mode: 'replay' }, email: { mode: 'deny' } });
   });
 });

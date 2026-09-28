@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   canonicalJson,
+  describeMcpPolicy,
   describeMcpReport,
   mcpReplayMissEntry,
   mcpReplayMissesOf,
@@ -14,6 +15,10 @@ describe('canonicalJson', () => {
     expect(canonicalJson({ subject: '1001', visit: { day: 1, arm: 'A' } }))
       .toBe(canonicalJson({ visit: { arm: 'A', day: 1 }, subject: '1001' }));
     expect(canonicalJson({ ids: [2, 1] })).not.toBe(canonicalJson({ ids: [1, 2] }));
+  });
+
+  it('sorts keys at every depth and drops undefined values', () => {
+    expect(canonicalJson({ b: 1, a: { d: [2, { f: 3, e: undefined }], c: null } })).toBe('{"a":{"c":null,"d":[2,{"f":3}]},"b":1}');
   });
 });
 
@@ -54,7 +59,7 @@ describe('replay misses in an Agent Trajectory', () => {
     const miss = { server: 'edc', tool: 'read_record', arguments: { subject: '1001' } };
     const entries = [
       { ts: '2026-09-23T08:00:00.000Z', type: 'assistant', subtype: 'tool_call', tool: 'mcp__edc__read_record' },
-      mcpReplayMissEntry(miss),
+      mcpReplayMissEntry(miss, '2026-09-23T08:00:01.000Z'),
     ];
     expect(mcpReplayMissesOf(entries)).toEqual([miss]);
   });
@@ -71,5 +76,13 @@ describe('describeMcpReport', () => {
 
   it('does not claim no live call when a server was live', () => {
     expect(describeMcpReport({ live: ['meddra'], replayed: [], denied: [], unrecordedCalls: [] })).toBe('MCP servers: meddra live.');
+  });
+});
+
+describe('describeMcpPolicy', () => {
+  it('states each server of a frozen policy by its mode', () => {
+    expect(describeMcpPolicy({ meddra: { mode: 'live', denyTools: ['update'] }, edc: { mode: 'replay' }, email: { mode: 'deny' } }))
+      .toBe('MCP servers: meddra live; edc replayed; email denied.');
+    expect(describeMcpPolicy({ edc: { mode: 'replay' } })).toBe('MCP servers: edc replayed. No trial made a live MCP call.');
   });
 });

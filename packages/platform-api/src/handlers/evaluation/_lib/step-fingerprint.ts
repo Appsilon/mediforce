@@ -9,6 +9,7 @@ import {
 } from '@mediforce/agent-runtime';
 import {
   STEP_FINGERPRINT_COMPONENTS,
+  canonicalJson,
   type StepFingerprint,
   type StepFingerprintComponent,
   type WorkflowDefinition,
@@ -19,18 +20,6 @@ import {
 export interface StepFingerprintRepos {
   agentDefinitions: ResolveMcpForStepDeps['agentDefinitionRepo'];
   toolCatalog: ResolveMcpForStepDeps['toolCatalogRepo'];
-}
-
-/** JSON with object keys sorted at every depth, so equal values hash equally. */
-export function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    const entries = Object.entries(value)
-      .filter(([, entry]) => entry !== undefined)
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
-    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`).join(',')}}`;
-  }
-  return JSON.stringify(value ?? null);
 }
 
 function sha256(text: string): string {

@@ -349,7 +349,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect(await repo.getMcpPolicy(otherStep)).toBeNull();
     });
 
-    it('keeps every MCP recording, oldest first, by case and server, and a trial\'s replay misses', async () => {
+    it('keeps every MCP recording, oldest first, by case and server — the newest few on request — and a trial\'s replay misses', async () => {
       const dataset = await repo.appendDatasetVersion({
         ...step, id: randomUUID(), version: 1, caseIds: [randomUUID()], containsProductionData: false,
         createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z',
@@ -374,6 +374,11 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect(await repo.listMcpRecordings(step, { caseId, server: 'edc' })).toEqual([older, newer]);
       expect(await repo.listMcpRecordings(step)).toEqual([older, other, newer]);
       expect(await repo.listMcpRecordings(otherStep)).toEqual([]);
+      expect(await repo.listMcpRecordings(step, { caseId, server: 'edc', limit: 1 })).toEqual([newer]);
+      const recorded = await repo.listMcpRecordedCases(step);
+      expect(recorded.sort((left, right) => left.server.localeCompare(right.server)))
+        .toEqual([{ server: 'edc', caseId }, { server: 'meddra', caseId }]);
+      expect(await repo.listMcpRecordedCases(otherStep)).toEqual([]);
 
       const miss = { server: 'edc', tool: 'read_record', arguments: { subject: '9999' } };
       await repo.transitionTrial(trialId, 'scoring', { status: 'scored', mcpReplayMisses: [miss] });

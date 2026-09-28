@@ -12,7 +12,7 @@ import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-arti
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
 import { agentLogEntries, createLineStreamReader, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
-import { MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
+import { MCP_TAPE_DIR, MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
@@ -212,9 +212,6 @@ export async function cleanupTempDir(tempDir: string | null): Promise<void> {
     await rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
 }
-
-/** Where an eval trial's MCP record/replay files live, inside the output directory. */
-const MCP_TAPE_DIR = 'mcp-tape';
 
 /** A server name as a file name. */
 function tapeFileStem(server: string): string {
@@ -431,7 +428,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const tapes = isWorkflowAgentContext(this.context) ? this.context.mcpTapes : undefined;
     const taped = entries.some(([name]) => tapes !== undefined && (name in tapes.replay || tapes.record.includes(name)));
     // The path the agent sees the tape directory at: /output in a container.
-    const tapeDir = this.agentConfig.image ? `/output/${MCP_TAPE_DIR}` : join(outputDir, MCP_TAPE_DIR);
+    const inContainer = this.agentConfig.image !== undefined && this.agentConfig.image !== '';
+    const tapeDir = inContainer ? `/output/${MCP_TAPE_DIR}` : join(outputDir, MCP_TAPE_DIR);
     const tapeScript = `${tapeDir}/mcp-tape.mjs`;
     if (taped) {
       await mkdir(join(outputDir, MCP_TAPE_DIR), { recursive: true });
@@ -503,24 +501,34 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     });
   }
 
-  /** Once the agent has exited: hand each recorded server's tape to the
-   *  caller, and put every call a replayed server could not answer into the
-   *  Agent Trajectory. A tape that cannot be stored is logged — recording is
-   *  evidence for a later trial, never a reason to fail this one. */
+  /** Once the agent has exited — finished, failed or timed out: hand each
+   *  recorded server's tape to the caller, and put every call a replayed
+   *  server could not answer into the Agent Trajectory. Never throws — a tape
+   *  that cannot be read or stored is logged; recording is evidence for a
+   *  later trial, never a reason to fail this one. */
   protected async collectMcpTapes(outputDir: string): Promise<void> {
-    const tapes = isWorkflowAgentContext(this.context) ? this.context.mcpTapes : undefined;
+    if (!isWorkflowAgentContext(this.context)) return;
+    const { mcpTapes: tapes, trajectory } = this.context;
     if (tapes === undefined) return;
     const dir = join(outputDir, MCP_TAPE_DIR);
+    const warn = (what: string, error: unknown) => console.warn(
+      `[mcp-tape] could not ${what} for step ${this.context.stepId}:`, error instanceof Error ? error.message : error,
+    );
     for (const server of tapes.record) {
-      const tape = await readRecordedTape(join(dir, `${tapeFileStem(server)}.tape.jsonl`));
-      if (tape === null) continue;
-      await tapes.onRecorded(server, tape).catch((error: unknown) => {
-        console.warn(`[mcp-tape] could not store the recording of '${server}' for step ${this.context.stepId}:`, error instanceof Error ? error.message : error);
-      });
+      try {
+        const tape = await readRecordedTape(join(dir, `${tapeFileStem(server)}.tape.jsonl`));
+        if (tape !== null) await tapes.onRecorded(server, tape);
+      } catch (error) {
+        warn(`store the recording of '${server}'`, error);
+      }
     }
     for (const server of Object.keys(tapes.replay)) {
-      const misses = await readReplayMisses(join(dir, `${tapeFileStem(server)}.misses.jsonl`), server);
-      if (misses.length > 0 && isWorkflowAgentContext(this.context)) this.context.trajectory?.record(misses.map(mcpReplayMissEntry));
+      try {
+        const misses = await readReplayMisses(join(dir, `${tapeFileStem(server)}.misses.jsonl`), server);
+        if (misses.length > 0) trajectory?.record(misses.map(({ ts, miss }) => mcpReplayMissEntry(miss, ts)));
+      } catch (error) {
+        warn(`read the unrecorded calls to '${server}'`, error);
+      }
     }
   }
 
@@ -950,8 +958,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         }
       }
 
-      await this.collectMcpTapes(dockerOutputDir);
-
       // Log injected env vars with source info for audit
       if (spawnResult.injectedEnvVars.length > 0) {
         const sources = this.resolvedEnv.sources;
@@ -1113,6 +1119,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // Re-throw so the agent runner's fallback handler deals with the error
       throw error;
     } finally {
+      if (dockerOutputDir) {
+        await this.collectMcpTapes(dockerOutputDir);
+      }
       if (succeeded) {
         await cleanupTempDir(tempDir);
       }

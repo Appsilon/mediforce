@@ -20,8 +20,11 @@ import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, s
  * recording — and the report says no trial made a live MCP call.
  *
  * MOCK_AGENT=true: the mock agent starts no MCP server, so a live trial
- * records nothing. The recording is written to Postgres as a live trial's
- * recording proxy would leave it; recording itself is covered at L1.
+ * records nothing and a replayed one is never called. This journey proves the
+ * storage, policy, fail-closed and report path. The recording is written to
+ * Postgres as a live trial's recording proxy would leave it; the proxy itself
+ * — recording, replaying, and wiring into mcp-config.json — is covered at L1
+ * (agent-runtime mcp-tape and mcp-config-integration tests).
  */
 
 async function post(request: APIRequestContext, path: string, data: Record<string, unknown>, status = 200) {

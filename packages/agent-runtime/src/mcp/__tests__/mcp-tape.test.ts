@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { canonicalJson } from '@mediforce/platform-core';
 import { MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp-tape';
 
 /** A stdio MCP server that echoes a tool call's arguments back as its result. */
@@ -25,18 +26,32 @@ const INITIALIZED = { jsonrpc: '2.0', method: 'notifications/initialized' };
 const LIST = { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} };
 const callFor = (id: number, subject: string) => ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'read_record', arguments: { subject } } });
 
-type RpcMessage = { id?: number; result?: Record<string, unknown>; error?: unknown };
+type RpcMessage = { id?: number; method?: string; result?: Record<string, unknown>; error?: unknown };
 
-/** Runs the tape script with `args`, feeds it `messages` a line each, and returns what it wrote to stdout. */
-function converse(dir: string, args: string[], messages: readonly object[], env: Record<string, string> = {}): Promise<RpcMessage[]> {
+/**
+ * Runs the tape script with `args`, feeds it `messages` a line each, and
+ * returns what it wrote to stdout. With `waitFor`, stdin stays open until a
+ * message of that method has come out.
+ */
+function converse(
+  dir: string,
+  args: string[],
+  messages: readonly object[],
+  env: Record<string, string> = {},
+  waitFor?: string,
+): Promise<RpcMessage[]> {
   return new Promise((resolve, reject) => {
     const child = spawn('node', [join(dir, 'mcp-tape.mjs'), ...args], { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'inherit'] });
     let stdout = '';
-    child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+    const parsed = () => stdout.split('\n').filter((line) => line !== '').map((line) => JSON.parse(line) as RpcMessage);
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString();
+      if (waitFor !== undefined && parsed().some((message) => message.method === waitFor)) child.stdin.end();
+    });
     child.on('error', reject);
-    child.on('close', () => resolve(stdout.split('\n').filter((line) => line !== '').map((line) => JSON.parse(line) as RpcMessage)));
+    child.on('close', () => resolve(parsed()));
     for (const message of messages) child.stdin.write(`${JSON.stringify(message)}\n`);
-    child.stdin.end();
+    if (waitFor === undefined) child.stdin.end();
   });
 }
 
@@ -90,17 +105,49 @@ describe('mcp-tape script (ADR-0023 D6)', () => {
       { content: [{ type: 'text', text: 'second' }] },
     ]);
     expect(answers.find((answer) => answer.id === 6)!.result).toMatchObject({ isError: true });
-    expect(await readReplayMisses(missesPath, 'edc')).toEqual([{ server: 'edc', tool: 'read_record', arguments: { subject: '9999' } }]);
+    expect(await readReplayMisses(missesPath, 'edc')).toEqual([
+      { ts: expect.any(String), miss: { server: 'edc', tool: 'read_record', arguments: { subject: '9999' } } },
+    ]);
+  });
+
+  it('keys a call as the platform merging recordings does, so the two never disagree on which calls are equal', () => {
+    const source = /function canonical\(value\) \{[\s\S]*?\n\}\n/.exec(MCP_TAPE_SCRIPT)?.[0];
+    expect(source).toBeDefined();
+    const canonical = new Function(`${source}\nreturn canonical;`)() as (value: unknown) => string;
+    const samples: unknown[] = [
+      { subject: '1001', visit: { day: 1, arm: 'A', notes: undefined } },
+      { ids: [3, 1, { b: null, a: [true, 'x'] }], 'key with "quotes"': 1.5 },
+      [],
+      {},
+      null,
+      'text',
+      0,
+    ];
+    for (const sample of samples) expect(canonical(sample)).toBe(canonicalJson(sample));
   });
 
   describe('record-http', () => {
     let server: Server;
     let url: string;
+    let serverStream: string | null;
+    let holdFirstCall: boolean;
     const seen: Array<{ headers: Record<string, unknown>; body: { method?: string } }> = [];
 
     beforeEach(async () => {
       seen.length = 0;
+      serverStream = null;
+      holdFirstCall = false;
+      let heldCall: (() => void) | null = null;
       server = createServer((request, response) => {
+        if (request.method === 'GET') {
+          if (serverStream === null) {
+            response.writeHead(405).end();
+            return;
+          }
+          response.writeHead(200, { 'content-type': 'text/event-stream' });
+          response.write(`data: ${serverStream}\n\n`);
+          return;
+        }
         let body = '';
         request.on('data', (chunk: Buffer) => { body += chunk.toString(); });
         request.on('end', () => {
@@ -115,9 +162,17 @@ describe('mcp-tape script (ADR-0023 D6)', () => {
             response.writeHead(200, { 'content-type': 'application/json' })
               .end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { tools: [{ name: 'read_record' }] } }));
           } else {
-            response.writeHead(200, { 'content-type': 'text/event-stream' });
-            response.write(`event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: `record ${message.params?.arguments?.subject}` }] } })}\n\n`);
-            response.end();
+            const answer = () => {
+              response.writeHead(200, { 'content-type': 'text/event-stream' });
+              response.write(`event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: `record ${message.params?.arguments?.subject}` }] } })}\n\n`);
+              response.end();
+            };
+            if (holdFirstCall && heldCall === null) {
+              heldCall = answer;
+            } else {
+              answer();
+              heldCall?.();
+            }
           }
         });
       });
@@ -137,11 +192,26 @@ describe('mcp-tape script (ADR-0023 D6)', () => {
 
       expect(answers.map((answer) => answer.id)).toEqual([1, 2, 3]);
       expect(seen.map((request) => request.headers['x-key'])).toEqual(['k-1', 'k-1', 'k-1', 'k-1']);
+      expect(seen[0]!.body.method).toBe('initialize');
       expect(seen.slice(1).map((request) => request.headers['mcp-session-id'])).toEqual(['session-1', 'session-1', 'session-1']);
       expect(await readRecordedTape(tapePath)).toEqual({
         tools: [{ name: 'read_record' }],
         calls: [{ tool: 'read_record', arguments: { subject: '1001' }, result: { content: [{ type: 'text', text: 'record 1001' }] } }],
       });
+    });
+
+    it('posts calls in parallel, so one the server holds back never blocks the next', async () => {
+      holdFirstCall = true;
+      const answers = await converse(dir, ['record-http', join(dir, 'email.tape.jsonl'), url], [INITIALIZE, INITIALIZED, callFor(3, '1001'), callFor(4, '1002')]);
+
+      expect(answers.filter((answer) => answer.id === 3 || answer.id === 4).map((answer) => answer.id)).toEqual([4, 3]);
+    });
+
+    it('relays what the server sends on its own stream once the session is initialized', async () => {
+      serverStream = JSON.stringify({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' });
+      const answers = await converse(dir, ['record-http', join(dir, 'email.tape.jsonl'), url], [INITIALIZE, INITIALIZED, LIST], {}, 'notifications/tools/list_changed');
+
+      expect(answers).toContainEqual({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' });
     });
   });
 });

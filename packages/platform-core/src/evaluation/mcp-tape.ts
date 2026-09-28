@@ -1,12 +1,13 @@
 import type { AgentTrajectoryEntry } from '../schemas/agent-trajectory';
 import type { EvalRunMcpReport } from '../schemas/eval-run';
-import { McpReplayMissSchema, type McpReplayMiss, type McpTape, type McpTapeCall } from '../schemas/evaluation';
+import { McpReplayMissSchema, type McpEvalServerPolicy, type McpReplayMiss, type McpTape, type McpTapeCall } from '../schemas/evaluation';
 
 /** The Agent Trajectory entry a replayed call no recording answered becomes. */
 export const MCP_REPLAY_MISS_ENTRY_TYPE = 'mcp_replay_miss';
 
-export function mcpReplayMissEntry(miss: McpReplayMiss): AgentTrajectoryEntry {
-  return { ts: new Date().toISOString(), type: MCP_REPLAY_MISS_ENTRY_TYPE, server: miss.server, tool: miss.tool, input: miss.arguments };
+/** `ts` is when the agent made the call. */
+export function mcpReplayMissEntry(miss: McpReplayMiss, ts: string): AgentTrajectoryEntry {
+  return { ts, type: MCP_REPLAY_MISS_ENTRY_TYPE, server: miss.server, tool: miss.tool, input: miss.arguments };
 }
 
 /** The replay misses an Agent Trajectory records. */
@@ -54,6 +55,18 @@ export function mergeMcpTapes(tapes: readonly McpTape[]): McpTape {
     for (const [key, calls] of recorded) callsByKey.set(key, calls);
   }
   return { tools, calls: [...callsByKey.values()].flat() };
+}
+
+/** The servers of a frozen MCP eval policy by the mode each ran in, each list sorted. */
+export function mcpServersByMode(policy: Record<string, McpEvalServerPolicy>): Pick<EvalRunMcpReport, 'live' | 'replayed' | 'denied'> {
+  const serversIn = (mode: McpEvalServerPolicy['mode']) =>
+    Object.entries(policy).filter(([, server]) => server.mode === mode).map(([name]) => name).sort();
+  return { live: serversIn('live'), replayed: serversIn('replay'), denied: serversIn('deny') };
+}
+
+/** The MCP eval policy an Eval Run froze — and a Step Qualification cites — in a sentence. */
+export function describeMcpPolicy(policy: Record<string, McpEvalServerPolicy>): string {
+  return describeMcpReport({ ...mcpServersByMode(policy), unrecordedCalls: [] });
 }
 
 /** How an Eval Run's trials reached MCP servers, in a sentence: every mode in use, and what replay could not answer. */

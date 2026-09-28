@@ -14,6 +14,17 @@ import type {
   SourceApproval,
 } from '../schemas/evaluation';
 
+export interface McpRecordingFilter {
+  caseId?: string;
+  server?: string;
+  limit?: number;
+}
+
+export interface McpRecordedCase {
+  server: string;
+  caseId: string;
+}
+
 /**
  * Storage for the Evaluation domain (ADR-0023): Briefs, Evaluators and their
  * versions, Eval Cases, frozen Eval Dataset versions, MCP eval policies and
@@ -57,8 +68,10 @@ export interface EvaluationRepository {
   putMcpPolicy(policy: McpEvalPolicy): Promise<McpEvalPolicy>;
 
   appendMcpRecording(recording: McpRecording): Promise<void>;
-  /** Oldest first; narrowed to one case and one server when `filter` names them. */
-  listMcpRecordings(step: EvaluatedStep, filter?: { caseId?: string; server?: string }): Promise<McpRecording[]>;
+  /** Oldest first; narrowed to one case and one server when `filter` names them, and to the newest `limit`. */
+  listMcpRecordings(step: EvaluatedStep, filter?: McpRecordingFilter): Promise<McpRecording[]>;
+  /** Each server and Eval Case the Step has a recording for, once — without the tapes. */
+  listMcpRecordedCases(step: EvaluatedStep): Promise<McpRecordedCase[]>;
 
   appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion>;
   /** Newest first. */

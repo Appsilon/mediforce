@@ -1,14 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import { loadEvaluatedStep } from '../evaluated-step';
-import { canonicalJson, changedFingerprintComponents, computeStepFingerprint } from '../step-fingerprint';
+import { changedFingerprintComponents, computeStepFingerprint } from '../step-fingerprint';
 import { evaluationFixture, STEP } from '../../__tests__/fixture';
-
-describe('canonicalJson', () => {
-  it('sorts keys at every depth and drops undefined values', () => {
-    expect(canonicalJson({ b: 1, a: { d: [2, { f: 3, e: undefined }], c: null } })).toBe('{"a":{"c":null,"d":[2,{"f":3}]},"b":1}');
-  });
-});
 
 describe('computeStepFingerprint', () => {
   async function loaded() {

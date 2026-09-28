@@ -1,4 +1,4 @@
-import type { EvaluationRepository } from '../interfaces/evaluation-repository';
+import type { EvaluationRepository, McpRecordedCase, McpRecordingFilter } from '../interfaces/evaluation-repository';
 import {
   EvalRunSchema,
   EvalTrialSchema,
@@ -169,12 +169,21 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     this.recordings.push(McpRecordingSchema.parse(recording));
   }
 
-  async listMcpRecordings(step: EvaluatedStep, filter: { caseId?: string; server?: string } = {}): Promise<McpRecording[]> {
-    return this.recordings
+  async listMcpRecordings(step: EvaluatedStep, filter: McpRecordingFilter = {}): Promise<McpRecording[]> {
+    const rows = this.recordings
       .filter((row) => sameStep(row, step)
         && (filter.caseId === undefined || row.caseId === filter.caseId)
         && (filter.server === undefined || row.server === filter.server))
       .sort((left, right) => left.recordedAt.localeCompare(right.recordedAt));
+    return filter.limit === undefined ? rows : rows.slice(-filter.limit);
+  }
+
+  async listMcpRecordedCases(step: EvaluatedStep): Promise<McpRecordedCase[]> {
+    const seen = new Map<string, McpRecordedCase>();
+    for (const row of this.recordings) {
+      if (sameStep(row, step)) seen.set(`${row.server}\u0000${row.caseId}`, { server: row.server, caseId: row.caseId });
+    }
+    return [...seen.values()];
   }
 
   async appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> {

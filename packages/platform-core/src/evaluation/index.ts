@@ -7,10 +7,10 @@ export {
 } from './trust';
 export { inlineMcpServerNames, mcpEvalRestrictions } from './mcp-eval-restrictions';
 export {
-  MCP_REPLAY_MISS_ENTRY_TYPE,
   canonicalJson,
+  describeMcpPolicy,
   describeMcpReport,
-  mcpCallKey,
+  mcpServersByMode,
   mcpReplayMissEntry,
   mcpReplayMissesOf,
   mergeMcpTapes,

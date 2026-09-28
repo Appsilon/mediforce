@@ -2,6 +2,9 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { McpTapeCallSchema, type McpReplayMiss, type McpTape } from '@mediforce/platform-core';
 
+/** Where an eval trial's MCP record/replay files live, inside the output directory. Never an Output File. */
+export const MCP_TAPE_DIR = 'mcp-tape';
+
 /**
  * MCP record/replay for eval trials (ADR-0023 D6): a dependency-free Node
  * script the agent's `mcp-config.json` starts in place of a server. It is
@@ -103,11 +106,37 @@ function recordStdio(command, args) {
   });
 }
 
+function events(response, onData, more) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  const next = async () => {
+    while (more()) {
+      const { value, done } = await reader.read();
+      if (done) return;
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+      let boundary = buffer.indexOf('\n\n');
+      while (boundary !== -1) {
+        const data = buffer.slice(0, boundary).split('\n')
+          .filter((field) => field.startsWith('data:'))
+          .map((field) => field.slice(5).replace(/^ /, ''))
+          .join('\n');
+        buffer = buffer.slice(boundary + 2);
+        if (data !== '') onData(data);
+        boundary = buffer.indexOf('\n\n');
+      }
+    }
+  };
+  return next().finally(() => reader.cancel().catch(() => undefined));
+}
+
 function recordHttp(url) {
   const headers = JSON.parse(process.env.MCP_TAPE_HEADERS || '{}');
   const recorder = createRecorder();
+  const stopped = new AbortController();
   let sessionId = null;
   let protocolVersion = null;
+  let listening = false;
 
   const deliver = (message) => {
     if (message.result && typeof message.result.protocolVersion === 'string') protocolVersion = message.result.protocolVersion;
@@ -119,16 +148,37 @@ function recordHttp(url) {
       if (isRequest(message)) send({ jsonrpc: '2.0', id: message.id, error: { code: -32000, message: reason } });
     }
   };
+  const requestHeaders = (accept) => {
+    const result = { ...headers, accept };
+    if (sessionId !== null) result['mcp-session-id'] = sessionId;
+    if (protocolVersion !== null) result['mcp-protocol-version'] = protocolVersion;
+    return result;
+  };
+
+  // The server's own messages — list_changed, sampling, elicitation — arrive on
+  // a standing GET stream, once the session is initialized. A server without
+  // one answers 405, and then there is nothing to relay.
+  async function listen() {
+    listening = true;
+    try {
+      const response = await fetch(url, { method: 'GET', headers: requestHeaders('text/event-stream'), signal: stopped.signal });
+      if (!response.ok || !(response.headers.get('content-type') || '').includes('text/event-stream')) return;
+      await events(response, (data) => { for (const message of parseMessages(data)) deliver(message); }, () => true);
+    } catch {
+      // Closed on exit, or the server dropped it: the agent keeps working over POST.
+    }
+  }
 
   async function post(line) {
     const messages = parseMessages(line);
     for (const message of messages) recorder.request(message);
     const unanswered = new Set(messages.filter(isRequest).map((message) => JSON.stringify(message.id)));
-    const requestHeaders = { ...headers, 'content-type': 'application/json', accept: 'application/json, text/event-stream' };
-    if (sessionId !== null) requestHeaders['mcp-session-id'] = sessionId;
-    if (protocolVersion !== null) requestHeaders['mcp-protocol-version'] = protocolVersion;
     try {
-      const response = await fetch(url, { method: 'POST', headers: requestHeaders, body: line });
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...requestHeaders('application/json, text/event-stream'), 'content-type': 'application/json' },
+        body: line,
+      });
       const session = response.headers.get('mcp-session-id');
       if (session !== null) sessionId = session;
       if (!response.ok) {
@@ -143,41 +193,34 @@ function recordHttp(url) {
         }
       };
       if ((response.headers.get('content-type') || '').includes('text/event-stream')) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        while (unanswered.size > 0) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
-          let boundary = buffer.indexOf('\n\n');
-          while (boundary !== -1) {
-            const data = buffer.slice(0, boundary).split('\n')
-              .filter((field) => field.startsWith('data:'))
-              .map((field) => field.slice(5).replace(/^ /, ''))
-              .join('\n');
-            buffer = buffer.slice(boundary + 2);
-            if (data !== '') receive(data);
-            boundary = buffer.indexOf('\n\n');
-          }
-        }
-        await reader.cancel().catch(() => undefined);
+        await events(response, receive, () => unanswered.size > 0);
       } else {
         const body = await response.text();
         if (body.trim() !== '') receive(body);
       }
+      if (listening === false && messages.some((message) => message.method === 'notifications/initialized')) listen();
     } catch (error) {
       fail(messages, 'MCP server unreachable: ' + (error instanceof Error ? error.message : String(error)));
     }
   }
 
-  let queue = Promise.resolve();
+  // Each message is posted as it arrives, so parallel tool calls stay parallel
+  // and the agent's answer to a server request inside a stream is never held
+  // behind that stream. Only initialize goes first: its answer carries the session.
+  const inFlight = new Set();
+  let initialized = Promise.resolve();
   createInterface({ input: process.stdin })
     .on('line', (line) => {
-      queue = queue.then(() => post(line));
+      const initializing = parseMessages(line).some((message) => message.method === 'initialize');
+      const posted = (initializing ? post(line) : initialized.then(() => post(line))).finally(() => inFlight.delete(posted));
+      if (initializing) initialized = posted;
+      inFlight.add(posted);
     })
     .on('close', () => {
-      queue.then(() => exitAfterFlush(0));
+      Promise.all(inFlight).then(() => {
+        stopped.abort();
+        exitAfterFlush(0);
+      });
     });
 }
 
@@ -203,7 +246,7 @@ function replay(missesPath) {
       const key = params.name + ' ' + canonical(args);
       const matches = tape.calls.filter((call) => call.tool + ' ' + canonical(call.arguments) === key);
       if (matches.length === 0) {
-        append(missesPath, { tool: params.name, arguments: args });
+        append(missesPath, { ts: new Date().toISOString(), tool: params.name, arguments: args });
         send({ jsonrpc: '2.0', id, result: { isError: true, content: [{ type: 'text', text:
           'No recorded response for ' + params.name + ' with these arguments. This eval trial replays the MCP '
           + 'responses a live trial of the same Eval Case recorded, and this call was not among them.' }] } });
@@ -239,8 +282,9 @@ async function readLines(path: string): Promise<unknown[] | null> {
   let text: string;
   try {
     text = await readFile(path, 'utf-8');
-  } catch {
-    return null;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
   }
   return text.split('\n').flatMap((line) => {
     if (line.trim() === '') return [];
@@ -274,12 +318,14 @@ export async function readRecordedTape(path: string): Promise<McpTape | null> {
   return tape;
 }
 
-const MissLineSchema = z.object({ tool: z.string().min(1), arguments: z.record(z.string(), z.unknown()) });
+const MissLineSchema = z.object({ ts: z.iso.datetime(), tool: z.string().min(1), arguments: z.record(z.string(), z.unknown()) });
 
-/** The calls `replay` could not answer from its tape. */
-export async function readReplayMisses(path: string, server: string): Promise<McpReplayMiss[]> {
+/** The calls `replay` could not answer from its tape, each with when it was made. */
+export async function readReplayMisses(path: string, server: string): Promise<{ ts: string; miss: McpReplayMiss }[]> {
   return ((await readLines(path)) ?? []).flatMap((line) => {
     const parsed = MissLineSchema.safeParse(line);
-    return parsed.success ? [{ server, ...parsed.data }] : [];
+    if (!parsed.success) return [];
+    const { ts, ...call } = parsed.data;
+    return [{ ts, miss: { server, ...call } }];
   });
 }

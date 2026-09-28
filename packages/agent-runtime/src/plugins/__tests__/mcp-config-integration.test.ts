@@ -764,7 +764,7 @@ describe('writeMcpConfig integration', () => {
         JSON.stringify({ kind: 'tools', tools: [{ name: 'lookup' }], cursor: null }),
         JSON.stringify({ kind: 'call', tool: 'lookup', arguments: { term: 'Sepsis' }, result: { content: [{ type: 'text', text: '10040047' }] } }),
       ].join('\n'));
-      await writeFile(join(tmpDir, 'mcp-tape', 'edc.misses.jsonl'), `${JSON.stringify({ tool: 'read_record', arguments: { subject: '1001' } })}\n`);
+      await writeFile(join(tmpDir, 'mcp-tape', 'edc.misses.jsonl'), `${JSON.stringify({ ts: '2026-09-28T10:00:00.000Z', tool: 'read_record', arguments: { subject: '1001' } })}\n`);
 
       await (plugin as unknown as CollectTarget).collectMcpTapes(tmpDir);
 
@@ -773,7 +773,7 @@ describe('writeMcpConfig integration', () => {
         calls: [{ tool: 'lookup', arguments: { term: 'Sepsis' }, result: { content: [{ type: 'text', text: '10040047' }] } }],
       });
       expect(record).toHaveBeenCalledWith([
-        expect.objectContaining({ type: 'mcp_replay_miss', server: 'edc', tool: 'read_record', input: { subject: '1001' } }),
+        { ts: '2026-09-28T10:00:00.000Z', type: 'mcp_replay_miss', server: 'edc', tool: 'read_record', input: { subject: '1001' } },
       ]);
 
       await cleanup();
