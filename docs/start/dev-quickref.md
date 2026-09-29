@@ -78,6 +78,10 @@ Playwright's `globalSetup` applies migrations and starts the mock OAuth server a
 scripted mock OpenRouter (`E2E_OPENROUTER_MOCK_PORT`, default 9019) —
 no separate migration step before `pnpm test:e2e`.
 
+The GEPA optimisation job runs on the host's `python3` under `ALLOW_LOCAL_AGENTS`,
+so its L1 test and L3 journey need `pip install gepa`; without it they are
+skipped, with that reason.
+
 **Your dev data is safe.** The suite deletes only the workspace handles it owns
 (`test`, `tenant-a`, `tenant-b`, plus per-journey handles and prefixes); FK
 cascade does the rest. Your personal namespace is never touched. A journey that

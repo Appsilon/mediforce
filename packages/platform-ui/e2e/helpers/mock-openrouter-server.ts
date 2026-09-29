@@ -6,8 +6,9 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
  * LLM judges answer from a script instead of a model.
  *
  * A journey scripts its turns under a key — the first user message of the
- * conversation it will send — so journeys running in parallel never draw from
- * each other's script:
+ * conversation it will send, or a unique text that message contains (a GEPA
+ * reflection prompt quotes the step's prompt) — so journeys running in
+ * parallel never draw from each other's script:
  *
  *   POST /__script   { key, turns: [{ content?, toolCalls?: [{ name, arguments }] }] }
  *   GET  /__requests?key=…   every chat request received under that key
@@ -79,7 +80,10 @@ export async function startMockOpenRouter(): Promise<MockOpenRouterHandle> {
       }
       if (req.method === 'POST' && url.pathname.endsWith('/chat/completions')) {
         const request = (await readJson(req)) as ChatRequest;
-        const key = request.messages.find((message) => message.role === 'user')?.content ?? '';
+        const firstUserMessage = request.messages.find((message) => message.role === 'user')?.content ?? '';
+        const key = scripts.has(firstUserMessage)
+          ? firstUserMessage
+          : [...scripts.keys()].find((scripted) => scripted !== '' && firstUserMessage.includes(scripted)) ?? firstUserMessage;
         received.get(key)?.push(request);
         const turn = scripts.get(key)?.shift() ?? { content: 'No scripted reply.' };
         const lastTool = [...request.messages].reverse().find((message) => message.role === 'tool');

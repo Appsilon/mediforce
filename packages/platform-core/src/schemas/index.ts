@@ -249,6 +249,15 @@ export {
 } from './eval-run';
 
 export {
+  EvalOptimisationStatusSchema,
+  OptimisationCandidateSchema,
+  EvalOptimisationSchema,
+  type EvalOptimisationStatus,
+  type OptimisationCandidate,
+  type EvalOptimisation,
+} from './eval-optimisation';
+
+export {
   QualificationDeviationSchema,
   ElectronicSignatureSchema,
   StepQualificationSchema,
