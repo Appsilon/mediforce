@@ -203,6 +203,10 @@ export {
   signStepQualification,
   getEvalRunFailures,
   applyVariantToStep,
+  startOptimisation,
+  getOptimisation,
+  listOptimisations,
+  failStaleOptimisations,
   computeStepFingerprint,
   changedFingerprintComponents,
 } from './evaluation/index';

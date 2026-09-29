@@ -136,6 +136,15 @@ trial's variant); the driver does not know variants exist. Applying a variant to
 (`apply-step-variant.ts`) saves it through `registerWorkflow`, not a second write path, so a
 qualification carries over exactly when the saved step's Fingerprint equals the variant's.
 `getEvalRunFailures` is the assistant's `get_failures` and `mediforce eval failures`.
+A GEPA optimisation (`optimisations.ts`) is the start handler's grant, a
+background job, then an ordinary Eval Run: `startOptimisation` validates and
+records it `proposing`, then answers; `proposeAndEvaluate` builds the reflective
+dataset from the source run's dev-case trials (`_lib/reflective-dataset.ts`),
+runs agent-runtime's `runGepaJob`, prices it, and prepares and starts the
+candidates' Eval Run with what is left of the budget through `prepareEvalRun`
+and `startEvalRun`, not a second path. Each move is a conditional transition, and
+the heartbeat fails one whose job outlived its timeout (`failStaleOptimisations`).
+The ranking (`_lib/optimisation-results.ts`) is computed from that run's Scores on read.
 
 **A Step Qualification binds a Step Fingerprint.** `_lib/step-fingerprint.ts`
 hashes each part of a step that shapes its behaviour on its own, so the badge
@@ -166,7 +175,8 @@ the core.
 
 A request may grant the Evaluation Assistant an unattended budget
 (`unattendedBudgetUsd`): `start_eval_run` then starts prepared runs of the step
-that fit what is left of it, as a person confirming each run's budget
+that fit what is left of it, as a person confirming each run's budget, and
+`start_optimisation` starts GEPA optimisations whose budgets fit it
 (`UnattendedGrant` in `_lib/run-evaluation-tool.ts`); the grant is recorded on the
 request's prompt audit event.
 

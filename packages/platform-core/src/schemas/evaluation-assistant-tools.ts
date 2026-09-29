@@ -323,6 +323,27 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
    * budget for this request and the run's budget fits what is left of it.
    */
   start_eval_run: z.object({ evalRunId: z.string().min(1) }),
+  /** The step's GEPA optimisations, newest first. */
+  list_optimisations: NoArguments,
+  /** One GEPA optimisation: its status and spend, the step as it is, and its candidate prompts ranked by dev pass rate with their holdout results. */
+  get_optimisation: z.object({ optimisationId: z.uuid() }),
+  /**
+   * Start a GEPA optimisation of the step's prompt from a finished Eval Run:
+   * a job reflects on one variant's dev-case trials and proposes prompts, which
+   * then run as challengers over dev and holdout. Refused unless the person
+   * granted an unattended budget for this request and budgetUsd fits what is
+   * left of it.
+   */
+  start_optimisation: z.object({
+    evalRunId: z.uuid(),
+    variantId: z.string().min(1).optional().describe('The variant whose dev-case trials GEPA reflects on; defaults to the champion.'),
+    budgetUsd: z.number().positive().max(10_000)
+      .describe('What the job and the candidates\' Eval Run may spend together; counted against the unattended budget.'),
+    candidates: z.number().int().min(1).max(3).optional().describe('Prompts to propose (default 3).'),
+    trialsPerCase: z.number().int().min(1).max(10).optional().describe('Trials per case in the candidates\' Eval Run (default 1).'),
+    reflectionModel: z.string().min(1).optional()
+      .describe('The model the job reflects with; the assistant\'s default model when absent. It must have a registry price.'),
+  }),
 } as const;
 
 export type EvaluationAssistantProposalToolName = keyof typeof EVALUATION_ASSISTANT_PROPOSAL_TOOLS;

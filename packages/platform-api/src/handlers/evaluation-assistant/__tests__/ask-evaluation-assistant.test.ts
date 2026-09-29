@@ -79,6 +79,7 @@ describe('askEvaluationAssistant', () => {
       }],
       preparedEvalRuns: [],
       startedEvalRuns: [],
+      startedOptimisations: [],
     });
     expect(requests[0]!.messages.some((message) => message.content.includes('A missed grade 5 is critical.'))).toBe(true);
     expect(await fixture.evaluationRepo.listEvaluators(STEP)).toEqual([]);

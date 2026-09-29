@@ -15,12 +15,18 @@ import {
   type McpEvalServerPolicy,
   type StepFingerprintComponent,
 } from '@mediforce/platform-core';
-import { EvalChallengerSchema, type EvalChallenger, type EvaluatorView, type PreparedEvalRun } from '@mediforce/platform-api/contract';
+import {
+  EvalChallengerSchema,
+  type EvalChallenger,
+  type EvaluatorView,
+  type OptimisationSplitResult,
+  type PreparedEvalRun,
+} from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
-import { useEvalRun, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
+import { useEvalRun, useOptimisation, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { EvalRunReport, describePatch } from './eval-run-report';
 import { QualificationStatusChip } from './step-qualification-badge';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
@@ -670,6 +676,131 @@ export function EvalRunsSection({ step, data, mayRun, runReason, mayEdit, editRe
                   editReason={editReason}
                 />
               </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
+  );
+}
+
+function splitText(result: OptimisationSplitResult): string {
+  if (result.cases === 0) return 'no cases';
+  if (result.passRate === null) return 'not graded';
+  return `${result.passes}/${result.graded} · ${(result.passRate * 100).toFixed(0)}% [${((result.wilsonLower ?? 0) * 100).toFixed(0)}–${((result.wilsonUpper ?? 0) * 100).toFixed(0)}%]`;
+}
+
+function OptimisationRow({ optimisationId, open, onOpen }: { optimisationId: string; open: boolean; onOpen: () => void }) {
+  const detail = useOptimisation(open ? optimisationId : null);
+  const output = detail.data;
+  return (
+    <div>
+      <button type="button" className="text-left text-xs font-mono hover:underline" onClick={onOpen}>{optimisationId.slice(0, 8)}</button>
+      {open && (output === undefined ? <Loading /> : (
+        <div className="mt-2 space-y-2 text-xs" data-testid="optimisation-detail">
+          <p className="text-muted-foreground">
+            {output.optimisation.status} · {output.spentUsd === null ? 'spend unknown' : `$${output.spentUsd.toFixed(2)}`} of ${output.optimisation.budgetUsd}
+            {output.optimisation.jobCostUsd !== null && ` (job $${output.optimisation.jobCostUsd})`}
+            {output.evalRun !== null && ` · Eval Run ${output.evalRun.id.slice(0, 8)} ${output.evalRun.status}`}
+          </p>
+          {output.optimisation.error !== null && <p className="text-destructive">{output.optimisation.error}</p>}
+          {output.baseline !== null && (
+            <table className="w-full">
+              <thead className="text-left text-muted-foreground">
+                <tr><th className="font-normal">#</th><th className="font-normal">Variant</th><th className="font-normal">Dev</th><th className="font-normal">Holdout</th></tr>
+              </thead>
+              <tbody>
+                <tr><td /><td>{output.baseline.label}</td><td>{splitText(output.baseline.dev)}</td><td>{splitText(output.baseline.holdout)}</td></tr>
+                {output.ranking.map((candidate) => (
+                  <tr key={candidate.variantId} data-testid="optimisation-candidate" className="align-top">
+                    <td>{candidate.rank}</td>
+                    <td>
+                      <details>
+                        <summary className="cursor-pointer">{candidate.label} <span className="font-mono text-muted-foreground">{candidate.variantId}</span></summary>
+                        <pre className="mt-1 whitespace-pre-wrap font-mono">{candidate.prompt}</pre>
+                      </details>
+                    </td>
+                    <td>{splitText(candidate.dev)}</td>
+                    <td>{splitText(candidate.holdout)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {output.ranking.length > 0 && (
+            <p className="text-muted-foreground">Apply a candidate from its Eval Run&apos;s report (Eval Runs above).</p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * GEPA optimisations of the Step's prompt (ADR-0023 D15): start one from a
+ * finished Eval Run with a budget — the person's grant, the workflow's `run`
+ * verb — and read its candidates ranked by holdout, then dev pass rate.
+ */
+export function OptimisationsSection({ step, data, runs, mayRun }: {
+  step: EvaluatedStep;
+  data: StepEvaluation['optimisations'];
+  runs: StepEvaluation['runs'];
+  mayRun: boolean;
+}) {
+  const finished = (runs.data?.evalRuns ?? []).filter((run) => run.status !== 'prepared' && run.status !== 'running');
+  const [evalRunId, setEvalRunId] = React.useState('');
+  const [budget, setBudget] = React.useState('');
+  const [candidates, setCandidates] = React.useState(3);
+  const [openId, setOpenId] = React.useState<string | null>(null);
+  const start = useStepEvaluationMutation(step, () => mediforce.evaluation.startOptimisation({
+    ...step,
+    evalRunId: evalRunId === '' ? finished[0]!.id : evalRunId,
+    budgetUsd: Number(budget),
+    candidates,
+  }));
+  const optimisations = data.data?.optimisations ?? [];
+
+  return (
+    <Section title="Optimisations">
+      {mayRun && finished.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <label className="flex items-center gap-1">From Eval Run
+            <select className={inputClass} value={evalRunId} onChange={(event) => setEvalRunId(event.target.value)}>
+              {finished.map((run) => <option key={run.id} value={run.id}>{run.id.slice(0, 8)} · {run.createdAt.slice(0, 16).replace('T', ' ')}</option>)}
+            </select>
+          </label>
+          <label className="flex items-center gap-1">Candidates
+            <input type="number" min={1} max={3} className={cn(inputClass, 'w-14')} value={candidates} onChange={(event) => setCandidates(Number(event.target.value))} />
+          </label>
+          <label className="flex items-center gap-1">Budget $
+            <input type="number" min={0} step={0.01} className={cn(inputClass, 'w-24')} value={budget} onChange={(event) => setBudget(event.target.value)} />
+          </label>
+          <button
+            type="button"
+            className={buttonClass}
+            disabled={start.isPending || Number(budget) > 0 === false}
+            onClick={() => start.mutate(undefined)}
+          >Optimise prompt</button>
+          {start.error !== null && <span className="text-destructive">{start.error.message}</span>}
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">
+        GEPA reflects on the dev-case trials of an Eval Run and proposes prompts, which run as challengers over dev and holdout. The job and that run spend at most the budget.
+      </p>
+      {data.isLoading ? <Loading /> : optimisations.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No optimisations yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {optimisations.map((optimisation) => (
+            <li key={optimisation.id} className="text-sm">
+              <span className="text-xs text-muted-foreground">
+                {optimisation.createdAt.slice(0, 16).replace('T', ' ')} · {optimisation.status} · budget ${optimisation.budgetUsd} · {optimisation.candidates.length} candidate(s)
+              </span>
+              <OptimisationRow
+                optimisationId={optimisation.id}
+                open={openId === optimisation.id}
+                onOpen={() => setOpenId(openId === optimisation.id ? null : optimisation.id)}
+              />
             </li>
           ))}
         </ul>

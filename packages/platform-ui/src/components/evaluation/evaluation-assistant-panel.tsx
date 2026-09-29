@@ -8,7 +8,7 @@ import type {
   EvaluationAssistantPlatformToolName,
   EvaluationAssistantProposalToolName,
 } from '@mediforce/platform-core';
-import type { EvaluationAssistantProgress, PreparedEvalRun, ProposalView, StartedEvalRun } from '@mediforce/platform-api/contract';
+import type { EvaluationAssistantProgress, PreparedEvalRun, ProposalView, StartedEvalRun, StartedOptimisation } from '@mediforce/platform-api/contract';
 import { useQueryClient } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
@@ -51,6 +51,7 @@ interface PanelMessage {
   readonly proposals?: ProposalState[];
   readonly prepared?: PreparedEvalRun[];
   readonly started?: StartedEvalRun[];
+  readonly startedOptimisations?: StartedOptimisation[];
   readonly steps?: ActivityStep[];
 }
 
@@ -85,6 +86,9 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   propose_acceptance_criteria: 'Drafting Acceptance Criteria',
   propose_control_settings: 'Recommending routing',
   get_failures: 'Reading an eval run\'s failures',
+  list_optimisations: 'Listing optimisations',
+  get_optimisation: 'Reading an optimisation',
+  start_optimisation: 'Starting a GEPA optimisation',
   propose_diagnosis: 'Diagnosing the failures',
   propose_fix: 'Drafting a fix',
 };
@@ -200,7 +204,7 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
           setActivity(turnActivity);
         },
       });
-      if (result.preparedEvalRuns.length > 0 || result.startedEvalRuns.length > 0) {
+      if (result.preparedEvalRuns.length > 0 || result.startedEvalRuns.length > 0 || result.startedOptimisations.length > 0) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId) });
       }
       setMessages([...thread, {
@@ -209,6 +213,7 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
         proposals: result.proposals.map((proposal) => ({ proposal, status: 'open' as const })),
         prepared: result.preparedEvalRuns,
         started: result.startedEvalRuns,
+        startedOptimisations: result.startedOptimisations,
         steps: turnActivity.steps,
       }]);
     } catch (err) {
@@ -335,6 +340,11 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
               {message.started?.map((started) => (
                 <p key={started.evalRunId} className="rounded-md border bg-background p-2.5 text-xs" data-testid="started-eval-run">
                   Started Eval Run <span className="font-mono">{started.evalRunId.slice(0, 8)}</span> with a budget of ${started.budgetUsd}. Follow it in the Eval Runs list.
+                </p>
+              ))}
+              {message.startedOptimisations?.map((started) => (
+                <p key={started.optimisationId} className="rounded-md border bg-background p-2.5 text-xs" data-testid="started-optimisation">
+                  Started GEPA optimisation <span className="font-mono">{started.optimisationId.slice(0, 8)}</span> with a budget of ${started.budgetUsd}. Follow it under Optimisations.
                 </p>
               ))}
               {message.prepared?.map((prepared) => <StartEvalRunCard key={prepared.evalRunId} step={step} prepared={prepared} mayRun={mayRun} runReason={runReason} />)}

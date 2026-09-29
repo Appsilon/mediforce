@@ -9,6 +9,11 @@ import {
 } from '../schemas/eval-run';
 import { StepQualificationSchema, type StepQualification } from '../schemas/step-qualification';
 import {
+  EvalOptimisationSchema,
+  type EvalOptimisation,
+  type EvalOptimisationStatus,
+} from '../schemas/eval-optimisation';
+import {
   AcceptanceCriteriaVersionSchema,
   type AcceptanceCriteriaVersion,
   EvalCaseSchema,
@@ -52,6 +57,7 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
   private readonly qualifications: StepQualification[] = [];
   private readonly runs = new Map<string, EvalRun>();
   private readonly trials = new Map<string, EvalTrial>();
+  private readonly optimisations = new Map<string, EvalOptimisation>();
 
   async appendBrief(brief: EvaluationBrief): Promise<EvaluationBrief> {
     const parsed = EvaluationBriefSchema.parse(brief);
@@ -275,6 +281,31 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     if (trial === undefined || trial.status !== 'scoring' || trial.scoringStartedAt === null) return false;
     if (Date.parse(trial.scoringStartedAt) >= Date.parse(staleBefore)) return false;
     this.trials.set(id, { ...trial, scoringStartedAt: now, scoringAttempts: trial.scoringAttempts + 1 });
+    return true;
+  }
+
+  async createOptimisation(optimisation: EvalOptimisation): Promise<void> {
+    this.optimisations.set(optimisation.id, EvalOptimisationSchema.parse(optimisation));
+  }
+
+  async getOptimisation(id: string): Promise<EvalOptimisation | null> {
+    return this.optimisations.get(id) ?? null;
+  }
+
+  async listOptimisations(step: EvaluatedStep): Promise<EvalOptimisation[]> {
+    return newestFirst([...this.optimisations.values()].filter((optimisation) => sameStep(optimisation, step)));
+  }
+
+  async listStaleProposingOptimisationIds(createdBefore: string): Promise<string[]> {
+    return [...this.optimisations.values()]
+      .filter((optimisation) => optimisation.status === 'proposing' && Date.parse(optimisation.createdAt) < Date.parse(createdBefore))
+      .map((optimisation) => optimisation.id);
+  }
+
+  async transitionOptimisation(id: string, from: EvalOptimisationStatus, next: EvalOptimisation): Promise<boolean> {
+    const current = this.optimisations.get(id);
+    if (current === undefined || current.status !== from) return false;
+    this.optimisations.set(id, EvalOptimisationSchema.parse(next));
     return true;
   }
 

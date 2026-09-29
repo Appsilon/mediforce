@@ -12,3 +12,18 @@ export async function scoresOfTrial(scope: CallerScope, run: EvalRun, trial: Eva
 export function isPass(score: Score): boolean {
   return score.value >= JUDGE_PASS_VALUE;
 }
+
+/**
+ * Whether a trial's Scores pass every counted Evaluator of the run; null when
+ * none counts or one of them did not grade it — a missing Score is not a pass.
+ */
+export function passedEveryCounted(run: EvalRun, scores: readonly Score[]): boolean | null {
+  const counted = new Set(run.evaluators.filter((evaluator) => evaluator.counted === true).map((evaluator) => evaluator.evaluatorId));
+  if (counted.size === 0) return null;
+  const graded = scores.filter((score) => score.evaluatorId !== null && counted.has(score.evaluatorId));
+  return new Set(graded.map((score) => score.evaluatorId)).size < counted.size ? null : graded.every(isPass);
+}
+
+export function mean(values: readonly number[]): number | null {
+  return values.length === 0 ? null : values.reduce((sum, value) => sum + value, 0) / values.length;
+}

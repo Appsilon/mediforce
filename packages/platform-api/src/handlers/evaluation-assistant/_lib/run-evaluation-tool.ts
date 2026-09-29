@@ -15,6 +15,7 @@ import {
 import { listCommitFiles, readCommitFile, resolveMcpForStep } from '@mediforce/agent-runtime';
 import type { CallerScope } from '../../../repositories/index';
 import { NotFoundError, ValidationError } from '../../../errors';
+import { StartOptimisationInputSchema } from '../../../contract/evaluation';
 import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
 import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
 import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
@@ -31,6 +32,7 @@ import { getEvalRunFailures } from '../../evaluation/eval-run-failures';
 import { previewEvaluator } from '../../evaluation/preview-evaluator';
 import { getAcceptanceCriteria } from '../../evaluation/acceptance-criteria';
 import { getStepQualification } from '../../evaluation/step-qualification';
+import { getOptimisation, listOptimisations, startOptimisation } from '../../evaluation/optimisations';
 
 type Tools = typeof EVALUATION_ASSISTANT_PLATFORM_TOOLS;
 type Args<Name extends EvaluationAssistantPlatformToolName> = z.infer<Tools[Name]>;
@@ -139,11 +141,13 @@ const MAX_LISTED_FILES = 300;
 
 /**
  * The unattended budget a person granted for one request (D15), and what it
- * has paid for so far — the runs started under it, and what is left.
+ * has paid for so far — the runs and optimisations started under it, and what
+ * is left.
  */
 export interface UnattendedGrant {
   remainingUsd: number;
   readonly started: Array<{ evalRunId: string; budgetUsd: number }>;
+  readonly startedOptimisations: Array<{ optimisationId: string; budgetUsd: number }>;
 }
 
 export interface EvaluationToolContext {
@@ -429,6 +433,58 @@ export async function executeEvaluationTool(
         started: { evalRunId, status: started.evalRun.status, budgetUsd: run.budgetUsd },
         unattendedBudgetLeftUsd: unattended.remainingUsd,
         note: 'The run is under way. Read its report with get_eval_run_report once it completes.',
+      };
+    }
+    case 'list_optimisations': {
+      const { optimisations } = await listOptimisations(step, scope);
+      return {
+        optimisations: optimisations.map((optimisation) => ({
+          id: optimisation.id,
+          status: optimisation.status,
+          createdAt: optimisation.createdAt,
+          sourceEvalRunId: optimisation.sourceEvalRunId,
+          budgetUsd: optimisation.budgetUsd,
+          candidates: optimisation.candidates.length,
+          evalRunId: optimisation.evalRunId,
+          error: optimisation.error,
+        })),
+      };
+    }
+    case 'get_optimisation': {
+      const { optimisationId } = args as Args<'get_optimisation'>;
+      const output = await getOptimisation({ optimisationId }, scope);
+      if (isSameStep(output.optimisation, step) === false) {
+        throw new NotFoundError(`Optimisation '${optimisationId}' is not an optimisation of this step`);
+      }
+      return {
+        status: output.optimisation.status,
+        error: output.optimisation.error,
+        budgetUsd: output.optimisation.budgetUsd,
+        spentUsd: output.spentUsd,
+        evalRun: output.evalRun,
+        baseline: output.baseline,
+        ranking: output.ranking.map((candidate) => ({ ...candidate, prompt: clip(candidate.prompt, 8000) })),
+      };
+    }
+    case 'start_optimisation': {
+      const { budgetUsd } = args as Args<'start_optimisation'>;
+      if (unattended === undefined) {
+        throw new ValidationError(
+          'An optimisation spends a budget only the person can grant: ask them to grant an unattended budget for this request, or to start it themselves with `mediforce eval optimise`.',
+        );
+      }
+      if (budgetUsd > unattended.remainingUsd) {
+        throw new ValidationError(
+          `This optimisation may spend up to $${budgetUsd}, but only $${unattended.remainingUsd.toFixed(2)} is left of the unattended budget the person granted for this request.`,
+        );
+      }
+      const { optimisation } = await startOptimisation(StartOptimisationInputSchema.parse({ ...step, ...(args as Args<'start_optimisation'>) }), scope);
+      unattended.remainingUsd = Math.round((unattended.remainingUsd - budgetUsd) * 100) / 100;
+      unattended.startedOptimisations.push({ optimisationId: optimisation.id, budgetUsd });
+      return {
+        started: { optimisationId: optimisation.id, status: optimisation.status, budgetUsd },
+        unattendedBudgetLeftUsd: unattended.remainingUsd,
+        note: 'GEPA is proposing prompts; they then run as challengers in an Eval Run. Read get_optimisation for the ranked candidates once that run completes.',
       };
     }
   }

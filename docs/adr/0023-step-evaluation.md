@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-09-28
+last_reviewed: 2026-09-29
 ---
 
 # 0023 — Step Evaluation: Evaluation Assistant, Evaluators, single-step Eval Runs, Step Qualification
@@ -176,6 +176,28 @@ fail on real outputs before proposing it. Every tool wraps a headless handler
   source, labelling calibration outputs — D9 and D10 require these to be human.
   Unattended fix attempts (Phase 4) run only under a budget the user grants per
   request.
+
+_Amended 2026-09-29 (Phase 5): a GEPA optimisation is such an attempt. Its
+budget is granted with the request that starts it — the person's own start, or
+an assistant request's unattended budget — and covers both its job, charged at
+the reflection model's registry price, and the Eval Run of its candidates, which
+starts with that grant as its confirmation. The job runs in its own container
+with network egress, for the reflection model, and the workspace's OpenRouter
+key; it reflects only on dev-case trials, since holdout cases are what its
+candidates are judged on. Applying a winner stays the person's._
+
+_The job runs one round of GEPA's reflective proposal step, not its evolution
+loop: each round's candidates become an Eval Run the person can read and stop,
+and the next round starts from its winner. A multi-round loop inside one job
+would spend without a checkpoint and could not be held to the grant call by
+call. For the same reason its input is narrow: the current prompt, the Evaluator
+feedback, and the tools a trajectory called — not their inputs and results,
+which would multiply the reflection prompt. A start is refused when the job's
+worst case (every call on the largest records at its full output allowance)
+leaves nothing of the grant. Candidates are ranked by holdout first, as the job
+fitted them to dev; since every round that picks a winner by holdout fits the
+prompt to it a little, the assistant suggests fresh holdout cases after a few
+rounds._
 
 **D16 — An Evaluation Brief states each Step's context of use.** A short,
 versioned text per Step — what it is for, who relies on its output, which

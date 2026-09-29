@@ -29,6 +29,15 @@ export { ensureStepImageBuilt } from './plugins/dry-run-image';
 export { OpenCodeAgentPlugin } from './plugins/opencode-agent-plugin';
 export { ScriptContainerPlugin } from './plugins/script-container-plugin';
 export { runCodeCheck, type CodeCheckRequest, type CodeCheckOutcome } from './plugins/code-check';
+export {
+  runGepaJob,
+  GEPA_JOB_IMAGE,
+  GEPA_REFLECTION_MINIBATCH_SIZE,
+  type GepaJobInput,
+  type GepaJobOutcome,
+  type GepaJobRequest,
+  type GepaReflectiveRecord,
+} from './plugins/gepa-job';
 export { DatabricksJobPlugin } from './plugins/databricks/databricks-job-plugin';
 export type { DatabricksJobPluginInit } from './plugins/databricks/databricks-job-plugin';
 export { DatabricksClient } from './plugins/databricks/databricks-client';

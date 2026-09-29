@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { InMemoryEvaluationRepository, STEP_FINGERPRINT_COMPONENTS, type StepFingerprint } from '@mediforce/platform-core';
 import type {
   EvalCase,
+  EvalOptimisation,
   EvalRun,
   EvaluatedStep,
   EvaluationRepository,
@@ -275,6 +276,48 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect(await repo.listEvalRunIdsToDrive()).toEqual([]);
     });
 
+    it('stores an optimisation, newest first per step, and moves it only from the expected status', async () => {
+      const optimisation: EvalOptimisation = {
+        ...step,
+        id: randomUUID(),
+        sourceEvalRunId: randomUUID(),
+        sourceVariantId: 'champion',
+        basePatch: { model: 'openai/gpt-5' },
+        reflectionModel: 'anthropic/claude-sonnet-4',
+        candidateCount: 2,
+        trialsPerCase: 1,
+        budgetUsd: 5,
+        jobCostUsd: null,
+        candidates: [],
+        evalRunId: null,
+        status: 'proposing',
+        error: null,
+        heartbeatAt: null,
+        createdBy: 'author-1',
+        createdAt: '2026-09-29T08:00:00.000Z',
+      };
+      const newer = { ...optimisation, id: randomUUID(), createdAt: '2026-09-29T09:00:00.000Z' };
+      await repo.createOptimisation(optimisation);
+      await repo.createOptimisation(newer);
+      await repo.createOptimisation({ ...optimisation, ...otherStep, id: randomUUID() });
+
+      expect(await repo.getOptimisation(optimisation.id)).toEqual(optimisation);
+      expect((await repo.listOptimisations(step)).map((row) => row.id)).toEqual([newer.id, optimisation.id]);
+      expect(await repo.listStaleProposingOptimisationIds('2026-09-29T08:30:00.000Z')).toHaveLength(2);
+
+      const evaluating: EvalOptimisation = {
+        ...optimisation,
+        status: 'evaluating',
+        jobCostUsd: 0.04,
+        candidates: [{ variantId: 'challenger-1', label: 'GEPA candidate 1', prompt: 'Grade each AE by CTCAE v5.', reflectedOn: 3 }],
+        evalRunId: randomUUID(),
+      };
+      expect(await repo.transitionOptimisation(optimisation.id, 'evaluating', evaluating)).toBe(false);
+      expect(await repo.transitionOptimisation(optimisation.id, 'proposing', evaluating)).toBe(true);
+      expect(await repo.getOptimisation(optimisation.id)).toEqual(evaluating);
+      expect(await repo.listStaleProposingOptimisationIds('2026-09-29T08:30:00.000Z')).not.toContain(optimisation.id);
+    });
+
     it('orders trials by case, variant, then trial index, and keeps a trial\'s confidence', async () => {
       const dataset = await repo.appendDatasetVersion({
         ...step, id: randomUUID(), version: 1, caseIds: [randomUUID()], containsProductionData: false,
@@ -453,7 +496,7 @@ describe.skipIf(skipPg)('PostgresEvaluationRepository (parity)', () => {
       `TRUNCATE TABLE "${schemaName}"."evaluation_briefs", "${schemaName}"."evaluators", "${schemaName}"."evaluator_versions", ` +
         `"${schemaName}"."eval_cases", "${schemaName}"."eval_dataset_versions", "${schemaName}"."mcp_eval_policies", ` +
         `"${schemaName}"."eval_runs", "${schemaName}"."eval_trials", "${schemaName}"."eval_acceptance_criteria", ` +
-        `"${schemaName}"."step_qualifications", "${schemaName}"."eval_mcp_recordings"`,
+        `"${schemaName}"."step_qualifications", "${schemaName}"."eval_mcp_recordings", "${schemaName}"."eval_optimisations"`,
     );
     return new PostgresEvaluationRepository(drizzle(testClient, { schema }));
   });

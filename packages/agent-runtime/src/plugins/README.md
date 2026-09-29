@@ -60,6 +60,22 @@ directory through Redis. A check that crashes or writes no
 valid `result.json` throws — an Evaluator's defect is never scored as the
 agent's.
 
+## GEPA job
+
+`gepa-job.ts` runs a Step Evaluation optimisation's GEPA job (ADR-0023 D15):
+the Python script it ships into `/output` calls the `gepa` package's reflective
+proposal step once per candidate, with the reflection model reached through
+OpenRouter on the workspace key. Unlike a code check it keeps the network, for
+that model, and mounts nothing but its `/output`; its image is
+`mediforce-gepa:latest` (`container/Dockerfile.gepa`), and under
+`ALLOW_LOCAL_AGENTS` it is the host's `python3`, which needs `gepa`. The script
+rewrites `result.json` after every call, so a job that dies part-way still says
+what it proposed and spent.
+
+Both share `sandbox-container.ts`: the hardening flags (capabilities, privileges,
+process, memory and CPU limits), unique container names, and the host
+environment a local process keeps.
+
 ## Shared machinery
 
 `base-container-agent-plugin.ts` (spawn, mounts, git, MCP, output),

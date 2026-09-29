@@ -1,0 +1,6 @@
+# GEPA job image: Python with the `gepa` package (no dependencies of its own).
+# The job script is shipped per run into /output by agent-runtime (gepa-job.ts),
+# so this image only pins the library.
+FROM python:3.12-slim
+
+RUN pip install --no-cache-dir gepa==0.1.4
