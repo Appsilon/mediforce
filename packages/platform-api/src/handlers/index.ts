@@ -163,6 +163,28 @@ export { listAgentRuns } from './agent-runs/list-agent-runs';
 export { getAgentRunCardStatusCounts } from './agent-runs/get-agent-run-card-status-counts';
 export { getAgentTrajectory } from './agent-runs/get-agent-trajectory';
 export { listScores } from './scores/list-scores';
+export {
+  getEvaluationBrief,
+  setEvaluationBrief,
+  listEvaluators,
+  getEvaluator,
+  createEvaluator,
+  addEvaluatorVersion,
+  archiveEvaluator,
+  approveEvaluatorSource,
+  labelEvaluatorOutput,
+  calibrateEvaluator,
+  previewEvaluator,
+  listStepAgentRuns,
+  listEvalCases,
+  createEvalCase,
+  createEvalCaseFromAgentRun,
+  archiveEvalCase,
+  listEvalDatasets,
+  freezeEvalDataset,
+  getMcpEvalPolicy,
+  setMcpEvalPolicy,
+} from './evaluation/index';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 
 export { getConfig, getConfigByPrefix } from './config/index';

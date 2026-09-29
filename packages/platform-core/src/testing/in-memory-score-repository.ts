@@ -27,6 +27,8 @@ export class InMemoryScoreRepository implements ScoreRepository {
         && (filter.processInstanceId === undefined || score.processInstanceId === filter.processInstanceId)
         && (filter.stepId === undefined || score.stepId === filter.stepId)
         && (filter.name === undefined || score.name === filter.name)
+        && (filter.evaluatorId === undefined || score.evaluatorId === filter.evaluatorId)
+        && (filter.source === undefined || score.source === filter.source)
         && (filter.namespace === undefined || score.namespace === filter.namespace))
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id))
       .slice(0, filter.limit);

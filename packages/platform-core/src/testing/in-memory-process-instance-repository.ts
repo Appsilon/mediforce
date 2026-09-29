@@ -373,9 +373,14 @@ export class InMemoryProcessInstanceRepository
     };
   }
 
-  async getIdsByDefinitionName(namespace: string, name: string): Promise<string[]> {
+  async getIdsByDefinitionName(
+    namespace: string,
+    name: string,
+    options: { excludeDryRuns?: boolean } = {},
+  ): Promise<string[]> {
     return [...this.instances.values()]
       .filter((i) => i.namespace === namespace && i.definitionName === name)
+      .filter((i) => options.excludeDryRuns !== true || i.dryRun !== true)
       .map((i) => i.id);
   }
 

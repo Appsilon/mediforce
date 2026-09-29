@@ -122,8 +122,13 @@ describe('clampToViewport', () => {
 
   it('trims a target taller than the screen to what is on it', () => {
     const clamped = clampToViewport({ top: -200, left: 20, width: 400, height: 2000 }, VIEWPORT);
-    expect(clamped.top).toBe(0);
-    expect(clamped.height).toBe(VIEWPORT.height);
+    expect(clamped?.top).toBe(0);
+    expect(clamped?.height).toBe(VIEWPORT.height);
+  });
+
+  it('has no spotlight for a target that is entirely off screen', () => {
+    expect(clampToViewport({ top: 900, left: 20, width: 400, height: 300 }, VIEWPORT)).toBeNull();
+    expect(clampToViewport({ top: -500, left: 20, width: 400, height: 300 }, VIEWPORT)).toBeNull();
   });
 });
 

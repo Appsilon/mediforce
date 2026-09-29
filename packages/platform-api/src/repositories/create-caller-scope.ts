@@ -22,6 +22,7 @@ import type {
   ProcessInstanceRepository,
   ProcessRepository,
   ScoreRepository,
+  EvaluationRepository,
   ToolCatalogRepository,
   TriggerRepository,
   UserDirectoryService,
@@ -54,6 +55,7 @@ import { AuthorizedHumanTaskRepository } from './authorized-human-task-repositor
 import { AuthorizedImageCatalogRepository } from './authorized-image-catalog-repository';
 import { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
 import { AuthorizedScoreRepository } from './authorized-score-repository';
+import { AuthorizedEvaluationRepository } from './authorized-evaluation-repository';
 import { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
 import { AuthorizedTriggerRepository } from './authorized-trigger-repository';
@@ -76,6 +78,7 @@ export interface CallerScopeServices {
   readonly agentRunRepo: AgentRunRepository;
   readonly agentTrajectoryRepo: AgentTrajectoryRepository;
   readonly scoreRepo: ScoreRepository;
+  readonly evaluationRepo: EvaluationRepository;
   readonly humanTaskRepo: HumanTaskRepository;
   readonly taskAttachmentRepo: TaskAttachmentRepository;
   readonly blobStore: BlobStore;
@@ -143,6 +146,7 @@ export function createCallerScope(
     agentEvents: new AuthorizedAgentEventRepository(caller, services.agentEventRepo),
     agentTrajectories: new AuthorizedAgentTrajectoryRepository(caller, services.agentTrajectoryRepo),
     scores: new AuthorizedScoreRepository(caller, services.scoreRepo),
+    evaluation: new AuthorizedEvaluationRepository(caller, services.evaluationRepo),
     auditEvents: new AuthorizedAuditEventRepository(caller, services.auditRepo),
     handoffs: new AuthorizedHandoffRepository(caller, services.handoffRepo),
     toolCatalog: new AuthorizedToolCatalogRepository(caller, services.toolCatalogRepo),
