@@ -12,6 +12,7 @@ import {
   StepVariantPatchSchema,
   WorkspaceFilePathSchema,
   hasPerturbationChange,
+  type StepVariantPatch,
 } from './evaluation';
 
 /**
@@ -21,7 +22,8 @@ import {
  * *Proposals* never run: the call comes back to the person as a card to
  * accept, edit or reject, and accepting goes through the same handler a
  * person's own form uses. *Platform* tools run as the person asking — reads,
- * a draft check against real outputs, and preparing an Eval Run. Nothing here
+ * a draft check against real outputs, preparing an Eval Run, and starting one
+ * only under an unattended budget the person granted for the request. Nothing here
  * signs a Step Qualification, approves a check's source or labels an output:
  * D15 keeps those human, so there is no tool to call.
  */
@@ -45,6 +47,8 @@ export const ProposeEvaluatorToolSchema = z.object({
   check: AssistantCheckSchema,
   /** Why this check, and what its preview showed. */
   rationale: z.string().max(1000).optional(),
+  runInProduction: z.boolean().optional()
+    .describe('Also score live production runs of the step (a guardrail). A failing critical schema or code check sends the run to the step\'s fallbackBehavior; an llm_judge only writes Scores. Counts only once the check is trusted.'),
 });
 
 /** Propose an Eval Case: from a production Agent Run, or written out. */
@@ -156,6 +160,82 @@ export const ProposeControlSettingsToolSchema = z.object({
   message: 'L4 needs a confidenceThreshold',
 });
 
+/** Why a group of an Eval Run's failing trials failed. */
+export const FailureRootCauseSchema = z.enum([
+  'ambiguous_instruction',
+  'missing_context',
+  'tool_problem',
+  'model_capability',
+  'evaluator_wrong',
+]);
+
+/**
+ * What would fix a root cause. `instruction`, `examples`, `model` and `tools`
+ * are variant patches (`propose_fix`); a `guardrail` is a production Evaluator
+ * (`propose_evaluator` with `runInProduction`), `control_mode` a routing change
+ * (`propose_control_settings`), `evaluator` a new version of a wrong Evaluator
+ * (`propose_evaluator_version`), and a `preprocessing_step` a change to the
+ * workflow made in the workflow editor.
+ */
+export const FixKindSchema = z.enum([
+  'instruction',
+  'examples',
+  'guardrail',
+  'model',
+  'tools',
+  'preprocessing_step',
+  'control_mode',
+  'evaluator',
+]);
+
+/**
+ * A diagnosis of one variant's failures in an Eval Run: its failing trials
+ * grouped by root cause, each group with its evidence and the kind of fix it
+ * points to. A card only — nothing is created.
+ */
+export const ProposeDiagnosisToolSchema = z.object({
+  evalRunId: z.uuid(),
+  variantId: z.string().min(1),
+  clusters: z.array(z.object({
+    rootCause: FailureRootCauseSchema,
+    summary: z.string().min(1).max(1000),
+    trialIds: z.array(z.uuid()).min(1).max(50),
+    /** What in the trajectories, outputs and cases shows it. */
+    evidence: z.string().min(1).max(2000),
+    fix: z.object({ kind: FixKindSchema, description: z.string().min(1).max(2000) }),
+  })).min(1).max(8),
+});
+
+/** The fix kinds a variant patch expresses, and the patch fields each may set. */
+export const VARIANT_FIX_PATCH_FIELDS = {
+  instruction: ['prompt', 'skillCommit'],
+  examples: ['examples'],
+  model: ['model'],
+  tools: ['allowedTools', 'mcpRestrictions'],
+} as const satisfies Record<string, ReadonlyArray<keyof StepVariantPatch>>;
+
+export const VariantFixKindSchema = FixKindSchema.extract(['instruction', 'examples', 'model', 'tools']);
+
+/**
+ * A fix the step's variant patch can express, to try as a challenger on the
+ * failing cases, dev and holdout before it is applied to the step.
+ */
+export const ProposeFixToolSchema = z.object({
+  evalRunId: z.uuid(),
+  kind: VariantFixKindSchema,
+  label: z.string().min(1).max(120),
+  patch: StepVariantPatchSchema,
+  /** The cluster or root cause of the diagnosis this addresses. */
+  addresses: z.string().min(1).max(500),
+  rationale: z.string().min(1).max(2000),
+}).refine((value) => {
+  const allowed: ReadonlyArray<string> = VARIANT_FIX_PATCH_FIELDS[value.kind];
+  const set = Object.entries(value.patch).filter(([, entry]) => entry !== undefined).map(([field]) => field);
+  return set.length > 0 && set.every((field) => allowed.includes(field));
+}, {
+  message: 'a fix patches only its kind\'s fields, and at least one: instruction → prompt or skillCommit; examples → examples; model → model; tools → allowedTools or mcpRestrictions',
+});
+
 export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
   propose_evaluation_plan: ProposeEvaluationPlanToolSchema,
   propose_evaluator: ProposeEvaluatorToolSchema,
@@ -166,6 +246,8 @@ export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
   propose_brief: ProposeBriefToolSchema,
   propose_acceptance_criteria: ProposeAcceptanceCriteriaToolSchema,
   propose_control_settings: ProposeControlSettingsToolSchema,
+  propose_diagnosis: ProposeDiagnosisToolSchema,
+  propose_fix: ProposeFixToolSchema,
 } as const;
 
 const NoArguments = z.object({});
@@ -200,6 +282,15 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
   list_eval_runs: NoArguments,
   /** One Eval Run's report, to explain it. */
   get_eval_run_report: z.object({ evalRunId: z.string().min(1) }),
+  /**
+   * One variant's failing trials in an Eval Run — a counted Evaluator failed,
+   * a check errored, or the trial produced no Agent Run — with each trial's
+   * case and the Evaluators that failed or errored on it.
+   */
+  get_failures: z.object({
+    evalRunId: z.uuid(),
+    variantId: z.string().min(1).optional().describe('Defaults to the champion.'),
+  }),
   /** Run a draft check against existing outputs; writes nothing. */
   preview_evaluator: z.object({
     check: AssistantCheckSchema,
@@ -227,7 +318,10 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
    * since, and the Acceptance Criteria set now.
    */
   get_qualification: NoArguments,
-  /** Start a prepared Eval Run. Refused: starting needs the person's confirmation of the budget. */
+  /**
+   * Start a prepared Eval Run. Refused unless the person granted an unattended
+   * budget for this request and the run's budget fits what is left of it.
+   */
   start_eval_run: z.object({ evalRunId: z.string().min(1) }),
 } as const;
 
@@ -245,8 +339,12 @@ export const EvaluationAssistantProposalSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('propose_brief'), arguments: ProposeBriefToolSchema }),
   z.object({ tool: z.literal('propose_acceptance_criteria'), arguments: ProposeAcceptanceCriteriaToolSchema }),
   z.object({ tool: z.literal('propose_control_settings'), arguments: ProposeControlSettingsToolSchema }),
+  z.object({ tool: z.literal('propose_diagnosis'), arguments: ProposeDiagnosisToolSchema }),
+  z.object({ tool: z.literal('propose_fix'), arguments: ProposeFixToolSchema }),
 ]);
 
 export type EvaluationAssistantProposal = z.infer<typeof EvaluationAssistantProposalSchema>;
+export type FailureRootCause = z.infer<typeof FailureRootCauseSchema>;
+export type FixKind = z.infer<typeof FixKindSchema>;
 
 export const EVALUATION_ASSISTANT_DEFAULT_MODEL = 'anthropic/claude-sonnet-4';

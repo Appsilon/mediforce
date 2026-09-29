@@ -98,7 +98,11 @@ Eval Case, Dataset version and MCP eval policy by `(namespace, workflowName,
 stepId)` and reaches it through the one `scope.evaluation` wrapper. Reads need
 only to see the workflow; writes need its `edit` verb (`_lib/evaluated-step.ts`).
 An Evaluator check that cannot run comes back as `error`, never as a failed
-output (`_lib/run-evaluator-check.ts`). Nothing here approves a `code` check's
+output (`_lib/run-evaluator-check.ts`). Evaluators flagged `runInProduction`
+(`setEvaluatorProduction`) score live runs through `_lib/production-evaluators.ts`,
+the runner's output gate: counted `schema`/`code` ones run inline and a failing
+critical one sends the run to the step's fallback; `llm_judge` ones only write
+Scores, asynchronously (D13). Nothing here approves a `code` check's
 source or labels an output on anyone's behalf: both record the person who did
 it, and an API key must name them. A synthesized Eval Case's file changes are the
 one write outside Postgres: a commit on the workflow's bare repo, kept by the
@@ -121,7 +125,10 @@ Run's report is computed from the Scores on read, never stored — per variant,
 with the verdict on each frozen Acceptance Criterion and the confidence
 calibration, from platform-core's pure rules. A variant is a patch the
 runtime applies to its trials (platform-ui's `execute-agent-step.ts` reads the
-trial's variant); the driver does not know variants exist.
+trial's variant); the driver does not know variants exist. Applying a variant to the step
+(`apply-step-variant.ts`) saves it through `registerWorkflow`, not a second write path, so a
+qualification carries over exactly when the saved step's Fingerprint equals the variant's.
+`getEvalRunFailures` is the assistant's `get_failures` and `mediforce eval failures`.
 
 **A Step Qualification binds a Step Fingerprint.** `_lib/step-fingerprint.ts`
 hashes each part of a step that shapes its behaviour on its own, so the badge
@@ -149,6 +156,12 @@ Assistant's self-test of a proposed check) travels with the proposal. The workfl
 interleaved with its graph-completeness gates and truncation salvage. The
 cowork chat (`handlers/cowork/`) is a separate OpenRouter loop and does not use
 the core.
+
+A request may grant the Evaluation Assistant an unattended budget
+(`unattendedBudgetUsd`): `start_eval_run` then starts prepared runs of the step
+that fit what is left of it, as a person confirming each run's budget
+(`UnattendedGrant` in `_lib/run-evaluation-tool.ts`); the grant is recorded on the
+request's prompt audit event.
 
 The Evaluation Assistant allows 32 model/tool rounds with an 8,000-token
 completion budget per call, independent of the selected model's context window.

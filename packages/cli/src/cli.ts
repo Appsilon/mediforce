@@ -102,6 +102,7 @@ import { evalBriefGetCommand, evalBriefSetCommand } from './commands/eval-brief'
 import {
   evalEvaluatorApproveCommand,
   evalEvaluatorArchiveCommand,
+  evalEvaluatorProductionCommand,
   evalEvaluatorCalibrateCommand,
   evalEvaluatorCreateCommand,
   evalEvaluatorLabelCommand,
@@ -123,7 +124,9 @@ import {
   evalMcpPolicySetCommand,
 } from './commands/eval-cases';
 import {
+  evalApplyVariantCommand,
   evalRunCancelCommand,
+  evalRunFailuresCommand,
   evalRunGetCommand,
   evalRunListCommand,
   evalRunPrepareCommand,
@@ -290,6 +293,7 @@ export const TREE: Record<string, BranchEntry> = {
       'evaluator-calibrate': { description: 'Calibrate an llm_judge against the labels', fn: evalEvaluatorCalibrateCommand },
       'evaluator-preview': { description: 'Run a draft check against recent outputs', fn: evalEvaluatorPreviewCommand },
       'evaluator-archive': { description: 'Archive or restore an Evaluator', fn: evalEvaluatorArchiveCommand },
+      'evaluator-production': { description: 'Run an Evaluator in production (--on) or stop (--off)', fn: evalEvaluatorProductionCommand },
       'case-list': { description: 'List a step\'s Eval Cases', fn: evalCaseListCommand },
       'case-add': { description: 'Add a hand-written Eval Case', fn: evalCaseAddCommand },
       'case-from-run': { description: 'Add a production Agent Run to the eval set', fn: evalCaseFromRunCommand },
@@ -305,6 +309,8 @@ export const TREE: Record<string, BranchEntry> = {
       'run-list': { description: 'List a step\'s Eval Runs', fn: evalRunListCommand },
       'run-cancel': { description: 'Cancel an Eval Run', fn: evalRunCancelCommand },
       report: { description: 'Print an Eval Run and its report', fn: evalRunGetCommand },
+      failures: { description: 'Print one variant\'s failing trials in an Eval Run', fn: evalRunFailuresCommand },
+      'apply-variant': { description: 'Apply a challenger or a patch to the step as a new Workflow Definition version', fn: evalApplyVariantCommand },
       'criteria-get': { description: 'Print a step\'s Acceptance Criteria', fn: evalCriteriaGetCommand },
       'criteria-set': { description: 'Set a step\'s Acceptance Criteria from a JSON file', fn: evalCriteriaSetCommand },
       qualification: { description: 'Print a step\'s qualification: Qualified, Stale or Not qualified', fn: evalQualificationCommand },

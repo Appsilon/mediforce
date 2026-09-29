@@ -249,6 +249,12 @@ export {
   ProposePerturbedCaseToolSchema,
   ProposeAcceptanceCriteriaToolSchema,
   ProposeControlSettingsToolSchema,
+  ProposeDiagnosisToolSchema,
+  ProposeFixToolSchema,
+  FailureRootCauseSchema,
+  FixKindSchema,
+  VariantFixKindSchema,
+  VARIANT_FIX_PATCH_FIELDS,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EvaluationAssistantProposalSchema,
@@ -256,6 +262,8 @@ export {
   type EvaluationAssistantProposalToolName,
   type EvaluationAssistantPlatformToolName,
   type EvaluationAssistantProposal,
+  type FailureRootCause,
+  type FixKind,
 } from './evaluation-assistant-tools';
 
 export {
@@ -356,6 +364,7 @@ export {
   ContainerSchema,
   WorkflowAgentConfigSchema,
   AgentOutputSchemaSchema,
+  AgentExampleSchema,
   OutputSchemaPropertyTypeSchema,
   ScriptStepConfigSchema,
   DatabricksJobConfigSchema,
@@ -398,6 +407,7 @@ export {
   STRANDED_STEP_GRACE_MS,
   type ContainerConfig,
   type WorkflowAgentConfig,
+  type AgentExample,
   type OutputSchemaPropertyType,
   type ScriptStepConfig,
   type DatabricksJobConfig,

@@ -40,6 +40,7 @@ function buildEvaluator(overrides: Partial<Evaluator> = {}): Evaluator {
     id: randomUUID(),
     name: 'grade-present',
     archived: false,
+    runInProduction: false,
     createdBy: 'author-1',
     createdAt: '2026-09-23T08:00:00.000Z',
     ...overrides,
@@ -150,6 +151,19 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect(await repo.getEvaluator(randomUUID())).toBeNull();
     });
 
+    it('stores whether an Evaluator runs in production and flips it', async () => {
+      const flagged = buildEvaluator({ name: 'flagged', runInProduction: true });
+      const plain = buildEvaluator({ name: 'plain' });
+      await repo.createEvaluator(flagged, buildVersion(flagged.id));
+      await repo.createEvaluator(plain, buildVersion(plain.id));
+
+      await repo.setEvaluatorRunInProduction(flagged.id, false);
+      await repo.setEvaluatorRunInProduction(plain.id, true);
+
+      expect((await repo.listEvaluators(step)).map((row) => [row.name, row.runInProduction]))
+        .toEqual([['flagged', false], ['plain', true]]);
+    });
+
     it('round-trips Eval Cases, newest first, and archives them', async () => {
       const older = buildCase({ createdAt: '2026-09-23T08:00:00.000Z' });
       const newer = buildCase({
@@ -202,6 +216,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         definitionVersion: 3,
         datasetVersionId: dataset.id,
         caseIds: dataset.caseIds,
+        exampleCaseIds: [randomUUID()],
         trialsPerCase: 2,
         concurrency: 2,
         evaluators: [{ evaluatorId: randomUUID(), name: 'findings-present', version: 1, kind: 'schema' as const, severity: 'critical' as const, counted: true }],
@@ -343,6 +358,7 @@ function storedRun(datasetVersionId: string, caseIds: string[]): EvalRun {
     definitionVersion: 3,
     datasetVersionId,
     caseIds,
+    exampleCaseIds: [],
     trialsPerCase: 2,
     concurrency: 2,
     evaluators: [{ evaluatorId: randomUUID(), name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],

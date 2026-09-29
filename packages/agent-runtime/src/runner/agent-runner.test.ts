@@ -12,6 +12,7 @@ import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { InMemoryAgentEventLog } from '../testing/index';
 import { NoopLlmClient } from '../testing/index';
 import type {
+  AgentOutputGate,
   StepExecutorPlugin,
   AgentContext,
   EmitFn,
@@ -851,6 +852,93 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
 
     expect(result.fallbackReason).toBe('low_confidence');
     expect(seenContexts).toHaveLength(1);
+  });
+
+  describe('output gate — production Evaluators (D13)', () => {
+    function gatedContext(gate: AgentOutputGate, fallbackBehavior: 'escalate_to_human' | 'continue_with_flag' = 'escalate_to_human'): WorkflowAgentContext {
+      return { ...makeSchemaStepContext(fallbackBehavior), outputGate: gate };
+    }
+
+    function statuses(): string[] {
+      return eventLog.getEvents('instance-1', 'step-1')
+        .filter((event) => event.type === 'status')
+        .map((event) => String(event.payload));
+    }
+
+    it('hands a conforming result to the gate with its Agent Run and lets a pass through', async () => {
+      const gate = vi.fn<AgentOutputGate>().mockResolvedValue({ failure: null, errors: [] });
+      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ result: { findings: [] } })]);
+
+      const result = await runner.runWithWorkflowStep(plugin, gatedContext(gate));
+
+      expect(result.status).toBe('completed');
+      expect(result.fallbackReason).toBeNull();
+      expect(gate).toHaveBeenCalledOnce();
+      const [call] = gate.mock.calls[0]!;
+      expect(call.agentRunId).toBe(result.agentRunId);
+      expect(call.envelope.result).toEqual({ findings: [] });
+    });
+
+    it('routes a gate failure to fallbackBehavior with reason production_evaluator', async () => {
+      const auditRepository = new InMemoryAuditRepository();
+      runner = new AgentRunner(instanceRepository, auditRepository, eventLog);
+      const gate: AgentOutputGate = async () => ({ failure: "Evaluator 'grade-5-flagged' v1 failed: grade 4 on a fatal AE", errors: [] });
+      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ result: { findings: [] } })]);
+
+      const result = await runner.runWithWorkflowStep(plugin, gatedContext(gate));
+
+      expect(result.status).toBe('escalated');
+      expect(result.fallbackReason).toBe('production_evaluator');
+      expect(result.errorMessage).toContain('grade 4 on a fatal AE');
+      expect((await instanceRepository.getById('instance-1'))?.pauseReason).toBe('agent_escalated');
+      expect(statuses().some((payload) => payload.includes('failed a production Evaluator'))).toBe(true);
+      const [audit] = await auditRepository.getByProcess('instance-1');
+      expect(audit?.outputSnapshot).toMatchObject({ error: expect.stringContaining('grade 4 on a fatal AE') });
+    });
+
+    it('keeps a low-confidence signal in the error when the gate fails too', async () => {
+      const gate: AgentOutputGate = async () => ({ failure: "Evaluator 'grade-5-flagged' v1 failed", errors: [] });
+      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ confidence: 0.5, result: { findings: [] } })]);
+      const context = gatedContext(gate);
+      const lowThresholdContext = {
+        ...context,
+        step: { ...context.step, agent: { ...context.step.agent, confidenceThreshold: 0.8 } },
+      };
+
+      const result = await runner.runWithWorkflowStep(plugin, lowThresholdContext);
+
+      expect(result.fallbackReason).toBe('production_evaluator');
+      expect(result.errorMessage).toContain('grade-5-flagged');
+      expect(result.errorMessage).toContain('below the confidence threshold');
+    });
+
+    it('never gates a result that still broke outputSchema', async () => {
+      const gate = vi.fn<AgentOutputGate>().mockResolvedValue({ failure: null, errors: [] });
+      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ result: { summary: 'still wrong' } })]);
+
+      const result = await runner.runWithWorkflowStep(plugin, gatedContext(gate));
+
+      expect(result.fallbackReason).toBe('output_schema');
+      expect(gate).not.toHaveBeenCalled();
+    });
+
+    it('records checks that could not run, and a gate that throws, without failing the run', async () => {
+      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ result: { findings: [] } })]);
+      const withErrors = await runner.runWithWorkflowStep(
+        plugin,
+        gatedContext(async () => ({ failure: null, errors: ['grade-5-flagged: script crashed'] })),
+      );
+      const thrown = await runner.runWithWorkflowStep(plugin, gatedContext(async () => {
+        throw new Error('database unreachable');
+      }));
+
+      expect(withErrors.status).toBe('completed');
+      expect(thrown.status).toBe('completed');
+      expect(statuses()).toEqual(expect.arrayContaining([
+        expect.stringContaining('grade-5-flagged: script crashed'),
+        expect.stringContaining('database unreachable'),
+      ]));
+    });
   });
 
   describe('retry budget — both attempts fit inside one step timeout', () => {

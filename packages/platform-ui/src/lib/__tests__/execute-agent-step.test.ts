@@ -248,7 +248,7 @@ describe('executeAgentStep', () => {
     const caseId = '22222222-2222-4222-8222-222222222222';
     await evaluationRepo.createEvalRun({
       namespace: 'test-namespace', workflowName: 'community-digest', stepId: 'gather-data',
-      id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId],
+      id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId], exampleCaseIds: [],
       trialsPerCase: 1, concurrency: 1,
       evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
       variants: [
@@ -288,7 +288,7 @@ describe('executeAgentStep', () => {
       const caseId = '22222222-2222-4222-8222-222222222222';
       await evaluationRepo.createEvalRun({
         namespace: 'test-namespace', workflowName: 'community-digest', stepId: 'gather-data',
-        id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId],
+        id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId], exampleCaseIds: [],
         trialsPerCase: 1, concurrency: 1,
         evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
         variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint }],
