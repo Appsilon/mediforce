@@ -146,10 +146,10 @@ describe('GEPA optimisations (ADR-0023 D15)', () => {
     expect(evalRun.caseIds).toContain(holdoutCaseId);
     expect(evalRun.variants.map((variant) => variant.patch)).toEqual([{}, { prompt: WORSE_PROMPT }, { prompt: FIXED_PROMPT }]);
 
-    // The step as it is fails neutropenia again; the fixed prompt passes everywhere; the worse one nowhere.
+    // The step as it is fails neutropenia again. Candidate 1 overfits: every dev case passes, the holdout case
+    // fails. Candidate 2 still fails neutropenia but passes the holdout case, so it generalises better.
     await finishKickedTrials((trial) => {
-      if (trial.variantId === 'challenger-2') return { findings: ['graded'] };
-      if (trial.variantId === 'challenger-1') return { summary: 'AEs summarised' };
+      if (trial.variantId === 'challenger-1') return trial.caseId === holdoutCaseId ? { summary: 'AEs summarised' } : { findings: ['graded'] };
       return trial.caseId === scenario.caseIds['Grade 4 neutropenia'] ? { summary: 'no findings' } : { findings: ['graded'] };
     });
 
@@ -162,8 +162,8 @@ describe('GEPA optimisations (ADR-0023 D15)', () => {
       holdout: { cases: 1, graded: 1, passes: 1, passRate: 1 },
     });
     expect(result.ranking.map(({ rank, variantId, dev, holdout }) => ({ rank, variantId, dev: dev.passRate, holdout: holdout.passRate }))).toEqual([
-      { rank: 1, variantId: 'challenger-2', dev: 1, holdout: 1 },
-      { rank: 2, variantId: 'challenger-1', dev: 0, holdout: 0 },
+      { rank: 1, variantId: 'challenger-2', dev: 0.5, holdout: 1 },
+      { rank: 2, variantId: 'challenger-1', dev: 1, holdout: 0 },
     ]);
     expect((await listOptimisations(STEP, scope)).optimisations.map((row) => row.id)).toEqual([started.optimisation.id]);
     const actions = (await fixture.auditRepo.getByEntity('eval_optimisation', started.optimisation.id)).map((event) => event.action);
@@ -195,15 +195,30 @@ describe('GEPA optimisations (ADR-0023 D15)', () => {
     const errored = await startOptimisation({ ...STEP, evalRunId: sourceRunId, budgetUsd: 3, candidates: 1, trialsPerCase: 1 }, scope);
     expect(await settled(errored.optimisation.id)).toMatchObject({ status: 'failed', error: 'the reflection model answered HTTP 500: upstream down' });
 
-    jobReturns({ candidates: [{ prompt: FIXED_PROMPT, reflectedOn: 2 }] });
-    const broke = await startOptimisation({ ...STEP, evalRunId: sourceRunId, budgetUsd: 0.05, candidates: 1, trialsPerCase: 1 }, scope);
+    // 100k prompt tokens: more than the worst case the start allowed for, so nothing is left.
+    jobReturns({ candidates: [{ prompt: FIXED_PROMPT, reflectedOn: 2 }], usage: [{ promptTokens: 100_000, completionTokens: 1000 }] });
+    const broke = await startOptimisation({ ...STEP, evalRunId: sourceRunId, budgetUsd: 0.2, candidates: 1, trialsPerCase: 1 }, scope);
     const failed = await settled(broke.optimisation.id);
     expect(failed.status).toBe('failed');
-    expect(failed.error).toContain('The job spent $0.0450 of the $0.05 budget');
+    expect(failed.error).toContain('The job spent $0.3150 of the $0.2 budget');
 
     vi.mocked(runGepaJob).mockRejectedValue(new Error('the GEPA job wrote no result'));
     const crashed = await startOptimisation({ ...STEP, evalRunId: sourceRunId, budgetUsd: 3, candidates: 1, trialsPerCase: 1 }, scope);
     expect(await settled(crashed.optimisation.id)).toMatchObject({ status: 'failed', jobCostUsd: null, error: 'the GEPA job wrote no result' });
+    // What it spent is unknown, not nothing.
+    expect((await getOptimisation({ optimisationId: crashed.optimisation.id }, scope)).spentUsd).toBeNull();
+  });
+
+  it('evaluates what a job proposed before it failed, and keeps why it stopped short', async () => {
+    jobReturns({ candidates: [{ prompt: FIXED_PROMPT, reflectedOn: 2 }], error: 'the reflection model answered HTTP 429: rate limited' });
+
+    const started = await startOptimisation({ ...STEP, evalRunId: sourceRunId, budgetUsd: 3, candidates: 3, trialsPerCase: 1 }, scope);
+
+    expect(await settled(started.optimisation.id)).toMatchObject({
+      status: 'evaluating',
+      candidates: [{ variantId: 'challenger-1', prompt: FIXED_PROMPT }],
+      error: 'the reflection model answered HTTP 429: rate limited',
+    });
   });
 
   it('refuses what it cannot hold to the budget or reflect on', async () => {
@@ -211,6 +226,8 @@ describe('GEPA optimisations (ADR-0023 D15)', () => {
       startOptimisation({ ...STEP, evalRunId: sourceRunId, budgetUsd: 3, candidates: 3, trialsPerCase: 1, ...overrides }, scope);
 
     await expect(start({ reflectionModel: 'acme/unpriced' })).rejects.toThrow(/no price for 'acme\/unpriced'/);
+    // Three calls of up to 4000 output tokens at $15 per million cost more than $0.10 before any input.
+    await expect(start({ budgetUsd: 0.1 })).rejects.toThrow(/may spend up to \$0\.\d+ on 3 call\(s\).*leaves nothing of the \$0\.1 budget/);
     await expect(start({ variantId: 'challenger-9' })).rejects.toThrow(NotFoundError);
     await expect(start({ evalRunId: '00000000-0000-4000-8000-000000000000' })).rejects.toThrow(NotFoundError);
     const { evalRun: prepared } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 1 }, scope);
@@ -224,7 +241,7 @@ describe('GEPA optimisations (ADR-0023 D15)', () => {
     expect(runGepaJob).not.toHaveBeenCalled();
   });
 
-  it('fails an optimisation whose job outlived its timeout', async () => {
+  it('fails a proposing optimisation whose job went silent, never one still stamping its heartbeat', async () => {
     const stale: EvalOptimisation = {
       ...STEP,
       id: '11111111-1111-4111-8111-111111111111',
@@ -240,16 +257,40 @@ describe('GEPA optimisations (ADR-0023 D15)', () => {
       evalRunId: null,
       status: 'proposing',
       error: null,
+      heartbeatAt: new Date(Date.now() - 10 * 60_000).toISOString(),
       createdBy: 'author-1',
       createdAt: new Date(Date.now() - 60 * 60_000).toISOString(),
     };
-    const fresh = { ...stale, id: '22222222-2222-4222-8222-222222222222', createdAt: new Date().toISOString() };
+    const fresh = { ...stale, id: '22222222-2222-4222-8222-222222222222', heartbeatAt: null, createdAt: new Date().toISOString() };
+    // Queued for an hour, but its process is alive and stamped a minute ago.
+    const queued = { ...stale, id: '33333333-3333-4333-8333-333333333333', heartbeatAt: new Date(Date.now() - 60_000).toISOString() };
     await fixture.evaluationRepo.createOptimisation(stale);
     await fixture.evaluationRepo.createOptimisation(fresh);
+    await fixture.evaluationRepo.createOptimisation(queued);
 
     await failStaleOptimisations(fixture.scope({ kind: 'apiKey', isSystemActor: true }));
 
     expect(await fixture.evaluationRepo.getOptimisation(stale.id)).toMatchObject({ status: 'failed', error: expect.stringContaining('did not finish') });
     expect((await fixture.evaluationRepo.getOptimisation(fresh.id))?.status).toBe('proposing');
+    expect((await fixture.evaluationRepo.getOptimisation(queued.id))?.status).toBe('proposing');
+  });
+
+  it('stamps the heartbeat while the job runs', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      let finishJob: (outcome: GepaJobOutcome) => void = () => {};
+      vi.mocked(runGepaJob).mockReturnValue(new Promise((resolve) => { finishJob = resolve; }));
+      const started = await startOptimisation({ ...STEP, evalRunId: sourceRunId, budgetUsd: 3, candidates: 1, trialsPerCase: 1 }, scope);
+      await vi.waitFor(() => expect(runGepaJob).toHaveBeenCalled());
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.waitFor(async () =>
+        expect((await fixture.evaluationRepo.getOptimisation(started.optimisation.id))?.heartbeatAt).not.toBeNull());
+
+      finishJob({ candidates: [], usage: [], error: null });
+      expect(await settled(started.optimisation.id)).toMatchObject({ status: 'failed' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

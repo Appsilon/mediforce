@@ -15,6 +15,7 @@ import {
 import { listCommitFiles, readCommitFile, resolveMcpForStep } from '@mediforce/agent-runtime';
 import type { CallerScope } from '../../../repositories/index';
 import { NotFoundError, ValidationError } from '../../../errors';
+import { StartOptimisationInputSchema } from '../../../contract/evaluation';
 import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
 import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
 import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
@@ -466,7 +467,7 @@ export async function executeEvaluationTool(
       };
     }
     case 'start_optimisation': {
-      const { evalRunId, variantId, budgetUsd, candidates, trialsPerCase } = args as Args<'start_optimisation'>;
+      const { budgetUsd } = args as Args<'start_optimisation'>;
       if (unattended === undefined) {
         throw new ValidationError(
           'An optimisation spends a budget only the person can grant: ask them to grant an unattended budget for this request, or to start it themselves with `mediforce eval optimise`.',
@@ -477,14 +478,7 @@ export async function executeEvaluationTool(
           `This optimisation may spend up to $${budgetUsd}, but only $${unattended.remainingUsd.toFixed(2)} is left of the unattended budget the person granted for this request.`,
         );
       }
-      const { optimisation } = await startOptimisation({
-        ...step,
-        evalRunId,
-        ...(variantId === undefined ? {} : { variantId }),
-        budgetUsd,
-        candidates: candidates ?? 3,
-        trialsPerCase: trialsPerCase ?? 1,
-      }, scope);
+      const { optimisation } = await startOptimisation(StartOptimisationInputSchema.parse({ ...step, ...(args as Args<'start_optimisation'>) }), scope);
       unattended.remainingUsd = Math.round((unattended.remainingUsd - budgetUsd) * 100) / 100;
       unattended.startedOptimisations.push({ optimisationId: optimisation.id, budgetUsd });
       return {

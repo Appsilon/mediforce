@@ -4,21 +4,10 @@ import {
   type EvalCase,
   type EvalOptimisation,
   type EvalRun,
-  type EvalTrial,
 } from '@mediforce/platform-core';
 import type { OptimisationSplitResult, OptimisationVariantResult } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
-import { isPass, scoresOfTrial } from './trial-scores';
-
-/** Whether a scored trial passed every counted Evaluator; null when one of them did not grade it. */
-async function trialVerdict(scope: CallerScope, run: EvalRun, trial: EvalTrial): Promise<boolean | null> {
-  if (trial.status !== 'scored') return null;
-  const scores = await scoresOfTrial(scope, run, trial);
-  const counted = run.evaluators.filter((evaluator) => evaluator.counted);
-  const graded = counted.map((evaluator) => scores.find((score) => score.evaluatorId === evaluator.evaluatorId));
-  if (counted.length === 0 || graded.some((score) => score === undefined)) return null;
-  return graded.every((score) => isPass(score!));
-}
+import { mean, passedEveryCounted, scoresOfTrial } from './trial-scores';
 
 function splitResult(caseCount: number, verdicts: readonly (boolean | null)[]): OptimisationSplitResult {
   const graded = verdicts.filter((verdict) => verdict !== null);
@@ -34,10 +23,6 @@ function splitResult(caseCount: number, verdicts: readonly (boolean | null)[]): 
   };
 }
 
-function mean(values: readonly number[]): number | null {
-  return values.length === 0 ? null : values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
 /** Higher first, an unknown rate last. */
 function byRate(left: number | null, right: number | null): number {
   return (right ?? -1) - (left ?? -1);
@@ -45,9 +30,11 @@ function byRate(left: number | null, right: number | null): number {
 
 /**
  * Each variant of an optimisation's Eval Run on its dev and its holdout cases.
- * The candidates are ranked by dev pass rate, as GEPA selects on the data it
- * reflected on; the holdout rate breaks a tie and shows whether a gain
- * generalises; then the cheaper one comes first.
+ * The candidates are ranked by the Wilson lower bound of their holdout pass
+ * rate: the job reflected on the dev cases, so a dev gain alone may be
+ * overfitting, and the bound ranks a rate on fewer graded trials lower. The
+ * dev pass rate breaks a tie — and ranks alone when the Dataset has no
+ * holdout case — then the cheaper one comes first.
  */
 export async function optimisationResults(
   scope: CallerScope,
@@ -57,7 +44,8 @@ export async function optimisationResults(
   const trials = await scope.evaluation.listTrials(run.id);
   const splits = new Map<string, EvalCase['split'] | null>(await Promise.all(run.caseIds.map(async (caseId) =>
     [caseId, (await scope.evaluation.getCase(caseId))?.split ?? null] as const)));
-  const verdicts = new Map(await Promise.all(trials.map(async (trial) => [trial.id, await trialVerdict(scope, run, trial)] as const)));
+  const verdicts = new Map(await Promise.all(trials.map(async (trial) =>
+    [trial.id, trial.status === 'scored' ? passedEveryCounted(run, await scoresOfTrial(scope, run, trial)) : null] as const)));
 
   const resultOf = (variantId: string, label: string, prompt: string | null): OptimisationVariantResult => {
     const ofVariant = trials.filter((trial) => trial.variantId === variantId);
@@ -78,8 +66,8 @@ export async function optimisationResults(
   const champion = run.variants.find((variant) => variant.id === CHAMPION_VARIANT_ID);
   const candidates = optimisation.candidates.flatMap((candidate) =>
     candidate.variantId === null ? [] : [resultOf(candidate.variantId, candidate.label, candidate.prompt)]);
-  const ranked = [...candidates].sort((left, right) => byRate(left.dev.passRate, right.dev.passRate)
-    || byRate(left.holdout.passRate, right.holdout.passRate)
+  const ranked = [...candidates].sort((left, right) => byRate(left.holdout.wilsonLower, right.holdout.wilsonLower)
+    || byRate(left.dev.passRate, right.dev.passRate)
     || (left.meanCostUsd ?? Number.MAX_VALUE) - (right.meanCostUsd ?? Number.MAX_VALUE));
   return {
     baseline: champion === undefined ? null : resultOf(champion.id, champion.label, null),

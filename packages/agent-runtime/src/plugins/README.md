@@ -72,6 +72,10 @@ that model, and mounts nothing but its `/output`; its image is
 rewrites `result.json` after every call, so a job that dies part-way still says
 what it proposed and spent.
 
+Both share `sandbox-container.ts`: the hardening flags (capabilities, privileges,
+process, memory and CPU limits), unique container names, and the host
+environment a local process keeps.
+
 ## Shared machinery
 
 `base-container-agent-plugin.ts` (spawn, mounts, git, MCP, output),

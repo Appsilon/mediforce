@@ -694,12 +694,12 @@ function OptimisationRow({ optimisationId, open, onOpen }: { optimisationId: str
   const detail = useOptimisation(open ? optimisationId : null);
   const output = detail.data;
   return (
-    <li className="border-t pt-2 first:border-t-0 first:pt-0">
+    <div>
       <button type="button" className="text-left text-xs font-mono hover:underline" onClick={onOpen}>{optimisationId.slice(0, 8)}</button>
       {open && (output === undefined ? <Loading /> : (
         <div className="mt-2 space-y-2 text-xs" data-testid="optimisation-detail">
           <p className="text-muted-foreground">
-            {output.optimisation.status} · ${output.spentUsd.toFixed(2)} of ${output.optimisation.budgetUsd}
+            {output.optimisation.status} · {output.spentUsd === null ? 'spend unknown' : `$${output.spentUsd.toFixed(2)}`} of ${output.optimisation.budgetUsd}
             {output.optimisation.jobCostUsd !== null && ` (job $${output.optimisation.jobCostUsd})`}
             {output.evalRun !== null && ` · Eval Run ${output.evalRun.id.slice(0, 8)} ${output.evalRun.status}`}
           </p>
@@ -732,14 +732,14 @@ function OptimisationRow({ optimisationId, open, onOpen }: { optimisationId: str
           )}
         </div>
       ))}
-    </li>
+    </div>
   );
 }
 
 /**
  * GEPA optimisations of the Step's prompt (ADR-0023 D15): start one from a
  * finished Eval Run with a budget — the person's grant, the workflow's `run`
- * verb — and read its candidates ranked by dev pass rate, with holdout.
+ * verb — and read its candidates ranked by holdout, then dev pass rate.
  */
 export function OptimisationsSection({ step, data, runs, mayRun }: {
   step: EvaluatedStep;
@@ -796,13 +796,11 @@ export function OptimisationsSection({ step, data, runs, mayRun }: {
               <span className="text-xs text-muted-foreground">
                 {optimisation.createdAt.slice(0, 16).replace('T', ' ')} · {optimisation.status} · budget ${optimisation.budgetUsd} · {optimisation.candidates.length} candidate(s)
               </span>
-              <ul>
-                <OptimisationRow
-                  optimisationId={optimisation.id}
-                  open={openId === optimisation.id}
-                  onOpen={() => setOpenId(openId === optimisation.id ? null : optimisation.id)}
-                />
-              </ul>
+              <OptimisationRow
+                optimisationId={optimisation.id}
+                open={openId === optimisation.id}
+                onOpen={() => setOpenId(openId === optimisation.id ? null : optimisation.id)}
+              />
             </li>
           ))}
         </ul>

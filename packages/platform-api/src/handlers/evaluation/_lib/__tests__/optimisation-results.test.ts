@@ -29,7 +29,7 @@ describe('optimisationResults', () => {
     else process.env.ALLOW_LOCAL_AGENTS = previousAllowLocal;
   });
 
-  it('splits each variant\'s pass rate into dev and holdout and ranks the candidates by dev, then holdout', async () => {
+  it('splits each variant\'s pass rate into dev and holdout and ranks the candidates by holdout, then dev', async () => {
     const neutropenia = scenario.caseIds['Grade 4 neutropenia'];
     const devCaseIds = Object.values(scenario.caseIds);
     // challenger-1 passes one dev case and the holdout; challenger-2 passes both dev cases but not the holdout.
@@ -53,9 +53,9 @@ describe('optimisationResults', () => {
 
     expect(baseline).toMatchObject({ variantId: 'champion', prompt: null, dev: { cases: 2, graded: 2, passes: 1 }, holdout: { cases: 1, graded: 1, passes: 1 } });
     expect(ranking.map(({ rank, variantId, dev, holdout }) => [rank, variantId, dev.passRate, holdout.passRate])).toEqual([
-      [1, 'challenger-2', 1, 0],
-      [2, 'challenger-1', 0.5, 1],
+      [1, 'challenger-1', 0.5, 1],
+      [2, 'challenger-2', 1, 0],
     ]);
-    expect(ranking[0]!.dev.wilsonLower).toBeGreaterThan(0);
+    expect(ranking[0]!.holdout.wilsonLower).toBeGreaterThan(0);
   });
 });

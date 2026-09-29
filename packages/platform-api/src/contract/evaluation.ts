@@ -461,13 +461,14 @@ export const OptimisationVariantResultSchema = z.object({
 /**
  * An optimisation with its candidates' results, computed from the Scores of
  * its Eval Run when read: the Step as it is as the baseline, and the
- * candidates best first — by dev pass rate, then holdout, then mean cost.
+ * candidates best first — by the Wilson lower bound of their holdout pass
+ * rate, then dev pass rate, then mean cost.
  */
 export const EvalOptimisationOutputSchema = z.object({
   optimisation: EvalOptimisationSchema,
   evalRun: EvalRunSchema.pick({ id: true, status: true, budgetUsd: true, spentUsd: true }).nullable(),
-  /** The job and the Eval Run together. */
-  spentUsd: z.number().nonnegative(),
+  /** The job and the Eval Run together; null while the job's cost is unknown — still proposing, or it died without saying. */
+  spentUsd: z.number().nonnegative().nullable(),
   baseline: OptimisationVariantResultSchema.nullable(),
   ranking: z.array(OptimisationVariantResultSchema.extend({ rank: z.number().int().positive() })),
 });

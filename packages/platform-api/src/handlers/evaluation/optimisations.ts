@@ -7,7 +7,7 @@ import {
   type EvalOptimisation,
   type EvalOptimisationStatus,
 } from '@mediforce/platform-core';
-import { runGepaJob, type GepaJobOutcome, type GepaReflectiveRecord } from '@mediforce/agent-runtime';
+import { GEPA_REFLECTION_MINIBATCH_SIZE, runGepaJob, type GepaJobOutcome, type GepaReflectiveRecord } from '@mediforce/agent-runtime';
 import type {
   EvalOptimisationOutput,
   GetOptimisationInput,
@@ -20,15 +20,20 @@ import { NotFoundError, ValidationError } from '../../errors';
 import { requireOpenRouterApiKey } from '../../services/openrouter-key';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
 import { isSameStep, loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
-import { loadModelPrices } from './_lib/model-prices';
+import { loadModelPrices, type ModelPrice } from './_lib/model-prices';
 import { optimisationResults } from './_lib/optimisation-results';
 import { reflectiveDataset } from './_lib/reflective-dataset';
 import { prepareEvalRun, startEvalRun } from './eval-runs';
 
 const JOB_TIMEOUT_MS = 10 * 60_000;
-/** A job still proposing this long after it started died with its process; the heartbeat fails it. */
-const STALE_PROPOSING_MS = JOB_TIMEOUT_MS + 5 * 60_000;
+const JOB_HEARTBEAT_INTERVAL_MS = 60_000;
+/** A proposing optimisation silent this long died with its process; the platform heartbeat fails it. */
+const STALE_HEARTBEAT_MS = 5 * JOB_HEARTBEAT_INTERVAL_MS;
 const REFLECTION_MAX_OUTPUT_TOKENS = 4000;
+/** The reflection prompt's own instructions around the current prompt and the records, in characters. */
+const REFLECTION_TEMPLATE_CHARS = 4000;
+/** Fewer characters per token than most text has, so the worst case errs high. */
+const CHARS_PER_TOKEN = 3;
 /** The candidates' Eval Run starts this many trials at a time, as an Eval Run prepared by the assistant does. */
 const EVAL_CONCURRENCY = 2;
 
@@ -39,14 +44,14 @@ async function loadOptimisation(scope: CallerScope, optimisationId: string): Pro
 }
 
 async function optimisationOutput(scope: CallerScope, optimisation: EvalOptimisation): Promise<EvalOptimisationOutput> {
-  const jobCostUsd = optimisation.jobCostUsd ?? 0;
+  const { jobCostUsd } = optimisation;
   const run = optimisation.evalRunId === null ? null : await scope.evaluation.getEvalRun(optimisation.evalRunId);
   if (run === null) return { optimisation, evalRun: null, spentUsd: jobCostUsd, baseline: null, ranking: [] };
   const { baseline, ranking } = await optimisationResults(scope, optimisation, run);
   return {
     optimisation,
     evalRun: { id: run.id, status: run.status, budgetUsd: run.budgetUsd, spentUsd: run.spentUsd },
-    spentUsd: jobCostUsd + run.spentUsd,
+    spentUsd: jobCostUsd === null ? null : jobCostUsd + run.spentUsd,
     baseline,
     ranking,
   };
@@ -80,6 +85,40 @@ async function jobCost(scope: CallerScope, model: string, usage: GepaJobOutcome[
     sum + (priceOf(model, { inputTokens: call.promptTokens, outputTokens: call.completionTokens }) ?? 0), 0);
 }
 
+/** The most the job can spend: every call on the largest records and at its full output allowance. */
+function worstCaseJobCostUsd(
+  priceOf: ModelPrice,
+  model: string,
+  currentPrompt: string,
+  records: readonly GepaReflectiveRecord[],
+  candidates: number,
+): number {
+  const largest = records.map((record) => JSON.stringify(record).length).sort((left, right) => right - left)
+    .slice(0, GEPA_REFLECTION_MINIBATCH_SIZE);
+  const inputChars = REFLECTION_TEMPLATE_CHARS + currentPrompt.length + largest.reduce((sum, length) => sum + length, 0);
+  const perCall = priceOf(model, { inputTokens: Math.ceil(inputChars / CHARS_PER_TOKEN), outputTokens: REFLECTION_MAX_OUTPUT_TOKENS });
+  return candidates * (perCall ?? 0);
+}
+
+/**
+ * Runs `work` while stamping the optimisation's heartbeat, so the sweep leaves
+ * a live job alone however long it waits in the container queue.
+ */
+async function whileBeating<Result>(scope: CallerScope, optimisation: EvalOptimisation, work: () => Promise<Result>): Promise<Result> {
+  let beat: Promise<unknown> = Promise.resolve();
+  const timer = setInterval(() => {
+    beat = beat
+      .then(() => scope.evaluation.transitionOptimisation(optimisation.id, 'proposing', { ...optimisation, heartbeatAt: new Date().toISOString() }))
+      .catch((err) => console.warn(`[optimisation] Could not stamp the heartbeat of '${optimisation.id}':`, err));
+  }, JOB_HEARTBEAT_INTERVAL_MS);
+  try {
+    return await work();
+  } finally {
+    clearInterval(timer);
+    await beat;
+  }
+}
+
 /**
  * The job, then the candidates' Eval Run: runs the GEPA container job, keeps
  * the prompts it proposed that differ from the current one and from each
@@ -95,18 +134,20 @@ export async function proposeAndEvaluate(
 ): Promise<void> {
   let current = optimisation;
   try {
-    const outcome = await runGepaJob({
+    const apiKey = await requireOpenRouterApiKey(scope, optimisation.namespace);
+    const outcome = await whileBeating(scope, optimisation, () => runGepaJob({
       input: {
         reflectionModel: optimisation.reflectionModel,
         currentPrompt,
         candidates: optimisation.candidateCount,
         maxOutputTokens: REFLECTION_MAX_OUTPUT_TOKENS,
+        minibatchSize: GEPA_REFLECTION_MINIBATCH_SIZE,
         records,
       },
-      apiKey: await requireOpenRouterApiKey(scope, optimisation.namespace),
+      apiKey,
       timeoutMs: JOB_TIMEOUT_MS,
       label: optimisation.id.slice(0, 12),
-    });
+    }));
     const jobCostUsd = await jobCost(scope, optimisation.reflectionModel, outcome.usage);
     const seen = new Set([currentPrompt.trim()]);
     const candidates = outcome.candidates.flatMap((candidate) => {
@@ -115,7 +156,8 @@ export async function proposeAndEvaluate(
       seen.add(prompt);
       return [{ prompt, reflectedOn: candidate.reflectedOn }];
     }).map((candidate, index) => ({ variantId: null, label: `GEPA candidate ${index + 1}`, ...candidate }));
-    current = { ...current, jobCostUsd, candidates };
+    // A job that stopped part-way still hands over what it proposed; its error says why there are fewer.
+    current = { ...current, jobCostUsd, candidates, error: outcome.error };
 
     if (candidates.length === 0) {
       await failOptimisation(scope, current, 'proposing', outcome.error ?? 'The job proposed no prompt that differs from the current one');
@@ -150,7 +192,7 @@ export async function proposeAndEvaluate(
       entityType: 'eval_optimisation',
       entityId: optimisation.id,
       inputSnapshot: { reflectionModel: optimisation.reflectionModel, records: records.length },
-      outputSnapshot: { candidates: evaluating.candidates, jobCostUsd, evalRunId: evalRun.id, evalRunBudgetUsd: remainingUsd },
+      outputSnapshot: { candidates: evaluating.candidates, jobCostUsd, jobError: outcome.error, evalRunId: evalRun.id, evalRunBudgetUsd: remainingUsd },
       basis: 'GEPA proposed candidate prompts; their Eval Run starts under the budget the person granted (ADR-0023 D15)',
     });
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: evalRun.budgetUsd }, scope);
@@ -161,10 +203,10 @@ export async function proposeAndEvaluate(
 }
 
 /**
- * Starts a GEPA optimisation of the Step's prompt (ADR-0023 D15, Phase 5) from
- * a finished Eval Run. The request's `budgetUsd` is the person's grant: the job
- * is charged at the reflection model's registry price, and the candidates'
- * Eval Run gets what is left. Returns at once, `proposing`; the job and the
+ * Starts a GEPA optimisation of the Step's prompt (ADR-0023 D15) from a
+ * finished Eval Run. The request's `budgetUsd` is the person's grant: it must
+ * cover the job's worst case at the reflection model's registry price, the job
+ * is charged what it spent, and the candidates' Eval Run gets what is left. Returns at once, `proposing`; the job and the
  * run go on in the background.
  */
 export async function startOptimisation(
@@ -190,13 +232,19 @@ export async function startOptimisation(
     throw new ValidationError(`No Evaluator of Eval Run '${source.id}' counts, so there is no feedback to optimise against`);
   }
   const reflectionModel = input.reflectionModel ?? EVALUATION_ASSISTANT_DEFAULT_MODEL;
-  if ((await loadModelPrices(scope))(reflectionModel, { inputTokens: 0, outputTokens: 0 }) === null) {
+  const priceOf = await loadModelPrices(scope);
+  if (priceOf(reflectionModel, { inputTokens: 0, outputTokens: 0 }) === null) {
     throw new ValidationError(`The model registry has no price for '${reflectionModel}', so the job could not be held to the budget; choose a priced reflection model`);
   }
   await requireOpenRouterApiKey(scope, step.namespace);
   const records = await reflectiveDataset(scope, source, variantId);
   if (records.length === 0) {
     throw new ValidationError(`Variant '${variantId}' of Eval Run '${source.id}' has no scored trial of a dev case to reflect on`);
+  }
+  const currentPrompt = variant.patch.prompt ?? workflowStep.agent?.prompt ?? '';
+  const worstCaseUsd = worstCaseJobCostUsd(priceOf, reflectionModel, currentPrompt, records, input.candidates);
+  if (worstCaseUsd >= input.budgetUsd) {
+    throw new ValidationError(`The job may spend up to $${worstCaseUsd.toFixed(4)} on ${input.candidates} call(s) to '${reflectionModel}', which leaves nothing of the $${input.budgetUsd} budget for its candidates' Eval Run; grant more, propose fewer candidates, or reflect with a cheaper model`);
   }
 
   const optimisation: EvalOptimisation = {
@@ -214,6 +262,7 @@ export async function startOptimisation(
     evalRunId: null,
     status: 'proposing',
     error: null,
+    heartbeatAt: null,
     createdBy: authorId(scope),
     createdAt: new Date().toISOString(),
   };
@@ -225,11 +274,10 @@ export async function startOptimisation(
     entityType: 'eval_optimisation',
     entityId: optimisation.id,
     inputSnapshot: { ...step, evalRunId: source.id, variantId, candidates: input.candidates, trialsPerCase: input.trialsPerCase, reflectionModel },
-    outputSnapshot: { budgetUsd: input.budgetUsd, records: records.length },
+    outputSnapshot: { budgetUsd: input.budgetUsd, worstCaseJobCostUsd: worstCaseUsd, records: records.length },
     basis: 'A person granted the optimisation its budget (ADR-0023 D15)',
   });
 
-  const currentPrompt = variant.patch.prompt ?? workflowStep.agent?.prompt ?? '';
   void proposeAndEvaluate(scope, optimisation, currentPrompt, records);
   return optimisationOutput(scope, optimisation);
 }
@@ -245,12 +293,13 @@ export async function listOptimisations(input: ListOptimisationsInput, scope: Ca
   return { optimisations: await scope.evaluation.listOptimisations(stepRef(input)) };
 }
 
-/** The heartbeat's sweep: an optimisation whose job outlived its timeout died with its process. */
+/** The platform heartbeat's sweep: a proposing optimisation whose job stopped stamping its heartbeat died with its process. */
 export async function failStaleOptimisations(scope: CallerScope): Promise<void> {
-  const createdBefore = new Date(Date.now() - STALE_PROPOSING_MS).toISOString();
-  for (const optimisationId of await scope.evaluation.listStaleProposingOptimisationIds(createdBefore)) {
+  const silentSince = new Date(Date.now() - STALE_HEARTBEAT_MS).toISOString();
+  for (const optimisationId of await scope.evaluation.listStaleProposingOptimisationIds(silentSince)) {
     try {
       const optimisation = await loadOptimisation(scope, optimisationId);
+      if ((optimisation.heartbeatAt ?? optimisation.createdAt) > silentSince) continue;
       await failOptimisation(scope, optimisation, 'proposing', 'The GEPA job did not finish; the platform may have restarted while it ran');
     } catch (err) {
       console.error(`[optimisation] Failed to sweep optimisation '${optimisationId}':`, err);

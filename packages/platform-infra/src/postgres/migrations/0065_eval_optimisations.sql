@@ -1,4 +1,4 @@
--- Step Evaluation 5d (ADR-0023 D15). A GEPA optimisation of one Step's
+-- ADR-0023 D15. A GEPA optimisation of one Step's
 -- prompt: the job's candidates, what it cost, and the Eval Run that runs them.
 CREATE TABLE "eval_optimisations" (
   "id" uuid PRIMARY KEY NOT NULL,

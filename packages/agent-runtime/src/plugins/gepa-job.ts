@@ -1,5 +1,4 @@
 import { execFile } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,6 +6,7 @@ import { promisify } from 'node:util';
 import { z } from 'zod';
 import { isLocalExecutionAllowed } from './base-container-agent-plugin';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy';
+import { localSandboxEnv, sandboxedDockerArgs, stderrDetail, uniqueContainerName } from './sandbox-container';
 
 const execFileAsync = promisify(execFile);
 
@@ -31,8 +31,6 @@ try:
 except ImportError:
     sys.stderr.write('the gepa package is not installed: pip install gepa\n')
     sys.exit(2)
-
-REFLECTION_MINIBATCH_SIZE = 3
 
 
 def main(output_dir):
@@ -75,7 +73,7 @@ def main(output_dir):
         return reply['choices'][0]['message'].get('content') or ''
 
     records = job['records']
-    size = min(REFLECTION_MINIBATCH_SIZE, len(records))
+    size = min(job['minibatchSize'], len(records))
     try:
         for index in range(job['candidates']):
             batch = [records[(index * size + offset) % len(records)] for offset in range(size)]
@@ -96,6 +94,9 @@ def main(output_dir):
 main(sys.argv[1])
 `;
 
+/** Records per reflection call, as GEPA samples its minibatches. */
+export const GEPA_REFLECTION_MINIBATCH_SIZE = 3;
+
 /** One example GEPA reflects on: what the step was given, what it produced, and the feedback on it. */
 export type GepaReflectiveRecord = Record<string, unknown>;
 
@@ -105,6 +106,7 @@ export interface GepaJobInput {
   readonly currentPrompt: string;
   readonly candidates: number;
   readonly maxOutputTokens: number;
+  readonly minibatchSize: number;
   readonly records: readonly GepaReflectiveRecord[];
 }
 
@@ -126,7 +128,7 @@ const GepaJobResultSchema = z.object({
 export type GepaJobOutcome = z.infer<typeof GepaJobResultSchema>;
 
 /**
- * Runs the GEPA job (ADR-0023 Phase 5) in its own container — network on, for
+ * Runs the GEPA job (ADR-0023 D15) in its own container — network on, for
  * the reflection model, and nothing mounted but its `/output` — or as a local
  * `python3` process under `ALLOW_LOCAL_AGENTS`. A job that fails after it
  * started still returns what it proposed and spent, with `error` set; one that
@@ -165,36 +167,24 @@ async function runLocally(request: GepaJobRequest, outputDir: string, env: Recor
       cwd: outputDir,
       timeout: request.timeoutMs,
       env: {
-        NODE_ENV: process.env.NODE_ENV,
-        PATH: process.env.PATH,
-        HOME: process.env.HOME,
-        TMPDIR: process.env.TMPDIR,
+        ...localSandboxEnv(),
         ...(process.env.PYTHONPATH === undefined ? {} : { PYTHONPATH: process.env.PYTHONPATH }),
         ...env,
       },
     });
     return null;
   } catch (err) {
-    const stderr = (err as { stderr?: string }).stderr;
-    return `GEPA job failed${typeof stderr === 'string' && stderr.trim().length > 0 ? `: ${stderr.trim().slice(0, 2000)}` : ''}`;
+    return `GEPA job failed${stderrDetail((err as { stderr?: unknown }).stderr)}`;
   }
 }
 
 async function runInContainer(request: GepaJobRequest, outputDir: string, env: Record<string, string>): Promise<string | null> {
-  const containerName = `mediforce-gepa-${request.label}`.replace(/[^a-zA-Z0-9_.-]/g, '-').slice(0, 50)
-    + `-${randomUUID().slice(0, 12)}`;
+  const containerName = uniqueContainerName('mediforce-gepa', request.label);
   const result = await getDockerSpawnStrategy().spawn({
     dockerArgs: [
       'run', '--rm',
       '--name', containerName,
-      // DAC_OVERRIDE is the one capability kept: `mkdtemp` directories are 0700
-      // and owned by whoever runs the platform, not by the container's root.
-      '--cap-drop', 'ALL',
-      '--cap-add', 'DAC_OVERRIDE',
-      '--security-opt', 'no-new-privileges',
-      '--pids-limit', '256',
-      '--memory', '1g',
-      '--cpus', '1',
+      ...sandboxedDockerArgs({ memory: '1g' }),
       '-v', `${outputDir}:/output`,
       ...Object.entries(env).flatMap(([key, value]) => ['-e', `${key}=${value}`]),
       GEPA_JOB_IMAGE,
@@ -209,6 +199,5 @@ async function runInContainer(request: GepaJobRequest, outputDir: string, env: R
     logFile: null,
   });
   if (result.exitCode === 0) return null;
-  const stderr = result.stderr.trim();
-  return `GEPA job exited with code ${String(result.exitCode)}${stderr.length > 0 ? `: ${stderr.slice(0, 2000)}` : ''}`;
+  return `GEPA job exited with code ${String(result.exitCode)}${stderrDetail(result.stderr)}`;
 }
