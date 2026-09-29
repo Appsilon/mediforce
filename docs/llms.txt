@@ -26,7 +26,7 @@ The project's canonical identifiers are the domain mediforce.ai, the repository 
 - [FDA/EMA AI Principles](https://mediforce.ai/fda-principles.html): the 10 guiding principles from the January 2026 FDA-hosted document, each mapped to Mediforce's current status. Explicitly a request for comment, not a finished compliance claim.
 - [News](https://mediforce.ai/news.html): every release and every Mediforce article, newest first. Releases come live from GitHub; articles are the Appsilon blog posts about the project.
 - [Workflow Examples](https://mediforce.ai/examples.html): CI-tested workflow patterns to combine and adapt.
-- [Server Setup](https://mediforce.ai/setup/): browser-based wizard for standing up a self-hosted instance.
+- [Self-host Mediforce](https://mediforce.ai/setup/): the whole path to running your own instance — the server, the DNS record, sign-in, email, and `scripts/bootstrap-server.py`, the resumable bootstrap that does the rest. Defers to the install reference in the docs for the env-var table.
 
 ## Case studies
 
