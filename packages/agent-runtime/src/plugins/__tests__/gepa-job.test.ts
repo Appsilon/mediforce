@@ -29,6 +29,7 @@ const input: GepaJobInput = {
   currentPrompt: 'Grade each AE.',
   candidates: 2,
   maxOutputTokens: 2000,
+  minibatchSize: 3,
   records: [
     {
       Inputs: { events: [{ term: 'Sepsis', outcome: 'fatal' }] },

@@ -341,6 +341,8 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
       .describe('What the job and the candidates\' Eval Run may spend together; counted against the unattended budget.'),
     candidates: z.number().int().min(1).max(3).optional().describe('Prompts to propose (default 3).'),
     trialsPerCase: z.number().int().min(1).max(10).optional().describe('Trials per case in the candidates\' Eval Run (default 1).'),
+    reflectionModel: z.string().min(1).optional()
+      .describe('The model the job reflects with; the assistant\'s default model when absent. It must have a registry price.'),
   }),
 } as const;
 

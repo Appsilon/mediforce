@@ -1,5 +1,4 @@
 import { execFile } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,6 +6,7 @@ import { promisify } from 'node:util';
 import { z } from 'zod';
 import { isLocalExecutionAllowed } from './base-container-agent-plugin';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy';
+import { localSandboxEnv, sandboxedDockerArgs, stderrDetail, uniqueContainerName } from './sandbox-container';
 import { RUNTIME_CONFIG } from './script-container-plugin';
 
 const execFileAsync = promisify(execFile);
@@ -101,15 +101,11 @@ async function runLocally(
     await execFileAsync(command!, args, {
       cwd: workspaceDir,
       timeout: request.timeoutMs,
-      env: { NODE_ENV: process.env.NODE_ENV, PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR },
+      env: localSandboxEnv(),
     });
     return 0;
   } catch (err) {
-    const failure = err as { code?: number | string; stderr?: string };
-    const detail = typeof failure.stderr === 'string' && failure.stderr.trim().length > 0
-      ? `: ${failure.stderr.trim().slice(0, 2000)}`
-      : '';
-    throw new Error(`code check failed${detail}`);
+    throw new Error(`code check failed${stderrDetail((err as { stderr?: unknown }).stderr)}`);
   }
 }
 
@@ -120,23 +116,13 @@ async function runInContainer(
   workspaceDir: string,
 ): Promise<number | null> {
   await writeFile(join(outputDir, `check${runtime.ext}`), request.source, 'utf-8');
-  // Unique per check: the same run can be previewed and calibrated at once, and
-  // the local strategy removes any container already holding the name.
-  const containerName = `mediforce-code-check-${request.label}`.replace(/[^a-zA-Z0-9_.-]/g, '-').slice(0, 50)
-    + `-${randomUUID().slice(0, 12)}`;
+  const containerName = uniqueContainerName('mediforce-code-check', request.label);
   const result = await getDockerSpawnStrategy().spawn({
     dockerArgs: [
       'run', '--rm',
       '--name', containerName,
       '--network', 'none',
-      // DAC_OVERRIDE is the one capability kept: `mkdtemp` directories are 0700
-      // and owned by whoever runs the platform, not by the container's root.
-      '--cap-drop', 'ALL',
-      '--cap-add', 'DAC_OVERRIDE',
-      '--security-opt', 'no-new-privileges',
-      '--pids-limit', '256',
-      '--memory', '2g',
-      '--cpus', '1',
+      ...sandboxedDockerArgs({ memory: '2g' }),
       '-v', `${outputDir}:/output`,
       '-v', `${workspaceDir}:/workspace:ro`,
       '-w', '/workspace',
@@ -152,7 +138,7 @@ async function runInContainer(
     logFile: null,
   });
   if (result.exitCode !== 0 && result.stderr.trim().length > 0) {
-    throw new Error(`code check failed: ${result.stderr.trim().slice(0, 2000)}`);
+    throw new Error(`code check failed${stderrDetail(result.stderr)}`);
   }
   return result.exitCode;
 }

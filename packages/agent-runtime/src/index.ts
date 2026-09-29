@@ -32,6 +32,7 @@ export { runCodeCheck, type CodeCheckRequest, type CodeCheckOutcome } from './pl
 export {
   runGepaJob,
   GEPA_JOB_IMAGE,
+  GEPA_REFLECTION_MINIBATCH_SIZE,
   type GepaJobInput,
   type GepaJobOutcome,
   type GepaJobRequest,

@@ -292,6 +292,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         evalRunId: null,
         status: 'proposing',
         error: null,
+        heartbeatAt: null,
         createdBy: 'author-1',
         createdAt: '2026-09-29T08:00:00.000Z',
       };

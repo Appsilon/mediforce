@@ -11,7 +11,7 @@ function split(result: OptimisationSplitResult): string {
 
 function printOptimisation(output: OutputSink, { optimisation, evalRun, spentUsd, baseline, ranking }: EvalOptimisationOutput): void {
   const job = optimisation.jobCostUsd === null ? 'job running' : `job $${optimisation.jobCostUsd}`;
-  output.stdout(`${optimisation.id}  ${optimisation.status}  budget $${optimisation.budgetUsd}, spent $${spentUsd.toFixed(4)} (${job})  from Eval Run ${optimisation.sourceEvalRunId} (${optimisation.sourceVariantId})  reflection ${optimisation.reflectionModel}`);
+  output.stdout(`${optimisation.id}  ${optimisation.status}  budget $${optimisation.budgetUsd}, spent ${spentUsd === null ? 'unknown' : `$${spentUsd.toFixed(4)}`} (${job})  from Eval Run ${optimisation.sourceEvalRunId} (${optimisation.sourceVariantId})  reflection ${optimisation.reflectionModel}`);
   if (optimisation.error !== null) output.stdout(`error: ${optimisation.error}`);
   if (evalRun !== null) output.stdout(`candidates run in Eval Run ${evalRun.id}: ${evalRun.status}, budget $${evalRun.budgetUsd}, spent $${evalRun.spentUsd.toFixed(4)}`);
   if (baseline !== null) output.stdout(`\nbaseline  ${baseline.label}  dev ${split(baseline.dev)}  holdout ${split(baseline.holdout)}`);

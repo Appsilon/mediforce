@@ -22,16 +22,12 @@ import {
   type VariantComparison,
 } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
-import { isPass, scoresOfTrial } from './trial-scores';
+import { isPass, mean, passedEveryCounted, scoresOfTrial } from './trial-scores';
 
 /** The Scores the run's Evaluators gave its scored trials, by trial id. */
 async function trialScores(scope: CallerScope, run: EvalRun, trials: readonly EvalTrial[]): Promise<Map<string, Score[]>> {
   const scored = trials.filter((trial) => trial.status === 'scored');
   return new Map(await Promise.all(scored.map(async (trial) => [trial.id, await scoresOfTrial(scope, run, trial)] as const)));
-}
-
-function mean(values: readonly number[]): number | null {
-  return values.length === 0 ? null : values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 function trialCounts(trials: readonly EvalTrial[]): EvalRunReport['trials'] {
@@ -131,13 +127,10 @@ function suiteReports(run: EvalRun, evaluators: readonly EvalRunEvaluatorReport[
  * is not a pass.
  */
 function confidenceOutcomes(run: EvalRun, trials: readonly EvalTrial[], scores: ReadonlyMap<string, Score[]>): ConfidenceOutcome[] {
-  const counted = new Set(run.evaluators.filter((evaluator) => evaluator.counted === true).map((evaluator) => evaluator.evaluatorId));
-  if (counted.size === 0) return [];
   return trials.flatMap((trial) => {
     if (trial.status !== 'scored' || trial.confidence === null) return [];
-    const graded = (scores.get(trial.id) ?? []).filter((score) => score.evaluatorId !== null && counted.has(score.evaluatorId));
-    const gradedBy = new Set(graded.map((score) => score.evaluatorId));
-    return gradedBy.size < counted.size ? [] : [{ confidence: trial.confidence, passed: graded.every(isPass) }];
+    const passed = passedEveryCounted(run, scores.get(trial.id) ?? []);
+    return passed === null ? [] : [{ confidence: trial.confidence, passed }];
   });
 }
 

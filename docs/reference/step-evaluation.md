@@ -548,8 +548,11 @@ budget) needs the workflow's `run` verb.
    workspace's `OPENROUTER_API_KEY`. Unlike a `code` check's sandbox it has
    network, for that model, and nothing mounted but its own `/output`. Under
    `ALLOW_LOCAL_AGENTS` it is a local `python3` process instead, which needs
-   `pip install gepa`. It runs after the start has answered (`proposing`); one
-   still proposing 15 minutes later is failed by the heartbeat.
+   `pip install gepa`. It runs after the start has answered (`proposing`) and
+   stamps `heartbeatAt` every minute, queued or running; one silent for 5
+   minutes died with its process and is failed by the heartbeat. It is one
+   round of proposals, not GEPA's multi-round loop — the next round is another
+   optimisation (ADR-0023 D15).
 3. **Candidates.** Prompts that are empty, unchanged or repeated are dropped.
    Each remaining one is a challenger — the variant's own patch with the new
    `prompt` — in a new Eval Run over the step's newest Dataset version, dev and
@@ -560,17 +563,23 @@ budget) needs the workflow's `run` verb.
 charged at the reflection model's registry price — a model the registry does
 not price is refused at the start, since the job could not be held to the
 budget — and the Eval Run gets what is left, which stops it like any other run
-(`budget_exceeded`). A job that spends it all fails the optimisation before any
-run. A job that fails part-way still records what it spent (`jobCostUsd`).
+(`budget_exceeded`). A start whose job's worst case — every call on the largest
+records at its full 4000-token output allowance — leaves nothing of the budget
+is refused. A job that spends it all anyway fails the optimisation before any
+run. A job that fails part-way still records what it spent (`jobCostUsd`), and
+what it proposed before it failed is still evaluated, with its `error` kept.
+While the job's cost is unknown — still proposing, or it died without saying —
+the reported `spentUsd` is null.
 
 **Results** (`mediforce eval optimisation <id>`,
 `GET /api/evaluation/optimisations/:id`; `mediforce eval optimisations` lists
 them) are computed from the Eval Run's Scores when read. Per variant and per
 split, a trial passes when every counted Evaluator graded it and passed it; the
 pass rate comes with its Wilson 95% interval. The step as it is is the
-baseline, and the candidates are ranked by dev pass rate — what GEPA selects
-on — then holdout, then mean cost. A dev gain the holdout does not show is
-fitted to the cases it reflected on. Apply a winner from its Eval Run's report
+baseline, and the candidates are ranked by the Wilson lower bound of their
+holdout pass rate, then dev pass rate, then mean cost: the job reflected on the
+dev cases, so a dev gain the holdout does not show is fitted to them. Without
+holdout cases, dev ranks alone. Apply a winner from its Eval Run's report
 (**Apply to step**, `apply-variant --run <evalRunId> --variant <id>`) as any
 challenger. Another round is another optimisation, from that Eval Run and the
 winner's `variantId`. Starting, proposing and failing are audited as

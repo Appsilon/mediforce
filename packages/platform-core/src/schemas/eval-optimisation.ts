@@ -3,7 +3,7 @@ import { EvaluatedStepSchema, StepVariantPatchSchema } from './evaluation';
 import { EvalVariantSchema } from './eval-run';
 
 /**
- * A GEPA optimisation of one Step's prompt (ADR-0023 D15, Phase 5): a container
+ * A GEPA optimisation of one Step's prompt (ADR-0023 D15): a container
  * job reflects on a finished Eval Run's trials of the dev cases and proposes
  * candidate prompts, which then run as challengers of a new Eval Run over the
  * Step's newest Dataset — dev and holdout cases alike — within a budget the
@@ -45,7 +45,10 @@ export const EvalOptimisationSchema = EvaluatedStepSchema.extend({
   candidates: z.array(OptimisationCandidateSchema),
   evalRunId: z.uuid().nullable(),
   status: EvalOptimisationStatusSchema,
+  /** Why it failed — or, while it evaluates, why the job stopped short of the candidates asked for. */
   error: z.string().nullable(),
+  /** Stamped while the job runs, queued or not, so the heartbeat fails only a job whose process died. */
+  heartbeatAt: z.iso.datetime().nullable().default(null),
   createdBy: z.string().min(1),
   createdAt: z.iso.datetime(),
 });
