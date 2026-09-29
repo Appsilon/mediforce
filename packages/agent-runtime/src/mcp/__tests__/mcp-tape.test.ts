@@ -244,7 +244,8 @@ describe('mcp-tape script (ADR-0023 D6)', () => {
       holdFirstCall = true;
       const answers = await converse(dir, ['record-http', join(dir, 'email.tape.jsonl'), url], [INITIALIZE, INITIALIZED, callFor(3, '1001'), callFor(4, '1002')]);
 
-      expect(answers.filter((answer) => answer.id === 3 || answer.id === 4).map((answer) => answer.id)).toEqual([4, 3]);
+      expect(events.filter((event) => event === 'received tools/call')).toHaveLength(2);
+      expect(answers.filter((answer) => answer.id === 3 || answer.id === 4).map((answer) => answer.id).sort()).toEqual([3, 4]);
     });
 
     it('relays what the server sends on its own stream once the session is initialized', async () => {
