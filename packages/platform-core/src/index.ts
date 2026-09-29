@@ -370,6 +370,7 @@ export {
   mcpReplayMissEntry,
   mcpReplayMissesOf,
   mergeMcpTapes,
+  MCP_REPLAY_RECORDINGS,
   JUDGE_MIN_LABELS,
   JUDGE_MIN_FAILURE_LABELS,
   JUDGE_MIN_AGREEMENT,

@@ -23,6 +23,7 @@ import {
   inlineMcpServerNames,
   mcpEvalRestrictions,
   mergeMcpTapes,
+  MCP_REPLAY_RECORDINGS,
   type AgentDefinitionRepository,
   type AgentOAuthTokenRepository,
   type EvaluationRepository,
@@ -301,9 +302,6 @@ export async function executeAgentStep(
     agentRunStatus: executionResult.status,
   };
 }
-
-/** How many of a case's newest recordings a replay merges — enough to cover what varies between live trials, bounded as recordings accumulate. */
-const MCP_REPLAY_RECORDINGS = 20;
 
 /**
  * An eval trial's step (ADR-0023 D4–D6): its variant's patch applied over the

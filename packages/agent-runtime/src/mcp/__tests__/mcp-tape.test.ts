@@ -80,7 +80,7 @@ describe('mcp-tape script (ADR-0023 D6)', () => {
     });
   });
 
-  it('replays recorded calls whatever their argument order, and answers an unrecorded one with an error it notes as a miss', async () => {
+  it('replays recorded calls whatever their argument order, and answers an unrecorded or extra one with an error it notes as a miss', async () => {
     const tapePath = join(dir, 'edc.replay.json');
     const missesPath = join(dir, 'edc.misses.jsonl');
     await writeFile(tapePath, JSON.stringify({
@@ -99,15 +99,23 @@ describe('mcp-tape script (ADR-0023 D6)', () => {
     ]);
 
     expect(answers.find((answer) => answer.id === 2)!.result).toEqual({ tools: [{ name: 'read_record', inputSchema: { type: 'object' } }] });
-    expect([3, 4, 5].map((id) => answers.find((answer) => answer.id === id)!.result)).toEqual([
+    expect([3, 4].map((id) => answers.find((answer) => answer.id === id)!.result)).toEqual([
       { content: [{ type: 'text', text: 'first' }] },
       { content: [{ type: 'text', text: 'second' }] },
-      { content: [{ type: 'text', text: 'second' }] },
     ]);
+    expect(answers.find((answer) => answer.id === 5)!.result).toMatchObject({ isError: true });
     expect(answers.find((answer) => answer.id === 6)!.result).toMatchObject({ isError: true });
     expect(await readReplayMisses(missesPath, 'edc')).toEqual([
+      { ts: expect.any(String), miss: { server: 'edc', tool: 'read_record', arguments: { subject: '1001', visit: 1 } } },
       { ts: expect.any(String), miss: { server: 'edc', tool: 'read_record', arguments: { subject: '9999' } } },
     ]);
+  });
+
+  it('refuses to read a misses file with a line it cannot parse, rather than count one miss fewer', async () => {
+    const missesPath = join(dir, 'edc.misses.jsonl');
+    await writeFile(missesPath, `${JSON.stringify({ ts: '2026-09-28T10:00:00.000Z', tool: 'read_record', arguments: {} })}\n{"ts":"2026-09\n`);
+
+    await expect(readReplayMisses(missesPath, 'edc')).rejects.toThrow();
   });
 
   it('keys a call as the platform merging recordings does, so the two never disagree on which calls are equal', () => {
@@ -131,12 +139,16 @@ describe('mcp-tape script (ADR-0023 D6)', () => {
     let url: string;
     let serverStream: string | null;
     let holdFirstCall: boolean;
+    let requestInCallStream: object | null;
     const seen: Array<{ headers: Record<string, unknown>; body: { method?: string } }> = [];
+    const events: string[] = [];
 
     beforeEach(async () => {
       seen.length = 0;
+      events.length = 0;
       serverStream = null;
       holdFirstCall = false;
+      requestInCallStream = null;
       let heldCall: (() => void) | null = null;
       server = createServer((request, response) => {
         if (request.method === 'GET') {
@@ -153,8 +165,12 @@ describe('mcp-tape script (ADR-0023 D6)', () => {
         request.on('end', () => {
           const message = JSON.parse(body) as { id?: number; method?: string; params?: { arguments?: { subject?: string } } };
           seen.push({ headers: request.headers, body: message });
+          events.push(`received ${message.method}`);
           if (message.id === undefined) {
-            response.writeHead(202).end();
+            setTimeout(() => {
+              events.push(`answered ${message.method}`);
+              response.writeHead(202).end();
+            }, 50);
           } else if (message.method === 'initialize') {
             response.writeHead(200, { 'content-type': 'application/json', 'mcp-session-id': 'session-1' })
               .end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'email', version: '1' } } }));
@@ -164,8 +180,16 @@ describe('mcp-tape script (ADR-0023 D6)', () => {
           } else {
             const answer = () => {
               response.writeHead(200, { 'content-type': 'text/event-stream' });
-              response.write(`event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: `record ${message.params?.arguments?.subject}` }] } })}\n\n`);
-              response.end();
+              const respond = () => {
+                response.write(`event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: `record ${message.params?.arguments?.subject}` }] } })}\n\n`);
+                response.end();
+              };
+              if (requestInCallStream === null) {
+                respond();
+              } else {
+                response.write(`data: ${JSON.stringify(requestInCallStream)}\n\n`);
+                setTimeout(respond, 50);
+              }
             };
             if (holdFirstCall && heldCall === null) {
               heldCall = answer;
@@ -198,6 +222,22 @@ describe('mcp-tape script (ADR-0023 D6)', () => {
         tools: [{ name: 'read_record' }],
         calls: [{ tool: 'read_record', arguments: { subject: '1001' }, result: { content: [{ type: 'text', text: 'record 1001' }] } }],
       });
+    });
+
+    it('posts nothing before the server has taken the initialized notification', async () => {
+      await converse(dir, ['record-http', join(dir, 'email.tape.jsonl'), url], [INITIALIZE, INITIALIZED, LIST]);
+
+      expect(events.slice(0, 4)).toEqual([
+        'received initialize', 'received notifications/initialized', 'answered notifications/initialized', 'received tools/list',
+      ]);
+    });
+
+    it('keeps reading a call\'s stream past a server request that shares the call\'s id', async () => {
+      requestInCallStream = { jsonrpc: '2.0', id: 3, method: 'sampling/createMessage', params: { messages: [] } };
+      const answers = await converse(dir, ['record-http', join(dir, 'email.tape.jsonl'), url], [INITIALIZE, INITIALIZED, callFor(3, '1001')]);
+
+      expect(answers).toContainEqual(expect.objectContaining({ id: 3, method: 'sampling/createMessage' }));
+      expect(answers).toContainEqual(expect.objectContaining({ id: 3, result: { content: [{ type: 'text', text: 'record 1001' }] } }));
     });
 
     it('posts calls in parallel, so one the server holds back never blocks the next', async () => {

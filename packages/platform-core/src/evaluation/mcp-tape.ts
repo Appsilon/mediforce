@@ -36,6 +36,9 @@ export function mcpCallKey(call: Pick<McpTapeCall, 'tool' | 'arguments'>): strin
   return `${call.tool} ${canonicalJson(call.arguments)}`;
 }
 
+/** How many of a case's newest recordings a replay merges — enough to cover what varies between live trials, bounded as recordings accumulate. */
+export const MCP_REPLAY_RECORDINGS = 20;
+
 /**
  * Every recording of one MCP server for one Eval Case, oldest first, merged
  * into the tape a replay answers from (ADR-0023 D6): the newest tool list, and

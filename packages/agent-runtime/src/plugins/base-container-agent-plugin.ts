@@ -213,9 +213,10 @@ export async function cleanupTempDir(tempDir: string | null): Promise<void> {
   }
 }
 
-/** A server name as a file name. */
+/** A server name as a file name, distinct for distinct names: every character
+ *  outside [A-Za-z0-9-], `_` included, becomes `_<hex code point>_`. */
 function tapeFileStem(server: string): string {
-  return server.replace(/[^A-Za-z0-9_-]/g, '_');
+  return server.replace(/[^A-Za-z0-9-]/gu, (character) => `_${character.codePointAt(0)!.toString(16)}_`);
 }
 
 /** Build the `headers` map for an HTTP MCP entry based on the resolved
@@ -502,33 +503,47 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   }
 
   /** Once the agent has exited — finished, failed or timed out: hand each
-   *  recorded server's tape to the caller, and put every call a replayed
-   *  server could not answer into the Agent Trajectory. Never throws — a tape
-   *  that cannot be read or stored is logged; recording is evidence for a
-   *  later trial, never a reason to fail this one. */
-  protected async collectMcpTapes(outputDir: string): Promise<void> {
-    if (!isWorkflowAgentContext(this.context)) return;
-    const { mcpTapes: tapes, trajectory } = this.context;
-    if (tapes === undefined) return;
-    const dir = join(outputDir, MCP_TAPE_DIR);
-    const warn = (what: string, error: unknown) => console.warn(
-      `[mcp-tape] could not ${what} for step ${this.context.stepId}:`, error instanceof Error ? error.message : error,
-    );
+   *  recorded server's tape to the caller. Never throws — a tape that cannot
+   *  be read or stored is logged; recording is evidence for a later trial,
+   *  never a reason to fail this one. */
+  protected async storeMcpRecordings(outputDir: string): Promise<void> {
+    if (!isWorkflowAgentContext(this.context) || this.context.mcpTapes === undefined) return;
+    const tapes = this.context.mcpTapes;
     for (const server of tapes.record) {
       try {
-        const tape = await readRecordedTape(join(dir, `${tapeFileStem(server)}.tape.jsonl`));
+        const tape = await readRecordedTape(join(outputDir, MCP_TAPE_DIR, `${tapeFileStem(server)}.tape.jsonl`));
         if (tape !== null) await tapes.onRecorded(server, tape);
       } catch (error) {
-        warn(`store the recording of '${server}'`, error);
+        console.warn(
+          `[mcp-tape] could not store the recording of '${server}' for step ${this.context.stepId}:`,
+          error instanceof Error ? error.message : error,
+        );
       }
     }
+  }
+
+  /** Once the agent has finished: put every call a replayed server could not
+   *  answer into the Agent Trajectory, where the Eval Run report counts them.
+   *  Throws when they cannot all be read or recorded — the trial then fails
+   *  rather than report fewer unanswered calls than it made. */
+  protected async recordMcpReplayMisses(outputDir: string): Promise<void> {
+    if (!isWorkflowAgentContext(this.context) || this.context.mcpTapes === undefined) return;
+    const { mcpTapes: tapes, trajectory } = this.context;
     for (const server of Object.keys(tapes.replay)) {
+      let misses: Awaited<ReturnType<typeof readReplayMisses>>;
       try {
-        const misses = await readReplayMisses(join(dir, `${tapeFileStem(server)}.misses.jsonl`), server);
-        if (misses.length > 0) trajectory?.record(misses.map(({ ts, miss }) => mcpReplayMissEntry(miss, ts)));
+        misses = await readReplayMisses(join(outputDir, MCP_TAPE_DIR, `${tapeFileStem(server)}.misses.jsonl`), server);
       } catch (error) {
-        warn(`read the unrecorded calls to '${server}'`, error);
+        throw new Error(
+          `Could not read the calls replayed MCP server '${server}' had no recording for: `
+          + `${error instanceof Error ? error.message : String(error)}`,
+        );
       }
+      if (misses.length === 0) continue;
+      if (trajectory === undefined) {
+        throw new Error(`Replayed MCP server '${server}' had no recording for ${misses.length} call(s), and this run keeps no Agent Trajectory to note them in`);
+      }
+      trajectory.record(misses.map(({ ts, miss }) => mcpReplayMissEntry(miss, ts)));
     }
   }
 
@@ -811,6 +826,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     let tempDir: string | null = null;
     let dockerOutputDir: string | null = null;
     let succeeded = false;
+    let replayMissesRecorded = false;
 
     try {
       // Download remote files to local temp dir so the CLI can read them directly
@@ -1041,6 +1057,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // Strip envelope-level fields from result to avoid duplication in UI
       const { confidence: _c, confidence_rationale: _cr, tokenUsage: _tu, ...cleanResult } = parsedResult;
 
+      if (dockerOutputDir !== null) {
+        replayMissesRecorded = true;
+        await this.recordMcpReplayMisses(dockerOutputDir);
+      }
+
       // Persist any deliverable file from the output dir before it gets cleaned up
       const deliverableFile = await this.persistDeliverableFile(
         dockerOutputDir ?? spawnResult.outputDir ?? '',
@@ -1119,8 +1140,14 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // Re-throw so the agent runner's fallback handler deals with the error
       throw error;
     } finally {
-      if (dockerOutputDir) {
-        await this.collectMcpTapes(dockerOutputDir);
+      if (dockerOutputDir !== null) {
+        // A failed trial is never scored, but its trajectory still shows what replay could not answer.
+        if (replayMissesRecorded === false) {
+          await this.recordMcpReplayMisses(dockerOutputDir).catch((error: unknown) => {
+            console.warn(`[mcp-tape] ${error instanceof Error ? error.message : String(error)}`);
+          });
+        }
+        await this.storeMcpRecordings(dockerOutputDir);
       }
       if (succeeded) {
         await cleanupTempDir(tempDir);

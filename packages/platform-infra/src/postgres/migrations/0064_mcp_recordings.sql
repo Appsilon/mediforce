@@ -11,7 +11,7 @@ CREATE TABLE "eval_mcp_recordings" (
   "server" text NOT NULL,
   "tape" jsonb NOT NULL,
   "eval_run_id" uuid NOT NULL REFERENCES "eval_runs"("id") ON DELETE CASCADE,
-  "trial_id" uuid NOT NULL,
+  "trial_id" uuid NOT NULL REFERENCES "eval_trials"("id") ON DELETE CASCADE,
   "recorded_at" timestamp with time zone DEFAULT now() NOT NULL
 );--> statement-breakpoint
 CREATE INDEX "eval_mcp_recordings_case_idx" ON "eval_mcp_recordings" ("workspace", "workflow_name", "step_id", "case_id", "server", "recorded_at");--> statement-breakpoint

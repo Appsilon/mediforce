@@ -1131,5 +1131,24 @@ describe('ClaudeCodeAgentPlugin', () => {
         { ts: '2026-09-28T10:00:00.000Z', type: 'mcp_replay_miss', server: 'edc', tool: 'read_record', input: { subject: '1001' } },
       ]);
     });
+
+    it('[ERROR] fails an eval trial whose replay misses cannot be read, rather than report fewer than it made (ADR-0023 D6)', async () => {
+      const context = {
+        ...buildWorkflowContext({}),
+        resolvedMcpConfig: { servers: { edc: { type: 'stdio', command: 'edc-mcp' } } },
+        mcpTapes: { replay: { edc: { tools: [], calls: [] } }, record: [], onRecorded: vi.fn() },
+        trajectory: { record: vi.fn() },
+      } as WorkflowAgentContext;
+      await plugin.initialize(context);
+      mockReadSkill(plugin).mockResolvedValue('# Skill');
+      mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
+        const tapeDir = join(options!.outputDir as string, 'mcp-tape');
+        await mkdir(tapeDir, { recursive: true });
+        await writeFile(join(tapeDir, 'edc.misses.jsonl'), '{"ts":"2026-09-28T10:00:00');
+        return { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: options!.outputDir as string, injectedEnvVars: [] };
+      });
+
+      await expect(plugin.run(buildEmitSpy().emit)).rejects.toThrow(/Could not read the calls replayed MCP server 'edc' had no recording for/);
+    });
   });
 });

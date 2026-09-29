@@ -80,16 +80,23 @@ use carries an eval policy: `live`, `deny`, or `live` with named tools denied.
 Undeclared servers are denied in trials. The policy applies as extra
 subtractive `mcpRestrictions`. It is **not** part of the Fingerprint; the Eval
 Run report and the Step Qualification state it ("qualified with `edc-write`
-denied"). Container network egress is out of scope — trials inherit production's. _Amended 2026-09-28
-(Phase 5c): a third mode, `replay`. A live trial records, per Eval Case and
+denied"). Container network egress is out of scope — trials inherit production's. _Amended 2026-09-28:
+a third mode, `replay`. A live trial records, per Eval Case and
 server, the tool list and every tool call with its result, through a proxy the
 trial's MCP config starts in the server's place. A replayed server is answered
 from the newest recordings of that case — the newest recording of each distinct
 call, matched on tool and canonical arguments — and is never reached, so a
-side-effecting tool is safe to exercise. An unrecorded call gets an error
-result, is kept on the trial, and is counted in the report; a replayed server
-no live trial of the case recorded fails the trial closed. The report says
-when no server was live, i.e. no trial made a live MCP call._
+side-effecting tool is safe to exercise. An unrecorded call, or one made more
+often than it was recorded, gets an error result, is kept on the trial, and is
+counted in the report; a trial whose unrecorded calls cannot all be read fails
+rather than under-count, and a replayed server no live trial of the case
+recorded fails the trial closed. The report says when no server was live, i.e.
+no trial made a live MCP call. Recordings are keyed by case and server only —
+not by variant or Fingerprint — so a challenger replays what any live trial of
+the case recorded. The proxy runs inside the agent's container and keeps its
+files where the agent can write, so a recording is only as trustworthy as the
+agent that ran beside it; isolating it from the agent is a later change
+([#1432](https://github.com/Appsilon/mediforce/issues/1432))._
 
 **D7 — Evaluators are versioned; a version that produced a Score is
 immutable.** Eval Runs record the Evaluator versions used; a Step

@@ -17,8 +17,9 @@ export const MCP_TAPE_DIR = 'mcp-tape';
  *
  * Recording appends the result of every `tools/list` and `tools/call` to the
  * tape. Replay answers `tools/call` by tool and canonical arguments — the n-th
- * identical call gets the n-th recorded result, the last one repeating — and
- * answers an unrecorded call with an `isError` result, noting it as a miss.
+ * identical call gets the n-th recorded result — and answers an unrecorded
+ * call, or one made more often than it was recorded, with an `isError` result,
+ * noting it as a miss.
  */
 export const MCP_TAPE_SCRIPT = String.raw`import { spawn } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -186,9 +187,11 @@ function recordHttp(url) {
         fail(messages, 'MCP server answered HTTP ' + response.status + ': ' + body.slice(0, 500));
         return;
       }
+      // A request the server makes inside the stream has an id of its own
+      // numbering, so only a response answers one of ours.
       const receive = (text) => {
         for (const message of parseMessages(text)) {
-          unanswered.delete(JSON.stringify(message.id));
+          if (message.method === undefined) unanswered.delete(JSON.stringify(message.id));
           deliver(message);
         }
       };
@@ -206,14 +209,16 @@ function recordHttp(url) {
 
   // Each message is posted as it arrives, so parallel tool calls stay parallel
   // and the agent's answer to a server request inside a stream is never held
-  // behind that stream. Only initialize goes first: its answer carries the session.
+  // behind that stream. Only the handshake goes in order: initialize, whose
+  // answer carries the session, then the initialized notification.
   const inFlight = new Set();
-  let initialized = Promise.resolve();
+  let handshake = Promise.resolve();
   createInterface({ input: process.stdin })
     .on('line', (line) => {
-      const initializing = parseMessages(line).some((message) => message.method === 'initialize');
-      const posted = (initializing ? post(line) : initialized.then(() => post(line))).finally(() => inFlight.delete(posted));
-      if (initializing) initialized = posted;
+      const methods = parseMessages(line).map((message) => message.method);
+      const initializing = methods.includes('initialize');
+      const posted = (initializing ? post(line) : handshake.then(() => post(line))).finally(() => inFlight.delete(posted));
+      if (initializing || methods.includes('notifications/initialized')) handshake = posted;
       inFlight.add(posted);
     })
     .on('close', () => {
@@ -245,16 +250,19 @@ function replay(missesPath) {
       const args = params.arguments || {};
       const key = params.name + ' ' + canonical(args);
       const matches = tape.calls.filter((call) => call.tool + ' ' + canonical(call.arguments) === key);
-      if (matches.length === 0) {
-        append(missesPath, { ts: new Date().toISOString(), tool: params.name, arguments: args });
-        send({ jsonrpc: '2.0', id, result: { isError: true, content: [{ type: 'text', text:
-          'No recorded response for ' + params.name + ' with these arguments. This eval trial replays the MCP '
-          + 'responses a live trial of the same Eval Case recorded, and this call was not among them.' }] } });
-        return;
-      }
       const occurrence = served.get(key) || 0;
       served.set(key, occurrence + 1);
-      send({ jsonrpc: '2.0', id, result: matches[Math.min(occurrence, matches.length - 1)].result });
+      if (occurrence >= matches.length) {
+        append(missesPath, { ts: new Date().toISOString(), tool: params.name, arguments: args });
+        const recorded = matches.length === 0
+          ? 'this call was not among them'
+          : 'they made this call only ' + matches.length + ' time' + (matches.length === 1 ? '' : 's');
+        send({ jsonrpc: '2.0', id, result: { isError: true, content: [{ type: 'text', text:
+          'No recorded response for ' + params.name + ' with these arguments. This eval trial replays the MCP '
+          + 'responses a live trial of the same Eval Case recorded, and ' + recorded + '.' }] } });
+        return;
+      }
+      send({ jsonrpc: '2.0', id, result: matches[occurrence].result });
     } else {
       send({ jsonrpc: '2.0', id, error: { code: -32601, message: 'Method not found: ' + method } });
     }
@@ -320,12 +328,20 @@ export async function readRecordedTape(path: string): Promise<McpTape | null> {
 
 const MissLineSchema = z.object({ ts: z.iso.datetime(), tool: z.string().min(1), arguments: z.record(z.string(), z.unknown()) });
 
-/** The calls `replay` could not answer from its tape, each with when it was made. */
+/**
+ * The calls `replay` could not answer from its tape, each with when it was
+ * made. Throws on a line it cannot read rather than count one miss fewer.
+ */
 export async function readReplayMisses(path: string, server: string): Promise<{ ts: string; miss: McpReplayMiss }[]> {
-  return ((await readLines(path)) ?? []).flatMap((line) => {
-    const parsed = MissLineSchema.safeParse(line);
-    if (!parsed.success) return [];
-    const { ts, ...call } = parsed.data;
-    return [{ ts, miss: { server, ...call } }];
+  let text: string;
+  try {
+    text = await readFile(path, 'utf-8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+  return text.split('\n').filter((line) => line.trim() !== '').map((line) => {
+    const { ts, ...call } = MissLineSchema.parse(JSON.parse(line));
+    return { ts, miss: { server, ...call } };
   });
 }
