@@ -4,6 +4,7 @@
  * where a function cannot travel.
  */
 import { z } from 'zod';
+import type { AgentTrajectoryEntry } from '../schemas/agent-trajectory';
 
 export const AgentLogFormatSchema = z.enum(['claude-stream-json', 'opencode-jsonl', 'raw', 'none']);
 export type AgentLogFormat = z.infer<typeof AgentLogFormatSchema>;
@@ -22,19 +23,9 @@ interface ClaudeStreamEvent {
   [key: string]: unknown;
 }
 
-interface LogEntry {
-  ts: string;
-  type: string;
-  subtype?: string;
-  tool?: string;
-  input?: Record<string, unknown>;
-  text?: string;
-  [key: string]: unknown;
-}
-
-function formatClaudeEvent(event: ClaudeStreamEvent): string[] {
+function claudeEventEntries(event: ClaudeStreamEvent): AgentTrajectoryEntry[] {
   const ts = new Date().toISOString();
-  const entries: LogEntry[] = [];
+  const entries: AgentTrajectoryEntry[] = [];
 
   if (event.type === 'assistant' && event.message?.content) {
     for (const block of event.message.content) {
@@ -51,7 +42,7 @@ function formatClaudeEvent(event: ClaudeStreamEvent): string[] {
         entries.push({ ts, type: 'assistant', subtype: 'text', text: block.text });
       }
     }
-    return entries.map((entry) => JSON.stringify(entry));
+    return entries;
   }
 
   if (event.type === 'tool_result') {
@@ -62,7 +53,7 @@ function formatClaudeEvent(event: ClaudeStreamEvent): string[] {
       subtype: event.subtype,
       content: event.content,
     });
-    return entries.map((entry) => JSON.stringify(entry));
+    return entries;
   }
 
   // CLI stream-json sends tool results as `user` messages with tool_result content blocks
@@ -83,7 +74,7 @@ function formatClaudeEvent(event: ClaudeStreamEvent): string[] {
       }
     }
     if (entries.length > 0) {
-      return entries.map((entry) => JSON.stringify(entry));
+      return entries;
     }
   }
 
@@ -94,13 +85,13 @@ function formatClaudeEvent(event: ClaudeStreamEvent): string[] {
       subtype: event.subtype,
       text: typeof event.result === 'string' ? event.result.slice(0, 500) : undefined,
     });
-    return entries.map((entry) => JSON.stringify(entry));
+    return entries;
   }
 
   // Generic fallback: capture any event type we don't explicitly handle
   const { type, subtype, ...rest } = event;
   entries.push({ ts, type, subtype, ...rest });
-  return entries.map((entry) => JSON.stringify(entry));
+  return entries;
 }
 
 interface OpenCodeEvent {
@@ -123,50 +114,50 @@ interface OpenCodeEvent {
   };
 }
 
-function formatOpenCodeEvent(event: OpenCodeEvent): string[] {
+function openCodeEventEntries(event: OpenCodeEvent): AgentTrajectoryEntry[] {
   const ts = event.timestamp
     ? new Date(event.timestamp).toISOString()
     : new Date().toISOString();
 
   if (event.type === 'text' && event.part?.text) {
-    return [JSON.stringify({ ts, type: 'assistant', subtype: 'text', text: event.part.text })];
+    return [{ ts, type: 'assistant', subtype: 'text', text: event.part.text }];
   }
 
   if (event.type === 'tool_use' && event.part?.tool) {
-    const entries: string[] = [];
+    const entries: AgentTrajectoryEntry[] = [];
     const toolName = event.part.tool;
     const state = event.part.state;
 
-    entries.push(JSON.stringify({
+    entries.push({
       ts,
       type: 'assistant',
       subtype: 'tool_call',
       tool: toolName,
       input: state?.input,
-    }));
+    });
 
     if (state?.output || state?.error) {
-      entries.push(JSON.stringify({
+      entries.push({
         ts,
         type: 'tool_result',
         tool_name: toolName,
         content: state.error
           ? `[error] ${state.error}`
           : (state.output ?? '').slice(0, 500),
-      }));
+      });
     }
 
     return entries;
   }
 
   if (event.type === 'step_finish' && event.part) {
-    return [JSON.stringify({
+    return [{
       ts,
       type: 'result',
       subtype: event.part.reason ?? 'completed',
       cost: event.part.cost,
       tokens: event.part.tokens,
-    })];
+    }];
   }
 
   // step_start and the rest carry nothing a reader of the activity log wants.
@@ -174,29 +165,41 @@ function formatOpenCodeEvent(event: OpenCodeEvent): string[] {
 }
 
 /**
- * JSONL entries for one raw stdout line, or `[]` when the line carries nothing
- * loggable. Never throws: it runs inside a stream reader, where an exception
- * would tear down the container's output handling mid-run.
+ * Structured entries for one line of an agent CLI's event stream, or `[]` when
+ * the line carries nothing loggable. The activity log and the Agent Trajectory
+ * (ADR-0023 D8) both take these, so the two never disagree. `raw` and `none`
+ * have no structure and yield nothing. Never throws: it runs inside a stream
+ * reader, where an exception would tear down the container's output handling
+ * mid-run.
  */
-export function formatAgentLogLine(format: AgentLogFormat, line: string): string[] {
-  if (format === 'none') return [];
+export function agentLogEntries(format: AgentLogFormat, line: string): AgentTrajectoryEntry[] {
+  if (format === 'none' || format === 'raw') return [];
 
   const trimmed = line.trim();
-
-  // A script's stdout is plain text with no event structure. It goes to the log
-  // verbatim, which is what the viewer's raw fallback renders.
-  if (format === 'raw') return trimmed.length > 0 ? [trimmed] : [];
-
   if (trimmed.startsWith('{') === false) return [];
 
   try {
     const event = JSON.parse(trimmed) as unknown;
     return format === 'claude-stream-json'
-      ? formatClaudeEvent(event as ClaudeStreamEvent)
-      : formatOpenCodeEvent(event as OpenCodeEvent);
+      ? claudeEventEntries(event as ClaudeStreamEvent)
+      : openCodeEventEntries(event as OpenCodeEvent);
   } catch {
     return [];
   }
+}
+
+/**
+ * JSONL entries for one raw stdout line, or `[]` when the line carries nothing
+ * loggable. Never throws, like `agentLogEntries`.
+ */
+export function formatAgentLogLine(format: AgentLogFormat, line: string): string[] {
+  // A script's stdout is plain text with no event structure. It goes to the log
+  // verbatim, which is what the viewer's raw fallback renders.
+  if (format === 'raw') {
+    const trimmed = line.trim();
+    return trimmed.length > 0 ? [trimmed] : [];
+  }
+  return agentLogEntries(format, line).map((entry) => JSON.stringify(entry));
 }
 
 /**

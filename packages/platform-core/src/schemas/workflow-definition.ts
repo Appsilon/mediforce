@@ -141,6 +141,19 @@ export const ContainerSchema = z.object({
   repoAuth: z.string().optional(),
 });
 
+/**
+ * JSON Schema an agent step's `result` must satisfy. The same structural subset
+ * cowork enforces (`type`, `required`, per-property `type`); other keywords pass
+ * through to the prompt as guidance but are not checked.
+ */
+export const OutputSchemaPropertyTypeSchema = z.enum(['string', 'number', 'integer', 'boolean', 'null', 'array', 'object']);
+
+export const AgentOutputSchemaSchema = z.looseObject({
+  type: z.literal('object').optional(),
+  required: z.array(z.string()).optional(),
+  properties: z.record(z.string(), z.looseObject({ type: OutputSchemaPropertyTypeSchema.optional() })).optional(),
+});
+
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
   skill: z.string().optional(),
@@ -150,6 +163,9 @@ export const WorkflowAgentConfigSchema = z.object({
   timeoutMinutes: z.number().optional(),
   confidenceThreshold: z.number().min(0).max(1).optional(),
   fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
+  /** Shown to the agent in its prompt and checked against `result` after the
+   *  run: one retry with the validation error, then `fallbackBehavior`. */
+  outputSchema: AgentOutputSchemaSchema.optional(),
   /** @deprecated Step-level MCP configuration is being removed.
    *  Move servers onto the agent via AgentDefinition.mcpServers and
    *  narrow them at the step via WorkflowStep.mcpRestrictions.
@@ -364,7 +380,7 @@ function validateSteps(
       plugin?: string;
       action?: unknown;
       assignedTo?: string;
-      agent?: unknown;
+      agent?: { outputSchema?: unknown };
       autonomyLevel?: string;
       cowork?: unknown;
       script?: unknown;
@@ -431,6 +447,14 @@ function validateSteps(
           message: `step '${step.id}': cowork config is not allowed on script steps`,
         });
       }
+    }
+
+    if (step.agent?.outputSchema !== undefined && step.executor !== 'agent') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['steps', i, 'agent', 'outputSchema'],
+        message: `step '${step.id}' has agent.outputSchema but executor is '${step.executor}' (only executor='agent' enforces it)`,
+      });
     }
 
     if (step.assignedTo !== undefined && step.executor !== 'human') {
@@ -924,6 +948,7 @@ export function parseWorkflowTemplate(input: unknown) {
 
 export type ContainerConfig = z.infer<typeof ContainerSchema>;
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
+export type OutputSchemaPropertyType = z.infer<typeof OutputSchemaPropertyTypeSchema>;
 export type ScriptStepConfig = z.infer<typeof ScriptStepConfigSchema>;
 export type DatabricksJobConfig = z.infer<typeof DatabricksJobConfigSchema>;
 export type WorkflowCoworkConfig = z.infer<typeof WorkflowCoworkConfigSchema>;

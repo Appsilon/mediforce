@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { AlertTriangle, Bot } from 'lucide-react';
-import type { AgentOutputData } from './task-utils';
+import type { AgentOutputData, EscalationReason } from './task-utils';
 import { formatStepName } from '@/lib/format';
 import { AgentOutputDisplay } from '@/components/agents/agent-output-display';
 
@@ -76,11 +76,12 @@ export function AgentOutputReviewPanel({
   );
 }
 
-function formatEscalationReason(reason: 'low_confidence' | 'timeout' | 'error' | 'iterations_limit'): string {
+function formatEscalationReason(reason: NonNullable<EscalationReason>): string {
   switch (reason) {
     case 'low_confidence': return 'low confidence';
     case 'timeout': return 'timeout';
     case 'error': return 'error';
+    case 'output_schema': return 'output does not match schema';
     case 'iterations_limit': return 'iterations limit reached';
   }
 }

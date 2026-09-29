@@ -12,7 +12,7 @@ import { carriedSkills } from '@/lib/carried-skills';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
-import { DEFAULT_AGENT_IMAGE, defaultVerdictLabel, uniqueName, uniqueSlug } from '@mediforce/platform-core';
+import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, defaultVerdictLabel, uniqueName, uniqueSlug } from '@mediforce/platform-core';
 import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
@@ -22,6 +22,7 @@ import {
   RUNTIME_OPTIONS,
 } from './constants';
 import { CoworkSection } from './cowork-section';
+import { OutputSchemaEditor } from './output-schema-editor';
 import { StepUiConfigSection } from './step-ui-config-section';
 import { StepDataFlow } from './step-data-flow';
 import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
@@ -126,6 +127,7 @@ const TIP = {
   agentTimeoutMs:          'Maximum run time in milliseconds. Takes precedence over timeoutMinutes if both are set.',
   agentConfidence:         'Minimum confidence (0–1) the agent must self-report before output is accepted. Below this, the step escalates.',
   agentFallback:           'What to do if the agent fails or is below the confidence threshold: escalate to human, retry, or skip.',
+  agentOutputSchema:       'JSON Schema the agent\'s result must match. Shown to the agent; a result that breaks it gets one retry with the error, then the fallback behavior.',
   agentAllowedTools:       'Tools the agent may call, comma-separated. Leave empty to allow all available tools.',
   agentPrompt:             'Additional instructions appended to the agent\'s system prompt for this step only.',
 
@@ -852,6 +854,15 @@ export function StepEditor({
             >
               {FALLBACK_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+          </FieldRow>
+
+          <FieldRow label="agent.outputSchema" tooltip={TIP.agentOutputSchema} alignStart>
+            <OutputSchemaEditor
+              key={`agent-output-schema-${step.id}`}
+              value={step.agent?.outputSchema}
+              onChange={(outputSchema) => updateAgent({ outputSchema })}
+              schema={AgentOutputSchemaSchema}
+            />
           </FieldRow>
 
           <FieldRow label="agent.allowedTools" tooltip={TIP.agentAllowedTools}>

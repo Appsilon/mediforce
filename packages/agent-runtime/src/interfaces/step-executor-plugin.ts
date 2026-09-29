@@ -1,5 +1,6 @@
 import type {
   AgentEvent,
+  AgentTrajectoryEntry,
   ProcessConfig,
   PluginCapabilityMetadata,
   ResolvedMcpConfig,
@@ -105,6 +106,12 @@ export interface WorkflowAgentContext {
    *  buildPrompt() after the workflow preamble. Skills are step-level
    *  (agentConfig.skillsDir) and are resolved separately. */
   agentIdentityPrompt?: string;
+  /** Set by AgentRunner on the one retry after `result` broke
+   *  `step.agent.outputSchema`: the validation error, for the prompt. */
+  outputSchemaViolation?: string;
+  /** Where a plugin records its Agent Trajectory (ADR-0023 D8). Set by
+   *  AgentRunner, keyed to its Agent Run; absent for script steps and in tests. */
+  trajectory?: { record(entries: readonly AgentTrajectoryEntry[]): void };
 }
 
 // EmitFn: platform assigns id and sequence — plugin provides type, payload, timestamp

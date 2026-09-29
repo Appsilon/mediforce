@@ -16,6 +16,8 @@ export { InMemoryAgentOAuthTokenRepository } from './in-memory-agent-oauth-token
 export { InMemoryAgentDefinitionRepository } from './in-memory-agent-definition-repository';
 export { InMemoryNamespaceRepository } from './in-memory-namespace-repository';
 export { InMemoryAgentRunRepository } from './in-memory-agent-run-repository';
+export { InMemoryAgentTrajectoryRepository } from './in-memory-agent-trajectory-repository';
+export { InMemoryScoreRepository } from './in-memory-score-repository';
 export { InMemoryModelRegistryRepository } from './in-memory-model-registry-repository';
 export { InMemoryPlatformSettingsRepository } from './in-memory-platform-settings-repository';
 export { InMemoryNamespaceSecretsRepository } from './in-memory-namespace-secrets-repository';
