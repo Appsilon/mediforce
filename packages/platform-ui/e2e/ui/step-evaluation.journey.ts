@@ -1,17 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../helpers/test-fixtures';
 import { trackPageErrors } from '../helpers/page-errors';
-import { agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
+import { JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
 import { EVALUATION_WORKSPACE, seedEvaluationWorkspace } from '../helpers/evaluation-workspace';
 import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
 
 /**
- * L4 journey for the workflow's Evaluation tab (ADR-0023 D14): pick the agent
+ * L4 journeys for the workflow's Evaluation tab (ADR-0023 D14): pick the agent
  * step, ask the Evaluation Assistant, and decide its proposals — accepting the
  * Evaluator adds it to the step's list as one that counts, rejecting the Brief
- * draft leaves the Brief unwritten. The steps the assistant took stay listed
- * under its reply, and the panel widens from its left edge. The model is the
- * scripted mock OpenRouter.
+ * draft leaves the Brief unwritten; a plan's risk asks the assistant to draft
+ * its check; outputs it picks are labelled by the person and become Eval
+ * Cases. The steps the assistant took stay listed under its reply, and the
+ * panel widens from its left edge. The model is the scripted mock OpenRouter.
  */
 test.describe('Step Evaluation tab', () => {
   test('the assistant proposes; accepting a proposal creates it, rejecting one does not', async ({ page, request }) => {
@@ -77,5 +78,65 @@ test.describe('Step Evaluation tab', () => {
     await page.mouse.move(handle.x - 150, handle.y + handle.height / 2, { steps: 5 });
     await page.mouse.up();
     await expect.poll(async () => (await panel.boundingBox())!.width).toBeGreaterThan(narrow + 100);
+  });
+
+  test('a plan drafts its checks one risk at a time; the person labels the outputs the assistant picks', async ({ page, request }) => {
+    test.setTimeout(90_000);
+    trackPageErrors(page);
+    await seedEvaluationWorkspace();
+    const workflowName = `e2e-eval-label-${randomUUID().slice(0, 8)}`;
+    const runId = await startRun(request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE);
+    const agentRunId = (await awaitFinishedAgentRun(request, runId)).id;
+    const judgeRes = await request.post('/api/evaluation/evaluators', {
+      headers: JSON_HEADERS,
+      data: {
+        namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes',
+        name: 'grades-justified', rule: 'Every grade is justified by the source record.', severity: 'major',
+        check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Is every AE graded?', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
+      },
+    });
+    expect(judgeRes.status(), await judgeRes.text()).toBe(201);
+    const { evaluator } = (await judgeRes.json()) as { evaluator: { id: string } };
+
+    const question = `Plan the evaluation. ${randomUUID()}`;
+    await scriptOpenRouter(question, [
+      {
+        toolCalls: [
+          {
+            name: 'propose_evaluation_plan',
+            arguments: {
+              summary: 'Wrong grades on fatal events matter most.',
+              risks: [{ failure: 'A fatal AE is graded below 5', severity: 'critical', why: 'A missed grade 5 hides a death.', check: { kind: 'code', rule: 'An AE with a fatal outcome is graded 5.' } }],
+              acceptanceCriteria: { critical: 0.95, major: 0.8, minor: 0.6 },
+            },
+          },
+          { name: 'propose_outputs_to_label', arguments: { evaluatorId: evaluator.id, outputs: [{ agentRunId, why: 'It carries no grades at all.' }] } },
+        ],
+      },
+      { content: 'Here is the plan. Label the output I picked so the judge can be calibrated.' },
+      { content: 'Drafting the fatal-outcome check now.' },
+    ]);
+
+    await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
+    await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await page.getByTestId('evaluation-assistant-input').fill(question);
+    await page.getByTestId('evaluation-assistant-send').click();
+    await expect(page.getByText('Here is the plan.')).toBeVisible({ timeout: 20_000 });
+
+    // The person labels the picked output; the labels become an Eval Case.
+    const labelling = page.getByTestId('labelling-card');
+    await expect(labelling.getByText('Label outputs for grades-justified v1')).toBeVisible();
+    await labelling.getByTestId('label-output').getByRole('button', { name: 'Fail' }).click();
+    await expect(labelling.getByText('labelled fail')).toBeVisible({ timeout: 10_000 });
+    await expect(labelling.getByTestId('label-counts')).toContainText('1 output(s) labelled, 1 fail');
+    await labelling.getByRole('button', { name: 'Add labelled outputs as Eval Cases' }).click();
+    await expect(labelling.getByText('1 Eval Case(s) added.')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/From run .* \(\d{4}-\d{2}-\d{2}\)/)).toBeVisible();
+
+    // A risk of the plan asks the assistant to draft its check.
+    const plan = page.getByTestId('plan-card');
+    await expect(plan.getByTestId('plan-risk')).toHaveCount(1);
+    await plan.getByRole('button', { name: 'Draft this check' }).click();
+    await expect(page.getByText('Drafting the fatal-outcome check now.')).toBeVisible({ timeout: 20_000 });
   });
 });

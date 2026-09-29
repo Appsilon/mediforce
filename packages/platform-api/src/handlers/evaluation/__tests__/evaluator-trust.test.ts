@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ValidationError } from '../../../errors';
 import { createEvaluator } from '../evaluators';
-import { approveEvaluatorSource, calibrateEvaluator, labelEvaluatorOutput } from '../evaluator-trust';
+import { approveEvaluatorSource, calibrateEvaluator, labelEvaluatorOutput, listEvaluatorLabels } from '../evaluator-trust';
 import { evaluationFixture, GRADED_RUN, STEP, UNGRADED_RUN, type EvaluationFixture } from './fixture';
 
 describe('approveEvaluatorSource', () => {
@@ -60,6 +60,8 @@ describe('labels and calibration', () => {
 
     expect(first.score).toMatchObject({ source: 'human', name: 'grades-justified', value: 0, evaluatorId: evaluator.id, supersedes: null });
     expect(second.score).toMatchObject({ value: 1, label: 'pass', comment: 'Sepsis graded 5.', supersedes: first.score.id, createdBy: 'author-1' });
+    const { labels } = await listEvaluatorLabels({ evaluatorId: evaluator.id }, fixture.scope());
+    expect(labels.map((label) => label.id)).toEqual([second.score.id]);
   });
 
   it('records how often the judge agreed with the latest labels', async () => {
@@ -75,7 +77,8 @@ describe('labels and calibration', () => {
 
     const result = await calibrateEvaluator({ evaluatorId: evaluator.id }, scope);
 
-    expect(result.evaluator.latest.calibration).toMatchObject({ agreement: 0.5, labelCount: 2, failureLabelCount: 1 });
+    // Agreeing on half while saying "graded" to everything is agreement by chance alone: κ 0.
+    expect(result.evaluator.latest.calibration).toMatchObject({ agreement: 0.5, kappa: 0, labelCount: 2, failureLabelCount: 1 });
     expect(result.disagreements).toEqual([{ agentRunId: UNGRADED_RUN, humanPassed: false, judgePassed: true }]);
     expect(result.evaluator.trust).toEqual({ trusted: false, reason: 'calibrated on 2 labels, needs 10' });
   });

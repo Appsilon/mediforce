@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { EvaluatedStepSchema, EvaluationAssistantProposalSchema } from '@mediforce/platform-core';
+import { PreviewEvaluatorOutputSchema } from './evaluation';
 
 /**
  * Contract for `POST /api/evaluation/assistant` — one turn with a Step's
@@ -22,9 +23,23 @@ export const PreparedEvalRunSchema = z.object({
   trials: z.number().int().nonnegative(),
 });
 
+/**
+ * A proposed check tried by the platform on the step's recent production
+ * outputs before the person sees it — or why it could not be (no `run` verb).
+ */
+export const EvaluatorSelfTestSchema = z.union([
+  PreviewEvaluatorOutputSchema,
+  z.object({ unavailable: z.string() }),
+]);
+
+/** A proposal as the person sees it; a proposed check carries its self-test. */
+export const ProposalViewSchema = EvaluationAssistantProposalSchema.and(z.object({
+  selfTest: EvaluatorSelfTestSchema.optional(),
+}));
+
 export const AskEvaluationAssistantOutputSchema = z.object({
   reply: z.string(),
-  proposals: z.array(EvaluationAssistantProposalSchema),
+  proposals: z.array(ProposalViewSchema),
   preparedEvalRuns: z.array(PreparedEvalRunSchema),
 });
 
@@ -45,3 +60,5 @@ export type AskEvaluationAssistantInput = z.infer<typeof AskEvaluationAssistantI
 export type AskEvaluationAssistantOutput = z.infer<typeof AskEvaluationAssistantOutputSchema>;
 export type PreparedEvalRun = z.infer<typeof PreparedEvalRunSchema>;
 export type EvaluationAssistantProgress = z.infer<typeof EvaluationAssistantProgressSchema>;
+export type EvaluatorSelfTest = z.infer<typeof EvaluatorSelfTestSchema>;
+export type ProposalView = z.infer<typeof ProposalViewSchema>;

@@ -1,4 +1,4 @@
-import { JUDGE_PASS_VALUE, type Score } from '@mediforce/platform-core';
+import { JUDGE_PASS_VALUE, cohensKappa, type Evaluator, type Score } from '@mediforce/platform-core';
 import type {
   ApproveEvaluatorSourceInput,
   CalibrateEvaluatorInput,
@@ -6,6 +6,8 @@ import type {
   EvaluatorOutput,
   LabelEvaluatorOutputInput,
   LabelEvaluatorOutputOutput,
+  ListEvaluatorLabelsInput,
+  ListEvaluatorLabelsOutput,
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError, ValidationError } from '../../errors';
@@ -92,22 +94,39 @@ export async function labelEvaluatorOutput(
   return { score };
 }
 
-/** The newest human label per Agent Run. */
-function latestLabels(scores: readonly Score[]): Score[] {
+/**
+ * The newest human label per Agent Run, newest first. A relabel supersedes
+ * the label before it, so a superseded label never counts — even when both
+ * carry the same timestamp.
+ */
+export async function evaluatorLabels(scope: CallerScope, evaluator: Evaluator): Promise<Score[]> {
+  const scores = await scope.scores.list({ evaluatorId: evaluator.id, source: 'human', limit: 1000 });
+  const superseded = new Set(scores.map((score) => score.supersedes).filter((id) => id !== null));
   const seen = new Set<string>();
   const latest: Score[] = [];
   for (const score of scores) {
-    if (seen.has(score.subject.id)) continue;
+    if (superseded.has(score.id) || seen.has(score.subject.id)) continue;
     seen.add(score.subject.id);
     latest.push(score);
   }
   return latest;
 }
 
+/** The person's labels on an Evaluator's outputs — what a judge is calibrated against. */
+export async function listEvaluatorLabels(
+  input: ListEvaluatorLabelsInput,
+  scope: CallerScope,
+): Promise<ListEvaluatorLabelsOutput> {
+  const evaluator = await loadEvaluator(scope, input.evaluatorId);
+  await loadEvaluatedStep(scope, stepRef(evaluator), 'read');
+  return { labels: await evaluatorLabels(scope, evaluator) };
+}
+
 /**
  * Runs a judge version over every output a person has labelled for this
- * Evaluator and records how often it agreed (D9). Outputs the judge could not
- * grade are reported and left out of the agreement.
+ * Evaluator and records how often it agreed (D9), and Cohen's κ — agreement
+ * beyond what the label mix gives by chance. Outputs the judge could not
+ * grade are reported and left out of both.
  */
 export async function calibrateEvaluator(
   input: CalibrateEvaluatorInput,
@@ -125,11 +144,12 @@ export async function calibrateEvaluator(
     throw new ValidationError(`Only an llm_judge is calibrated; v${version.version} is a ${version.check.kind} check`);
   }
 
-  const labels = latestLabels(await scope.scores.list({ evaluatorId: evaluator.id, source: 'human', limit: 1000 }));
+  const labels = await evaluatorLabels(scope, evaluator);
   if (labels.length === 0) throw new ValidationError(`Evaluator '${evaluator.name}' has no labelled outputs to calibrate against`);
 
   const disagreements: CalibrateEvaluatorOutput['disagreements'] = [];
   const errors: CalibrateEvaluatorOutput['errors'] = [];
+  const verdicts: Array<{ first: boolean; second: boolean }> = [];
   let graded = 0;
   let failures = 0;
   for (const label of labels) {
@@ -142,6 +162,7 @@ export async function calibrateEvaluator(
     }
     graded += 1;
     if (!humanPassed) failures += 1;
+    verdicts.push({ first: humanPassed, second: outcome.passed });
     if (outcome.passed !== humanPassed) {
       disagreements.push({ agentRunId: label.subject.id, humanPassed, judgePassed: outcome.passed });
     }
@@ -149,6 +170,7 @@ export async function calibrateEvaluator(
 
   const calibration = {
     agreement: graded === 0 ? 0 : (graded - disagreements.length) / graded,
+    kappa: cohensKappa(verdicts),
     labelCount: graded,
     failureLabelCount: failures,
     calibratedAt: new Date().toISOString(),

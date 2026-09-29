@@ -547,9 +547,14 @@ import {
   ApproveEvaluatorSourceInputSchema,
   ArchiveEvalCaseInputSchema,
   ArchiveEvaluatorInputSchema,
+  ListEvaluatorLabelsInputSchema,
+  ListEvaluatorLabelsOutputSchema,
   CalibrateEvaluatorInputSchema,
   CalibrateEvaluatorOutputSchema,
   CreateEvalCaseFromAgentRunInputSchema,
+  CreatePerturbedEvalCaseInputSchema,
+  CreateEvalCasesFromLabelsInputSchema,
+  CreateEvalCasesFromLabelsOutputSchema,
   CreateEvalCaseInputSchema,
   CreateEvaluatorInputSchema,
   EvalCaseOutputSchema,
@@ -581,9 +586,14 @@ import {
   type ApproveEvaluatorSourceInput,
   type ArchiveEvalCaseInput,
   type ArchiveEvaluatorInput,
+  type ListEvaluatorLabelsInput,
+  type ListEvaluatorLabelsOutput,
   type CalibrateEvaluatorInput,
   type CalibrateEvaluatorOutput,
   type CreateEvalCaseFromAgentRunInput,
+  type CreatePerturbedEvalCaseInput,
+  type CreateEvalCasesFromLabelsInput,
+  type CreateEvalCasesFromLabelsOutput,
   type CreateEvalCaseInput,
   type CreateEvaluatorInput,
   type EvalCaseOutput,
@@ -1020,12 +1030,15 @@ export class Mediforce {
     archiveEvaluator: (input: ArchiveEvaluatorInput) => Promise<EvaluatorOutput>;
     approveEvaluatorSource: (input: ApproveEvaluatorSourceInput) => Promise<EvaluatorOutput>;
     labelOutput: (input: LabelEvaluatorOutputInput) => Promise<LabelEvaluatorOutputOutput>;
+    listLabels: (input: ListEvaluatorLabelsInput) => Promise<ListEvaluatorLabelsOutput>;
     calibrateEvaluator: (input: CalibrateEvaluatorInput) => Promise<CalibrateEvaluatorOutput>;
     previewEvaluator: (input: PreviewEvaluatorInput) => Promise<PreviewEvaluatorOutput>;
     listStepAgentRuns: (input: ListStepAgentRunsInput) => Promise<ListStepAgentRunsOutput>;
     listCases: (input: ListEvalCasesInput) => Promise<ListEvalCasesOutput>;
     createCase: (input: CreateEvalCaseInput) => Promise<EvalCaseOutput>;
     createCaseFromAgentRun: (input: CreateEvalCaseFromAgentRunInput) => Promise<EvalCaseOutput>;
+    createPerturbedCase: (input: CreatePerturbedEvalCaseInput) => Promise<EvalCaseOutput>;
+    createCasesFromLabels: (input: CreateEvalCasesFromLabelsInput) => Promise<CreateEvalCasesFromLabelsOutput>;
     archiveCase: (input: ArchiveEvalCaseInput) => Promise<EvalCaseOutput>;
     listDatasets: (input: ListEvalDatasetsInput) => Promise<ListEvalDatasetsOutput>;
     freezeDataset: (input: FreezeEvalDatasetInput) => Promise<FreezeEvalDatasetOutput>;
@@ -2464,6 +2477,10 @@ export class Mediforce {
         return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/labels`, body,
           LabelEvaluatorOutputOutputSchema, 'mediforce.evaluation.labelOutput');
       },
+      listLabels: async (input) => {
+        const { evaluatorId } = ListEvaluatorLabelsInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/labels`, ListEvaluatorLabelsOutputSchema, 'mediforce.evaluation.listLabels');
+      },
       calibrateEvaluator: async (input) => {
         const { evaluatorId, ...body } = CalibrateEvaluatorInputSchema.parse(input);
         return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/calibrate`, body,
@@ -2501,6 +2518,15 @@ export class Mediforce {
         'POST', '/api/evaluation/cases/from-agent-run', CreateEvalCaseFromAgentRunInputSchema.parse(input),
         EvalCaseOutputSchema, 'mediforce.evaluation.createCaseFromAgentRun',
       ),
+      createPerturbedCase: async (input) => this.sendJson(
+        'POST', '/api/evaluation/cases/perturbed', CreatePerturbedEvalCaseInputSchema.parse(input),
+        EvalCaseOutputSchema, 'mediforce.evaluation.createPerturbedCase',
+      ),
+      createCasesFromLabels: async (input) => {
+        const { evaluatorId, ...body } = CreateEvalCasesFromLabelsInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/cases-from-labels`, body,
+          CreateEvalCasesFromLabelsOutputSchema, 'mediforce.evaluation.createCasesFromLabels');
+      },
       archiveCase: async (input) => {
         const { caseId, ...body } = ArchiveEvalCaseInputSchema.parse(input);
         return this.sendJson('POST', `/api/evaluation/cases/${encodeURIComponent(caseId)}/archive`, body,
