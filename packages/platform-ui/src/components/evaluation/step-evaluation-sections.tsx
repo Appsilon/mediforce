@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import {
   CHAMPION_VARIANT_ID,
   EvaluatorSeveritySchema,
+  McpEvalServerPolicySchema,
   describeAcceptanceCriteria,
   describeMcpPolicy,
   type AcceptanceCriteria,
@@ -331,7 +332,7 @@ export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep;
                 className={cn(inputClass, 'ml-auto text-xs')}
                 value={server.mode}
                 disabled={!mayEdit || save.isPending}
-                onChange={(event) => setMode(server.name, event.target.value as McpEvalMode)}
+                onChange={(event) => setMode(server.name, McpEvalServerPolicySchema.shape.mode.parse(event.target.value))}
               >
                 <option value="deny">deny{server.defaulted ? ' (default)' : ''}</option>
                 <option value="live">live</option>

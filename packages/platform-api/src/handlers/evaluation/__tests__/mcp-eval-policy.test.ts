@@ -42,12 +42,9 @@ describe('MCP eval policy', () => {
       .rejects.toThrow(/lists no allowedTools/);
   });
 
-  it('drops denied tools from a server that is not live, as a policy saved before replay may carry them', async () => {
+  it('refuses denied tools on a replayed server, which runs no tool', async () => {
     const fixture = await evaluationFixture();
-    const { policy } = await setMcpEvalPolicy({
-      ...STEP,
-      servers: { edc: { mode: 'replay', denyTools: ['write_record'] }, email: { mode: 'deny', denyTools: ['send'] } },
-    }, fixture.scope());
-    expect(policy.servers).toEqual({ edc: { mode: 'replay' }, email: { mode: 'deny' } });
+    await expect(setMcpEvalPolicy({ ...STEP, servers: { edc: { mode: 'replay', denyTools: ['write_record'] } } }, fixture.scope()))
+      .rejects.toThrow(/'edc' is replayed/);
   });
 });

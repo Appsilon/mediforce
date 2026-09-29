@@ -361,7 +361,8 @@ A version never changes.
 
 Per MCP server of the Step's agent: `live`, `live` with named tools denied,
 `replay`, or `deny`. A server the policy does not name is denied in eval trials.
-Denied tools apply only to a `live` server and are dropped from any other.
+Denied tools apply only to a `live` server: a `replay` server refuses them, and on
+a denied one they have no effect.
 `mcp-policy-get` shows what each server does, defaults included, and which Eval
 Cases each server has a recording for.
 
@@ -370,23 +371,29 @@ server answered: the trial's `mcp-config.json` starts the server behind a small
 proxy (`node /output/mcp-tape/mcp-tape.mjs`, stdio and streamable-HTTP alike)
 that keeps the tool list and each tool call with its result, stored per Eval
 Case and server once the agent exits — finished, failed or timed out. The HTTP
-proxy posts each message as it arrives (only `initialize` goes first, for the
-session), so parallel tool calls stay parallel, and relays what the server sends
+proxy posts each message as it arrives (only the handshake goes in order:
+`initialize`, which carries the session, then the initialized notification), so parallel tool calls stay parallel, and relays what the server sends
 on its own stream (`list_changed`, sampling, elicitation). The proxy needs
 `node` in the agent's image; every Mediforce image has it. A `replay` server is
 never started: the proxy answers the agent from the 20 newest recordings of the
 trial's case — for each
 distinct call (tool plus arguments, key order ignored) the newest recording of
-it, the n-th identical call getting the n-th recorded result. It needs no OAuth
+it, the n-th identical call getting the n-th recorded result. A recording is
+kept per case and server, whichever variant made it, so a challenger replays
+what the champion's live trials recorded. It needs no OAuth
 token and reaches no network, so tools with side effects are safe to replay.
 
-- A call no recording answered gets an error result. The trial keeps it
-  (`mcpReplayMisses`), its Agent Trajectory records it, and the report counts
-  it per server and tool.
+- A call no recording answered — or made more often than any recording made
+  it — gets an error result. The trial keeps it (`mcpReplayMisses`), its Agent
+  Trajectory records it, and the report counts it per server and tool. A trial
+  whose unanswered calls cannot all be read fails rather than count fewer.
 - A replayed server that no live trial of the case has recorded fails the trial
   closed. Run the case with the server `live` first.
 - Tool lists and results are recorded in full, like the Agent Trajectory:
   they stay in the platform's database, never among the run's Output Files.
+- The proxy keeps its files in `/output/mcp-tape/`, which the agent can read
+  and write like the rest of `/output`. A recording is only as trustworthy as
+  the agent under evaluation that ran beside it.
 
 The report states each server's mode and says when no trial made a live MCP
 call (`report.mcp`; one line in the Evaluation tab and in `mediforce eval report`).

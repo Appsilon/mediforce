@@ -8,13 +8,14 @@ import {
   GetMcpEvalPolicyOutputSchema,
   type EvalRunOutput,
 } from '@mediforce/platform-api/contract';
+import { describeMcpReport } from '@mediforce/platform-core';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
 import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
 
 /**
- * API E2E for MCP replay in eval trials (ADR-0023 D6, Step Evaluation 5c): a
+ * API E2E for MCP replay in eval trials (ADR-0023 D6): a
  * replayed server fails a trial closed while no live trial of its Eval Case
  * recorded it, and once one has, a trial runs with it answered from the
  * recording — and the report says no trial made a live MCP call.
@@ -132,5 +133,6 @@ test.describe('Step Evaluation MCP replay — API E2E', () => {
     // The replayed server is kept for the agent; the undeclared `email` is denied.
     expect(first?.text).toContain('with MCP servers: meddra.');
     expect(replayed.report.mcp).toEqual({ live: [], replayed: ['meddra'], denied: ['email'], unrecordedCalls: [] });
+    expect(describeMcpReport(replayed.report.mcp)).toContain('No trial made a live MCP call.');
   });
 });

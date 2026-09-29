@@ -248,7 +248,7 @@ export const evalMcpRecordings = pgTable(
     server: text('server').notNull(),
     tape: jsonb('tape').notNull(),
     evalRunId: uuid('eval_run_id').notNull().references(() => evalRuns.id, { onDelete: 'cascade' }),
-    trialId: uuid('trial_id').notNull(),
+    trialId: uuid('trial_id').notNull().references(() => evalTrials.id, { onDelete: 'cascade' }),
     recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
