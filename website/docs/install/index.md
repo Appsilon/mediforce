@@ -11,6 +11,10 @@ container worker that runs workflow steps, Postgres, Redis, and Caddy for TLS.
 You bring a domain, a machine with Docker, and the values in
 [Configuration](#configuration).
 
+This page is the reference. For the whole path from an empty box to a running
+deployment, including the interactive bootstrap in `scripts/bootstrap-server.py`,
+follow the [self-host walkthrough](https://mediforce.ai/setup/).
+
 ## Prerequisites
 
 - A host with Docker and the Compose plugin, and ports 80 and 443 free.
