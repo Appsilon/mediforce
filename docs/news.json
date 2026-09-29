@@ -1,0 +1,66 @@
+[
+  {
+    "kind": "post",
+    "id": "https://www.appsilon.com/post/traceable-tfls-protocol-to-table",
+    "title": "What's Your Workflow?: Traceable TFLs From Protocol to Table",
+    "url": "https://www.appsilon.com/post/traceable-tfls-protocol-to-table",
+    "date": "2026-09-24T09:00:00.000Z",
+    "summary": "Protocol in, TFLs out: two agents plan and audit, scripts derive and validate, three human gates decide, and traceability comes out live and queryable."
+  },
+  {
+    "kind": "post",
+    "id": "https://www.appsilon.com/post/synthetic-sdtm-from-nct-id",
+    "title": "What's Your Workflow?: Synthetic SDTM From an NCT ID",
+    "url": "https://www.appsilon.com/post/synthetic-sdtm-from-nct-id",
+    "date": "2026-09-17T09:00:00.000Z",
+    "summary": "Reproducible synthetic SDTM from an NCT ID: an agent reads the protocol, a person approves the spec, and a seeded R package generates the data."
+  },
+  {
+    "kind": "post",
+    "id": "https://www.appsilon.com/post/submission-document-chase",
+    "title": "What's Your Workflow?: The Submission Document Chase That Runs Itself",
+    "url": "https://www.appsilon.com/post/submission-document-chase",
+    "date": "2026-09-10T09:00:00.000Z",
+    "summary": "The submission document chase, automated: define the ask once, let agents watch the drive and draft follow-ups, keep the coordinator on the judgment calls."
+  },
+  {
+    "kind": "release",
+    "id": "release-382639418",
+    "title": "v1.1.0",
+    "url": "https://github.com/Appsilon/mediforce/releases/tag/v1.1.0",
+    "date": "2026-09-04T10:24:00Z",
+    "tag": "v1.1.0"
+  },
+  {
+    "kind": "post",
+    "id": "https://www.appsilon.com/post/landing-zone-cro-data-deliveries",
+    "title": "What's Your Workflow?: The Landing Zone for CRO Data Deliveries",
+    "url": "https://www.appsilon.com/post/landing-zone-cro-data-deliveries",
+    "date": "2026-09-03T09:00:00.000Z",
+    "summary": "First in the What's Your Workflow? series: the CRO delivery landing zone, where scripts validate, agents draft, and the accept call stays human."
+  },
+  {
+    "kind": "post",
+    "id": "https://www.appsilon.com/post/introducing-mediforce",
+    "title": "Introducing Mediforce v1.0.0: Human-in-the-Lead Workflows for Pharma",
+    "url": "https://www.appsilon.com/post/introducing-mediforce",
+    "date": "2026-08-27T09:00:00.000Z",
+    "summary": "Mediforce hits v1.0.0: open-source, Apache 2.0, per-step control modes from full autonomy to human review, and an audit trail that fills itself in."
+  },
+  {
+    "kind": "release",
+    "id": "release-377039184",
+    "title": "v1.0.0",
+    "url": "https://github.com/Appsilon/mediforce/releases/tag/v1.0.0",
+    "date": "2026-08-26T10:06:57Z",
+    "tag": "v1.0.0"
+  },
+  {
+    "kind": "post",
+    "id": "https://www.appsilon.com/post/mediforce-databricks-orchestration",
+    "title": "Mediforce x Databricks: Human-in-the-Lead AI Workflows While Your Data Stays in Databricks",
+    "url": "https://www.appsilon.com/post/mediforce-databricks-orchestration",
+    "date": "2026-06-17T00:00:00.000Z",
+    "summary": "Mediforce now orchestrates your Databricks jobs with human-in-the-lead AI workflows, audit trails, and full control, while your clinical data never leaves your own Databricks environment."
+  }
+]

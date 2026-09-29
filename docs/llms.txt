@@ -24,6 +24,7 @@ The project's canonical identifiers are the domain mediforce.ai, the repository 
 - [Validated AI for Regulated Pharma](https://mediforce.ai/validated-ai.html): the concrete mechanisms behind validation — CDISC CORE checks, IQ/OQ/PQ documentation, versioning locked on activation, 21 CFR Part 11-aligned audit trails. Carries a Live / In progress / Planned maturity ledger.
 - [Security for Clinical Data](https://mediforce.ai/security.html): sandboxed agent execution, per-step data scoping, AES-256-GCM at rest, per-step RBAC. Also carries a maturity ledger.
 - [FDA/EMA AI Principles](https://mediforce.ai/fda-principles.html): the 10 guiding principles from the January 2026 FDA-hosted document, each mapped to Mediforce's current status. Explicitly a request for comment, not a finished compliance claim.
+- [News](https://mediforce.ai/news.html): every release and every Mediforce article, newest first. Releases come live from GitHub; articles are the Appsilon blog posts about the project.
 - [Workflow Examples](https://mediforce.ai/examples.html): CI-tested workflow patterns to combine and adapt.
 - [Server Setup](https://mediforce.ai/setup/): browser-based wizard for standing up a self-hosted instance.
 

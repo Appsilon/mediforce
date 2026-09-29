@@ -20,6 +20,12 @@ New here: [`../GETTING-STARTED.md`](../GETTING-STARTED.md), then
 > this README when you browse the folder. Everything below is engineering
 > documentation.
 >
+> `news.html` merges GitHub releases with the Appsilon blog posts about Mediforce into one timeline. It renders `news.json` and nothing else: both feeds are baked by `pnpm news:build` ([`scripts/build-news.ts`](../scripts/build-news.ts)). The blog has no choice — `www.appsilon.com/post/rss.xml` sends no `Access-Control-Allow-Origin`, so a page on mediforce.ai cannot read it however simple the code. Releases could be read live, since `api.github.com` does send the header, but the rules about which of them are news at all would then exist a second time in inline browser script where no test reaches them. `pages.yml` runs the build daily **and on every published release**, so a release still lands within minutes of being cut.
+>
+> **A release card carries no description, deliberately.** A release body is a changelog: the two written so far open with a hand-written lede, but an auto-generated one opens with `## What's Changed` and a bullet list, so the first usable line is a commit message — worse on a card than nothing. A release is a compact row of name and date, and only a post carries prose, because only a post's feed has a description field written to be read alone.
+>
+> Which posts count is `POST_FILTERS` in [`scripts/news/feeds.ts`](../scripts/news/feeds.ts), matched against the title, the description and the URL slug — adding a series is one line there. The feed writes apostrophes three ways (curly in titles, `&#39;` in descriptions, hyphens in slugs), so matching goes through `normalise()`; a straight-quoted needle compared directly finds nothing and fails silently. A post's description is the feed's own field, capped at 220 characters on the way in — 18 of the feed's 100 run past what a card can hold. `news.json` is committed, so an unreachable feed costs freshness rather than the page: the script exits 0 and the previous file stays.
+>
 > `theme.css` holds the shared palette, copied from the app's `globals.css`, and
 > every page links it **after** its own `<style>` so it wins the cascade. A page
 > that needs to opt out of the dotted ground adds a third `<style>` after that

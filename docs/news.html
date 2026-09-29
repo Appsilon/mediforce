@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>News: Releases and Articles | Mediforce</title>
+  <meta name="description" content="Every Mediforce release and the writing behind it, newest first." />
+  <link rel="canonical" href="https://mediforce.ai/news.html" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Mediforce" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:url" content="https://mediforce.ai/news.html" />
+  <meta property="og:title" content="News: Releases and Articles | Mediforce" />
+  <meta property="og:description" content="Every Mediforce release and the writing behind it, newest first." />
+  <meta property="og:image" content="https://mediforce.ai/images/og/news.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="News: Releases and Articles — Mediforce social card" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="News: Releases and Articles | Mediforce" />
+  <meta name="twitter:description" content="Every Mediforce release and the writing behind it, newest first." />
+  <meta name="twitter:image" content="https://mediforce.ai/images/og/news.png" />
+  <meta name="twitter:image:alt" content="News: Releases and Articles — Mediforce social card" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      background: var(--ground);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1, h2 { font-family: 'Space Grotesk', 'Inter', sans-serif; letter-spacing: -0.02em; }
+
+    .page { max-width: 880px; margin: 0 auto; padding: 4rem 1.5rem 5rem; }
+
+    .page-head {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 1.5rem; flex-wrap: wrap; margin-bottom: 2.5rem;
+    }
+    .page-head h1 { font-size: clamp(2rem, 5vw, 2.75rem); margin-bottom: 0.5rem; }
+    .lede { color: var(--text-60); max-width: 60ch; }
+
+    .filters { display: flex; gap: 0.5rem; }
+    .filter {
+      height: 2.25rem; padding: 0 0.9rem; border-radius: 8px; cursor: pointer;
+      font: 500 0.8125rem/1 'Inter', sans-serif;
+      background: var(--bg-card); border: 1px solid var(--border); color: var(--text-80);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .filter:hover { border-color: var(--accent); }
+    .filter[aria-pressed="true"] {
+      font-weight: 600; background: var(--accent-dim);
+      border-color: var(--accent); color: var(--accent-darker);
+    }
+
+    .timeline { list-style: none; }
+    .item { display: flex; }
+
+    .rail { position: relative; width: 6.5rem; flex-shrink: 0; }
+    .rail::before {
+      content: ''; position: absolute; right: 0; top: 0; bottom: 0;
+      width: 2px; background: var(--dot);
+    }
+    .item:first-child .rail::before { top: 1.6rem; }
+    .item:last-child .rail::before { bottom: auto; height: 1.6rem; }
+    .month {
+      position: absolute; right: 1.25rem; top: 1.15rem; white-space: nowrap;
+      font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em;
+      text-transform: uppercase; color: var(--text-60);
+    }
+
+    .card {
+      position: relative; flex: 1; min-width: 0;
+      margin: 0 0 1rem 1.75rem; padding: 1.35rem 1.6rem;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    }
+
+    .marker {
+      position: absolute; left: -2.31rem; top: 1.6rem;
+      width: 12px; height: 12px; border-radius: 50%;
+      box-shadow: 0 0 0 4px var(--ground);
+    }
+    .marker.release { background: var(--accent); }
+    .marker.post { background: var(--bg-card); border: 2px solid var(--text-60); }
+
+    .meta { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.375rem; height: 1.4rem;
+      padding: 0 0.6rem; border-radius: 999px;
+      font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .badge.release { background: var(--accent-dim); color: var(--accent-darker); }
+    .badge.post { background: var(--bg-3); color: var(--text-80); }
+    .badge svg { width: 11px; height: 11px; }
+    .when { font-size: 0.8125rem; color: var(--text-60); }
+
+    .card--release { padding: 1.1rem 1.6rem; }
+    .card--release h2 { font-size: 1.05rem; }
+
+    .card h2 { font-size: 1.3rem; line-height: 1.32; }
+    .card h2 a { color: var(--text); text-decoration: none; }
+    .card h2 a:hover { color: var(--accent-dark); text-decoration: underline; }
+    .summary { margin-top: 0.5rem; font-size: 0.95rem; color: var(--text-70); max-width: 70ch; }
+
+    .note { margin: 1rem 0 0 8.25rem; font-size: 0.875rem; color: var(--text-60); }
+    .note a { color: var(--accent-dark); }
+
+    @media (max-width: 640px) {
+      .rail, .marker { display: none; }
+      .card { margin-left: 0; }
+      .note { margin-left: 0; }
+      .page-head { align-items: flex-start; }
+    }
+
+    .footer { border-top: 1px solid var(--border, #E5E7EB); background: var(--bg-dark, #F8F9FA); }
+    .footer-inner {
+      max-width: 68rem; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 0.75rem;
+      padding: 1.5rem; font-size: 0.8125rem; color: var(--text-60);
+    }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
+    .footer-links a { transition: color 0.15s; color: inherit; text-decoration: none; }
+    .footer-links a:hover { color: var(--text-70, #4B5563); }
+    @media (max-width: 639px) {
+      .footer-inner { flex-direction: column; align-items: center; text-align: center; }
+      .footer-links { justify-content: center; }
+    }
+  </style>
+  <link rel="stylesheet" href="theme.css?v=c85f62e4" />
+</head>
+<body>
+  <header class="site-header" id="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="logo-group">
+        <div class="logo-mark"><img src="logo.png" alt="Mediforce logo" width="32" height="32" /></div>
+        <span class="logo-text">Mediforce</span>
+      </a>
+      <div class="header-links">
+        <a href="case-studies/" class="header-link">Case Studies</a>
+        <a href="validated-ai.html" class="header-link">Validation</a>
+        <a href="security.html" class="header-link">Security</a>
+        <a href="fda-principles.html" class="header-link">FDA Alignment</a>
+        <a href="news.html" class="header-link">News</a>
+        <a href="setup/" class="header-link">Self-host</a>
+        <a href="https://mediforce.ai/docs/" class="header-link" target="_blank" rel="noopener noreferrer">Docs</a>
+        <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer" class="header-link">GitHub</a>
+        <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="header-link">Join Discord</a>
+      </div>
+    </div>
+  </header>
+  <script src="nav.js?v=34ac4713" defer></script>
+
+  <main class="page">
+    <div class="page-head">
+      <div>
+        <h1>News</h1>
+        <p class="lede">What shipped and what we wrote, newest first. Releases come from GitHub, articles from the Appsilon blog.</p>
+      </div>
+      <div class="filters" role="group" aria-label="Filter news by source">
+        <button type="button" class="filter" data-filter="all" aria-pressed="true">Everything</button>
+        <button type="button" class="filter" data-filter="release" aria-pressed="false">Releases</button>
+        <button type="button" class="filter" data-filter="post" aria-pressed="false">Articles</button>
+      </div>
+    </div>
+
+    <ol class="timeline" id="timeline"></ol>
+    <p class="note" id="note" hidden></p>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>Mediforce</span>
+      <nav class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="case-studies/data-delivery/">Data Delivery</a>
+        <a href="case-studies/collecting-documents/">Collecting Documents</a>
+        <a href="validated-ai.html">Validation</a>
+        <a href="security.html">Security</a>
+        <a href="fda-principles.html">FDA Alignment</a>
+        <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer">Discord</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+  (function () {
+    'use strict';
+
+    var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var LONG = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+    var ICONS = {
+      release: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>',
+      post: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>'
+    };
+
+    var timeline = document.getElementById('timeline');
+    var note = document.getElementById('note');
+    var entries = [];
+    var filter = 'all';
+
+    function monthLabel(iso) {
+      var at = new Date(iso);
+      return isNaN(at.getTime()) ? '' : MONTHS[at.getUTCMonth()] + ' ' + at.getUTCFullYear();
+    }
+
+    function longDate(iso) {
+      var at = new Date(iso);
+      if (isNaN(at.getTime())) return '';
+      return at.getUTCDate() + ' ' + LONG[at.getUTCMonth()] + ' ' + at.getUTCFullYear();
+    }
+
+    function card(entry, month) {
+      var li = document.createElement('li');
+      li.className = 'item';
+
+      var rail = document.createElement('div');
+      rail.className = 'rail';
+      if (month) {
+        var label = document.createElement('span');
+        label.className = 'month';
+        label.textContent = month;
+        rail.appendChild(label);
+      }
+
+      var box = document.createElement('div');
+      box.className = entry.kind === 'release' ? 'card card--release' : 'card';
+
+      var marker = document.createElement('span');
+      marker.className = 'marker ' + entry.kind;
+      marker.setAttribute('aria-hidden', 'true');
+
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+      var badge = document.createElement('span');
+      badge.className = 'badge ' + entry.kind;
+      badge.innerHTML = ICONS[entry.kind];
+      badge.appendChild(document.createTextNode(entry.kind === 'release' ? 'Release' : 'Article'));
+      var when = document.createElement('span');
+      when.className = 'when';
+      when.textContent = longDate(entry.date) + (entry.kind === 'post' ? ' \u00b7 Appsilon' : '');
+      meta.appendChild(badge);
+      meta.appendChild(when);
+
+      var heading = document.createElement('h2');
+      var link = document.createElement('a');
+      link.href = entry.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = entry.title;
+      heading.appendChild(link);
+
+      box.appendChild(marker);
+      box.appendChild(meta);
+      box.appendChild(heading);
+
+      if (entry.summary) {
+        var summary = document.createElement('p');
+        summary.className = 'summary';
+        summary.textContent = entry.summary;
+        box.appendChild(summary);
+      }
+
+      li.appendChild(rail);
+      li.appendChild(box);
+      return li;
+    }
+
+    function render() {
+      timeline.textContent = '';
+      var lastMonth = '';
+      entries
+        .filter(function (entry) { return filter === 'all' || entry.kind === filter; })
+        .forEach(function (entry) {
+          var month = monthLabel(entry.date);
+          timeline.appendChild(card(entry, month !== lastMonth ? month : ''));
+          lastMonth = month;
+        });
+    }
+
+    document.querySelectorAll('.filter').forEach(function (button) {
+      button.addEventListener('click', function () {
+        filter = button.getAttribute('data-filter');
+        document.querySelectorAll('.filter').forEach(function (other) {
+          other.setAttribute('aria-pressed', String(other === button));
+        });
+        render();
+      });
+    });
+
+    fetch('news.json')
+      .then(function (response) {
+        if (response.ok === false) throw new Error(String(response.status));
+        return response.json();
+      })
+      .then(function (data) {
+        entries = data || [];
+        render();
+      })
+      .catch(function () {
+        note.hidden = false;
+        note.innerHTML = 'The timeline could not be loaded. '
+          + '<a href="https://github.com/Appsilon/mediforce/releases" target="_blank" rel="noopener noreferrer">Releases</a>'
+          + ' and the <a href="https://www.appsilon.com/blog" target="_blank" rel="noopener noreferrer">Appsilon blog</a> have everything on it.';
+      });
+  })();
+  </script>
+</body>
+</html>

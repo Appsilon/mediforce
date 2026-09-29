@@ -29,7 +29,13 @@ on:
       # changes every card, and nothing else would rebuild the site.
       - 'scripts/generate-og-cards.ts'
       - 'scripts/assets/**'
+      - 'scripts/build-news.ts'
+      - 'scripts/news/**'
       - '.github/workflows/pages.yml'
+  schedule:
+    - cron: '0 5 * * *'
+  release:
+    types: [published]
   pull_request:
     paths:
       - 'docs/**'
@@ -41,6 +47,8 @@ on:
       # changes every card, and nothing else would rebuild the site.
       - 'scripts/generate-og-cards.ts'
       - 'scripts/assets/**'
+      - 'scripts/build-news.ts'
+      - 'scripts/news/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -75,6 +83,9 @@ jobs:
       # otherwise ship a tag pointing at a 404.
       - name: Generate the Open Graph cards
         run: pnpm gen:og-cards
+
+      - name: Build the News timeline
+        run: pnpm news:build
 
       # Reproduces what the legacy builder does today. Every `.md` under
       # `docs/` is rendered to HTML and is already live — `docs/README.md`
@@ -119,6 +130,7 @@ jobs:
         run: |
           for page in index.html README.html security.html CNAME \
                       robots.txt sitemap.xml llms.txt images/og/index.png \
+                      news.html news.json \
                       docs/index.html docs/install/index.html; do
             test -f "_site/$page" || {
               echo "::error::_site/$page missing — composed site incomplete"
