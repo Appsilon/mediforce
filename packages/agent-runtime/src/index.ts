@@ -9,6 +9,7 @@ export type {
   AgentOutputGate,
   AgentOutputGateVerdict,
   ResolvedOAuthBinding,
+  McpTapeContext,
   EmitPayload,
   EmitFn,
   StepExecutorPlugin,

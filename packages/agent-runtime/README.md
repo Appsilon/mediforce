@@ -14,7 +14,7 @@ actually executes and whether its result is trustworthy enough to continue.
 | `src/runner/` | `AgentRunner`, `PluginRegistry`, `FallbackHandler`, step executors, `OpenRouterLlmClient`, the `LlmJudgeReviewPlugin` behind `llm_judge` Evaluators, OTel tracing |
 | `src/plugins/` | `BaseContainerAgentPlugin` and the concrete plugins — see [`src/plugins/README.md`](src/plugins/README.md) |
 | `src/interfaces/` | `StepExecutorPlugin`, review and step-executor contracts |
-| `src/mcp/` | Per-step MCP resolution (`resolveMcpForStep`) |
+| `src/mcp/` | Per-step MCP resolution (`resolveMcpForStep`); the record/replay proxy an eval trial runs in an MCP server's place (`mcp-tape.ts`, ADR-0023 D6) |
 | `src/oauth/` | MCP OAuth — discovery, dynamic client registration, token resolution |
 | `src/workspace/` | Run workspace paths, output-file collection, workspace reads |
 | `src/testing/` | `InMemoryAgentEventLog`, `NoopLlmClient`, recording tracer |

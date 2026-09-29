@@ -163,6 +163,10 @@ export {
   EvalCaseSchema,
   EvalDatasetVersionSchema,
   McpEvalServerPolicySchema,
+  McpTapeCallSchema,
+  McpTapeSchema,
+  McpRecordingSchema,
+  McpReplayMissSchema,
   McpEvalPolicySchema,
   AcceptanceCriterionSchema,
   AcceptanceCriteriaSchema,
@@ -192,6 +196,10 @@ export {
   type EvalCase,
   type EvalDatasetVersion,
   type McpEvalServerPolicy,
+  type McpTapeCall,
+  type McpTape,
+  type McpRecording,
+  type McpReplayMiss,
   type McpEvalPolicy,
 } from './evaluation';
 
@@ -204,6 +212,7 @@ export {
   EvalTrialSchema,
   EvalRunEvaluatorReportSchema,
   EvalRunReportSchema,
+  EvalRunMcpReportSchema,
   CHAMPION_VARIANT_ID,
   StepFingerprintHashSchema,
   STEP_FINGERPRINT_COMPONENTS,
@@ -236,6 +245,7 @@ export {
   type EvalTrial,
   type EvalRunEvaluatorReport,
   type EvalRunReport,
+  type EvalRunMcpReport,
 } from './eval-run';
 
 export {

@@ -2,6 +2,7 @@ import type {
   AgentEvent,
   AgentOutputEnvelope,
   AgentTrajectoryEntry,
+  McpTape,
   ProcessConfig,
   PluginCapabilityMetadata,
   ResolvedMcpConfig,
@@ -58,6 +59,18 @@ export interface ResolvedOAuthBinding {
   /** Template for the header value; `{token}` is replaced with
    *  `accessToken` via `renderOAuthHeader`. (e.g. "Bearer {token}"). */
   headerValueTemplate: string;
+}
+
+/**
+ * MCP record/replay of an eval trial (ADR-0023 D6). A server named in
+ * `replay` is answered from its tape instead of started; one named in `record`
+ * runs live behind a proxy that records what it answers.
+ */
+export interface McpTapeContext {
+  replay: Record<string, McpTape>;
+  record: readonly string[];
+  /** Receives each recorded server's tape once the agent has exited. */
+  onRecorded(server: string, tape: McpTape): Promise<void>;
 }
 
 /**
@@ -119,6 +132,8 @@ export interface WorkflowAgentContext {
    *  applies — production Evaluators (ADR-0023 D13). Set by platform-ui's
    *  executeAgentStep only for a production run of a step that has them. */
   outputGate?: AgentOutputGate;
+  /** Set by platform-ui's executeAgentStep for an eval trial only. */
+  mcpTapes?: McpTapeContext;
 }
 
 /** What an output gate made of a result. */

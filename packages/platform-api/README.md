@@ -99,7 +99,7 @@ production Scores when read, never stored.
 
 **Evaluation belongs to a Step, not a definition.** `handlers/evaluation/`
 ([ADR-0023](../../docs/adr/0023-step-evaluation.md)) keys every Brief, Evaluator,
-Eval Case, Dataset version and MCP eval policy by `(namespace, workflowName,
+Eval Case, Dataset version, MCP eval policy and MCP recording by `(namespace, workflowName,
 stepId)` and reaches it through the one `scope.evaluation` wrapper. Reads need
 only to see the workflow; writes need its `edit` verb (`_lib/evaluated-step.ts`).
 An Evaluator check that cannot run comes back as `error`, never as a failed

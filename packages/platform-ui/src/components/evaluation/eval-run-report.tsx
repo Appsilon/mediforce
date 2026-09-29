@@ -6,6 +6,7 @@ import { Loader2, X } from 'lucide-react';
 import {
   CHAMPION_VARIANT_ID,
   describeAcceptanceCriteria,
+  describeMcpReport,
   qualificationSignatureMeaning,
   type AcceptanceCriterionVerdict,
   type EvalRunVariantReport,
@@ -419,6 +420,7 @@ export function EvalRunReport({ output, step, mayEdit, editReason }: {
           ? 'No Acceptance Criteria were frozen into this run, so nothing is judged.'
           : `Judged against ${describeAcceptanceCriteria(evalRun.acceptanceCriteria)}.`}
       </p>
+      <p className="text-xs text-muted-foreground" data-testid="eval-run-mcp">{describeMcpReport(report.mcp)}</p>
       {report.variants.map((variant) => (
         <VariantReport key={variant.id} output={output} variant={variant} step={step} mayEdit={mayEdit} editReason={editReason} />
       ))}

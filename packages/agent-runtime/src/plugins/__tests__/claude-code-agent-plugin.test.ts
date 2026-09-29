@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
@@ -1103,6 +1103,52 @@ describe('ClaudeCodeAgentPlugin', () => {
     it('[DATA] honours an explicit step timeoutMinutes', async () => {
       const prompt = await captureBudgetMinutes({ timeoutMinutes: 45 });
       expect(prompt).toContain('approximately 45 minutes');
+    });
+
+    it('[ERROR] still hands back an eval trial\'s MCP recording and replay misses when the agent fails (ADR-0023 D6)', async () => {
+      const onRecorded = vi.fn().mockResolvedValue(undefined);
+      const record = vi.fn();
+      const context = {
+        ...buildWorkflowContext({}),
+        resolvedMcpConfig: { servers: { meddra: { type: 'stdio', command: 'meddra-mcp' }, edc: { type: 'stdio', command: 'edc-mcp' } } },
+        mcpTapes: { replay: { edc: { tools: [], calls: [] } }, record: ['meddra'], onRecorded },
+        trajectory: { record },
+      } as WorkflowAgentContext;
+      await plugin.initialize(context);
+      mockReadSkill(plugin).mockResolvedValue('# Skill');
+      mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
+        const tapeDir = join(options!.outputDir as string, 'mcp-tape');
+        await mkdir(tapeDir, { recursive: true });
+        await writeFile(join(tapeDir, 'meddra.tape.jsonl'), `${JSON.stringify({ kind: 'call', tool: 'lookup', arguments: { term: 'Sepsis' }, result: { content: [] } })}\n`);
+        await writeFile(join(tapeDir, 'edc.misses.jsonl'), `${JSON.stringify({ ts: '2026-09-28T10:00:00.000Z', tool: 'read_record', arguments: { subject: '1001' } })}\n`);
+        throw new Error('Agent timed out after 30 minutes');
+      });
+
+      await expect(plugin.run(buildEmitSpy().emit)).rejects.toThrow('Agent timed out');
+
+      expect(onRecorded).toHaveBeenCalledWith('meddra', { tools: [], calls: [{ tool: 'lookup', arguments: { term: 'Sepsis' }, result: { content: [] } }] });
+      expect(record).toHaveBeenCalledWith([
+        { ts: '2026-09-28T10:00:00.000Z', type: 'mcp_replay_miss', server: 'edc', tool: 'read_record', input: { subject: '1001' } },
+      ]);
+    });
+
+    it('[ERROR] fails an eval trial whose replay misses cannot be read, rather than report fewer than it made (ADR-0023 D6)', async () => {
+      const context = {
+        ...buildWorkflowContext({}),
+        resolvedMcpConfig: { servers: { edc: { type: 'stdio', command: 'edc-mcp' } } },
+        mcpTapes: { replay: { edc: { tools: [], calls: [] } }, record: [], onRecorded: vi.fn() },
+        trajectory: { record: vi.fn() },
+      } as WorkflowAgentContext;
+      await plugin.initialize(context);
+      mockReadSkill(plugin).mockResolvedValue('# Skill');
+      mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
+        const tapeDir = join(options!.outputDir as string, 'mcp-tape');
+        await mkdir(tapeDir, { recursive: true });
+        await writeFile(join(tapeDir, 'edc.misses.jsonl'), '{"ts":"2026-09-28T10:00:00');
+        return { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: options!.outputDir as string, injectedEnvVars: [] };
+      });
+
+      await expect(plugin.run(buildEmitSpy().emit)).rejects.toThrow(/Could not read the calls replayed MCP server 'edc' had no recording for/);
     });
   });
 });

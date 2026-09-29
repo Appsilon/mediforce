@@ -3,6 +3,7 @@ import {
   calibrateConfidence,
   caseReliability,
   judgeAcceptanceCriteria,
+  mcpServersByMode,
   recommendControl,
   wilsonInterval,
   type AcceptanceCriterionVerdict,
@@ -10,6 +11,7 @@ import {
   type ConfidenceOutcome,
   type EvalRun,
   type EvalRunEvaluatorReport,
+  type EvalRunMcpReport,
   type EvalRunReport,
   type EvalRunVariantReport,
   type EvalSuite,
@@ -151,6 +153,17 @@ function judgedOnEveryTrial(verdicts: AcceptanceCriterionVerdict[], counts: Eval
     : verdict));
 }
 
+/** The servers by the mode the run froze for them, and every unanswered replayed call, counted by server and tool. */
+function mcpReport(run: EvalRun, trials: readonly EvalTrial[]): EvalRunMcpReport {
+  const counts = new Map<string, EvalRunMcpReport['unrecordedCalls'][number]>();
+  for (const miss of trials.flatMap((trial) => trial.mcpReplayMisses)) {
+    const key = `${miss.server}\u0000${miss.tool}`;
+    const counted = counts.get(key);
+    counts.set(key, { server: miss.server, tool: miss.tool, count: (counted?.count ?? 0) + 1 });
+  }
+  return { ...mcpServersByMode(run.mcpPolicy), unrecordedCalls: [...counts.values()] };
+}
+
 function variantReport(
   run: EvalRun,
   variant: EvalVariant,
@@ -217,7 +230,7 @@ function compare(champion: EvalRunVariantReport, challenger: EvalRunVariantRepor
  * variant: every Evaluator's results, the verdict on each Acceptance
  * Criterion, how the agent's confidence matched its pass rate and what that
  * recommends for routing, and what the variant cost. Then every challenger
- * against the champion.
+ * against the champion, and how the trials reached MCP servers.
  */
 export async function buildEvalRunReport(scope: CallerScope, run: EvalRun, trials: readonly EvalTrial[]): Promise<EvalRunReport> {
   const scores = await trialScores(scope, run, trials);
@@ -227,6 +240,7 @@ export async function buildEvalRunReport(scope: CallerScope, run: EvalRun, trial
   return {
     k: run.trialsPerCase,
     trials: trialCounts(trials),
+    mcp: mcpReport(run, trials),
     variants,
     comparison: champion === undefined ? [] : challengers.map((challenger) => compare(champion, challenger)),
     costUsd: trials.reduce((sum, trial) => sum + (trial.costUsd ?? 0), 0),

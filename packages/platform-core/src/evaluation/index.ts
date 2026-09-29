@@ -6,6 +6,16 @@ export {
   type EvaluatorTrust,
 } from './trust';
 export { inlineMcpServerNames, mcpEvalRestrictions } from './mcp-eval-restrictions';
+export {
+  canonicalJson,
+  describeMcpPolicy,
+  describeMcpReport,
+  mcpServersByMode,
+  mcpReplayMissEntry,
+  mcpReplayMissesOf,
+  mergeMcpTapes,
+  MCP_REPLAY_RECORDINGS,
+} from './mcp-tape';
 export { wilsonInterval, caseReliability, cohensKappa, type CaseReliability } from './statistics';
 export { applyStepVariant, isEmptyVariantPatch, variantPatchProblem } from './variant';
 export { describeAcceptanceCriteria, judgeAcceptanceCriteria } from './acceptance';

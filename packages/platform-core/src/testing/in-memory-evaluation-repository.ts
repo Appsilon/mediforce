@@ -1,4 +1,4 @@
-import type { EvaluationRepository } from '../interfaces/evaluation-repository';
+import type { EvaluationRepository, McpRecordedCase, McpRecordingFilter } from '../interfaces/evaluation-repository';
 import {
   EvalRunSchema,
   EvalTrialSchema,
@@ -17,6 +17,7 @@ import {
   EvaluatorSchema,
   EvaluatorVersionSchema,
   McpEvalPolicySchema,
+  McpRecordingSchema,
   type EvalCase,
   type EvalDatasetVersion,
   type EvaluatedStep,
@@ -25,6 +26,7 @@ import {
   type EvaluatorVersion,
   type JudgeCalibration,
   type McpEvalPolicy,
+  type McpRecording,
   type SourceApproval,
 } from '../schemas/evaluation';
 
@@ -45,6 +47,7 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
   private readonly cases = new Map<string, EvalCase>();
   private readonly datasets: EvalDatasetVersion[] = [];
   private readonly policies: McpEvalPolicy[] = [];
+  private readonly recordings: McpRecording[] = [];
   private readonly criteria: AcceptanceCriteriaVersion[] = [];
   private readonly qualifications: StepQualification[] = [];
   private readonly runs = new Map<string, EvalRun>();
@@ -160,6 +163,27 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     if (index === -1) this.policies.push(parsed);
     else this.policies[index] = parsed;
     return parsed;
+  }
+
+  async appendMcpRecording(recording: McpRecording): Promise<void> {
+    this.recordings.push(McpRecordingSchema.parse(recording));
+  }
+
+  async listMcpRecordings(step: EvaluatedStep, filter: McpRecordingFilter = {}): Promise<McpRecording[]> {
+    const rows = this.recordings
+      .filter((row) => sameStep(row, step)
+        && (filter.caseId === undefined || row.caseId === filter.caseId)
+        && (filter.server === undefined || row.server === filter.server))
+      .sort((left, right) => left.recordedAt.localeCompare(right.recordedAt));
+    return filter.limit === undefined ? rows : rows.slice(-filter.limit);
+  }
+
+  async listMcpRecordedCases(step: EvaluatedStep): Promise<McpRecordedCase[]> {
+    const seen = new Map<string, McpRecordedCase>();
+    for (const row of this.recordings) {
+      if (sameStep(row, step)) seen.set(`${row.server}\u0000${row.caseId}`, { server: row.server, caseId: row.caseId });
+    }
+    return [...seen.values()];
   }
 
   async appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> {

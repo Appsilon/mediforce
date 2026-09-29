@@ -14,6 +14,9 @@ import type {
   EvaluatorVersion,
   JudgeCalibration,
   McpEvalPolicy,
+  McpRecordedCase,
+  McpRecording,
+  McpRecordingFilter,
   SourceApproval,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
@@ -114,6 +117,17 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
     this.assertNamespaceWrite(policy.namespace);
     return this.raw.putMcpPolicy(policy);
   };
+
+  appendMcpRecording = async (recording: McpRecording): Promise<void> => {
+    this.assertNamespaceWrite(recording.namespace);
+    await this.raw.appendMcpRecording(recording);
+  };
+
+  listMcpRecordings = async (step: EvaluatedStep, filter?: McpRecordingFilter): Promise<McpRecording[]> =>
+    this.canSeeNamespace(step.namespace) ? this.raw.listMcpRecordings(step, filter) : [];
+
+  listMcpRecordedCases = async (step: EvaluatedStep): Promise<McpRecordedCase[]> =>
+    this.canSeeNamespace(step.namespace) ? this.raw.listMcpRecordedCases(step) : [];
 
   appendAcceptanceCriteria = async (criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> => {
     this.assertNamespaceWrite(criteria.namespace);
