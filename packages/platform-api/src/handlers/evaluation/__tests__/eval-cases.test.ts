@@ -84,4 +84,10 @@ describe('Eval Cases', () => {
     expect((await listEvalCases(STEP, fixture.scope())).cases).toEqual([]);
     expect((await listEvalCases({ ...STEP, includeArchived: true }, fixture.scope())).cases).toHaveLength(1);
   });
+
+  it('refuses to harvest an eval trial as a production run', async () => {
+    await fixture.instanceRepo.update('run-graded', { evalRunId: 'eval-run-1' });
+    await expect(createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'positive', split: 'dev' }, fixture.scope()))
+      .rejects.toThrow('is an eval trial, not a production run');
+  });
 });

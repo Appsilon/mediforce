@@ -119,6 +119,13 @@ import {
   evalMcpPolicyGetCommand,
   evalMcpPolicySetCommand,
 } from './commands/eval-cases';
+import {
+  evalRunCancelCommand,
+  evalRunGetCommand,
+  evalRunListCommand,
+  evalRunPrepareCommand,
+  evalRunStartCommand,
+} from './commands/eval-runs';
 import { namespaceUpdateCommand } from './commands/namespace-update';
 import { namespaceDeleteCommand } from './commands/namespace-delete';
 import { namespaceResetCommand } from './commands/namespace-reset';
@@ -265,7 +272,7 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   eval: {
-    description: 'Step Evaluation (ADR-0023) — Briefs, Evaluators, Eval Cases, Datasets, MCP eval policy',
+    description: 'Step Evaluation (ADR-0023) — Briefs, Evaluators, Eval Cases, Datasets, MCP eval policy, Eval Runs',
     leaves: {
       'brief-get': { description: 'Print a step\'s Evaluation Brief', fn: evalBriefGetCommand },
       'brief-set': { description: 'Write a new Evaluation Brief version', fn: evalBriefSetCommand },
@@ -285,6 +292,11 @@ export const TREE: Record<string, BranchEntry> = {
       'dataset-freeze': { description: 'Freeze the live cases as a Dataset version', fn: evalDatasetFreezeCommand },
       'mcp-policy-get': { description: 'Show the step\'s MCP eval policy', fn: evalMcpPolicyGetCommand },
       'mcp-policy-set': { description: 'Replace the step\'s MCP eval policy', fn: evalMcpPolicySetCommand },
+      'run-prepare': { description: 'Prepare an Eval Run and print its cost estimate', fn: evalRunPrepareCommand },
+      'run-start': { description: 'Start a prepared Eval Run, confirming its budget', fn: evalRunStartCommand },
+      'run-list': { description: 'List a step\'s Eval Runs', fn: evalRunListCommand },
+      'run-cancel': { description: 'Cancel an Eval Run', fn: evalRunCancelCommand },
+      report: { description: 'Print an Eval Run and its report', fn: evalRunGetCommand },
     },
   },
   model: {

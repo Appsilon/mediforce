@@ -49,8 +49,12 @@ export class MockAgentPlugin implements StepExecutorPlugin {
 
     if (isWorkflowAgentContext(this.context)) {
       const ts = new Date().toISOString();
+      // Names the MCP servers the step would have run with, so a test can see
+      // restrictions (an eval trial's default-deny policy) take effect.
+      const mcpServers = Object.keys(this.context.resolvedMcpConfig?.servers ?? {}).sort();
+      const mcpNote = mcpServers.length === 0 ? 'no MCP servers' : `MCP servers: ${mcpServers.join(', ')}`;
       this.context.trajectory?.record([
-        { ts, type: 'assistant', subtype: 'text', text: `Mock agent working on step '${this.context.stepId}'.` },
+        { ts, type: 'assistant', subtype: 'text', text: `Mock agent working on step '${this.context.stepId}' with ${mcpNote}.` },
         { ts, type: 'result', subtype: 'success', text: `Mock output for step ${this.context.stepId}` },
       ]);
     }

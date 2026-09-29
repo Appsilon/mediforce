@@ -45,6 +45,23 @@ describe('runEvaluatorCheck', () => {
     expect(body).toMatchObject({ model: 'anthropic/claude-haiku-4.5', temperature: 0 });
   });
 
+  it('reports what a judge call spent even when its answer is unusable', async () => {
+    const fixture = await evaluationFixture();
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: 'I would rather not choose.' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 4000, completion_tokens: 500 },
+    }))));
+    const scope = fixture.scope();
+    Object.assign(scope, { workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) } });
+    const usages: unknown[] = [];
+
+    const outcome = await runEvaluatorCheck(scope, judge, await loadEvaluationSubject(scope, GRADED_RUN, STEP), null, (usage) => usages.push(usage));
+
+    expect(outcome).toMatchObject({ passed: null, value: null });
+    expect(usages.length).toBeGreaterThan(0);
+    expect(usages[0]).toEqual({ model: 'anthropic/claude-haiku-4.5', promptTokens: 4000, completionTokens: 500 });
+  });
+
   it('reports a check that cannot run as an error, not a failure', async () => {
     const fixture = await evaluationFixture();
     const outcome = await runEvaluatorCheck(fixture.scope(), judge, await loadEvaluationSubject(fixture.scope(), GRADED_RUN, STEP), null);

@@ -1,4 +1,8 @@
 import type {
+  EvalRun,
+  EvalRunStatus,
+  EvalTrial,
+  EvalTrialStatus,
   EvalCase,
   EvalDatasetVersion,
   EvaluatedStep,
@@ -103,6 +107,62 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
     this.assertNamespaceWrite(policy.namespace);
     return this.raw.putMcpPolicy(policy);
   };
+
+  createEvalRun = async (run: EvalRun, trials: readonly EvalTrial[]): Promise<void> => {
+    this.assertNamespaceWrite(run.namespace);
+    await this.raw.createEvalRun(run, trials);
+  };
+
+  getEvalRun = async (id: string): Promise<EvalRun | null> => this.visible(await this.raw.getEvalRun(id));
+
+  listEvalRuns = async (step: EvaluatedStep): Promise<EvalRun[]> =>
+    this.canSeeNamespace(step.namespace) ? this.raw.listEvalRuns(step) : [];
+
+  /** The Eval Runs the heartbeat moves on, across workspaces — system actors only. */
+  listEvalRunIdsToDrive = async (): Promise<string[]> =>
+    this.caller.isSystemActor ? this.raw.listEvalRunIdsToDrive() : [];
+
+  transitionEvalRun = async (
+    id: string,
+    from: EvalRunStatus,
+    patch: Partial<Pick<EvalRun, 'status' | 'startedAt' | 'completedAt'>>,
+  ): Promise<boolean> => {
+    await this.writableRun(id);
+    return this.raw.transitionEvalRun(id, from, patch);
+  };
+
+  addEvalRunSpend = async (id: string, usd: number): Promise<void> => {
+    await this.writableRun(id);
+    await this.raw.addEvalRunSpend(id, usd);
+  };
+
+  /** A run's trials; `[]` when the run is not visible. */
+  listTrials = async (evalRunId: string): Promise<EvalTrial[]> =>
+    (await this.getEvalRun(evalRunId)) === null ? [] : this.raw.listTrials(evalRunId);
+
+  getTrialByInstanceId = async (processInstanceId: string): Promise<EvalTrial | null> => {
+    const trial = await this.raw.getTrialByInstanceId(processInstanceId);
+    return trial !== null && (await this.getEvalRun(trial.evalRunId)) !== null ? trial : null;
+  };
+
+  transitionTrial = async (
+    trial: Pick<EvalTrial, 'id' | 'evalRunId'>,
+    from: EvalTrialStatus,
+    patch: Partial<Omit<EvalTrial, 'id' | 'evalRunId' | 'caseId' | 'trialIndex'>>,
+  ): Promise<boolean> => {
+    await this.writableRun(trial.evalRunId);
+    return this.raw.transitionTrial(trial.id, from, patch);
+  };
+
+  renewScoringClaim = async (trial: Pick<EvalTrial, 'id' | 'evalRunId'>, staleBefore: string, now: string): Promise<boolean> => {
+    await this.writableRun(trial.evalRunId);
+    return this.raw.renewScoringClaim(trial.id, staleBefore, now);
+  };
+
+  private async writableRun(id: string): Promise<void> {
+    const run = await this.raw.getEvalRun(id);
+    this.assertNamespaceWrite(run?.namespace);
+  }
 
   private visible<T extends { namespace: string }>(row: T | null): T | null {
     return row !== null && this.canSeeNamespace(row.namespace) ? row : null;

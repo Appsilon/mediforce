@@ -403,7 +403,12 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
     this.runWorkspaceHandle = await this.workspaceManager.createRunWorkspace(
       { name, namespace, workspace: workspaceConfig },
       this.context.processInstanceId,
-      { remoteToken },
+      {
+        remoteToken,
+        ...(isWorkflowAgentContext(this.context) && this.context.workspaceStartCommit !== undefined
+          ? { startCommit: this.context.workspaceStartCommit }
+          : {}),
+      },
     );
   }
 

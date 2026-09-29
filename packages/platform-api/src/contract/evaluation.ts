@@ -6,6 +6,9 @@ import {
   EvalCaseSchema,
   EvalCaseSplitSchema,
   EvalDatasetVersionSchema,
+  EvalRunReportSchema,
+  EvalRunSchema,
+  EvalTrialSchema,
   EvaluatedStepSchema,
   EvaluationBriefSchema,
   EvaluationOriginSchema,
@@ -207,6 +210,42 @@ export const SetMcpEvalPolicyInputSchema = EvaluatedStepSchema.extend({
 });
 export const SetMcpEvalPolicyOutputSchema = z.object({ policy: McpEvalPolicySchema });
 
+/**
+ * Prepares an Eval Run (ADR-0023 D4, D10): freezes the Dataset version (the
+ * newest when none is named), the Step's live Evaluator versions and its MCP
+ * eval policy, and estimates the cost. Nothing runs until `start`.
+ */
+export const PrepareEvalRunInputSchema = EvaluatedStepSchema.extend({
+  datasetVersionId: z.uuid().optional(),
+  trialsPerCase: z.number().int().min(1).max(10).default(3),
+  concurrency: z.number().int().min(1).max(8).default(2),
+  /** Spend cap; defaults to 1.5× the estimate, and is required when there is no estimate. */
+  budgetUsd: z.number().positive().max(10_000).optional(),
+});
+
+/**
+ * Starts a prepared Eval Run. `confirmedBudgetUsd` is the person confirming the
+ * spend they were shown (D15): it must equal the run's budget. The Evaluation
+ * Assistant can prepare a run but never supplies this.
+ */
+export const StartEvalRunInputSchema = z.object({
+  evalRunId: z.uuid(),
+  confirmedBudgetUsd: z.number().positive().optional(),
+});
+
+export const GetEvalRunInputSchema = z.object({ evalRunId: z.uuid() });
+export const CancelEvalRunInputSchema = GetEvalRunInputSchema;
+
+/** An Eval Run with its trials and its report, computed from the Scores its trials received. */
+export const EvalRunOutputSchema = z.object({
+  evalRun: EvalRunSchema,
+  trials: z.array(EvalTrialSchema),
+  report: EvalRunReportSchema,
+});
+
+export const ListEvalRunsInputSchema = EvaluatedStepSchema;
+export const ListEvalRunsOutputSchema = z.object({ evalRuns: z.array(EvalRunSchema) });
+
 export type GetEvaluationBriefInput = z.infer<typeof GetEvaluationBriefInputSchema>;
 export type GetEvaluationBriefOutput = z.infer<typeof GetEvaluationBriefOutputSchema>;
 export type SetEvaluationBriefInput = z.input<typeof SetEvaluationBriefInputSchema>;
@@ -243,3 +282,10 @@ export type GetMcpEvalPolicyInput = z.infer<typeof GetMcpEvalPolicyInputSchema>;
 export type GetMcpEvalPolicyOutput = z.infer<typeof GetMcpEvalPolicyOutputSchema>;
 export type SetMcpEvalPolicyInput = z.infer<typeof SetMcpEvalPolicyInputSchema>;
 export type SetMcpEvalPolicyOutput = z.infer<typeof SetMcpEvalPolicyOutputSchema>;
+export type PrepareEvalRunInput = z.input<typeof PrepareEvalRunInputSchema>;
+export type StartEvalRunInput = z.infer<typeof StartEvalRunInputSchema>;
+export type GetEvalRunInput = z.infer<typeof GetEvalRunInputSchema>;
+export type CancelEvalRunInput = z.infer<typeof CancelEvalRunInputSchema>;
+export type EvalRunOutput = z.infer<typeof EvalRunOutputSchema>;
+export type ListEvalRunsInput = z.infer<typeof ListEvalRunsInputSchema>;
+export type ListEvalRunsOutput = z.infer<typeof ListEvalRunsOutputSchema>;

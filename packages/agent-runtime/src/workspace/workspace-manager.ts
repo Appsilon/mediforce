@@ -92,6 +92,12 @@ export interface EnsureBareRepoOptions {
   remoteToken?: string;
 }
 
+export interface CreateRunWorkspaceOptions extends EnsureBareRepoOptions {
+  /** Commit the run branch starts from instead of the default branch — an eval
+   *  trial's workspace seed (ADR-0023 D4). Ignored when the branch exists. */
+  startCommit?: string;
+}
+
 export interface BareRepoHandle {
   path: string;
   /** True when the bare repo is brand new (just initialized). */
@@ -587,13 +593,14 @@ export class WorkspaceManager {
    *
    * Starting ref resolution:
    *   - branch already in bare repo (e.g. pre-existing on a previous run) → reuse it
+   *   - `opts.startCommit` set (an eval trial's seed) → branch from that commit
    *   - remote-backed WD → branch from `<remoteName>/<defaultBranch>`
    *   - local-only WD → branch from local `main` (always present; seeded on init)
    */
   async createRunWorkspace(
     workflow: WorkflowIdentity & { workspace: WorkflowWorkspace },
     runId: string,
-    opts: EnsureBareRepoOptions = {},
+    opts: CreateRunWorkspaceOptions = {},
   ): Promise<RunWorkspaceHandle> {
     const bare = await this.ensureBareRepo(workflow, opts);
     const wtPath = this.worktreePath(workflow, runId);
@@ -611,7 +618,7 @@ export class WorkspaceManager {
     if (branchExists) {
       runGit(['worktree', 'add', wtPath, branch], { cwd: bare.path });
     } else {
-      const startingPoint = this.resolveStartingPoint(bare.path, workflow.workspace);
+      const startingPoint = opts.startCommit ?? this.resolveStartingPoint(bare.path, workflow.workspace);
       runGit(['worktree', 'add', '-b', branch, wtPath, startingPoint], { cwd: bare.path });
     }
 
