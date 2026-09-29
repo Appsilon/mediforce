@@ -184,6 +184,20 @@ describe('GEPA optimisations (ADR-0023 D15)', () => {
     expect(evalRun.variants[1]!.patch).toEqual({ model: 'openai/gpt-5', prompt: FIXED_PROMPT });
   });
 
+  it('reflects on the prompt the source run ran, not one the Step has since been given', async () => {
+    const v1 = (await fixture.processRepo.getWorkflowDefinition(STEP.namespace, STEP.workflowName, 1))!;
+    await fixture.processRepo.saveWorkflowDefinition({
+      ...v1,
+      version: 2,
+      steps: v1.steps.map((step) => step.id === STEP.stepId ? { ...step, agent: { prompt: 'Summarise the AEs.' } } : step),
+    });
+    jobReturns({ candidates: [{ prompt: FIXED_PROMPT, reflectedOn: 2 }] });
+
+    await startOptimisation({ ...STEP, evalRunId: sourceRunId, budgetUsd: 3, candidates: 1, trialsPerCase: 1 }, scope);
+
+    expect(vi.mocked(runGepaJob).mock.calls[0]![0].input.currentPrompt).toBe('Grade each AE.');
+  });
+
   it('fails with what the job spent when it proposes nothing new, errors, or leaves no budget', async () => {
     jobReturns({ candidates: [{ prompt: 'Grade each AE.', reflectedOn: 2 }] });
     const unchanged = await startOptimisation({ ...STEP, evalRunId: sourceRunId, budgetUsd: 3, candidates: 1, trialsPerCase: 1 }, scope);

@@ -214,7 +214,7 @@ export async function startOptimisation(
   scope: CallerScope,
 ): Promise<EvalOptimisationOutput> {
   const step = stepRef(input);
-  const { step: workflowStep } = await loadEvaluatedStep(scope, step, 'run');
+  await loadEvaluatedStep(scope, step, 'run');
 
   const source = await scope.evaluation.getEvalRun(input.evalRunId);
   if (source === null || isSameStep(source, step) === false) {
@@ -241,7 +241,9 @@ export async function startOptimisation(
   if (records.length === 0) {
     throw new ValidationError(`Variant '${variantId}' of Eval Run '${source.id}' has no scored trial of a dev case to reflect on`);
   }
-  const currentPrompt = variant.patch.prompt ?? workflowStep.agent?.prompt ?? '';
+  // The prompt the source run's feedback was produced by: its variant's, or the Step's in the version the run pinned.
+  const { step: sourceStep } = await loadEvaluatedStep(scope, step, 'read', source.definitionVersion);
+  const currentPrompt = variant.patch.prompt ?? sourceStep.agent?.prompt ?? '';
   const worstCaseUsd = worstCaseJobCostUsd(priceOf, reflectionModel, currentPrompt, records, input.candidates);
   if (worstCaseUsd >= input.budgetUsd) {
     throw new ValidationError(`The job may spend up to $${worstCaseUsd.toFixed(4)} on ${input.candidates} call(s) to '${reflectionModel}', which leaves nothing of the $${input.budgetUsd} budget for its candidates' Eval Run; grant more, propose fewer candidates, or reflect with a cheaper model`);

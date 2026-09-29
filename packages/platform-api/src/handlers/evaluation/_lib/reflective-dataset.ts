@@ -2,7 +2,7 @@ import type { GepaReflectiveRecord } from '@mediforce/agent-runtime';
 import type { EvalCase, EvalRun, EvalTrial, Score, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { loadEvaluationSubject } from './evaluation-subject';
-import { isPass, scoresOfTrial } from './trial-scores';
+import { isPass, passedEveryCounted, scoresOfTrial } from './trial-scores';
 
 /** What one job reflects on at most: its prompt must fit the reflection model's context many times over. */
 const MAX_RECORDS = 12;
@@ -33,8 +33,10 @@ interface GradedTrial {
  * GEPA's reflective dataset (its `Inputs`, `Generated Outputs`, `Feedback`)
  * from one variant's scored trials of an Eval Run — only its dev cases: the
  * holdout cases are what the candidates are checked on afterwards, so the job
- * never sees them. Feedback is each counted Evaluator's verdict with its rule
- * and comment, and the case's expectation and notes. Failing trials come first.
+ * never sees them. Feedback is each counted Evaluator's verdict — PASS, FAIL,
+ * or ERROR when it gave none — with its rule and comment, the trial's
+ * Evaluator errors, and the case's expectation and notes. Trials that did not
+ * pass every counted Evaluator come first.
  */
 export async function reflectiveDataset(scope: CallerScope, run: EvalRun, variantId: string): Promise<GepaReflectiveRecord[]> {
   const counted = run.evaluators.filter((evaluator) => evaluator.counted);
@@ -50,23 +52,18 @@ export async function reflectiveDataset(scope: CallerScope, run: EvalRun, varian
     const evalCase = await scope.evaluation.getCase(trial.caseId);
     if (evalCase === null || evalCase.split !== 'dev') continue;
     const scores = await scoresOfTrial(scope, run, trial);
-    const failing = counted.some((evaluator) => {
-      const score = scores.find((candidate) => candidate.evaluatorId === evaluator.evaluatorId);
-      return score !== undefined && isPass(score) === false;
-    });
-    graded.push({ trial, evalCase, scores, failing });
+    graded.push({ trial, evalCase, scores, failing: passedEveryCounted(run, scores) !== true });
   }
   const chosen = [...graded.filter((row) => row.failing), ...graded.filter((row) => row.failing === false)].slice(0, MAX_RECORDS);
 
   return Promise.all(chosen.map(async ({ trial, evalCase, scores }) => {
     const subject = await loadEvaluationSubject(scope, trial.agentRunId!);
-    const verdicts = counted.flatMap((evaluator) => {
+    const verdicts = counted.map((evaluator) => {
       const score = scores.find((candidate) => candidate.evaluatorId === evaluator.evaluatorId);
-      if (score === undefined) return [];
-      const passed = isPass(score);
+      const verdict = score === undefined ? 'ERROR' : isPass(score) ? 'PASS' : 'FAIL';
       const rule = rules.get(evaluator.evaluatorId);
-      const comment = passed === false && score.comment !== null ? ` — ${score.comment}` : '';
-      return [`${passed ? 'PASS' : 'FAIL'} ${evaluator.name} (${evaluator.severity})${rule === null || rule === undefined ? '' : `: ${rule}`}${comment}`];
+      const comment = score === undefined || score.comment === null ? '' : ` — ${score.comment}`;
+      return `${verdict} ${evaluator.name} (${evaluator.severity})${rule === null || rule === undefined ? '' : `: ${rule}`}${comment}`;
     });
     return {
       Inputs: clipped({
@@ -78,6 +75,7 @@ export async function reflectiveDataset(scope: CallerScope, run: EvalRun, varian
         `The output of this case should be ${evalCase.expectation === 'positive' ? 'accepted' : 'rejected'}.`,
         ...(evalCase.notes === null ? [] : [`Notes on the case: ${evalCase.notes}`]),
         ...verdicts,
+        ...(trial.error === null ? [] : [`Evaluator errors: ${trial.error}`]),
       ].join('\n'),
     };
   }));

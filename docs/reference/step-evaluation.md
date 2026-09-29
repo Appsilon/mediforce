@@ -534,13 +534,16 @@ Evaluation tab, or the assistant's `start_optimisation` under an unattended
 budget) needs the workflow's `run` verb.
 
 1. **Reflective dataset.** The chosen variant's scored trials of **dev** cases
-   only — failing ones first, at most 12 — each as GEPA's `Inputs` (trigger
-   payload and earlier steps' outputs), `Generated Outputs` (the result, and
-   the tools the trajectory called) and `Feedback` (the case's expectation and
-   notes, and each counted Evaluator's verdict with its rule and comment).
-   Holdout cases are what the candidates are checked on afterwards, so the job
-   never sees them. A variant with no scored dev trial, or a run with no counted
-   Evaluator, is refused.
+   only — those that did not pass every counted Evaluator first, at most 12 —
+   each as GEPA's `Inputs` (trigger payload and earlier steps' outputs),
+   `Generated Outputs` (the result, and the tools the trajectory called) and
+   `Feedback` (the case's expectation and notes, each counted Evaluator's
+   `PASS`, `FAIL` or — when it gave no verdict — `ERROR` with its rule and
+   comment, and the trial's Evaluator errors). The current prompt GEPA rewrites
+   is the variant's, or the step's in the workflow version the source run
+   pinned. Holdout cases are what the candidates are checked on afterwards, so
+   the job never sees them. A variant with no scored dev trial, or a run with no
+   counted Evaluator, is refused.
 2. **The job.** A container of the `mediforce-gepa` image (Python with the
    `gepa` package, built by `scripts/rebuild-docker-images.sh`) runs GEPA's
    reflective proposal step once per candidate, each over its own minibatch of

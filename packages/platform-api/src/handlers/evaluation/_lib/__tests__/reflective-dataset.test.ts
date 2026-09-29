@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createEvalCase } from '../../eval-cases';
 import { freezeEvalDataset } from '../../eval-datasets';
+import { createEvaluator } from '../../evaluators';
 import { STEP, evaluationFixture, type EvaluationFixture } from '../../__tests__/fixture';
 import { evalScenario, finishEvalRun, type EvalScenario } from '../../__tests__/finished-eval-run';
 import { reflectiveDataset } from '../reflective-dataset';
@@ -18,6 +19,7 @@ describe('reflectiveDataset', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     if (previousAllowLocal === undefined) delete process.env.ALLOW_LOCAL_AGENTS;
     else process.env.ALLOW_LOCAL_AGENTS = previousAllowLocal;
   });
@@ -53,5 +55,37 @@ describe('reflectiveDataset', () => {
     const records = await reflectiveDataset(scenario.scope, run, 'champion');
 
     expect(JSON.stringify(records)).not.toContain('Anaemia');
+  });
+
+  it('keeps every counted Evaluator in the feedback — a passing verdict\'s comment, and one that errored', async () => {
+    await createEvaluator({
+      ...STEP, name: 'grades-present', rule: 'Every AE carries a grade.', severity: 'major', origin: 'user',
+      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Every AE carries a grade.', choices: [{ label: 'graded', value: 1 }, { label: 'ungraded', value: 0 }] },
+    }, scenario.scope);
+    let judgeCalls = 0;
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => {
+      judgeCalls += 1;
+      return judgeCalls === 1
+        ? new Response(JSON.stringify({
+          choices: [{ message: { content: '{"reasoning": "Every AE is graded.", "choice": "graded"}' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 100, completion_tokens: 20 },
+        }))
+        : new Response('upstream down', { status: 500 });
+    }));
+    Object.assign(scenario.scope, {
+      workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) },
+      models: { list: async () => [{ id: 'anthropic/claude-haiku-4.5', pricing: { input: 0.000001, output: 0.000005 } }] },
+    });
+    const evalRunId = await finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5, challengers: [] }, () => ({ findings: ['graded'] }));
+    const finished = (await fixture.evaluationRepo.getEvalRun(evalRunId))!;
+    // An untrusted judge is frozen uncounted; count it, as a calibrated one would be.
+    const run = { ...finished, evaluators: finished.evaluators.map((evaluator) => ({ ...evaluator, counted: true })) };
+
+    const records = await reflectiveDataset(scenario.scope, run, 'champion');
+
+    expect(records).toHaveLength(2);
+    expect(records[0]!.Feedback).toContain('ERROR grades-present (major): Every AE carries a grade.');
+    expect(records[0]!.Feedback).toMatch(/Evaluator errors: grades-present: /);
+    expect(records[1]!.Feedback).toContain('PASS grades-present (major): Every AE carries a grade. — Every AE is graded.');
   });
 });
