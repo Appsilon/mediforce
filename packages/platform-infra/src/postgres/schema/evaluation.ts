@@ -145,6 +145,24 @@ export const mcpEvalPolicies = pgTable(
   }),
 );
 
+/** Acceptance Criteria per Step, one row per version, like Briefs. */
+export const evalAcceptanceCriteria = pgTable(
+  'eval_acceptance_criteria',
+  {
+    workspace: workspaceColumn(),
+    workflowName: text('workflow_name').notNull(),
+    stepId: text('step_id').notNull(),
+    version: integer('version').notNull(),
+    criteria: jsonb('criteria').notNull(),
+    origin: text('origin').notNull(),
+    createdBy: text('created_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.workspace, table.workflowName, table.stepId, table.version] }),
+  }),
+);
+
 /**
  * Eval Runs (ADR-0023 D4, D10). The frozen parts — cases, Evaluator versions,
  * MCP policy, estimate — are written once at prepare; afterwards only
@@ -164,6 +182,9 @@ export const evalRuns = pgTable(
     trialsPerCase: integer('trials_per_case').notNull(),
     concurrency: integer('concurrency').notNull(),
     evaluators: jsonb('evaluators').notNull(),
+    variants: jsonb('variants').notNull(),
+    acceptanceCriteria: jsonb('acceptance_criteria'),
+    briefVersion: integer('brief_version'),
     mcpPolicy: jsonb('mcp_policy').notNull(),
     estimate: jsonb('estimate').notNull(),
     budgetUsd: doublePrecision('budget_usd').notNull(),
@@ -187,6 +208,7 @@ export const evalTrials = pgTable(
     id: uuid('id').primaryKey(),
     evalRunId: uuid('eval_run_id').notNull().references(() => evalRuns.id, { onDelete: 'cascade' }),
     caseId: uuid('case_id').notNull(),
+    variantId: text('variant_id').notNull(),
     trialIndex: integer('trial_index').notNull(),
     status: text('status').notNull(),
     processInstanceId: text('process_instance_id'),
@@ -195,6 +217,7 @@ export const evalTrials = pgTable(
     inputTokens: integer('input_tokens'),
     outputTokens: integer('output_tokens'),
     durationMs: integer('duration_ms'),
+    confidence: doublePrecision('confidence'),
     error: text('error'),
     startedAt: timestamp('started_at', { withTimezone: true }),
     scoringStartedAt: timestamp('scoring_started_at', { withTimezone: true }),
@@ -202,7 +225,31 @@ export const evalTrials = pgTable(
     completedAt: timestamp('completed_at', { withTimezone: true }),
   },
   (table) => ({
-    runIdx: index('eval_trials_run_idx').on(table.evalRunId, table.caseId, table.trialIndex),
+    runIdx: index('eval_trials_run_idx').on(table.evalRunId, table.caseId, table.variantId, table.trialIndex),
     instanceIdx: uniqueIndex('eval_trials_instance_idx').on(table.processInstanceId),
+  }),
+);
+
+/**
+ * Signed Step Qualifications (ADR-0023 D10, D11): insert-only. The signed
+ * record is `record` whole; the columns beside it are what the Step's badge
+ * and history are looked up by.
+ */
+export const stepQualifications = pgTable(
+  'step_qualifications',
+  {
+    id: uuid('id').primaryKey(),
+    workspace: workspaceColumn(),
+    workflowName: text('workflow_name').notNull(),
+    stepId: text('step_id').notNull(),
+    evalRunId: uuid('eval_run_id').notNull().references(() => evalRuns.id),
+    variantId: text('variant_id').notNull(),
+    fingerprint: text('fingerprint').notNull(),
+    record: jsonb('record').notNull(),
+    signedBy: text('signed_by').notNull(),
+    signedAt: timestamp('signed_at', { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    stepIdx: index('step_qualifications_step_idx').on(table.workspace, table.workflowName, table.stepId, table.signedAt.desc()),
   }),
 );

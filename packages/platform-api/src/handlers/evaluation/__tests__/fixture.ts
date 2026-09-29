@@ -15,7 +15,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import type { CallerIdentity } from '../../../auth';
 import type { CallerScope } from '../../../repositories/index';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller, type TestScopeOverrides } from '../../../repositories/__tests__/create-test-scope';
 
 export const NAMESPACE = 'pharma-a';
 export const WORKFLOW = 'ae-grading';
@@ -33,7 +33,8 @@ export interface EvaluationFixture {
   readonly scoreRepo: InMemoryScoreRepository;
   readonly evaluationRepo: InMemoryEvaluationRepository;
   readonly auditRepo: InMemoryAuditRepository;
-  scope(caller?: CallerIdentity): CallerScope;
+  readonly agentDefinitionRepo: InMemoryAgentDefinitionRepository;
+  scope(caller?: CallerIdentity, overrides?: TestScopeOverrides): CallerScope;
 }
 
 /**
@@ -85,7 +86,9 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
     scoreRepo,
     evaluationRepo,
     auditRepo,
-    scope: (caller = userCaller('author-1', [NAMESPACE])) => createTestScope({
+    agentDefinitionRepo,
+    scope: (caller = userCaller('author-1', [NAMESPACE]), overrides = {}) => createTestScope({
+      ...overrides,
       processRepo,
       instanceRepo,
       agentRunRepo,

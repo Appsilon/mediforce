@@ -2,29 +2,38 @@ import type { StepMcpRestriction } from '../schemas/agent-mcp-binding';
 import type { McpEvalServerPolicy } from '../schemas/evaluation';
 import type { WorkflowStep } from '../schemas/workflow-definition';
 
+/** `base` narrowed by `extra`: a server either disables stays disabled, and denied tools add up. */
+export function narrowMcpRestrictions(base: StepMcpRestriction = {}, extra: StepMcpRestriction = {}): StepMcpRestriction {
+  const merged: StepMcpRestriction = { ...base };
+  for (const [name, restriction] of Object.entries(extra)) {
+    const existing = merged[name] ?? {};
+    const denyTools = [...new Set([...(existing.denyTools ?? []), ...(restriction.denyTools ?? [])])];
+    merged[name] = {
+      ...((existing.disable === true || restriction.disable === true) ? { disable: true } : {}),
+      ...(denyTools.length === 0 ? {} : { denyTools }),
+    };
+  }
+  return merged;
+}
+
 /**
  * The step restrictions an eval trial runs with (D6): the step's own
- * `mcpRestrictions` plus, for every server the step's agent binds, the eval
- * policy — `deny` (or no entry at all) disables the server, `live` keeps it
- * and adds its `denyTools`. Subtractive only, like every step restriction.
+ * `mcpRestrictions` narrowed by, for every server the step's agent binds, the
+ * eval policy — `deny` (or no entry at all) disables the server, `live` keeps
+ * it and adds its `denyTools`. Subtractive only, like every step restriction.
  */
 export function mcpEvalRestrictions(
   agentServerNames: readonly string[],
   policy: Readonly<Record<string, McpEvalServerPolicy>>,
   stepRestrictions: StepMcpRestriction = {},
 ): StepMcpRestriction {
-  const merged: StepMcpRestriction = { ...stepRestrictions };
+  const evalRestrictions: StepMcpRestriction = {};
   for (const name of agentServerNames) {
     const serverPolicy = policy[name];
-    const existing = merged[name] ?? {};
-    if (serverPolicy === undefined || serverPolicy.mode === 'deny') {
-      merged[name] = { ...existing, disable: true };
-      continue;
-    }
-    const denyTools = [...new Set([...(existing.denyTools ?? []), ...(serverPolicy.denyTools ?? [])])];
-    if (denyTools.length > 0) merged[name] = { ...existing, denyTools };
+    if (serverPolicy === undefined || serverPolicy.mode === 'deny') evalRestrictions[name] = { disable: true };
+    else if ((serverPolicy.denyTools ?? []).length > 0) evalRestrictions[name] = { denyTools: serverPolicy.denyTools };
   }
-  return merged;
+  return narrowMcpRestrictions(stepRestrictions, evalRestrictions);
 }
 
 /**

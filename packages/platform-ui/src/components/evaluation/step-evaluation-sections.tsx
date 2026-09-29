@@ -2,20 +2,27 @@
 
 import * as React from 'react';
 import { Loader2 } from 'lucide-react';
-import type { EvaluatedStep, EvaluatorCheck } from '@mediforce/platform-core';
-import type { EvaluatorView, PreparedEvalRun } from '@mediforce/platform-api/contract';
+import {
+  CHAMPION_VARIANT_ID,
+  EvaluatorSeveritySchema,
+  describeAcceptanceCriteria,
+  type AcceptanceCriteria,
+  type EvaluatedStep,
+  type EvaluatorCheck,
+  type EvaluatorSeverity,
+  type StepFingerprintComponent,
+} from '@mediforce/platform-core';
+import { EvalChallengerSchema, type EvalChallenger, type EvaluatorView, type PreparedEvalRun } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { useEvalRun, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
-import { EvalRunReport } from './eval-run-report';
+import { EvalRunReport, describePatch } from './eval-run-report';
+import { QualificationStatusChip } from './step-qualification-badge';
+import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 
 type StepEvaluation = ReturnType<typeof useStepEvaluation>;
-
-const buttonClass = 'rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50 disabled:pointer-events-none';
-const primaryButtonClass = 'rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none';
-const inputClass = 'rounded-md border bg-background px-2 py-1 text-sm';
 
 function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
@@ -310,6 +317,140 @@ export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep;
   );
 }
 
+const SEVERITIES = EvaluatorSeveritySchema.options;
+
+type CriteriaDraft = Record<EvaluatorSeverity, { minPassRate: string; minPassHatK: string }>;
+
+function toDraft(criteria: AcceptanceCriteria | undefined): CriteriaDraft {
+  const field = (value: number | undefined) => (value === undefined ? '' : String(value));
+  return Object.fromEntries(SEVERITIES.map((severity) => [severity, {
+    minPassRate: field(criteria?.[severity]?.minPassRate),
+    minPassHatK: field(criteria?.[severity]?.minPassHatK),
+  }])) as CriteriaDraft;
+}
+
+function fromDraft(draft: CriteriaDraft): AcceptanceCriteria {
+  return Object.fromEntries(SEVERITIES.flatMap((severity) => {
+    const { minPassRate, minPassHatK } = draft[severity];
+    if (minPassRate.trim() === '') return [];
+    return [[severity, { minPassRate: Number(minPassRate), ...(minPassHatK.trim() === '' ? {} : { minPassHatK: Number(minPassHatK) }) }]];
+  })) as AcceptanceCriteria;
+}
+
+/**
+ * The floors Eval Runs are judged against (D10): per severity, the minimum
+ * pass rate on its Wilson 95% lower bound and optionally pass^k. Each save is
+ * a version; the next run prepared freezes the one in force.
+ */
+export function AcceptanceCriteriaSection({ step, data, mayEdit }: { step: EvaluatedStep; data: StepEvaluation['criteria']; mayEdit: boolean }) {
+  const [draft, setDraft] = React.useState<CriteriaDraft | null>(null);
+  const save = useStepEvaluationMutation(step, (criteria: AcceptanceCriteria) => mediforce.evaluation.setAcceptanceCriteria({ ...step, criteria }));
+  const current = data.data?.criteria ?? null;
+  return (
+    <Section
+      title="Acceptance Criteria"
+      action={mayEdit && draft === null && (
+        <button type="button" className={buttonClass} onClick={() => setDraft(toDraft(current?.criteria))}>{current === null ? 'Set' : 'Edit'}</button>
+      )}
+    >
+      {data.isLoading ? <Loading /> : draft !== null ? (
+        <div className="space-y-2" data-testid="acceptance-criteria-form">
+          <p className="text-xs text-muted-foreground">Minimum pass rate on the Wilson 95% lower bound, and optionally pass^k, that every counted Evaluator of the severity must reach. Leave a severity empty not to judge it.</p>
+          {SEVERITIES.map((severity) => (
+            <div key={severity} className="flex items-center gap-2 text-xs">
+              <span className="w-14">{severity}</span>
+              <input
+                aria-label={`${severity} minimum pass rate`}
+                type="number" min={0} max={1} step={0.01} placeholder="—"
+                className={cn(inputClass, 'w-20')}
+                value={draft[severity].minPassRate}
+                onChange={(event) => setDraft({ ...draft, [severity]: { ...draft[severity], minPassRate: event.target.value } })}
+              />
+              <span className="text-muted-foreground">pass^k</span>
+              <input
+                aria-label={`${severity} minimum pass^k`}
+                type="number" min={0} max={1} step={0.01} placeholder="—"
+                className={cn(inputClass, 'w-20')}
+                value={draft[severity].minPassHatK}
+                onChange={(event) => setDraft({ ...draft, [severity]: { ...draft[severity], minPassHatK: event.target.value } })}
+              />
+            </div>
+          ))}
+          {save.error !== null && <p className="text-xs text-destructive">{save.error.message}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className={primaryButtonClass}
+              disabled={SEVERITIES.every((severity) => draft[severity].minPassRate.trim() === '') || save.isPending}
+              onClick={() => save.mutate(fromDraft(draft), { onSuccess: () => setDraft(null) })}
+            >Save as v{(current?.version ?? 0) + 1}</button>
+            <button type="button" className={buttonClass} onClick={() => setDraft(null)}>Cancel</button>
+          </div>
+        </div>
+      ) : current === null ? (
+        <p className="text-sm text-muted-foreground">No Acceptance Criteria yet — Eval Runs judge nothing until they are set. The assistant can propose them from the step&apos;s risks.</p>
+      ) : (
+        <div className="space-y-1">
+          <p className="text-sm" data-testid="acceptance-criteria">{describeAcceptanceCriteria(current.criteria)}</p>
+          <p className="text-xs text-muted-foreground">v{current.version} · {current.origin === 'assistant' ? 'proposed by the assistant' : 'set'} by {current.createdBy}</p>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+const COMPONENT_LABELS: Record<StepFingerprintComponent, string> = {
+  step: 'step config',
+  model: 'model',
+  systemPrompt: 'agent system prompt',
+  skill: 'skill',
+  image: 'image',
+  mcpServers: 'MCP servers',
+  preamble: 'workflow preamble',
+};
+
+/**
+ * The Step's qualification (D10, D11): whether a signed Step Qualification
+ * binds the step as it is now, what it cites, and — when stale — what changed.
+ * A person signs one from an Eval Run's report below.
+ */
+export function QualificationSection({ data }: { data: StepEvaluation['qualification'] }) {
+  const status = data.data;
+  const qualification = status?.qualification ?? null;
+  return (
+    <Section title="Step Qualification" action={status !== undefined && <QualificationStatusChip status={status.status} />}>
+      {data.isLoading || status === undefined ? <Loading /> : qualification === null ? (
+        <p className="text-sm text-muted-foreground">
+          Not qualified. Set Acceptance Criteria, run the step, and sign a Step Qualification from the run&apos;s report. It is informational: nothing is blocked without one.
+        </p>
+      ) : (
+        <div className="space-y-1.5 text-xs" data-testid="step-qualification">
+          <p>
+            Signed by <span className="font-medium">{qualification.signature.signerName}</span> on {qualification.signature.signedAt.slice(0, 16).replace('T', ' ')}
+            {' '}for {qualification.variantId === CHAMPION_VARIANT_ID ? 'the step' : `'${qualification.variantLabel}' (${describePatch(qualification.patch)})`}
+            {' '}— Eval Run <span className="font-mono">{qualification.evalRunId.slice(0, 8)}</span>, Brief v{qualification.briefVersion},
+            {' '}fingerprint <span className="font-mono">{qualification.fingerprint.hash.slice(0, 12)}</span>.
+          </p>
+          <p className="text-muted-foreground">{qualification.signature.meaning} ({qualification.signature.reauthentication === 'password' ? 'password re-entered' : 'signed from the session'})</p>
+          <p>Criteria: {describeAcceptanceCriteria(qualification.acceptanceCriteria)}</p>
+          {qualification.deviations.map((deviation) => (
+            <p key={deviation.severity} className="text-amber-700 dark:text-amber-300">Deviation ({deviation.severity}): {deviation.justification}</p>
+          ))}
+          {status.status === 'stale' && (
+            <p className="text-amber-700 dark:text-amber-300" data-testid="qualification-changed">
+              The step changed since: {status.changed.map((component) => COMPONENT_LABELS[component]).join(', ')}.
+            </p>
+          )}
+          {status.evaluatorsChanged.length > 0 && (
+            <p className="text-muted-foreground" data-testid="qualification-evaluators-changed">Evaluators changed since: {status.evaluatorsChanged.join('; ')}.</p>
+          )}
+          {status.history.length > 1 && <p className="text-muted-foreground">{status.history.length} qualifications signed for this step.</p>}
+        </div>
+      )}
+    </Section>
+  );
+}
+
 /**
  * The card a prepared Eval Run waits on: the person starts it by confirming
  * the budget shown (D15). The only place `confirmedBudgetUsd` is sent from.
@@ -347,38 +488,79 @@ export function StartEvalRunCard({ step, prepared, mayRun, runReason }: {
   );
 }
 
-function EvalRunRow({ evalRunId, onOpen, open }: { evalRunId: string; onOpen: () => void; open: boolean }) {
+function EvalRunRow({ step, evalRunId, onOpen, open, mayEdit, editReason }: {
+  step: EvaluatedStep;
+  evalRunId: string;
+  onOpen: () => void;
+  open: boolean;
+  mayEdit: boolean;
+  editReason: string | undefined;
+}) {
   const run = useEvalRun(open ? evalRunId : null);
   return (
     <li className="border-t pt-2 first:border-t-0 first:pt-0">
       <button type="button" className="text-left text-xs font-mono hover:underline" onClick={onOpen}>{evalRunId.slice(0, 8)}</button>
-      {open && (run.data === undefined ? <Loading /> : <div className="mt-2"><EvalRunReport output={run.data} /></div>)}
+      {open && (run.data === undefined ? <Loading /> : (
+        <div className="mt-2"><EvalRunReport output={run.data} step={step} mayEdit={mayEdit} editReason={editReason} /></div>
+      ))}
     </li>
   );
 }
 
-/** Prepare, confirm and read the Step's Eval Runs. Preparing and starting one is the workflow's `run` verb. */
-export function EvalRunsSection({ step, data, mayRun, runReason }: {
+const CHALLENGERS_TEMPLATE = JSON.stringify([{ label: 'Another model', patch: { model: 'openai/gpt-5' } }], null, 2);
+
+/**
+ * Prepare, confirm and read the Step's Eval Runs — the step as it is and any
+ * challengers patched over it. Preparing and starting one is the workflow's
+ * `run` verb; signing a qualification from a report is its `edit` verb.
+ */
+export function EvalRunsSection({ step, data, mayRun, runReason, mayEdit, editReason }: {
   step: EvaluatedStep;
   data: StepEvaluation['runs'];
   mayRun: boolean;
   runReason: string | undefined;
+  mayEdit: boolean;
+  editReason: string | undefined;
 }) {
   const [trials, setTrials] = React.useState(3);
   const [budget, setBudget] = React.useState('');
+  const [challengers, setChallengers] = React.useState<string | null>(null);
+  const [challengersError, setChallengersError] = React.useState<string | null>(null);
   const [openRunId, setOpenRunId] = React.useState<string | null>(null);
-  const prepare = useStepEvaluationMutation(step, () => mediforce.evaluation.prepareRun({
+  const prepare = useStepEvaluationMutation(step, (variants: EvalChallenger[]) => mediforce.evaluation.prepareRun({
     ...step,
     trialsPerCase: trials,
+    challengers: variants,
     ...(budget === '' ? {} : { budgetUsd: Number(budget) }),
   }));
+  const submit = () => {
+    let variants: EvalChallenger[] = [];
+    if (challengers !== null) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(challengers);
+      } catch {
+        setChallengersError('The challengers are not valid JSON.');
+        return;
+      }
+      const checked = EvalChallengerSchema.array().safeParse(parsed);
+      if (checked.success === false) {
+        setChallengersError(`The challengers do not fit: ${checked.error.issues.map((issue) => `${issue.path.length === 0 ? 'list' : issue.path.join('.')} — ${issue.message}`).join('; ')}`);
+        return;
+      }
+      variants = checked.data;
+    }
+    setChallengersError(null);
+    prepare.mutate(variants);
+  };
+  const prepareError = challengersError ?? prepare.error?.message ?? null;
   const runs = data.data?.evalRuns ?? [];
   // Prepared here, by the assistant or from the CLI: each waits for a person to confirm its budget.
   const waiting: PreparedEvalRun[] = runs.filter((run) => run.status === 'prepared').map((run) => ({
     evalRunId: run.id,
     budgetUsd: run.budgetUsd,
     estimatedUsd: run.estimate.totalUsd,
-    trials: run.caseIds.length * run.trialsPerCase,
+    trials: run.caseIds.length * run.trialsPerCase * run.variants.length,
   }));
 
   return (
@@ -391,13 +573,29 @@ export function EvalRunsSection({ step, data, mayRun, runReason }: {
           <label className="flex items-center gap-1">Budget $
             <input type="number" min={0} step={0.01} className={cn(inputClass, 'w-24')} placeholder="auto" value={budget} onChange={(event) => setBudget(event.target.value)} />
           </label>
+          <button type="button" className={buttonClass} onClick={() => setChallengers(challengers === null ? CHALLENGERS_TEMPLATE : null)}>
+            {challengers === null ? 'Add challengers' : 'No challengers'}
+          </button>
           <button
             type="button"
             className={buttonClass}
             disabled={prepare.isPending}
-            onClick={() => prepare.mutate(undefined)}
+            onClick={submit}
           >Prepare</button>
-          {prepare.error !== null && <span className="text-destructive">{prepare.error.message}</span>}
+          {prepareError !== null && <span className="text-destructive">{prepareError}</span>}
+        </div>
+      )}
+      {mayRun && challengers !== null && (
+        <div className="space-y-1 text-xs">
+          <p className="text-muted-foreground">
+            Up to three challengers run beside the step as it is, each a patch: model, prompt, skillCommit or allowedTools replace the step&apos;s own; mcpRestrictions narrow it. Every variant runs every case.
+          </p>
+          <textarea
+            aria-label="Challengers"
+            className={cn(inputClass, 'w-full min-h-24 font-mono text-xs')}
+            value={challengers}
+            onChange={(event) => setChallengers(event.target.value)}
+          />
         </div>
       )}
       {waiting.map((run) => <StartEvalRunCard key={run.evalRunId} step={step} prepared={run} mayRun={mayRun} runReason={runReason} />)}
@@ -407,8 +605,20 @@ export function EvalRunsSection({ step, data, mayRun, runReason }: {
         <ul className="space-y-2">
           {runs.map((run) => (
             <li key={run.id} className="text-sm">
-              <span className="text-xs text-muted-foreground">{run.createdAt.slice(0, 16).replace('T', ' ')} · {run.status} · ${run.spentUsd.toFixed(2)} of ${run.budgetUsd}</span>
-              <ul><EvalRunRow evalRunId={run.id} open={openRunId === run.id} onOpen={() => setOpenRunId(openRunId === run.id ? null : run.id)} /></ul>
+              <span className="text-xs text-muted-foreground">
+                {run.createdAt.slice(0, 16).replace('T', ' ')} · {run.status} · ${run.spentUsd.toFixed(2)} of ${run.budgetUsd}
+                {run.variants.length > 1 && ` · ${run.variants.length} variants`}
+              </span>
+              <ul>
+                <EvalRunRow
+                  step={step}
+                  evalRunId={run.id}
+                  open={openRunId === run.id}
+                  onOpen={() => setOpenRunId(openRunId === run.id ? null : run.id)}
+                  mayEdit={mayEdit}
+                  editReason={editReason}
+                />
+              </ul>
             </li>
           ))}
         </ul>

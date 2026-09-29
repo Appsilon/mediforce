@@ -7,7 +7,10 @@ import {
   type EvalTrial,
   type EvalTrialStatus,
 } from '../schemas/eval-run';
+import { StepQualificationSchema, type StepQualification } from '../schemas/step-qualification';
 import {
+  AcceptanceCriteriaVersionSchema,
+  type AcceptanceCriteriaVersion,
   EvalCaseSchema,
   EvalDatasetVersionSchema,
   EvaluationBriefSchema,
@@ -42,6 +45,8 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
   private readonly cases = new Map<string, EvalCase>();
   private readonly datasets: EvalDatasetVersion[] = [];
   private readonly policies: McpEvalPolicy[] = [];
+  private readonly criteria: AcceptanceCriteriaVersion[] = [];
+  private readonly qualifications: StepQualification[] = [];
   private readonly runs = new Map<string, EvalRun>();
   private readonly trials = new Map<string, EvalTrial>();
 
@@ -152,6 +157,31 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     return parsed;
   }
 
+  async appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> {
+    const parsed = AcceptanceCriteriaVersionSchema.parse(criteria);
+    if (this.criteria.some((row) => sameStep(row, parsed) && row.version === parsed.version)) {
+      throw new Error(`Acceptance Criteria version ${parsed.version} already exists`);
+    }
+    this.criteria.push(parsed);
+    return parsed;
+  }
+
+  async listAcceptanceCriteria(step: EvaluatedStep): Promise<AcceptanceCriteriaVersion[]> {
+    return this.criteria.filter((row) => sameStep(row, step)).sort((left, right) => right.version - left.version);
+  }
+
+  async createQualification(qualification: StepQualification): Promise<StepQualification> {
+    const parsed = StepQualificationSchema.parse(qualification);
+    this.qualifications.push(parsed);
+    return parsed;
+  }
+
+  async listQualifications(step: EvaluatedStep): Promise<StepQualification[]> {
+    return this.qualifications
+      .filter((row) => sameStep(row, step))
+      .sort((left, right) => right.signature.signedAt.localeCompare(left.signature.signedAt));
+  }
+
   async createEvalRun(run: EvalRun, trials: readonly EvalTrial[]): Promise<void> {
     this.runs.set(run.id, EvalRunSchema.parse(run));
     for (const trial of trials) this.trials.set(trial.id, EvalTrialSchema.parse(trial));
@@ -191,7 +221,9 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
   async listTrials(evalRunId: string): Promise<EvalTrial[]> {
     return [...this.trials.values()]
       .filter((trial) => trial.evalRunId === evalRunId)
-      .sort((left, right) => left.caseId.localeCompare(right.caseId) || left.trialIndex - right.trialIndex);
+      .sort((left, right) => left.caseId.localeCompare(right.caseId)
+        || left.variantId.localeCompare(right.variantId)
+        || left.trialIndex - right.trialIndex);
   }
 
   async getTrialByInstanceId(processInstanceId: string): Promise<EvalTrial | null> {

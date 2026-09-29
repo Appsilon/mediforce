@@ -16,6 +16,7 @@ import {
   buildAgentOutputEnvelope,
   buildWorkflowDefinition,
   InMemoryAgentOAuthTokenRepository,
+  InMemoryEvaluationRepository,
   InMemoryOAuthProviderRepository,
 } from '@mediforce/platform-core/testing';
 import {
@@ -66,6 +67,7 @@ const mockAuditRepo = {
 const mockEngine = {
   advanceStep: vi.fn(),
   submitReviewVerdict: vi.fn(),
+  finishEvalTrial: vi.fn(),
 };
 const mockHumanTaskRepo = {
   create: vi.fn(),
@@ -102,6 +104,7 @@ const mockModelRegistryRepo = {
 };
 const oauthProviderRepo = new InMemoryOAuthProviderRepository();
 const agentOAuthTokenRepo = new InMemoryAgentOAuthTokenRepository();
+const evaluationRepo = new InMemoryEvaluationRepository();
 
 const eventLog = new InMemoryAgentEventLog();
 const pluginRunner = new PluginRunner(eventLog);
@@ -125,6 +128,7 @@ vi.mock('@/lib/platform-services', () => ({
     oauthProviderRepo,
     agentOAuthTokenRepo,
     modelRegistryRepo: mockModelRegistryRepo,
+    evaluationRepo,
   }),
 }));
 
@@ -148,6 +152,7 @@ vi.mock('@/lib/resolve-agent-defaults', async (importOriginal) => ({
 
 // Import after mock setup
 import { executeAgentStep } from '../execute-agent-step';
+import { computeStepFingerprint } from '@mediforce/platform-api/handlers';
 import { resolveAgentDefaults } from '@/lib/resolve-agent-defaults';
 
 describe('executeAgentStep', () => {
@@ -236,6 +241,86 @@ describe('executeAgentStep', () => {
       executeAgentStep('inst-wf-001', 'gather-data', inlineStep, {}, 'user-1'),
     ).rejects.toThrow("declares MCP servers inline (edc)");
     expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
+  });
+
+  it('[DATA] runs an eval trial as its variant: the challenger\'s patch over the pinned step', async () => {
+    const evalRunId = '11111111-1111-4111-8111-111111111111';
+    const caseId = '22222222-2222-4222-8222-222222222222';
+    await evaluationRepo.createEvalRun({
+      namespace: 'test-namespace', workflowName: 'community-digest', stepId: 'gather-data',
+      id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId],
+      trialsPerCase: 1, concurrency: 1,
+      evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
+      variants: [
+        { id: 'champion', label: 'Current step', patch: {}, fingerprint: null },
+        { id: 'challenger-1', label: 'GPT-5', patch: { model: 'openai/gpt-5', prompt: 'Gather every source.' }, fingerprint: null },
+      ],
+      acceptanceCriteria: null, briefVersion: null, mcpPolicy: {},
+      estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
+      budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null,
+    }, [{
+      id: '55555555-5555-4555-8555-555555555555', evalRunId, caseId, variantId: 'challenger-1', trialIndex: 0, status: 'running',
+      processInstanceId: 'inst-wf-001', agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
+      confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null,
+    }]);
+    mockInstanceRepo.getById.mockResolvedValue({ ...defaultInstance, evalRunId });
+    mockEngine.finishEvalTrial.mockResolvedValue({ status: 'completed', currentStepId: null });
+
+    await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
+
+    const context = mockAgentRunner.runWithWorkflowStep.mock.calls[0]![1] as { step: WorkflowStep; workflowDefinition: WorkflowDefinition };
+    expect(context.step.agent).toMatchObject({ model: 'openai/gpt-5', prompt: 'Gather every source.' });
+    expect(context.workflowDefinition.steps[0]!.agent?.model).toBe('openai/gpt-5');
+    expect(firstStep.agent?.model).toBeUndefined();
+  });
+
+  describe('an eval trial whose step changed since its Eval Run was prepared', () => {
+    const agentStep: WorkflowStep = { ...firstStep, agentId: 'digest-agent' };
+    const agentWithPrompt = (systemPrompt: string) => ({ id: 'digest-agent', systemPrompt, mcpServers: {} });
+
+    async function prepareTrial(instanceId: string, evalRunId: string, trialId: string): Promise<void> {
+      mockAgentDefinitionRepo.getById.mockResolvedValue(agentWithPrompt('Summarise the week.'));
+      const fingerprint = await computeStepFingerprint(
+        { agentDefinitions: mockAgentDefinitionRepo, toolCatalog: mockToolCatalogRepo },
+        workflowDefinition,
+        agentStep,
+      );
+      const caseId = '22222222-2222-4222-8222-222222222222';
+      await evaluationRepo.createEvalRun({
+        namespace: 'test-namespace', workflowName: 'community-digest', stepId: 'gather-data',
+        id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId],
+        trialsPerCase: 1, concurrency: 1,
+        evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
+        variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint }],
+        acceptanceCriteria: null, briefVersion: null, mcpPolicy: {},
+        estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
+        budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null,
+      }, [{
+        id: trialId, evalRunId, caseId, variantId: 'champion', trialIndex: 0, status: 'running',
+        processInstanceId: instanceId, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
+        confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null,
+      }]);
+      mockInstanceRepo.getById.mockResolvedValue({ ...defaultInstance, id: instanceId, evalRunId });
+      mockEngine.finishEvalTrial.mockResolvedValue({ status: 'completed', currentStepId: null });
+    }
+
+    it('[ERROR] refuses to run it when its agent\'s system prompt was edited', async () => {
+      await prepareTrial('inst-eval-edited', '66666666-6666-4666-8666-666666666666', '77777777-7777-4777-8777-777777777777');
+      mockAgentDefinitionRepo.getById.mockResolvedValue(agentWithPrompt('Summarise the month.'));
+
+      await expect(
+        executeAgentStep('inst-eval-edited', 'gather-data', agentStep, {}, 'user-1'),
+      ).rejects.toThrow("changed since Eval Run '66666666-6666-4666-8666-666666666666' was prepared (systemPrompt)");
+      expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
+    });
+
+    it('[DATA] runs it when the step is still the one its variant was prepared with', async () => {
+      await prepareTrial('inst-eval-same', '88888888-8888-4888-8888-888888888888', '99999999-9999-4999-8999-999999999999');
+
+      await executeAgentStep('inst-eval-same', 'gather-data', agentStep, {}, 'user-1');
+
+      expect(mockAgentRunner.runWithWorkflowStep).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ---- Plugin resolution ----

@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-09-23
+last_reviewed: 2026-09-24
 ---
 
 # 0023 — Step Evaluation: Evaluation Assistant, Evaluators, single-step Eval Runs, Step Qualification
@@ -68,7 +68,12 @@ config, the SKILL.md content, the Agent's `systemPrompt`, the image digest,
 the effective MCP set, `outputSchema` and the workflow preamble — not to a
 Definition version. Applying a winning variant creates a Definition version as
 usual; if the Step's Fingerprint matches, the qualification carries over.
-Editing Step B never touches Step A.
+Editing Step B never touches Step A. _Amended 2026-09-24 (Phase 3): the image
+enters the Fingerprint as the reference the runtime resolves — its tag, or the
+files and commit a build uses — not a registry digest, which would need a
+registry lookup per Fingerprint. A tag re-pushed under the same name does not
+change the Fingerprint; pin an image by digest (`image@sha256:…`) where that
+matters._
 
 **D6 — Default-deny eval policy for MCP servers.** Each MCP server a Step can
 use carries an eval policy: `live`, `deny`, or `live` with named tools denied.
