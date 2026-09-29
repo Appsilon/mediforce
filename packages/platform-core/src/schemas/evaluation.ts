@@ -27,7 +27,7 @@ export const EvaluationBriefSchema = EvaluatedStepSchema.extend({
   createdAt: z.iso.datetime(),
 });
 
-export const EvaluatorKindSchema = z.enum(['schema', 'code', 'llm_judge']);
+export const EvaluatorKindSchema = z.enum(['schema', 'code', 'llm_judge', 'builtin']);
 export const EvaluatorSeveritySchema = z.enum(['critical', 'major', 'minor']);
 
 /** Checks the step's `result` against the structural JSON Schema subset `agent.outputSchema` uses. */
@@ -65,10 +65,31 @@ export const LlmJudgeCheckSchema = z.object({
     }),
 });
 
+/**
+ * The red-team and robustness checks the platform ships, one per suite:
+ * `phi_leak` fails an output carrying patient identifiers (SSN, email, phone,
+ * MRN, date of birth); `injection_ignored` fails one that repeats the canary
+ * of the case's `injected_instruction` perturbation; `result_stable` fails one
+ * that differs from the source run's — over `keys` of `result` only, when given.
+ */
+export const BUILTIN_CHECK_NAMES = ['phi_leak', 'injection_ignored', 'result_stable'] as const;
+export const BuiltinCheckNameSchema = z.enum(BUILTIN_CHECK_NAMES);
+
+/** A check the platform runs itself: deterministic, in process, trusted on creation. */
+export const BuiltinCheckSchema = z.object({
+  kind: z.literal('builtin'),
+  name: BuiltinCheckNameSchema,
+  /** `result_stable` only: the top-level keys of `result` that must not change. */
+  keys: z.array(z.string().min(1)).min(1).max(50).optional(),
+}).refine((check) => check.keys === undefined || check.name === 'result_stable', {
+  message: 'keys applies to result_stable only',
+});
+
 export const EvaluatorCheckSchema = z.discriminatedUnion('kind', [
   SchemaCheckSchema,
   CodeCheckSchema,
   LlmJudgeCheckSchema,
+  BuiltinCheckSchema,
 ]);
 
 export const JUDGE_PASS_VALUE = 0.5;
@@ -151,6 +172,8 @@ export const EvalCasePerturbationKindSchema = z.enum([
   'renamed_columns',
   'edge_values',
   'injected_instruction',
+  /** A change that keeps the input's meaning: the result must not change. */
+  'metamorphic',
   'other',
 ]);
 
@@ -158,6 +181,8 @@ export const EvalCasePerturbationKindSchema = z.enum([
 export const EvalCasePerturbationSchema = z.object({
   kind: EvalCasePerturbationKindSchema,
   description: z.string().min(1).max(1000),
+  /** An `injected_instruction` case: the marker the injected text tells the agent to output. */
+  canary: z.string().min(4).max(200).optional(),
 });
 
 /** Which part of an Eval Case input a change addresses. */
@@ -304,6 +329,7 @@ export const StepVariantPatchSchema = z.object({
 export type EvaluatedStep = z.infer<typeof EvaluatedStepSchema>;
 export type EvaluationOrigin = z.infer<typeof EvaluationOriginSchema>;
 export type EvaluationBrief = z.infer<typeof EvaluationBriefSchema>;
+export type BuiltinCheckName = z.infer<typeof BuiltinCheckNameSchema>;
 export type EvaluatorKind = z.infer<typeof EvaluatorKindSchema>;
 export type EvaluatorSeverity = z.infer<typeof EvaluatorSeveritySchema>;
 export type EvaluatorCheck = z.infer<typeof EvaluatorCheckSchema>;

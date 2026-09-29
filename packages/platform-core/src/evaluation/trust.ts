@@ -11,13 +11,14 @@ export type EvaluatorTrust = { trusted: true } | { trusted: false; reason: strin
 
 /**
  * Whether an Evaluator version counts toward an Eval Run's verdict (D9).
- * `schema` is trusted on creation; `code` once a person approved its source;
+ * `schema` and `builtin` are trusted on creation; `code` once a person approved its source;
  * `llm_judge` once calibrated against enough human labels. An untrusted
  * version still runs and writes Scores — the report shows it as not counted.
  */
 export function evaluatorTrust(version: Pick<EvaluatorVersion, 'check' | 'sourceApproval' | 'calibration'>): EvaluatorTrust {
   switch (version.check.kind) {
     case 'schema':
+    case 'builtin':
       return { trusted: true };
     case 'code':
       return version.sourceApproval !== null

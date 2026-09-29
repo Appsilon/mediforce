@@ -46,6 +46,13 @@ export function applyInputChanges(input: EvalCaseInput, changes: readonly EvalCa
   return changed;
 }
 
+/** The value an input change would address, or undefined when the path does not lead anywhere. */
+export function inputValueAt(input: EvalCaseInput, part: EvalCaseInputChange['part'], path: readonly string[]): unknown {
+  let value: unknown = input[part];
+  for (const key of path) value = isContainer(value) ? childOf(value, key) : undefined;
+  return value;
+}
+
 export interface PerturbedCase {
   readonly input: EvalCaseInput;
   /** The workspace the file changes apply to, and what each changed file ends up holding (null: deleted); null when no file changes. */
