@@ -9,6 +9,7 @@ import {
   EvalCaseSchema,
   EvalCaseSplitSchema,
   EvalDatasetVersionSchema,
+  EvalOptimisationSchema,
   EvalRunReportSchema,
   EvalRunSchema,
   EvalTrialSchema,
@@ -414,6 +415,64 @@ export const GetEvalRunFailuresOutputSchema = z.object({
 });
 
 /**
+ * Starts a GEPA optimisation of the Step's prompt (ADR-0023 D15): a container
+ * job reflects on one variant's trials of the dev cases in a finished Eval Run
+ * — the champion by default — and proposes up to `candidates` prompts, which
+ * then run as challengers over the Step's newest Dataset, dev and holdout. The
+ * job and that run together spend at most `budgetUsd`, which the person grants
+ * with this request. Needs the workflow's `run` verb.
+ */
+export const StartOptimisationInputSchema = EvaluatedStepSchema.extend({
+  evalRunId: z.uuid(),
+  variantId: z.string().min(1).optional(),
+  budgetUsd: z.number().positive().max(10_000),
+  candidates: z.number().int().min(1).max(3).default(3),
+  trialsPerCase: z.number().int().min(1).max(10).default(1),
+  /** The model GEPA reflects with; the Evaluation Assistant's default when absent. It must have a registry price. */
+  reflectionModel: z.string().min(1).optional(),
+});
+
+export const GetOptimisationInputSchema = z.object({ optimisationId: z.uuid() });
+export const ListOptimisationsInputSchema = EvaluatedStepSchema;
+export const ListOptimisationsOutputSchema = z.object({ optimisations: z.array(EvalOptimisationSchema) });
+
+/** One variant's trials of one split's cases: a trial passes when every counted Evaluator graded it and passed it. */
+export const OptimisationSplitResultSchema = z.object({
+  /** Cases of this split in the Eval Run. */
+  cases: z.number().int().nonnegative(),
+  /** Trials every counted Evaluator graded. */
+  graded: z.number().int().nonnegative(),
+  passes: z.number().int().nonnegative(),
+  passRate: z.number().min(0).max(1).nullable(),
+  wilsonLower: z.number().min(0).max(1).nullable(),
+  wilsonUpper: z.number().min(0).max(1).nullable(),
+});
+
+export const OptimisationVariantResultSchema = z.object({
+  variantId: z.string(),
+  label: z.string(),
+  /** The prompt it ran with; null for the Step as it is. */
+  prompt: z.string().nullable(),
+  dev: OptimisationSplitResultSchema,
+  holdout: OptimisationSplitResultSchema,
+  meanCostUsd: z.number().nonnegative().nullable(),
+});
+
+/**
+ * An optimisation with its candidates' results, computed from the Scores of
+ * its Eval Run when read: the Step as it is as the baseline, and the
+ * candidates best first — by dev pass rate, then holdout, then mean cost.
+ */
+export const EvalOptimisationOutputSchema = z.object({
+  optimisation: EvalOptimisationSchema,
+  evalRun: EvalRunSchema.pick({ id: true, status: true, budgetUsd: true, spentUsd: true }).nullable(),
+  /** The job and the Eval Run together. */
+  spentUsd: z.number().nonnegative(),
+  baseline: OptimisationVariantResultSchema.nullable(),
+  ranking: z.array(OptimisationVariantResultSchema.extend({ rank: z.number().int().positive() })),
+});
+
+/**
  * Applies a variant to the Step (D5): a challenger of one of its Eval Runs, or
  * a patch, over the Step as its runnable version has it, saved as a new
  * Workflow Definition version the way the workflow editor saves one —
@@ -594,3 +653,10 @@ export type SignStepQualificationOutput = z.infer<typeof SignStepQualificationOu
 export type GetStepDriftInput = z.input<typeof GetStepDriftInputSchema>;
 export type GetStepDriftOutput = z.infer<typeof GetStepDriftOutputSchema>;
 export type EvaluatorDrift = z.infer<typeof EvaluatorDriftSchema>;
+export type StartOptimisationInput = z.input<typeof StartOptimisationInputSchema>;
+export type GetOptimisationInput = z.infer<typeof GetOptimisationInputSchema>;
+export type ListOptimisationsInput = z.infer<typeof ListOptimisationsInputSchema>;
+export type ListOptimisationsOutput = z.infer<typeof ListOptimisationsOutputSchema>;
+export type OptimisationSplitResult = z.infer<typeof OptimisationSplitResultSchema>;
+export type OptimisationVariantResult = z.infer<typeof OptimisationVariantResultSchema>;
+export type EvalOptimisationOutput = z.infer<typeof EvalOptimisationOutputSchema>;

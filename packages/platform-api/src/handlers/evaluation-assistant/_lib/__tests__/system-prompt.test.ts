@@ -32,10 +32,11 @@ describe('Evaluation Assistant prompt', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('A preprocessing step is advice in the diagnosis');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Few-shot examples come from dev cases only — never holdout');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Start such a run only under a granted unattended budget');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('start_optimisation runs GEPA');
   });
 
   it('says whether the request carries an unattended budget', () => {
-    expect(unattendedBudgetMessage(undefined)).toContain('start_eval_run is refused');
+    expect(unattendedBudgetMessage(undefined)).toContain('start_eval_run and start_optimisation are refused');
     expect(unattendedBudgetMessage(5)).toContain('unattended budget of $5');
   });
 

@@ -17,6 +17,13 @@ docker build \
   "$REPO_ROOT/packages/agent-runtime/container"
 
 echo ""
+echo "=== Building GEPA optimisation job image ==="
+docker build \
+  -f "$REPO_ROOT/packages/agent-runtime/container/Dockerfile.gepa" \
+  -t mediforce-gepa:latest \
+  "$REPO_ROOT/packages/agent-runtime/container"
+
+echo ""
 echo "=== Building protocol-to-tfl agent image ==="
 docker build \
   -f "$REPO_ROOT/apps/protocol-to-tfl/container/Dockerfile" \

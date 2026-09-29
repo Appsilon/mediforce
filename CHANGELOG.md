@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Step Evaluation GEPA optimisation ([ADR-0023](docs/adr/0023-step-evaluation.md) D15): from a finished Eval Run, a container job (`mediforce-gepa` image) reflects on the step's failing dev-case trials and proposes up to three prompts, which run as challengers over dev and holdout within a budget the person grants — ranked by dev pass rate with holdout beside it (`mediforce eval optimise|optimisation|optimisations`, the Evaluation tab's **Optimisations**, the assistant's `start_optimisation` under an unattended budget) [#1421](https://github.com/Appsilon/mediforce/issues/1421).
+
 ## [1.2.0] - 2026-09-28
 
 ### Added

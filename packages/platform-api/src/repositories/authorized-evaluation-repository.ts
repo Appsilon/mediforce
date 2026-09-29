@@ -5,6 +5,8 @@ import type {
   EvalRunStatus,
   EvalTrial,
   EvalTrialStatus,
+  EvalOptimisation,
+  EvalOptimisationStatus,
   EvalCase,
   EvalDatasetVersion,
   EvaluatedStep,
@@ -194,6 +196,27 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   renewScoringClaim = async (trial: Pick<EvalTrial, 'id' | 'evalRunId'>, staleBefore: string, now: string): Promise<boolean> => {
     await this.writableRun(trial.evalRunId);
     return this.raw.renewScoringClaim(trial.id, staleBefore, now);
+  };
+
+  createOptimisation = async (optimisation: EvalOptimisation): Promise<void> => {
+    this.assertNamespaceWrite(optimisation.namespace);
+    await this.raw.createOptimisation(optimisation);
+  };
+
+  getOptimisation = async (id: string): Promise<EvalOptimisation | null> => this.visible(await this.raw.getOptimisation(id));
+
+  listOptimisations = async (step: EvaluatedStep): Promise<EvalOptimisation[]> =>
+    this.canSeeNamespace(step.namespace) ? this.raw.listOptimisations(step) : [];
+
+  /** The optimisations the heartbeat fails, across workspaces — system actors only. */
+  listStaleProposingOptimisationIds = async (createdBefore: string): Promise<string[]> =>
+    this.caller.isSystemActor ? this.raw.listStaleProposingOptimisationIds(createdBefore) : [];
+
+  transitionOptimisation = async (id: string, from: EvalOptimisationStatus, next: EvalOptimisation): Promise<boolean> => {
+    const current = await this.raw.getOptimisation(id);
+    this.assertNamespaceWrite(current?.namespace);
+    this.assertNamespaceWrite(next.namespace);
+    return this.raw.transitionOptimisation(id, from, next);
   };
 
   private async writableRun(id: string): Promise<void> {

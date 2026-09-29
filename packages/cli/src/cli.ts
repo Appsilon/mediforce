@@ -135,6 +135,7 @@ import {
   evalRunStartCommand,
 } from './commands/eval-runs';
 import { evalAskCommand } from './commands/eval-ask';
+import { evalOptimiseCommand, evalOptimisationGetCommand, evalOptimisationListCommand } from './commands/eval-optimisations';
 import { evalCriteriaGetCommand, evalCriteriaSetCommand, evalQualificationCommand } from './commands/eval-qualification';
 import { namespaceUpdateCommand } from './commands/namespace-update';
 import { namespaceDeleteCommand } from './commands/namespace-delete';
@@ -314,6 +315,9 @@ export const TREE: Record<string, BranchEntry> = {
       report: { description: 'Print an Eval Run and its report', fn: evalRunGetCommand },
       failures: { description: 'Print one variant\'s failing trials in an Eval Run', fn: evalRunFailuresCommand },
       'apply-variant': { description: 'Apply a challenger or a patch to the step as a new Workflow Definition version', fn: evalApplyVariantCommand },
+      optimise: { description: 'Start a GEPA optimisation of the step\'s prompt under a budget you grant', fn: evalOptimiseCommand },
+      optimisation: { description: 'Print an optimisation and its ranked candidate prompts', fn: evalOptimisationGetCommand },
+      optimisations: { description: 'List a step\'s GEPA optimisations', fn: evalOptimisationListCommand },
       'criteria-get': { description: 'Print a step\'s Acceptance Criteria', fn: evalCriteriaGetCommand },
       'criteria-set': { description: 'Set a step\'s Acceptance Criteria from a JSON file', fn: evalCriteriaSetCommand },
       qualification: { description: 'Print a step\'s qualification: Qualified, Stale or Not qualified', fn: evalQualificationCommand },

@@ -48,7 +48,10 @@ export async function evalScenario(fixture: EvaluationFixture): Promise<EvalScen
   return { scope, kicker, caseIds };
 }
 
-/** Prepares and starts an Eval Run, then finishes every trial it kicked with the result `resultOf` gives it. */
+/**
+ * Prepares and starts an Eval Run, then finishes every trial it kicks — the
+ * ones a finished trial starts too — with the result `resultOf` gives it.
+ */
 export async function finishEvalRun(
   fixture: EvaluationFixture,
   scenario: EvalScenario,
@@ -59,7 +62,8 @@ export async function finishEvalRun(
   const kicksBefore = kicker.kicks.length;
   const { evalRun } = await prepareEvalRun({ ...STEP, concurrency: 4, ...prepare }, scope);
   await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: evalRun.budgetUsd }, scope);
-  for (const { instanceId } of kicker.kicks.slice(kicksBefore)) {
+  for (let index = kicksBefore; index < kicker.kicks.length; index += 1) {
+    const { instanceId } = kicker.kicks[index]!;
     const trial = (await fixture.evaluationRepo.getTrialByInstanceId(instanceId))!;
     const startedAt = new Date().toISOString();
     await fixture.instanceRepo.addStepExecution(instanceId, buildStepExecution({ instanceId, stepId: 'grade-aes', startedAt }));

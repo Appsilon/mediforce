@@ -20,6 +20,7 @@ import type { CallerScope } from '../../repositories/index';
 import { ForbiddenError, PreconditionFailedError } from '../../errors';
 import { resumeWait } from '../processes/resume-wait';
 import { driveOpenEvalRuns } from '../evaluation/eval-runs';
+import { failStaleOptimisations } from '../evaluation/optimisations';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
 
@@ -309,6 +310,8 @@ export async function heartbeat(
   // Sweep: move on every Eval Run with work left (ADR-0023 D4). A trial's run
   // ending drives it too; this catches the one whose driver died.
   await driveOpenEvalRuns(scope);
+  // …and fail an optimisation whose GEPA job died with its process.
+  await failStaleOptimisations(scope);
 
   // Sweep: refresh the model registry once it has gone a day without a sync.
   // The heartbeat is the only scheduler every deployment is guaranteed to run,

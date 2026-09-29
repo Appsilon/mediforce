@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-09-28
+last_reviewed: 2026-09-29
 ---
 
 # Step Evaluation
@@ -39,8 +39,9 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   calibration, cases, Eval Runs and reports, one variant's failing trials
   (`get_failures`), each challenger compared with the
   champion (`compare_variants`), the step's qualification and Acceptance
-  Criteria (`get_qualification`), and `preview_evaluator` — it tries a check
-  on real outputs before proposing it.
+  Criteria (`get_qualification`), its GEPA optimisations
+  (`list_optimisations`, `get_optimisation`), and `preview_evaluator` — it
+  tries a check on real outputs before proposing it.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
   written or synthesized), Brief drafts and Acceptance Criteria come back as
   cards to accept, edit or reject. Accepting one is the same write the forms
@@ -57,9 +58,13 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   starts a prepared run of this step whose `budgetUsd` fits what is left of the
   grant (the sum of the budgets of the runs started in the request is what has
   been spent), confirming that budget as a person would; a run that does not
-  fit is refused with the amount left. The response lists them as
-  `startedEvalRuns: [{ evalRunId, budgetUsd }]` and the request's audit event
-  records the grant. Without the field nothing changes.
+  fit is refused with the amount left. `start_optimisation` starts a GEPA
+  optimisation (below) under the same grant, its `budgetUsd` counted against
+  what is left. The response lists them as
+  `startedEvalRuns: [{ evalRunId, budgetUsd }]` and
+  `startedOptimisations: [{ optimisationId, budgetUsd }]`, and the request's
+  audit event records the grant. Without the field nothing changes, and
+  `start_optimisation` is refused.
 - **Never:** approving a `code` check's source, labelling outputs, signing a
   Step Qualification. There is no tool for these.
 
@@ -517,6 +522,59 @@ the judge calls. Then, per variant:
 Each challenger is compared with the champion Evaluator by Evaluator: `better`
 or `worse` only when their Wilson intervals do not overlap, otherwise `no
 clear difference`, with the change in mean cost and duration.
+
+## GEPA optimisation
+
+GEPA (reflective prompt evolution) searches for a better `prompt` for the step
+from a finished Eval Run, and runs what it finds through the Eval Run machinery
+above. `mediforce eval optimise --run <evalRunId> [--variant <id>] --budget
+<usd> [--candidates 1-3] [--trials N] [--reflection-model <model>]`
+(`POST /api/evaluation/optimisations`, the **Optimisations** section of the
+Evaluation tab, or the assistant's `start_optimisation` under an unattended
+budget) needs the workflow's `run` verb.
+
+1. **Reflective dataset.** The chosen variant's scored trials of **dev** cases
+   only — failing ones first, at most 12 — each as GEPA's `Inputs` (trigger
+   payload and earlier steps' outputs), `Generated Outputs` (the result, and
+   the tools the trajectory called) and `Feedback` (the case's expectation and
+   notes, and each counted Evaluator's verdict with its rule and comment).
+   Holdout cases are what the candidates are checked on afterwards, so the job
+   never sees them. A variant with no scored dev trial, or a run with no counted
+   Evaluator, is refused.
+2. **The job.** A container of the `mediforce-gepa` image (Python with the
+   `gepa` package, built by `scripts/rebuild-docker-images.sh`) runs GEPA's
+   reflective proposal step once per candidate, each over its own minibatch of
+   up to three records, with the reflection model through OpenRouter on the
+   workspace's `OPENROUTER_API_KEY`. Unlike a `code` check's sandbox it has
+   network, for that model, and nothing mounted but its own `/output`. Under
+   `ALLOW_LOCAL_AGENTS` it is a local `python3` process instead, which needs
+   `pip install gepa`. It runs after the start has answered (`proposing`); one
+   still proposing 15 minutes later is failed by the heartbeat.
+3. **Candidates.** Prompts that are empty, unchanged or repeated are dropped.
+   Each remaining one is a challenger — the variant's own patch with the new
+   `prompt` — in a new Eval Run over the step's newest Dataset version, dev and
+   holdout (`evaluating`). That run starts at once: the budget the person
+   granted is its confirmation.
+
+**Budget.** `budgetUsd` (required, up to 10,000) covers both. The job is
+charged at the reflection model's registry price — a model the registry does
+not price is refused at the start, since the job could not be held to the
+budget — and the Eval Run gets what is left, which stops it like any other run
+(`budget_exceeded`). A job that spends it all fails the optimisation before any
+run. A job that fails part-way still records what it spent (`jobCostUsd`).
+
+**Results** (`mediforce eval optimisation <id>`,
+`GET /api/evaluation/optimisations/:id`; `mediforce eval optimisations` lists
+them) are computed from the Eval Run's Scores when read. Per variant and per
+split, a trial passes when every counted Evaluator graded it and passed it; the
+pass rate comes with its Wilson 95% interval. The step as it is is the
+baseline, and the candidates are ranked by dev pass rate — what GEPA selects
+on — then holdout, then mean cost. A dev gain the holdout does not show is
+fitted to the cases it reflected on. Apply a winner from its Eval Run's report
+(**Apply to step**, `apply-variant --run <evalRunId> --variant <id>`) as any
+challenger. Another round is another optimisation, from that Eval Run and the
+winner's `variantId`. Starting, proposing and failing are audited as
+`eval_optimisation.started|proposed|failed`.
 
 ## Acceptance Criteria
 

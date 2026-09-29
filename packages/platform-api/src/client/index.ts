@@ -665,10 +665,20 @@ import {
   GetEvalRunFailuresOutputSchema,
   ApplyStepVariantInputSchema,
   ApplyStepVariantOutputSchema,
+  StartOptimisationInputSchema,
+  GetOptimisationInputSchema,
+  ListOptimisationsInputSchema,
+  ListOptimisationsOutputSchema,
+  EvalOptimisationOutputSchema,
   type GetEvalRunFailuresInput,
   type GetEvalRunFailuresOutput,
   type ApplyStepVariantInput,
   type ApplyStepVariantOutput,
+  type StartOptimisationInput,
+  type GetOptimisationInput,
+  type ListOptimisationsInput,
+  type ListOptimisationsOutput,
+  type EvalOptimisationOutput,
 } from '../contract/evaluation';
 import {
   AskEvaluationAssistantInputSchema,
@@ -1090,6 +1100,9 @@ export class Mediforce {
     cancelRun: (input: CancelEvalRunInput) => Promise<EvalRunOutput>;
     getRunFailures: (input: GetEvalRunFailuresInput) => Promise<GetEvalRunFailuresOutput>;
     applyVariant: (input: ApplyStepVariantInput) => Promise<ApplyStepVariantOutput>;
+    startOptimisation: (input: StartOptimisationInput) => Promise<EvalOptimisationOutput>;
+    getOptimisation: (input: GetOptimisationInput) => Promise<EvalOptimisationOutput>;
+    listOptimisations: (input: ListOptimisationsInput) => Promise<ListOptimisationsOutput>;
     getAcceptanceCriteria: (input: GetAcceptanceCriteriaInput) => Promise<GetAcceptanceCriteriaOutput>;
     setAcceptanceCriteria: (input: SetAcceptanceCriteriaInput) => Promise<SetAcceptanceCriteriaOutput>;
     getQualification: (input: GetStepQualificationInput) => Promise<GetStepQualificationOutput>;
@@ -2634,6 +2647,20 @@ export class Mediforce {
         'POST', '/api/evaluation/variants/apply', ApplyStepVariantInputSchema.parse(input),
         ApplyStepVariantOutputSchema, 'mediforce.evaluation.applyVariant',
       ),
+      startOptimisation: async (input) => this.sendJson(
+        'POST', '/api/evaluation/optimisations', StartOptimisationInputSchema.parse(input),
+        EvalOptimisationOutputSchema, 'mediforce.evaluation.startOptimisation',
+      ),
+      getOptimisation: async (input) => {
+        const { optimisationId } = GetOptimisationInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/optimisations/${encodeURIComponent(optimisationId)}`,
+          EvalOptimisationOutputSchema, 'mediforce.evaluation.getOptimisation');
+      },
+      listOptimisations: async (input) => {
+        const step = ListOptimisationsInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/optimisations${toSearchParams(step)}`,
+          ListOptimisationsOutputSchema, 'mediforce.evaluation.listOptimisations');
+      },
       getAcceptanceCriteria: async (input) => {
         const step = GetAcceptanceCriteriaInputSchema.parse(input);
         return this.getJson(`/api/evaluation/acceptance-criteria${toSearchParams(step)}`, GetAcceptanceCriteriaOutputSchema, 'mediforce.evaluation.getAcceptanceCriteria');

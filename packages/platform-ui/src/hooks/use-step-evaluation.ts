@@ -13,6 +13,7 @@ type Section =
   | 'datasets'
   | 'mcp-policy'
   | 'runs'
+  | 'optimisations'
   | 'agent-runs'
   | 'criteria'
   | 'drift'
@@ -63,6 +64,13 @@ export function useStepEvaluation(step: EvaluatedStep) {
     datasets: useQuery({ queryKey: sectionKey(step, 'datasets'), queryFn: () => mediforce.evaluation.listDatasets(step), ...options }),
     mcpPolicy: useQuery({ queryKey: sectionKey(step, 'mcp-policy'), queryFn: () => mediforce.evaluation.getMcpPolicy(step), ...options }),
     runs: useQuery({ queryKey: sectionKey(step, 'runs'), queryFn: () => mediforce.evaluation.listRuns(step), ...options }),
+    optimisations: useQuery({
+      queryKey: sectionKey(step, 'optimisations'),
+      queryFn: () => mediforce.evaluation.listOptimisations(step),
+      ...options,
+      // A proposing optimisation becomes `evaluating` or `failed` on its own; show it when it does.
+      refetchInterval: (query) => (query.state.data?.optimisations.some((optimisation) => optimisation.status === 'proposing') === true ? 5000 : false),
+    }),
     criteria: useQuery({ queryKey: sectionKey(step, 'criteria'), queryFn: () => mediforce.evaluation.getAcceptanceCriteria(step), ...options }),
     qualification: useStepQualification(step),
     drift: useQuery({ queryKey: sectionKey(step, 'drift'), queryFn: () => mediforce.evaluation.getDrift(step), ...options }),
@@ -106,5 +114,20 @@ export function useEvalRun(evalRunId: string | null) {
     enabled: evalRunId !== null,
     retry: stopRetryOn4xx,
     refetchInterval: (query) => (query.state.data !== undefined && isEvalRunActive(query.state.data) ? 3000 : false),
+  });
+}
+
+/** One optimisation with its candidates ranked, polled while its job or its Eval Run is under way. */
+export function useOptimisation(optimisationId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.optimisation(optimisationId ?? '__none__'),
+    queryFn: () => mediforce.evaluation.getOptimisation({ optimisationId: optimisationId! }),
+    enabled: optimisationId !== null,
+    retry: stopRetryOn4xx,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (data === undefined) return false;
+      return data.optimisation.status === 'proposing' || data.evalRun?.status === 'running' ? 3000 : false;
+    },
   });
 }

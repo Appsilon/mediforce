@@ -122,6 +122,9 @@ export {
   StepQualificationSchema,
   StepQualificationStatusSchema,
   qualificationSignatureMeaning,
+  EvalOptimisationStatusSchema,
+  OptimisationCandidateSchema,
+  EvalOptimisationSchema,
   HumanTaskStatusSchema,
   HumanTaskSchema,
   HandoffStatusSchema,
@@ -323,6 +326,11 @@ export type {
   StepFingerprintComponent,
   StepFingerprint,
 } from './schemas/eval-run';
+export type {
+  EvalOptimisationStatus,
+  OptimisationCandidate,
+  EvalOptimisation,
+} from './schemas/eval-optimisation';
 export type {
   QualificationDeviation,
   ElectronicSignature,

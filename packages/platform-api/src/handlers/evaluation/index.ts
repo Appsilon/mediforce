@@ -36,3 +36,4 @@ export { getStepQualification, signStepQualification } from './step-qualificatio
 export { computeStepFingerprint, changedFingerprintComponents } from './_lib/step-fingerprint';
 export { getEvalRunFailures } from './eval-run-failures';
 export { applyVariantToStep } from './apply-step-variant';
+export { startOptimisation, getOptimisation, listOptimisations, failStaleOptimisations } from './optimisations';

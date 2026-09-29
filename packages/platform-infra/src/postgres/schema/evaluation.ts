@@ -258,6 +258,28 @@ export const evalMcpRecordings = pgTable(
 );
 
 /**
+ * GEPA optimisations of a Step's prompt: the whole record is `record`; the
+ * columns beside it are what it is looked up and swept by. It changes only by
+ * a conditional update on `status`, so two writers cannot both move it on.
+ */
+export const evalOptimisations = pgTable(
+  'eval_optimisations',
+  {
+    id: uuid('id').primaryKey(),
+    workspace: workspaceColumn(),
+    workflowName: text('workflow_name').notNull(),
+    stepId: text('step_id').notNull(),
+    status: text('status').notNull(),
+    record: jsonb('record').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    stepIdx: index('eval_optimisations_step_idx').on(table.workspace, table.workflowName, table.stepId, table.createdAt.desc()),
+    statusIdx: index('eval_optimisations_status_idx').on(table.status, table.createdAt),
+  }),
+);
+
+/**
  * Signed Step Qualifications (ADR-0023 D10, D11): insert-only. The signed
  * record is `record` whole; the columns beside it are what the Step's badge
  * and history are looked up by.

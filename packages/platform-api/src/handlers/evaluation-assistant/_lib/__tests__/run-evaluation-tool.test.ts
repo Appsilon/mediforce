@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { z } from 'zod';
 import type { CallerScope } from '../../../../repositories/index';
 import { EVALUATION_ASSISTANT_PLATFORM_TOOLS, type StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
@@ -17,6 +17,12 @@ import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RU
 import { gitWorkspace } from '../../../evaluation/__tests__/git-workspace';
 import { evalScenario, finishEvalRun } from '../../../evaluation/__tests__/finished-eval-run';
 import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
+import { runGepaJob } from '@mediforce/agent-runtime';
+
+vi.mock('@mediforce/agent-runtime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@mediforce/agent-runtime')>()),
+  runGepaJob: vi.fn(),
+}));
 
 async function setup(entries?: StoredAgentTrajectoryEntry[]) {
   const fixture = await evaluationFixture();
@@ -360,14 +366,14 @@ describe('executeEvaluationTool', () => {
 
     it('starts a prepared run whose budget fits the grant, spends it down, and refuses the one that no longer fits', async () => {
       const { fixture, scope, context } = await scenarioContext();
-      const grant: UnattendedGrant = { remainingUsd: 3, started: [] };
+      const grant: UnattendedGrant = { remainingUsd: 3, started: [], startedOptimisations: [] };
       const first = await preparedRunId(scope, context, 2);
       const second = await preparedRunId(scope, context, 2);
 
       expect(await executeEvaluationTool('start_eval_run', { evalRunId: first }, scope, { ...context, unattended: grant }))
         .toMatchObject({ started: { evalRunId: first, status: 'running', budgetUsd: 2 }, unattendedBudgetLeftUsd: 1 });
       expect((await fixture.evaluationRepo.getEvalRun(first))?.status).toBe('running');
-      expect(grant).toEqual({ remainingUsd: 1, started: [{ evalRunId: first, budgetUsd: 2 }] });
+      expect(grant).toEqual({ remainingUsd: 1, started: [{ evalRunId: first, budgetUsd: 2 }], startedOptimisations: [] });
 
       await expect(executeEvaluationTool('start_eval_run', { evalRunId: second }, scope, { ...context, unattended: grant }))
         .rejects.toThrow('only $1.00 is left of the unattended budget');
@@ -379,8 +385,60 @@ describe('executeEvaluationTool', () => {
       const { scope, context } = await scenarioContext();
       const evalRunId = await preparedRunId(scope, context, 1);
       await expect(executeEvaluationTool('start_eval_run', { evalRunId }, scope, {
-        ...context, step: { ...STEP, stepId: 'extract-aes' }, unattended: { remainingUsd: 10, started: [] },
+        ...context, step: { ...STEP, stepId: 'extract-aes' }, unattended: { remainingUsd: 10, started: [], startedOptimisations: [] },
       })).rejects.toThrow('is not a run of this step');
+    });
+
+    describe('optimisations', () => {
+      async function optimisable() {
+        const setup = await scenarioContext();
+        Object.assign(setup.scope, {
+          workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) },
+          models: { list: async () => [{ id: 'anthropic/claude-sonnet-4', pricing: { input: 0.000003, output: 0.000015 } }] },
+        });
+        const evalRunId = await finishEvalRun(setup.fixture, setup.scenario, { trialsPerCase: 1, budgetUsd: 5, challengers: [] },
+          (trial) => trial.caseId === setup.scenario.caseIds['Grade 4 neutropenia'] ? { summary: 'none' } : { findings: ['ok'] });
+        vi.mocked(runGepaJob).mockReset().mockResolvedValue({
+          candidates: [{ prompt: 'Grade each AE by CTCAE v5 under findings.', reflectedOn: 2 }],
+          usage: [{ promptTokens: 1000, completionTokens: 100 }],
+          error: null,
+        });
+        return { ...setup, evalRunId };
+      }
+
+      it('refuses to start one without an unattended grant, or beyond what is left of it', async () => {
+        const { scope, context, evalRunId } = await optimisable();
+        await expect(executeEvaluationTool('start_optimisation', { evalRunId, budgetUsd: 1 }, scope, context))
+          .rejects.toThrow('ask them to grant an unattended budget');
+        await expect(executeEvaluationTool('start_optimisation', { evalRunId, budgetUsd: 2 }, scope, {
+          ...context, unattended: { remainingUsd: 1, started: [], startedOptimisations: [] },
+        })).rejects.toThrow('only $1.00 is left of the unattended budget');
+        expect(runGepaJob).not.toHaveBeenCalled();
+      });
+
+      it('starts one under the grant, spends the grant down, and reads it back for this step only', async () => {
+        const { fixture, scope, context, evalRunId } = await optimisable();
+        const grant: UnattendedGrant = { remainingUsd: 3, started: [], startedOptimisations: [] };
+
+        const started = await executeEvaluationTool('start_optimisation', { evalRunId, budgetUsd: 2, candidates: 1 }, scope, { ...context, unattended: grant }) as {
+          started: { optimisationId: string; status: string; budgetUsd: number };
+        };
+        expect(started).toMatchObject({ started: { status: 'proposing', budgetUsd: 2 }, unattendedBudgetLeftUsd: 1 });
+        const { optimisationId } = started.started;
+        expect(grant).toEqual({ remainingUsd: 1, started: [], startedOptimisations: [{ optimisationId, budgetUsd: 2 }] });
+
+        await vi.waitFor(async () => expect((await fixture.evaluationRepo.getOptimisation(optimisationId))?.status).toBe('evaluating'));
+        expect(await executeEvaluationTool('get_optimisation', { optimisationId }, scope, context)).toMatchObject({
+          status: 'evaluating',
+          budgetUsd: 2,
+          baseline: { variantId: 'champion' },
+          ranking: [{ rank: 1, variantId: 'challenger-1', prompt: 'Grade each AE by CTCAE v5 under findings.' }],
+        });
+        expect(await executeEvaluationTool('list_optimisations', {}, scope, context))
+          .toMatchObject({ optimisations: [{ id: optimisationId, status: 'evaluating', candidates: 1 }] });
+        await expect(executeEvaluationTool('get_optimisation', { optimisationId }, scope, { ...context, step: { ...STEP, stepId: 'extract-aes' } }))
+          .rejects.toThrow('is not an optimisation of this step');
+      });
     });
 
     it('does not start a run for a caller without the run verb', async () => {
@@ -388,7 +446,7 @@ describe('executeEvaluationTool', () => {
       const evalRunId = await preparedRunId(scope, context, 1);
       await fixture.processRepo.setWorkflowAccess(STEP.namespace, STEP.workflowName, { run: ['someone-else'], edit: ['author-1'] });
       const viewer = fixture.scope(userCaller('author-1', [STEP.namespace]));
-      await expect(executeEvaluationTool('start_eval_run', { evalRunId }, viewer, { ...context, unattended: { remainingUsd: 10, started: [] } }))
+      await expect(executeEvaluationTool('start_eval_run', { evalRunId }, viewer, { ...context, unattended: { remainingUsd: 10, started: [], startedOptimisations: [] } }))
         .rejects.toThrow();
     });
   });
