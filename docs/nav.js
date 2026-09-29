@@ -17,6 +17,7 @@
     { href: 'validated-ai.html', label: 'Validation' },
     { href: 'security.html', label: 'Security' },
     { href: 'fda-principles.html', label: 'FDA Alignment' },
+    { href: 'news.html', label: 'News' },
     { href: 'setup/', label: 'Self-host' },
     // Absolute: /docs/ is the Docusaurus build pages.yml mounts, not a sibling file.
     { href: 'https://mediforce.ai/docs/', label: 'Docs', external: true },
