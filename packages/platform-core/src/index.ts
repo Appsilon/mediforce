@@ -45,6 +45,7 @@ export {
   AgentRunSchema,
   AgentRunCardStatusSchema,
   AgentFallbackReasonSchema,
+  AgentRunTraceSchema,
   AgentTrajectoryEntrySchema,
   StoredAgentTrajectoryEntrySchema,
   AgentTrajectorySchema,
@@ -364,6 +365,11 @@ export {
   calibrateConfidence,
   recommendControl,
   type ConfidenceOutcome,
+  DEFAULT_DRIFT_SETTINGS,
+  detectDrift,
+  parseDriftSettings,
+  type DriftSettings,
+  type DriftWindows,
 } from './evaluation/index';
 
 // Types (re-exported from schemas for convenience)
@@ -402,6 +408,7 @@ export type {
   AgentEvent,
   AgentRunStatus,
   AgentRun,
+  AgentRunTrace,
   AgentRunCardStatus,
   AgentFallbackReason,
   AgentTrajectoryEntry,

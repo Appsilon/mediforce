@@ -574,6 +574,8 @@ import {
   GetStepQualificationOutputSchema,
   SignStepQualificationInputSchema,
   SignStepQualificationOutputSchema,
+  GetStepDriftInputSchema,
+  GetStepDriftOutputSchema,
   GetEvaluatorInputSchema,
   GetMcpEvalPolicyInputSchema,
   GetMcpEvalPolicyOutputSchema,
@@ -624,6 +626,8 @@ import {
   type GetStepQualificationOutput,
   type SignStepQualificationInput,
   type SignStepQualificationOutput,
+  type GetStepDriftInput,
+  type GetStepDriftOutput,
   type GetEvaluatorInput,
   type GetMcpEvalPolicyInput,
   type GetMcpEvalPolicyOutput,
@@ -1090,6 +1094,7 @@ export class Mediforce {
     setAcceptanceCriteria: (input: SetAcceptanceCriteriaInput) => Promise<SetAcceptanceCriteriaOutput>;
     getQualification: (input: GetStepQualificationInput) => Promise<GetStepQualificationOutput>;
     signQualification: (input: SignStepQualificationInput) => Promise<SignStepQualificationOutput>;
+    getDrift: (input: GetStepDriftInput) => Promise<GetStepDriftOutput>;
     // `signal` aborts the request: an assistant turn is long enough that a person will want to stop it.
     // `onProgress` streams the turn's model rounds and tool calls as they happen.
     askAssistant: (
@@ -2651,6 +2656,17 @@ export class Mediforce {
         'POST', '/api/evaluation/qualification', SignStepQualificationInputSchema.parse(input),
         SignStepQualificationOutputSchema, 'mediforce.evaluation.signQualification',
       ),
+      getDrift: async (input) => {
+        const validated = GetStepDriftInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflowName: validated.workflowName,
+          stepId: validated.stepId,
+          window: validated.window === undefined ? undefined : String(validated.window),
+          threshold: validated.threshold === undefined ? undefined : String(validated.threshold),
+        });
+        return this.getJson(`/api/evaluation/drift${qs}`, GetStepDriftOutputSchema, 'mediforce.evaluation.getDrift');
+      },
       askAssistant: async (input, options) => {
         const body = AskEvaluationAssistantInputSchema.parse(input);
         const ctx = 'mediforce.evaluation.askAssistant';

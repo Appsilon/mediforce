@@ -2,6 +2,7 @@ import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
 import type {
   AuditRepository,
   AutoJoinRule,
+  DriftSettings,
   BlobStore,
   CredentialsRepository,
   EmailProviderInfo,
@@ -200,4 +201,10 @@ export interface SystemServices {
    * place a signed-in user's memberships are reconciled.
    */
   readonly autoJoinWorkspaces: readonly AutoJoinRule[];
+  /**
+   * The deployment's drift-alert window and threshold (`MEDIFORCE_DRIFT_WINDOW`,
+   * `MEDIFORCE_DRIFT_THRESHOLD`), resolved at wiring time. A request may
+   * override either.
+   */
+  readonly driftSettings: DriftSettings;
 }

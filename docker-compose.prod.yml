@@ -154,6 +154,25 @@ services:
       # completions only when `true`. Unset = off — spans keep metadata only;
       # Agent Trajectories in the platform database keep full content either way.
       - MEDIFORCE_OTEL_CAPTURE_CONTENT=${MEDIFORCE_OTEL_CAPTURE_CONTENT:-}
+      # OTLP trace export (ADR-0007), e.g. http://phoenix:6006. Unset = no tracing.
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      # Auth headers for that endpoint, e.g. `Authorization=Basic <base64 pk:sk>`
+      # for Langfuse. Unset = no headers.
+      - OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS:-}
+      # One-way Score export next to the traces (ADR-0023): `phoenix` or
+      # `langfuse`. Unset = off. Phoenix defaults to the OTLP endpoint above;
+      # Langfuse needs its URL and both keys, or export stays off. Comments are
+      # sent only with MEDIFORCE_OTEL_CAPTURE_CONTENT=true.
+      - MEDIFORCE_SCORE_EXPORT=${MEDIFORCE_SCORE_EXPORT:-}
+      - PHOENIX_BASE_URL=${PHOENIX_BASE_URL:-}
+      - PHOENIX_API_KEY=${PHOENIX_API_KEY:-}
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL:-}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      # Drift alerts: production Scores per window (default 20) and the drop in
+      # their mean that raises an alert (default 0.15).
+      - MEDIFORCE_DRIFT_WINDOW=${MEDIFORCE_DRIFT_WINDOW:-}
+      - MEDIFORCE_DRIFT_THRESHOLD=${MEDIFORCE_DRIFT_THRESHOLD:-}
       # Shared secret for the container-worker's HTTP routes that act on the
       # host daemon (image delete, image capability probe). Both sides read the
       # same var; unset on both means the worker enforces no header, which is

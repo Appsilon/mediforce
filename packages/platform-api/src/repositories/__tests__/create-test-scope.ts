@@ -36,6 +36,7 @@ import type {
   ScoreRepository,
   EvaluationRepository,
   AutoJoinRule,
+  DriftSettings,
   BlobStore,
   EmailProviderInfo,
   HumanTaskRepository,
@@ -51,6 +52,7 @@ import type {
   CredentialsRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
+import { DEFAULT_DRIFT_SETTINGS } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../../auth';
 import type { CallerScope } from '../caller-scope';
 import { createCallerScope, type CallerScopeServices } from '../create-caller-scope';
@@ -212,6 +214,7 @@ export interface TestScopeOverrides {
   readonly dockerImages?: DockerImagesService | null;
   readonly namespaceRepo?: NamespaceRepository;
   readonly autoJoinWorkspaces?: readonly AutoJoinRule[];
+  readonly driftSettings?: DriftSettings;
   readonly userProfileRepo?: UserProfileRepository;
   readonly assistantInstructionsRepo?: WorkflowAssistantInstructionsRepository;
   readonly credentialsRepo?: CredentialsRepository;
@@ -285,6 +288,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     userDirectory: overrides.userDirectory ?? null,
     emailProviderInfo: overrides.emailProviderInfo ?? null,
     autoJoinWorkspaces: overrides.autoJoinWorkspaces ?? [],
+    driftSettings: overrides.driftSettings ?? DEFAULT_DRIFT_SETTINGS,
     passwordAuthEnabled: overrides.passwordAuthEnabled ?? true,
   };
   return createCallerScope(services, caller);

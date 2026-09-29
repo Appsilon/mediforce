@@ -90,7 +90,12 @@ authenticated, and only these two may do that.
 **Every Score goes through `recordScore`** (`handlers/scores/record-score.ts`),
 which appends its `score.created` audit event. There is no generic Score write
 route: Scores arrive from task completion (Control Mode 3 verdicts) and from a
-person labelling an output for an Evaluator (`labelEvaluatorOutput`).
+person labelling an output for an Evaluator (`labelEvaluatorOutput`). With
+`MEDIFORCE_SCORE_EXPORT` set, `services/score-export.ts` wraps the Score
+repository and also sends each Score of a traced Agent Run to Phoenix or
+Langfuse. It only writes, runs in the background, and never fails the Score
+write. Drift alerts (`handlers/evaluation/drift.ts`) are computed from
+production Scores when read, never stored.
 
 **Evaluation belongs to a Step, not a definition.** `handlers/evaluation/`
 ([ADR-0023](../../docs/adr/0023-step-evaluation.md)) keys every Brief, Evaluator,

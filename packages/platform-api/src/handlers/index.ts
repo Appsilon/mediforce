@@ -183,6 +183,7 @@ export {
   createEvalCaseFromAgentRun,
   createPerturbedEvalCase,
   createRedTeamEvalCases,
+  getStepDrift,
   createEvalCasesFromLabels,
   archiveEvalCase,
   listEvalDatasets,

@@ -223,3 +223,46 @@ export const evalEvaluatorProductionCommand = defineCommand({
     return 0;
   },
 });
+
+function describeMean(mean: number | null, count: number, window: number): string {
+  return mean === null ? `${count}/${window} Scores` : mean.toFixed(2);
+}
+
+export const evalDriftCommand = defineCommand({
+  name: 'mediforce eval drift',
+  description: 'Print drift alerts for a step: per production Evaluator, the mean of its newest production Scores against the window before. An alert is a drop of at least the threshold.',
+  args: {
+    ...STEP_ARGS,
+    window: { type: 'string', description: 'Production Scores per window, 2–500 (default: the deployment\'s, 20 unless set)' },
+    threshold: { type: 'string', description: 'Drop in the mean Score that raises an alert, 0–1 (default: the deployment\'s, 0.15 unless set)' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const window = parsePositiveIntArg(args.window);
+    if (window === 'invalid') {
+      output.stderr('--window must be a positive integer');
+      return 2;
+    }
+    const threshold = args.threshold === undefined ? undefined : Number(args.threshold);
+    if (threshold !== undefined && (Number.isFinite(threshold) === false || threshold <= 0 || threshold > 1)) {
+      output.stderr('--threshold must be a number above 0 and at most 1');
+      return 2;
+    }
+    const result = await mediforce.evaluation.getDrift({
+      ...stepFrom(args),
+      ...(window === undefined ? {} : { window }),
+      ...(threshold === undefined ? {} : { threshold }),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    output.stdout(`window ${result.window}, threshold ${result.threshold}`);
+    if (result.evaluators.length === 0) output.stdout('No Evaluator scores this step\'s production runs.');
+    for (const evaluator of result.evaluators) {
+      output.stdout(`${evaluator.drifting ? 'ALERT' : 'ok   '}  ${evaluator.name} v${evaluator.evaluatorVersion} (${evaluator.severity})  `
+        + `recent ${describeMean(evaluator.recentMean, evaluator.recentCount, result.window)}, `
+        + `before ${describeMean(evaluator.baselineMean, evaluator.baselineCount, result.window)}`);
+    }
+    return 0;
+  },
+});

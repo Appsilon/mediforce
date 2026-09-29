@@ -146,6 +146,17 @@ function contract(
       expect(fetched?.envelope?.result).toEqual({ ok: true });
     });
 
+    it('round-trips the span the run was traced under, and none', async () => {
+      const instanceId = randomUUID();
+      await registerInstance(instanceId, 'ws-1');
+      const trace = { traceId: 'a'.repeat(32), spanId: 'b'.repeat(16) };
+      const traced = await repo.create(runFor(instanceId, { trace }));
+      const untraced = await repo.create(runFor(instanceId, { trace: null }));
+
+      expect((await repo.getById(traced.id))?.trace).toEqual(trace);
+      expect((await repo.getById(untraced.id))?.trace ?? null).toBeNull();
+    });
+
     it('create supports a null envelope (e.g. running status)', async () => {
       const instanceId = randomUUID();
       await registerInstance(instanceId, 'ws-1');
