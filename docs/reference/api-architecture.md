@@ -155,6 +155,14 @@ and `jsonErrorResponse`, so the rare binary route that cannot compose through
 `createRouteAdapter` still runs the identical auth + scope pipeline and returns a
 byte-identical error envelope.
 
+A long-running handler that reports progress composes through
+`createProgressRouteAdapter` instead; its handler takes a third argument,
+`onProgress`. A request with `Accept: application/x-ndjson` gets JSON lines —
+`{ progress }` as the handler reports it, then one `{ result }` or the error
+envelope — and any other request gets the plain JSON response. The client reads
+the stream when the caller passes `onProgress` (e.g.
+`mediforce.evaluation.askAssistant(input, { onProgress })`).
+
 ## Testing layers
 
 - **Contract** — Zod schema invariants.
