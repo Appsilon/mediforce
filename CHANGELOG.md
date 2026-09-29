@@ -25,6 +25,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Image capability probing moved off the card into a background, one-at-a-time queue instead of blocking on expand [#1391](https://github.com/Appsilon/mediforce/pull/1391).
 
 ### Fixed
+- Vercel no longer deploys on every push, so its blocked deployment stops failing a check on every PR. `/deploy` previews are unaffected — they drive the Vercel CLI with a token, not the Git integration.
 - A live workflow version now blocks deleting or losing the image it's pinned to [#1378](https://github.com/Appsilon/mediforce/pull/1378); seeded default images are named after the image itself [#1380](https://github.com/Appsilon/mediforce/pull/1380); capability probing checks for `sh`, the binary a bash step actually runs [#1381](https://github.com/Appsilon/mediforce/pull/1381).
 - Redis is bounded (`maxmemory`, retention/eviction tuning, oversized-payload offload), fixing agent-step stalls seen on staging [#1371](https://github.com/Appsilon/mediforce/pull/1371), [#1385](https://github.com/Appsilon/mediforce/pull/1385).
 - A public repo given as an SSH `git@github.com:...` ref now falls back to anonymous HTTPS instead of failing with no deploy key configured [#1388](https://github.com/Appsilon/mediforce/pull/1388).
