@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { evalRunPrepareCommand, evalRunStartCommand } from '../commands/eval-runs';
 import { captureOutput, jsonResponse } from './test-helpers';
 
@@ -12,6 +15,8 @@ const OUTPUT = {
     datasetVersionId: '1e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', caseIds: ['2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c'],
     trialsPerCase: 3, concurrency: 2,
     evaluators: [{ evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
+    variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
+    acceptanceCriteria: { critical: { minPassRate: 0.9 } }, briefVersion: 1,
     mcpPolicy: {}, estimate: { perTrialUsd: 0.2, totalUsd: 0.6, basis: 'history', sampleSize: 5 },
     budgetUsd: 0.9, spentUsd: 0, status: 'prepared', createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
     startedAt: null, completedAt: null,
@@ -19,11 +24,23 @@ const OUTPUT = {
   trials: [],
   report: {
     k: 3, trials: { total: 3, scored: 0, failed: 0, skipped: 0, inProgress: 3 },
-    evaluators: [{
-      evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true,
-      passes: 0, failures: 0, errors: 0, passRate: null, wilsonLower: null, wilsonUpper: null, passAtK: null, passHatK: null, flakiness: null,
+    variants: [{
+      id: 'champion', label: 'Current step', patch: {}, fingerprint: null,
+      trials: { total: 3, scored: 0, failed: 0, skipped: 0, inProgress: 3 },
+      evaluators: [{
+        evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true,
+        passes: 0, failures: 0, errors: 0, passRate: null, wilsonLower: null, wilsonUpper: null, passAtK: null, passHatK: null, flakiness: null,
+      }],
+      criteria: [{
+        severity: 'critical', criterion: { minPassRate: 0.9 }, status: 'not_evaluable',
+        evaluators: [{ evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', wilsonLower: null, passHatK: null, met: null }],
+        reason: 'findings-present graded no trial',
+      }],
+      confidence: null, recommendation: null,
+      costUsd: 0, meanCostUsd: null, inputTokens: 0, outputTokens: 0, meanDurationMs: null, maxDurationMs: null,
     }],
-    costUsd: 0, meanCostUsd: null, inputTokens: 0, outputTokens: 0, meanDurationMs: null, maxDurationMs: null,
+    comparison: [],
+    costUsd: 0, inputTokens: 0, outputTokens: 0,
   },
 };
 
@@ -35,8 +52,10 @@ describe('mediforce eval runs', () => {
   it('run-prepare posts the step and trial count, and prints how to start with the budget', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(OUTPUT, 201));
     const output = captureOutput();
+    const challengers = join(mkdtempSync(join(tmpdir(), 'eval-cli-')), 'challengers.json');
+    writeFileSync(challengers, JSON.stringify([{ label: 'GPT-5', patch: { model: 'openai/gpt-5' } }]));
     const code = await evalRunPrepareCommand({
-      argv: ['--namespace', 'pharma-a', '--workflow', 'ae-grading', '--step', 'grade-aes', '--trials', '3', ...BASE],
+      argv: ['--namespace', 'pharma-a', '--workflow', 'ae-grading', '--step', 'grade-aes', '--trials', '3', '--challengers', challengers, ...BASE],
       env: ENV,
       output,
     });
@@ -44,8 +63,13 @@ describe('mediforce eval runs', () => {
     expect(code).toBe(0);
     const [url, init] = fetchSpy.mock.calls[0]!;
     expect(url).toBe('http://localhost:5555/api/evaluation/runs');
-    expect(JSON.parse(String(init?.body))).toMatchObject({ namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', trialsPerCase: 3 });
-    expect(output.stdoutLines.join('\n')).toContain(`mediforce eval run-start ${RUN_ID} --confirm-budget 0.9`);
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', trialsPerCase: 3,
+      challengers: [{ label: 'GPT-5', patch: { model: 'openai/gpt-5' } }],
+    });
+    const printed = output.stdoutLines.join('\n');
+    expect(printed).toContain('criterion critical: not evaluable — findings-present graded no trial');
+    expect(printed).toContain(`mediforce eval run-start ${RUN_ID} --confirm-budget 0.9`);
   });
 
   it('run-start sends the confirmed budget', async () => {

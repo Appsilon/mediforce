@@ -13,6 +13,7 @@ import { HandlerError } from '../../../errors';
 import { previewEvaluator } from '../../evaluation/preview-evaluator';
 import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
+import { isSameStep } from '../../evaluation/_lib/evaluated-step';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
 import { loadStepEvaluator } from './run-evaluation-tool';
 
@@ -61,7 +62,8 @@ async function selfTest(
  * Checks one Evaluation Assistant proposal against the platform before the
  * person sees it, so a card never offers what accepting would refuse: a name
  * already taken, an Evaluator of another step, an output that is not one of
- * the step's production runs, a perturbation that does not apply to its run.
+ * the step's production runs, a perturbation that does not apply to its run,
+ * a routing recommendation for a run or variant the step does not have.
  */
 export async function reviewEvaluationProposal(
   toolName: string,
@@ -108,6 +110,17 @@ export async function reviewEvaluationProposal(
     case 'propose_perturbed_case': {
       const proposal = args as Args<'propose_perturbed_case'>;
       await perturbCase(await loadCaseSource(scope, proposal.baseAgentRunId, step, 'read'), proposal);
+      return { ok: true };
+    }
+    case 'propose_control_settings': {
+      const { evalRunId, variantId } = args as Args<'propose_control_settings'>;
+      const run = await scope.evaluation.getEvalRun(evalRunId);
+      if (run === null || isSameStep(run, step) === false) {
+        return { ok: false, error: `Eval Run '${evalRunId}' is not a run of this step` };
+      }
+      if (run.variants.some((variant) => variant.id === variantId) === false) {
+        return { ok: false, error: `Eval Run '${evalRunId}' has no variant '${variantId}'; its variants are ${run.variants.map((variant) => variant.id).join(', ')}` };
+      }
       return { ok: true };
     }
     case 'propose_eval_case': {

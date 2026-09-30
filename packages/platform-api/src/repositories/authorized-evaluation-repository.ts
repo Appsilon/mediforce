@@ -1,4 +1,6 @@
 import type {
+  AcceptanceCriteriaVersion,
+  StepQualification,
   EvalRun,
   EvalRunStatus,
   EvalTrial,
@@ -107,6 +109,22 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
     this.assertNamespaceWrite(policy.namespace);
     return this.raw.putMcpPolicy(policy);
   };
+
+  appendAcceptanceCriteria = async (criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> => {
+    this.assertNamespaceWrite(criteria.namespace);
+    return this.raw.appendAcceptanceCriteria(criteria);
+  };
+
+  listAcceptanceCriteria = async (step: EvaluatedStep): Promise<AcceptanceCriteriaVersion[]> =>
+    this.canSeeNamespace(step.namespace) ? this.raw.listAcceptanceCriteria(step) : [];
+
+  createQualification = async (qualification: StepQualification): Promise<StepQualification> => {
+    this.assertNamespaceWrite(qualification.namespace);
+    return this.raw.createQualification(qualification);
+  };
+
+  listQualifications = async (step: EvaluatedStep): Promise<StepQualification[]> =>
+    this.canSeeNamespace(step.namespace) ? this.raw.listQualifications(step) : [];
 
   createEvalRun = async (run: EvalRun, trials: readonly EvalTrial[]): Promise<void> => {
     this.assertNamespaceWrite(run.namespace);

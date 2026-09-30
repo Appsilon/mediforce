@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  AcceptanceCriteriaSchema,
   EvalCaseExpectationSchema,
   EvalCaseInputSchema,
   EvalCaseSplitSchema,
@@ -8,6 +9,7 @@ import {
   EvaluatorSchema,
   EvaluatorSeveritySchema,
   PerturbedEvalCaseSpecSchema,
+  StepVariantPatchSchema,
   WorkspaceFilePathSchema,
   hasPerturbationChange,
 } from './evaluation';
@@ -20,8 +22,8 @@ import {
  * accept, edit or reject, and accepting goes through the same handler a
  * person's own form uses. *Platform* tools run as the person asking — reads,
  * a draft check against real outputs, and preparing an Eval Run. Nothing here
- * signs, approves a check's source or labels an output: D15 keeps those human,
- * so there is no tool to call.
+ * signs a Step Qualification, approves a check's source or labels an output:
+ * D15 keeps those human, so there is no tool to call.
  */
 
 const AssistantCheckSchema = EvaluatorCheckSchema.describe(
@@ -126,6 +128,34 @@ export const ProposePerturbedCaseToolSchema = PerturbedEvalCaseSpecSchema.extend
   rationale: z.string().max(1000).optional(),
 }).refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' });
 
+/**
+ * Propose the step's Acceptance Criteria (D10): per severity, the minimum pass
+ * rate on its Wilson 95% lower bound, and optionally a minimum pass^k. Set
+ * before the Eval Runs judged against them; accepting writes a new version.
+ */
+export const ProposeAcceptanceCriteriaToolSchema = z.object({
+  criteria: AcceptanceCriteriaSchema,
+  /** Why these floors: the risks behind each severity, the Brief, what a miss costs. */
+  rationale: z.string().min(1).max(2000),
+});
+
+/**
+ * Recommend how the step's outputs are routed after an Eval Run: `L4`
+ * (Control Mode 4) above a `confidenceThreshold` (below it, `fallbackBehavior`
+ * applies), or `L3` (Control Mode 3), a person reviewing every output. A recommendation card —
+ * the person changes the step in the workflow editor.
+ */
+export const ProposeControlSettingsToolSchema = z.object({
+  evalRunId: z.uuid(),
+  variantId: z.string().min(1),
+  autonomyLevel: z.enum(['L3', 'L4']),
+  confidenceThreshold: z.number().min(0).max(1).optional(),
+  /** What in the report supports it: criteria, calibration, coverage. */
+  rationale: z.string().min(1).max(2000),
+}).refine((value) => value.autonomyLevel === 'L3' || value.confidenceThreshold !== undefined, {
+  message: 'L4 needs a confidenceThreshold',
+});
+
 export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
   propose_evaluation_plan: ProposeEvaluationPlanToolSchema,
   propose_evaluator: ProposeEvaluatorToolSchema,
@@ -134,6 +164,8 @@ export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
   propose_perturbed_case: ProposePerturbedCaseToolSchema,
   propose_outputs_to_label: ProposeOutputsToLabelToolSchema,
   propose_brief: ProposeBriefToolSchema,
+  propose_acceptance_criteria: ProposeAcceptanceCriteriaToolSchema,
+  propose_control_settings: ProposeControlSettingsToolSchema,
 } as const;
 
 const NoArguments = z.object({});
@@ -173,11 +205,28 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
     check: AssistantCheckSchema,
     agentRunIds: z.array(z.string().min(1)).min(1).max(10).optional(),
   }),
-  /** Prepare an Eval Run over the newest Dataset version; the person confirms its cost to start it. */
+  /**
+   * Prepare an Eval Run over the newest Dataset version — the step as it is,
+   * and up to three challengers patched over it — which the person confirms
+   * the cost of to start it.
+   */
   prepare_eval_run: z.object({
     trialsPerCase: z.number().int().min(1).max(10).optional(),
     budgetUsd: z.number().positive().max(10_000).optional(),
+    challengers: z.array(z.object({
+      label: z.string().min(1).max(120),
+      patch: StepVariantPatchSchema,
+    })).max(3).optional()
+      .describe('Variants to run beside the step as it is. A patch sets model, prompt, skillCommit or allowedTools, or narrows mcpRestrictions — e.g. {"label":"GPT-5","patch":{"model":"openai/gpt-5"}}.'),
   }),
+  /** Each challenger of an Eval Run against the champion, Evaluator by Evaluator, with criteria, cost and routing per variant. */
+  compare_variants: z.object({ evalRunId: z.string().min(1) }),
+  /**
+   * The step's qualification: Qualified, Stale (and what changed) or Not
+   * qualified, the qualification's criteria and deviations, Evaluators changed
+   * since, and the Acceptance Criteria set now.
+   */
+  get_qualification: NoArguments,
   /** Start a prepared Eval Run. Refused: starting needs the person's confirmation of the budget. */
   start_eval_run: z.object({ evalRunId: z.string().min(1) }),
 } as const;
@@ -194,6 +243,8 @@ export const EvaluationAssistantProposalSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('propose_perturbed_case'), arguments: ProposePerturbedCaseToolSchema }),
   z.object({ tool: z.literal('propose_outputs_to_label'), arguments: ProposeOutputsToLabelToolSchema }),
   z.object({ tool: z.literal('propose_brief'), arguments: ProposeBriefToolSchema }),
+  z.object({ tool: z.literal('propose_acceptance_criteria'), arguments: ProposeAcceptanceCriteriaToolSchema }),
+  z.object({ tool: z.literal('propose_control_settings'), arguments: ProposeControlSettingsToolSchema }),
 ]);
 
 export type EvaluationAssistantProposal = z.infer<typeof EvaluationAssistantProposalSchema>;

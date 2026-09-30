@@ -6,11 +6,13 @@ import { useStepEvaluation } from '@/hooks/use-step-evaluation';
 import { useWorkflowRunGate } from '@/hooks/use-workflow-access';
 import { EvaluationAssistantPanel } from './evaluation-assistant-panel';
 import {
+  AcceptanceCriteriaSection,
   BriefSection,
   CasesSection,
   EvalRunsSection,
   EvaluatorsSection,
   McpPolicySection,
+  QualificationSection,
 } from './step-evaluation-sections';
 
 const ASSISTANT_WIDTH_KEY = 'mediforce.evaluation-assistant.width';
@@ -113,11 +115,13 @@ function StepEvaluation({ step, mayEdit, editReason, mayRun, runReason }: {
       style={{ '--evaluation-columns': columns } as React.CSSProperties}
     >
       <div className="space-y-4">
+        <QualificationSection data={evaluation.qualification} />
         <BriefSection step={step} data={evaluation.brief} mayEdit={mayEdit} />
+        <AcceptanceCriteriaSection step={step} data={evaluation.criteria} mayEdit={mayEdit} />
         <EvaluatorsSection step={step} data={evaluation.evaluators} mayEdit={mayEdit} />
         <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
         <McpPolicySection step={step} data={evaluation.mcpPolicy} mayEdit={mayEdit} />
-        <EvalRunsSection step={step} data={evaluation.runs} mayRun={mayRun} runReason={runReason} />
+        <EvalRunsSection step={step} data={evaluation.runs} mayRun={mayRun} runReason={runReason} mayEdit={mayEdit} editReason={editReason} />
       </div>
       <div className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
         <AssistantResizeHandle {...assistantWidth} />
@@ -129,8 +133,8 @@ function StepEvaluation({ step, mayEdit, editReason, mayRun, runReason }: {
 
 /**
  * The workflow's **Evaluation** tab (ADR-0023 D14): one agent step at a time,
- * its Brief, Evaluators, Eval Cases, MCP eval policy and Eval Runs beside the
- * Evaluation Assistant. Everything here lives outside the definition, so no
+ * its Step Qualification, Brief, Acceptance Criteria, Evaluators, Eval Cases,
+ * MCP eval policy and Eval Runs beside the Evaluation Assistant. Everything here lives outside the definition, so no
  * change on this tab mints a version.
  */
 export function EvaluationTab({ handle, workflowName, steps, mayEdit, editReason }: {

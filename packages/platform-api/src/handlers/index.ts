@@ -194,6 +194,12 @@ export {
   cancelEvalRun,
   advanceEvalRunOfInstance,
   driveOpenEvalRuns,
+  getAcceptanceCriteria,
+  setAcceptanceCriteria,
+  getStepQualification,
+  signStepQualification,
+  computeStepFingerprint,
+  changedFingerprintComponents,
 } from './evaluation/index';
 export { askEvaluationAssistant } from './evaluation-assistant/index';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  AcceptanceCriteriaSchema,
+  AcceptanceCriteriaVersionSchema,
   AgentRunSchema,
   EvalCaseExpectationSchema,
   EvalCaseInputSchema,
@@ -19,15 +21,22 @@ import {
   McpEvalPolicySchema,
   McpEvalServerPolicySchema,
   PerturbedEvalCaseSpecSchema,
+  QualificationDeviationSchema,
   ScoreSchema,
+  StepFingerprintComponentSchema,
+  StepFingerprintSchema,
+  StepQualificationSchema,
+  StepQualificationStatusSchema,
+  StepVariantPatchSchema,
   hasPerturbationChange,
 } from '@mediforce/platform-core';
 
 /**
  * Contracts for the Evaluation domain (ADR-0023): Evaluation Briefs,
- * Evaluators, Eval Cases, Eval Datasets and MCP eval policies. Every read and
- * write names the agent Workflow Step it belongs to by
- * `(namespace, workflowName, stepId)`; writes need the workflow's `edit` verb.
+ * Evaluators, Eval Cases, Eval Datasets, MCP eval policies, Acceptance
+ * Criteria, Eval Runs and Step Qualifications. Every read and write names the
+ * agent Workflow Step it belongs to by `(namespace, workflowName, stepId)`;
+ * writes need the workflow's `edit` verb.
  */
 
 /** A query-string boolean. */
@@ -253,13 +262,37 @@ export const SetMcpEvalPolicyInputSchema = EvaluatedStepSchema.extend({
 });
 export const SetMcpEvalPolicyOutputSchema = z.object({ policy: McpEvalPolicySchema });
 
+export const GetAcceptanceCriteriaInputSchema = EvaluatedStepSchema;
+export const GetAcceptanceCriteriaOutputSchema = z.object({
+  /** The current Acceptance Criteria; null until some are set. */
+  criteria: AcceptanceCriteriaVersionSchema.nullable(),
+  /** Every version, newest first. */
+  versions: z.array(AcceptanceCriteriaVersionSchema),
+});
+
+/** Sets the Step's Acceptance Criteria as a new version; the next Eval Run prepared freezes them (D10). */
+export const SetAcceptanceCriteriaInputSchema = EvaluatedStepSchema.extend({
+  criteria: AcceptanceCriteriaSchema,
+  origin: EvaluationOriginSchema.default('user'),
+});
+export const SetAcceptanceCriteriaOutputSchema = z.object({ criteria: AcceptanceCriteriaVersionSchema });
+
+/** A challenger: the Step with a patch over it (D5), run beside the unpatched champion. */
+export const EvalChallengerSchema = z.object({
+  label: z.string().trim().min(1).max(120),
+  patch: StepVariantPatchSchema,
+});
+
 /**
- * Prepares an Eval Run (ADR-0023 D4, D10): freezes the Dataset version (the
- * newest when none is named), the Step's live Evaluator versions and its MCP
- * eval policy, and estimates the cost. Nothing runs until `start`.
+ * Prepares an Eval Run (ADR-0023 D4, D5, D10): freezes the Dataset version (the
+ * newest when none is named), the Step's live Evaluator versions, its MCP eval
+ * policy, its Acceptance Criteria and Brief version, and the variants — the
+ * champion and up to three challengers, each with its Step Fingerprint — and
+ * estimates the cost. Nothing runs until `start`.
  */
 export const PrepareEvalRunInputSchema = EvaluatedStepSchema.extend({
   datasetVersionId: z.uuid().optional(),
+  challengers: z.array(EvalChallengerSchema).max(3).default([]),
   trialsPerCase: z.number().int().min(1).max(10).default(3),
   concurrency: z.number().int().min(1).max(8).default(2),
   /** Spend cap; defaults to 1.5× the estimate, and is required when there is no estimate. */
@@ -288,6 +321,47 @@ export const EvalRunOutputSchema = z.object({
 
 export const ListEvalRunsInputSchema = EvaluatedStepSchema;
 export const ListEvalRunsOutputSchema = z.object({ evalRuns: z.array(EvalRunSchema) });
+
+/**
+ * The Step's qualification badge (D11). By default for the Step as its
+ * runnable version has it; with `definitionVersion`, as that version has it —
+ * what a run of that version ran.
+ */
+export const GetStepQualificationInputSchema = EvaluatedStepSchema.extend({
+  definitionVersion: z.coerce.number().int().positive().optional(),
+});
+export const GetStepQualificationOutputSchema = z.object({
+  status: StepQualificationStatusSchema,
+  /** A signed qualification that binds this Fingerprint, else the newest one; null when there is none. */
+  qualification: StepQualificationSchema.nullable(),
+  definitionVersion: z.number().int().positive(),
+  /** The Step's Fingerprint in that version. */
+  fingerprint: StepFingerprintSchema,
+  /** What differs from the qualified Fingerprint; empty unless stale. */
+  changed: z.array(StepFingerprintComponentSchema),
+  /**
+   * Evaluators added, archived or given a new version since the qualification
+   * (D7). A flag, not staleness: the qualification still holds for its Fingerprint.
+   */
+  evaluatorsChanged: z.array(z.string()),
+  /** Every qualification of the Step, newest first. */
+  history: z.array(StepQualificationSchema),
+});
+
+/**
+ * A person signs a Step Qualification for one variant of a finished Eval Run
+ * (D10). Each criterion the variant missed, or that could not be judged,
+ * needs a deviation with a written justification. Where password sign-in is
+ * enabled, the signer's password re-authenticates them (21 CFR 11.200); an
+ * API key cannot sign.
+ */
+export const SignStepQualificationInputSchema = z.object({
+  evalRunId: z.uuid(),
+  variantId: z.string().min(1),
+  deviations: z.array(QualificationDeviationSchema).default([]),
+  password: z.string().min(1).optional(),
+});
+export const SignStepQualificationOutputSchema = z.object({ qualification: StepQualificationSchema });
 
 export type GetEvaluationBriefInput = z.infer<typeof GetEvaluationBriefInputSchema>;
 export type GetEvaluationBriefOutput = z.infer<typeof GetEvaluationBriefOutputSchema>;
@@ -337,3 +411,12 @@ export type CancelEvalRunInput = z.infer<typeof CancelEvalRunInputSchema>;
 export type EvalRunOutput = z.infer<typeof EvalRunOutputSchema>;
 export type ListEvalRunsInput = z.infer<typeof ListEvalRunsInputSchema>;
 export type ListEvalRunsOutput = z.infer<typeof ListEvalRunsOutputSchema>;
+export type GetAcceptanceCriteriaInput = z.infer<typeof GetAcceptanceCriteriaInputSchema>;
+export type GetAcceptanceCriteriaOutput = z.infer<typeof GetAcceptanceCriteriaOutputSchema>;
+export type SetAcceptanceCriteriaInput = z.input<typeof SetAcceptanceCriteriaInputSchema>;
+export type SetAcceptanceCriteriaOutput = z.infer<typeof SetAcceptanceCriteriaOutputSchema>;
+export type EvalChallenger = z.infer<typeof EvalChallengerSchema>;
+export type GetStepQualificationInput = z.input<typeof GetStepQualificationInputSchema>;
+export type GetStepQualificationOutput = z.infer<typeof GetStepQualificationOutputSchema>;
+export type SignStepQualificationInput = z.input<typeof SignStepQualificationInputSchema>;
+export type SignStepQualificationOutput = z.infer<typeof SignStepQualificationOutputSchema>;
