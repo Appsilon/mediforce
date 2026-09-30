@@ -376,6 +376,15 @@ finished production runs not yet harvested, newest first and a page at a time
 `nextCursor` as `cursor`). Each shows its reasoning summary, and **Log** opens
 the run's execution log before you add it as good or bad.
 
+**Write a case** covers inputs production has not sent — above all negative
+cases, which nobody runs on purpose. Its input starts from an existing case's,
+so it keeps the shape the step is given (and that case's workspace commit), or
+from a `.json` file: a whole case as `case-add --file` takes it (`{ name, input,
+expectation, notes?, split? }`), or only its input (`{ triggerPayload,
+previousStepOutputs, previousRun? }`). It is saved with `POST /api/evaluation/cases`
+as a `manual` case, flagged as containing production data when the case it
+started from was.
+
 Each case in the list opens **Details**: where it came from, what it expects
 (its notes), the input the step is given, the workspace commit it starts from,
 and **Source run log** for a case made from a run. **Edit** changes its name,
