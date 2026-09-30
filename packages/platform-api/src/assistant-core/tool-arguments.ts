@@ -1,4 +1,5 @@
-import { z } from 'zod';
+import type { z } from 'zod';
+import { toolParameters } from './tool-definitions';
 
 export type ParsedToolArguments<T> =
   | { ok: true; data: T }
@@ -115,6 +116,6 @@ export function parseToolArguments<T>(
     ok: false,
     error: `Invalid arguments for '${toolName}': ${issues}. Resend arguments matching the tool's schema; nested objects must not be encoded as strings.`,
     validationError: result.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`).sort().join('; '),
-    expectedArguments: z.toJSONSchema(schema, { io: 'input' }),
+    expectedArguments: toolParameters(schema),
   };
 }

@@ -26,6 +26,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Image capability probing moved off the card into a background, one-at-a-time queue instead of blocking on expand [#1391](https://github.com/Appsilon/mediforce/pull/1391).
 
 ### Fixed
+- The Evaluation Assistant fails far less often to draft an Evaluator with "check: expected object, received string": the `check` argument is offered to the model typed as an object, where it was an untyped union the model sent as a JSON string. Every assistant tool argument that is a union of objects is typed the same way, including the Workflow Assistant's `add_step` / `update_step` `action` and `create_agent` `mcpServers`.
 - The Evaluation Assistant can propose the `injection_ignored` and `result_stable` built-in checks again: they grade an output against the case it ran on, so the pre-proposal self-test no longer runs them on production outputs (where they always errored and the proposal was refused); the card says they are graded in an Eval Run.
 - The Evaluation Assistant no longer stops with "truncated at its output-token limit" when asked for several checks at once: a response cut off before any tool call completes is retried with a note to work one check at a time, and the prompt asks for that up front.
 - The Evaluation tab's production runs to add as Eval Cases are no longer capped at the latest 10: they page with **Load more**, show each run's reasoning summary, and open its execution log from **Log**.
