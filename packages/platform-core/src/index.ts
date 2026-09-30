@@ -456,6 +456,7 @@ export type {
   ContainerConfig,
   WorkflowAgentConfig,
   AgentExample,
+  AgentOutputSchema,
   OutputSchemaPropertyType,
   ScriptStepConfig,
   DatabricksJobConfig,

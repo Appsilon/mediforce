@@ -154,6 +154,18 @@ describe('EvaluatorsSection', () => {
     }));
   });
 
+  it('starts a schema check from the step\'s own output schema', () => {
+    const stepOutputSchema = { type: 'object' as const, required: ['grades'], properties: { grades: { type: 'array' as const } } };
+    render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [] } } as never} mayEdit={true} stepOutputSchema={stepOutputSchema} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    const schema = screen.getByLabelText('JSON Schema') as HTMLTextAreaElement;
+    expect(JSON.parse(schema.value)).toEqual(stepOutputSchema);
+    fireEvent.change(schema, { target: { value: '{}' } });
+    fireEvent.click(screen.getByRole('button', { name: "Use the step's output schema" }));
+    expect(JSON.parse(schema.value)).toEqual(stepOutputSchema);
+  });
+
   it('says what is wrong with a schema that is not JSON instead of sending it', () => {
     evaluation.createEvaluator.mockClear();
     openForm();

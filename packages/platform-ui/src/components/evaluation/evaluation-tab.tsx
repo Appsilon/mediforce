@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import type { EvaluatedStep, WorkflowStep } from '@mediforce/platform-core';
+import type { AgentOutputSchema, EvaluatedStep, WorkflowStep } from '@mediforce/platform-core';
 import { useStepEvaluation } from '@/hooks/use-step-evaluation';
 import { useWorkflowRunGate } from '@/hooks/use-workflow-access';
 import { EvaluationAssistantPanel } from './evaluation-assistant-panel';
@@ -98,8 +98,9 @@ function AssistantResizeHandle({ width, resize, persist, commit }: ReturnType<ty
   );
 }
 
-function StepEvaluation({ step, mayEdit, editReason, mayRun, runReason }: {
+function StepEvaluation({ step, outputSchema, mayEdit, editReason, mayRun, runReason }: {
   step: EvaluatedStep;
+  outputSchema: AgentOutputSchema | undefined;
   mayEdit: boolean;
   editReason: string | undefined;
   mayRun: boolean;
@@ -121,7 +122,7 @@ function StepEvaluation({ step, mayEdit, editReason, mayRun, runReason }: {
         <QualificationSection data={evaluation.qualification} />
         <BriefSection step={step} data={evaluation.brief} mayEdit={mayEdit} />
         <AcceptanceCriteriaSection step={step} data={evaluation.criteria} mayEdit={mayEdit} />
-        <EvaluatorsSection step={step} data={evaluation.evaluators} mayEdit={mayEdit} />
+        <EvaluatorsSection step={step} data={evaluation.evaluators} mayEdit={mayEdit} stepOutputSchema={outputSchema} />
         <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
         <McpPolicySection step={step} data={evaluation.mcpPolicy} mayEdit={mayEdit} />
         <EvalRunsSection step={step} data={evaluation.runs} mayRun={mayRun} runReason={runReason} mayEdit={mayEdit} editReason={editReason} />
@@ -169,7 +170,7 @@ export function EvaluationTab({ handle, workflowName, steps, mayEdit, editReason
           {agentSteps.map((step) => <option key={step.id} value={step.id}>{step.name}</option>)}
         </select>
       </label>
-      <StepEvaluation key={selected.id} step={{ namespace: handle, workflowName, stepId: selected.id }} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
+      <StepEvaluation key={selected.id} step={{ namespace: handle, workflowName, stepId: selected.id }} outputSchema={selected.agent?.outputSchema} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   describeAcceptanceCriteria,
   describeMcpPolicy,
   type AcceptanceCriteria,
+  type AgentOutputSchema,
   type EvaluatedStep,
   type EvaluatorCheck,
   type EvaluatorSeverity,
@@ -171,8 +172,9 @@ interface EvaluatorFormValues {
 }
 
 /** Name, severity, the kind of check and its fields. The kind comes from the dropdown, never typed. */
-function EvaluatorForm({ initial, submitLabel, pending, error, onSubmit, onCancel }: {
+function EvaluatorForm({ initial, stepOutputSchema, submitLabel, pending, error, onSubmit, onCancel }: {
   initial: EvaluatorFormValues;
+  stepOutputSchema: AgentOutputSchema | undefined;
   submitLabel: string;
   pending: boolean;
   error: string | null;
@@ -211,7 +213,7 @@ function EvaluatorForm({ initial, submitLabel, pending, error, onSubmit, onCance
           value={values.draft.kind}
           onChange={(event) => {
             const kind = event.target.value as CheckDraftKind;
-            setValues({ ...values, draft: emptyCheckDraft(kind) });
+            setValues({ ...values, draft: emptyCheckDraft(kind, stepOutputSchema) });
           }}
         >
           {(Object.keys(CHECK_KINDS) as CheckDraftKind[]).map((kind) => <option key={kind} value={kind}>{CHECK_KINDS[kind].label}</option>)}
@@ -219,7 +221,7 @@ function EvaluatorForm({ initial, submitLabel, pending, error, onSubmit, onCance
       </div>
       <p className="text-xs text-muted-foreground">{CHECK_KINDS[values.draft.kind].description}</p>
       <input aria-label="Rule" className={cn(inputClass, 'w-full')} placeholder="The rule, in plain language" value={values.rule} onChange={(event) => setValues({ ...values, rule: event.target.value })} />
-      <CheckEditor draft={values.draft} onChange={(draft) => setValues({ ...values, draft })} />
+      <CheckEditor draft={values.draft} onChange={(draft) => setValues({ ...values, draft })} stepOutputSchema={stepOutputSchema} />
       {shownError !== null && <p className="text-xs text-destructive">{shownError}</p>}
       <div className="flex gap-2">
         <button type="button" className={primaryButtonClass} disabled={values.name === '' || values.rule.trim() === '' || pending} onClick={submit}>{submitLabel}</button>
@@ -230,7 +232,13 @@ function EvaluatorForm({ initial, submitLabel, pending, error, onSubmit, onCance
 }
 
 /** The Step's Evaluators with whether each counts (D9); code source is approved here, by a person. */
-export function EvaluatorsSection({ step, data, mayEdit }: { step: EvaluatedStep; data: StepEvaluation['evaluators']; mayEdit: boolean }) {
+export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
+  step: EvaluatedStep;
+  data: StepEvaluation['evaluators'];
+  mayEdit: boolean;
+  /** The step's `agent.outputSchema`, offered as the start of a schema check. */
+  stepOutputSchema?: AgentOutputSchema;
+}) {
   const [adding, setAdding] = React.useState(false);
   const create = useStepEvaluationMutation(step, (values: { name: string; rule: string; severity: EvaluatorSeverity; check: EvaluatorCheck }) =>
     mediforce.evaluation.createEvaluator({ ...step, ...values }));
@@ -245,7 +253,8 @@ export function EvaluatorsSection({ step, data, mayEdit }: { step: EvaluatedStep
       )}
       {adding && (
         <EvaluatorForm
-          initial={{ name: '', rule: '', severity: 'major', draft: emptyCheckDraft('schema') }}
+          initial={{ name: '', rule: '', severity: 'major', draft: emptyCheckDraft('schema', stepOutputSchema) }}
+          stepOutputSchema={stepOutputSchema}
           submitLabel="Create"
           pending={create.isPending}
           error={create.error?.message ?? null}
