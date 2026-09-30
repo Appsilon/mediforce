@@ -603,6 +603,68 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(promptArg).toContain('missing required keys: findings');
     });
 
+    it('[DATA] renders agent.examples as their own section after the custom prompt', async () => {
+      const context: WorkflowAgentContext = {
+        stepId: 'grade',
+        processInstanceId: 'pi-001',
+        runNamespace: 'test-namespace',
+        definitionVersion: 'v1',
+        stepInput: {},
+        autonomyLevel: 'L2',
+        workflowDefinition: {
+          name: 'ae-grading',
+          version: 1,
+          namespace: 'test-namespace',
+          visibility: 'private',
+          steps: [],
+          transitions: [],
+        },
+        step: {
+          id: 'grade',
+          name: 'Grade AEs',
+          type: 'creation',
+          executor: 'agent',
+          agent: {
+            prompt: 'Grade each AE by CTCAE v5.',
+            image: 'mediforce-agent:ae-grading',
+            examples: [
+              { input: 'Sepsis, fatal', output: '{"grade": 5}', note: 'Death is always Grade 5.' },
+              { input: 'Neutropenia ```ANC 400```', output: '{"grade": 4}' },
+            ],
+          },
+        },
+        llm: { complete: vi.fn() },
+        getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
+      };
+      await plugin.initialize(context);
+
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue(
+        { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
+      );
+
+      await plugin.run(buildEmitSpy().emit);
+
+      const promptArg = spawnSpy.mock.calls[0][0] as string;
+      const examplesAt = promptArg.indexOf('## Examples');
+      expect(examplesAt).toBeGreaterThan(promptArg.indexOf('Grade each AE by CTCAE v5.'));
+      expect(examplesAt).toBeLessThan(promptArg.indexOf('## Time Budget'));
+      expect(promptArg).toContain('### Example 1\nDeath is always Grade 5.\nInput:\n```\nSepsis, fatal\n```\nOutput:\n```\n{"grade": 5}\n```');
+      expect(promptArg).toContain('### Example 2\nInput:\n````\nNeutropenia ```ANC 400```\n````');
+    });
+
+    it('[DATA] leaves the Examples section out when the step has none', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+      mockReadSkill(plugin).mockResolvedValue('# Skill');
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue(
+        { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
+      );
+
+      await plugin.run(buildEmitSpy().emit);
+
+      expect(spawnSpy.mock.calls[0][0] as string).not.toContain('## Examples');
+    });
+
     it('[DATA] accepts standalone Docker mode (image only, no repo/commit)', async () => {
       const context = buildMockContext({
         config: {

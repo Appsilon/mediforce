@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { z } from 'zod';
+import type { CallerScope } from '../../../../repositories/index';
 import { EVALUATION_ASSISTANT_PLATFORM_TOOLS, type StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import { InMemoryAgentTrajectoryRepository } from '@mediforce/platform-core/testing';
 import { createTestScope } from '../../../../repositories/__tests__/create-test-scope';
@@ -11,9 +12,11 @@ import { freezeEvalDataset } from '../../../evaluation/eval-datasets';
 import { prepareEvalRun } from '../../../evaluation/eval-runs';
 import { setAcceptanceCriteria } from '../../../evaluation/acceptance-criteria';
 import { recordScore } from '../../../scores/record-score';
-import { executeEvaluationTool } from '../run-evaluation-tool';
+import { executeEvaluationTool, type UnattendedGrant } from '../run-evaluation-tool';
 import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN } from '../../../evaluation/__tests__/fixture';
 import { gitWorkspace } from '../../../evaluation/__tests__/git-workspace';
+import { evalScenario, finishEvalRun } from '../../../evaluation/__tests__/finished-eval-run';
+import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
 
 async function setup(entries?: StoredAgentTrajectoryEntry[]) {
   const fixture = await evaluationFixture();
@@ -309,6 +312,84 @@ describe('executeEvaluationTool', () => {
       evaluatorsChanged: [],
       qualification: null,
       acceptanceCriteria: { version: 1, critical: { minPassRate: 0.95, minPassHatK: 0.9 } },
+    });
+  });
+
+  describe('the fix loop', () => {
+    let previousAllowLocal: string | undefined;
+    beforeEach(() => {
+      previousAllowLocal = process.env.ALLOW_LOCAL_AGENTS;
+      process.env.ALLOW_LOCAL_AGENTS = 'true';
+    });
+    afterEach(() => {
+      if (previousAllowLocal === undefined) delete process.env.ALLOW_LOCAL_AGENTS;
+      else process.env.ALLOW_LOCAL_AGENTS = previousAllowLocal;
+    });
+
+    async function scenarioContext() {
+      const fixture = await evaluationFixture();
+      const scenario = await evalScenario(fixture);
+      const { definition, step } = await loadEvaluatedStep(scenario.scope, STEP, 'read');
+      return { fixture, scenario, scope: scenario.scope, context: { step: STEP, definition, workflowStep: step } };
+    }
+
+    it('reads a variant\'s failing trials with their cases, and only of this step\'s runs', async () => {
+      const { fixture, scenario, scope, context } = await scenarioContext();
+      const evalRunId = await finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5, challengers: [] },
+        (trial) => trial.caseId === scenario.caseIds['Grade 4 neutropenia'] ? { summary: 'none' } : { findings: ['ok'] });
+
+      expect(await executeEvaluationTool('get_failures', { evalRunId }, scope, context)).toMatchObject({
+        variantId: 'champion',
+        total: 1,
+        failures: [{ caseName: 'Grade 4 neutropenia', split: 'dev', evaluators: [{ name: 'findings-present', outcome: 'failed', counted: true }] }],
+      });
+      await expect(executeEvaluationTool('get_failures', { evalRunId }, scope, { ...context, step: { ...STEP, stepId: 'extract-aes' } }))
+        .rejects.toThrow('is not a run of this step');
+    });
+
+    async function preparedRunId(scope: CallerScope, context: Parameters<typeof executeEvaluationTool>[3], budgetUsd: number) {
+      const prepared = await executeEvaluationTool('prepare_eval_run', { trialsPerCase: 1, budgetUsd }, scope, context) as { prepared: { evalRunId: string } };
+      return prepared.prepared.evalRunId;
+    }
+
+    it('refuses to start a run without an unattended grant', async () => {
+      const { scope, context } = await scenarioContext();
+      const evalRunId = await preparedRunId(scope, context, 1);
+      await expect(executeEvaluationTool('start_eval_run', { evalRunId }, scope, context)).rejects.toThrow('a person must confirm that budget');
+    });
+
+    it('starts a prepared run whose budget fits the grant, spends it down, and refuses the one that no longer fits', async () => {
+      const { fixture, scope, context } = await scenarioContext();
+      const grant: UnattendedGrant = { remainingUsd: 3, started: [] };
+      const first = await preparedRunId(scope, context, 2);
+      const second = await preparedRunId(scope, context, 2);
+
+      expect(await executeEvaluationTool('start_eval_run', { evalRunId: first }, scope, { ...context, unattended: grant }))
+        .toMatchObject({ started: { evalRunId: first, status: 'running', budgetUsd: 2 }, unattendedBudgetLeftUsd: 1 });
+      expect((await fixture.evaluationRepo.getEvalRun(first))?.status).toBe('running');
+      expect(grant).toEqual({ remainingUsd: 1, started: [{ evalRunId: first, budgetUsd: 2 }] });
+
+      await expect(executeEvaluationTool('start_eval_run', { evalRunId: second }, scope, { ...context, unattended: grant }))
+        .rejects.toThrow('only $1.00 is left of the unattended budget');
+      expect((await fixture.evaluationRepo.getEvalRun(second))?.status).toBe('prepared');
+      expect(grant.started).toHaveLength(1);
+    });
+
+    it('does not start a run of another step under the grant', async () => {
+      const { scope, context } = await scenarioContext();
+      const evalRunId = await preparedRunId(scope, context, 1);
+      await expect(executeEvaluationTool('start_eval_run', { evalRunId }, scope, {
+        ...context, step: { ...STEP, stepId: 'extract-aes' }, unattended: { remainingUsd: 10, started: [] },
+      })).rejects.toThrow('is not a run of this step');
+    });
+
+    it('does not start a run for a caller without the run verb', async () => {
+      const { fixture, scope, context } = await scenarioContext();
+      const evalRunId = await preparedRunId(scope, context, 1);
+      await fixture.processRepo.setWorkflowAccess(STEP.namespace, STEP.workflowName, { run: ['someone-else'], edit: ['author-1'] });
+      const viewer = fixture.scope(userCaller('author-1', [STEP.namespace]));
+      await expect(executeEvaluationTool('start_eval_run', { evalRunId }, viewer, { ...context, unattended: { remainingUsd: 10, started: [] } }))
+        .rejects.toThrow();
     });
   });
 });

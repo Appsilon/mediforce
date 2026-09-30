@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { z } from 'zod';
+import { VARIANT_FIX_PATCH_FIELDS } from '@mediforce/platform-core';
 import type {
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EvaluatedStep,
@@ -11,9 +12,10 @@ import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { HandlerError } from '../../../errors';
 import { previewEvaluator } from '../../evaluation/preview-evaluator';
+import { stepPatchProblem } from '../../evaluation/_lib/step-patch-problem';
 import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
-import { isSameStep } from '../../evaluation/_lib/evaluated-step';
+import { isSameStep, loadEvaluatedStep } from '../../evaluation/_lib/evaluated-step';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
 import { loadStepEvaluator } from './run-evaluation-tool';
 
@@ -122,6 +124,39 @@ export async function reviewEvaluationProposal(
         return { ok: false, error: `Eval Run '${evalRunId}' has no variant '${variantId}'; its variants are ${run.variants.map((variant) => variant.id).join(', ')}` };
       }
       return { ok: true };
+    }
+    case 'propose_diagnosis': {
+      const { evalRunId, variantId, clusters } = args as Args<'propose_diagnosis'>;
+      const run = await scope.evaluation.getEvalRun(evalRunId);
+      if (run === null || isSameStep(run, step) === false) {
+        return { ok: false, error: `Eval Run '${evalRunId}' is not a run of this step` };
+      }
+      if (run.variants.some((variant) => variant.id === variantId) === false) {
+        return { ok: false, error: `Eval Run '${evalRunId}' has no variant '${variantId}'; its variants are ${run.variants.map((variant) => variant.id).join(', ')}` };
+      }
+      const known = new Set((await scope.evaluation.listTrials(evalRunId))
+        .filter((trial) => trial.variantId === variantId)
+        .map((trial) => trial.id));
+      const unknown = clusters.flatMap((cluster) => cluster.trialIds).filter((trialId) => known.has(trialId) === false);
+      return unknown.length === 0
+        ? { ok: true }
+        : { ok: false, error: `Not trials of variant '${variantId}' in Eval Run '${evalRunId}': ${[...new Set(unknown)].join(', ')} — take trial ids from get_failures` };
+    }
+    case 'propose_fix': {
+      const { evalRunId, kind, patch } = args as Args<'propose_fix'>;
+      const run = await scope.evaluation.getEvalRun(evalRunId);
+      if (run === null || isSameStep(run, step) === false) {
+        return { ok: false, error: `Eval Run '${evalRunId}' is not a run of this step` };
+      }
+      const changed = Object.entries(patch).filter(([, value]) => value !== undefined).map(([field]) => field);
+      const allowed: ReadonlyArray<string> = VARIANT_FIX_PATCH_FIELDS[kind];
+      const stray = changed.filter((field) => allowed.includes(field) === false);
+      if (stray.length > 0) {
+        return { ok: false, error: `A '${kind}' fix patches ${allowed.join(' or ')}, not ${stray.join(', ')} — propose one fix per kind` };
+      }
+      const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'read');
+      const problem = await stepPatchProblem(scope, step, definition, workflowStep, patch);
+      return problem === null ? { ok: true } : { ok: false, error: `This fix cannot be tried or applied: ${problem}` };
     }
     case 'propose_eval_case': {
       const { agentRunId } = args as Args<'propose_eval_case'>;

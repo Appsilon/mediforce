@@ -128,6 +128,43 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     expect(await fixture.evaluationRepo.listEvalRuns(STEP)).toEqual([]);
   });
 
+  it('leaves out the cases a variant\'s few-shot examples came from, and refuses holdout ones (D12)', async () => {
+    const cases = await fixture.evaluationRepo.listCases(STEP);
+    const caseId = (name: string) => cases.find((evalCase) => evalCase.name === name)!.id;
+    const example = (fromCase: string) => ({ input: 'Sepsis, fatal', output: '{"grade": 5}', caseId: caseId(fromCase) });
+
+    const { evalRun, trials } = await prepareEvalRun({
+      ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5,
+      challengers: [{ label: 'Few-shot', patch: { examples: [example('Grade 5 sepsis')] } }],
+    }, scope);
+    expect(evalRun.caseIds).toEqual([caseId('Grade 4 neutropenia')]);
+    expect(evalRun.exampleCaseIds).toEqual([caseId('Grade 5 sepsis')]);
+    expect(trials.map((trial) => trial.caseId)).toEqual([caseId('Grade 4 neutropenia'), caseId('Grade 4 neutropenia')]);
+
+    const { evalCase: holdout } = await createEvalCase({
+      ...STEP, name: 'Grade 3 rash', input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: null,
+      expectation: 'positive', notes: null, split: 'holdout', containsProductionData: false, origin: 'user',
+    }, scope);
+    await expect(prepareEvalRun({
+      ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5,
+      challengers: [{ label: 'Leaky', patch: { examples: [{ input: 'Rash', output: '{"grade": 3}', caseId: holdout.id }] } }],
+    }, scope)).rejects.toThrow(/Challenger 'Leaky': .*holdout cases are never offered as examples/);
+
+    // The champion's own examples count too: with both cases used as examples, nothing is left to score.
+    const [definition] = await fixture.processRepo.listWorkflowVersions(STEP.namespace, STEP.workflowName);
+    await fixture.processRepo.saveWorkflowDefinition({
+      ...definition!,
+      version: definition!.version + 1,
+      steps: definition!.steps.map((step) => step.id === STEP.stepId
+        ? { ...step, agent: { ...step.agent, examples: [example('Grade 5 sepsis')] } }
+        : step),
+    });
+    await expect(prepareEvalRun({
+      ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5,
+      challengers: [{ label: 'Few-shot', patch: { examples: [example('Grade 4 neutropenia')] } }],
+    }, scope)).rejects.toThrow(/no case left to score/);
+  });
+
   it('refuses to start without the person confirming the budget', async () => {
     const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
 

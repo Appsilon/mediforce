@@ -3,9 +3,14 @@ import { printJson } from '../output';
 import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
 import type { EvaluatorView } from '@mediforce/platform-api/contract';
 
+function describeProduction(evaluator: EvaluatorView): string {
+  if (evaluator.production.active === true) return '  in production';
+  return evaluator.production.reason === undefined ? '' : `  production: ${evaluator.production.reason}`;
+}
+
 function describeEvaluator(evaluator: EvaluatorView): string {
   const trust = evaluator.trust.trusted ? 'counted' : `not counted (${evaluator.trust.reason})`;
-  return `${evaluator.id}  ${evaluator.name.padEnd(24)} v${evaluator.latest.version}  ${evaluator.latest.check.kind.padEnd(9)} ${evaluator.latest.severity.padEnd(8)} ${trust}`;
+  return `${evaluator.id}  ${evaluator.name.padEnd(24)} v${evaluator.latest.version}  ${evaluator.latest.check.kind.padEnd(9)} ${evaluator.latest.severity.padEnd(8)} ${trust}${describeProduction(evaluator)}`;
 }
 
 export const evalEvaluatorListCommand = defineCommand({
@@ -195,6 +200,26 @@ export const evalEvaluatorArchiveCommand = defineCommand({
     const result = await mediforce.evaluation.archiveEvaluator({ evaluatorId: args.evaluatorId, archived: args.restore !== true });
     if (jsonMode) printJson(output, result);
     else output.stdout(`${result.evaluator.name} ${result.evaluator.archived ? 'archived' : 'restored'}`);
+    return 0;
+  },
+});
+
+export const evalEvaluatorProductionCommand = defineCommand({
+  name: 'mediforce eval evaluator-production',
+  description: 'Set whether an Evaluator also scores live production runs of its step (--on / --off); it takes effect while it counts (ADR-0023 D13).',
+  args: {
+    evaluatorId: { type: 'positional', required: true, description: 'Evaluator id' },
+    on: { type: 'boolean', description: 'Run it in production' },
+    off: { type: 'boolean', description: 'Stop running it in production' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    if ((args.on === true) === (args.off === true)) {
+      output.stderr('Pass exactly one of --on or --off');
+      return 2;
+    }
+    const result = await mediforce.evaluation.setEvaluatorProduction({ evaluatorId: args.evaluatorId, runInProduction: args.on === true });
+    if (jsonMode) printJson(output, result);
+    else output.stdout(describeEvaluator(result.evaluator));
     return 0;
   },
 });
