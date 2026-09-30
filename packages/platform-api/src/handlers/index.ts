@@ -186,6 +186,7 @@ export {
   getStepDrift,
   createEvalCasesFromLabels,
   archiveEvalCase,
+  updateEvalCase,
   listEvalDatasets,
   freezeEvalDataset,
   getMcpEvalPolicy,

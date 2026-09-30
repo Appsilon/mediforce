@@ -16,12 +16,40 @@ const evaluation = vi.hoisted(() => ({
   createEvaluator: vi.fn(),
   addEvaluatorVersion: vi.fn(),
   createRedTeamCases: vi.fn(),
+  updateCase: vi.fn(),
+  archiveCase: vi.fn(),
 }));
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
 
 vi.mock('@/components/agents/agent-log-panel', () => ({
   AgentLogPanel: ({ run }: { run: { id: string } | null }) => (run === null ? null : <div data-testid="agent-log-panel">{run.id}</div>),
 }));
+
+vi.mock('@/hooks/use-agent-runs', () => ({
+  useAgentRun: (runId: string | null) => ({ data: runId === null ? null : { id: runId }, loading: false }),
+}));
+
+const evalCaseOf = (overrides: Record<string, unknown>) => ({
+  id: 'c-1',
+  namespace: 'acme',
+  workflowName: 'safety',
+  stepId: 'grade-aes',
+  name: 'Sepsis, fatal',
+  input: { triggerPayload: { studyId: 'CDISCPILOT01' }, previousStepOutputs: { 'extract-aes': { events: [{ term: 'Sepsis' }] } } },
+  workspaceSeedCommit: null,
+  expectation: 'positive',
+  notes: 'A fatal event is grade 5.',
+  source: 'production',
+  sourceAgentRunId: 'run-00000001',
+  perturbation: null,
+  origin: 'user',
+  split: 'dev',
+  containsProductionData: true,
+  archived: false,
+  createdBy: 'author-1',
+  createdAt: '2026-09-24T08:00:00.000Z',
+  ...overrides,
+});
 
 vi.mock('@/lib/api-fetch', () => ({
   apiFetch: async () => new Response(JSON.stringify({ models: [] })),
@@ -244,7 +272,7 @@ describe('Built-in case suites', () => {
   it('warns when the run already has the suite for that field', () => {
     const evaluationWithCase = {
       ...(stepEvaluation([]) as object),
-      cases: { isLoading: false, data: { cases: [{ id: 'c-1', name: "Injection: direct override in 'triggerPayload.narrative'", expectation: 'positive', split: 'dev', source: 'synthesized', sourceAgentRunId: run.id, perturbation: { kind: 'injected_instruction' }, origin: 'user' }] } },
+      cases: { isLoading: false, data: { cases: [evalCaseOf({ name: "Injection: direct override in 'triggerPayload.narrative'", source: 'synthesized', sourceAgentRunId: run.id, perturbation: { kind: 'injected_instruction', description: 'x', canary: 'CANARY-1' } })] } },
     } as never;
     render(<CasesSection step={step} evaluation={evaluationWithCase} mayEdit={true} />);
     expect(screen.queryByTestId('builtin-suite-duplicate')).toBeNull();
@@ -296,5 +324,47 @@ describe('Production runs to add as Eval Cases', () => {
     expect(screen.queryByTestId('agent-log-panel')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Log' }));
     expect(screen.getByTestId('agent-log-panel').textContent).toBe('run-a');
+  });
+});
+
+describe('Eval Case view and edit', () => {
+  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const withCase = (evalCase: unknown) => ({
+    cases: { isLoading: false, data: { cases: [evalCase] } },
+    agentRuns: { data: { pages: [] }, hasNextPage: false },
+    datasets: { data: { datasets: [] } },
+    evaluators: { data: { evaluators: [] } },
+  }) as never;
+
+  it('shows what a case gives the step and what it expects, and opens its source run\'s log', () => {
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={false} />);
+
+    const details = screen.getByTestId('eval-case-details');
+    expect(details.textContent).toContain('A fatal event is grade 5.');
+    expect(details.textContent).toContain('"studyId": "CDISCPILOT01"');
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Source run log' }));
+    expect(screen.getByTestId('agent-log-panel').textContent).toBe('run-00000001');
+  });
+
+  it('saves only what changed', () => {
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByLabelText('Expectation'), { target: { value: 'negative' } });
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Grades the fatal event below 5.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(evaluation.updateCase).toHaveBeenCalledWith({ caseId: 'c-1', expectation: 'negative', notes: 'Grades the fatal event below 5.' });
+  });
+
+  it('says what is wrong with an input that does not fit instead of sending it', () => {
+    evaluation.updateCase.mockClear();
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByLabelText('Case input'), { target: { value: '{"triggerPayload": {}}' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(screen.getByTestId('case-form').textContent).toContain('previousStepOutputs');
+    expect(evaluation.updateCase).not.toHaveBeenCalled();
   });
 });

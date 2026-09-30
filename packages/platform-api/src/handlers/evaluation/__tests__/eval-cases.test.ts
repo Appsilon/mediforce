@@ -8,7 +8,9 @@ import {
   createEvalCasesFromLabels,
   createPerturbedEvalCase,
   listEvalCases,
+  updateEvalCase,
 } from '../eval-cases';
+import { freezeEvalDataset } from '../eval-datasets';
 import { createEvaluator } from '../evaluators';
 import { labelEvaluatorOutput } from '../evaluator-trust';
 import { listCommitFiles, readCommitFile } from '@mediforce/agent-runtime';
@@ -95,6 +97,55 @@ describe('Eval Cases', () => {
     await archiveEvalCase({ caseId: evalCase.id, archived: true }, fixture.scope());
     expect((await listEvalCases(STEP, fixture.scope())).cases).toEqual([]);
     expect((await listEvalCases({ ...STEP, includeArchived: true }, fixture.scope())).cases).toHaveLength(1);
+  });
+
+  it('edits a case as a replacement, so a Dataset frozen with the old one keeps what it ran', async () => {
+    const scope = fixture.scope();
+    await reviewVerdict(fixture, GRADED_RUN, 1, null);
+    const { evalCase: original } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, split: 'dev', origin: 'user' }, scope);
+    const { dataset } = await freezeEvalDataset(STEP, scope);
+
+    const { evalCase: edited } = await updateEvalCase({
+      caseId: original.id, expectation: 'negative', notes: 'The sepsis grade is wrong.', split: 'holdout',
+    }, scope);
+
+    expect(edited.id).not.toBe(original.id);
+    expect(edited).toMatchObject({
+      name: original.name,
+      input: original.input,
+      expectation: 'negative',
+      notes: 'The sepsis grade is wrong.',
+      split: 'holdout',
+      source: 'production',
+      sourceAgentRunId: GRADED_RUN,
+      containsProductionData: true,
+      archived: false,
+    });
+    expect((await listEvalCases(STEP, scope)).cases.map((evalCase) => evalCase.id)).toEqual([edited.id]);
+    expect((await scope.evaluation.getCase(original.id))?.archived).toBe(true);
+    expect((await scope.evaluation.getDatasetVersion(dataset.id))?.caseIds).toEqual([original.id]);
+    const [event] = await fixture.auditRepo.getByEntity('eval_case', edited.id);
+    expect(event).toMatchObject({ action: 'eval_case.edited', inputSnapshot: { replaces: original.id } });
+  });
+
+  it('calls a production case with an edited input a manual one: production never saw that input', async () => {
+    const scope = fixture.scope();
+    const { evalCase: original } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'positive', split: 'dev', origin: 'user' }, scope);
+    const input = { ...original.input, triggerPayload: { studyId: 'CDISCPILOT02' } };
+
+    const { evalCase: edited } = await updateEvalCase({ caseId: original.id, input }, scope);
+
+    expect(edited).toMatchObject({ input, source: 'manual', sourceAgentRunId: GRADED_RUN, containsProductionData: true });
+  });
+
+  it('refuses an edit that changes nothing, and an edit of an archived case', async () => {
+    const scope = fixture.scope();
+    const { evalCase } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'positive', split: 'dev', origin: 'user' }, scope);
+    await expect(updateEvalCase({ caseId: evalCase.id, expectation: 'positive', name: evalCase.name }, scope))
+      .rejects.toThrow('changes nothing');
+    await archiveEvalCase({ caseId: evalCase.id, archived: true }, scope);
+    await expect(updateEvalCase({ caseId: evalCase.id, expectation: 'negative' }, scope))
+      .rejects.toThrow('archived');
   });
 
   it('records a case from an accepted assistant proposal as the assistant\'s, in the case and its audit entry', async () => {
