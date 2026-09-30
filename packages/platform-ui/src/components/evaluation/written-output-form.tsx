@@ -194,25 +194,36 @@ export function WriteOutputForm({ step, evaluator, runs, stepOutputSchema, onClo
           stepInput={runId === FROM_NOTHING ? null : io.data?.stepInput ?? null}
           base={base}
           stepOutputSchema={stepOutputSchema}
-          onClose={onClose}
+          onSaved={onClose}
+          onCancel={onClose}
         />
       )}
     </div>
   );
 }
 
-function WriteOutputFields({ step, evaluator, basedOnAgentRunId, stepInput, base, stepOutputSchema, onClose }: {
+/**
+ * The output being written, its note, and saving it labelled. `initial` starts
+ * the output from a draft instead of the run's own; `origin` marks a draft the
+ * assistant wrote; `onSaved` hears which label it was saved with.
+ */
+export function WriteOutputFields({ step, evaluator, basedOnAgentRunId, stepInput, base, stepOutputSchema, initial, initialNote = '', origin = 'user', collapsedEditor = false, onSaved, onCancel }: {
   step: EvaluatedStep;
-  evaluator: EvaluatorView;
+  evaluator: Pick<EvaluatorView, 'id'>;
   basedOnAgentRunId: string | null;
   stepInput: JsonObject | null;
   base: JsonObject | null;
   stepOutputSchema: AgentOutputSchema | undefined;
-  onClose: () => void;
+  initial?: JsonObject;
+  initialNote?: string;
+  origin?: 'user' | 'assistant';
+  collapsedEditor?: boolean;
+  onSaved: (passed: boolean) => void;
+  onCancel?: () => void;
 }) {
-  const [result, setResult] = React.useState<JsonObject>(base ?? emptyOutput(stepOutputSchema));
+  const [result, setResult] = React.useState<JsonObject>(initial ?? base ?? emptyOutput(stepOutputSchema));
   const [inputText, setInputText] = React.useState('{}');
-  const [note, setNote] = React.useState('');
+  const [note, setNote] = React.useState(initialNote);
   const [error, setError] = React.useState<string | null>(null);
   const save = useStepEvaluationMutation(step, (passed: boolean) => {
     let writtenInput: JsonObject | null = null;
@@ -226,13 +237,14 @@ function WriteOutputFields({ step, evaluator, basedOnAgentRunId, stepInput, base
       result,
       ...(basedOnAgentRunId === null ? { stepInput: writtenInput } : { basedOnAgentRunId }),
       ...(note.trim() === '' ? {} : { note: note.trim() }),
+      origin,
       label: { evaluatorId: evaluator.id, passed },
     });
   });
   const changes = base === null ? [] : describeChanges(base, result);
   const submit = (passed: boolean) => {
     setError(null);
-    save.mutate(passed, { onSuccess: onClose, onError: (err) => setError(err instanceof SyntaxError ? 'The input is not valid JSON.' : err.message) });
+    save.mutate(passed, { onSuccess: () => onSaved(passed), onError: (err) => setError(err instanceof SyntaxError ? 'The input is not valid JSON.' : err.message) });
   };
   return (
     <div className="space-y-2">
@@ -247,8 +259,17 @@ function WriteOutputFields({ step, evaluator, basedOnAgentRunId, stepInput, base
           <pre className="mt-0.5 max-h-48 overflow-auto rounded bg-muted p-1.5 whitespace-pre-wrap break-words" data-testid="write-output-input">{JSON.stringify(stepInput, null, 2)}</pre>
         </details>
       )}
-      <div className="font-medium">Output</div>
-      <OutputEditor schema={stepOutputSchema} base={base} value={result} onChange={setResult} />
+      {collapsedEditor ? (
+        <details>
+          <summary className="cursor-pointer text-muted-foreground">Edit the output</summary>
+          <div className="mt-1"><OutputEditor schema={stepOutputSchema} base={base} value={result} onChange={setResult} /></div>
+        </details>
+      ) : (
+        <>
+          <div className="font-medium">Output</div>
+          <OutputEditor schema={stepOutputSchema} base={base} value={result} onChange={setResult} />
+        </>
+      )}
       {base !== null && (
         <p className={changes.length === 0 ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'} data-testid="write-output-changes">
           {changes.length === 0 ? 'Nothing changed yet — this is the run\'s own output; label the run itself instead.' : `Changed: ${changes.slice(0, 5).join('; ')}${changes.length > 5 ? ` and ${changes.length - 5} more` : ''}`}
@@ -259,8 +280,51 @@ function WriteOutputFields({ step, evaluator, basedOnAgentRunId, stepInput, base
       <div className="flex flex-wrap gap-1.5">
         <button type="button" className={primaryButtonClass} disabled={save.isPending} onClick={() => submit(false)}>Save as fail</button>
         <button type="button" className={buttonClass} disabled={save.isPending} onClick={() => submit(true)}>Save as pass</button>
-        <button type="button" className={buttonClass} onClick={onClose}>Cancel</button>
+        {onCancel !== undefined && <button type="button" className={buttonClass} onClick={onCancel}>Cancel</button>}
       </div>
     </div>
+  );
+}
+
+/** One output the assistant drafted: why, what it changed from its run, and the person's label. */
+export function DraftedOutput({ step, evaluatorId, draft, stepOutputSchema, mayEdit }: {
+  step: EvaluatedStep;
+  evaluatorId: string;
+  draft: { basedOnAgentRunId: string; result: JsonObject; why: string };
+  stepOutputSchema: AgentOutputSchema | undefined;
+  mayEdit: boolean;
+}) {
+  const io = useAgentRunIo(draft.basedOnAgentRunId);
+  const [saved, setSaved] = React.useState<boolean | null>(null);
+  const base = isObject(io.data?.result) ? io.data.result : null;
+  return (
+    <li className="border-t pt-2 first:border-t-0 first:pt-0" data-testid="drafted-output">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-muted-foreground">from run <span className="font-mono">{draft.basedOnAgentRunId.slice(0, 8)}</span></span>
+        {saved !== null && (
+          <span className={cn('rounded px-1.5 text-[11px]', saved ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-700 dark:text-red-400')}>
+            saved, labelled {saved ? 'pass' : 'fail'}
+          </span>
+        )}
+      </div>
+      <p>{draft.why}</p>
+      {io.data === undefined ? <p className="text-muted-foreground">Loading the run&apos;s output…</p> : saved === null && mayEdit ? (
+        <WriteOutputFields
+          step={step}
+          evaluator={{ id: evaluatorId }}
+          basedOnAgentRunId={draft.basedOnAgentRunId}
+          stepInput={io.data.stepInput}
+          base={base}
+          stepOutputSchema={stepOutputSchema}
+          initial={draft.result}
+          initialNote={draft.why}
+          origin="assistant"
+          collapsedEditor
+          onSaved={setSaved}
+        />
+      ) : (
+        <p className="text-muted-foreground">Changed: {describeChanges(base, draft.result).slice(0, 5).join('; ')}</p>
+      )}
+    </li>
   );
 }

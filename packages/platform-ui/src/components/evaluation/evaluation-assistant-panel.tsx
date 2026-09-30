@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
 import { EVALUATION_ASSISTANT_DEFAULT_MODEL } from '@mediforce/platform-core';
 import type {
+  AgentOutputSchema,
   EvaluatedStep,
   EvaluationAssistantPlatformToolName,
   EvaluationAssistantProposalToolName,
@@ -22,6 +23,7 @@ import {
   DiagnosisCard,
   FixCard,
   LabellingCard,
+  DraftedOutputsCard,
   PlanCard,
   ProposalCard,
   isDecidable,
@@ -83,6 +85,7 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   propose_perturbed_case: 'Synthesizing an eval case',
   propose_case_suite: 'Proposing a built-in case suite',
   propose_outputs_to_label: 'Picking outputs to label',
+  propose_written_outputs: 'Drafting outputs to label',
   propose_brief: 'Drafting the brief',
   propose_acceptance_criteria: 'Drafting Acceptance Criteria',
   propose_control_settings: 'Recommending routing',
@@ -144,8 +147,10 @@ function StepsSummary({ steps }: { steps: ActivityStep[] }) {
  * proposal to accept — and an Eval Run it prepares starts only when the
  * person confirms the budget on the card.
  */
-export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, runReason }: {
+export function EvaluationAssistantPanel({ step, stepOutputSchema, mayEdit, editReason, mayRun, runReason }: {
   step: EvaluatedStep;
+  /** The step's `agent.outputSchema`: drafted outputs are edited in its shape. */
+  stepOutputSchema?: AgentOutputSchema;
   mayEdit: boolean;
   editReason: string | undefined;
   mayRun: boolean;
@@ -323,6 +328,9 @@ export function EvaluationAssistantPanel({ step, mayEdit, editReason, mayRun, ru
                 }
                 if (proposal.tool === 'propose_fix') {
                   return <FixCard key={proposalIndex} step={step} fix={proposal.arguments} mayRun={mayRun} runReason={runReason} />;
+                }
+                if (proposal.tool === 'propose_written_outputs') {
+                  return <DraftedOutputsCard key={proposalIndex} step={step} proposal={proposal.arguments} stepOutputSchema={stepOutputSchema} mayEdit={mayEdit} />;
                 }
                 if (proposal.tool === 'propose_outputs_to_label') {
                   return <LabellingCard key={proposalIndex} step={step} proposal={proposal.arguments} mayEdit={mayEdit} editReason={editReason} />;

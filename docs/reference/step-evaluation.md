@@ -44,7 +44,8 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   tries a check on real outputs before proposing it.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
   written or synthesized), a built-in case suite on one field of a run
-  (`propose_case_suite`, accepted as the suite's cases in one write), Brief drafts and Acceptance Criteria come back as
+  (`propose_case_suite`, accepted as the suite's cases in one write), outputs
+  for a judge's person to label (`propose_written_outputs`), Brief drafts and Acceptance Criteria come back as
   cards to accept, edit or reject. Accepting one is the same write the forms
   make, recorded with `origin: assistant`. A routing recommendation (Control
   Mode and `confidenceThreshold`) comes back as a card to apply in the
@@ -244,6 +245,14 @@ judge about it exactly as about a production output — its result, the input it
 kept, no agent summary. `written-output-archive` takes one out of every judge's
 labels and calibration; `cases-from-labels` skips written outputs, since only a
 production run can become a case.
+
+The Evaluation Assistant drafts such outputs with `propose_written_outputs`: up
+to five production runs' results with values changed to break (or nearly break)
+a judge's rule, each with why. The platform sends a draft back to the model when
+it is not a change of one of the step's production runs or breaks the step's
+`outputSchema`. The card shows what each draft changed; the person may edit it,
+and **Save as fail** / **Save as pass** saves it as a written output with
+`origin: assistant` and the person's label — the assistant never labels.
 
 `evaluator-archive` archives or restores an Evaluator; `evaluator-production`
 sets whether it also runs in production (see below).

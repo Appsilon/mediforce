@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { z } from 'zod';
 import { VARIANT_FIX_PATCH_FIELDS } from '@mediforce/platform-core';
+import { validateOutputSchema } from '@mediforce/agent-runtime';
 import type {
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EvaluatedStep,
@@ -120,6 +121,29 @@ export async function reviewEvaluationProposal(
       const proposal = args as Args<'propose_perturbed_case'>;
       await perturbCase(await loadCaseSource(scope, proposal.baseAgentRunId, step, 'read'), proposal);
       return { ok: true };
+    }
+    case 'propose_written_outputs': {
+      const { evaluatorId, outputs } = args as Args<'propose_written_outputs'>;
+      const evaluator = await loadStepEvaluator(scope, step, evaluatorId);
+      if (evaluator.archived) return { ok: false, error: `Evaluator '${evaluator.name}' is archived` };
+      const { step: workflowStep } = await loadEvaluatedStep(scope, step, 'read');
+      const outputSchema = workflowStep.agent?.outputSchema;
+      const refused: string[] = [];
+      for (const { basedOnAgentRunId, result } of outputs) {
+        try {
+          const subject = await loadEvaluationSubject(scope, basedOnAgentRunId, step);
+          if (subject.instance.evalRunId !== undefined) refused.push(`${basedOnAgentRunId}: an eval trial, not a production run`);
+          else if (isDeepStrictEqual(subject.agentRun.envelope?.result ?? null, result)) refused.push(`${basedOnAgentRunId}: the draft is the run's own output — change it, or propose_outputs_to_label the run`);
+          else {
+            const violation = outputSchema === undefined ? null : validateOutputSchema(result, outputSchema);
+            if (violation !== null) refused.push(`${basedOnAgentRunId}: the draft breaks the step's outputSchema (${violation}) — keep its shape and change values`);
+          }
+        } catch (err) {
+          if (err instanceof HandlerError === false) throw err;
+          refused.push(`${basedOnAgentRunId}: ${err.message}`);
+        }
+      }
+      return refused.length === 0 ? { ok: true } : { ok: false, error: `Draft outputs must change a production run of this step: ${refused.join('; ')}` };
     }
     case 'propose_case_suite': {
       const proposal = args as Args<'propose_case_suite'>;

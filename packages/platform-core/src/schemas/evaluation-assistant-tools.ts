@@ -135,6 +135,24 @@ export const ProposeOutputsToLabelToolSchema = z.object({
     }),
 });
 
+/**
+ * Drafts of the step's output for a judge's person to label (ADR-0023 D9):
+ * each a production run's result with values changed so that it breaks — or
+ * nearly breaks — the Evaluator's rule, where production has too few such
+ * outputs. The person labels each one pass or fail and it is saved as a
+ * written output; the assistant never labels.
+ */
+export const ProposeWrittenOutputsToolSchema = z.object({
+  evaluatorId: z.uuid(),
+  outputs: z.array(z.object({
+    basedOnAgentRunId: z.string().min(1),
+    result: z.record(z.string(), z.unknown())
+      .describe('The whole output: the run\'s result with the values changed, keeping every other key and the step\'s outputSchema.'),
+    /** What it changes and why it should break the rule. */
+    why: z.string().min(1).max(300),
+  })).min(1).max(5),
+});
+
 /** Propose a case synthesized from a production run by changing its input or workspace. */
 export const ProposePerturbedCaseToolSchema = PerturbedEvalCaseSpecSchema.extend({
   rationale: z.string().max(1000).optional(),
@@ -266,6 +284,7 @@ export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
   propose_perturbed_case: ProposePerturbedCaseToolSchema,
   propose_case_suite: ProposeCaseSuiteToolSchema,
   propose_outputs_to_label: ProposeOutputsToLabelToolSchema,
+  propose_written_outputs: ProposeWrittenOutputsToolSchema,
   propose_brief: ProposeBriefToolSchema,
   propose_acceptance_criteria: ProposeAcceptanceCriteriaToolSchema,
   propose_control_settings: ProposeControlSettingsToolSchema,
@@ -381,6 +400,7 @@ export const EvaluationAssistantProposalSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('propose_perturbed_case'), arguments: ProposePerturbedCaseToolSchema }),
   z.object({ tool: z.literal('propose_case_suite'), arguments: ProposeCaseSuiteToolSchema }),
   z.object({ tool: z.literal('propose_outputs_to_label'), arguments: ProposeOutputsToLabelToolSchema }),
+  z.object({ tool: z.literal('propose_written_outputs'), arguments: ProposeWrittenOutputsToolSchema }),
   z.object({ tool: z.literal('propose_brief'), arguments: ProposeBriefToolSchema }),
   z.object({ tool: z.literal('propose_acceptance_criteria'), arguments: ProposeAcceptanceCriteriaToolSchema }),
   z.object({ tool: z.literal('propose_control_settings'), arguments: ProposeControlSettingsToolSchema }),
