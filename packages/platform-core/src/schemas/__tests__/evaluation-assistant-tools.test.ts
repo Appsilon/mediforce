@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { z } from 'zod';
 import {
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
@@ -59,6 +60,14 @@ describe('Evaluation Assistant fix-loop tools (ADR-0023 D14)', () => {
     expect(ProposeEvaluatorToolSchema.parse(evaluator).runInProduction).toBeUndefined();
     expect(EvaluationAssistantProposalSchema.parse({ tool: 'propose_evaluator', arguments: { ...evaluator, runInProduction: true } }))
       .toMatchObject({ arguments: { runInProduction: true } });
+  });
+
+  it('turns the name a model writes into an Evaluator name', () => {
+    const evaluator = { rule: 'Grades are 1-5.', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } } };
+    expect(ProposeEvaluatorToolSchema.parse({ ...evaluator, name: 'Grade_In Range!' }).name).toBe('grade-in-range');
+    expect(ProposeEvaluatorToolSchema.parse({ ...evaluator, name: `-${'a'.repeat(62)}-b` }).name).toBe('a'.repeat(62));
+    expect(ProposeEvaluatorToolSchema.safeParse({ ...evaluator, name: '!!!' }).success).toBe(false);
+    expect(z.toJSONSchema(ProposeEvaluatorToolSchema, { io: 'input' })).toMatchObject({ properties: { name: { type: 'string' } } });
   });
 
   it('registers the tools, and shows each proposal as a card', () => {
