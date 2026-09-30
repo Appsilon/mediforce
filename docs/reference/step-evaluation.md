@@ -170,9 +170,12 @@ requests. Nothing is accepted or started automatically.
 
 When a tool call fails validation, the assistant gets the exact error, the
 expected argument schema and examples (a `check` is an object such as
-`{"kind":"code","runtime":"python","source":"..."}`, never a string). Three
-consecutive rounds that fail with the same validation error and no successful
-call end the turn early with the cause named in the notice.
+`{"kind":"code","runtime":"python","source":"..."}`, never a string). A union
+argument like `check` is offered to the model typed as an object — without a
+`type`, models tend to send it as a JSON-encoded string, which a script's
+unescaped quotes make impossible to decode. Three consecutive rounds that fail
+with the same validation error and no successful call end the turn early with
+the cause named in the notice.
 A single tool result the assistant reads — a trajectory page or a preview whose
 check writes a long `comment` — is cut to 60,000 characters with a note to ask
 for less, so one oversized result cannot exceed the model provider's request
