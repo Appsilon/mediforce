@@ -278,4 +278,41 @@ test.describe('Step Evaluation tab', () => {
     await expect(challengerReport.getByTestId('apply-variant-result')).toContainText('Saved as Workflow Definition version', { timeout: 10_000 });
     await expect(challengerReport.getByTestId('apply-variant-result')).toContainText("matches this variant's Fingerprint");
   });
+
+  test('an Evaluator is added through its type\'s fields, read in full, and edited into a new version', async ({ page, request }) => {
+    test.setTimeout(60_000);
+    trackPageErrors(page);
+    const workflowName = `e2e-eval-form-${randomUUID().slice(0, 8)}`;
+    await startRun(request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE);
+
+    await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
+    await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await expect(page.getByText('No Evaluators yet.')).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    const form = page.getByTestId('evaluator-form');
+    await form.getByLabel('Evaluator name').fill('No PHI in output');
+    await expect(form.getByLabel('Evaluator name')).toHaveValue('no-phi-in-output');
+    await form.getByLabel('Type').selectOption('builtin');
+    await form.getByLabel('Check').selectOption('phi_leak');
+    await form.getByLabel('Rule').fill('The output carries no patient identifiers.');
+    await form.getByRole('button', { name: 'Create' }).click();
+
+    const row = page.getByTestId('evaluator-row').filter({ hasText: 'no-phi-in-output' });
+    await expect(row).toContainText('v1 · Built-in · major', { timeout: 10_000 });
+    await expect(row.getByText('Counts')).toBeVisible();
+    await row.getByText('Details', { exact: true }).click();
+    await expect(row.getByTestId('evaluator-details')).toContainText('medical record number');
+
+    await row.getByRole('button', { name: 'Edit' }).click();
+    const editForm = row.getByTestId('evaluator-form');
+    await expect(editForm.getByLabel('Evaluator name')).toBeDisabled();
+    await expect(editForm.getByLabel('Type')).toBeDisabled();
+    await editForm.getByLabel('Severity').selectOption('critical');
+    await editForm.getByRole('button', { name: 'Save as v2' }).click();
+
+    await expect(row).toContainText('v2 · Built-in · critical', { timeout: 10_000 });
+    await row.getByText('Details', { exact: true }).click();
+    await expect(row.getByTestId('evaluator-details')).toContainText('v1 ·');
+  });
 });

@@ -136,6 +136,38 @@ test.describe('Step Evaluation entities — API E2E', () => {
     expect(outsiderById.status(), await outsiderById.text()).toBe(404);
   });
 
+  test('an edit is a new version with only what changed, and a code check needs its source approved again', async ({ request }) => {
+    const source = "import json\njson.dump({'passed': True}, open('/output/result.json', 'w'))";
+    const { evaluator } = EvaluatorOutputSchema.parse(await post(request, '/api/evaluation/evaluators', {
+      ...step,
+      name: 'always-passes',
+      rule: 'Every output passes.',
+      severity: 'minor',
+      check: { kind: 'code', runtime: 'python', source },
+    }, 201));
+    await post(request, `/api/evaluation/evaluators/${evaluator.id}/approve`, { version: 1, uid: TEST_USER_ID });
+
+    const nothing = await request.post(`/api/evaluation/evaluators/${evaluator.id}/versions`, { headers: JSON_HEADERS, data: {} });
+    expect(nothing.status(), await nothing.text()).toBe(400);
+
+    const edited = EvaluatorOutputSchema.parse(await post(request, `/api/evaluation/evaluators/${evaluator.id}/versions`, { severity: 'major' }, 201));
+    expect(edited.evaluator.name).toBe('always-passes');
+    expect(edited.evaluator.latest).toMatchObject({
+      version: 2,
+      severity: 'major',
+      rule: 'Every output passes.',
+      check: { kind: 'code', runtime: 'python', source },
+      sourceApproval: null,
+    });
+    expect(edited.evaluator.versions.map((version) => version.version)).toEqual([1, 2]);
+    expect(edited.evaluator.trust).toEqual({ trusted: false, reason: 'source not approved' });
+
+    const outsider = await request.post(`/api/evaluation/evaluators/${evaluator.id}/versions`, {
+      headers: sessionCookieHeaders(callers.outsider), data: { severity: 'critical' },
+    });
+    expect(outsider.status(), await outsider.text()).toBe(404);
+  });
+
   test('a draft check is previewed against the step\'s real output without writing anything', async ({ request }) => {
     const preview = PreviewEvaluatorOutputSchema.parse(await post(request, '/api/evaluation/evaluators/preview', {
       ...step,
