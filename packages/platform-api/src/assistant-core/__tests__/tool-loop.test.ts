@@ -189,10 +189,25 @@ describe('runProposalToolLoop', () => {
     ]);
   });
 
-  it('summarizes partial progress when the final answer is truncated', async () => {
+  it('asks for smaller steps when a response is truncated with no tool call in it', async () => {
+    const bodies = scriptOpenRouter([
+      { content: 'Here are the four checks: first, a python script that', finishReason: 'length' },
+      { toolCalls: [{ name: 'propose_note', arguments: { text: 'First check.' } }] },
+      { content: 'Proposed the first check.' },
+    ]);
+    const result = await runProposalToolLoop({
+      ...config, messages: [{ role: 'user', content: 'go' }], executePlatformTool: vi.fn(),
+    });
+    expect(bodies[1]!.messages.at(-1)).toMatchObject({ role: 'user', content: expect.stringContaining('smaller pieces') });
+    expect(result.proposals).toEqual([{ tool: 'propose_note', arguments: { text: 'First check.' } }]);
+    expect(result.reply).toBe('Proposed the first check.');
+  });
+
+  it('summarizes partial progress when responses stay truncated', async () => {
     scriptOpenRouter([
       { toolCalls: [{ name: 'propose_note', arguments: { text: 'Check grade 5 first.' } }] },
       { content: 'The first thing to check is', finishReason: 'length' },
+      { content: 'Still the first thing to check is', finishReason: 'length' },
       { content: 'The grade check is proposed; the rest is unfinished.' },
     ]);
     const result = await runProposalToolLoop({

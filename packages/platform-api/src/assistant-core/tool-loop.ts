@@ -28,6 +28,8 @@ export interface ProposalToolLoopConfig<TPlatform extends string> {
   readonly reviewProposal?: (toolName: string, args: unknown) => Promise<ProposalReview>;
   readonly maxIterations: number;
   readonly maxTokens: number;
+  /** Told to the model when a response is cut off with no tool call in it; says how to split this assistant's work. */
+  readonly truncatedResponseNotice?: string;
   /** Told when a model round starts and as each tool call runs, so a person can watch the turn progress. */
   readonly onProgress?: (event: ToolLoopProgress) => void;
 }
@@ -67,6 +69,9 @@ const ALREADY_PROPOSED = {
 };
 
 const MAX_REPEATED_VALIDATION_ROUNDS = 3;
+// A response cut off with no tool call in it (too much drafted at once, or a long final answer) is retried once, smaller.
+const MAX_TRUNCATED_ROUNDS = 2;
+const DEFAULT_TRUNCATED_RESPONSE_NOTICE = 'Your last response was cut off at the output-token limit before it finished, and no tool call in it ran. Continue in smaller pieces: at most one tool call per response and short prose; if you were writing your final answer, give it again more briefly.';
 // ~15k tokens. Keeps one tool result (a check comment, a trajectory page) from
 // pushing the conversation past the provider's request-size or context limit.
 const MAX_TOOL_RESULT_CHARS = 60_000;
@@ -108,6 +113,7 @@ export async function runProposalToolLoop<TPlatform extends string>(
   const requestId = randomUUID();
   const report = config.onProgress ?? (() => {});
   let validationStreaks = new Map<string, number>();
+  let truncatedRounds = 0;
 
   const finishPartial = async (reason: string): Promise<ProposalToolLoopResult> => {
     const notice = `${reason} Any completed proposals and prepared runs are included below; unfinished work can be continued in another message.`;
@@ -158,11 +164,16 @@ export async function runProposalToolLoop<TPlatform extends string>(
       tools: response.toolCalls.map((call) => call.function.name),
     });
     if (response.toolCalls.length === 0) {
-      if (response.finishReason === 'length') {
+      if (response.finishReason !== 'length') return { reply: response.content, proposals, platformCalls };
+      truncatedRounds += 1;
+      if (truncatedRounds >= MAX_TRUNCATED_ROUNDS) {
         return finishPartial('The assistant response was truncated at its output-token limit.');
       }
-      return { reply: response.content, proposals, platformCalls };
+      if (response.content !== '') messages.push({ role: 'assistant', content: response.content });
+      messages.push({ role: 'user', content: config.truncatedResponseNotice ?? DEFAULT_TRUNCATED_RESPONSE_NOTICE });
+      continue;
     }
+    truncatedRounds = 0;
 
     messages.push({ role: 'assistant', content: response.content, tool_calls: response.toolCalls });
     const validationFailures = new Map<string, { tool: string; error: string }>();

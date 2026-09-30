@@ -26,6 +26,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Image capability probing moved off the card into a background, one-at-a-time queue instead of blocking on expand [#1391](https://github.com/Appsilon/mediforce/pull/1391).
 
 ### Fixed
+- The Evaluation Assistant no longer stops with "truncated at its output-token limit" when asked for several checks at once: a response cut off before any tool call completes is retried with a note to work one check at a time, and the prompt asks for that up front.
 - The Evaluation tab's production runs to add as Eval Cases are no longer capped at the latest 10: they page with **Load more**, show each run's reasoning summary, and open its execution log from **Log**.
 - The Evaluation Assistant no longer fails to draft an Evaluator when the model sends the check as a JSON string (fenced, or with raw newlines in a script) or names it outside kebab-case: the check is decoded, the name normalised, and a remaining error names the field that is actually wrong.
 - The Evaluation tab explains itself and drops raw JSON: Evaluators are added and edited through per-type fields (a code language and source, a judge model, question and verdicts, the built-in checks, a schema started from the step's `outputSchema`), each shows its whole check and version history, and the MCP eval modes, the Evaluation Brief's role in qualification and the built-in prompt-injection / robustness case suites are spelled out, with the suites now runnable from the tab.

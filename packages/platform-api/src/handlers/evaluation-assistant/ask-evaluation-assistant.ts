@@ -24,6 +24,7 @@ import { reviewEvaluationProposal, type PreviewedCheck } from './_lib/review-pro
 // Leave room for paged trajectory reads and preview/repair cycles for several checks.
 const MAX_TOOL_LOOP_ITERATIONS = 32;
 const ASSISTANT_MAX_OUTPUT_TOKENS = 8000;
+const TRUNCATED_RESPONSE_NOTICE = 'Your last response was cut off at the output-token limit before it finished, and no tool call in it ran. Work one check at a time: a single tool call per response (preview_evaluator or propose_evaluator for one check) and short prose, then the next check once it is done. If you were writing your final answer, give it again more briefly.';
 
 function preparedRun(result: unknown): PreparedEvalRun | null {
   if (result === null || typeof result !== 'object' || !('prepared' in result)) return null;
@@ -95,6 +96,7 @@ export async function askEvaluationAssistant(
     reviewProposal: (toolName, args) => reviewEvaluationProposal(toolName, args, scope, step, previewed),
     maxIterations: MAX_TOOL_LOOP_ITERATIONS,
     maxTokens: ASSISTANT_MAX_OUTPUT_TOKENS,
+    truncatedResponseNotice: TRUNCATED_RESPONSE_NOTICE,
     onProgress,
   });
 
