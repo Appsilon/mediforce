@@ -110,6 +110,16 @@ describe('reviewEvaluationProposal', () => {
     }, fixture.scope(), STEP, [])).rejects.toThrow('has no workspace to change files in');
   });
 
+  it('offers a built-in case suite only on a field of the run it can change', async () => {
+    const suite = (target: { part: 'triggerPayload'; path: string[] }, name: 'prompt_injection' | 'robustness' = 'prompt_injection') =>
+      reviewEvaluationProposal('propose_case_suite', { suite: name, baseAgentRunId: GRADED_RUN, target }, fixture.scope(), STEP, []);
+
+    expect(await suite({ part: 'triggerPayload', path: ['studyId'] })).toEqual({ ok: true });
+    expect(await suite({ part: 'triggerPayload', path: ['studyId'] }, 'robustness')).toEqual({ ok: true });
+    await expect(suite({ part: 'triggerPayload', path: ['narrative'] })).rejects.toThrow("'triggerPayload.narrative' is not in the input");
+    expect(await fixture.scope().evaluation.listCases(STEP)).toEqual([]);
+  });
+
   it('offers routing only for a run and variant of this step', async () => {
     const scope = fixture.scope();
     await createEvaluator({ ...STEP, ...proposeEvaluator(findings), origin: 'user' }, scope);

@@ -3,12 +3,14 @@ import {
   AcceptanceCriteriaSchema,
   EvalCaseExpectationSchema,
   EvalCaseInputSchema,
+  EvalCaseInputTargetSchema,
   EvalCaseSplitSchema,
   EvaluatorCheckSchema,
   EvaluatorKindSchema,
   EvaluatorSchema,
   EvaluatorSeveritySchema,
   PerturbedEvalCaseSpecSchema,
+  RedTeamSuiteSchema,
   StepVariantPatchSchema,
   WorkspaceFilePathSchema,
   hasPerturbationChange,
@@ -139,6 +141,20 @@ export const ProposePerturbedCaseToolSchema = PerturbedEvalCaseSpecSchema.extend
 }).refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' });
 
 /**
+ * Propose a built-in case suite: the platform writes its cases from one
+ * production run by changing the value at `target` — three injected
+ * instructions into a text field (`prompt_injection`), or rewrites that keep
+ * its meaning (`robustness`) — each expecting the output the run gave.
+ */
+export const ProposeCaseSuiteToolSchema = z.object({
+  suite: RedTeamSuiteSchema,
+  baseAgentRunId: z.string().min(1),
+  target: EvalCaseInputTargetSchema.describe('The value to change: part is triggerPayload, previousStepOutputs or previousRun; path walks keys below it, e.g. {"part":"triggerPayload","path":["narrative"]}. prompt_injection needs text; robustness text or an object.'),
+  split: EvalCaseSplitSchema.optional(),
+  rationale: z.string().max(1000).optional(),
+});
+
+/**
  * Propose the step's Acceptance Criteria (D10): per severity, the minimum pass
  * rate on its Wilson 95% lower bound, and optionally a minimum pass^k. Set
  * before the Eval Runs judged against them; accepting writes a new version.
@@ -248,6 +264,7 @@ export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
   propose_evaluator_version: ProposeEvaluatorVersionToolSchema,
   propose_eval_case: ProposeEvalCaseToolSchema,
   propose_perturbed_case: ProposePerturbedCaseToolSchema,
+  propose_case_suite: ProposeCaseSuiteToolSchema,
   propose_outputs_to_label: ProposeOutputsToLabelToolSchema,
   propose_brief: ProposeBriefToolSchema,
   propose_acceptance_criteria: ProposeAcceptanceCriteriaToolSchema,
@@ -362,6 +379,7 @@ export const EvaluationAssistantProposalSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('propose_evaluator_version'), arguments: ProposeEvaluatorVersionToolSchema }),
   z.object({ tool: z.literal('propose_eval_case'), arguments: ProposeEvalCaseToolSchema }),
   z.object({ tool: z.literal('propose_perturbed_case'), arguments: ProposePerturbedCaseToolSchema }),
+  z.object({ tool: z.literal('propose_case_suite'), arguments: ProposeCaseSuiteToolSchema }),
   z.object({ tool: z.literal('propose_outputs_to_label'), arguments: ProposeOutputsToLabelToolSchema }),
   z.object({ tool: z.literal('propose_brief'), arguments: ProposeBriefToolSchema }),
   z.object({ tool: z.literal('propose_acceptance_criteria'), arguments: ProposeAcceptanceCriteriaToolSchema }),

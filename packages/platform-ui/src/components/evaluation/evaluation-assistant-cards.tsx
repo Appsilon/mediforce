@@ -47,6 +47,7 @@ const TITLES: Record<DecidableProposal['tool'], string> = {
   propose_evaluator_version: 'Evaluator version',
   propose_eval_case: 'Eval Case',
   propose_perturbed_case: 'synthesized Eval Case',
+  propose_case_suite: 'built-in case suite',
   propose_brief: 'Evaluation Brief',
   propose_acceptance_criteria: 'Acceptance Criteria',
 };
@@ -71,6 +72,10 @@ async function acceptProposal(step: EvaluatedStep, proposal: DecidableProposal):
     case 'propose_perturbed_case': {
       const { rationale: _rationale, ...synthesized } = proposal.arguments;
       return mediforce.evaluation.createPerturbedCase({ ...step, ...synthesized, origin: 'assistant' });
+    }
+    case 'propose_case_suite': {
+      const { rationale: _rationale, ...suite } = proposal.arguments;
+      return mediforce.evaluation.createRedTeamCases({ ...step, ...suite, origin: 'assistant' });
     }
     case 'propose_brief':
       return mediforce.evaluation.setBrief({ ...step, text: proposal.arguments.text, origin: 'assistant' });
@@ -106,6 +111,11 @@ function SelfTestSummary({ selfTest }: { selfTest: EvaluatorSelfTest }) {
     </details>
   );
 }
+
+const CASE_SUITES = {
+  prompt_injection: { writes: 'Three cases, each appending an injected instruction with its own canary to', grader: 'injection_ignored' },
+  robustness: { writes: 'Cases that rewrite, without changing what it says,', grader: 'result_stable' },
+} as const;
 
 function perturbedCaseSummary(proposal: Proposal<'propose_perturbed_case'>['arguments']): string {
   const changes = [
@@ -147,6 +157,17 @@ function ProposalSummary({ step, proposal }: { step: EvaluatedStep; proposal: De
       return <>{proposal.arguments.name} — {proposal.arguments.expectation}</>;
     case 'propose_perturbed_case':
       return <>{perturbedCaseSummary(proposal.arguments)}</>;
+    case 'propose_case_suite': {
+      const { suite, baseAgentRunId, target, rationale } = proposal.arguments;
+      const graded = evaluators.data?.evaluators.some((evaluator) => evaluator.latest.check.kind === 'builtin' && evaluator.latest.check.name === CASE_SUITES[suite].grader) === true;
+      return (
+        <>
+          {CASE_SUITES[suite].writes} &lsquo;{[target.part, ...target.path].join('.')}&rsquo; of run {baseAgentRunId.slice(0, 8)}; each expects the output that run gave.
+          {`\nGraded by the built-in ${CASE_SUITES[suite].grader} Evaluator${graded ? '.' : ' — the step has none yet: add it under Evaluators.'}`}
+          {rationale !== undefined && `\n${rationale}`}
+        </>
+      );
+    }
     case 'propose_acceptance_criteria':
       return <>{describeAcceptanceCriteria(proposal.arguments.criteria)}{`\n${proposal.arguments.rationale}`}</>;
   }

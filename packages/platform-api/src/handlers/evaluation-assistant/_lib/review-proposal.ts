@@ -18,6 +18,7 @@ import { loadCaseSource } from '../../evaluation/_lib/case-source';
 import { isSameStep, loadEvaluatedStep } from '../../evaluation/_lib/evaluated-step';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
 import { caseNeededByCheck } from '../../evaluation/_lib/builtin-checks';
+import { redTeamSuiteVariants } from '../../evaluation/red-team-cases';
 import { loadStepEvaluator } from './run-evaluation-tool';
 
 type Args<Name extends EvaluationAssistantProposalToolName> = z.infer<(typeof EVALUATION_ASSISTANT_PROPOSAL_TOOLS)[Name]>;
@@ -118,6 +119,11 @@ export async function reviewEvaluationProposal(
     case 'propose_perturbed_case': {
       const proposal = args as Args<'propose_perturbed_case'>;
       await perturbCase(await loadCaseSource(scope, proposal.baseAgentRunId, step, 'read'), proposal);
+      return { ok: true };
+    }
+    case 'propose_case_suite': {
+      const proposal = args as Args<'propose_case_suite'>;
+      redTeamSuiteVariants((await loadCaseSource(scope, proposal.baseAgentRunId, step, 'read')).input, proposal);
       return { ok: true };
     }
     case 'propose_control_settings': {
