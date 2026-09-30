@@ -237,6 +237,18 @@ describe('Built-in case suites', () => {
     expect(screen.getByTestId('builtin-suite-grader').textContent).toContain('this step has none yet');
   });
 
+  it('warns when the run already has the suite for that field', () => {
+    const evaluationWithCase = {
+      ...(stepEvaluation([]) as object),
+      cases: { isLoading: false, data: { cases: [{ id: 'c-1', name: "Injection: direct override in 'triggerPayload.narrative'", expectation: 'positive', split: 'dev', source: 'synthesized', sourceAgentRunId: run.id, perturbation: { kind: 'injected_instruction' }, origin: 'user' }] } },
+    } as never;
+    render(<CasesSection step={step} evaluation={evaluationWithCase} mayEdit={true} />);
+    expect(screen.queryByTestId('builtin-suite-duplicate')).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('Field path'), { target: { value: 'narrative' } });
+    expect(screen.getByTestId('builtin-suite-duplicate').textContent).toContain('already has 1 prompt injection case(s)');
+  });
+
   it('writes a suite from a run and a field of its input', () => {
     render(<CasesSection step={step} evaluation={stepEvaluation([{ latest: { check: { kind: 'builtin', name: 'result_stable' } } }])} mayEdit={true} />);
     fireEvent.change(screen.getByLabelText('Suite'), { target: { value: 'robustness' } });

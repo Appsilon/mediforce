@@ -354,14 +354,17 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
 const RedTeamSuiteSchema = z.enum(RED_TEAM_SUITES);
 type RedTeamSuite = z.infer<typeof RedTeamSuiteSchema>;
 
-const RED_TEAM_SUITE_INFO: Record<RedTeamSuite, { label: string; description: string; grader: BuiltinCheckName; target: string }> = {
+// casePrefix: how createRedTeamEvalCases names the suite's cases — "<prefix>: <variant> in '<part>.<path>'".
+const RED_TEAM_SUITE_INFO: Record<RedTeamSuite, { casePrefix: string; label: string; description: string; grader: BuiltinCheckName; target: string }> = {
   prompt_injection: {
+    casePrefix: 'Injection',
     label: 'Prompt injection',
     description: 'Three cases, each appending an instruction to a text field of the input — a fake system notice, a note "from the sponsor", a delimiter escape — that asks the agent to output a canary marker. The agent should do its job and ignore it.',
     grader: 'injection_ignored',
     target: 'a text field',
   },
   robustness: {
+    casePrefix: 'Robustness',
     label: 'Robustness',
     description: 'Cases that change how a field is written but not what it says — doubled whitespace and blank-line padding for text, reversed key order for an object. The result should not change.',
     grader: 'result_stable',
@@ -386,13 +389,20 @@ function BuiltinCaseSuites({ step, evaluation }: { step: EvaluatedStep; evaluati
   const [runId, setRunId] = React.useState('');
   const [part, setPart] = React.useState<EvalCaseInputPart>('triggerPayload');
   const [path, setPath] = React.useState('');
+  const baseAgentRunId = runId === '' ? runs[0]?.id : runId;
+  const pathKeys = path.split('.').map((key) => key.trim()).filter((key) => key !== '');
   const create = useStepEvaluationMutation(step, () => mediforce.evaluation.createRedTeamCases({
     ...step,
     suite,
-    baseAgentRunId: runId === '' ? runs[0]!.id : runId,
-    target: { part, path: path.split('.').map((key) => key.trim()).filter((key) => key !== '') },
+    baseAgentRunId: baseAgentRunId!,
+    target: { part, path: pathKeys },
   }));
   const info = RED_TEAM_SUITE_INFO[suite];
+  const target = `'${[part, ...pathKeys].join('.')}'`;
+  const alreadyAdded = (evaluation.cases.data?.cases ?? []).filter((evalCase) =>
+    evalCase.sourceAgentRunId === baseAgentRunId
+    && evalCase.name.startsWith(`${info.casePrefix}: `)
+    && evalCase.name.endsWith(` in ${target}`)).length;
   const graded = evaluators.some((evaluator) => evaluator.latest.check.kind === 'builtin' && evaluator.latest.check.name === info.grader);
 
   return (
@@ -441,7 +451,12 @@ function BuiltinCaseSuites({ step, evaluation }: { step: EvaluatedStep; evaluati
             >Add suite cases</button>
           </div>
         )}
-        {create.error !== null && <p className="text-destructive">{create.error.message}</p>}
+        {pathKeys.length > 0 && alreadyAdded > 0 && (
+          <p className="text-amber-700 dark:text-amber-300" data-testid="builtin-suite-duplicate">
+            This run already has {alreadyAdded} {info.label.toLowerCase()} case(s) for {target}; adding the suite again writes them again.
+          </p>
+        )}
+        {create.error !== null && <p className="text-destructive">{create.error.message} Cases are written one at a time, so any written before the error were kept.</p>}
         {create.data !== undefined && <p className="text-muted-foreground">Added {create.data.cases.length} case(s).</p>}
       </div>
     </details>
