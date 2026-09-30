@@ -46,7 +46,7 @@ domains:
         path: skills/add-changelog-entry/SKILL.md
         complexity: basic
         language: multi
-        description: Append a one-line entry for a merged PR under [Unreleased] in CHANGELOG.md (Keep-a-Changelog)
+        description: Developer-triggered at release time. Drafts a version's CHANGELOG.md section from the PRs merged since the last tag
       - id: new-test
         path: skills/new-test/SKILL.md
         complexity: intermediate

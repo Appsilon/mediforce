@@ -149,7 +149,7 @@ reader cannot tell the difference between a clean pass and a skipped one.
 ```
 /sync-docs --commit <sha>    git diff <sha>~1 <sha>
 /sync-docs --pr <number>     gh pr diff <number>
-/sync-docs --audit           CHANGELOG [Unreleased] bullets as the signal
+/sync-docs --audit           commits since the last tag as the signal
 ```
 
 `--audit` walks the routing table plus every `packages/*/README.md` and

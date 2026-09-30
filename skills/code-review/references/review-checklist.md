@@ -85,7 +85,7 @@ A behaviour the user could rely on yesterday MUST keep working today. Migrations
 - [ ] Self-documenting code wins: prefer a better name over a comment.
 - [ ] No "Added for X flow" / "Used by Y" / issue-number comments — that belongs in the PR description.
 - [ ] No section-title / banner comments (`// ---- POST /api/foo ----`, `// === Helpers ===`) — symbol names and file structure already delineate sections.
-- [ ] No ephemeral plan numbering or migration history (`// Phase 2.5`, `// added in Phase 2.6`, `// pre-Phase-2.5 Server Action`, `// replaces the old action`). Plan phases are temporary scaffolding; describe the durable behavior/reason instead. Test: would this still make sense to a reader in two years who never saw the plan? If not, cut it — the history belongs in the PR description / changelog.
+- [ ] No ephemeral plan numbering or migration history (`// Phase 2.5`, `// added in Phase 2.6`, `// pre-Phase-2.5 Server Action`, `// replaces the old action`). Plan phases are temporary scaffolding; describe the durable behavior/reason instead. Test: would this still make sense to a reader in two years who never saw the plan? If not, cut it — the history belongs in the PR description.
 
 ## 6. Testing
 
@@ -108,10 +108,7 @@ A behaviour the user could rely on yesterday MUST keep working today. Migrations
 
 ## 9. Changelog
 
-- [ ] Non-trivial change adds a bullet under `## [Unreleased]` in `CHANGELOG.md` (skip only for typos / single-line config / comment-only diffs; Renovate batches under `### Dependencies`).
-- [ ] Bullet states the **effect** of the change, not the mechanic. Rejected style: "Refactored X into shared component", "Updated Y handler". Accepted style: "Agent output now consistent across surfaces — L2 steps finally show HTML report". Test: would a year-later reader, with PR link removed, understand why the change mattered?
-- [ ] Placed in the right Keep-a-Changelog category (Added / Changed / Deprecated / Removed / Fixed / Security / Dependencies).
-- [ ] No edits to dated `## [YYYY-MM-DD]` sections — those are historical.
+- [ ] A feature PR does not touch `CHANGELOG.md`. Only a release PR adds a `## [X.Y.Z]` section, written by a developer (AGENTS.md §10).
 
 ## Anti-Pattern Quick Scan
 
