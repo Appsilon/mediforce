@@ -5,6 +5,9 @@ import {
   EvaluatorOutputSchema,
   FreezeEvalDatasetOutputSchema,
   GetAgentRunIoOutputSchema,
+  CreateWrittenOutputOutputSchema,
+  ListWrittenOutputsOutputSchema,
+  ListEvaluatorLabelsOutputSchema,
   GetMcpEvalPolicyOutputSchema,
   ListStepAgentRunsOutputSchema,
   ListEvalCasesOutputSchema,
@@ -246,6 +249,49 @@ test.describe('Step Evaluation entities — API E2E', () => {
 
     const outsider = await request.get(`/api/evaluation/agent-runs/${agentRunId}/io`, { headers: sessionCookieHeaders(callers.outsider) });
     expect(outsider.status(), await outsider.text()).toBe(404);
+  });
+
+  test('a written output keeps its run\'s input, is labelled for a judge, and leaves the labels once archived', async ({ request }) => {
+    const { evaluator } = EvaluatorOutputSchema.parse(await post(request, '/api/evaluation/evaluators', {
+      ...step,
+      name: 'summary-grounded',
+      rule: 'The summary is grounded in the input.',
+      severity: 'major',
+      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Grounded?', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
+    }, 201));
+    const created = CreateWrittenOutputOutputSchema.parse(await post(request, '/api/evaluation/written-outputs', {
+      ...step,
+      basedOnAgentRunId: agentRunId,
+      result: { mock: true, summary: 'A summary that invents a grade 5 event.' },
+      note: 'Invented event.',
+      label: { evaluatorId: evaluator.id, passed: false },
+      uid: TEST_USER_ID,
+    }, 201));
+    const { writtenOutput } = created;
+    expect(writtenOutput).toMatchObject({ basedOnAgentRunId: agentRunId, note: 'Invented event.', archived: false });
+    expect(created.score).toMatchObject({ subject: { type: 'written_output', id: writtenOutput.id }, label: 'fail' });
+
+    const outsider = await request.get(
+      `/api/evaluation/written-outputs?namespace=${step.namespace}&workflowName=${step.workflowName}&stepId=${step.stepId}`,
+      { headers: sessionCookieHeaders(callers.outsider) },
+    );
+    expect(outsider.status(), await outsider.text()).not.toBe(200);
+    const listRes = await request.get(
+      `/api/evaluation/written-outputs?namespace=${step.namespace}&workflowName=${step.workflowName}&stepId=${step.stepId}`,
+      { headers: AUTH_HEADERS },
+    );
+    expect(ListWrittenOutputsOutputSchema.parse(await listRes.json()).writtenOutputs.map((row) => row.id)).toContain(writtenOutput.id);
+
+    await post(request, `/api/evaluation/evaluators/${evaluator.id}/labels`, { writtenOutputId: writtenOutput.id, passed: true, uid: TEST_USER_ID }, 201);
+    const both = await request.post(`/api/evaluation/evaluators/${evaluator.id}/labels`, {
+      headers: JSON_HEADERS, data: { writtenOutputId: writtenOutput.id, agentRunId, passed: true, uid: TEST_USER_ID },
+    });
+    expect(both.status(), await both.text()).toBe(400);
+    const labels = async () => ListEvaluatorLabelsOutputSchema.parse(await (await request.get(`/api/evaluation/evaluators/${evaluator.id}/labels`, { headers: AUTH_HEADERS })).json()).labels;
+    expect((await labels()).map((label) => [label.subject.id, label.label])).toEqual([[writtenOutput.id, 'pass']]);
+
+    await post(request, `/api/evaluation/written-outputs/${writtenOutput.id}/archive`, { archived: true });
+    expect(await labels()).toEqual([]);
   });
 
   test('editing a case replaces it, and the Dataset frozen before keeps the case it froze', async ({ request }) => {

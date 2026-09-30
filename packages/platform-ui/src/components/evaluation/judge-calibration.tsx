@@ -6,27 +6,36 @@ import {
   JUDGE_MIN_FAILURE_LABELS,
   JUDGE_MIN_LABELS,
   JUDGE_PASS_VALUE,
+  type AgentOutputSchema,
   type AgentRun,
   type EvalCase,
   type EvaluatedStep,
   type Score,
+  type WrittenOutput,
 } from '@mediforce/platform-core';
 import type { EvaluatorView } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
-import { useEvaluatorLabels, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
+import { useAgentRunIo, useEvaluatorLabels, useStepEvaluationMutation, useWrittenOutputs } from '@/hooks/use-step-evaluation';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { RunInputOutput } from './run-input-output';
+import { WriteOutputForm, describeChanges } from './written-output-form';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 
 export interface OutputLabel {
   passed: boolean;
   comment: string | null;
+  /** A production run's output, or a person's written one. */
+  written: boolean;
 }
 
 /** The newest label per labelled output, by the id of what was labelled. */
 export function labelsBySubject(labels: readonly Score[]): Map<string, OutputLabel> {
-  return new Map(labels.map((score) => [score.subject.id, { passed: score.value >= JUDGE_PASS_VALUE, comment: score.comment }]));
+  return new Map(labels.map((score) => [score.subject.id, {
+    passed: score.value >= JUDGE_PASS_VALUE,
+    comment: score.comment,
+    written: score.subject.type === 'written_output',
+  }]));
 }
 
 export function LabelBadge({ label }: { label: OutputLabel }) {
@@ -88,6 +97,46 @@ export function LabelOutputRow({ step, evaluatorId, agentRunId, note, label, may
         </div>
       )}
       {save.error !== null && <p className="mt-1 text-destructive">{save.error.message}</p>}
+    </li>
+  );
+}
+
+/** One written example: what it changed from its run, its label for this judge, and relabelling or archiving it. */
+function WrittenOutputRow({ step, evaluatorId, written, label, mayEdit }: {
+  step: EvaluatedStep;
+  evaluatorId: string;
+  written: WrittenOutput;
+  label: OutputLabel | undefined;
+  mayEdit: boolean;
+}) {
+  const base = useAgentRunIo(written.basedOnAgentRunId);
+  const relabel = useStepEvaluationMutation(step, (passed: boolean) => mediforce.evaluation.labelOutput({ evaluatorId, writtenOutputId: written.id, passed }));
+  const archive = useStepEvaluationMutation(step, () => mediforce.evaluation.archiveWrittenOutput({ writtenOutputId: written.id, archived: true }));
+  const changes = base.data === undefined ? [] : describeChanges(base.data.result, written.result);
+  const error = relabel.error ?? archive.error;
+  return (
+    <li className="rounded border p-1.5" data-testid="written-output">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {label === undefined ? <span className="text-muted-foreground">not labelled for this judge</span> : <LabelBadge label={label} />}
+        <span className="text-muted-foreground">{written.basedOnAgentRunId === null ? 'written from nothing' : <>from run <span className="font-mono">{written.basedOnAgentRunId.slice(0, 8)}</span></>}{written.origin === 'assistant' ? ' · drafted by the assistant' : ''}</span>
+        {mayEdit && (
+          <span className="ml-auto flex gap-1">
+            <button type="button" className={buttonClass} disabled={relabel.isPending} onClick={() => relabel.mutate(true)}>Pass</button>
+            <button type="button" className={buttonClass} disabled={relabel.isPending} onClick={() => relabel.mutate(false)}>Fail</button>
+            <button type="button" className={buttonClass} disabled={archive.isPending} onClick={() => archive.mutate(undefined)}>Archive</button>
+          </span>
+        )}
+      </div>
+      {written.note !== null && <p className="mt-0.5">{written.note}</p>}
+      {changes.length > 0 && <p className="mt-0.5 text-muted-foreground" data-testid="written-output-changes">Changed: {changes.slice(0, 5).join('; ')}{changes.length > 5 ? ` and ${changes.length - 5} more` : ''}</p>}
+      <details className="mt-0.5">
+        <summary className="cursor-pointer text-muted-foreground">Input and output</summary>
+        <div className="mt-1 grid gap-2 md:grid-cols-2">
+          <pre className="max-h-48 overflow-auto rounded bg-muted p-1.5 whitespace-pre-wrap break-words">{JSON.stringify(written.stepInput, null, 2)}</pre>
+          <pre className="max-h-48 overflow-auto rounded bg-muted p-1.5 whitespace-pre-wrap break-words">{JSON.stringify(written.result, null, 2)}</pre>
+        </div>
+      </details>
+      {error !== null && <p className="mt-0.5 text-destructive">{error.message}</p>}
     </li>
   );
 }
@@ -157,14 +206,17 @@ const MARKED: Record<EvalCase['expectation'], string> = {
  * positives, since a judge needs failures — then the other production runs.
  * A label is about this Evaluator's rule, not the run overall.
  */
-export function JudgeCalibrationPanel({ step, evaluator, cases, runs, mayEdit }: {
+export function JudgeCalibrationPanel({ step, evaluator, cases, runs, stepOutputSchema, mayEdit }: {
   step: EvaluatedStep;
   evaluator: EvaluatorView;
   cases: readonly EvalCase[];
   runs: readonly AgentRun[];
+  stepOutputSchema: AgentOutputSchema | undefined;
   mayEdit: boolean;
 }) {
+  const [writing, setWriting] = React.useState(false);
   const labels = useEvaluatorLabels(step, evaluator.id);
+  const writtenOutputs = useWrittenOutputs(step).data?.writtenOutputs ?? [];
   const byOutput = labelsBySubject(labels.data?.labels ?? []);
   const marked = new Map<string, EvalCase['expectation']>();
   for (const evalCase of [...cases].sort((left, right) => (left.expectation === right.expectation ? 0 : left.expectation === 'negative' ? -1 : 1))) {
@@ -174,17 +226,31 @@ export function JudgeCalibrationPanel({ step, evaluator, cases, runs, mayEdit }:
   }
   const unlabelledMarked = [...marked].filter(([agentRunId]) => !byOutput.has(agentRunId));
   const otherRuns = runs.filter((run) => !marked.has(run.id) && !byOutput.has(run.id));
-  const labelled = [...byOutput];
+  const labelled = [...byOutput].filter(([, label]) => !label.written);
 
   return (
     <div className="mt-2 space-y-3 rounded-md bg-muted/40 p-3 text-xs" data-testid="judge-calibration">
       <p className="text-muted-foreground">
         A judge is a model&apos;s opinion, so it counts only once it agrees with yours. Label outputs pass or fail <span className="font-medium text-foreground">for this rule</span> — not whether the run was good overall — then calibrate. It needs {JUDGE_MIN_LABELS} labels, {JUDGE_MIN_FAILURE_LABELS} of them fails (a judge that passes everything would otherwise look perfect), and agreement of {JUDGE_MIN_AGREEMENT} or better.
       </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <CalibrationProgress evaluator={evaluator} labels={[...byOutput.values()]} />
-      </div>
       <CalibrateAction step={step} evaluator={evaluator} labelCount={byOutput.size} mayEdit={mayEdit} />
+      <section className="space-y-1" data-testid="written-outputs">
+        <div className="flex items-center gap-2">
+          <h4 className="font-medium">Your written examples</h4>
+          {mayEdit && !writing && <button type="button" className={buttonClass} onClick={() => setWriting(true)}>Write an example</button>}
+        </div>
+        <p className="text-muted-foreground">
+          When production has no output that breaks this rule — nobody runs a bad case on purpose — change a real run&apos;s output until it does, and label it. It keeps the run&apos;s input and the step&apos;s output shape; nothing re-runs it. The assistant can draft such outputs too.
+        </p>
+        {writing && <WriteOutputForm step={step} evaluator={evaluator} runs={runs} stepOutputSchema={stepOutputSchema} onClose={() => setWriting(false)} />}
+        {writtenOutputs.length > 0 && (
+          <ul className="space-y-2">
+            {writtenOutputs.map((written) => (
+              <WrittenOutputRow key={written.id} step={step} evaluatorId={evaluator.id} written={written} label={byOutput.get(written.id)} mayEdit={mayEdit} />
+            ))}
+          </ul>
+        )}
+      </section>
       {unlabelledMarked.length > 0 && (
         <section className="space-y-1">
           <h4 className="font-medium">Runs you added as Eval Cases</h4>
@@ -217,7 +283,7 @@ export function JudgeCalibrationPanel({ step, evaluator, cases, runs, mayEdit }:
         </details>
       )}
       {unlabelledMarked.length === 0 && otherRuns.length === 0 && labelled.length === 0 && (
-        <p className="text-muted-foreground">The step has no production outputs to label yet.</p>
+        <p className="text-muted-foreground">The step has no production outputs to label yet — write an example above.</p>
       )}
     </div>
   );

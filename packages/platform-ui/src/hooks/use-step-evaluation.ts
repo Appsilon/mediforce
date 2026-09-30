@@ -17,6 +17,7 @@ type Section =
   | 'agent-runs'
   | 'criteria'
   | 'drift'
+  | 'written-outputs'
   | `qualification:${number | 'runnable'}`
   | `labels:${string}`;
 
@@ -42,6 +43,15 @@ export function useStepEvaluators(step: EvaluatedStep) {
   return useQuery({
     queryKey: sectionKey(step, 'evaluators'),
     queryFn: () => mediforce.evaluation.listEvaluators(step),
+    retry: stopRetryOn4xx,
+  });
+}
+
+/** The Step's live written outputs, newest first; refreshed by every write on the Step. */
+export function useWrittenOutputs(step: EvaluatedStep) {
+  return useQuery({
+    queryKey: sectionKey(step, 'written-outputs'),
+    queryFn: () => mediforce.evaluation.listWrittenOutputs(step),
     retry: stopRetryOn4xx,
   });
 }

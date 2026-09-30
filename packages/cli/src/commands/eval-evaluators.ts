@@ -85,10 +85,11 @@ export const evalEvaluatorApproveCommand = defineCommand({
 
 export const evalEvaluatorLabelCommand = defineCommand({
   name: 'mediforce eval evaluator-label',
-  description: 'Label one Agent Run\'s output pass or fail for an Evaluator — ground truth for judge calibration.',
+  description: 'Label one output pass or fail for an Evaluator — a production run\'s (--agent-run) or a written one (--written-output) — ground truth for judge calibration.',
   args: {
     evaluatorId: { type: 'positional', required: true, description: 'Evaluator id' },
-    'agent-run': { type: 'string', required: true, description: 'Agent Run id' },
+    'agent-run': { type: 'string', description: 'Agent Run id' },
+    'written-output': { type: 'string', description: 'Written output id' },
     pass: { type: 'boolean', description: 'The output passes' },
     fail: { type: 'boolean', description: 'The output fails' },
     comment: { type: 'string', description: 'Why' },
@@ -99,15 +100,20 @@ export const evalEvaluatorLabelCommand = defineCommand({
       output.stderr('Pass exactly one of --pass or --fail');
       return 2;
     }
+    if ((args['agent-run'] === undefined) === (args['written-output'] === undefined)) {
+      output.stderr('Pass exactly one of --agent-run or --written-output');
+      return 2;
+    }
     const result = await mediforce.evaluation.labelOutput({
       evaluatorId: args.evaluatorId,
-      agentRunId: args['agent-run'],
+      ...(args['agent-run'] !== undefined ? { agentRunId: args['agent-run'] } : {}),
+      ...(args['written-output'] !== undefined ? { writtenOutputId: args['written-output'] } : {}),
       passed: args.pass === true,
       ...(args.comment !== undefined ? { comment: args.comment } : {}),
       ...(args.uid !== undefined ? { uid: args.uid } : {}),
     });
     if (jsonMode) printJson(output, result);
-    else output.stdout(`Labelled ${args['agent-run']} ${result.score.label}`);
+    else output.stdout(`Labelled ${result.score.subject.id} ${result.score.label}`);
     return 0;
   },
 });

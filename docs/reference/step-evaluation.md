@@ -230,6 +230,21 @@ before positives (you judged them once; the label asks whether the output breaks
 *this* rule), then the other loaded production runs, each with its input and
 output; then **Calibrate**.
 
+When production has no output that breaks the rule — nobody runs a bad case on
+purpose — **Write an example** makes one: start from a production run, keep its
+input, and change its output in a form built from the step's `outputSchema`
+(one typed field per property, enumerations as choices, arrays and objects as
+JSON, changed fields marked and resettable, or the whole output as JSON), then
+**Save as fail** or **Save as pass**. It is a **written output**
+(`written-output-add --file`, `POST /api/evaluation/written-outputs`, with
+`label` to label it in the same write), not an Eval Case: nothing re-runs it. A
+label on it is a human Score on subject `written_output`
+(`evaluator-label <evaluatorId> --written-output <id>`), and calibration asks the
+judge about it exactly as about a production output — its result, the input it
+kept, no agent summary. `written-output-archive` takes one out of every judge's
+labels and calibration; `cases-from-labels` skips written outputs, since only a
+production run can become a case.
+
 `evaluator-archive` archives or restores an Evaluator; `evaluator-production`
 sets whether it also runs in production (see below).
 

@@ -1,4 +1,4 @@
-import { JUDGE_PASS_VALUE, cohensKappa, type Evaluator, type Score } from '@mediforce/platform-core';
+import { JUDGE_PASS_VALUE, cohensKappa, type Evaluator, type Score, type ScoreSubject } from '@mediforce/platform-core';
 import type {
   ApproveEvaluatorSourceInput,
   CalibrateEvaluatorInput,
@@ -16,7 +16,8 @@ import { recordScore } from '../scores/record-score';
 import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
 import { evaluatorView, loadEvaluator } from './_lib/evaluator-view';
 import { loadEvaluationSubject } from './_lib/evaluation-subject';
-import { runEvaluatorCheck } from './_lib/run-evaluator-check';
+import { runEvaluatorCheck, runJudgeCheck } from './_lib/run-evaluator-check';
+import { judgedWrittenOutput, loadWrittenOutput } from './_lib/written-output';
 import { appendEvaluationAudit } from './_lib/audit';
 
 /**
@@ -67,16 +68,25 @@ export async function labelEvaluatorOutput(
   const evaluator = await loadEvaluator(scope, input.evaluatorId);
   const step = stepRef(evaluator);
   await loadEvaluatedStep(scope, step, 'edit');
-  const subject = await loadEvaluationSubject(scope, input.agentRunId, step);
-  const [previous] = await scope.scores.list({
-    agentRunId: input.agentRunId,
-    evaluatorId: evaluator.id,
-    source: 'human',
-    limit: 1,
-  });
+  let subject: ScoreSubject;
+  let processInstanceId: string | null;
+  let previous: Score | undefined;
+  if (input.writtenOutputId !== undefined) {
+    const writtenOutput = await loadWrittenOutput(scope, input.writtenOutputId, step);
+    subject = { type: 'written_output', id: writtenOutput.id };
+    processInstanceId = null;
+    previous = (await scope.scores.list({ evaluatorId: evaluator.id, source: 'human', limit: 1000 }))
+      .find((score) => score.subject.type === 'written_output' && score.subject.id === writtenOutput.id);
+  } else {
+    const agentRunId = input.agentRunId!;
+    const run = await loadEvaluationSubject(scope, agentRunId, step);
+    subject = { type: 'agent_run', id: agentRunId };
+    processInstanceId = run.instance.id;
+    [previous] = await scope.scores.list({ agentRunId, evaluatorId: evaluator.id, source: 'human', limit: 1 });
+  }
 
   const score = await recordScore({
-    subject: { type: 'agent_run', id: input.agentRunId },
+    subject,
     name: evaluator.name,
     value: input.passed ? 1 : 0,
     label: input.passed ? 'pass' : 'fail',
@@ -85,7 +95,7 @@ export async function labelEvaluatorOutput(
     createdBy: labelledBy,
     metadata: { calibrationLabel: true },
     namespace: evaluator.namespace,
-    processInstanceId: subject.instance.id,
+    processInstanceId,
     stepId: step.stepId,
     evaluatorId: evaluator.id,
     supersedes: previous?.id ?? null,
@@ -95,17 +105,22 @@ export async function labelEvaluatorOutput(
 }
 
 /**
- * The newest human label per Agent Run, newest first. A relabel supersedes
+ * The newest human label per labelled output — a production run's or a live
+ * written one — newest first. A relabel supersedes
  * the label before it, so a superseded label never counts — even when both
  * carry the same timestamp.
  */
 export async function evaluatorLabels(scope: CallerScope, evaluator: Evaluator): Promise<Score[]> {
   const scores = await scope.scores.list({ evaluatorId: evaluator.id, source: 'human', limit: 1000 });
+  const liveWritten = scores.some((score) => score.subject.type === 'written_output')
+    ? new Set((await scope.evaluation.listWrittenOutputs(stepRef(evaluator))).filter((row) => !row.archived).map((row) => row.id))
+    : new Set<string>();
   const superseded = new Set(scores.map((score) => score.supersedes).filter((id) => id !== null));
   const seen = new Set<string>();
   const latest: Score[] = [];
   for (const score of scores) {
     if (superseded.has(score.id) || seen.has(score.subject.id)) continue;
+    if (score.subject.type === 'written_output' && !liveWritten.has(score.subject.id)) continue;
     seen.add(score.subject.id);
     latest.push(score);
   }
@@ -154,8 +169,9 @@ export async function calibrateEvaluator(
   let failures = 0;
   for (const label of labels) {
     const humanPassed = label.value >= JUDGE_PASS_VALUE;
-    const subject = await loadEvaluationSubject(scope, label.subject.id, step);
-    const outcome = await runEvaluatorCheck(scope, version.check, subject, null);
+    const outcome = label.subject.type === 'written_output'
+      ? await runJudgeCheck(scope, version.check, judgedWrittenOutput(await loadWrittenOutput(scope, label.subject.id, step)), null)
+      : await runEvaluatorCheck(scope, version.check, await loadEvaluationSubject(scope, label.subject.id, step), null);
     if (outcome.passed === null) {
       errors.push({ agentRunId: label.subject.id, error: outcome.error ?? 'judge returned no verdict' });
       continue;

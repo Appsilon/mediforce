@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * A Score is an external quality judgment on one Agent Run or one Workflow Run
+ * A Score is an external quality judgment on one Agent Run, one Workflow Run or one written output
  * (ADR-0023, shape from `docs/research/layer2-scores-research.md` § 6). It is
  * never the agent's own `confidence`. Append-only: a revised judgment is a new
  * Score whose `supersedes` names the one it replaces.
@@ -9,6 +9,8 @@ import { z } from 'zod';
 export const ScoreSubjectSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('agent_run'), id: z.string().min(1) }),
   z.object({ type: z.literal('workflow_run'), id: z.string().min(1) }),
+  /** A person's written example of a step's output (ADR-0023 D9), labelled to calibrate a judge. */
+  z.object({ type: z.literal('written_output'), id: z.string().min(1) }),
 ]);
 
 /** Who judged: a person, an LLM judge, or a deterministic check. */

@@ -9,6 +9,7 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
     data: agentRunId === null ? undefined : { agentRunId, status: 'completed', stepInput: { narrative: `input of ${agentRunId}` }, result: { grade: `output of ${agentRunId}` }, reasoningSummary: null, confidence: null },
   }),
   useEvaluatorLabels: () => ({ data: { labels: judgeLabels } }),
+  useWrittenOutputs: () => ({ data: { writtenOutputs: writtenOutputs } }),
   useStepEvaluationMutation: (_step: unknown, mutationFn: (value: unknown) => unknown) => ({
     mutate: (value: unknown) => { void mutationFn(value); },
     isPending: false,
@@ -18,6 +19,7 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
 }),);
 
 const judgeLabels = vi.hoisted((): unknown[] => []);
+const writtenOutputs = vi.hoisted((): unknown[] => []);
 
 const evaluation = vi.hoisted(() => ({
   labelOutput: vi.fn(),
@@ -548,6 +550,26 @@ describe('Labelling a judge from the Evaluators section', () => {
     expect(screen.getByTestId('label-candidates-runs').textContent).toContain('run-othe');
     expect(screen.getByTestId('label-candidates-runs').textContent).not.toContain('run-good');
     expect(screen.getByTestId('labelled-outputs').textContent).toContain('labelled pass');
+    judgeLabels.splice(0, judgeLabels.length);
+  });
+
+  it('lists written examples with what they changed and their label, apart from the production outputs', () => {
+    writtenOutputs.splice(0, writtenOutputs.length, {
+      id: 'w-1', basedOnAgentRunId: 'run-base', stepInput: { narrative: 'x' }, result: { grade: 'output of run-base, edited' },
+      note: 'Grade 4 written as 2.', origin: 'user', archived: false,
+    });
+    judgeLabels.splice(0, judgeLabels.length, { subject: { type: 'written_output', id: 'w-1' }, value: 0, comment: null });
+    openPanel([], []);
+
+    const row = screen.getByTestId('written-output');
+    expect(row.textContent).toContain('labelled fail');
+    expect(row.textContent).toContain('Grade 4 written as 2.');
+    expect(screen.getByTestId('written-output-changes').textContent).toBe('Changed: grade: "output of run-base" → "output of run-base, edited"');
+    expect(screen.queryByTestId('labelled-outputs')).toBeNull();
+    expect(screen.getByTestId('calibration-progress').textContent).toContain('1/10 labels · 1/2 fails');
+    fireEvent.click([...row.querySelectorAll('button')].find((button) => button.textContent === 'Pass')!);
+    expect(evaluation.labelOutput).toHaveBeenCalledWith({ evaluatorId: 'judge-1', writtenOutputId: 'w-1', passed: true });
+    writtenOutputs.splice(0, writtenOutputs.length);
     judgeLabels.splice(0, judgeLabels.length);
   });
 

@@ -548,6 +548,12 @@ import {
   ArchiveEvalCaseInputSchema,
   UpdateEvalCaseInputSchema,
   GetAgentRunIoInputSchema,
+  ListWrittenOutputsInputSchema,
+  ListWrittenOutputsOutputSchema,
+  CreateWrittenOutputInputSchema,
+  CreateWrittenOutputOutputSchema,
+  ArchiveWrittenOutputInputSchema,
+  WrittenOutputOutputSchema,
   GetAgentRunIoOutputSchema,
   ArchiveEvaluatorInputSchema,
   SetEvaluatorProductionInputSchema,
@@ -603,6 +609,12 @@ import {
   type ArchiveEvalCaseInput,
   type UpdateEvalCaseInput,
   type GetAgentRunIoInput,
+  type ListWrittenOutputsInput,
+  type ListWrittenOutputsOutput,
+  type CreateWrittenOutputInput,
+  type CreateWrittenOutputOutput,
+  type ArchiveWrittenOutputInput,
+  type WrittenOutputOutput,
   type GetAgentRunIoOutput,
   type ArchiveEvaluatorInput,
   type SetEvaluatorProductionInput,
@@ -1090,6 +1102,10 @@ export class Mediforce {
     listStepAgentRuns: (input: ListStepAgentRunsInput) => Promise<ListStepAgentRunsOutput>;
     /** What one Agent Run's step was given and what it returned. */
     getAgentRunIo: (input: GetAgentRunIoInput) => Promise<GetAgentRunIoOutput>;
+    /** A person's written examples of the step's output, labelled to calibrate a judge. */
+    listWrittenOutputs: (input: ListWrittenOutputsInput) => Promise<ListWrittenOutputsOutput>;
+    createWrittenOutput: (input: CreateWrittenOutputInput) => Promise<CreateWrittenOutputOutput>;
+    archiveWrittenOutput: (input: ArchiveWrittenOutputInput) => Promise<WrittenOutputOutput>;
     listCases: (input: ListEvalCasesInput) => Promise<ListEvalCasesOutput>;
     createCase: (input: CreateEvalCaseInput) => Promise<EvalCaseOutput>;
     createCaseFromAgentRun: (input: CreateEvalCaseFromAgentRunInput) => Promise<EvalCaseOutput>;
@@ -2564,6 +2580,25 @@ export class Mediforce {
         'POST', '/api/evaluation/evaluators/preview', PreviewEvaluatorInputSchema.parse(input),
         PreviewEvaluatorOutputSchema, 'mediforce.evaluation.previewEvaluator',
       ),
+      listWrittenOutputs: async (input) => {
+        const validated = ListWrittenOutputsInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflowName: validated.workflowName,
+          stepId: validated.stepId,
+          includeArchived: validated.includeArchived === undefined ? undefined : String(validated.includeArchived),
+        });
+        return this.getJson(`/api/evaluation/written-outputs${qs}`, ListWrittenOutputsOutputSchema, 'mediforce.evaluation.listWrittenOutputs');
+      },
+      createWrittenOutput: async (input) => this.sendJson(
+        'POST', '/api/evaluation/written-outputs', CreateWrittenOutputInputSchema.parse(input),
+        CreateWrittenOutputOutputSchema, 'mediforce.evaluation.createWrittenOutput',
+      ),
+      archiveWrittenOutput: async (input) => {
+        const { writtenOutputId, ...body } = ArchiveWrittenOutputInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/written-outputs/${encodeURIComponent(writtenOutputId)}/archive`, body,
+          WrittenOutputOutputSchema, 'mediforce.evaluation.archiveWrittenOutput');
+      },
       getAgentRunIo: async (input) => {
         const { agentRunId } = GetAgentRunIoInputSchema.parse(input);
         return this.getJson(`/api/evaluation/agent-runs/${encodeURIComponent(agentRunId)}/io`, GetAgentRunIoOutputSchema, 'mediforce.evaluation.getAgentRunIo');

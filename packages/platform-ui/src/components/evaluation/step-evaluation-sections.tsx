@@ -231,7 +231,7 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema, labelCandida
         )}
       </div>
       {labelling && check.kind === 'llm_judge' && (
-        <JudgeCalibrationPanel step={step} evaluator={evaluator} cases={labelCandidates.cases} runs={labelCandidates.runs} mayEdit={mayEdit} />
+        <JudgeCalibrationPanel step={step} evaluator={evaluator} cases={labelCandidates.cases} runs={labelCandidates.runs} stepOutputSchema={stepOutputSchema} mayEdit={mayEdit} />
       )}
       {editing ? (
         <div className="mt-2 space-y-1">

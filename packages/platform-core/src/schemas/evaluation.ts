@@ -272,6 +272,28 @@ export const EvalCaseSchema = EvaluatedStepSchema.extend({
   createdAt: z.iso.datetime(),
 });
 
+/**
+ * A person's own example of the Step's output for one input (ADR-0023 D9):
+ * labelled pass or fail for a judge where production has no such output —
+ * above all a failure nobody would run on purpose. Usually started from a
+ * production run's input and output with values changed. It is not an Eval
+ * Case: nothing re-runs it; a judge grades it only while being calibrated.
+ */
+export const WrittenOutputSchema = EvaluatedStepSchema.extend({
+  id: z.uuid(),
+  /** What the step was given; the production run's own input when started from one. */
+  stepInput: z.record(z.string(), z.unknown()).nullable(),
+  result: z.record(z.string(), z.unknown()),
+  /** The production run it was started from; null when written from nothing. */
+  basedOnAgentRunId: z.string().nullable(),
+  /** What it changed or shows, in words. */
+  note: z.string().max(2000).nullable(),
+  origin: EvaluationOriginSchema,
+  archived: z.boolean(),
+  createdBy: z.string().min(1),
+  createdAt: z.iso.datetime(),
+});
+
 /** A frozen set of a Step's Eval Cases; an Eval Run runs one of these. */
 export const EvalDatasetVersionSchema = EvaluatedStepSchema.extend({
   id: z.uuid(),
@@ -387,6 +409,7 @@ export type SourceApproval = z.infer<typeof SourceApprovalSchema>;
 export type JudgeCalibration = z.infer<typeof JudgeCalibrationSchema>;
 export type Evaluator = z.infer<typeof EvaluatorSchema>;
 export type EvaluatorVersion = z.infer<typeof EvaluatorVersionSchema>;
+export type WrittenOutput = z.infer<typeof WrittenOutputSchema>;
 export type EvalCaseInput = z.infer<typeof EvalCaseInputSchema>;
 export type EvalCaseExpectation = z.infer<typeof EvalCaseExpectationSchema>;
 export type EvalCasePerturbation = z.infer<typeof EvalCasePerturbationSchema>;

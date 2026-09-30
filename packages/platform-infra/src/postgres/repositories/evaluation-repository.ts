@@ -14,6 +14,7 @@ import {
   type EvalTrial,
   type EvalTrialStatus,
   EvalCaseSchema,
+  WrittenOutputSchema,
   EvalDatasetVersionSchema,
   EvaluationBriefSchema,
   EvaluatorSchema,
@@ -21,6 +22,7 @@ import {
   McpEvalPolicySchema,
   McpRecordingSchema,
   type EvalCase,
+  type WrittenOutput,
   type EvalDatasetVersion,
   type EvaluatedStep,
   type EvaluationBrief,
@@ -39,6 +41,7 @@ import type { Database } from '../client';
 import {
   evalAcceptanceCriteria,
   evalCases,
+  evalWrittenOutputs,
   evalDatasetVersions,
   evalMcpRecordings,
   evalOptimisations,
@@ -105,6 +108,11 @@ function toVersion(row: typeof evaluatorVersions.$inferSelect): EvaluatorVersion
     createdBy: row.createdBy,
     createdAt: row.createdAt.toISOString(),
   });
+}
+
+/** `archived` is kept in its column; the record carries it as written. */
+function toWrittenOutput(row: typeof evalWrittenOutputs.$inferSelect): WrittenOutput {
+  return WrittenOutputSchema.parse({ ...(row.record as object), archived: row.archived });
 }
 
 function toCase(row: typeof evalCases.$inferSelect): EvalCase {
@@ -351,6 +359,36 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
 
   async setCaseArchived(id: string, archived: boolean): Promise<void> {
     await this.db.update(evalCases).set({ archived }).where(eq(evalCases.id, id));
+  }
+
+  async createWrittenOutput(writtenOutput: WrittenOutput): Promise<WrittenOutput> {
+    const parsed = WrittenOutputSchema.parse(writtenOutput);
+    await this.db.insert(evalWrittenOutputs).values({
+      id: parsed.id,
+      workspace: parsed.namespace,
+      workflowName: parsed.workflowName,
+      stepId: parsed.stepId,
+      archived: parsed.archived,
+      record: parsed,
+      createdAt: new Date(parsed.createdAt),
+    });
+    return parsed;
+  }
+
+  async getWrittenOutput(id: string): Promise<WrittenOutput | null> {
+    const [row] = await this.db.select().from(evalWrittenOutputs).where(eq(evalWrittenOutputs.id, id)).limit(1);
+    return row === undefined ? null : toWrittenOutput(row);
+  }
+
+  async listWrittenOutputs(step: EvaluatedStep): Promise<WrittenOutput[]> {
+    const rows = await this.db.select().from(evalWrittenOutputs)
+      .where(onStep(evalWrittenOutputs, step))
+      .orderBy(desc(evalWrittenOutputs.createdAt), desc(evalWrittenOutputs.id));
+    return rows.map(toWrittenOutput);
+  }
+
+  async setWrittenOutputArchived(id: string, archived: boolean): Promise<void> {
+    await this.db.update(evalWrittenOutputs).set({ archived }).where(eq(evalWrittenOutputs.id, id));
   }
 
   async appendDatasetVersion(dataset: EvalDatasetVersion): Promise<EvalDatasetVersion> {
