@@ -409,7 +409,7 @@ function BuiltinCaseSuites({ step, evaluation }: { step: EvaluatedStep; evaluati
         </label>
         <p className="text-muted-foreground">{info.description}</p>
         <p className={graded ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-300'} data-testid="builtin-suite-grader">
-          Graded by the built-in &ldquo;{BUILTIN_CHECKS[info.grader].label}&rdquo; Evaluator{graded ? '.' : ' — this step has none yet: add it under Evaluators, or these cases grade nothing.'}
+          Graded by the built-in &ldquo;{BUILTIN_CHECKS[info.grader].label}&rdquo; Evaluator{graded ? '.' : ' — this step has none yet: add it under Evaluators to grade these cases.'}
         </p>
         {runs.length === 0 ? (
           <p className="text-muted-foreground">The step has no production runs to start from yet.</p>
