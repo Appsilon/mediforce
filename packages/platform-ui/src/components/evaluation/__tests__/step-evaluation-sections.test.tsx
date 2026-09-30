@@ -7,6 +7,7 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
     mutate: (value: unknown) => { void mutationFn(value); },
     isPending: false,
     error: null,
+    reset: () => undefined,
   }),
 }),);
 
@@ -207,6 +208,7 @@ describe('Evaluator view and edit', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     await waitFor(() => expect((screen.getByLabelText('Judge model') as HTMLSelectElement).disabled).toBe(false));
     expect((screen.getByLabelText('Evaluator name') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Type') as HTMLSelectElement).disabled).toBe(true);
 
     fireEvent.click(screen.getByRole('button', { name: 'Save as v2' }));
     expect(screen.getByText('Nothing changed.')).toBeTruthy();

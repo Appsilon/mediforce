@@ -361,8 +361,8 @@ export function CheckDetails({ check }: { check: EvaluatorCheck }) {
           <Detail label="Question for the judge"><pre className={cn(preClass, 'font-sans')}>{check.rubric}</pre></Detail>
           <Detail label="Verdicts">
             <ul>
-              {check.choices.map((choice) => (
-                <li key={choice.label}>
+              {check.choices.map((choice, index) => (
+                <li key={index}>
                   {choice.label} — {choice.value} ({choice.value >= JUDGE_PASS_VALUE ? 'passes' : 'fails'})
                 </li>
               ))}

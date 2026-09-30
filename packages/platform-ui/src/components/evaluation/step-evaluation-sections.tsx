@@ -1,10 +1,12 @@
 'use client';
 
 import * as React from 'react';
+import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
 import {
   CHAMPION_VARIANT_ID,
   EvalCaseInputPartSchema,
+  EvaluatorKindSchema,
   EvaluatorSeveritySchema,
   McpEvalServerPolicySchema,
   describeAcceptanceCriteria,
@@ -45,7 +47,6 @@ import {
   draftFromCheck,
   emptyCheckDraft,
   type CheckDraft,
-  type CheckDraftKind,
 } from './evaluator-check-editor';
 
 type StepEvaluation = ReturnType<typeof useStepEvaluation>;
@@ -196,12 +197,12 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
         <div className="mt-2 space-y-1">
           <p className="text-xs text-muted-foreground">
             Saving makes v{evaluator.latest.version + 1}; Scores already written keep the version that wrote them.
-            {check.kind === 'code' && ' Changed source needs approving again.'}
-            {check.kind === 'llm_judge' && ' A changed judge needs calibrating again.'}
+            {check.kind === 'code' && ' The new version needs its source approved again before it counts, whatever changed.'}
+            {check.kind === 'llm_judge' && ' The new version needs calibrating again before it counts, whatever changed.'}
           </p>
           <EvaluatorForm
             initial={{ name: evaluator.name, rule: evaluator.latest.rule, severity: evaluator.latest.severity, draft: draftFromCheck(check) }}
-            nameLocked
+            editing
             stepOutputSchema={stepOutputSchema}
             submitLabel={`Save as v${evaluator.latest.version + 1}`}
             pending={edit.isPending}
@@ -210,6 +211,7 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
             onCancel={() => {
               setEditing(false);
               setUnchanged(false);
+              edit.reset();
             }}
           />
         </div>
@@ -245,10 +247,13 @@ interface EvaluatorFormValues {
 }
 
 /** Name, severity, the kind of check and its fields. The kind comes from the dropdown, never typed. */
-function EvaluatorForm({ initial, nameLocked = false, stepOutputSchema, submitLabel, pending, error, onSubmit, onCancel }: {
+function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel, pending, error, onSubmit, onCancel }: {
   initial: EvaluatorFormValues;
-  /** An Evaluator's name is its stable handle: set once, never renamed. */
-  nameLocked?: boolean;
+  /**
+   * Editing an existing Evaluator: its name and type stay. The name is its
+   * stable handle, and its Scores, drift and production series are one kind of check.
+   */
+  editing?: boolean;
   stepOutputSchema: AgentOutputSchema | undefined;
   submitLabel: string;
   pending: boolean;
@@ -277,7 +282,7 @@ function EvaluatorForm({ initial, nameLocked = false, stepOutputSchema, submitLa
           placeholder="Name, e.g. grades-match-ctcae"
           title="Also names the Scores it writes: lowercase letters, digits and dashes."
           value={values.name}
-          disabled={nameLocked}
+          disabled={editing}
           onChange={(event) => setValues({ ...values, name: toEvaluatorName(event.target.value) })}
         />
         <select aria-label="Severity" className={inputClass} value={values.severity} onChange={(event) => setValues({ ...values, severity: EvaluatorSeveritySchema.parse(event.target.value) })}>
@@ -287,12 +292,13 @@ function EvaluatorForm({ initial, nameLocked = false, stepOutputSchema, submitLa
           aria-label="Type"
           className={inputClass}
           value={values.draft.kind}
+          disabled={editing}
           onChange={(event) => {
-            const kind = event.target.value as CheckDraftKind;
+            const kind = EvaluatorKindSchema.parse(event.target.value);
             setValues({ ...values, draft: emptyCheckDraft(kind, stepOutputSchema) });
           }}
         >
-          {(Object.keys(CHECK_KINDS) as CheckDraftKind[]).map((kind) => <option key={kind} value={kind}>{CHECK_KINDS[kind].label}</option>)}
+          {EvaluatorKindSchema.options.map((kind) => <option key={kind} value={kind}>{CHECK_KINDS[kind].label}</option>)}
         </select>
       </div>
       <p className="text-xs text-muted-foreground">{CHECK_KINDS[values.draft.kind].description}</p>
@@ -335,14 +341,18 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
           pending={create.isPending}
           error={create.error?.message ?? null}
           onSubmit={(values) => create.mutate(values, { onSuccess: () => setAdding(false) })}
-          onCancel={() => setAdding(false)}
+          onCancel={() => {
+            setAdding(false);
+            create.reset();
+          }}
         />
       )}
     </Section>
   );
 }
 
-type RedTeamSuite = (typeof RED_TEAM_SUITES)[number];
+const RedTeamSuiteSchema = z.enum(RED_TEAM_SUITES);
+type RedTeamSuite = z.infer<typeof RedTeamSuiteSchema>;
 
 const RED_TEAM_SUITE_INFO: Record<RedTeamSuite, { label: string; description: string; grader: BuiltinCheckName; target: string }> = {
   prompt_injection: {
@@ -393,7 +403,7 @@ function BuiltinCaseSuites({ step, evaluation }: { step: EvaluatedStep; evaluati
           The platform writes these cases for you from one production run: it changes one field of that run&apos;s input and expects the output the run gave. A built-in Evaluator grades each suite.
         </p>
         <label className="flex items-center gap-1">Suite
-          <select aria-label="Suite" className={inputClass} value={suite} onChange={(event) => setSuite(event.target.value as RedTeamSuite)}>
+          <select aria-label="Suite" className={inputClass} value={suite} onChange={(event) => setSuite(RedTeamSuiteSchema.parse(event.target.value))}>
             {RED_TEAM_SUITES.map((name) => <option key={name} value={name}>{RED_TEAM_SUITE_INFO[name].label}</option>)}
           </select>
         </label>
