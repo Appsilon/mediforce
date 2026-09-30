@@ -962,6 +962,7 @@ export function parseWorkflowTemplate(input: unknown) {
 export type ContainerConfig = z.infer<typeof ContainerSchema>;
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
 export type AgentExample = z.infer<typeof AgentExampleSchema>;
+export type AgentOutputSchema = z.infer<typeof AgentOutputSchemaSchema>;
 export type OutputSchemaPropertyType = z.infer<typeof OutputSchemaPropertyTypeSchema>;
 export type ScriptStepConfig = z.infer<typeof ScriptStepConfigSchema>;
 export type DatabricksJobConfig = z.infer<typeof DatabricksJobConfigSchema>;

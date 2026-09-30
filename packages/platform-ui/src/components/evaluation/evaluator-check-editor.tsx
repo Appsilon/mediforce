@@ -7,6 +7,7 @@ import {
   CodeCheckSchema,
   EvaluatorCheckSchema,
   JUDGE_PASS_VALUE,
+  type AgentOutputSchema,
   type BuiltinCheckName,
   type EvaluatorCheck,
   type JudgeChoice,
@@ -90,9 +91,10 @@ const MIN_VERDICTS = 2;
 const MAX_VERDICTS = 6;
 const DEFAULT_JUDGE_MODEL = 'anthropic/claude-sonnet-4';
 
-export function emptyCheckDraft(kind: CheckDraftKind): CheckDraft {
+/** The step's own `agent.outputSchema`, when it declares one, is the natural start for a schema check. */
+export function emptyCheckDraft(kind: CheckDraftKind, stepOutputSchema?: AgentOutputSchema): CheckDraft {
   switch (kind) {
-    case 'schema': return { kind, schemaText: JSON.stringify({ type: 'object', required: [] }, null, 2) };
+    case 'schema': return { kind, schemaText: JSON.stringify(stepOutputSchema ?? { type: 'object', required: [] }, null, 2) };
     case 'code': return { kind, runtime: 'python', source: CODE_TEMPLATES.python };
     case 'builtin': return { kind, name: 'phi_leak', keys: '' };
     case 'llm_judge': return { kind, model: DEFAULT_JUDGE_MODEL, rubric: '', choices: VERDICT_PRESETS[0]!.choices };
@@ -147,19 +149,35 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 /** The fields of one kind of check. The kind itself is picked outside, in the form's type dropdown. */
-export function CheckEditor({ draft, onChange }: { draft: CheckDraft; onChange: (draft: CheckDraft) => void }) {
+export function CheckEditor({ draft, onChange, stepOutputSchema }: {
+  draft: CheckDraft;
+  onChange: (draft: CheckDraft) => void;
+  stepOutputSchema?: AgentOutputSchema;
+}) {
   switch (draft.kind) {
-    case 'schema':
+    case 'schema': {
+      const stepSchemaText = stepOutputSchema === undefined ? null : JSON.stringify(stepOutputSchema, null, 2);
       return (
-        <Field label="JSON Schema" hint="Checked: type, required and each property's type. Other keywords are ignored.">
-          <textarea
-            aria-label="JSON Schema"
-            className={cn(inputClass, 'w-full min-h-32 font-mono text-xs')}
-            value={draft.schemaText}
-            onChange={(event) => onChange({ ...draft, schemaText: event.target.value })}
-          />
-        </Field>
+        <div className="space-y-1">
+          {stepSchemaText !== null && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {draft.schemaText === stepSchemaText ? 'Starts from the step\'s output schema — tighten it here.' : 'The step declares an output schema.'}
+              {draft.schemaText !== stepSchemaText && (
+                <button type="button" className={buttonClass} onClick={() => onChange({ ...draft, schemaText: stepSchemaText })}>Use the step&apos;s output schema</button>
+              )}
+            </div>
+          )}
+          <Field label="JSON Schema" hint="Checked: type, required and each property's type. Other keywords are ignored.">
+            <textarea
+              aria-label="JSON Schema"
+              className={cn(inputClass, 'w-full min-h-32 font-mono text-xs')}
+              value={draft.schemaText}
+              onChange={(event) => onChange({ ...draft, schemaText: event.target.value })}
+            />
+          </Field>
+        </div>
       );
+    }
     case 'code':
       return (
         <div className="space-y-2">
