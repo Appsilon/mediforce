@@ -187,6 +187,7 @@ export {
   createEvalCasesFromLabels,
   archiveEvalCase,
   updateEvalCase,
+  getAgentRunIo,
   listEvalDatasets,
   freezeEvalDataset,
   getMcpEvalPolicy,

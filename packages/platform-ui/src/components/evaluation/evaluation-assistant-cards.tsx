@@ -13,12 +13,12 @@ import {
 import type { EvaluatorSelfTest, ProposalView } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
-import { useAgentRun } from '@/hooks/use-agent-runs';
 import { useEvaluatorLabels, useStepEvaluationMutation, useStepEvaluators } from '@/hooks/use-step-evaluation';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { describePatch } from './eval-run-report';
+import { RunInputOutput } from './run-input-output';
 
 export type ProposalStatus = 'open' | 'accepted' | 'rejected';
 
@@ -339,14 +339,12 @@ function OutputToLabel({ step, evaluatorId, output, label, mayEdit }: {
   mayEdit: boolean;
 }) {
   const [comment, setComment] = React.useState('');
-  const { data: run } = useAgentRun(output.agentRunId);
   const save = useStepEvaluationMutation(step, (passed: boolean) => mediforce.evaluation.labelOutput({
     evaluatorId,
     agentRunId: output.agentRunId,
     passed,
     ...(comment.trim() === '' ? {} : { comment: comment.trim() }),
   }));
-  const result = run?.envelope?.result;
   return (
     <li className="border-t pt-2 first:border-t-0 first:pt-0" data-testid="label-output">
       <div className="flex items-center gap-1.5">
@@ -358,9 +356,7 @@ function OutputToLabel({ step, evaluatorId, output, label, mayEdit }: {
         )}
       </div>
       <p className="text-muted-foreground">{output.why}</p>
-      <pre className="mt-1 max-h-40 overflow-auto rounded bg-muted p-1.5 whitespace-pre-wrap">
-        {result === undefined ? 'Loading output…' : JSON.stringify(result, null, 2)}
-      </pre>
+      <div className="mt-1"><RunInputOutput agentRunId={output.agentRunId} outputTitle="Output to label" /></div>
       {mayEdit && (
         <div className="mt-1 flex gap-1.5">
           <input

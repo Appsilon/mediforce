@@ -3,6 +3,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { BriefSection, CasesSection, DriftAlert, EvaluatorsSection, McpPolicySection, caseFromFile, datasetDrift, toEvaluatorName } from '../step-evaluation-sections';
 
 vi.mock('@/hooks/use-step-evaluation', () => ({
+  useAgentRunIo: (agentRunId: string | null) => ({
+    isError: false,
+    error: null,
+    data: agentRunId === null ? undefined : { agentRunId, status: 'completed', stepInput: { narrative: `input of ${agentRunId}` }, result: { grade: `output of ${agentRunId}` }, reasoningSummary: null, confidence: null },
+  }),
   useStepEvaluationMutation: (_step: unknown, mutationFn: (value: unknown) => unknown) => ({
     mutate: (value: unknown) => { void mutationFn(value); },
     isPending: false,
@@ -321,11 +326,24 @@ describe('Production runs to add as Eval Cases', () => {
     const fetchNextPage = vi.fn();
     render(<CasesSection step={step} evaluation={withRuns([[agentRun('run-a', 'Graded 3 events.')], [agentRun('run-b', 'No events found.')]], { hasNextPage: true, fetchNextPage })} mayEdit={true} />);
 
-    expect(screen.getByText('Production runs to add (2+)')).toBeTruthy();
+    expect(screen.getByText('Production runs to add as Eval Cases (2+)')).toBeTruthy();
     expect(screen.getByTestId('harvestable-runs').textContent).toContain('Graded 3 events.');
     expect(screen.getByTestId('harvestable-runs').textContent).toContain('No events found.');
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
     expect(fetchNextPage).toHaveBeenCalled();
+  });
+
+  it('shows a run\'s input and output before it is added, fetched only when opened', () => {
+    render(<CasesSection step={step} evaluation={withRuns([[agentRun('run-a', 'Graded 3 events.')]], { hasNextPage: false })} mayEdit={true} />);
+    expect(screen.queryByTestId('run-input-output')).toBeNull();
+
+    const details = screen.getByText('Input and output').closest('details')!;
+    details.open = true;
+    fireEvent(details, new Event('toggle'));
+    expect(screen.getByTestId('run-input').textContent).toContain('input of run-a');
+    expect(screen.getByTestId('run-output').textContent).toContain('output of run-a');
+    expect(screen.getByRole('button', { name: 'Positive case' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Negative case' })).toBeTruthy();
   });
 
   it('opens a run\'s log', () => {
@@ -356,6 +374,16 @@ describe('Eval Case view and edit', () => {
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Source run log' }));
     expect(screen.getByTestId('agent-log-panel').textContent).toBe('run-00000001');
+  });
+
+  it('shows the input and output of the run a production case was marked from', () => {
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ expectation: 'negative' }))} mayEdit={false} />);
+    const details = screen.getByTestId('eval-case-details') as HTMLDetailsElement;
+    details.open = true;
+    fireEvent(details, new Event('toggle'));
+
+    expect(details.textContent).toContain('The run you marked negative');
+    expect(screen.getByTestId('run-output').textContent).toContain('output of run-00000001');
   });
 
   it('saves only what changed', () => {

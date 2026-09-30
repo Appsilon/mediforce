@@ -209,6 +209,8 @@ export const queryKeys = {
   },
   /** One Eval Run with its trials and report — its own domain so it polls alone while running. */
   evalRun: (evalRunId: string) => ['eval-run', evalRunId] as const,
+  /** What one Agent Run's step was given and returned; fixed once the run finished. */
+  agentRunIo: (agentRunId: string) => ['agent-run-io', agentRunId] as const,
   /** One GEPA optimisation with its ranked candidates — polled alone while it proposes or evaluates. */
   optimisation: (optimisationId: string) => ['eval-optimisation', optimisationId] as const,
   namespaceAuditEvents: (

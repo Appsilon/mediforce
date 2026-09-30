@@ -4,6 +4,7 @@ import {
   EvalCaseOutputSchema,
   EvaluatorOutputSchema,
   FreezeEvalDatasetOutputSchema,
+  GetAgentRunIoOutputSchema,
   GetMcpEvalPolicyOutputSchema,
   ListStepAgentRunsOutputSchema,
   ListEvalCasesOutputSchema,
@@ -233,6 +234,18 @@ test.describe('Step Evaluation entities — API E2E', () => {
     );
     const { cases } = ListEvalCasesOutputSchema.parse(await casesRes.json());
     expect(cases.find((listed) => listed.id === evalCase.id)?.archived).toBe(false);
+  });
+
+  test('a production run reads as its input/output pair, only inside its workspace', async ({ request }) => {
+    const res = await request.get(`/api/evaluation/agent-runs/${agentRunId}/io`, { headers: AUTH_HEADERS });
+    expect(res.status(), await res.text()).toBe(200);
+    const io = GetAgentRunIoOutputSchema.parse(await res.json());
+    expect(io.agentRunId).toBe(agentRunId);
+    expect(io.status).toBe('completed');
+    expect(io.result).toHaveProperty('mock');
+
+    const outsider = await request.get(`/api/evaluation/agent-runs/${agentRunId}/io`, { headers: sessionCookieHeaders(callers.outsider) });
+    expect(outsider.status(), await outsider.text()).toBe(404);
   });
 
   test('editing a case replaces it, and the Dataset frozen before keeps the case it froze', async ({ request }) => {

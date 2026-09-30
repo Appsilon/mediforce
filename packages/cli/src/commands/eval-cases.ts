@@ -22,6 +22,23 @@ export const evalCaseListCommand = defineCommand({
   },
 });
 
+export const evalRunIoCommand = defineCommand({
+  name: 'mediforce eval run-io',
+  description: 'Show what an Agent Run\'s step was given and what it returned — the pair a case or a label is about.',
+  args: { agentRunId: { type: 'positional', required: true, description: 'Agent Run id' } },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.getAgentRunIo({ agentRunId: args.agentRunId });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    output.stdout(`Agent Run ${result.agentRunId} (${result.status})`);
+    output.stdout(`Input:\n${JSON.stringify(result.stepInput, null, 2)}`);
+    output.stdout(`Output:\n${JSON.stringify(result.result, null, 2)}`);
+    return 0;
+  },
+});
+
 export const evalCaseAddCommand = defineCommand({
   name: 'mediforce eval case-add',
   description: 'Add a hand-written Eval Case from a JSON file: { name, input, expectation, notes?, split? }.',
