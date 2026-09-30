@@ -360,6 +360,12 @@ recheck, needs `--expectation`. Cases are `dev` or
 `holdout`, carry a *contains production data* flag, and an `origin` — `user`,
 or `assistant` for an accepted Evaluation Assistant proposal.
 
+In the Evaluation tab, **Eval Cases → Production runs to add** lists the Step's
+finished production runs not yet harvested, newest first and a page at a time
+(**Load more**; `GET /api/evaluation/agent-runs` takes the previous page's
+`nextCursor` as `cursor`). Each shows its reasoning summary, and **Log** opens
+the run's execution log before you add it as good or bad.
+
 A **synthesized** case (`case-perturb --file`, `POST /api/evaluation/cases/perturbed`)
 is a production run's case with deliberate changes, and records what kind
 (`missing_file`, `extra_file`, `renamed_columns`, `edge_values`,

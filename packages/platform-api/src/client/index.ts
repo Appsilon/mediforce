@@ -2561,6 +2561,7 @@ export class Mediforce {
           workflowName: validated.workflowName,
           stepId: validated.stepId,
           limit: String(validated.limit),
+          cursor: validated.cursor,
         });
         return this.getJson(`/api/evaluation/agent-runs${qs}`, ListStepAgentRunsOutputSchema, 'mediforce.evaluation.listStepAgentRuns');
       },

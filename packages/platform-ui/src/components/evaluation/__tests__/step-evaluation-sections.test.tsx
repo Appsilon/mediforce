@@ -19,6 +19,10 @@ const evaluation = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
 
+vi.mock('@/components/agents/agent-log-panel', () => ({
+  AgentLogPanel: ({ run }: { run: { id: string } | null }) => (run === null ? null : <div data-testid="agent-log-panel">{run.id}</div>),
+}));
+
 vi.mock('@/lib/api-fetch', () => ({
   apiFetch: async () => new Response(JSON.stringify({ models: [] })),
 }));
@@ -222,10 +226,10 @@ describe('Evaluator view and edit', () => {
 
 describe('Built-in case suites', () => {
   const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
-  const run = { id: 'run-00000001', status: 'completed', startedAt: '2026-09-24T08:00:00.000Z' };
+  const run = { id: 'run-00000001', status: 'completed', fallbackReason: null, envelope: null, startedAt: '2026-09-24T08:00:00.000Z' };
   const stepEvaluation = (evaluators: unknown[]) => ({
     cases: { isLoading: false, data: { cases: [] } },
-    agentRuns: { data: { runs: [run] } },
+    agentRuns: { data: { pages: [{ runs: [run] }] }, hasNextPage: false },
     datasets: { data: { datasets: [] } },
     evaluators: { data: { evaluators } },
   }) as never;
@@ -259,5 +263,38 @@ describe('Built-in case suites', () => {
     expect(evaluation.createRedTeamCases).toHaveBeenCalledWith({
       ...step, suite: 'robustness', baseAgentRunId: run.id, target: { part: 'triggerPayload', path: ['document', 'text'] },
     });
+  });
+});
+
+describe('Production runs to add as Eval Cases', () => {
+  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const agentRun = (id: string, summary: string) => ({
+    id, status: 'completed', fallbackReason: null, startedAt: '2026-09-24T08:00:00.000Z', envelope: { reasoning_summary: summary },
+  });
+  const withRuns = (pages: unknown[][], more: { hasNextPage: boolean; fetchNextPage?: () => void }) => ({
+    cases: { isLoading: false, data: { cases: [] } },
+    agentRuns: { data: { pages: pages.map((runs) => ({ runs })) }, isFetchingNextPage: false, fetchNextPage: () => undefined, ...more },
+    datasets: { data: { datasets: [] } },
+    evaluators: { data: { evaluators: [] } },
+  }) as never;
+
+  it('lists every loaded page with what each run did, and loads more on request', () => {
+    const fetchNextPage = vi.fn();
+    render(<CasesSection step={step} evaluation={withRuns([[agentRun('run-a', 'Graded 3 events.')], [agentRun('run-b', 'No events found.')]], { hasNextPage: true, fetchNextPage })} mayEdit={true} />);
+
+    expect(screen.getByText('Production runs to add (2+)')).toBeTruthy();
+    expect(screen.getByTestId('harvestable-runs').textContent).toContain('Graded 3 events.');
+    expect(screen.getByTestId('harvestable-runs').textContent).toContain('No events found.');
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+    expect(fetchNextPage).toHaveBeenCalled();
+  });
+
+  it('opens a run\'s log', () => {
+    render(<CasesSection step={step} evaluation={withRuns([[agentRun('run-a', 'Graded 3 events.')]], { hasNextPage: false })} mayEdit={true} />);
+
+    expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
+    expect(screen.queryByTestId('agent-log-panel')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Log' }));
+    expect(screen.getByTestId('agent-log-panel').textContent).toBe('run-a');
   });
 });

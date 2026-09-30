@@ -16,6 +16,20 @@ describe('listStepAgentRuns', () => {
     expect(runs.map((run) => run.id)).toEqual([UNGRADED_RUN, GRADED_RUN]);
   });
 
+  it('pages through the finished runs by cursor, skipping running ones without losing any', async () => {
+    const fixture = await evaluationFixture();
+    await fixture.agentRunRepo.create(buildAgentRun({
+      id: 'still-running', processInstanceId: 'run-graded', stepId: 'grade-aes', status: 'running', startedAt: '2026-09-22T11:00:00.000Z',
+    }));
+
+    const first = await listStepAgentRuns({ ...STEP, limit: 1 }, fixture.scope());
+    expect(first.runs.map((run) => run.id)).toEqual([UNGRADED_RUN]);
+    expect(first.nextCursor).toEqual(expect.any(String));
+
+    const second = await listStepAgentRuns({ ...STEP, limit: 1, cursor: first.nextCursor }, fixture.scope());
+    expect(second).toEqual({ runs: [expect.objectContaining({ id: GRADED_RUN })] });
+  });
+
   it('reads as missing from another workspace', async () => {
     const fixture = await evaluationFixture();
     await expect(listStepAgentRuns({ ...STEP, limit: 20 }, fixture.scope(userCaller('outsider', ['pharma-b']))))

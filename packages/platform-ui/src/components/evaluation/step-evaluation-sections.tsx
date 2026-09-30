@@ -13,6 +13,7 @@ import {
   describeMcpPolicy,
   type AcceptanceCriteria,
   type AgentOutputSchema,
+  type AgentRun,
   type BuiltinCheckName,
   type EvalCaseInputPart,
   type EvaluatedStep,
@@ -34,6 +35,7 @@ import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
+import { AgentLogPanel } from '@/components/agents/agent-log-panel';
 import { useEvalRun, useOptimisation, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { EvalRunReport, describePatch } from './eval-run-report';
 import { QualificationStatusChip } from './step-qualification-badge';
@@ -67,6 +69,11 @@ function Section({ title, children, action }: { title: string; children: React.R
 
 function Loading() {
   return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+}
+
+/** Every production run of the Step loaded so far, newest first. */
+function loadedAgentRuns(evaluation: StepEvaluation): AgentRun[] {
+  return evaluation.agentRuns.data?.pages.flatMap((page) => page.runs) ?? [];
 }
 
 /** The Step's context of use (D16), versioned on every save. */
@@ -383,7 +390,7 @@ const INPUT_PARTS: Record<EvalCaseInputPart, string> = {
  * platform writes the cases itself, each graded by a built-in Evaluator.
  */
 function BuiltinCaseSuites({ step, evaluation }: { step: EvaluatedStep; evaluation: StepEvaluation }) {
-  const runs = evaluation.agentRuns.data?.runs ?? [];
+  const runs = loadedAgentRuns(evaluation);
   const evaluators = evaluation.evaluators.data?.evaluators ?? [];
   const [suite, setSuite] = React.useState<RedTeamSuite>('prompt_injection');
   const [runId, setRunId] = React.useState('');
@@ -470,8 +477,9 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
   const freeze = useStepEvaluationMutation(step, () => mediforce.evaluation.freezeDataset(step));
   const cases = evaluation.cases.data?.cases ?? [];
   const harvested = new Set(cases.filter((evalCase) => evalCase.source === 'production').map((evalCase) => evalCase.sourceAgentRunId));
-  const runs = (evaluation.agentRuns.data?.runs ?? []).filter((run) => !harvested.has(run.id));
+  const runs = loadedAgentRuns(evaluation).filter((run) => !harvested.has(run.id));
   const [latest] = evaluation.datasets.data?.datasets ?? [];
+  const [logRun, setLogRun] = React.useState<AgentRun | null>(null);
 
   return (
     <Section
@@ -498,22 +506,40 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
       )}
       {mayEdit && runs.length > 0 && (
         <details className="text-sm">
-          <summary className="cursor-pointer text-xs text-muted-foreground">Recent production runs ({runs.length})</summary>
-          <ul className="mt-2 space-y-1">
+          <summary className="cursor-pointer text-xs text-muted-foreground">
+            Production runs to add ({runs.length}{evaluation.agentRuns.hasNextPage ? '+' : ''})
+          </summary>
+          <ul className="mt-2 max-h-96 space-y-1 overflow-y-auto pr-1" data-testid="harvestable-runs">
             {runs.map((run) => (
-              <li key={run.id} className="flex items-center gap-2 text-xs">
-                <span className="font-mono">{run.id.slice(0, 8)}</span>
-                <span className="text-muted-foreground">{run.status} · {run.startedAt.slice(0, 16).replace('T', ' ')}</span>
-                <span className="ml-auto flex gap-1">
-                  <button type="button" className={buttonClass} onClick={() => harvest.mutate({ agentRunId: run.id, expectation: 'positive' })}>Add as good</button>
-                  <button type="button" className={buttonClass} onClick={() => harvest.mutate({ agentRunId: run.id, expectation: 'negative' })}>Add as bad</button>
-                </span>
+              <li key={run.id} className="rounded border px-2 py-1.5 text-xs">
+                <div className="flex items-center gap-2">
+                  <span>{run.startedAt.slice(0, 16).replace('T', ' ')}</span>
+                  <span className="text-muted-foreground">{run.status}{run.fallbackReason === null ? '' : ` · ${run.fallbackReason}`}</span>
+                  <span className="font-mono text-muted-foreground" title={run.id}>{run.id.slice(0, 8)}</span>
+                  <span className="ml-auto flex shrink-0 gap-1">
+                    <button type="button" className={buttonClass} onClick={() => setLogRun(run)}>Log</button>
+                    <button type="button" className={buttonClass} onClick={() => harvest.mutate({ agentRunId: run.id, expectation: 'positive' })}>Add as good</button>
+                    <button type="button" className={buttonClass} onClick={() => harvest.mutate({ agentRunId: run.id, expectation: 'negative' })}>Add as bad</button>
+                  </span>
+                </div>
+                {run.envelope !== null && run.envelope.reasoning_summary !== '' && (
+                  <p className="mt-1 line-clamp-2 text-muted-foreground" title={run.envelope.reasoning_summary}>{run.envelope.reasoning_summary}</p>
+                )}
               </li>
             ))}
           </ul>
+          {evaluation.agentRuns.hasNextPage && (
+            <button
+              type="button"
+              className={cn(buttonClass, 'mt-2')}
+              disabled={evaluation.agentRuns.isFetchingNextPage}
+              onClick={() => void evaluation.agentRuns.fetchNextPage()}
+            >{evaluation.agentRuns.isFetchingNextPage ? 'Loading…' : 'Load more'}</button>
+          )}
           {harvest.error !== null && <p className="mt-1 text-xs text-destructive">{harvest.error.message}</p>}
         </details>
       )}
+      <AgentLogPanel run={logRun} onClose={() => setLogRun(null)} />
       {mayEdit && <BuiltinCaseSuites step={step} evaluation={evaluation} />}
     </Section>
   );
