@@ -41,7 +41,7 @@ describe('PluginRegistry.list()', () => {
 
   it('[DATA] returns {name, metadata} for plugin with metadata', () => {
     const plugin = makeMockPluginWithMetadata(testMetadata);
-    registry.register('data-analyzer', plugin);
+    registry.register('data-analyzer', () => plugin);
 
     const result = registry.list();
     expect(result).toHaveLength(1);
@@ -53,7 +53,7 @@ describe('PluginRegistry.list()', () => {
 
   it('[DATA] returns {name, metadata: undefined} for plugin without metadata', () => {
     const plugin = makeMockPlugin();
-    registry.register('basic-plugin', plugin);
+    registry.register('basic-plugin', () => plugin);
 
     const result = registry.list();
     expect(result).toHaveLength(1);
@@ -64,8 +64,8 @@ describe('PluginRegistry.list()', () => {
   });
 
   it('[DATA] returns all registered plugins', () => {
-    registry.register('plugin-a', makeMockPlugin());
-    registry.register('plugin-b', makeMockPluginWithMetadata(testMetadata));
+    registry.register('plugin-a', makeMockPlugin);
+    registry.register('plugin-b', () => makeMockPluginWithMetadata(testMetadata));
 
     const result = registry.list();
     expect(result).toHaveLength(2);
@@ -73,5 +73,17 @@ describe('PluginRegistry.list()', () => {
     const names = result.map((p) => p.name);
     expect(names).toContain('plugin-a');
     expect(names).toContain('plugin-b');
+  });
+});
+
+describe('PluginRegistry.get()', () => {
+  it('[DATA] returns a fresh plugin per call so concurrent runs never share state', () => {
+    const registry = new PluginRegistry();
+    registry.register('stateful', makeMockPlugin);
+
+    const first = registry.get('stateful');
+    const second = registry.get('stateful');
+
+    expect(first).not.toBe(second);
   });
 });

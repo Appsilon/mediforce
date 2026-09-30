@@ -108,8 +108,8 @@ export type {
   CommitStepOptions,
   CommitStepResult,
 } from './workspace/workspace-manager';
-export { WorkspaceReader } from './workspace/workspace-reader';
-export type { OutputFileEntry, WorkspaceReaderInit } from './workspace/workspace-reader';
+export { WorkspaceReader, listCommitFiles, readCommitFile } from './workspace/workspace-reader';
+export type { CommitFileEntry, OutputFileEntry, WorkspaceReaderInit } from './workspace/workspace-reader';
 export {
   copyOutputFilesIntoWorkspace,
   INTERNAL_OUTPUT_FILE_NAMES,

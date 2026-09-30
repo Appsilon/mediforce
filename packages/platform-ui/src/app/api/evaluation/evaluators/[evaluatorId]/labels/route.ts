@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import { createRouteAdapter } from '@/lib/route-adapter';
-import { labelEvaluatorOutput } from '@mediforce/platform-api/handlers';
-import { LabelEvaluatorOutputInputSchema } from '@mediforce/platform-api/contract';
+import { labelEvaluatorOutput, listEvaluatorLabels } from '@mediforce/platform-api/handlers';
+import { LabelEvaluatorOutputInputSchema, ListEvaluatorLabelsInputSchema } from '@mediforce/platform-api/contract';
 
 interface RouteContext {
   params: Promise<{ evaluatorId: string }>;
@@ -16,4 +16,11 @@ export const POST = createRouteAdapter<typeof LabelEvaluatorOutputInputSchema, z
   }),
   labelEvaluatorOutput,
   { successStatus: 201 },
+);
+
+/** GET /api/evaluation/evaluators/:evaluatorId/labels — The newest human label per Agent Run, newest first. */
+export const GET = createRouteAdapter<typeof ListEvaluatorLabelsInputSchema, z.infer<typeof ListEvaluatorLabelsInputSchema>, unknown, RouteContext>(
+  ListEvaluatorLabelsInputSchema,
+  async (_req, ctx) => ({ evaluatorId: (await ctx.params).evaluatorId }),
+  listEvaluatorLabels,
 );
