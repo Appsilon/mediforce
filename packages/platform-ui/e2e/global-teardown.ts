@@ -12,6 +12,12 @@ async function globalTeardown(_config: FullConfig): Promise<void> {
     console.warn(`[global-teardown] mock OAuth server stop failed: ${String(err)}`);
   }
   try {
+    await globalThis.__mockOpenRouterHandle?.stop();
+  } catch (err: unknown) {
+    // eslint-disable-next-line no-console
+    console.warn(`[global-teardown] mock OpenRouter stop failed: ${String(err)}`);
+  }
+  try {
     fs.rmSync(OAUTH_URL_FILE, { force: true });
   } catch {
     // non-fatal

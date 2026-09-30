@@ -46,6 +46,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
         notes: null,
         split: 'dev',
         containsProductionData: false,
+        origin: 'user',
       }, scope);
     }
     await freezeEvalDataset(STEP, scope);

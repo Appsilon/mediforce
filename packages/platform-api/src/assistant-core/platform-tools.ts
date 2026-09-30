@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import { HandlerError } from '../errors';
+import { parseToolArguments } from './tool-arguments';
 
 export interface PlatformToolCall<TName extends string> {
   readonly toolName: string;
@@ -25,12 +26,9 @@ export async function runPlatformTool<TName extends string>(call: PlatformToolCa
     return { error: `Unknown tool '${toolName}'. Platform tools: ${valid}.` };
   }
   const name = toolName as TName;
-  const parsed = tools[name].safeParse(rawArguments);
-  if (!parsed.success) {
-    const issues = parsed.error.issues
-      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-      .join('; ');
-    return { error: `Invalid arguments for '${toolName}': ${issues}` };
+  const parsed = parseToolArguments(toolName, tools[name], rawArguments);
+  if (parsed.ok === false) {
+    return { error: parsed.error, validationError: parsed.validationError, expectedArguments: parsed.expectedArguments };
   }
 
   try {

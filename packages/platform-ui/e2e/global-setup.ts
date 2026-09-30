@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { FullConfig } from '@playwright/test';
 import { startMockOAuthServer, type MockOAuthServerHandle } from './helpers/mock-oauth-server';
+import { startMockOpenRouter, type MockOpenRouterHandle } from './helpers/mock-openrouter-server';
 
 /** PATH for spawned tooling (drizzle-kit, pnpm). Homebrew installs these under
  *  /opt/homebrew/bin on Apple Silicon macOS, but that directory is absent on
@@ -35,6 +36,8 @@ const OAUTH_URL_FILE = path.join(__dirname, '.mock-oauth-url');
 declare global {
   // eslint-disable-next-line no-var
   var __mockOAuthHandle: MockOAuthServerHandle | undefined;
+  // eslint-disable-next-line no-var
+  var __mockOpenRouterHandle: MockOpenRouterHandle | undefined;
 }
 
 async function globalSetup(_config: FullConfig): Promise<void> {
@@ -44,6 +47,8 @@ async function globalSetup(_config: FullConfig): Promise<void> {
   fs.writeFileSync(OAUTH_URL_FILE, handle.baseUrl, 'utf8');
   // eslint-disable-next-line no-console
   console.log(`[global-setup] mock OAuth server at ${handle.baseUrl} (url file: ${OAUTH_URL_FILE})`);
+  // Assistant turns and LLM judges answer from a script (helpers/mock-openrouter-server.ts).
+  globalThis.__mockOpenRouterHandle = await startMockOpenRouter();
 }
 
 export default globalSetup;
