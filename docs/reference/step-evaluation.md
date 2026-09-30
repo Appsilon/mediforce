@@ -175,7 +175,10 @@ limit.
 
 A short text per Step — what it is for, who relies on its output, which
 failures matter most. Every write is a new version. The web tab displays the
-text as Markdown; the stored value remains the original text.
+text as Markdown; the stored value remains the original text. An Eval Run
+freezes the Brief version in force when it is prepared, and a Step
+Qualification cites that version as its context-of-use statement, so a step
+needs a Brief before it can be qualified.
 `mediforce eval brief-get|brief-set`, `GET|POST /api/evaluation/briefs`.
 
 ## Evaluators
@@ -208,6 +211,14 @@ a fail negative, noting the rule and the person's comment.
 
 `evaluator-archive` archives or restores an Evaluator; `evaluator-production`
 sets whether it also runs in production (see below).
+
+In the Evaluation tab, **Evaluators → Add** picks the kind from a dropdown and
+shows its fields — a JSON Schema (started from the step's `agent.outputSchema`
+when it declares one), a language and source, a judge model with the question
+it answers and its verdicts, or a built-in check — never the check's JSON.
+Each Evaluator's **Details** show the whole check and its versions; **Edit**
+saves a new version with what changed (`POST
+/api/evaluation/evaluators/:id/versions`), keeping its name and kind.
 
 `evaluator-preview` (`POST /api/evaluation/evaluators/preview`) runs a draft
 check against the Step's recent production outputs (dry runs left out) and
@@ -311,7 +322,10 @@ each asking for a canary of its own to the target text. `robustness` doubles the
 whitespace of the target text and pads it with blank lines, or reverses the
 keys of a target object (kind `metamorphic`). Each case is positive: the output
 is what the original run gave, ignoring the injection. Files of the workspace
-are not targeted yet; a hand-written `case-perturb` covers them.
+are not targeted yet; a hand-written `case-perturb` covers them. The Evaluation
+tab's **Eval Cases → Built-in case suites** does the same from a chosen run,
+input part and field path, names the built-in Evaluator that grades the suite,
+and warns when the run already has that suite for the field.
 
 `injection_ignored` looks for the canary anywhere in the result, so a step that
 quotes its input verbatim (an extraction, a summary) can fail it without having
