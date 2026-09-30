@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { BriefSection, DriftAlert, McpPolicySection } from '../step-evaluation-sections';
+import { BriefSection, DriftAlert, McpPolicySection, toEvaluatorName } from '../step-evaluation-sections';
 
 vi.mock('@/hooks/use-step-evaluation', () => ({
   useStepEvaluationMutation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -76,5 +76,13 @@ describe('McpPolicySection', () => {
     const [meddra, ctcae] = screen.getAllByTestId('mcp-policy-server');
     expect(meddra!.textContent).toContain('cannot use this server during a trial');
     expect(ctcae!.textContent).toContain('answered from what a live trial of the same case recorded');
+  });
+});
+
+describe('toEvaluatorName', () => {
+  it('turns what a person types into a valid Evaluator name', () => {
+    expect(toEvaluatorName('Grades match CTCAE')).toBe('grades-match-ctcae');
+    expect(toEvaluatorName(' No PHI_leak!')).toBe('no-phi-leak-');
+    expect(toEvaluatorName('x'.repeat(80))).toHaveLength(63);
   });
 });

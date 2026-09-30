@@ -110,6 +110,11 @@ const CHECK_TEMPLATES: Record<EvaluatorCheck['kind'], string> = {
   }, null, 2),
 };
 
+/** Typing "Grades match CTCAE" gives "grades-match-ctcae" — the only form an Evaluator name takes. */
+export function toEvaluatorName(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 63);
+}
+
 function EvaluatorRow({ step, evaluator, mayEdit }: { step: EvaluatedStep; evaluator: EvaluatorView; mayEdit: boolean }) {
   const approve = useStepEvaluationMutation(step, () =>
     mediforce.evaluation.approveEvaluatorSource({ evaluatorId: evaluator.id, version: evaluator.latest.version }));
@@ -181,7 +186,7 @@ export function EvaluatorsSection({ step, data, mayEdit }: { step: EvaluatedStep
   const [checkText, setCheckText] = React.useState(CHECK_TEMPLATES.schema);
   const [error, setError] = React.useState<string | null>(null);
   const create = useStepEvaluationMutation(step, (check: EvaluatorCheck) =>
-    mediforce.evaluation.createEvaluator({ ...step, name, rule, severity, check }));
+    mediforce.evaluation.createEvaluator({ ...step, name: name.replace(/-+$/, ''), rule, severity, check }));
 
   const submit = () => {
     let check: EvaluatorCheck;
@@ -215,7 +220,14 @@ export function EvaluatorsSection({ step, data, mayEdit }: { step: EvaluatedStep
       {adding && (
         <div className="space-y-2 rounded-md bg-muted/40 p-3">
           <div className="flex gap-2">
-            <input className={cn(inputClass, 'flex-1')} placeholder="name-in-kebab-case" value={name} onChange={(event) => setName(event.target.value)} />
+            <input
+              aria-label="Evaluator name"
+              className={cn(inputClass, 'flex-1')}
+              placeholder="Name, e.g. grades-match-ctcae"
+              title="Also names the Scores it writes: lowercase letters, digits and dashes."
+              value={name}
+              onChange={(event) => setName(toEvaluatorName(event.target.value))}
+            />
             <select className={inputClass} value={severity} onChange={(event) => setSeverity(event.target.value as typeof severity)}>
               <option value="critical">critical</option>
               <option value="major">major</option>
