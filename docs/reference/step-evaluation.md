@@ -70,3 +70,51 @@ A version never changes.
 Per MCP server of the Step's agent: `live`, `live` with named tools denied, or
 `deny`. A server the policy does not name is denied in eval trials.
 `mcp-policy-get` shows what each server does, defaults included.
+
+## Eval Runs
+
+An Eval Run runs the Step, as its runnable Definition version has it, over a
+frozen Dataset version: every case, `trialsPerCase` times.
+
+1. **Prepare** (`run-prepare`, `POST /api/evaluation/runs`) freezes the Dataset
+   version (the newest unless named), the latest version of every live
+   Evaluator — and whether each one counts — and the MCP eval policy, and
+   estimates the cost: the Step's mean cost over its recent production runs, or
+   its model's registry price for a nominal turn when it has none, plus one call
+   per `llm_judge`. The budget cap defaults to 1.5× the estimate; with no
+   estimate it must be given.
+2. **Start** (`run-start --confirm-budget <usd>`) needs the budget echoed back —
+   the person confirming what the run may spend. Without it the start is
+   refused, which is also how an assistant's attempt to start one ends.
+3. Each **trial** is a real Workflow Run flagged with the Eval Run's id. It
+   enters the Step directly with the case's trigger payload and earlier step
+   outputs, its workspace branched from the case's seed commit, and stops after
+   the Step: no review task, no escalation, no next step. MCP servers the policy
+   does not declare `live` are removed from the agent's config; a Step that
+   declares MCP servers inline cannot be evaluated at all. Run lists, workflow
+   summaries, monitoring, the Agents history and carry-over (`inputForNextRun`)
+   leave trials out.
+4. When a trial's run ends, every frozen Evaluator grades its Agent Run and
+   writes a Score (`source: deterministic` or `llm_judge`, `metadata.evalRunId`).
+   Trials start `concurrency` at a time; once spend reaches the budget the rest
+   are skipped and the run ends `budget_exceeded`. A trial's cost is its Agent
+   Run plus the LLM judge calls that graded it (at the model registry's price;
+   a judge model it does not price is noted on the trial and not counted), each
+   charged to the budget as it is spent; a judge Score keeps its cost in
+   `metadata.judgeCostUsd`. **Cancel** skips the pending trials; the
+   ones already running still finish and are scored. The heartbeat moves on
+   every running Eval Run, and any cancelled one with trials in flight, so a
+   restart does not strand one: a driver that died after claiming a trial —
+   before creating its run, or mid-scoring — leaves a claim that another takes
+   over once it is 15 minutes old, without re-running Evaluators that already
+   scored the trial. A trial whose scoring was abandoned three times fails.
+
+The **report** (`mediforce eval report <id>`, `GET /api/evaluation/runs/:id`)
+is computed from those Scores. Per Evaluator: pass rate with its Wilson 95%
+interval, pass@k (a case passes if any of its k trials does), pass^k (all of
+them do), flakiness (its trials disagree), and checks that could not grade a
+trial as errors. A trial that could not be graded, or failed before producing
+an Agent Run, stays out of the pass rate but still counts toward its case's k,
+so it can lower pass@k and pass^k, never lift them. Evaluators that do not
+count are marked so. Tokens and duration come from the trials' runs; cost adds
+the judge calls.

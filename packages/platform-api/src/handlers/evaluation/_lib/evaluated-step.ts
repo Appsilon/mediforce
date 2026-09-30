@@ -1,4 +1,5 @@
 import {
+  inlineMcpServerNames,
   resolveRunnableVersion,
   type EvaluatedStep,
   type WorkflowDefinition,
@@ -36,12 +37,10 @@ export async function loadEvaluatedStep(
   if (step.executor !== 'agent') {
     throw new ValidationError(`Step '${ref.stepId}' is a ${step.executor} step; only agent steps are evaluated`);
   }
-  // Inline servers bypass the agent's bindings, so an eval policy cannot deny
-  // them in a trial (D6) — fail closed until they move onto the agent.
-  const inlineServers = step.agent?.mcpServers ?? [];
+  const inlineServers = inlineMcpServerNames(step);
   if (inlineServers.length > 0) {
     throw new ValidationError(
-      `Step '${ref.stepId}' declares MCP servers inline (${inlineServers.map((server) => server.name).join(', ')}); `
+      `Step '${ref.stepId}' declares MCP servers inline (${inlineServers.join(', ')}); `
       + 'move them onto its agent before evaluating it',
     );
   }

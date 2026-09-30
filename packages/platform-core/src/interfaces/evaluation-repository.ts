@@ -1,3 +1,4 @@
+import type { EvalRun, EvalRunStatus, EvalTrial, EvalTrialStatus } from '../schemas/eval-run';
 import type {
   EvalCase,
   EvalDatasetVersion,
@@ -48,4 +49,34 @@ export interface EvaluationRepository {
 
   getMcpPolicy(step: EvaluatedStep): Promise<McpEvalPolicy | null>;
   putMcpPolicy(policy: McpEvalPolicy): Promise<McpEvalPolicy>;
+
+  createEvalRun(run: EvalRun, trials: readonly EvalTrial[]): Promise<void>;
+  getEvalRun(id: string): Promise<EvalRun | null>;
+  /** Newest first. */
+  listEvalRuns(step: EvaluatedStep): Promise<EvalRun[]>;
+  /**
+   * Every Eval Run the heartbeat must move on, across workspaces: the running
+   * ones, and any other — a cancelled one — with a trial still running or scoring.
+   */
+  listEvalRunIdsToDrive(): Promise<string[]>;
+  /** Applies `patch` only while the run is in `from`; true when it did. */
+  transitionEvalRun(
+    id: string,
+    from: EvalRunStatus,
+    patch: Partial<Pick<EvalRun, 'status' | 'startedAt' | 'completedAt'>>,
+  ): Promise<boolean>;
+  /** Atomically adds a trial's cost to the run's spend. */
+  addEvalRunSpend(id: string, usd: number): Promise<void>;
+
+  /** By case, then trial index. */
+  listTrials(evalRunId: string): Promise<EvalTrial[]>;
+  getTrialByInstanceId(processInstanceId: string): Promise<EvalTrial | null>;
+  /** Applies `patch` only while the trial is in `from`; true when it did. */
+  transitionTrial(
+    id: string,
+    from: EvalTrialStatus,
+    patch: Partial<Omit<EvalTrial, 'id' | 'evalRunId' | 'caseId' | 'trialIndex'>>,
+  ): Promise<boolean>;
+  /** Takes over a `scoring` claim made before `staleBefore`, restamping it `now` and counting the attempt; true when it did. */
+  renewScoringClaim(id: string, staleBefore: string, now: string): Promise<boolean>;
 }
