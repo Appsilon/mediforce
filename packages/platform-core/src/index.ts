@@ -352,6 +352,7 @@ export {
   ProposeOutputsToLabelToolSchema,
   ProposePerturbedCaseToolSchema,
   ProposeCaseSuiteToolSchema,
+  ProposeWrittenOutputsToolSchema,
   ProposeAcceptanceCriteriaToolSchema,
   ProposeControlSettingsToolSchema,
   ProposeDiagnosisToolSchema,

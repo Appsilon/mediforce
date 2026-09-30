@@ -137,7 +137,7 @@ function StepEvaluation({ step, outputSchema, mayEdit, editReason, mayRun, runRe
       </div>
       <div className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
         <AssistantResizeHandle {...assistantWidth} />
-        <EvaluationAssistantPanel step={step} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
+        <EvaluationAssistantPanel step={step} stepOutputSchema={outputSchema} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { WriteOutputForm, describeChanges, emptyOutput, outputFields } from '../written-output-form';
+import { DraftedOutput, WriteOutputForm, describeChanges, emptyOutput, outputFields } from '../written-output-form';
 
 const evaluation = vi.hoisted(() => ({ createWrittenOutput: vi.fn() }));
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
@@ -68,6 +68,7 @@ describe('WriteOutputForm', () => {
       basedOnAgentRunId: 'run-00000001',
       result: { grade: 2, term: 'Neutropenia', rationale: 'ANC below 0.5.', flags: ['lab'] },
       note: 'Grade 4 neutropenia written as 2.',
+      origin: 'user',
       label: { evaluatorId: 'judge-1', passed: false },
     });
   });
@@ -76,5 +77,25 @@ describe('WriteOutputForm', () => {
     render(<WriteOutputForm step={step} evaluator={evaluator} runs={[run]} stepOutputSchema={schema} onClose={() => undefined} />);
     const term = screen.getByLabelText('Output field term') as HTMLSelectElement;
     expect([...term.options].map((option) => option.value)).toEqual(['Neutropenia', 'Anaemia']);
+  });
+});
+
+describe('DraftedOutput', () => {
+  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const draft = {
+    basedOnAgentRunId: 'run-00000001',
+    result: { grade: 4, term: 'Neutropenia', rationale: 'Looks severe.', flags: ['lab'] },
+    why: 'The rationale no longer cites the ANC.',
+  };
+
+  it('shows what the assistant changed, and the person\'s label saves it as the assistant\'s written output', () => {
+    evaluation.createWrittenOutput.mockClear();
+    render(<DraftedOutput step={step} evaluatorId="judge-1" draft={draft} stepOutputSchema={schema} mayEdit={true} />);
+
+    expect(screen.getByTestId('write-output-changes').textContent).toBe('Changed: rationale: "ANC below 0.5." → "Looks severe."');
+    fireEvent.click(screen.getByRole('button', { name: 'Save as fail' }));
+    expect(evaluation.createWrittenOutput).toHaveBeenCalledWith(expect.objectContaining({
+      basedOnAgentRunId: 'run-00000001', result: draft.result, note: draft.why, origin: 'assistant', label: { evaluatorId: 'judge-1', passed: false },
+    }));
   });
 });

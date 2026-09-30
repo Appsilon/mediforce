@@ -7,6 +7,7 @@ import {
   JUDGE_MIN_FAILURE_LABELS,
   JUDGE_MIN_LABELS,
   describeAcceptanceCriteria,
+  type AgentOutputSchema,
   type EvaluatedStep,
 } from '@mediforce/platform-core';
 import type { EvaluatorSelfTest, ProposalView } from '@mediforce/platform-api/contract';
@@ -18,6 +19,7 @@ import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { describePatch } from './eval-run-report';
 import { CalibrateAction, LabelOutputRow, labelsBySubject } from './judge-calibration';
+import { DraftedOutput } from './written-output-form';
 
 export type ProposalStatus = 'open' | 'accepted' | 'rejected';
 
@@ -28,11 +30,12 @@ type Proposal<Tool extends ProposalView['tool']> = Extract<ProposalView, { tool:
  * labelling queue are worked through instead; a routing recommendation is
  * applied in the workflow editor.
  */
-type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_outputs_to_label' | 'propose_control_settings' | 'propose_diagnosis' | 'propose_fix' }>;
+type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_outputs_to_label' | 'propose_written_outputs' | 'propose_control_settings' | 'propose_diagnosis' | 'propose_fix' }>;
 
 export function isDecidable(proposal: ProposalView): proposal is DecidableProposal {
   return proposal.tool !== 'propose_evaluation_plan'
     && proposal.tool !== 'propose_outputs_to_label'
+    && proposal.tool !== 'propose_written_outputs'
     && proposal.tool !== 'propose_control_settings'
     && proposal.tool !== 'propose_diagnosis'
     && proposal.tool !== 'propose_fix';
@@ -431,6 +434,35 @@ export function LabellingCard({ step, proposal, mayEdit, editReason }: {
           </span>
         </InstantTooltip>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Outputs the assistant drafted for a judge (ADR-0023 D9) — real runs' results
+ * changed to break the rule, where production has too few failures. The
+ * person labels each one pass or fail, which saves it as a written output;
+ * the assistant never labels.
+ */
+export function DraftedOutputsCard({ step, proposal, stepOutputSchema, mayEdit }: {
+  step: EvaluatedStep;
+  proposal: Proposal<'propose_written_outputs'>['arguments'];
+  stepOutputSchema: AgentOutputSchema | undefined;
+  mayEdit: boolean;
+}) {
+  const evaluators = useStepEvaluators(step);
+  const evaluator = evaluators.data?.evaluators.find((candidate) => candidate.id === proposal.evaluatorId);
+  return (
+    <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="drafted-outputs-card">
+      <div className="mb-1 font-medium">Draft outputs to label{evaluator === undefined ? '' : ` for ${evaluator.name}`}</div>
+      <p className="text-muted-foreground">
+        Changed from real runs to break the rule. Label each one yourself: it is saved as a written example and counts toward calibrating the judge. Open &ldquo;Edit the output&rdquo; to adjust a draft first.
+      </p>
+      <ul className="mt-2 space-y-2">
+        {proposal.outputs.map((draft, index) => (
+          <DraftedOutput key={index} step={step} evaluatorId={proposal.evaluatorId} draft={draft} stepOutputSchema={stepOutputSchema} mayEdit={mayEdit} />
+        ))}
+      </ul>
     </div>
   );
 }

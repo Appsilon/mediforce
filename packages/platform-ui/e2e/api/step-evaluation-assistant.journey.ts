@@ -5,6 +5,8 @@ import {
   AskEvaluationAssistantOutputSchema,
   CreateEvalCasesFromLabelsOutputSchema,
   CreateRedTeamEvalCasesOutputSchema,
+  CreateWrittenOutputOutputSchema,
+  GetAgentRunIoOutputSchema,
   EvalCaseOutputSchema,
   EvalRunOutputSchema,
   EvaluationAssistantProgressSchema,
@@ -368,4 +370,37 @@ test.describe('Evaluation Assistant — API E2E', () => {
     expect(cases).toHaveLength(3);
     expect(cases.every((evalCase) => evalCase.origin === 'assistant' && evalCase.perturbation?.kind === 'injected_instruction')).toBe(true);
   });
+
+  test('drafts outputs for the person to label; an unchanged draft goes back to the model', async ({ request }) => {
+    const { evaluator } = EvaluatorOutputSchema.parse(await (await request.post('/api/evaluation/evaluators', {
+      headers: JSON_HEADERS,
+      data: {
+        ...step, name: `grounded-${randomUUID().slice(0, 8)}`, rule: 'The summary is grounded in the input.', severity: 'major',
+        check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Grounded?', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
+      },
+    })).json());
+    const io = GetAgentRunIoOutputSchema.parse(await (await request.get(`/api/evaluation/agent-runs/${agentRunId}/io`, { headers: AUTH_HEADERS })).json());
+    const own = io.result as Record<string, unknown>;
+    const broken = { ...own, summary: 'Grade 5 sepsis, which the input never mentions.' };
+    const question = `The judge needs failures to calibrate. ${randomUUID()}`;
+    await scriptOpenRouter(question, [
+      { toolCalls: [{ name: 'propose_written_outputs', arguments: { evaluatorId: evaluator.id, outputs: [{ basedOnAgentRunId: agentRunId, result: own, why: 'Unchanged.' }] } }] },
+      { toolCalls: [{ name: 'propose_written_outputs', arguments: { evaluatorId: evaluator.id, outputs: [{ basedOnAgentRunId: agentRunId, result: broken, why: 'Invents an event.' }] } }] },
+      { content: 'I drafted an output that invents an event; label it.' },
+    ]);
+
+    const answer = await ask(request, step, question);
+    const requests = await openRouterRequests(question);
+    expect(String(lastToolResult(requests[1]!.messages).error)).toContain("the draft is the run's own output");
+    expect(answer.proposals).toEqual([expect.objectContaining({ tool: 'propose_written_outputs' })]);
+
+    // The person's label saves the draft as a written output, marked as the assistant's.
+    const saved = await request.post('/api/evaluation/written-outputs', {
+      headers: JSON_HEADERS,
+      data: { ...step, basedOnAgentRunId: agentRunId, result: broken, origin: 'assistant', label: { evaluatorId: evaluator.id, passed: false }, uid: 'e2e-reviewer' },
+    });
+    expect(saved.status(), await saved.text()).toBe(201);
+    expect(CreateWrittenOutputOutputSchema.parse(await saved.json())).toMatchObject({ writtenOutput: { origin: 'assistant' }, score: { label: 'fail' } });
+  });
 });
+
