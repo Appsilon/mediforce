@@ -235,6 +235,12 @@ describe('executeEvaluationTool', () => {
     expect(result).toEqual({ results: [{ agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', comment: null, error: null }] });
   });
 
+  it('says a case-bound built-in check cannot be previewed on production outputs, instead of erroring on each', async () => {
+    const { scope, context } = await setup();
+    const result = await executeEvaluationTool('preview_evaluator', { check: { kind: 'builtin', name: 'result_stable' } }, scope, context);
+    expect(result).toEqual({ results: [], notPreviewed: expect.stringContaining('an Eval Case made from a production Agent Run') });
+  });
+
   it('reads the SKILL.md the runtime loads — `<skillsDir>/<skill>` — and none for a prompt-only step', async () => {
     const { scope, context } = await setup();
     const artifacts = [

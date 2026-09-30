@@ -121,11 +121,15 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   outputs before the card is shown (reusing the assistant's own preview of the
   same check), and the card shows what it did. A check that errors on every
   output goes back to the assistant instead of to the person; for a person
-  without the `run` verb the card says it was not tried. The try runs the check
-  on up to 5 outputs, so it is not free: a `code` check starts a sandbox per
-  output, and an `llm_judge` pays for a model call per output — a turn that
-  proposes a judge the assistant did not preview takes longer and costs more. A
-  refined rule is a proposed new version of the Evaluator.
+  without the `run` verb the card says it was not tried. So it does for the
+  `injection_ignored` and `result_stable` built-ins, which grade an output
+  against the case it ran on and so can be graded only in an Eval Run over such
+  cases; `preview_evaluator` says the same instead of erroring on each output.
+  The try runs the check on up to 5 outputs, so it is not free: a `code` check
+  starts a sandbox per output, and an `llm_judge` pays for a model call per
+  output — a turn that proposes a judge the assistant did not preview takes
+  longer and costs more. A refined rule is a proposed new version of the
+  Evaluator.
 - **Calibration help.** For a judge, it picks the outputs most worth labelling
   — ones reviewers rejected, ones its preview failed, ones unlike those already
   labelled — and returns them as a labelling card. The person labels each pass
