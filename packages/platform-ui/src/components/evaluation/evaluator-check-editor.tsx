@@ -4,11 +4,13 @@ import * as React from 'react';
 import {
   CodeCheckSchema,
   EvaluatorCheckSchema,
+  JUDGE_PASS_VALUE,
   type EvaluatorCheck,
   type JudgeChoice,
 } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
-import { inputClass } from './evaluation-styles';
+import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
+import { buttonClass, inputClass } from './evaluation-styles';
 
 type CodeRuntime = (typeof CodeCheckSchema.shape.runtime.options)[number];
 
@@ -31,7 +33,7 @@ export const CHECK_KINDS: Record<CheckDraftKind, { label: string; description: s
   },
   llm_judge: {
     label: 'LLM judge',
-    description: 'A model reads the step\'s input and output and answers a question about it.',
+    description: 'A model reads the step\'s input and output, reasons about your question, then picks one of your verdicts. Use it for what code cannot check: meaning, tone, clinical judgement.',
   },
 };
 
@@ -56,13 +58,20 @@ const CODE_TEMPLATES: Record<CodeRuntime, string> = {
   ].join('\n'),
 };
 
-const PASS_FAIL: JudgeChoice[] = [{ label: 'pass', value: 1 }, { label: 'fail', value: 0 }];
+const VERDICT_PRESETS: { label: string; choices: JudgeChoice[] }[] = [
+  { label: 'Pass / fail', choices: [{ label: 'pass', value: 1 }, { label: 'fail', value: 0 }] },
+  { label: 'Good / acceptable / poor', choices: [{ label: 'good', value: 1 }, { label: 'acceptable', value: 0.5 }, { label: 'poor', value: 0 }] },
+];
+// LlmJudgeCheckSchema.choices bounds.
+const MIN_VERDICTS = 2;
+const MAX_VERDICTS = 6;
+const DEFAULT_JUDGE_MODEL = 'anthropic/claude-sonnet-4';
 
 export function emptyCheckDraft(kind: CheckDraftKind): CheckDraft {
   switch (kind) {
     case 'schema': return { kind, schemaText: JSON.stringify({ type: 'object', required: [] }, null, 2) };
     case 'code': return { kind, runtime: 'python', source: CODE_TEMPLATES.python };
-    case 'llm_judge': return { kind, model: '', rubric: '', choices: PASS_FAIL };
+    case 'llm_judge': return { kind, model: DEFAULT_JUDGE_MODEL, rubric: '', choices: VERDICT_PRESETS[0]!.choices };
   }
 }
 
@@ -81,7 +90,14 @@ export function checkFromDraft(draft: CheckDraft): { check: EvaluatorCheck } | {
       candidate = { kind: 'code', runtime: draft.runtime, source: draft.source };
       break;
     case 'llm_judge':
-      candidate = { kind: 'llm_judge', model: draft.model.trim(), rubric: draft.rubric.trim(), choices: draft.choices };
+      if (draft.model.trim() === '') return { error: 'Pick the model that judges.' };
+      if (draft.rubric.trim() === '') return { error: 'Write the question the judge answers.' };
+      candidate = {
+        kind: 'llm_judge',
+        model: draft.model.trim(),
+        rubric: draft.rubric.trim(),
+        choices: draft.choices.map((choice) => ({ ...choice, label: choice.label.trim() })),
+      };
       break;
   }
   const parsed = EvaluatorCheckSchema.safeParse(candidate);
@@ -148,15 +164,84 @@ export function CheckEditor({ draft, onChange }: { draft: CheckDraft; onChange: 
         </div>
       );
     case 'llm_judge':
-      return (
-        <div className="space-y-2">
-          <Field label="Model">
-            <input aria-label="Model" className={cn(inputClass, 'w-full')} value={draft.model} onChange={(event) => onChange({ ...draft, model: event.target.value })} />
-          </Field>
-          <Field label="Rubric">
-            <textarea aria-label="Rubric" className={cn(inputClass, 'w-full min-h-24')} value={draft.rubric} onChange={(event) => onChange({ ...draft, rubric: event.target.value })} />
-          </Field>
-        </div>
-      );
+      return <JudgeEditor draft={draft} onChange={onChange} />;
   }
+}
+
+function JudgeEditor({ draft, onChange }: {
+  draft: Extract<CheckDraft, { kind: 'llm_judge' }>;
+  onChange: (draft: CheckDraft) => void;
+}) {
+  const setChoice = (index: number, choice: JudgeChoice) =>
+    onChange({ ...draft, choices: draft.choices.map((existing, at) => (at === index ? choice : existing)) });
+  return (
+    <div className="space-y-3">
+      <Field label="Judge model">
+        <ModelPicker
+          ariaLabel="Judge model"
+          className={cn(inputClass, 'w-full')}
+          value={draft.model === '' ? undefined : draft.model}
+          onChange={(model) => onChange({ ...draft, model: model ?? '' })}
+        />
+      </Field>
+      <Field
+        label="Question for the judge"
+        hint="The judge sees the step's input, its output, the agent's own summary and the Eval Case's notes. Say what a good output does and what makes it fail; it writes its reasoning, then picks a verdict."
+      >
+        <textarea
+          aria-label="Question for the judge"
+          className={cn(inputClass, 'w-full min-h-24')}
+          placeholder="Does every adverse event carry the CTCAE grade its narrative supports? Fail if a grade is missing, or a Grade 5 is given without a fatal outcome."
+          value={draft.rubric}
+          onChange={(event) => onChange({ ...draft, rubric: event.target.value })}
+        />
+      </Field>
+      <div className="space-y-1.5" role="group" aria-label="Verdicts">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium">Verdicts</span>
+          <span className="flex gap-1">
+            {VERDICT_PRESETS.map((preset) => (
+              <button key={preset.label} type="button" className={buttonClass} onClick={() => onChange({ ...draft, choices: preset.choices })}>{preset.label}</button>
+            ))}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          The judge answers with exactly one of these. Each scores 0 to 1; {JUDGE_PASS_VALUE} or more counts as a pass.
+        </p>
+        {draft.choices.map((choice, index) => (
+          <div key={index} className="flex items-center gap-2" data-testid="judge-verdict">
+            <input
+              aria-label={`Verdict ${index + 1}`}
+              className={cn(inputClass, 'flex-1')}
+              value={choice.label}
+              onChange={(event) => setChoice(index, { ...choice, label: event.target.value })}
+            />
+            <input
+              aria-label={`Verdict ${index + 1} score`}
+              type="number" min={0} max={1} step={0.1}
+              className={cn(inputClass, 'w-20')}
+              value={choice.value}
+              onChange={(event) => setChoice(index, { ...choice, value: Number(event.target.value) })}
+            />
+            <span className={cn('w-16 text-xs', choice.value >= JUDGE_PASS_VALUE ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400')}>
+              {choice.value >= JUDGE_PASS_VALUE ? 'passes' : 'fails'}
+            </span>
+            <button
+              type="button"
+              aria-label={`Remove verdict ${index + 1}`}
+              className={buttonClass}
+              disabled={draft.choices.length <= MIN_VERDICTS}
+              onClick={() => onChange({ ...draft, choices: draft.choices.filter((_, at) => at !== index) })}
+            >×</button>
+          </div>
+        ))}
+        <button
+          type="button"
+          className={buttonClass}
+          disabled={draft.choices.length >= MAX_VERDICTS}
+          onClick={() => onChange({ ...draft, choices: [...draft.choices, { label: '', value: 0 }] })}
+        >Add verdict</button>
+      </div>
+    </div>
+  );
 }

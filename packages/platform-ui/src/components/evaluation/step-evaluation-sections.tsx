@@ -155,7 +155,7 @@ function EvaluatorRow({ step, evaluator, mayEdit }: { step: EvaluatedStep; evalu
       </div>
       {(check.kind === 'code' || check.kind === 'llm_judge') && (
         <details className="mt-1 text-xs">
-          <summary className="cursor-pointer text-muted-foreground">{check.kind === 'code' ? 'Source' : 'Rubric'}</summary>
+          <summary className="cursor-pointer text-muted-foreground">{check.kind === 'code' ? 'Source' : 'Question for the judge'}</summary>
           <pre className="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 whitespace-pre-wrap">{check.kind === 'code' ? check.source : check.rubric}</pre>
         </details>
       )}

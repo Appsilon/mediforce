@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { BriefSection, DriftAlert, EvaluatorsSection, McpPolicySection, toEvaluatorName } from '../step-evaluation-sections';
 
 vi.mock('@/hooks/use-step-evaluation', () => ({
@@ -16,6 +16,10 @@ const evaluation = vi.hoisted(() => ({
   addEvaluatorVersion: vi.fn(),
 }));
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
+
+vi.mock('@/lib/api-fetch', () => ({
+  apiFetch: async () => new Response(JSON.stringify({ models: [] })),
+}));
 
 describe('BriefSection', () => {
   it('renders the Evaluation Brief as Markdown', () => {
@@ -115,6 +119,25 @@ describe('EvaluatorsSection', () => {
       name: 'grades-valid',
       severity: 'major',
       check: { kind: 'code', runtime: 'javascript', source: 'process.exit(0)' },
+    }));
+  });
+
+  it('builds a judge from a question and verdicts, defaulting the model', async () => {
+    evaluation.createEvaluator.mockClear();
+    openForm();
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'llm_judge' } });
+    await waitFor(() => expect((screen.getByLabelText('Judge model') as HTMLSelectElement).disabled).toBe(false));
+    fireEvent.change(screen.getByLabelText('Question for the judge'), { target: { value: 'Is every grade justified?' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Good / acceptable / poor' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(evaluation.createEvaluator).toHaveBeenCalledWith(expect.objectContaining({
+      check: {
+        kind: 'llm_judge',
+        model: 'anthropic/claude-sonnet-4',
+        rubric: 'Is every grade justified?',
+        choices: [{ label: 'good', value: 1 }, { label: 'acceptable', value: 0.5 }, { label: 'poor', value: 0 }],
+      },
     }));
   });
 
