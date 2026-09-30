@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { BriefSection, DriftAlert, EvaluatorsSection, McpPolicySection, toEvaluatorName } from '../step-evaluation-sections';
+import { BriefSection, CasesSection, DriftAlert, EvaluatorsSection, McpPolicySection, toEvaluatorName } from '../step-evaluation-sections';
 
 vi.mock('@/hooks/use-step-evaluation', () => ({
   useStepEvaluationMutation: (_step: unknown, mutationFn: (value: unknown) => unknown) => ({
@@ -14,6 +14,7 @@ const evaluation = vi.hoisted(() => ({
   setBrief: vi.fn(),
   createEvaluator: vi.fn(),
   addEvaluatorVersion: vi.fn(),
+  createRedTeamCases: vi.fn(),
 }));
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
 
@@ -214,5 +215,35 @@ describe('Evaluator view and edit', () => {
     fireEvent.change(screen.getByLabelText('Severity'), { target: { value: 'critical' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save as v2' }));
     expect(evaluation.addEvaluatorVersion).toHaveBeenCalledWith({ evaluatorId: evaluator.id, severity: 'critical' });
+  });
+});
+
+describe('Built-in case suites', () => {
+  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const run = { id: 'run-00000001', status: 'completed', startedAt: '2026-09-24T08:00:00.000Z' };
+  const stepEvaluation = (evaluators: unknown[]) => ({
+    cases: { isLoading: false, data: { cases: [] } },
+    agentRuns: { data: { runs: [run] } },
+    datasets: { data: { datasets: [] } },
+    evaluators: { data: { evaluators } },
+  }) as never;
+
+  it('says which built-in Evaluator grades a suite, and that the step lacks it', () => {
+    render(<CasesSection step={step} evaluation={stepEvaluation([])} mayEdit={true} />);
+
+    expect(screen.getByTestId('builtin-suite-grader').textContent).toContain('Ignores injected instructions');
+    expect(screen.getByTestId('builtin-suite-grader').textContent).toContain('this step has none yet');
+  });
+
+  it('writes a suite from a run and a field of its input', () => {
+    render(<CasesSection step={step} evaluation={stepEvaluation([{ latest: { check: { kind: 'builtin', name: 'result_stable' } } }])} mayEdit={true} />);
+    fireEvent.change(screen.getByLabelText('Suite'), { target: { value: 'robustness' } });
+    expect(screen.getByTestId('builtin-suite-grader').textContent).not.toContain('none yet');
+    fireEvent.change(screen.getByLabelText('Field path'), { target: { value: 'document.text' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add suite cases' }));
+
+    expect(evaluation.createRedTeamCases).toHaveBeenCalledWith({
+      ...step, suite: 'robustness', baseAgentRunId: run.id, target: { part: 'triggerPayload', path: ['document', 'text'] },
+    });
   });
 });
