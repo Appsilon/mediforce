@@ -22,6 +22,7 @@ import {
   type EvalCaseExpectation,
   type EvalCaseInput,
   type EvalCaseInputPart,
+  type EvalDatasetVersion,
   type EvaluatedStep,
   type EvaluatorCheck,
   type EvaluatorSeverity,
@@ -600,7 +601,13 @@ const CASE_SOURCES: Record<EvalCase['source'], string> = {
 };
 
 /** One Eval Case: what it gives the step and expects, its source run's log, and editing or archiving it. */
-function CaseRow({ step, evalCase, mayEdit }: { step: EvaluatedStep; evalCase: EvalCase; mayEdit: boolean }) {
+function CaseRow({ step, evalCase, mayEdit, unfrozen }: {
+  step: EvaluatedStep;
+  evalCase: EvalCase;
+  mayEdit: boolean;
+  /** Not in the newest Dataset version, so the next Eval Run does not run it. */
+  unfrozen: boolean;
+}) {
   const [editing, setEditing] = React.useState(false);
   const edit = useStepEvaluationMutation(step, (values: CaseFormResult) => mediforce.evaluation.updateCase({
     caseId: evalCase.id,
@@ -616,6 +623,11 @@ function CaseRow({ step, evalCase, mayEdit }: { step: EvaluatedStep; evalCase: E
       <div className="flex items-center gap-2">
         <span className={cn('rounded px-1.5 text-[11px]', evalCase.expectation === 'positive' ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-700 dark:text-red-400')}>{evalCase.expectation}</span>
         <span className="truncate">{evalCase.name}</span>
+        {unfrozen && (
+          <InstantTooltip label="Not in the newest Dataset version, so the next Eval Run does not run it. Freeze the dataset to include it.">
+            <span className="shrink-0 rounded bg-amber-500/10 px-1.5 text-[11px] text-amber-700 dark:text-amber-300" data-testid="eval-case-unfrozen">not frozen</span>
+          </InstantTooltip>
+        )}
         <span className="ml-auto shrink-0 text-xs text-muted-foreground">{evalCase.split} · {evalCase.source}{evalCase.perturbation === null ? '' : ` (${evalCase.perturbation.kind.replace(/_/g, ' ')})`}{evalCase.origin === 'assistant' ? ' · from the assistant' : ''}</span>
       </div>
       {editing ? (
@@ -785,6 +797,55 @@ function WriteCase({ step, cases, onClose }: { step: EvaluatedStep; cases: reado
   );
 }
 
+/** How the live cases differ from a Dataset version: cases added or edited since, and cases it has that were archived or replaced. */
+export function datasetDrift(cases: readonly EvalCase[], dataset: EvalDatasetVersion | undefined): { unfrozen: Set<string>; dropped: number } {
+  const frozen = new Set(dataset?.caseIds ?? []);
+  const live = new Set(cases.map((evalCase) => evalCase.id));
+  return {
+    unfrozen: new Set(cases.filter((evalCase) => !frozen.has(evalCase.id)).map((evalCase) => evalCase.id)),
+    dropped: [...frozen].filter((caseId) => !live.has(caseId)).length,
+  };
+}
+
+/**
+ * What freezing means and where it stands: an Eval Run runs the newest frozen
+ * Dataset version, never the live list, and a version never changes.
+ */
+function DatasetStatus({ cases, datasets }: { cases: readonly EvalCase[]; datasets: readonly EvalDatasetVersion[] }) {
+  const [latest] = datasets;
+  const { unfrozen, dropped } = datasetDrift(cases, latest);
+  return (
+    <div className="space-y-1 rounded-md bg-muted/40 p-2 text-xs" data-testid="dataset-status">
+      <p className="text-muted-foreground">
+        An Eval Run does not run the list above: it runs a <span className="font-medium text-foreground">Dataset</span> — a numbered snapshot of the live cases taken by <span className="font-medium text-foreground">Freeze dataset</span>. A snapshot never changes, so every Eval Run can be read against exactly the cases it ran. Freeze again after adding, editing or archiving cases.
+      </p>
+      {latest === undefined ? (
+        <p className="text-amber-700 dark:text-amber-300">Nothing frozen yet — an Eval Run cannot be prepared until the cases are frozen.</p>
+      ) : unfrozen.size === 0 && dropped === 0 ? (
+        <p>The next Eval Run runs <span className="font-medium">Dataset v{latest.version}</span>: all {latest.caseIds.length} live case(s){latest.containsProductionData ? ' — contains production data' : ''}.</p>
+      ) : (
+        <p className="text-amber-700 dark:text-amber-300">
+          The next Eval Run runs <span className="font-medium">Dataset v{latest.version}</span> ({latest.caseIds.length} case(s)), which is behind the list:
+          {unfrozen.size > 0 && ` ${unfrozen.size} case(s) added or edited since are not in it`}{unfrozen.size > 0 && dropped > 0 && ';'}
+          {dropped > 0 && ` it still has ${dropped} case(s) archived or replaced since`}. Freeze to make v{latest.version + 1}.
+        </p>
+      )}
+      {datasets.length > 0 && (
+        <details>
+          <summary className="cursor-pointer text-muted-foreground">Versions ({datasets.length})</summary>
+          <ul className="mt-1 space-y-0.5 text-muted-foreground" data-testid="dataset-versions">
+            {datasets.map((dataset) => (
+              <li key={dataset.id}>
+                v{dataset.version} · {dataset.createdAt.slice(0, 16).replace('T', ' ')} · {dataset.caseIds.length} case(s) · {dataset.createdBy}{dataset.containsProductionData ? ' · contains production data' : ''}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
 /** Eval Cases, harvested from production runs or written by the assistant, and frozen Dataset versions. */
 export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedStep; evaluation: StepEvaluation; mayEdit: boolean }) {
   const harvest = useStepEvaluationMutation(step, (input: { agentRunId: string; expectation: 'positive' | 'negative' }) =>
@@ -793,7 +854,10 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
   const cases = evaluation.cases.data?.cases ?? [];
   const harvested = new Set(cases.filter((evalCase) => evalCase.source === 'production').map((evalCase) => evalCase.sourceAgentRunId));
   const runs = loadedAgentRuns(evaluation).filter((run) => !harvested.has(run.id));
-  const [latest] = evaluation.datasets.data?.datasets ?? [];
+  const datasets = evaluation.datasets.data?.datasets ?? [];
+  const [latest] = datasets;
+  const { unfrozen, dropped } = datasetDrift(cases, latest);
+  const upToDate = latest !== undefined && unfrozen.size === 0 && dropped === 0;
   const [logRun, setLogRun] = React.useState<AgentRun | null>(null);
   const [writing, setWriting] = React.useState(false);
 
@@ -803,7 +867,13 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
       action={mayEdit && (
         <div className="flex gap-1.5">
           {!writing && <button type="button" className={buttonClass} onClick={() => setWriting(true)}>Write a case</button>}
-          {cases.length > 0 && <button type="button" className={buttonClass} disabled={freeze.isPending} onClick={() => freeze.mutate(undefined)}>Freeze dataset</button>}
+          {cases.length > 0 && (
+            <InstantTooltip label={upToDate ? `Dataset v${latest.version} already has every live case.` : `Snapshot the ${cases.length} live case(s) as Dataset v${(latest?.version ?? 0) + 1}, which the next Eval Run runs.`}>
+              <span className="inline-flex">
+                <button type="button" className={buttonClass} disabled={freeze.isPending || upToDate} onClick={() => freeze.mutate(undefined)}>Freeze dataset</button>
+              </span>
+            </InstantTooltip>
+          )}
         </div>
       )}
     >
@@ -812,12 +882,11 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
         <p className="text-sm text-muted-foreground">No cases yet. Add production runs below, write one, or ask the assistant.</p>
       ) : (
         <ul className="space-y-1.5 text-sm">
-          {cases.map((evalCase) => <CaseRow key={evalCase.id} step={step} evalCase={evalCase} mayEdit={mayEdit} />)}
+          {cases.map((evalCase) => <CaseRow key={evalCase.id} step={step} evalCase={evalCase} mayEdit={mayEdit} unfrozen={latest !== undefined && unfrozen.has(evalCase.id)} />)}
         </ul>
       )}
-      {latest !== undefined && (
-        <p className="text-xs text-muted-foreground">Dataset v{latest.version} frozen with {latest.caseIds.length} case(s){latest.containsProductionData ? ' — contains production data' : ''}.</p>
-      )}
+      {cases.length > 0 && <DatasetStatus cases={cases} datasets={datasets} />}
+      {freeze.error !== null && <p className="text-xs text-destructive">{freeze.error.message}</p>}
       {mayEdit && runs.length > 0 && (
         <details className="text-sm">
           <summary className="cursor-pointer text-xs text-muted-foreground">
@@ -1151,9 +1220,11 @@ const CHALLENGERS_TEMPLATE = JSON.stringify([{ label: 'Another model', patch: { 
  * challengers patched over it. Preparing and starting one is the workflow's
  * `run` verb; signing a qualification from a report is its `edit` verb.
  */
-export function EvalRunsSection({ step, data, mayRun, runReason, mayEdit, editReason }: {
+export function EvalRunsSection({ step, data, datasets, mayRun, runReason, mayEdit, editReason }: {
   step: EvaluatedStep;
   data: StepEvaluation['runs'];
+  /** The Step's frozen Dataset versions, newest first: the one a new run takes, and the one each run ran. */
+  datasets: StepEvaluation['datasets'];
   mayRun: boolean;
   runReason: string | undefined;
   mayEdit: boolean;
@@ -1192,6 +1263,9 @@ export function EvalRunsSection({ step, data, mayRun, runReason, mayEdit, editRe
   };
   const prepareError = challengersError ?? prepare.error?.message ?? null;
   const runs = data.data?.evalRuns ?? [];
+  const versions = datasets.data?.datasets ?? [];
+  const [nextDataset] = versions;
+  const datasetVersion = new Map(versions.map((dataset) => [dataset.id, dataset.version]));
   // Prepared here, by the assistant or from the CLI: each waits for a person to confirm its budget.
   const waiting: PreparedEvalRun[] = runs.filter((run) => run.status === 'prepared').map((run) => ({
     evalRunId: run.id,
@@ -1219,6 +1293,9 @@ export function EvalRunsSection({ step, data, mayRun, runReason, mayEdit, editRe
             disabled={prepare.isPending}
             onClick={submit}
           >Prepare</button>
+          <span className="text-muted-foreground" data-testid="eval-run-dataset">
+            {nextDataset === undefined ? 'No Dataset frozen yet — freeze the Eval Cases first.' : `Runs Dataset v${nextDataset.version} (${nextDataset.caseIds.length} case(s)).`}
+          </span>
           {prepareError !== null && <span className="text-destructive">{prepareError}</span>}
         </div>
       )}
@@ -1243,7 +1320,7 @@ export function EvalRunsSection({ step, data, mayRun, runReason, mayEdit, editRe
           {runs.map((run) => (
             <li key={run.id} className="text-sm">
               <span className="text-xs text-muted-foreground">
-                {run.createdAt.slice(0, 16).replace('T', ' ')} · {run.status} · ${run.spentUsd.toFixed(2)} of ${run.budgetUsd}
+                {run.createdAt.slice(0, 16).replace('T', ' ')} · {run.status}{datasetVersion.has(run.datasetVersionId) ? ` · Dataset v${datasetVersion.get(run.datasetVersionId)}` : ''} · ${run.spentUsd.toFixed(2)} of ${run.budgetUsd}
                 {run.variants.length > 1 && ` · ${run.variants.length} variants`}
               </span>
               <ul>
