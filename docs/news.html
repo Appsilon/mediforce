@@ -202,8 +202,28 @@
 
     var timeline = document.getElementById('timeline');
     var note = document.getElementById('note');
-    var entries = [];
+    var RELEASES = 'https://api.github.com/repos/Appsilon/mediforce/releases?per_page=20';
+    var posts = [];
+    var releases = [];
+    var missing = [];
     var filter = 'all';
+
+    function byNewest(left, right) {
+      return new Date(right.date) - new Date(left.date);
+    }
+
+    function toReleases(list) {
+      return list
+        .filter(function (release) { return release.draft === false && release.prerelease === false; })
+        .map(function (release) {
+          return {
+            kind: 'release',
+            title: (release.name || '').trim() || release.tag_name,
+            url: release.html_url,
+            date: release.published_at || release.created_at
+          };
+        });
+    }
 
     function monthLabel(iso) {
       var at = new Date(iso);
@@ -275,7 +295,7 @@
     function render() {
       timeline.textContent = '';
       var lastMonth = '';
-      entries
+      posts.concat(releases).sort(byNewest)
         .filter(function (entry) { return filter === 'all' || entry.kind === filter; })
         .forEach(function (entry) {
           var month = monthLabel(entry.date);
@@ -294,21 +314,28 @@
       });
     });
 
-    fetch('news.json')
-      .then(function (response) {
-        if (response.ok === false) throw new Error(String(response.status));
-        return response.json();
-      })
-      .then(function (data) {
-        entries = data || [];
-        render();
-      })
-      .catch(function () {
-        note.hidden = false;
-        note.innerHTML = 'The timeline could not be loaded. '
-          + '<a href="https://github.com/Appsilon/mediforce/releases" target="_blank" rel="noopener noreferrer">Releases</a>'
-          + ' and the <a href="https://www.appsilon.com/blog" target="_blank" rel="noopener noreferrer">Appsilon blog</a> have everything on it.';
-      });
+    function showMissing() {
+      note.hidden = missing.length === 0;
+      note.innerHTML = missing.join(' ');
+    }
+
+    function load(url, read, onData, fallback) {
+      fetch(url)
+        .then(function (response) {
+          if (response.ok === false) throw new Error(String(response.status));
+          return read(response);
+        })
+        .then(function (data) { onData(data); render(); })
+        .catch(function () { missing.push(fallback); showMissing(); });
+    }
+
+    load('news.json', function (response) { return response.json(); },
+      function (list) { posts = list.filter(function (entry) { return entry.kind === 'post'; }); },
+      'Articles could not be loaded; the <a href="https://www.appsilon.com/blog" target="_blank" rel="noopener noreferrer">Appsilon blog</a> has them.');
+
+    load(RELEASES, function (response) { return response.json(); },
+      function (list) { releases = toReleases(list); },
+      'Releases could not be loaded; <a href="https://github.com/Appsilon/mediforce/releases" target="_blank" rel="noopener noreferrer">GitHub</a> has them.');
   })();
   </script>
 </body>
