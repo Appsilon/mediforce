@@ -17,6 +17,8 @@ import {
   AcceptanceCriteriaVersionSchema,
   type AcceptanceCriteriaVersion,
   EvalCaseSchema,
+  WrittenOutputSchema,
+  type WrittenOutput,
   EvalDatasetVersionSchema,
   EvaluationBriefSchema,
   EvaluatorSchema,
@@ -58,6 +60,7 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
   private readonly runs = new Map<string, EvalRun>();
   private readonly trials = new Map<string, EvalTrial>();
   private readonly optimisations = new Map<string, EvalOptimisation>();
+  private readonly writtenOutputs = new Map<string, WrittenOutput>();
 
   async appendBrief(brief: EvaluationBrief): Promise<EvaluationBrief> {
     const parsed = EvaluationBriefSchema.parse(brief);
@@ -140,6 +143,25 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
   async setCaseArchived(id: string, archived: boolean): Promise<void> {
     const row = this.cases.get(id);
     if (row !== undefined) this.cases.set(id, { ...row, archived });
+  }
+
+  async createWrittenOutput(writtenOutput: WrittenOutput): Promise<WrittenOutput> {
+    const parsed = WrittenOutputSchema.parse(writtenOutput);
+    this.writtenOutputs.set(parsed.id, parsed);
+    return parsed;
+  }
+
+  async getWrittenOutput(id: string): Promise<WrittenOutput | null> {
+    return this.writtenOutputs.get(id) ?? null;
+  }
+
+  async listWrittenOutputs(step: EvaluatedStep): Promise<WrittenOutput[]> {
+    return newestFirst([...this.writtenOutputs.values()].filter((writtenOutput) => sameStep(writtenOutput, step)));
+  }
+
+  async setWrittenOutputArchived(id: string, archived: boolean): Promise<void> {
+    const row = this.writtenOutputs.get(id);
+    if (row !== undefined) this.writtenOutputs.set(id, { ...row, archived });
   }
 
   async appendDatasetVersion(dataset: EvalDatasetVersion): Promise<EvalDatasetVersion> {

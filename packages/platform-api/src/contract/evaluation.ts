@@ -10,6 +10,7 @@ import {
   EvalCaseSchema,
   EvalCaseSplitSchema,
   EvalDatasetVersionSchema,
+  WrittenOutputSchema,
   EvalOptimisationSchema,
   EvalRunReportSchema,
   EvalRunSchema,
@@ -136,10 +137,14 @@ export const ApproveEvaluatorSourceInputSchema = z.object({
 /** A human label on one Agent Run's output for this Evaluator, the ground truth a judge is calibrated against. */
 export const LabelEvaluatorOutputInputSchema = z.object({
   evaluatorId: z.uuid(),
-  agentRunId: z.string().min(1),
+  /** A production run's output; or `writtenOutputId`, a person's written one. */
+  agentRunId: z.string().min(1).optional(),
+  writtenOutputId: z.uuid().optional(),
   passed: z.boolean(),
   comment: z.string().trim().max(2000).optional(),
   uid: z.string().min(1).optional(),
+}).refine((value) => (value.agentRunId === undefined) !== (value.writtenOutputId === undefined), {
+  message: 'give exactly one of agentRunId (a production output) or writtenOutputId (a written one)',
 });
 export const LabelEvaluatorOutputOutputSchema = z.object({ score: ScoreSchema });
 
@@ -190,6 +195,44 @@ export const ListStepAgentRunsOutputSchema = z.object({
   /** Present while older runs remain. */
   nextCursor: z.string().optional(),
 });
+
+export const ListWrittenOutputsInputSchema = EvaluatedStepSchema.extend({
+  includeArchived: QueryBooleanSchema.optional(),
+});
+export const ListWrittenOutputsOutputSchema = z.object({ writtenOutputs: z.array(WrittenOutputSchema) });
+
+/**
+ * A person's written example of the step's output (ADR-0023 D9), usually
+ * started from a production run — its input taken as it was — and labelled
+ * for a judge in the same write when `label` is given.
+ */
+export const CreateWrittenOutputInputSchema = EvaluatedStepSchema.extend({
+  basedOnAgentRunId: z.string().min(1).optional(),
+  /** What the step was given; defaults to the input of `basedOnAgentRunId`. */
+  stepInput: z.record(z.string(), z.unknown()).nullable().optional(),
+  result: z.record(z.string(), z.unknown()),
+  note: z.string().trim().max(2000).optional(),
+  origin: EvaluationOriginSchema.default('user'),
+  label: z.object({
+    evaluatorId: z.uuid(),
+    passed: z.boolean(),
+    comment: z.string().trim().max(2000).optional(),
+  }).optional(),
+  /** Who labels, when an API key writes the label. */
+  uid: z.string().min(1).optional(),
+});
+export const CreateWrittenOutputOutputSchema = z.object({
+  writtenOutput: WrittenOutputSchema,
+  /** The label written with it; null without `label`. */
+  score: ScoreSchema.nullable(),
+});
+
+/** An archived written output leaves every Evaluator's labels and calibration. */
+export const ArchiveWrittenOutputInputSchema = z.object({
+  writtenOutputId: z.uuid(),
+  archived: z.boolean().default(true),
+});
+export const WrittenOutputOutputSchema = z.object({ writtenOutput: WrittenOutputSchema });
 
 /** One Agent Run as an input/output pair: what its step was given and what it returned. */
 export const GetAgentRunIoInputSchema = z.object({ agentRunId: z.string().min(1) });
@@ -641,6 +684,12 @@ export type PreviewEvaluatorInput = z.input<typeof PreviewEvaluatorInputSchema>;
 export type PreviewEvaluatorOutput = z.infer<typeof PreviewEvaluatorOutputSchema>;
 export type ListStepAgentRunsInput = z.input<typeof ListStepAgentRunsInputSchema>;
 export type ListStepAgentRunsOutput = z.infer<typeof ListStepAgentRunsOutputSchema>;
+export type ListWrittenOutputsInput = z.input<typeof ListWrittenOutputsInputSchema>;
+export type ListWrittenOutputsOutput = z.infer<typeof ListWrittenOutputsOutputSchema>;
+export type CreateWrittenOutputInput = z.input<typeof CreateWrittenOutputInputSchema>;
+export type CreateWrittenOutputOutput = z.infer<typeof CreateWrittenOutputOutputSchema>;
+export type ArchiveWrittenOutputInput = z.input<typeof ArchiveWrittenOutputInputSchema>;
+export type WrittenOutputOutput = z.infer<typeof WrittenOutputOutputSchema>;
 export type GetAgentRunIoInput = z.input<typeof GetAgentRunIoInputSchema>;
 export type GetAgentRunIoOutput = z.infer<typeof GetAgentRunIoOutputSchema>;
 export type ListEvalCasesInput = z.input<typeof ListEvalCasesInputSchema>;

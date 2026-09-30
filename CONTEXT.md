@@ -511,6 +511,18 @@ _Avoid_: "validation rule", "assertion", "metric", "grader".
 One input fixture for a Workflow Step plus what its output must — or must not — contain.
 _Avoid_: "test case", "sample", "golden" (a case can be a negative one).
 
+**Label**:
+A person's pass/fail on one output for one **Evaluator** — the ground truth a judge
+is calibrated against. Not an **Eval Case**: a case is an input that is re-run; a
+label is a verdict on an output that already exists.
+_Avoid_: "positive/negative" for labels (those words belong to **Eval Cases**).
+
+**Written output**:
+A person's own example of a Workflow Step's output for one input, usually a real
+run's output changed so that it breaks a rule, labelled to calibrate a judge where
+production has no such output. Nothing re-runs it.
+_Avoid_: "synthetic run", "fake run" (it is never an Agent Run), "Eval Case".
+
 **Eval Dataset**:
 A versioned, frozen set of Eval Cases for one Workflow Step, drawn from production
 Agent Runs, synthesised, or written by hand. Namespace-scoped.

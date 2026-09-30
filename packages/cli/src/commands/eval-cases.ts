@@ -180,6 +180,53 @@ export const evalCaseEditCommand = defineCommand({
   },
 });
 
+export const evalWrittenOutputListCommand = defineCommand({
+  name: 'mediforce eval written-output-list',
+  description: 'List a step\'s written outputs — a person\'s examples of its output, labelled to calibrate a judge.',
+  args: { ...STEP_ARGS, 'include-archived': { type: 'boolean', description: 'Include archived ones' } },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.listWrittenOutputs({ ...stepFrom(args), includeArchived: args['include-archived'] === true ? 'true' : undefined });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    if (result.writtenOutputs.length === 0) output.stdout('No written outputs.');
+    for (const written of result.writtenOutputs) {
+      output.stdout(`${written.id}  ${written.basedOnAgentRunId === null ? 'written from nothing' : `from ${written.basedOnAgentRunId}`}${written.archived ? '  archived' : ''}  ${written.note ?? ''}`);
+    }
+    return 0;
+  },
+});
+
+export const evalWrittenOutputAddCommand = defineCommand({
+  name: 'mediforce eval written-output-add',
+  description: 'Add a written output from a JSON file: { result, basedOnAgentRunId?, stepInput?, note?, label?: { evaluatorId, passed, comment? }, uid? }. '
+    + 'Started from a production run, it takes that run\'s input.',
+  args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with the written output' } },
+  async run({ args, output, mediforce, jsonMode }) {
+    const body = readJsonFile(args.file) as Record<string, unknown>;
+    const result = await mediforce.evaluation.createWrittenOutput({ ...body, ...stepFrom(args) } as Parameters<typeof mediforce.evaluation.createWrittenOutput>[0]);
+    if (jsonMode) printJson(output, result);
+    else output.stdout(`Written output ${result.writtenOutput.id} added${result.score === null ? '' : `, labelled ${result.score.label}`}`);
+    return 0;
+  },
+});
+
+export const evalWrittenOutputArchiveCommand = defineCommand({
+  name: 'mediforce eval written-output-archive',
+  description: 'Archive a written output (--restore brings it back); an archived one leaves every judge\'s labels.',
+  args: {
+    writtenOutputId: { type: 'positional', required: true, description: 'Written output id' },
+    restore: { type: 'boolean', description: 'Restore instead of archive' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.archiveWrittenOutput({ writtenOutputId: args.writtenOutputId, archived: args.restore !== true });
+    if (jsonMode) printJson(output, result);
+    else output.stdout(`Written output ${result.writtenOutput.id} ${result.writtenOutput.archived ? 'archived' : 'restored'}`);
+    return 0;
+  },
+});
+
 export const evalDatasetListCommand = defineCommand({
   name: 'mediforce eval dataset-list',
   description: 'List a step\'s frozen Eval Dataset versions.',

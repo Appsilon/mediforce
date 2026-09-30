@@ -199,6 +199,10 @@ export async function createEvalCasesFromLabels(
   const skipped: CreateEvalCasesFromLabelsOutput['skipped'] = [];
   for (const label of await evaluatorLabels(scope, evaluator)) {
     const agentRunId = label.subject.id;
+    if (label.subject.type === 'written_output') {
+      skipped.push({ agentRunId, reason: 'a written output, not a production run' });
+      continue;
+    }
     if (existing.has(agentRunId)) {
       skipped.push({ agentRunId, reason: 'already a case' });
       continue;

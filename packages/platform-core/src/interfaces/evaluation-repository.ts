@@ -13,6 +13,7 @@ import type {
   McpEvalPolicy,
   McpRecording,
   SourceApproval,
+  WrittenOutput,
 } from '../schemas/evaluation';
 
 export interface McpRecordingFilter {
@@ -59,6 +60,12 @@ export interface EvaluationRepository {
   /** Newest first, archived cases included. */
   listCases(step: EvaluatedStep): Promise<EvalCase[]>;
   setCaseArchived(id: string, archived: boolean): Promise<void>;
+
+  createWrittenOutput(writtenOutput: WrittenOutput): Promise<WrittenOutput>;
+  getWrittenOutput(id: string): Promise<WrittenOutput | null>;
+  /** Newest first, archived ones included. */
+  listWrittenOutputs(step: EvaluatedStep): Promise<WrittenOutput[]>;
+  setWrittenOutputArchived(id: string, archived: boolean): Promise<void>;
 
   appendDatasetVersion(dataset: EvalDatasetVersion): Promise<EvalDatasetVersion>;
   getDatasetVersion(id: string): Promise<EvalDatasetVersion | null>;

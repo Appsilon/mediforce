@@ -1,5 +1,6 @@
 import {
   JUDGE_PASS_VALUE,
+  type AgentOutputEnvelope,
   type EvalCase,
   type EvaluatorCheck,
 } from '@mediforce/platform-core';
@@ -15,6 +16,8 @@ import { callOpenRouter } from '../../../services/openrouter-client';
 import { requireOpenRouterApiKey } from '../../../services/openrouter-key';
 import { runBuiltinCheck } from './builtin-checks';
 import type { EvaluationSubject } from './evaluation-subject';
+
+type LlmJudgeCheck = Extract<EvaluatorCheck, { kind: 'llm_judge' }>;
 
 const CODE_CHECK_TIMEOUT_MS = 2 * 60_000;
 const JUDGE_MAX_OUTPUT_TOKENS = 1000;
@@ -45,6 +48,59 @@ function openRouterJudgeClient(apiKey: string, model: string, onUsage: (usage: J
 
 function binary(agentRunId: string, passed: boolean, comment: string | null): EvaluatorOutcome {
   return { agentRunId, passed, value: passed ? 1 : 0, label: passed ? 'pass' : 'fail', comment, error: null };
+}
+
+/** An output a judge reads: a production run's, or a person's written one (then `processInstanceId` is null). */
+export interface JudgedOutput {
+  readonly id: string;
+  readonly namespace: string;
+  readonly stepId: string;
+  readonly processInstanceId: string | null;
+  readonly envelope: AgentOutputEnvelope;
+  readonly stepInput: Record<string, unknown> | null;
+}
+
+/**
+ * Asks an `llm_judge` about one output. A judge that answers with no listed
+ * choice comes back as `error`, never as a failed output. The outcome's
+ * `agentRunId` is the output's id.
+ */
+export async function runJudgeCheck(
+  scope: CallerScope,
+  check: LlmJudgeCheck,
+  output: JudgedOutput,
+  evalCase: EvalCase | null,
+  onJudgeUsage: (usage: JudgeUsage) => void = () => {},
+): Promise<EvaluatorOutcome> {
+  try {
+    const apiKey = await requireOpenRouterApiKey(scope, output.namespace);
+    const judge = new LlmJudgeReviewPlugin({
+      model: check.model,
+      rubric: check.rubric,
+      choices: check.choices,
+      stepInput: output.stepInput,
+      expectation: evalCase === null
+        ? null
+        : [`This is a ${evalCase.expectation} case.`, evalCase.notes].filter((part) => part !== null).join(' '),
+    });
+    const verdict = await judge.review({
+      stepId: output.stepId,
+      processInstanceId: output.processInstanceId ?? '',
+      executorOutput: output.envelope,
+      iterationNumber: 0,
+      llm: openRouterJudgeClient(apiKey, check.model, onJudgeUsage),
+    });
+    return {
+      agentRunId: output.id,
+      passed: verdict.value >= JUDGE_PASS_VALUE,
+      value: verdict.value,
+      label: verdict.choice,
+      comment: verdict.reasoning,
+      error: null,
+    };
+  } catch (err) {
+    return { agentRunId: output.id, passed: null, value: null, label: null, comment: null, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 /**
@@ -95,33 +151,15 @@ export async function runEvaluatorCheck(
         const verdict = await runBuiltinCheck(scope, check, result, evalCase);
         return binary(agentRun.id, verdict.passed, verdict.comment);
       }
-      case 'llm_judge': {
-        const apiKey = await requireOpenRouterApiKey(scope, subject.instance.namespace ?? '');
-        const judge = new LlmJudgeReviewPlugin({
-          model: check.model,
-          rubric: check.rubric,
-          choices: check.choices,
-          stepInput: subject.stepInput,
-          expectation: evalCase === null
-            ? null
-            : [`This is a ${evalCase.expectation} case.`, evalCase.notes].filter((part) => part !== null).join(' '),
-        });
-        const verdict = await judge.review({
+      case 'llm_judge':
+        return await runJudgeCheck(scope, check, {
+          id: agentRun.id,
+          namespace: subject.instance.namespace ?? '',
           stepId: agentRun.stepId,
           processInstanceId: agentRun.processInstanceId,
-          executorOutput: envelope,
-          iterationNumber: 0,
-          llm: openRouterJudgeClient(apiKey, check.model, onJudgeUsage),
-        });
-        return {
-          agentRunId: agentRun.id,
-          passed: verdict.value >= JUDGE_PASS_VALUE,
-          value: verdict.value,
-          label: verdict.choice,
-          comment: verdict.reasoning,
-          error: null,
-        };
-      }
+          envelope,
+          stepInput: subject.stepInput,
+        }, evalCase, onJudgeUsage);
     }
   } catch (err) {
     return {

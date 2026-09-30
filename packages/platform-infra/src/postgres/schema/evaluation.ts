@@ -112,6 +112,23 @@ export const evalCases = pgTable(
   }),
 );
 
+/** Written outputs (ADR-0023 D9): the record whole, listed by Step. `archived` is its only in-place write. */
+export const evalWrittenOutputs = pgTable(
+  'eval_written_outputs',
+  {
+    id: uuid('id').primaryKey(),
+    workspace: workspaceColumn(),
+    workflowName: text('workflow_name').notNull(),
+    stepId: text('step_id').notNull(),
+    archived: boolean('archived').notNull().default(false),
+    record: jsonb('record').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    stepIdx: index('eval_written_outputs_step_idx').on(table.workspace, table.workflowName, table.stepId, table.createdAt.desc()),
+  }),
+);
+
 export const evalDatasetVersions = pgTable(
   'eval_dataset_versions',
   {

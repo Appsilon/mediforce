@@ -194,6 +194,31 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect(await repo.listCases(otherStep)).toEqual([]);
     });
 
+    it('round-trips written outputs, newest first per step, and archives them', async () => {
+      const written = (id: string, createdAt: string, target: EvaluatedStep = step) => ({
+        ...target,
+        id,
+        stepInput: { events: [{ term: 'Neutropenia', anc: 0.4 }] },
+        result: { grade: 2, rationale: 'Not tied to the ANC.' },
+        basedOnAgentRunId: 'agent-run-1',
+        note: 'Grade 4 written as 2.',
+        origin: 'user' as const,
+        archived: false,
+        createdBy: 'author-1',
+        createdAt,
+      });
+      const older = written(randomUUID(), '2026-09-23T08:00:00.000Z');
+      const newer = written(randomUUID(), '2026-09-23T09:00:00.000Z');
+      await repo.createWrittenOutput(older);
+      await repo.createWrittenOutput(newer);
+      await repo.createWrittenOutput(written(randomUUID(), '2026-09-23T10:00:00.000Z', otherStep));
+      await repo.setWrittenOutputArchived(older.id, true);
+
+      expect((await repo.listWrittenOutputs(step)).map((row) => [row.id, row.archived])).toEqual([[newer.id, false], [older.id, true]]);
+      expect(await repo.getWrittenOutput(newer.id)).toEqual(newer);
+      expect(await repo.getWrittenOutput(randomUUID())).toBeNull();
+    });
+
     it('freezes Dataset versions, newest first, unique per step', async () => {
       const caseIds = [randomUUID(), randomUUID()];
       const base = { ...step, containsProductionData: true, createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z' };
