@@ -39,9 +39,15 @@ const AssistantCheckSchema = EvaluatorCheckSchema.describe(
   { kind: 'llm_judge', model: 'anthropic/claude-sonnet-4', rubric: 'Does the result explain its findings?', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
 ] });
 
+/** Models name rules in prose or snake_case; an Evaluator's name is kebab-case. */
+const AssistantEvaluatorNameSchema = z.string()
+  .describe('kebab-case: lowercase letters, digits and dashes, at most 63 characters')
+  .transform((name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 63).replace(/-+$/, ''))
+  .pipe(EvaluatorSchema.shape.name);
+
 /** Propose an Evaluator for the step. */
 export const ProposeEvaluatorToolSchema = z.object({
-  name: EvaluatorSchema.shape.name,
+  name: AssistantEvaluatorNameSchema,
   rule: z.string().min(1).max(2000),
   severity: EvaluatorSeveritySchema,
   check: AssistantCheckSchema,

@@ -16,6 +16,40 @@ function valueAtPath(input: unknown, path: readonly PropertyKey[]): unknown {
   return current;
 }
 
+const CODE_FENCE = /^```[a-z]*\s*([\s\S]*?)\s*```$/i;
+
+/** Escape the raw control characters (newlines in a script, tabs) a model leaves inside JSON strings. */
+function escapeControlCharactersInStrings(text: string): string {
+  let escaped = '';
+  let inString = false;
+  let backslashed = false;
+  for (const character of text) {
+    if (inString === true && backslashed === false && character < ' ') {
+      escaped += JSON.stringify(character).slice(1, -1);
+      continue;
+    }
+    if (backslashed === true) backslashed = false;
+    else if (character === '\\') backslashed = true;
+    else if (character === '"') inString = !inString;
+    escaped += character;
+  }
+  return escaped;
+}
+
+function decodeObjectString(value: string): object | undefined {
+  const trimmed = value.trim();
+  const unfenced = CODE_FENCE.exec(trimmed)?.[1] ?? trimmed;
+  for (const candidate of [unfenced, escapeControlCharactersInStrings(unfenced)]) {
+    try {
+      const decoded: unknown = JSON.parse(candidate);
+      if (decoded !== null && typeof decoded === 'object') return decoded;
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+}
+
 /** A model sometimes JSON-encodes a nested object into a string; decode those where the schema wants an object or array. */
 function decodeStringifiedObjects(rawArguments: unknown, issues: readonly z.core.$ZodIssue[]): unknown {
   const repaired = structuredClone(rawArguments);
@@ -28,18 +62,16 @@ function decodeStringifiedObjects(rawArguments: unknown, issues: readonly z.core
     if (parent === null || typeof parent !== 'object') continue;
     const value = (parent as Record<PropertyKey, unknown>)[key];
     if (typeof value !== 'string') continue;
-    try {
-      const decoded: unknown = JSON.parse(value);
-      if (decoded !== null && typeof decoded === 'object') {
-        (parent as Record<PropertyKey, unknown>)[key] = decoded;
-        changed = true;
-      }
-    } catch {
-      continue;
-    }
+    const decoded = decodeObjectString(value);
+    if (decoded === undefined) continue;
+    (parent as Record<PropertyKey, unknown>)[key] = decoded;
+    changed = true;
   }
   return changed ? repaired : undefined;
 }
+
+// Decoding one level can reveal another encoded one inside it (a check whose schema is a string too).
+const MAX_DECODE_PASSES = 3;
 
 /**
  * Validate a tool call's arguments against its registry schema, and on failure
@@ -52,20 +84,22 @@ export function parseToolArguments<T>(
   rawArguments: unknown,
   hint?: ToolIssueHint,
 ): ParsedToolArguments<T> {
-  const result = schema.safeParse(rawArguments);
-  if (result.success) return { ok: true, data: result.data };
-  const decoded = decodeStringifiedObjects(rawArguments, result.error.issues);
-  if (decoded !== undefined) {
-    const retried = schema.safeParse(decoded);
-    if (retried.success) return { ok: true, data: retried.data };
+  let decodedArguments = rawArguments;
+  let result = schema.safeParse(decodedArguments);
+  for (let pass = 0; pass < MAX_DECODE_PASSES && result.success === false; pass++) {
+    const decoded = decodeStringifiedObjects(decodedArguments, result.error.issues);
+    if (decoded === undefined) break;
+    decodedArguments = decoded;
+    result = schema.safeParse(decodedArguments);
   }
+  if (result.success) return { ok: true, data: result.data };
   const issues = result.error.issues.map((issue) => {
     const path = issue.path.join('.') || '(root)';
-    let received = valueAtPath(rawArguments, issue.path);
+    let received = valueAtPath(decodedArguments, issue.path);
     let describedPath = path;
     if (received === undefined && issue.path.length > 0) {
       const parentPath = issue.path.slice(0, -1);
-      const parent = valueAtPath(rawArguments, parentPath);
+      const parent = valueAtPath(decodedArguments, parentPath);
       if (parent !== undefined) {
         received = parent;
         describedPath = parentPath.join('.') || '(root)';
