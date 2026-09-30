@@ -191,6 +191,17 @@ export const ListStepAgentRunsOutputSchema = z.object({
   nextCursor: z.string().optional(),
 });
 
+/** One Agent Run as an input/output pair: what its step was given and what it returned. */
+export const GetAgentRunIoInputSchema = z.object({ agentRunId: z.string().min(1) });
+export const GetAgentRunIoOutputSchema = z.object({
+  agentRunId: z.string(),
+  status: AgentRunSchema.shape.status,
+  stepInput: z.record(z.string(), z.unknown()).nullable(),
+  result: z.unknown(),
+  reasoningSummary: z.string().nullable(),
+  confidence: z.number().nullable(),
+});
+
 export const ListEvalCasesInputSchema = EvaluatedStepSchema.extend({
   includeArchived: QueryBooleanSchema.optional(),
 });
@@ -630,6 +641,8 @@ export type PreviewEvaluatorInput = z.input<typeof PreviewEvaluatorInputSchema>;
 export type PreviewEvaluatorOutput = z.infer<typeof PreviewEvaluatorOutputSchema>;
 export type ListStepAgentRunsInput = z.input<typeof ListStepAgentRunsInputSchema>;
 export type ListStepAgentRunsOutput = z.infer<typeof ListStepAgentRunsOutputSchema>;
+export type GetAgentRunIoInput = z.input<typeof GetAgentRunIoInputSchema>;
+export type GetAgentRunIoOutput = z.infer<typeof GetAgentRunIoOutputSchema>;
 export type ListEvalCasesInput = z.input<typeof ListEvalCasesInputSchema>;
 export type ListEvalCasesOutput = z.infer<typeof ListEvalCasesOutputSchema>;
 export type CreateEvalCaseInput = z.input<typeof CreateEvalCaseInputSchema>;

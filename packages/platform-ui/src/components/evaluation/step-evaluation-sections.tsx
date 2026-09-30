@@ -43,6 +43,7 @@ import { cn } from '@/lib/utils';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { AgentLogPanel } from '@/components/agents/agent-log-panel';
+import { RunInputOutput, RunInputOutputDetails } from './run-input-output';
 import { useAgentRun } from '@/hooks/use-agent-runs';
 import { useEvalRun, useOptimisation, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { EvalRunReport, describePatch } from './eval-run-report';
@@ -620,6 +621,7 @@ function CaseRow({ step, evalCase, mayEdit, unfrozen }: {
   unfrozen: boolean;
 }) {
   const [editing, setEditing] = React.useState(false);
+  const [opened, setOpened] = React.useState(false);
   const edit = useStepEvaluationMutation(step, (values: CaseFormResult) => mediforce.evaluation.updateCase({
     caseId: evalCase.id,
     ...(values.name === evalCase.name ? {} : { name: values.name }),
@@ -658,7 +660,7 @@ function CaseRow({ step, evalCase, mayEdit, unfrozen }: {
           <p className="mt-1 text-xs text-muted-foreground">Saving adds the edited case and archives this one: a Dataset version frozen with it keeps it, and the next freeze takes the edit.</p>
         </div>
       ) : (
-        <details className="mt-0.5 text-xs" data-testid="eval-case-details">
+        <details className="mt-0.5 text-xs" data-testid="eval-case-details" onToggle={(event) => { if (event.currentTarget.open) setOpened(true); }}>
           <summary className="cursor-pointer text-muted-foreground">Details</summary>
           <div className="mt-1 space-y-1.5">
             <p><span className="text-muted-foreground">Source:</span> {CASE_SOURCES[evalCase.source]}{evalCase.sourceAgentRunId !== null && <> — run <span className="font-mono">{evalCase.sourceAgentRunId.slice(0, 8)}</span></>}</p>
@@ -669,10 +671,25 @@ function CaseRow({ step, evalCase, mayEdit, unfrozen }: {
               </p>
             )}
             <p><span className="text-muted-foreground">Expects:</span> {evalCase.notes ?? (evalCase.expectation === 'positive' ? 'an output that passes every counted Evaluator (no notes)' : 'no output to be accepted (no notes)')}</p>
-            <div>
-              <div className="text-muted-foreground">Input the step is given</div>
-              <pre className="mt-0.5 max-h-60 overflow-auto rounded bg-muted p-1.5 whitespace-pre-wrap">{JSON.stringify(evalCase.input, null, 2)}</pre>
-            </div>
+            {opened && evalCase.source === 'production' && evalCase.sourceAgentRunId !== null && (
+              <div>
+                <div className="mb-0.5 font-medium">The run you marked {evalCase.expectation}</div>
+                <RunInputOutput agentRunId={evalCase.sourceAgentRunId} />
+              </div>
+            )}
+            {evalCase.source === 'synthesized' && evalCase.sourceAgentRunId !== null && (
+              <>
+                <p className="text-muted-foreground">This changed input has no output of its own until an Eval Run runs it.</p>
+                <RunInputOutputDetails agentRunId={evalCase.sourceAgentRunId} summary="The source run's input and output, before the change" />
+              </>
+            )}
+            {evalCase.source === 'manual' && (
+              <p className="text-muted-foreground">Written by hand: it has no output until an Eval Run runs it.</p>
+            )}
+            <details>
+              <summary className="cursor-pointer text-muted-foreground">Input an Eval Run gives the step</summary>
+              <pre className="mt-0.5 max-h-60 overflow-auto rounded bg-muted p-1.5 whitespace-pre-wrap" data-testid="eval-case-input">{JSON.stringify(evalCase.input, null, 2)}</pre>
+            </details>
             {evalCase.workspaceSeedCommit !== null && (
               <p><span className="text-muted-foreground">Starts from workspace commit</span> <span className="font-mono">{evalCase.workspaceSeedCommit.slice(0, 12)}</span></p>
             )}
@@ -888,6 +905,9 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
         </div>
       )}
     >
+      <p className="text-xs text-muted-foreground" data-testid="eval-cases-purpose">
+        An Eval Case is an <span className="font-medium text-foreground">input</span> an Eval Run re-runs the step on, and what its new output should be — positive when a correct output exists, negative when the output it gave was wrong. A case grades nothing itself: the Evaluators grade each re-run&apos;s output. Pass/fail <span className="font-medium text-foreground">labels</span> on outputs are a different thing — they calibrate a judge, under Evaluators.
+      </p>
       {writing && <WriteCase step={step} cases={cases} onClose={() => setWriting(false)} />}
       {evaluation.cases.isLoading ? <Loading /> : cases.length === 0 ? (
         <p className="text-sm text-muted-foreground">No cases yet. Add production runs below, write one, or ask the assistant.</p>
@@ -901,8 +921,9 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
       {mayEdit && runs.length > 0 && (
         <details className="text-sm">
           <summary className="cursor-pointer text-xs text-muted-foreground">
-            Production runs to add ({runs.length}{evaluation.agentRuns.hasNextPage ? '+' : ''})
+            Production runs to add as Eval Cases ({runs.length}{evaluation.agentRuns.hasNextPage ? '+' : ''})
           </summary>
+          <p className="mt-1 text-xs text-muted-foreground">Open a run&apos;s input and output, then add it as a positive case (its output was right) or a negative one (it was wrong).</p>
           <ul className="mt-2 max-h-96 space-y-1 overflow-y-auto pr-1" data-testid="harvestable-runs">
             {runs.map((run) => (
               <li key={run.id} className="rounded border px-2 py-1.5 text-xs">
@@ -912,13 +933,18 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
                   <span className="font-mono text-muted-foreground" title={run.id}>{run.id.slice(0, 8)}</span>
                   <span className="ml-auto flex shrink-0 gap-1">
                     <button type="button" className={buttonClass} onClick={() => setLogRun(run)}>Log</button>
-                    <button type="button" className={buttonClass} onClick={() => harvest.mutate({ agentRunId: run.id, expectation: 'positive' })}>Add as good</button>
-                    <button type="button" className={buttonClass} onClick={() => harvest.mutate({ agentRunId: run.id, expectation: 'negative' })}>Add as bad</button>
+                    <InstantTooltip label="The output was right: an Eval Run re-runs this input and expects an output its Evaluators accept.">
+                      <button type="button" className={buttonClass} onClick={() => harvest.mutate({ agentRunId: run.id, expectation: 'positive' })}>Positive case</button>
+                    </InstantTooltip>
+                    <InstantTooltip label="The output was wrong: an Eval Run re-runs this input; the case's notes say what the output must not do.">
+                      <button type="button" className={buttonClass} onClick={() => harvest.mutate({ agentRunId: run.id, expectation: 'negative' })}>Negative case</button>
+                    </InstantTooltip>
                   </span>
                 </div>
                 {run.envelope !== null && run.envelope.reasoning_summary !== '' && (
                   <p className="mt-1 line-clamp-2 text-muted-foreground" title={run.envelope.reasoning_summary}>{run.envelope.reasoning_summary}</p>
                 )}
+                <RunInputOutputDetails agentRunId={run.id} />
               </li>
             ))}
           </ul>

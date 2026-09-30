@@ -26,6 +26,17 @@ function sectionKey(step: EvaluatedStep, section: Section) {
   return queryKeys.evaluation.section(step.namespace, step.workflowName, step.stepId, section);
 }
 
+/** What one Agent Run's step was given and what it returned; fetched only while `agentRunId` is set. */
+export function useAgentRunIo(agentRunId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.agentRunIo(agentRunId ?? ''),
+    queryFn: () => mediforce.evaluation.getAgentRunIo({ agentRunId: agentRunId! }),
+    enabled: agentRunId !== null,
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: stopRetryOn4xx,
+  });
+}
+
 /** The Step's live Evaluators with whether each counts. */
 export function useStepEvaluators(step: EvaluatedStep) {
   return useQuery({

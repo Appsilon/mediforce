@@ -19,6 +19,7 @@ export {
   archiveEvalCase,
   updateEvalCase,
 } from './eval-cases';
+export { getAgentRunIo } from './agent-run-io';
 export { createRedTeamEvalCases } from './red-team-cases';
 export { getStepDrift } from './drift';
 export { listEvalDatasets, freezeEvalDataset } from './eval-datasets';

@@ -17,15 +17,15 @@ export interface EvaluationSubject {
 }
 
 /**
- * Loads an Agent Run for evaluation, gated through its parent Workflow Run —
+ * Loads an Agent Run gated through its parent Workflow Run —
  * `agentRuns.getById` is not workspace-gated (#588), so a run in another
  * workspace reads as missing here. With `step`, the run must belong to it.
  */
-export async function loadEvaluationSubject(
+export async function loadGatedAgentRun(
   scope: CallerScope,
   agentRunId: string,
   step?: EvaluatedStep,
-): Promise<EvaluationSubject> {
+): Promise<{ agentRun: AgentRun; instance: ProcessInstance }> {
   const agentRun = await scope.agentRuns.getById(agentRunId);
   const instance = agentRun === null ? null : await scope.runs.getById(agentRun.processInstanceId);
   if (agentRun === null || instance === null) throw new NotFoundError(`Agent Run '${agentRunId}' not found`);
@@ -36,17 +36,29 @@ export async function loadEvaluationSubject(
   )) {
     throw new ValidationError(`Agent Run '${agentRunId}' is not a run of step '${step.stepId}' in '${step.workflowName}'`);
   }
+  return { agentRun, instance };
+}
 
+/** What the step was given, from the execution the run belongs to. */
+export async function loadStepInput(scope: CallerScope, agentRun: AgentRun, instance: ProcessInstance): Promise<Record<string, unknown> | null> {
   const executions = await scope.runs.getStepExecutions(instance.id);
   const execution = executions
     .filter((candidate) => candidate.stepId === agentRun.stepId && candidate.startedAt <= agentRun.startedAt)
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0];
-  const trajectory = await scope.agentTrajectories.list(agentRunId) ?? [];
+  return (execution?.input as Record<string, unknown> | undefined) ?? null;
+}
 
+/** Loads an Agent Run for evaluation, gated as `loadGatedAgentRun` is. */
+export async function loadEvaluationSubject(
+  scope: CallerScope,
+  agentRunId: string,
+  step?: EvaluatedStep,
+): Promise<EvaluationSubject> {
+  const { agentRun, instance } = await loadGatedAgentRun(scope, agentRunId, step);
   return {
     agentRun,
     instance,
-    stepInput: (execution?.input as Record<string, unknown> | undefined) ?? null,
-    trajectory,
+    stepInput: await loadStepInput(scope, agentRun, instance),
+    trajectory: await scope.agentTrajectories.list(agentRunId) ?? [],
   };
 }

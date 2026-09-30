@@ -375,11 +375,20 @@ recheck, needs `--expectation`. Cases are `dev` or
 `holdout`, carry a *contains production data* flag, and an `origin` — `user`,
 or `assistant` for an accepted Evaluation Assistant proposal.
 
-In the Evaluation tab, **Eval Cases → Production runs to add** lists the Step's
-finished production runs not yet harvested, newest first and a page at a time
-(**Load more**; `GET /api/evaluation/agent-runs` takes the previous page's
-`nextCursor` as `cursor`). Each shows its reasoning summary, and **Log** opens
-the run's execution log before you add it as good or bad.
+An Eval Case is not a label. A case is an *input* an Eval Run re-runs the step
+on; its expectation says what the new output should be, and the Evaluators grade
+it. A label (below, under calibration) is a person's pass/fail on one *output*
+for one Evaluator, and only labels calibrate a judge. The tab keeps the words
+apart: cases are positive or negative, labels pass or fail.
+
+In the Evaluation tab, **Eval Cases → Production runs to add as Eval Cases**
+lists the Step's finished production runs not yet harvested, newest first and a
+page at a time (**Load more**; `GET /api/evaluation/agent-runs` takes the
+previous page's `nextCursor` as `cursor`). Each shows its reasoning summary,
+opens its **Input and output** — what the step was given beside what it
+returned (`eval run-io <agentRunId>`, `GET /api/evaluation/agent-runs/:agentRunId/io`)
+— and **Log** opens the run's execution log before you add it as a **Positive
+case** (its output was right) or a **Negative case** (it was wrong).
 
 **Write a case** covers inputs production has not sent — above all negative
 cases, which nobody runs on purpose. Its input starts from an existing case's,
@@ -391,8 +400,10 @@ as a `manual` case, flagged as containing production data when the case it
 started from was.
 
 Each case in the list opens **Details**: where it came from, what it expects
-(its notes), the input the step is given, the workspace commit it starts from,
-and **Source run log** for a case made from a run. **Edit** changes its name,
+(its notes), for a production case the input and output of the run you marked
+(for a synthesized one, its source run's, before the change), the input an Eval
+Run gives the step, the workspace commit it starts from, and **Source run log**
+for a case made from a run. **Edit** changes its name,
 expectation, split, notes or input (`case-edit <caseId> --file`,
 `PATCH /api/evaluation/cases/:caseId`); **Archive** takes it out of the next
 freeze (`case-archive`). An edit is a new case that replaces the old one, which

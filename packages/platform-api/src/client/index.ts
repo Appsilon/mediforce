@@ -547,6 +547,8 @@ import {
   ApproveEvaluatorSourceInputSchema,
   ArchiveEvalCaseInputSchema,
   UpdateEvalCaseInputSchema,
+  GetAgentRunIoInputSchema,
+  GetAgentRunIoOutputSchema,
   ArchiveEvaluatorInputSchema,
   SetEvaluatorProductionInputSchema,
   ListEvaluatorLabelsInputSchema,
@@ -600,6 +602,8 @@ import {
   type ApproveEvaluatorSourceInput,
   type ArchiveEvalCaseInput,
   type UpdateEvalCaseInput,
+  type GetAgentRunIoInput,
+  type GetAgentRunIoOutput,
   type ArchiveEvaluatorInput,
   type SetEvaluatorProductionInput,
   type ListEvaluatorLabelsInput,
@@ -1084,6 +1088,8 @@ export class Mediforce {
     calibrateEvaluator: (input: CalibrateEvaluatorInput) => Promise<CalibrateEvaluatorOutput>;
     previewEvaluator: (input: PreviewEvaluatorInput) => Promise<PreviewEvaluatorOutput>;
     listStepAgentRuns: (input: ListStepAgentRunsInput) => Promise<ListStepAgentRunsOutput>;
+    /** What one Agent Run's step was given and what it returned. */
+    getAgentRunIo: (input: GetAgentRunIoInput) => Promise<GetAgentRunIoOutput>;
     listCases: (input: ListEvalCasesInput) => Promise<ListEvalCasesOutput>;
     createCase: (input: CreateEvalCaseInput) => Promise<EvalCaseOutput>;
     createCaseFromAgentRun: (input: CreateEvalCaseFromAgentRunInput) => Promise<EvalCaseOutput>;
@@ -2558,6 +2564,10 @@ export class Mediforce {
         'POST', '/api/evaluation/evaluators/preview', PreviewEvaluatorInputSchema.parse(input),
         PreviewEvaluatorOutputSchema, 'mediforce.evaluation.previewEvaluator',
       ),
+      getAgentRunIo: async (input) => {
+        const { agentRunId } = GetAgentRunIoInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/agent-runs/${encodeURIComponent(agentRunId)}/io`, GetAgentRunIoOutputSchema, 'mediforce.evaluation.getAgentRunIo');
+      },
       listStepAgentRuns: async (input) => {
         const validated = ListStepAgentRunsInputSchema.parse(input);
         const qs = toSearchParams({
