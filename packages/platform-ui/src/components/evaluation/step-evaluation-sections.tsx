@@ -30,8 +30,11 @@ import { useEvalRun, useOptimisation, useStepEvaluation, useStepEvaluationMutati
 import { EvalRunReport, describePatch } from './eval-run-report';
 import { QualificationStatusChip } from './step-qualification-badge';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
+import { CHECK_KINDS, CheckEditor, checkFromDraft, emptyCheckDraft, type CheckDraft, type CheckDraftKind } from './evaluator-check-editor';
 
 type StepEvaluation = ReturnType<typeof useStepEvaluation>;
+
+const SEVERITIES = EvaluatorSeveritySchema.options;
 
 function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
@@ -93,22 +96,6 @@ export function BriefSection({ step, data, mayEdit }: { step: EvaluatedStep; dat
     </Section>
   );
 }
-
-const CHECK_TEMPLATES: Record<EvaluatorCheck['kind'], string> = {
-  builtin: JSON.stringify({ kind: 'builtin', name: 'phi_leak' }, null, 2),
-  schema: JSON.stringify({ kind: 'schema', schema: { required: [] } }, null, 2),
-  code: JSON.stringify({
-    kind: 'code',
-    runtime: 'python',
-    source: "import json\ndata = json.load(open('/output/input.json'))\njson.dump({'passed': True}, open('/output/result.json', 'w'))",
-  }, null, 2),
-  llm_judge: JSON.stringify({
-    kind: 'llm_judge',
-    model: 'anthropic/claude-sonnet-4',
-    rubric: '',
-    choices: [{ label: 'pass', value: 1 }, { label: 'fail', value: 0 }],
-  }, null, 2),
-};
 
 /** Typing "Grades match CTCAE" gives "grades-match-ctcae" — the only form an Evaluator name takes. */
 export function toEvaluatorName(text: string): string {
@@ -176,38 +163,77 @@ function EvaluatorRow({ step, evaluator, mayEdit }: { step: EvaluatedStep; evalu
   );
 }
 
+interface EvaluatorFormValues {
+  name: string;
+  rule: string;
+  severity: EvaluatorSeverity;
+  draft: CheckDraft;
+}
+
+/** Name, severity, the kind of check and its fields. The kind comes from the dropdown, never typed. */
+function EvaluatorForm({ initial, submitLabel, pending, error, onSubmit, onCancel }: {
+  initial: EvaluatorFormValues;
+  submitLabel: string;
+  pending: boolean;
+  error: string | null;
+  onSubmit: (values: { name: string; rule: string; severity: EvaluatorSeverity; check: EvaluatorCheck }) => void;
+  onCancel: () => void;
+}) {
+  const [values, setValues] = React.useState(initial);
+  const [draftError, setDraftError] = React.useState<string | null>(null);
+  const submit = () => {
+    const result = checkFromDraft(values.draft);
+    if ('error' in result) {
+      setDraftError(result.error);
+      return;
+    }
+    setDraftError(null);
+    onSubmit({ name: values.name.replace(/-+$/, ''), rule: values.rule, severity: values.severity, check: result.check });
+  };
+  const shownError = draftError ?? error;
+  return (
+    <div className="space-y-2 rounded-md bg-muted/40 p-3" data-testid="evaluator-form">
+      <div className="flex gap-2">
+        <input
+          aria-label="Evaluator name"
+          className={cn(inputClass, 'flex-1')}
+          placeholder="Name, e.g. grades-match-ctcae"
+          title="Also names the Scores it writes: lowercase letters, digits and dashes."
+          value={values.name}
+          onChange={(event) => setValues({ ...values, name: toEvaluatorName(event.target.value) })}
+        />
+        <select aria-label="Severity" className={inputClass} value={values.severity} onChange={(event) => setValues({ ...values, severity: EvaluatorSeveritySchema.parse(event.target.value) })}>
+          {SEVERITIES.map((severity) => <option key={severity} value={severity}>{severity}</option>)}
+        </select>
+        <select
+          aria-label="Type"
+          className={inputClass}
+          value={values.draft.kind}
+          onChange={(event) => {
+            const kind = event.target.value as CheckDraftKind;
+            setValues({ ...values, draft: emptyCheckDraft(kind) });
+          }}
+        >
+          {(Object.keys(CHECK_KINDS) as CheckDraftKind[]).map((kind) => <option key={kind} value={kind}>{CHECK_KINDS[kind].label}</option>)}
+        </select>
+      </div>
+      <p className="text-xs text-muted-foreground">{CHECK_KINDS[values.draft.kind].description}</p>
+      <input aria-label="Rule" className={cn(inputClass, 'w-full')} placeholder="The rule, in plain language" value={values.rule} onChange={(event) => setValues({ ...values, rule: event.target.value })} />
+      <CheckEditor draft={values.draft} onChange={(draft) => setValues({ ...values, draft })} />
+      {shownError !== null && <p className="text-xs text-destructive">{shownError}</p>}
+      <div className="flex gap-2">
+        <button type="button" className={primaryButtonClass} disabled={values.name === '' || values.rule.trim() === '' || pending} onClick={submit}>{submitLabel}</button>
+        <button type="button" className={buttonClass} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 /** The Step's Evaluators with whether each counts (D9); code source is approved here, by a person. */
 export function EvaluatorsSection({ step, data, mayEdit }: { step: EvaluatedStep; data: StepEvaluation['evaluators']; mayEdit: boolean }) {
   const [adding, setAdding] = React.useState(false);
-  const [name, setName] = React.useState('');
-  const [rule, setRule] = React.useState('');
-  const [severity, setSeverity] = React.useState<'critical' | 'major' | 'minor'>('major');
-  const [kind, setKind] = React.useState<EvaluatorCheck['kind']>('schema');
-  const [checkText, setCheckText] = React.useState(CHECK_TEMPLATES.schema);
-  const [error, setError] = React.useState<string | null>(null);
-  const create = useStepEvaluationMutation(step, (check: EvaluatorCheck) =>
-    mediforce.evaluation.createEvaluator({ ...step, name: name.replace(/-+$/, ''), rule, severity, check }));
-
-  const submit = () => {
-    let check: EvaluatorCheck;
-    try {
-      check = JSON.parse(checkText) as EvaluatorCheck;
-    } catch {
-      setError('The check is not valid JSON.');
-      return;
-    }
-    setError(null);
-    create.mutate(check, {
-      onSuccess: () => {
-        setAdding(false);
-        setName('');
-        setRule('');
-        setKind('schema');
-        setCheckText(CHECK_TEMPLATES.schema);
-      },
-      onError: (err) => setError(err.message),
-    });
-  };
+  const create = useStepEvaluationMutation(step, (values: { name: string; rule: string; severity: EvaluatorSeverity; check: EvaluatorCheck }) =>
+    mediforce.evaluation.createEvaluator({ ...step, ...values }));
 
   const evaluators = data.data?.evaluators ?? [];
   return (
@@ -218,44 +244,14 @@ export function EvaluatorsSection({ step, data, mayEdit }: { step: EvaluatedStep
         <ul className="space-y-2">{evaluators.map((evaluator) => <EvaluatorRow key={evaluator.id} step={step} evaluator={evaluator} mayEdit={mayEdit} />)}</ul>
       )}
       {adding && (
-        <div className="space-y-2 rounded-md bg-muted/40 p-3">
-          <div className="flex gap-2">
-            <input
-              aria-label="Evaluator name"
-              className={cn(inputClass, 'flex-1')}
-              placeholder="Name, e.g. grades-match-ctcae"
-              title="Also names the Scores it writes: lowercase letters, digits and dashes."
-              value={name}
-              onChange={(event) => setName(toEvaluatorName(event.target.value))}
-            />
-            <select className={inputClass} value={severity} onChange={(event) => setSeverity(event.target.value as typeof severity)}>
-              <option value="critical">critical</option>
-              <option value="major">major</option>
-              <option value="minor">minor</option>
-            </select>
-            <select
-              className={inputClass}
-              aria-label="Kind"
-              value={kind}
-              onChange={(event) => {
-                const selected = event.target.value as EvaluatorCheck['kind'];
-                setKind(selected);
-                setCheckText(CHECK_TEMPLATES[selected]);
-              }}
-            >
-              <option value="schema">schema</option>
-              <option value="code">code</option>
-              <option value="llm_judge">llm_judge</option>
-            </select>
-          </div>
-          <input className={cn(inputClass, 'w-full')} placeholder="The rule, in plain language" value={rule} onChange={(event) => setRule(event.target.value)} />
-          <textarea className={cn(inputClass, 'w-full min-h-32 font-mono text-xs')} value={checkText} onChange={(event) => setCheckText(event.target.value)} />
-          {error !== null && <p className="text-xs text-destructive">{error}</p>}
-          <div className="flex gap-2">
-            <button type="button" className={primaryButtonClass} disabled={name === '' || rule === '' || create.isPending} onClick={submit}>Create</button>
-            <button type="button" className={buttonClass} onClick={() => setAdding(false)}>Cancel</button>
-          </div>
-        </div>
+        <EvaluatorForm
+          initial={{ name: '', rule: '', severity: 'major', draft: emptyCheckDraft('schema') }}
+          submitLabel="Create"
+          pending={create.isPending}
+          error={create.error?.message ?? null}
+          onSubmit={(values) => create.mutate(values, { onSuccess: () => setAdding(false) })}
+          onCancel={() => setAdding(false)}
+        />
       )}
     </Section>
   );
@@ -390,8 +386,6 @@ export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep;
     </Section>
   );
 }
-
-const SEVERITIES = EvaluatorSeveritySchema.options;
 
 type CriteriaDraft = Record<EvaluatorSeverity, { minPassRate: string; minPassHatK: string }>;
 
