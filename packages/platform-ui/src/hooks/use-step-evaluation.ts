@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EvaluatedStep } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
@@ -19,6 +19,8 @@ type Section =
   | 'drift'
   | `qualification:${number | 'runnable'}`
   | `labels:${string}`;
+
+const STEP_AGENT_RUNS_PAGE = 20;
 
 function sectionKey(step: EvaluatedStep, section: Section) {
   return queryKeys.evaluation.section(step.namespace, step.workflowName, step.stepId, section);
@@ -74,9 +76,11 @@ export function useStepEvaluation(step: EvaluatedStep) {
     criteria: useQuery({ queryKey: sectionKey(step, 'criteria'), queryFn: () => mediforce.evaluation.getAcceptanceCriteria(step), ...options }),
     qualification: useStepQualification(step),
     drift: useQuery({ queryKey: sectionKey(step, 'drift'), queryFn: () => mediforce.evaluation.getDrift(step), ...options }),
-    agentRuns: useQuery({
+    agentRuns: useInfiniteQuery({
       queryKey: sectionKey(step, 'agent-runs'),
-      queryFn: () => mediforce.evaluation.listStepAgentRuns({ ...step, limit: 10 }),
+      queryFn: ({ pageParam }) => mediforce.evaluation.listStepAgentRuns({ ...step, limit: STEP_AGENT_RUNS_PAGE, cursor: pageParam }),
+      initialPageParam: undefined as string | undefined,
+      getNextPageParam: (page) => page.nextCursor,
       ...options,
     }),
   };

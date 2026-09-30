@@ -179,8 +179,14 @@ export const PreviewEvaluatorOutputSchema = z.object({ results: z.array(Evaluato
 /** The Step's finished production Agent Runs, newest first — dry runs excluded. */
 export const ListStepAgentRunsInputSchema = EvaluatedStepSchema.extend({
   limit: z.coerce.number().int().min(1).max(50).default(20),
+  /** The previous page's `nextCursor`. */
+  cursor: z.string().min(1).optional(),
 });
-export const ListStepAgentRunsOutputSchema = z.object({ runs: z.array(AgentRunSchema) });
+export const ListStepAgentRunsOutputSchema = z.object({
+  runs: z.array(AgentRunSchema),
+  /** Present while older runs remain. */
+  nextCursor: z.string().optional(),
+});
 
 export const ListEvalCasesInputSchema = EvaluatedStepSchema.extend({
   includeArchived: QueryBooleanSchema.optional(),

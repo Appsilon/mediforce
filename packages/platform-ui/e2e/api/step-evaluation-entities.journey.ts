@@ -5,6 +5,7 @@ import {
   EvaluatorOutputSchema,
   FreezeEvalDatasetOutputSchema,
   GetMcpEvalPolicyOutputSchema,
+  ListStepAgentRunsOutputSchema,
   ListEvalCasesOutputSchema,
   ListEvaluatorsOutputSchema,
   PreviewEvaluatorOutputSchema,
@@ -337,5 +338,27 @@ test.describe('Step Evaluation entities — API E2E', () => {
       expect(previewed.status(), await previewed.text()).toBe(200);
       expect(PreviewEvaluatorOutputSchema.parse(await previewed.json()).results).toEqual([]);
     });
+  });
+});
+
+test.describe('Step Evaluation production runs — API E2E', () => {
+  test('the step\'s finished production runs page by cursor, newest first', async ({ request }) => {
+    const workflowName = `e2e-eval-step-runs-${randomUUID().slice(0, 8)}`;
+    const workflow = agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } });
+    const older = (await awaitFinishedAgentRun(request, await startRun(request, workflow))).id;
+    const newer = (await awaitFinishedAgentRun(request, await startRun(request, workflow))).id;
+    const query = `namespace=${TEST_ORG_HANDLE}&workflowName=${workflowName}&stepId=grade-aes&limit=1`;
+
+    const firstRes = await request.get(`/api/evaluation/agent-runs?${query}`, { headers: AUTH_HEADERS });
+    expect(firstRes.status(), await firstRes.text()).toBe(200);
+    const first = ListStepAgentRunsOutputSchema.parse(await firstRes.json());
+    expect(first.runs.map((run) => run.id)).toEqual([newer]);
+    expect(first.nextCursor).toEqual(expect.any(String));
+
+    const secondRes = await request.get(`/api/evaluation/agent-runs?${query}&cursor=${encodeURIComponent(first.nextCursor!)}`, { headers: AUTH_HEADERS });
+    expect(secondRes.status(), await secondRes.text()).toBe(200);
+    const second = ListStepAgentRunsOutputSchema.parse(await secondRes.json());
+    expect(second.runs.map((run) => run.id)).toEqual([older]);
+    expect(second.nextCursor).toBeUndefined();
   });
 });

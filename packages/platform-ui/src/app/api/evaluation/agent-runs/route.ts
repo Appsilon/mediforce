@@ -12,6 +12,7 @@ export const GET = createRouteAdapter(
       workflowName: params.get('workflowName') ?? undefined,
       stepId: params.get('stepId') ?? undefined,
       limit: params.get('limit') ?? undefined,
+      cursor: params.get('cursor') ?? undefined,
     };
   },
   listStepAgentRuns,
