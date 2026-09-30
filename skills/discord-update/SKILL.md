@@ -44,7 +44,7 @@ Identify the key facts: what shipped / changed / broke, the specific component o
 
 **Pick the opening verb to match the change.**
 - User-facing features → `Shipped` / `Just shipped` / `I created`.
-- Process / tooling / internal infra → lead with the **outcome itself**, not a "Shipped X" frame. Example: `We now have a weekly CHANGELOG…` reads as something the community gains; `Shipped a weekly CHANGELOG` reads as a release announcement, which is the wrong frame for plumbing.
+- Process / tooling / internal infra → lead with the **outcome itself**, not a "Shipped X" frame. Example: `Releases now publish straight from the CHANGELOG…` reads as something the community gains; `Shipped a release workflow` reads as a release announcement, which is the wrong frame for plumbing.
 - Bugfixes → `Fixed`.
 - **Perf / DX improvements** → personal benefit framing works well: `I [did X], should [help with reader's day-to-day]:`. Example: `I sped up our e2e tests, should make development more smooth:`. Connects sender → effort → audience benefit in one breath. Beats bare "X is now Y" because it tells the reader why they should care.
 
@@ -78,8 +78,8 @@ Output short first, then `---`, then detailed. Both stand alone.
   - Bad: "We refactored the workflow copy handler across API, CLI, and SDK."
   - Good: "You can now copy any workflow into your own namespace and edit it freely — no fork, no upstream sync to maintain."
 - **Discord-safe links.** Bare `#NNN`, `PR #NNN`, `issue #NNN` do NOT auto-link on Discord (only GitHub renders them). Always write `[#NNN](https://github.com/Appsilon/mediforce/pull/NNN)` so the link works in Discord, Slack, blogs, and GitHub alike. Same for external URLs — use `[label](url)`, never bare URLs except for short standalone "Address:" lines.
-- **Actionable hook, not passive description.** Tell the reader what *they* can now do or should do, not just "this happens". `Every non-trivial PR drops a bullet` reads like magic; `Every non-trivial PR should add a bullet (we have a /add-changelog-entry skill for that)` invites the reader to participate and points them at the tool.
-- **Active voice + real ownership.** If a human is in the loop, name the actor. "PRs should add a bullet" beats "PRs drop a bullet" — the latter falsely implies automation that doesn't exist.
+- **Actionable hook, not passive description.** Tell the reader what *they* can now do or should do, not just "this happens". `Tests run on every PR` reads like magic; `Every PR should add a test (we have a /new-test skill for that)` invites the reader to participate and points them at the tool.
+- **Active voice + real ownership.** If a human is in the loop, name the actor. "PRs should add a test" beats "PRs get a test" — the latter falsely implies automation that doesn't exist.
 - **No marketing language.** No "exciting", "thrilled", "game-changing", "revolutionary", "powerful". Zero adjectives that sell.
 - **Be specific.** Name the component, the PR, the dialog, the CLI command. Vague is worse than short.
 - **Keep it short.** 3-8 sentences. Discord, not a blog.
@@ -128,7 +128,7 @@ These three posts are the reference style. New output should feel like these —
 - Enumerate the surface area when it spans layers: `API, CLI, SDK, and a UI dialog` — only if that matters to the reader.
 - Call out defaults / fallback in a separate sentence: "If these are not defined, workflows will use the default Accept/Revise buttons that we had so far."
 - For tools / mini-apps: include Address + auth hint (where key lives) on their own lines.
-- If the update introduces a process the reader participates in, add a one-clause **hook** pointing them at the tool: "(we have a `/add-changelog-entry` skill for that)".
+- If the update introduces a process the reader participates in, add a one-clause **hook** pointing them at the tool: "(we have a `/new-test` skill for that)".
 - No mandatory closing question. Hooks are not questions — they're invitations.
 - **Cut secondary details first.** Cache hit edge cases, opt-in flags, perf footnotes, "and also we did X" — drop them. If the reader's daily action doesn't change, the detail isn't earning its line. The PR description carries the long tail.
 

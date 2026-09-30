@@ -99,9 +99,8 @@ Two branches are permanent: `main` (default, deploys to staging via
 triggers on every push to it). Everything else on `origin` is temporary.
 
 Work branches are named `<type>/<slug>`, e.g. `feat/cron-trigger-management`,
-`fix/1158-agent-time-budget-overhead`. Bots own their own prefixes: `renovate/*`
-(Renovate recreates and drops these itself) and `changelog/cut-<sunday>` (one per
-weekly run of `changelog-cut.yml`, disposable once its PR merges).
+`fix/1158-agent-time-budget-overhead`. Bots own their own prefix: `renovate/*`
+(Renovate recreates and drops these itself).
 
 **Retention rule:**
 

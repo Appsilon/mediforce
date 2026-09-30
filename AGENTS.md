@@ -29,7 +29,7 @@ Treat it as drift: surface it and fix it in the same task.
 ## Per-task workflow
 
 ```
-understand → simplify → write test (RED) → implement (GREEN) → self-review → log → docs → ship
+understand → simplify → write test (RED) → implement (GREEN) → self-review → docs → ship
 ```
 
 1. **Simplify first.** Before coding, ask: *can this be smaller?* Cut layers,
@@ -118,11 +118,13 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    clever workarounds. Voice input: interpret intent. NEVER use the
    `AskUserQuestion` tool — write a/b/c/... in plain text.
 
-10. **Log it via `/add-changelog-entry`.** Every non-trivial PR appends a
-   one-line bullet under `## [Unreleased]` in `CHANGELOG.md` using
-   Keep-a-Changelog categories. Group several PRs covering one thing as a
-   nested list. Skip only for trivial edits. Weekly cut is automated —
-   never edit dated `## [YYYY-MM-DD]` sections by hand.
+10. **Changelogs are human-driven. Don't touch `CHANGELOG.md`.** It holds
+   released versions, written by a developer in the release PR, and a
+   `vX.Y.Z` tag publishes that section as the GitHub release. `## [Unreleased]`
+   stays empty unless a developer writes in it by hand. Feature PRs add no
+   entry, and no agent, hook or workflow ever fills it. Never run
+   `/add-changelog-entry` yourself: a developer invokes it at release time to
+   draft the section, then edits and owns it.
 
 11. **Sync the docs via `/sync-docs`.** Before reporting done, run it — with no
     arguments it checks what *this session* changed and what that made untrue,
