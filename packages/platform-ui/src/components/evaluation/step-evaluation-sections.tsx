@@ -303,6 +303,21 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
 
 type McpEvalMode = McpEvalServerPolicy['mode'];
 
+const MCP_MODES: Record<McpEvalMode, { label: string; description: string }> = {
+  deny: {
+    label: 'Deny',
+    description: 'The agent cannot use this server during a trial — its tools are not offered.',
+  },
+  live: {
+    label: 'Live',
+    description: 'Calls go to the real server. Every call and its answer is recorded per case, so later runs can replay it.',
+  },
+  replay: {
+    label: 'Replay',
+    description: 'Nothing reaches the server: calls are answered from what a live trial of the same case recorded. A call no recording answers gets an error.',
+  },
+};
+
 /**
  * What each MCP server of the Step's agent may do in a trial (D6); unnamed
  * servers are denied. A live trial records what a server answers, per case, for
@@ -323,27 +338,36 @@ export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep;
   };
   return (
     <Section title="MCP servers in eval trials">
+      <p className="text-xs text-muted-foreground">
+        What the step&apos;s agent may do with each of its MCP servers while an Eval Run tries it. Record with Live once, then Replay for repeatable runs that touch nothing outside.
+      </p>
       {data.isLoading ? <Loading /> : (
-        <ul className="space-y-1 text-sm">
+        <ul className="space-y-2 text-sm">
           {servers.map((server) => (
-            <li key={server.name} className="flex items-center gap-2">
-              <span className="font-mono text-xs">{server.name}</span>
-              {server.mode === 'live' && server.denyTools !== undefined && server.denyTools.length > 0 && (
-                <span className="text-xs text-muted-foreground">denied tools: {server.denyTools.join(', ')}</span>
-              )}
-              <span className="text-xs text-muted-foreground">
-                recorded for {server.recordedCaseIds.length} case{server.recordedCaseIds.length === 1 ? '' : 's'}
-              </span>
-              <select
-                className={cn(inputClass, 'ml-auto text-xs')}
-                value={server.mode}
-                disabled={!mayEdit || save.isPending}
-                onChange={(event) => setMode(server.name, McpEvalServerPolicySchema.shape.mode.parse(event.target.value))}
-              >
-                <option value="deny">deny{server.defaulted ? ' (default)' : ''}</option>
-                <option value="live">live</option>
-                <option value="replay">replay</option>
-              </select>
+            <li key={server.name} className="space-y-0.5" data-testid="mcp-policy-server">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs">{server.name}</span>
+                {server.mode === 'live' && server.denyTools !== undefined && server.denyTools.length > 0 && (
+                  <span className="text-xs text-muted-foreground">denied tools: {server.denyTools.join(', ')}</span>
+                )}
+                <InstantTooltip label="Replay can answer only the cases a Live trial recorded.">
+                  <span className="text-xs text-muted-foreground">
+                    recorded for {server.recordedCaseIds.length} case{server.recordedCaseIds.length === 1 ? '' : 's'}
+                  </span>
+                </InstantTooltip>
+                <select
+                  aria-label={`${server.name} mode`}
+                  className={cn(inputClass, 'ml-auto text-xs')}
+                  value={server.mode}
+                  disabled={!mayEdit || save.isPending}
+                  onChange={(event) => setMode(server.name, McpEvalServerPolicySchema.shape.mode.parse(event.target.value))}
+                >
+                  {McpEvalServerPolicySchema.shape.mode.options.map((mode) => (
+                    <option key={mode} value={mode}>{MCP_MODES[mode].label}{mode === 'deny' && server.defaulted ? ' (default)' : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-xs text-muted-foreground">{MCP_MODES[server.mode].description}</p>
             </li>
           ))}
         </ul>
