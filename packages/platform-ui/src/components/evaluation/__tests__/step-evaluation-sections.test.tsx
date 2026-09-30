@@ -1,14 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { BriefSection, DriftAlert, McpPolicySection, toEvaluatorName } from '../step-evaluation-sections';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { BriefSection, DriftAlert, EvaluatorsSection, McpPolicySection, toEvaluatorName } from '../step-evaluation-sections';
 
 vi.mock('@/hooks/use-step-evaluation', () => ({
-  useStepEvaluationMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useStepEvaluationMutation: (_step: unknown, mutationFn: (value: unknown) => unknown) => ({
+    mutate: (value: unknown) => { void mutationFn(value); },
+    isPending: false,
+    error: null,
+  }),
 }),);
 
-vi.mock('@/lib/mediforce', () => ({
-  mediforce: { evaluation: { setBrief: vi.fn() } },
+const evaluation = vi.hoisted(() => ({
+  setBrief: vi.fn(),
+  createEvaluator: vi.fn(),
+  addEvaluatorVersion: vi.fn(),
 }));
+vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
 
 describe('BriefSection', () => {
   it('renders the Evaluation Brief as Markdown', () => {
@@ -84,5 +91,40 @@ describe('toEvaluatorName', () => {
     expect(toEvaluatorName('Grades match CTCAE')).toBe('grades-match-ctcae');
     expect(toEvaluatorName(' No PHI_leak!')).toBe('no-phi-leak-');
     expect(toEvaluatorName('x'.repeat(80))).toHaveLength(63);
+  });
+});
+
+describe('EvaluatorsSection', () => {
+  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+
+  function openForm() {
+    render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [] } } as never} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.change(screen.getByLabelText('Evaluator name'), { target: { value: 'grades valid' } });
+    fireEvent.change(screen.getByLabelText('Rule'), { target: { value: 'Every grade is 1 to 5.' } });
+  }
+
+  it('builds a code check from a language and a source, with no kind to type', () => {
+    openForm();
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'code' } });
+    fireEvent.change(screen.getByLabelText('Language'), { target: { value: 'javascript' } });
+    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'process.exit(0)' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(evaluation.createEvaluator).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'grades-valid',
+      severity: 'major',
+      check: { kind: 'code', runtime: 'javascript', source: 'process.exit(0)' },
+    }));
+  });
+
+  it('says what is wrong with a schema that is not JSON instead of sending it', () => {
+    evaluation.createEvaluator.mockClear();
+    openForm();
+    fireEvent.change(screen.getByLabelText('JSON Schema'), { target: { value: '{ nope' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(screen.getByText('The schema is not valid JSON.')).toBeTruthy();
+    expect(evaluation.createEvaluator).not.toHaveBeenCalled();
   });
 });
