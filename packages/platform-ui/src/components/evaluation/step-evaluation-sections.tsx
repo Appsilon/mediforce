@@ -61,6 +61,9 @@ export function BriefSection({ step, data, mayEdit }: { step: EvaluatedStep; dat
         <button type="button" className={buttonClass} onClick={() => setDraft(brief?.text ?? '')}>{brief === null ? 'Write' : 'Edit'}</button>
       )}
     >
+      <p className="text-xs text-muted-foreground" data-testid="brief-purpose">
+        The step&apos;s context of use: what it is for, who relies on its output, which failures matter most. The assistant reads it on every turn to plan Evaluators and propose Acceptance Criteria, and a Step Qualification cites the Brief version its Eval Run was prepared under — so a step needs a Brief before it can be qualified.
+      </p>
       {data.isLoading ? <Loading /> : draft !== null ? (
         <div className="space-y-2">
           <textarea
@@ -501,7 +504,7 @@ export function QualificationSection({ data }: { data: StepEvaluation['qualifica
     <Section title="Step Qualification" action={status !== undefined && <QualificationStatusChip status={status.status} />}>
       {data.isLoading || status === undefined ? <Loading /> : qualification === null ? (
         <p className="text-sm text-muted-foreground">
-          Not qualified. Set Acceptance Criteria, run the step, and sign a Step Qualification from the run&apos;s report. It is informational: nothing is blocked without one.
+          Not qualified. Write an Evaluation Brief, set Acceptance Criteria, run the step, and sign a Step Qualification from the run&apos;s report. It is informational: nothing is blocked without one.
         </p>
       ) : (
         <div className="space-y-1.5 text-xs" data-testid="step-qualification">
