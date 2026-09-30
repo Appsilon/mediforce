@@ -81,6 +81,7 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   propose_evaluator_version: 'Drafting a new evaluator version',
   propose_eval_case: 'Drafting an eval case',
   propose_perturbed_case: 'Synthesizing an eval case',
+  propose_case_suite: 'Proposing a built-in case suite',
   propose_outputs_to_label: 'Picking outputs to label',
   propose_brief: 'Drafting the brief',
   propose_acceptance_criteria: 'Drafting Acceptance Criteria',

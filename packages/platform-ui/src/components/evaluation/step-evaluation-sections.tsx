@@ -419,13 +419,20 @@ function BuiltinCaseSuites({ step, evaluation }: { step: EvaluatedStep; evaluati
     && evalCase.name.startsWith(`${info.casePrefix}: `)
     && evalCase.name.endsWith(` in ${target}`)).length;
   const graded = evaluators.some((evaluator) => evaluator.latest.check.kind === 'builtin' && evaluator.latest.check.name === info.grader);
+  const addGrader = useStepEvaluationMutation(step, () => mediforce.evaluation.createEvaluator({
+    ...step,
+    name: toEvaluatorName(info.grader),
+    rule: BUILTIN_CHECKS[info.grader].label,
+    severity: 'major',
+    check: { kind: 'builtin', name: info.grader },
+  }));
 
   return (
     <details className="text-sm" data-testid="builtin-case-suites">
-      <summary className="cursor-pointer text-xs text-muted-foreground">Built-in case suites</summary>
+      <summary className="cursor-pointer text-xs text-muted-foreground">Built-in case suites — injection and robustness cases, written for you</summary>
       <div className="mt-2 space-y-2 text-xs">
-        <p className="text-muted-foreground">
-          The platform writes these cases for you from one production run: it changes one field of that run&apos;s input and expects the output the run gave. A built-in Evaluator grades each suite.
+        <p className="text-muted-foreground" data-testid="builtin-suites-purpose">
+          Two risks production runs rarely show: the agent obeying an instruction hidden in its data (prompt injection), and its answer changing when the input is only reworded (robustness). Pick a production run and a field of its input: the platform writes the cases — copies of that run&apos;s input with the field changed — into the Eval Cases above, where each opens, edits and archives like any case. Every case expects the output the run gave, and a built-in Evaluator grades it in an Eval Run. The assistant can propose a suite too.
         </p>
         <label className="flex items-center gap-1">Suite
           <select aria-label="Suite" className={inputClass} value={suite} onChange={(event) => setSuite(RedTeamSuiteSchema.parse(event.target.value))}>
@@ -433,9 +440,13 @@ function BuiltinCaseSuites({ step, evaluation }: { step: EvaluatedStep; evaluati
           </select>
         </label>
         <p className="text-muted-foreground">{info.description}</p>
-        <p className={graded ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-300'} data-testid="builtin-suite-grader">
-          Graded by the built-in &ldquo;{BUILTIN_CHECKS[info.grader].label}&rdquo; Evaluator{graded ? '.' : ' — this step has none yet: add it under Evaluators to grade these cases.'}
-        </p>
+        <div className={cn('flex flex-wrap items-center gap-2', graded ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-300')} data-testid="builtin-suite-grader">
+          <span>Graded by the built-in &ldquo;{BUILTIN_CHECKS[info.grader].label}&rdquo; Evaluator{graded ? '.' : ' — this step has none yet, so nothing would grade these cases.'}</span>
+          {!graded && (
+            <button type="button" className={buttonClass} disabled={addGrader.isPending} onClick={() => addGrader.mutate(undefined)}>Add it</button>
+          )}
+          {addGrader.error !== null && <span className="text-destructive">{addGrader.error.message}</span>}
+        </div>
         {runs.length === 0 ? (
           <p className="text-muted-foreground">The step has no production runs to start from yet.</p>
         ) : (

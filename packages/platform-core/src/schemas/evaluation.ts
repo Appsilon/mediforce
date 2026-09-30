@@ -189,6 +189,20 @@ export const EvalCasePerturbationSchema = z.object({
 export const EvalCaseInputPartSchema = z.enum(['triggerPayload', 'previousStepOutputs', 'previousRun']);
 
 /**
+ * The built-in case suites (ADR-0023 phase 5a), each written by the platform
+ * from one production run: `prompt_injection` appends injected instructions to
+ * a text field; `robustness` rewrites a field without changing what it says.
+ */
+export const RED_TEAM_SUITES = ['prompt_injection', 'robustness'] as const;
+export const RedTeamSuiteSchema = z.enum(RED_TEAM_SUITES);
+
+/** One value in an Eval Case input: `path` walks keys (and array indexes, as digits) below `part`. */
+export const EvalCaseInputTargetSchema = z.object({
+  part: EvalCaseInputPartSchema,
+  path: z.array(z.string().min(1)).min(1),
+});
+
+/**
  * One change to a case input. `path` walks keys (and array indexes, as
  * digits) below `part`; `set` may add the last key, `remove` needs it to exist.
  */

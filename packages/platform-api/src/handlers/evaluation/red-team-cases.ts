@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
-import type { EvalCaseInputChange } from '@mediforce/platform-core';
+import type { EvalCaseInput, EvalCaseInputChange } from '@mediforce/platform-core';
 import type {
   CreateRedTeamEvalCasesInputSchema,
   CreateRedTeamEvalCasesOutput,
@@ -79,6 +79,28 @@ function robustnessVariants(value: unknown, where: string): Variant[] {
 }
 
 /**
+ * The changes a suite makes to the value at `target` of a case input —
+ * computed, not written, so an Evaluation Assistant proposal of the suite is
+ * checked against the real run before a person sees it.
+ */
+export function redTeamSuiteVariants(
+  caseInput: EvalCaseInput,
+  { suite, target, baseAgentRunId }: Pick<Input, 'suite' | 'target' | 'baseAgentRunId'>,
+): Variant[] {
+  const { part, path } = target;
+  const where = `'${[part, ...path].join('.')}'`;
+  const value = inputValueAt(caseInput, part, path);
+  if (value === undefined) throw new ValidationError(`${where} is not in the input of Agent Run '${baseAgentRunId}'`);
+  if (suite === 'prompt_injection') {
+    if (typeof value !== 'string') throw new ValidationError(`${where} is not text, so an instruction cannot be injected into it`);
+    return injectionVariants(value);
+  }
+  const variants = robustnessVariants(value, where).filter((variant) => JSON.stringify(variant.value) !== JSON.stringify(value));
+  if (variants.length === 0) throw new ValidationError(`${where} has no change that keeps its meaning but alters it`);
+  return variants;
+}
+
+/**
  * A red-team or robustness suite from one production Agent Run: one Eval Case
  * per built-in injection or meaning-preserving change of the value at
  * `target`. Each expects the acceptable output the original run gave, so it is
@@ -91,17 +113,7 @@ export async function createRedTeamEvalCases(input: Input, scope: CallerScope): 
   const source = await loadCaseSource(scope, input.baseAgentRunId, step, 'edit');
   const { part, path } = input.target;
   const where = `'${[part, ...path].join('.')}'`;
-  const value = inputValueAt(source.input, part, path);
-  if (value === undefined) throw new ValidationError(`${where} is not in the input of Agent Run '${input.baseAgentRunId}'`);
-
-  let variants: Variant[];
-  if (input.suite === 'prompt_injection') {
-    if (typeof value !== 'string') throw new ValidationError(`${where} is not text, so an instruction cannot be injected into it`);
-    variants = injectionVariants(value);
-  } else {
-    variants = robustnessVariants(value, where).filter((variant) => JSON.stringify(variant.value) !== JSON.stringify(value));
-    if (variants.length === 0) throw new ValidationError(`${where} has no change that keeps its meaning but alters it`);
-  }
+  const variants = redTeamSuiteVariants(source.input, input);
 
   const cases = [];
   for (const variant of variants) {

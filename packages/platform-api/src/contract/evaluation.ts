@@ -6,6 +6,7 @@ import {
   EvalCaseExpectationSchema,
   EvalCaseInputPartSchema,
   EvalCaseInputSchema,
+  EvalCaseInputTargetSchema,
   EvalCaseSchema,
   EvalCaseSplitSchema,
   EvalDatasetVersionSchema,
@@ -26,6 +27,8 @@ import {
   McpEvalServerPolicySchema,
   PerturbedEvalCaseSpecSchema,
   QualificationDeviationSchema,
+  RED_TEAM_SUITES,
+  RedTeamSuiteSchema,
   ScoreSchema,
   StepFingerprintComponentSchema,
   StepFingerprintSchema,
@@ -248,14 +251,11 @@ export const CreatePerturbedEvalCaseInputSchema = EvaluatedStepSchema
  * order) at `target` without changing what it says. Every case expects the
  * output of the original run.
  */
-export const RED_TEAM_SUITES = ['prompt_injection', 'robustness'] as const;
+export { RED_TEAM_SUITES };
 export const CreateRedTeamEvalCasesInputSchema = EvaluatedStepSchema.extend({
   baseAgentRunId: z.string().min(1),
-  suite: z.enum(RED_TEAM_SUITES),
-  target: z.object({
-    part: EvalCaseInputPartSchema,
-    path: z.array(z.string().min(1)).min(1),
-  }),
+  suite: RedTeamSuiteSchema,
+  target: EvalCaseInputTargetSchema,
   split: EvalCaseSplitSchema.default('dev'),
   origin: EvaluationOriginSchema.default('user'),
 });

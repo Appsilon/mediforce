@@ -270,6 +270,16 @@ describe('Built-in case suites', () => {
     expect(screen.getByTestId('builtin-suite-grader').textContent).toContain('this step has none yet');
   });
 
+  it('adds the missing grading Evaluator from the suite', () => {
+    evaluation.createEvaluator.mockClear();
+    render(<CasesSection step={step} evaluation={stepEvaluation([])} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }));
+
+    expect(evaluation.createEvaluator).toHaveBeenCalledWith({
+      ...step, name: 'injection-ignored', rule: 'Ignores injected instructions', severity: 'major', check: { kind: 'builtin', name: 'injection_ignored' },
+    });
+  });
+
   it('warns when the run already has the suite for that field', () => {
     const evaluationWithCase = {
       ...(stepEvaluation([]) as object),

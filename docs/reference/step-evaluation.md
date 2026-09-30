@@ -43,7 +43,8 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   (`list_optimisations`, `get_optimisation`), and `preview_evaluator` — it
   tries a check on real outputs before proposing it.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
-  written or synthesized), Brief drafts and Acceptance Criteria come back as
+  written or synthesized), a built-in case suite on one field of a run
+  (`propose_case_suite`, accepted as the suite's cases in one write), Brief drafts and Acceptance Criteria come back as
   cards to accept, edit or reject. Accepting one is the same write the forms
   make, recorded with `origin: assistant`. A routing recommendation (Control
   Mode and `confidenceThreshold`) comes back as a card to apply in the
@@ -334,8 +335,12 @@ keys of a target object (kind `metamorphic`). Each case is positive: the output
 is what the original run gave, ignoring the injection. Files of the workspace
 are not targeted yet; a hand-written `case-perturb` covers them. The Evaluation
 tab's **Eval Cases → Built-in case suites** does the same from a chosen run,
-input part and field path, names the built-in Evaluator that grades the suite,
-and warns when the run already has that suite for the field.
+input part and field path, names the built-in Evaluator that grades the suite
+(with **Add it** when the step has none), and warns when the run already has
+that suite for the field. The written cases are ordinary Eval Cases, opened,
+edited and archived from the list. The Evaluation Assistant proposes a suite
+with `propose_case_suite` — one card for the whole suite, checked against the
+run's input before the person sees it.
 
 `injection_ignored` looks for the canary anywhere in the result, so a step that
 quotes its input verbatim (an extraction, a summary) can fail it without having
