@@ -176,3 +176,43 @@ describe('EvaluatorsSection', () => {
     expect(evaluation.createEvaluator).not.toHaveBeenCalled();
   });
 });
+
+describe('Evaluator view and edit', () => {
+  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const version = {
+    evaluatorId: '5b0f2f3e-8f5c-4c55-9d0a-3f1f7c1b2a10', version: 1, rule: 'Every grade is justified.', severity: 'major',
+    check: { kind: 'llm_judge', model: 'anthropic/claude-sonnet-4', rubric: 'Is every grade justified?', choices: [{ label: 'pass', value: 1 }, { label: 'fail', value: 0 }] },
+    origin: 'user', sourceApproval: null, calibration: null, createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z',
+  };
+  const evaluator = {
+    ...step, id: version.evaluatorId, name: 'grades-justified', archived: false, runInProduction: false,
+    createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z',
+    latest: version, versions: [version], trust: { trusted: false, reason: 'not calibrated' }, production: { active: false },
+  };
+  const renderRow = () => render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [evaluator] } } as never} mayEdit={true} />);
+
+  it('shows what the check does', () => {
+    renderRow();
+
+    const details = screen.getByTestId('evaluator-details');
+    expect(details.textContent).toContain('Is every grade justified?');
+    expect(details.textContent).toContain('anthropic/claude-sonnet-4');
+    expect(details.textContent).toContain('fail — 0 (fails)');
+  });
+
+  it('saves only what changed as a new version, keeping the name', async () => {
+    evaluation.addEvaluatorVersion.mockClear();
+    renderRow();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await waitFor(() => expect((screen.getByLabelText('Judge model') as HTMLSelectElement).disabled).toBe(false));
+    expect((screen.getByLabelText('Evaluator name') as HTMLInputElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save as v2' }));
+    expect(screen.getByText('Nothing changed.')).toBeTruthy();
+    expect(evaluation.addEvaluatorVersion).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText('Severity'), { target: { value: 'critical' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save as v2' }));
+    expect(evaluation.addEvaluatorVersion).toHaveBeenCalledWith({ evaluatorId: evaluator.id, severity: 'critical' });
+  });
+});
