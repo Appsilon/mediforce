@@ -125,7 +125,7 @@ function StepEvaluation({ step, outputSchema, mayEdit, editReason, mayRun, runRe
         <EvaluatorsSection step={step} data={evaluation.evaluators} mayEdit={mayEdit} stepOutputSchema={outputSchema} />
         <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
         <McpPolicySection step={step} data={evaluation.mcpPolicy} mayEdit={mayEdit} />
-        <EvalRunsSection step={step} data={evaluation.runs} mayRun={mayRun} runReason={runReason} mayEdit={mayEdit} editReason={editReason} />
+        <EvalRunsSection step={step} data={evaluation.runs} datasets={evaluation.datasets} mayRun={mayRun} runReason={runReason} mayEdit={mayEdit} editReason={editReason} />
         <OptimisationsSection step={step} data={evaluation.optimisations} runs={evaluation.runs} mayRun={mayRun} />
       </div>
       <div className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">

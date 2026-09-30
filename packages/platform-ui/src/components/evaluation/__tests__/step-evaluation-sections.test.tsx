@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { BriefSection, CasesSection, DriftAlert, EvaluatorsSection, McpPolicySection, caseFromFile, toEvaluatorName } from '../step-evaluation-sections';
+import { BriefSection, CasesSection, DriftAlert, EvaluatorsSection, McpPolicySection, caseFromFile, datasetDrift, toEvaluatorName } from '../step-evaluation-sections';
 
 vi.mock('@/hooks/use-step-evaluation', () => ({
   useStepEvaluationMutation: (_step: unknown, mutationFn: (value: unknown) => unknown) => ({
@@ -411,5 +411,49 @@ describe('Writing an Eval Case', () => {
   it('refuses a file that is not a case or a case input', () => {
     expect(caseFromFile('{"events": []}')).toEqual({ error: expect.stringContaining('neither a case') });
     expect(caseFromFile('{"triggerPayload": {}, "previousStepOutputs": {}}')).toEqual({ values: { input: expect.any(String) } });
+  });
+});
+
+describe('Freezing a Dataset', () => {
+  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const datasetOf = (version: number, caseIds: string[]) => ({
+    ...step, id: `d-${version}`, version, caseIds, containsProductionData: true, createdBy: 'author-1', createdAt: '2026-09-24T09:00:00.000Z',
+  });
+  const withDatasets = (cases: unknown[], datasets: unknown[]) => ({
+    cases: { isLoading: false, data: { cases } },
+    agentRuns: { data: { pages: [] }, hasNextPage: false },
+    datasets: { data: { datasets } },
+    evaluators: { data: { evaluators: [] } },
+  }) as never;
+
+  it('tells cases added since the newest version from cases it has that are gone', () => {
+    const drift = datasetDrift([evalCaseOf({ id: 'c-1' }), evalCaseOf({ id: 'c-3' })] as never, datasetOf(1, ['c-1', 'c-2']) as never);
+    expect([...drift.unfrozen]).toEqual(['c-3']);
+    expect(drift.dropped).toBe(1);
+  });
+
+  it('says an Eval Run runs a frozen snapshot, and that nothing is frozen yet', () => {
+    render(<CasesSection step={step} evaluation={withDatasets([evalCaseOf({})], [])} mayEdit={true} />);
+
+    const status = screen.getByTestId('dataset-status').textContent;
+    expect(status).toContain('An Eval Run does not run the list above');
+    expect(status).toContain('Nothing frozen yet');
+  });
+
+  it('marks the cases the next Eval Run will not run until the next freeze', () => {
+    render(<CasesSection step={step} evaluation={withDatasets([evalCaseOf({ id: 'c-2', name: 'Edited' }), evalCaseOf({ id: 'c-1' })], [datasetOf(1, ['c-1'])])} mayEdit={true} />);
+
+    expect(screen.getByTestId('dataset-status').textContent).toContain('runs Dataset v1 (1 case(s)), which is behind the list: 1 case(s) added or edited since are not in it. Freeze to make v2.');
+    expect(screen.getAllByTestId('eval-case-unfrozen')).toHaveLength(1);
+    expect((screen.getByRole('button', { name: 'Freeze dataset' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('has nothing to freeze when the newest version has every live case', () => {
+    render(<CasesSection step={step} evaluation={withDatasets([evalCaseOf({ id: 'c-1' })], [datasetOf(2, ['c-1']), datasetOf(1, ['c-1'])])} mayEdit={true} />);
+
+    expect(screen.getByTestId('dataset-status').textContent).toContain('The next Eval Run runs Dataset v2: all 1 live case(s)');
+    expect(screen.queryByTestId('eval-case-unfrozen')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Freeze dataset' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId('dataset-versions').children).toHaveLength(2);
   });
 });
