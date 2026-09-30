@@ -404,7 +404,7 @@ export function LabellingCard({ step, proposal, mayEdit, editReason }: {
       {refining === null ? (
         <div className="space-y-0.5">
           <p>{evaluator.latest.rule}</p>
-          {check.kind === 'llm_judge' && <p className="whitespace-pre-wrap text-muted-foreground">Rubric: {check.rubric}</p>}
+          {check.kind === 'llm_judge' && <p className="whitespace-pre-wrap text-muted-foreground">Question for the judge: {check.rubric}</p>}
           {mayEdit && (
             <button type="button" className={buttonClass} onClick={() => setRefining({ rule: evaluator.latest.rule, rubric: check.kind === 'llm_judge' ? check.rubric : '' })}>
               Refine the rule
@@ -415,7 +415,7 @@ export function LabellingCard({ step, proposal, mayEdit, editReason }: {
         <div className="space-y-1">
           <textarea aria-label="Rule" className="w-full min-h-12 rounded border bg-background p-1.5" value={refining.rule} onChange={(event) => setRefining({ ...refining, rule: event.target.value })} />
           {check.kind === 'llm_judge' && (
-            <textarea aria-label="Rubric" className="w-full min-h-20 rounded border bg-background p-1.5" value={refining.rubric} onChange={(event) => setRefining({ ...refining, rubric: event.target.value })} />
+            <textarea aria-label="Question for the judge" className="w-full min-h-20 rounded border bg-background p-1.5" value={refining.rubric} onChange={(event) => setRefining({ ...refining, rubric: event.target.value })} />
           )}
           <div className="flex gap-1.5">
             <button

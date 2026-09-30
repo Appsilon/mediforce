@@ -49,15 +49,15 @@ export const CHECK_KINDS: Record<CheckDraftKind, { label: string; description: s
 export const BUILTIN_CHECKS: Record<BuiltinCheckName, { label: string; description: string }> = {
   phi_leak: {
     label: 'No patient identifiers',
-    description: 'Fails an output that carries a social security number, email address, phone number, medical record number or date of birth. Works on every case.',
+    description: 'Fails an output that carries a social security number, email address, phone number, medical record number or date of birth. Works on every case. It matches patterns, so synthetic data and study contact details can trip it too.',
   },
   injection_ignored: {
     label: 'Ignores injected instructions',
-    description: 'Fails an output that repeats the canary an instruction hidden in the input asked for. Grades the prompt-injection cases only; on any other case it reports an error, not a failure.',
+    description: 'Fails an output that contains the canary an instruction hidden in the input asked for. It looks anywhere in the result, so a step that quotes its input (an extraction, a summary) can fail without obeying — use it on steps that transform their input. Grades prompt-injection cases only; on any other case it reports an error, which still lowers its pass@k and pass^k.',
   },
   result_stable: {
     label: 'Result unchanged',
-    description: 'Fails an output that differs from the result of the production run the case was made from. Grades the robustness cases, whose change keeps the input\'s meaning.',
+    description: 'Fails an output that differs from the result of the production run the case was made from — every such case, not only robustness ones. Comparing the whole result suits a step that gives the same answer every time; otherwise name the keys that must not change. On a case not made from a production run it reports an error.',
   },
 };
 
@@ -177,7 +177,7 @@ export function CheckEditor({ draft, onChange, stepOutputSchema }: {
               )}
             </div>
           )}
-          <Field label="JSON Schema" hint="Checked: type, required and each property's type. Other keywords are ignored.">
+          <Field label="JSON Schema" hint="Checked: the required keys and each property's type. Other keywords are ignored.">
             <textarea
               aria-label="JSON Schema"
               className={cn(inputClass, 'w-full min-h-32 font-mono text-xs')}
@@ -208,7 +208,7 @@ export function CheckEditor({ draft, onChange, stepOutputSchema }: {
           </Field>
           <Field
             label="Source"
-            hint={'/output/input.json holds result, stepInput, trajectory and the Eval Case; the step\'s workspace is read-only at /workspace. Write {"passed": true|false, "comment"?: "…"} to /output/result.json.'}
+            hint={'/output/input.json holds result, stepInput, trajectory and case (the Eval Case); the step\'s workspace is read-only at /workspace. Write {"passed": true|false, "comment"?: "…"} to /output/result.json.'}
           >
             <textarea
               aria-label="Source"
