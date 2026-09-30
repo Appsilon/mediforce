@@ -37,6 +37,12 @@ describe('BriefSection', () => {
     expect(screen.getByText('critical').tagName).toBe('STRONG');
     expect(screen.queryByText('A **critical** check.')).toBeNull();
   });
+
+  it('says a Step Qualification cites the Brief version', () => {
+    render(<BriefSection step={{ namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' }} data={{ isLoading: false, data: { brief: null } } as never} mayEdit={false} />);
+
+    expect(screen.getByTestId('brief-purpose').textContent).toContain('a Step Qualification cites the Brief version');
+  });
 });
 
 describe('DriftAlert', () => {
