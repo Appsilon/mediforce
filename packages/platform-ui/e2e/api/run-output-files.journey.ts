@@ -1,6 +1,7 @@
 import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
+import { pollUntil } from '../helpers/poll-until';
 import { seedOutputFiles } from '../helpers/seed-output-files';
 
 /**
@@ -16,24 +17,6 @@ import { seedOutputFiles } from '../helpers/seed-output-files';
 
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
 const AUTH_HEADERS = { 'X-Api-Key': API_KEY };
-
-async function pollUntil<T>(
-  fn: () => Promise<T | null>,
-  {
-    timeoutMs = 20_000,
-    intervalMs = 250,
-    description = 'condition',
-  }: { timeoutMs?: number; intervalMs?: number; description?: string } = {},
-): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  let last: T | null = null;
-  while (Date.now() < deadline) {
-    last = await fn();
-    if (last !== null) return last;
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-  throw new Error(`Timed out waiting for ${description} (${timeoutMs}ms)`);
-}
 
 interface OutputFileEntry {
   stepId: string;

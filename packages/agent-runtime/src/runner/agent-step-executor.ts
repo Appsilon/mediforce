@@ -1,5 +1,6 @@
 import {
   calculateEstimatedCost,
+  type AgentFallbackReason,
   type AgentOutputEnvelope,
 } from '@mediforce/platform-core';
 import type { StepExecutorPlugin, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
@@ -140,7 +141,7 @@ export class AgentStepExecutor implements StepExecutor {
 
     // Helper: create a human review task for L3 escalation
     const createAgentReviewHumanTask = async (
-      escalationReason: 'low_confidence' | 'timeout' | 'error' | 'iterations_limit' | null,
+      escalationReason: AgentFallbackReason | 'iterations_limit' | null,
       auditBasis: string,
     ): Promise<void> => {
       const reviewTaskId = crypto.randomUUID();
@@ -173,6 +174,7 @@ export class AgentStepExecutor implements StepExecutor {
             gitMetadata: envelope?.gitMetadata ?? null,
             presentation: envelope?.presentation ?? null,
             escalationReason,
+            agentRunId: runResult.agentRunId ?? null,
           },
           iterationNumber: priorReviewExecutions,
         },

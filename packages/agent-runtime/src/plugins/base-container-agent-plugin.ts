@@ -4,14 +4,14 @@ import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, OutputSchemaShape } from '@mediforce/platform-core';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, AgentTrajectoryEntry } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { createLineStreamReader, formatAgentLogLine, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
+import { agentLogEntries, createLineStreamReader, formatAgentLogLine, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
@@ -244,58 +244,6 @@ function buildHttpHeaders(
   return { [bundle.headerName]: headerValue };
 }
 
-export type OutputSchema = OutputSchemaShape;
-
-export function validateOutputSchema(
-  output: Record<string, unknown>,
-  schema: OutputSchemaShape,
-): string | null {
-  let data = output;
-
-  if ('raw' in output && typeof output.raw === 'string' && Object.keys(output).length === 1) {
-    try {
-      const parsed = JSON.parse(output.raw);
-      if (Array.isArray(parsed)) return 'expected object, got array';
-      if (typeof parsed !== 'object' || parsed === null) return 'output is not valid JSON';
-      data = parsed as Record<string, unknown>;
-    } catch {
-      return 'output is not valid JSON';
-    }
-  }
-
-  if (Object.keys(data).length === 0
-    || (Object.keys(data).length === 1 && 'raw' in data && (data.raw === '' || data.raw == null))) {
-    return 'output is empty';
-  }
-
-  const required = schema.required ?? [];
-  const missing = required.filter((key) => !(key in data));
-  if (missing.length > 0) return `missing required keys: ${missing.join(', ')}`;
-
-  const properties = schema.properties ?? {};
-  for (const [key, spec] of Object.entries(properties)) {
-    if (!(key in data)) continue;
-    const value = data[key];
-    const expectedType = spec.type;
-    if (!expectedType) continue;
-
-    if (expectedType === 'array' && !Array.isArray(value)) {
-      return `property "${key}" expected array, got ${typeof value}`;
-    }
-    if (expectedType === 'object' && (typeof value !== 'object' || value === null || Array.isArray(value))) {
-      return `property "${key}" expected object, got ${Array.isArray(value) ? 'array' : typeof value}`;
-    }
-    if (expectedType === 'string' && typeof value !== 'string') {
-      return `property "${key}" expected string, got ${typeof value}`;
-    }
-    if (expectedType === 'number' && typeof value !== 'number') {
-      return `property "${key}" expected number, got ${typeof value}`;
-    }
-  }
-
-  return null;
-}
-
 /**
  * Abstract base class for container-based agent plugins.
  *
@@ -344,6 +292,14 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *  container can write activity-log entries as the lines arrive. Default:
    *  'none' (this agent streams nothing a reader of the log wants). */
   protected readonly logFormat: AgentLogFormat = 'none';
+
+  /** Record one stdout line in the run's Agent Trajectory (ADR-0023 D8), when
+   *  the runner set a recorder — the same entries the activity log gets. */
+  protected recordTrajectory(line: string): void {
+    if (!isWorkflowAgentContext(this.context) || this.context.trajectory === undefined) return;
+    const entries: AgentTrajectoryEntry[] = agentLogEntries(this.logFormat, line);
+    if (entries.length > 0) this.context.trajectory.record(entries);
+  }
 
   /** Extract a human-readable error detail from the final result/output.
    *  Default: null (no error extraction). */
@@ -1238,6 +1194,23 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       );
     }
 
+    // 4b. Output schema (ADR-0023 D13) — checked by AgentRunner after the run.
+    if (isWorkflowAgentContext(this.context) && this.context.step.agent?.outputSchema) {
+      parts.push(
+        `## Output Schema\n` +
+        `The result JSON must conform to this JSON Schema. It is validated after you finish; ` +
+        `a non-conforming result is rejected.\n` +
+        '```json\n' + JSON.stringify(this.context.step.agent.outputSchema, null, 2) + '\n```',
+      );
+      if (this.context.outputSchemaViolation !== undefined) {
+        parts.push(
+          `## Previous Attempt Rejected\n` +
+          `Your previous result did not match the Output Schema: ${this.context.outputSchemaViolation}\n` +
+          `Produce a result that conforms to the schema.`,
+        );
+      }
+    }
+
     // 5. Input context
     const previousOutputs = await this.context.getPreviousStepOutputs();
     const hasPreviousOutputs = Object.keys(previousOutputs).length > 0;
@@ -1415,6 +1388,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         const trimmed = line.trim();
         if (!trimmed) return;
         rawLines.push(trimmed);
+        this.recordTrajectory(trimmed);
 
         if (logFile) {
           const logEntries = formatAgentLogLine(this.logFormat, trimmed);
@@ -1625,6 +1599,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       logFile,
       imageBuild,
       lineFormat: this.logFormat,
+      // Live on the local strategy; replayed after exit on the queued one.
+      onStdoutLine: (line) => this.recordTrajectory(line),
     });
 
     // The log file is written live by whichever process watched the container

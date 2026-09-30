@@ -7,6 +7,8 @@ import {
   InMemoryAgentDefinitionRepository,
   InMemoryAgentEventRepository,
   InMemoryAgentRunRepository,
+  InMemoryAgentTrajectoryRepository,
+  InMemoryScoreRepository,
   InMemoryAuditRepository,
   InMemoryCoworkSessionRepository,
   InMemoryHandoffRepository,
@@ -29,6 +31,8 @@ import {
 } from '@mediforce/platform-core/testing';
 import type {
   AgentRunRepository,
+  AgentTrajectoryRepository,
+  ScoreRepository,
   AutoJoinRule,
   BlobStore,
   EmailProviderInfo,
@@ -184,6 +188,8 @@ export interface TestScopeOverrides {
   readonly auditRepo?: InMemoryAuditRepository;
   readonly agentEventRepo?: InMemoryAgentEventRepository;
   readonly agentRunRepo?: AgentRunRepository;
+  readonly agentTrajectoryRepo?: AgentTrajectoryRepository;
+  readonly scoreRepo?: ScoreRepository;
   readonly handoffRepo?: InMemoryHandoffRepository;
   readonly agentDefinitionRepo?: InMemoryAgentDefinitionRepository;
   readonly coworkSessionRepo?: InMemoryCoworkSessionRepository;
@@ -231,13 +237,16 @@ const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope {
   const caller = overrides.caller ?? apiKeyCaller;
   const instanceRepo = overrides.instanceRepo ?? new InMemoryProcessInstanceRepository();
+  const agentRunRepo = overrides.agentRunRepo ?? new InMemoryAgentRunRepository(instanceRepo);
   const services: CallerScopeServices = {
     instanceRepo,
     processRepo: overrides.processRepo ?? new InMemoryProcessRepository(),
     auditRepo: overrides.auditRepo ?? new InMemoryAuditRepository(instanceRepo),
     agentEventRepo:
       overrides.agentEventRepo ?? new InMemoryAgentEventRepository(instanceRepo),
-    agentRunRepo: overrides.agentRunRepo ?? new InMemoryAgentRunRepository(instanceRepo),
+    agentRunRepo,
+    agentTrajectoryRepo: overrides.agentTrajectoryRepo ?? new InMemoryAgentTrajectoryRepository(agentRunRepo),
+    scoreRepo: overrides.scoreRepo ?? new InMemoryScoreRepository(),
     humanTaskRepo: overrides.humanTaskRepo ?? new InMemoryHumanTaskRepository(instanceRepo),
     taskAttachmentRepo: overrides.taskAttachmentRepo ?? new InMemoryTaskAttachmentRepository(),
     blobStore: overrides.blobStore ?? new InMemoryBlobStore(),

@@ -18,7 +18,7 @@ import type {
   WorkflowStep,
   ProcessNotificationConfig,
 } from '@mediforce/platform-core';
-import type { Selection, TaskVerdict } from '@mediforce/platform-core';
+import type { AgentFallbackReason, Selection, TaskVerdict } from '@mediforce/platform-core';
 import { normalizeSelection, buildTaskVerdicts, interpolate, toProcessDefinition, resolveStepAssignee } from '@mediforce/platform-core';
 import { validateStepGraph } from '@mediforce/platform-core';
 import { StepExecutor, type StepActor } from './step-executor';
@@ -40,7 +40,7 @@ export interface AgentRunResult {
     confidence?: number;
   } | null;
   appliedToWorkflow: boolean;
-  fallbackReason: 'timeout' | 'low_confidence' | 'error' | null;
+  fallbackReason: AgentFallbackReason | null;
   /** Optional: agentRunId for traceability in HandoffEntity */
   agentRunId?: string;
 }

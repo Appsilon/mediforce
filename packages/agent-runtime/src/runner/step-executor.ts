@@ -1,4 +1,4 @@
-import type { StepOutputEnvelope, AgentOutputEnvelope } from '@mediforce/platform-core';
+import type { StepOutputEnvelope, AgentOutputEnvelope, AgentFallbackReason } from '@mediforce/platform-core';
 import type { StepExecutorPlugin, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 
 export type StepExecutionStatus = 'completed' | 'paused' | 'escalated' | 'failed';
@@ -9,7 +9,7 @@ export interface StepExecutionResult {
   status: StepExecutionStatus;
   envelope: StepOutputEnvelope | AgentOutputEnvelope | null;
   appliedToWorkflow: boolean;
-  fallbackReason: 'timeout' | 'low_confidence' | 'error' | null;
+  fallbackReason: AgentFallbackReason | null;
   errorMessage?: string | null;
   executorType: 'agent' | 'script';
   /** Instance status + currentStepId as known by the executor at return time.
