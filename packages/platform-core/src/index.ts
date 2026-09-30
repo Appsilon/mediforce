@@ -290,6 +290,7 @@ export type {
   EvalCaseInput,
   EvalCaseExpectation,
   EvalCasePerturbation,
+  EvalCaseInputPart,
   EvalCaseInputChange,
   WorkspaceFileChange,
   EvalCase,

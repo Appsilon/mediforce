@@ -191,6 +191,7 @@ export {
   type EvalCaseInput,
   type EvalCaseExpectation,
   type EvalCasePerturbation,
+  type EvalCaseInputPart,
   type EvalCaseInputChange,
   type WorkspaceFileChange,
   type EvalCase,

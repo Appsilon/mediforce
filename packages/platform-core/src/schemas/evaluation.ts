@@ -376,6 +376,7 @@ export type EvaluatorVersion = z.infer<typeof EvaluatorVersionSchema>;
 export type EvalCaseInput = z.infer<typeof EvalCaseInputSchema>;
 export type EvalCaseExpectation = z.infer<typeof EvalCaseExpectationSchema>;
 export type EvalCasePerturbation = z.infer<typeof EvalCasePerturbationSchema>;
+export type EvalCaseInputPart = z.infer<typeof EvalCaseInputPartSchema>;
 export type EvalCaseInputChange = z.infer<typeof EvalCaseInputChangeSchema>;
 export type WorkspaceFileChange = z.infer<typeof WorkspaceFileChangeSchema>;
 export type EvalCase = z.infer<typeof EvalCaseSchema>;

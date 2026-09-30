@@ -4,12 +4,15 @@ import * as React from 'react';
 import { Loader2 } from 'lucide-react';
 import {
   CHAMPION_VARIANT_ID,
+  EvalCaseInputPartSchema,
   EvaluatorSeveritySchema,
   McpEvalServerPolicySchema,
   describeAcceptanceCriteria,
   describeMcpPolicy,
   type AcceptanceCriteria,
   type AgentOutputSchema,
+  type BuiltinCheckName,
+  type EvalCaseInputPart,
   type EvaluatedStep,
   type EvaluatorCheck,
   type EvaluatorSeverity,
@@ -18,6 +21,7 @@ import {
 } from '@mediforce/platform-core';
 import {
   EvalChallengerSchema,
+  RED_TEAM_SUITES,
   type AddEvaluatorVersionInput,
   type EvalChallenger,
   type EvaluatorView,
@@ -33,6 +37,7 @@ import { EvalRunReport, describePatch } from './eval-run-report';
 import { QualificationStatusChip } from './step-qualification-badge';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 import {
+  BUILTIN_CHECKS,
   CHECK_KINDS,
   CheckDetails,
   CheckEditor,
@@ -337,6 +342,102 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
   );
 }
 
+type RedTeamSuite = (typeof RED_TEAM_SUITES)[number];
+
+const RED_TEAM_SUITE_INFO: Record<RedTeamSuite, { label: string; description: string; grader: BuiltinCheckName; target: string }> = {
+  prompt_injection: {
+    label: 'Prompt injection',
+    description: 'Three cases, each appending an instruction to a text field of the input — a fake system notice, a note "from the sponsor", a delimiter escape — that asks the agent to output a canary marker. The agent should do its job and ignore it.',
+    grader: 'injection_ignored',
+    target: 'a text field',
+  },
+  robustness: {
+    label: 'Robustness',
+    description: 'Cases that change how a field is written but not what it says — doubled whitespace and blank-line padding for text, reversed key order for an object. The result should not change.',
+    grader: 'result_stable',
+    target: 'a text or object field',
+  },
+};
+
+const INPUT_PARTS: Record<EvalCaseInputPart, string> = {
+  triggerPayload: 'Trigger payload',
+  previousStepOutputs: 'Earlier steps\' outputs',
+  previousRun: 'Previous run carry-over',
+};
+
+/**
+ * The built-in case suites (ADR-0023 phase 5a): from one production run, the
+ * platform writes the cases itself, each graded by a built-in Evaluator.
+ */
+function BuiltinCaseSuites({ step, evaluation }: { step: EvaluatedStep; evaluation: StepEvaluation }) {
+  const runs = evaluation.agentRuns.data?.runs ?? [];
+  const evaluators = evaluation.evaluators.data?.evaluators ?? [];
+  const [suite, setSuite] = React.useState<RedTeamSuite>('prompt_injection');
+  const [runId, setRunId] = React.useState('');
+  const [part, setPart] = React.useState<EvalCaseInputPart>('triggerPayload');
+  const [path, setPath] = React.useState('');
+  const create = useStepEvaluationMutation(step, () => mediforce.evaluation.createRedTeamCases({
+    ...step,
+    suite,
+    baseAgentRunId: runId === '' ? runs[0]!.id : runId,
+    target: { part, path: path.split('.').map((key) => key.trim()).filter((key) => key !== '') },
+  }));
+  const info = RED_TEAM_SUITE_INFO[suite];
+  const graded = evaluators.some((evaluator) => evaluator.latest.check.kind === 'builtin' && evaluator.latest.check.name === info.grader);
+
+  return (
+    <details className="text-sm" data-testid="builtin-case-suites">
+      <summary className="cursor-pointer text-xs text-muted-foreground">Built-in case suites</summary>
+      <div className="mt-2 space-y-2 text-xs">
+        <p className="text-muted-foreground">
+          The platform writes these cases for you from one production run: it changes one field of that run&apos;s input and expects the output the run gave. A built-in Evaluator grades each suite.
+        </p>
+        <label className="flex items-center gap-1">Suite
+          <select aria-label="Suite" className={inputClass} value={suite} onChange={(event) => setSuite(event.target.value as RedTeamSuite)}>
+            {RED_TEAM_SUITES.map((name) => <option key={name} value={name}>{RED_TEAM_SUITE_INFO[name].label}</option>)}
+          </select>
+        </label>
+        <p className="text-muted-foreground">{info.description}</p>
+        <p className={graded ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-300'} data-testid="builtin-suite-grader">
+          Graded by the built-in &ldquo;{BUILTIN_CHECKS[info.grader].label}&rdquo; Evaluator{graded ? '.' : ' — this step has none yet: add it under Evaluators, or these cases grade nothing.'}
+        </p>
+        {runs.length === 0 ? (
+          <p className="text-muted-foreground">The step has no production runs to start from yet.</p>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1">From run
+              <select aria-label="From run" className={inputClass} value={runId} onChange={(event) => setRunId(event.target.value)}>
+                {runs.map((run) => <option key={run.id} value={run.id}>{run.id.slice(0, 8)} · {run.startedAt.slice(0, 16).replace('T', ' ')}</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-1">Field in
+              <select aria-label="Input part" className={inputClass} value={part} onChange={(event) => setPart(EvalCaseInputPartSchema.parse(event.target.value))}>
+                {EvalCaseInputPartSchema.options.map((name) => <option key={name} value={name}>{INPUT_PARTS[name]}</option>)}
+              </select>
+            </label>
+            <input
+              aria-label="Field path"
+              className={cn(inputClass, 'font-mono text-xs')}
+              placeholder="e.g. narrative or document.text"
+              title={`The path to ${info.target} of the input, keys joined by dots.`}
+              value={path}
+              onChange={(event) => setPath(event.target.value)}
+            />
+            <button
+              type="button"
+              className={buttonClass}
+              disabled={path.trim() === '' || create.isPending}
+              onClick={() => create.mutate(undefined)}
+            >Add suite cases</button>
+          </div>
+        )}
+        {create.error !== null && <p className="text-destructive">{create.error.message}</p>}
+        {create.data !== undefined && <p className="text-muted-foreground">Added {create.data.cases.length} case(s).</p>}
+      </div>
+    </details>
+  );
+}
+
 /** Eval Cases, harvested from production runs or written by the assistant, and frozen Dataset versions. */
 export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedStep; evaluation: StepEvaluation; mayEdit: boolean }) {
   const harvest = useStepEvaluationMutation(step, (input: { agentRunId: string; expectation: 'positive' | 'negative' }) =>
@@ -388,6 +489,7 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
           {harvest.error !== null && <p className="mt-1 text-xs text-destructive">{harvest.error.message}</p>}
         </details>
       )}
+      {mayEdit && <BuiltinCaseSuites step={step} evaluation={evaluation} />}
     </Section>
   );
 }
