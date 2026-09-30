@@ -44,6 +44,8 @@ export interface OpenRouterResponse {
    * truncated — callers building large artifacts must treat this as an error.
    */
   finishReason: string | null;
+  /** Token counts as OpenRouter reports them; zero when the response carries none. */
+  usage: { promptTokens: number; completionTokens: number };
 }
 
 export interface OpenRouterRequest {
@@ -86,6 +88,7 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
       };
       finish_reason?: string | null;
     }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
 
   const choice = data.choices?.[0];
@@ -93,5 +96,9 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
     content: choice?.message?.content ?? '',
     toolCalls: choice?.message?.tool_calls ?? [],
     finishReason: choice?.finish_reason ?? null,
+    usage: {
+      promptTokens: data.usage?.prompt_tokens ?? 0,
+      completionTokens: data.usage?.completion_tokens ?? 0,
+    },
   };
 }

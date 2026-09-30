@@ -18,6 +18,7 @@ import {
   PostgresAgentRunRepository,
   PostgresAgentTrajectoryRepository,
   PostgresScoreRepository,
+  PostgresEvaluationRepository,
   PostgresHumanTaskRepository,
   PostgresTaskAttachmentRepository,
   FilesystemBlobStore,
@@ -43,6 +44,7 @@ import type {
   AgentRunRepository,
   AgentTrajectoryRepository,
   ScoreRepository,
+  EvaluationRepository,
   AuditRepository,
   BlobStore,
   CoworkSessionRepository,
@@ -137,6 +139,7 @@ export interface PlatformServices {
   agentRunRepo: AgentRunRepository;
   agentTrajectoryRepo: AgentTrajectoryRepository;
   scoreRepo: ScoreRepository;
+  evaluationRepo: EvaluationRepository;
   humanTaskRepo: HumanTaskRepository;
   taskAttachmentRepo: TaskAttachmentRepository;
   blobStore: BlobStore;
@@ -267,6 +270,7 @@ export function getPlatformServices(): PlatformServices {
   const agentRunRepo: AgentRunRepository = new PostgresAgentRunRepository(pg, instanceRepo);
   const agentTrajectoryRepo: AgentTrajectoryRepository = new PostgresAgentTrajectoryRepository(pg);
   const scoreRepo: ScoreRepository = new PostgresScoreRepository(pg);
+  const evaluationRepo: EvaluationRepository = new PostgresEvaluationRepository(pg);
   const humanTaskRepo: HumanTaskRepository = new PostgresHumanTaskRepository(pg, instanceRepo);
   const taskAttachmentRepo: TaskAttachmentRepository = new PostgresTaskAttachmentRepository(pg);
   const blobStore: BlobStore = new FilesystemBlobStore();
@@ -441,6 +445,7 @@ export function getPlatformServices(): PlatformServices {
     agentRunRepo,
     agentTrajectoryRepo,
     scoreRepo,
+    evaluationRepo,
     humanTaskRepo,
     taskAttachmentRepo,
     blobStore,

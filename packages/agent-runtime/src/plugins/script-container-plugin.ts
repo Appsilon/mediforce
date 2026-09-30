@@ -19,7 +19,7 @@ const DEFAULT_TIMEOUT_MS = 30 * 60_000;
  *  The images come from `DEFAULT_SCRIPT_RUNTIME_IMAGES` because the Image
  *  Catalog seeds a new workspace with the same list (#1376) — two spellings of
  *  the same default would leave the catalog offering an image nothing runs. */
-const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (path: string) => string[] }> = {
+export const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (path: string) => string[] }> = {
   javascript: { image: DEFAULT_SCRIPT_RUNTIME_IMAGES.javascript, ext: '.mjs', cmd: (p) => ['node', p] },
   python: { image: DEFAULT_SCRIPT_RUNTIME_IMAGES.python, ext: '.py', cmd: (p) => ['python3', p] },
   r: { image: DEFAULT_SCRIPT_RUNTIME_IMAGES.r, ext: '.R', cmd: (p) => ['Rscript', p] },

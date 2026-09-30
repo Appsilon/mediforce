@@ -77,6 +77,8 @@ export class PostgresScoreRepository implements ScoreRepository {
     if (filter.processInstanceId !== undefined) conditions.push(eq(scores.processInstanceId, filter.processInstanceId));
     if (filter.stepId !== undefined) conditions.push(eq(scores.stepId, filter.stepId));
     if (filter.name !== undefined) conditions.push(eq(scores.name, filter.name));
+    if (filter.evaluatorId !== undefined) conditions.push(eq(scores.evaluatorId, filter.evaluatorId));
+    if (filter.source !== undefined) conditions.push(eq(scores.source, filter.source));
     if (filter.namespace !== undefined) conditions.push(eq(scores.workspace, filter.namespace));
     const rows = await this.db
       .select()
