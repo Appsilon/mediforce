@@ -220,6 +220,16 @@ decides whether a judge counts. `cases-from-labels <evaluatorId>` turns every
 labelled production output that is not yet a case into one — a pass positive,
 a fail negative, noting the rule and the person's comment.
 
+Why a judge needs this: its verdict is a model's opinion, and its Scores feed
+Acceptance Criteria and a Step Qualification. The minimum failures matter as
+much as the count — a judge that passes everything agrees perfectly with an
+all-pass set of labels and catches nothing. In the Evaluation tab each judge
+shows its progress (`labels · fails · agreement`) and **Label outputs** opens
+the labelling: the production runs already added as Eval Cases first, negatives
+before positives (you judged them once; the label asks whether the output breaks
+*this* rule), then the other loaded production runs, each with its input and
+output; then **Calibrate**.
+
 `evaluator-archive` archives or restores an Evaluator; `evaluator-production`
 sets whether it also runs in production (see below).
 

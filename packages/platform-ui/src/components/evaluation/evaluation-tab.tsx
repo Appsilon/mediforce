@@ -15,6 +15,7 @@ import {
   McpPolicySection,
   DriftAlert,
   QualificationSection,
+  loadedAgentRuns,
 } from './step-evaluation-sections';
 
 const ASSISTANT_WIDTH_KEY = 'mediforce.evaluation-assistant.width';
@@ -122,7 +123,13 @@ function StepEvaluation({ step, outputSchema, mayEdit, editReason, mayRun, runRe
         <QualificationSection data={evaluation.qualification} />
         <BriefSection step={step} data={evaluation.brief} mayEdit={mayEdit} />
         <AcceptanceCriteriaSection step={step} data={evaluation.criteria} mayEdit={mayEdit} />
-        <EvaluatorsSection step={step} data={evaluation.evaluators} mayEdit={mayEdit} stepOutputSchema={outputSchema} />
+        <EvaluatorsSection
+          step={step}
+          data={evaluation.evaluators}
+          mayEdit={mayEdit}
+          stepOutputSchema={outputSchema}
+          labelCandidates={{ cases: evaluation.cases.data?.cases ?? [], runs: loadedAgentRuns(evaluation) }}
+        />
         <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
         <McpPolicySection step={step} data={evaluation.mcpPolicy} mayEdit={mayEdit} />
         <EvalRunsSection step={step} data={evaluation.runs} datasets={evaluation.datasets} mayRun={mayRun} runReason={runReason} mayEdit={mayEdit} editReason={editReason} />

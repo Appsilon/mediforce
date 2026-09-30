@@ -8,6 +8,7 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
     error: null,
     data: agentRunId === null ? undefined : { agentRunId, status: 'completed', stepInput: { narrative: `input of ${agentRunId}` }, result: { grade: `output of ${agentRunId}` }, reasoningSummary: null, confidence: null },
   }),
+  useEvaluatorLabels: () => ({ data: { labels: judgeLabels } }),
   useStepEvaluationMutation: (_step: unknown, mutationFn: (value: unknown) => unknown) => ({
     mutate: (value: unknown) => { void mutationFn(value); },
     isPending: false,
@@ -16,7 +17,11 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
   }),
 }),);
 
+const judgeLabels = vi.hoisted((): unknown[] => []);
+
 const evaluation = vi.hoisted(() => ({
+  labelOutput: vi.fn(),
+  calibrateEvaluator: vi.fn(),
   setBrief: vi.fn(),
   createEvaluator: vi.fn(),
   addEvaluatorVersion: vi.fn(),
@@ -493,5 +498,65 @@ describe('Freezing a Dataset', () => {
     expect(screen.queryByTestId('eval-case-unfrozen')).toBeNull();
     expect((screen.getByRole('button', { name: 'Freeze dataset' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByTestId('dataset-versions').children).toHaveLength(2);
+  });
+});
+
+describe('Labelling a judge from the Evaluators section', () => {
+  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const judge = {
+    id: 'judge-1', name: 'rationale-grounded', archived: false, runInProduction: false, production: { active: false, reason: null },
+    trust: { trusted: false, reason: 'not calibrated' },
+    latest: {
+      version: 1, rule: 'The rationale cites the labs.', severity: 'major', origin: 'user', sourceApproval: null, calibration: null,
+      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Cited?', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
+      createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z',
+    },
+    versions: [],
+  };
+  const run = (id: string) => ({ id, status: 'completed', fallbackReason: null, startedAt: '2026-09-24T08:00:00.000Z', envelope: null });
+
+  function openPanel(cases: unknown[], runs: unknown[]) {
+    render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [judge] } } as never} mayEdit={true} labelCandidates={{ cases, runs } as never} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Label outputs' }));
+  }
+
+  it('shows how far the judge is from counting', () => {
+    judgeLabels.splice(0, judgeLabels.length, { subject: { type: 'agent_run', id: 'run-a' }, value: 0, comment: null });
+    render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [judge] } } as never} mayEdit={false} />);
+
+    expect(screen.getByTestId('calibration-progress').textContent).toBe('1/10 labels · 1/2 fails · not calibrated');
+    judgeLabels.splice(0, judgeLabels.length);
+  });
+
+  it('offers the runs added as Eval Cases first, negatives first, and leaves out outputs already labelled', () => {
+    judgeLabels.splice(0, judgeLabels.length, { subject: { type: 'agent_run', id: 'run-labelled' }, value: 1, comment: null });
+    openPanel(
+      [
+        evalCaseOf({ id: 'c-1', expectation: 'positive', sourceAgentRunId: 'run-good' }),
+        evalCaseOf({ id: 'c-2', expectation: 'negative', sourceAgentRunId: 'run-bad' }),
+        evalCaseOf({ id: 'c-3', expectation: 'negative', sourceAgentRunId: 'run-labelled' }),
+      ],
+      [run('run-good'), run('run-other')],
+    );
+
+    const marked = screen.getByTestId('label-candidates-marked').querySelectorAll('[data-testid="label-output"]');
+    expect([...marked].map((row) => row.textContent)).toEqual([
+      expect.stringContaining('you added it as a negative case'),
+      expect.stringContaining('you added it as a positive case'),
+    ]);
+    expect(marked[0]!.textContent).toContain('run-bad');
+    expect(screen.getByTestId('label-candidates-runs').textContent).toContain('run-othe');
+    expect(screen.getByTestId('label-candidates-runs').textContent).not.toContain('run-good');
+    expect(screen.getByTestId('labelled-outputs').textContent).toContain('labelled pass');
+    judgeLabels.splice(0, judgeLabels.length);
+  });
+
+  it('labels an output for the judge\'s rule', () => {
+    openPanel([evalCaseOf({ expectation: 'negative', sourceAgentRunId: 'run-bad' })], []);
+    const row = screen.getByTestId('label-candidates-marked').querySelector('[data-testid="label-output"]') as HTMLElement;
+    fireEvent.change(row.querySelector('input')!, { target: { value: 'Grade not tied to ANC.' } });
+    fireEvent.click([...row.querySelectorAll('button')].find((button) => button.textContent === 'Fail')!);
+
+    expect(evaluation.labelOutput).toHaveBeenCalledWith({ evaluatorId: 'judge-1', agentRunId: 'run-bad', passed: false, comment: 'Grade not tied to ANC.' });
   });
 });
