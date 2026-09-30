@@ -155,9 +155,12 @@ Each request allows 32 model/tool rounds and up to 8,000 output tokens per
 model call. These application limits are separate from the model's context
 window. Trajectories are read in pages of complete entries, including generated
 source; the assistant follows `nextOffset` to reach later pages instead of
-seeing only the beginning of a run. If the round or text-output limit is
-reached, completed proposal and prepared-run cards still return with an
-explicit notice and, when available, a summary of unfinished work. A follow-up
+seeing only the beginning of a run. A response cut off at the output limit
+with no tool call in it — several checks drafted at once, or a long answer — is
+retried once with a note to work one check at a time and answer briefly. If the
+round limit is reached, or the output limit twice in a row, completed proposal
+and prepared-run cards still return with an explicit notice and, when
+available, a summary of unfinished work. A follow-up
 can use that summary, but the full tool transcript is not carried between
 requests. Nothing is accepted or started automatically.
 

@@ -182,7 +182,10 @@ request's prompt audit event.
 
 The Evaluation Assistant allows 32 model/tool rounds with an 8,000-token
 completion budget per call, independent of the selected model's context window.
-On round exhaustion or a truncated text response, the proposal loop keeps all
+A response truncated with no tool call in it is answered, once, with a note to
+continue in smaller pieces (`truncatedResponseNotice`; the Evaluation
+Assistant's says to work one check at a time); on round exhaustion or a second
+truncated response in a row, the proposal loop keeps all
 validated proposals and platform-call results and attempts one final no-tools
 summary (up to 2,000 tokens). If that call fails, the cards still return with an
 explicit partial-completion notice. Follow-up messages receive the summary,
