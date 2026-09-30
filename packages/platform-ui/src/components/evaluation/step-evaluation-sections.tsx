@@ -44,8 +44,9 @@ import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { AgentLogPanel } from '@/components/agents/agent-log-panel';
 import { RunInputOutput, RunInputOutputDetails } from './run-input-output';
+import { CalibrationProgress, JudgeCalibrationPanel, labelsBySubject } from './judge-calibration';
 import { useAgentRun } from '@/hooks/use-agent-runs';
-import { useEvalRun, useOptimisation, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
+import { useEvalRun, useEvaluatorLabels, useOptimisation, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { EvalRunReport, describePatch } from './eval-run-report';
 import { QualificationStatusChip } from './step-qualification-badge';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
@@ -81,7 +82,7 @@ function Loading() {
 }
 
 /** Every production run of the Step loaded so far, newest first. */
-function loadedAgentRuns(evaluation: StepEvaluation): AgentRun[] {
+export function loadedAgentRuns(evaluation: StepEvaluation): AgentRun[] {
   return evaluation.agentRuns.data?.pages.flatMap((page) => page.runs) ?? [];
 }
 
@@ -135,12 +136,26 @@ export function toEvaluatorName(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 63);
 }
 
-function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
+/** What a judge may be labelled on: the Step's Eval Cases (their source runs first) and its loaded production runs. */
+export interface LabelCandidates {
+  cases: readonly EvalCase[];
+  runs: readonly AgentRun[];
+}
+
+/** A judge's labels so far, against what it needs to count. */
+function JudgeProgress({ step, evaluator }: { step: EvaluatedStep; evaluator: EvaluatorView }) {
+  const labels = useEvaluatorLabels(step, evaluator.id);
+  return <CalibrationProgress evaluator={evaluator} labels={[...labelsBySubject(labels.data?.labels ?? []).values()]} />;
+}
+
+function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema, labelCandidates }: {
   step: EvaluatedStep;
   evaluator: EvaluatorView;
   mayEdit: boolean;
   stepOutputSchema: AgentOutputSchema | undefined;
+  labelCandidates: LabelCandidates;
 }) {
+  const [labelling, setLabelling] = React.useState(false);
   const approve = useStepEvaluationMutation(step, () =>
     mediforce.evaluation.approveEvaluatorSource({ evaluatorId: evaluator.id, version: evaluator.latest.version }));
   const archive = useStepEvaluationMutation(step, () => mediforce.evaluation.archiveEvaluator({ evaluatorId: evaluator.id }));
@@ -177,6 +192,12 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
             'mt-1 inline-block rounded px-1.5 py-0.5 text-[11px] font-medium',
             evaluator.trust.trusted ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
           )}>{evaluator.trust.trusted ? 'Counts' : `Not counted — ${evaluator.trust.reason}`}</span>
+          {check.kind === 'llm_judge' && (
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <JudgeProgress step={step} evaluator={evaluator} />
+              <button type="button" className={buttonClass} onClick={() => setLabelling(!labelling)}>{labelling ? 'Hide labelling' : 'Label outputs'}</button>
+            </div>
+          )}
           <label className="mt-1.5 flex items-center gap-1.5 text-xs" data-testid="evaluator-production">
             <input
               type="checkbox"
@@ -209,6 +230,9 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
           </div>
         )}
       </div>
+      {labelling && check.kind === 'llm_judge' && (
+        <JudgeCalibrationPanel step={step} evaluator={evaluator} cases={labelCandidates.cases} runs={labelCandidates.runs} mayEdit={mayEdit} />
+      )}
       {editing ? (
         <div className="mt-2 space-y-1">
           <p className="text-xs text-muted-foreground">
@@ -330,10 +354,11 @@ function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel
 }
 
 /** The Step's Evaluators with whether each counts (D9); code source is approved here, by a person. */
-export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
+export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema, labelCandidates = { cases: [], runs: [] } }: {
   step: EvaluatedStep;
   data: StepEvaluation['evaluators'];
   mayEdit: boolean;
+  labelCandidates?: LabelCandidates;
   /** The step's `agent.outputSchema`, offered as the start of a schema check. */
   stepOutputSchema?: AgentOutputSchema;
 }) {
@@ -347,7 +372,7 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
       {data.isLoading ? <Loading /> : evaluators.length === 0 && !adding ? (
         <p className="text-sm text-muted-foreground">No Evaluators yet. Ask the assistant what to check, or add one.</p>
       ) : (
-        <ul className="space-y-2">{evaluators.map((evaluator) => <EvaluatorRow key={evaluator.id} step={step} evaluator={evaluator} mayEdit={mayEdit} stepOutputSchema={stepOutputSchema} />)}</ul>
+        <ul className="space-y-2">{evaluators.map((evaluator) => <EvaluatorRow key={evaluator.id} step={step} evaluator={evaluator} mayEdit={mayEdit} stepOutputSchema={stepOutputSchema} labelCandidates={labelCandidates} />)}</ul>
       )}
       {adding && (
         <EvaluatorForm

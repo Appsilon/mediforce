@@ -6,7 +6,6 @@ import {
   JUDGE_MIN_AGREEMENT,
   JUDGE_MIN_FAILURE_LABELS,
   JUDGE_MIN_LABELS,
-  JUDGE_PASS_VALUE,
   describeAcceptanceCriteria,
   type EvaluatedStep,
 } from '@mediforce/platform-core';
@@ -18,7 +17,7 @@ import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { describePatch } from './eval-run-report';
-import { RunInputOutput } from './run-input-output';
+import { CalibrateAction, LabelOutputRow, labelsBySubject } from './judge-calibration';
 
 export type ProposalStatus = 'open' | 'accepted' | 'rejected';
 
@@ -331,49 +330,6 @@ export function ControlSettingsCard({ proposal }: { proposal: Proposal<'propose_
   );
 }
 
-function OutputToLabel({ step, evaluatorId, output, label, mayEdit }: {
-  step: EvaluatedStep;
-  evaluatorId: string;
-  output: { agentRunId: string; why: string };
-  label: { passed: boolean; comment: string | null } | undefined;
-  mayEdit: boolean;
-}) {
-  const [comment, setComment] = React.useState('');
-  const save = useStepEvaluationMutation(step, (passed: boolean) => mediforce.evaluation.labelOutput({
-    evaluatorId,
-    agentRunId: output.agentRunId,
-    passed,
-    ...(comment.trim() === '' ? {} : { comment: comment.trim() }),
-  }));
-  return (
-    <li className="border-t pt-2 first:border-t-0 first:pt-0" data-testid="label-output">
-      <div className="flex items-center gap-1.5">
-        <span className="font-mono">{output.agentRunId.slice(0, 8)}</span>
-        {label !== undefined && (
-          <span className={cn('rounded px-1.5 text-[11px]', label.passed ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-700 dark:text-red-400')}>
-            labelled {label.passed ? 'pass' : 'fail'}
-          </span>
-        )}
-      </div>
-      <p className="text-muted-foreground">{output.why}</p>
-      <div className="mt-1"><RunInputOutput agentRunId={output.agentRunId} outputTitle="Output to label" /></div>
-      {mayEdit && (
-        <div className="mt-1 flex gap-1.5">
-          <input
-            className="min-w-0 flex-1 rounded border bg-background px-1.5 py-0.5"
-            placeholder="Why (optional)"
-            value={comment}
-            onChange={(event) => setComment(event.target.value)}
-          />
-          <button type="button" className={buttonClass} disabled={save.isPending} onClick={() => save.mutate(true)}>Pass</button>
-          <button type="button" className={buttonClass} disabled={save.isPending} onClick={() => save.mutate(false)}>Fail</button>
-        </div>
-      )}
-      {save.error !== null && <p className="mt-1 text-destructive">{save.error.message}</p>}
-    </li>
-  );
-}
-
 /**
  * Calibration help (ADR-0023 D9, EvalGen): the outputs the assistant picked
  * for the person to label. The person labels — the assistant never does —
@@ -399,18 +355,16 @@ export function LabellingCard({ step, proposal, mayEdit, editReason }: {
       ...(check.kind === 'llm_judge' && draft.rubric !== check.rubric ? { check: { ...check, rubric: draft.rubric } } : {}),
     });
   });
-  const calibrate = useStepEvaluationMutation(step, () => mediforce.evaluation.calibrateEvaluator({ evaluatorId: proposal.evaluatorId }));
   const seed = useStepEvaluationMutation(step, () => mediforce.evaluation.createCasesFromLabels({ evaluatorId: proposal.evaluatorId }));
 
   if (evaluator === undefined) {
     return <div className="rounded-md border bg-background p-2.5 text-xs text-muted-foreground">{evaluators.isLoading ? 'Loading…' : 'That Evaluator is no longer live.'}</div>;
   }
-  const byRun = new Map((labels.data?.labels ?? []).map((score) => [score.subject.id, { passed: score.value >= JUDGE_PASS_VALUE, comment: score.comment }]));
+  const byRun = labelsBySubject(labels.data?.labels ?? []);
   const all = [...byRun.values()];
   const failures = all.filter((label) => label.passed === false).length;
   const check = evaluator.latest.check;
-  const calibration = evaluator.latest.calibration;
-  const actionError = calibrate.error ?? seed.error;
+  const actionError = seed.error;
   const refinedUnchanged = refining !== null
     && refining.rule.trim() === evaluator.latest.rule
     && (check.kind !== 'llm_judge' || refining.rubric === check.rubric);
@@ -448,7 +402,7 @@ export function LabellingCard({ step, proposal, mayEdit, editReason }: {
       )}
       <ul className="mt-2 space-y-2">
         {proposal.outputs.map((output) => (
-          <OutputToLabel key={output.agentRunId} step={step} evaluatorId={proposal.evaluatorId} output={output} label={byRun.get(output.agentRunId)} mayEdit={mayEdit} />
+          <LabelOutputRow key={output.agentRunId} step={step} evaluatorId={proposal.evaluatorId} agentRunId={output.agentRunId} note={output.why} label={byRun.get(output.agentRunId)} mayEdit={mayEdit} />
         ))}
       </ul>
       <p className="mt-2 text-muted-foreground" data-testid="label-counts">
@@ -456,18 +410,6 @@ export function LabellingCard({ step, proposal, mayEdit, editReason }: {
           ? ` — a judge counts after ${JUDGE_MIN_LABELS} labels, ${JUDGE_MIN_FAILURE_LABELS} of them failures, at agreement ${JUDGE_MIN_AGREEMENT} or better`
           : ''}.
       </p>
-      {calibration !== null && (
-        <p className="mt-0.5" data-testid="calibration-result">
-          v{evaluator.latest.version} agreement {calibration.agreement.toFixed(2)}
-          {typeof calibration.kappa === 'number' && ` · κ ${calibration.kappa.toFixed(2)}`} on {calibration.labelCount} labels
-          {evaluator.trust.trusted ? ' — counts' : ` — not counted: ${evaluator.trust.reason}`}
-        </p>
-      )}
-      {calibrate.data !== undefined && calibrate.data.disagreements.length > 0 && (
-        <p className="mt-0.5 text-muted-foreground">
-          Disagrees with you on {calibrate.data.disagreements.map((miss) => miss.agentRunId.slice(0, 8)).join(', ')} — refine the rule, or ask the assistant why.
-        </p>
-      )}
       {seed.data !== undefined && (
         <div className="mt-0.5 text-muted-foreground" data-testid="cases-from-labels-result">
           <p>{seed.data.cases.length} Eval Case(s) added{seed.data.skipped.length > 0 ? `, ${seed.data.skipped.length} skipped:` : '.'}</p>
@@ -480,15 +422,7 @@ export function LabellingCard({ step, proposal, mayEdit, editReason }: {
       )}
       {actionError !== null && <p className="mt-0.5 text-destructive">{actionError.message}</p>}
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {check.kind === 'llm_judge' && (
-          <InstantTooltip label={editReason}>
-            <span className="inline-flex">
-              <button type="button" className={primaryButtonClass} disabled={mayEdit === false || all.length === 0 || calibrate.isPending} onClick={() => calibrate.mutate(undefined)}>
-                {calibrate.isPending ? 'Calibrating…' : 'Calibrate'}
-              </button>
-            </span>
-          </InstantTooltip>
-        )}
+        {check.kind === 'llm_judge' && <CalibrateAction step={step} evaluator={evaluator} labelCount={all.length} mayEdit={mayEdit} editReason={editReason} />}
         <InstantTooltip label={editReason}>
           <span className="inline-flex">
             <button type="button" className={buttonClass} disabled={mayEdit === false || all.length === 0 || seed.isPending} onClick={() => seed.mutate(undefined)}>
