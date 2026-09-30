@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { BriefSection, CasesSection, DriftAlert, EvaluatorsSection, McpPolicySection, toEvaluatorName } from '../step-evaluation-sections';
+import { BriefSection, CasesSection, DriftAlert, EvaluatorsSection, McpPolicySection, caseFromFile, toEvaluatorName } from '../step-evaluation-sections';
 
 vi.mock('@/hooks/use-step-evaluation', () => ({
   useStepEvaluationMutation: (_step: unknown, mutationFn: (value: unknown) => unknown) => ({
@@ -17,6 +17,7 @@ const evaluation = vi.hoisted(() => ({
   addEvaluatorVersion: vi.fn(),
   createRedTeamCases: vi.fn(),
   updateCase: vi.fn(),
+  createCase: vi.fn(),
   archiveCase: vi.fn(),
 }));
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
@@ -366,5 +367,49 @@ describe('Eval Case view and edit', () => {
 
     expect(screen.getByTestId('case-form').textContent).toContain('previousStepOutputs');
     expect(evaluation.updateCase).not.toHaveBeenCalled();
+  });
+});
+
+describe('Writing an Eval Case', () => {
+  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const withCases = (cases: unknown[]) => ({
+    cases: { isLoading: false, data: { cases } },
+    agentRuns: { data: { pages: [] }, hasNextPage: false },
+    datasets: { data: { datasets: [] } },
+    evaluators: { data: { evaluators: [] } },
+  }) as never;
+
+  it('starts from an existing case\'s input, so it keeps the shape the step is given, and its workspace', () => {
+    const source = evalCaseOf({ workspaceSeedCommit: 'abc1234' });
+    render(<CasesSection step={step} evaluation={withCases([source])} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Write a case' }));
+
+    expect(JSON.parse((screen.getByLabelText('Case input') as HTMLTextAreaElement).value)).toEqual(source.input);
+    const input = { ...source.input, triggerPayload: { studyId: 'NOT-A-STUDY' } };
+    fireEvent.change(screen.getByLabelText('Case input'), { target: { value: JSON.stringify(input) } });
+    fireEvent.change(screen.getByLabelText('Case name'), { target: { value: 'Unknown study' } });
+    fireEvent.change(screen.getByLabelText('Expectation'), { target: { value: 'negative' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add case' }));
+
+    expect(evaluation.createCase).toHaveBeenCalledWith({
+      ...step, name: 'Unknown study', expectation: 'negative', split: 'dev', notes: null, input,
+      workspaceSeedCommit: 'abc1234', containsProductionData: true,
+    });
+  });
+
+  it('fills the form from a .json file of a whole case', async () => {
+    render(<CasesSection step={step} evaluation={withCases([])} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Write a case' }));
+    const written = { name: 'Grade 4 neutropenia', input: { triggerPayload: {}, previousStepOutputs: { 'extract-aes': { events: [] } } }, expectation: 'positive', notes: 'ANC < 0.5 is grade 4.' };
+    fireEvent.change(screen.getByLabelText('Case file'), { target: { files: [new File([JSON.stringify(written)], 'neutropenia.json', { type: 'application/json' })] } });
+
+    await waitFor(() => expect((screen.getByLabelText('Case name') as HTMLInputElement).value).toBe('Grade 4 neutropenia'));
+    expect((screen.getByLabelText('Notes') as HTMLTextAreaElement).value).toBe('ANC < 0.5 is grade 4.');
+    expect(JSON.parse((screen.getByLabelText('Case input') as HTMLTextAreaElement).value)).toEqual(written.input);
+  });
+
+  it('refuses a file that is not a case or a case input', () => {
+    expect(caseFromFile('{"events": []}')).toEqual({ error: expect.stringContaining('neither a case') });
+    expect(caseFromFile('{"triggerPayload": {}, "previousStepOutputs": {}}')).toEqual({ values: { input: expect.any(String) } });
   });
 });

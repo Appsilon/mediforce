@@ -667,6 +667,124 @@ function CaseRow({ step, evalCase, mayEdit }: { step: EvaluatedStep; evalCase: E
   );
 }
 
+const EMPTY_CASE_INPUT: EvalCaseInput = { triggerPayload: {}, previousStepOutputs: {} };
+const FROM_FILE = 'file';
+
+/** A `.json` file: a whole case as `mediforce eval case-add --file` takes it, or only its input. */
+export function caseFromFile(text: string): { values: Partial<CaseFormValues> } | { error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { error: 'The file is not valid JSON.' };
+  }
+  const whole = z.object({
+    name: z.string().optional(),
+    input: EvalCaseInputSchema,
+    expectation: EvalCaseExpectationSchema.optional(),
+    notes: z.string().nullable().optional(),
+    split: EvalCaseSplitSchema.optional(),
+  }).safeParse(parsed);
+  if (whole.success) {
+    const { input, notes, ...rest } = whole.data;
+    return { values: { ...rest, ...(notes === undefined || notes === null ? {} : { notes }), input: JSON.stringify(input, null, 2) } };
+  }
+  const input = EvalCaseInputSchema.safeParse(parsed);
+  if (input.success) return { values: { input: JSON.stringify(input.data, null, 2) } };
+  return { error: 'The file is neither a case ({ name, input, expectation, notes, split }) nor a case input ({ triggerPayload, previousStepOutputs }).' };
+}
+
+/**
+ * A case written by hand: its input starts from an existing case's, so it has
+ * the shape the step is given, or from a `.json` file. For inputs production
+ * never sent — a negative case nobody would run on purpose.
+ */
+function WriteCase({ step, cases, onClose }: { step: EvaluatedStep; cases: readonly EvalCase[]; onClose: () => void }) {
+  const [startFrom, setStartFrom] = React.useState<string>(cases[0]?.id ?? '');
+  const [fromFile, setFromFile] = React.useState<{ name: string; values: Partial<CaseFormValues> } | null>(null);
+  const [fileError, setFileError] = React.useState<string | null>(null);
+  const template = fromFile === null ? cases.find((evalCase) => evalCase.id === startFrom) : undefined;
+  const create = useStepEvaluationMutation(step, (values: CaseFormResult) => mediforce.evaluation.createCase({
+    ...step,
+    ...values,
+    workspaceSeedCommit: template?.workspaceSeedCommit ?? null,
+    containsProductionData: template?.containsProductionData ?? false,
+  }));
+  const readFile = async (file: File) => {
+    const read = caseFromFile(await file.text());
+    if ('error' in read) {
+      setFileError(read.error);
+      return;
+    }
+    setFileError(null);
+    setFromFile({ name: file.name, values: read.values });
+  };
+  const initial: CaseFormValues = {
+    name: '',
+    expectation: 'positive',
+    split: 'dev',
+    notes: '',
+    input: JSON.stringify(template?.input ?? EMPTY_CASE_INPUT, null, 2),
+    ...fromFile?.values,
+  };
+  return (
+    <div className="space-y-2 text-xs" data-testid="write-case">
+      <p className="text-muted-foreground">
+        Write the input yourself — for what production has not sent yet, such as an input the step must refuse or a record that should trip a rule. Start from a case so the input keeps the shape the step is given, then change its values.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-1">Start from
+          <select
+            aria-label="Start from"
+            className={inputClass}
+            value={fromFile === null ? startFrom : FROM_FILE}
+            onChange={(event) => {
+              if (event.target.value === FROM_FILE) return;
+              setFromFile(null);
+              setStartFrom(event.target.value);
+            }}
+          >
+            {fromFile !== null && <option value={FROM_FILE}>{fromFile.name}</option>}
+            {cases.map((evalCase) => <option key={evalCase.id} value={evalCase.id}>{evalCase.name}</option>)}
+            <option value="">{cases.length === 0 ? 'An empty input' : 'An empty input (no workspace files)'}</option>
+          </select>
+        </label>
+        <label className={cn(buttonClass, 'cursor-pointer')}>
+          Load a .json file
+          <input
+            type="file"
+            accept="application/json,.json"
+            aria-label="Case file"
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file !== undefined) void readFile(file);
+            }}
+          />
+        </label>
+      </div>
+      {cases.length === 0 && fromFile === null && (
+        <p className="text-muted-foreground">Add a production run as a case first to start from the input it was given.</p>
+      )}
+      {template?.workspaceSeedCommit != null && (
+        <p className="text-muted-foreground">It starts from the same workspace files as &lsquo;{template.name}&rsquo;.</p>
+      )}
+      {fileError !== null && <p className="text-destructive">{fileError}</p>}
+      <CaseForm
+        key={fromFile === null ? `case:${startFrom}` : `file:${fromFile.name}:${JSON.stringify(fromFile.values)}`}
+        initial={initial}
+        inputHelp="What the step is given: the trigger payload, the outputs of the steps before it by step id, and the previous run's carry-over when the workflow has one."
+        submitLabel="Add case"
+        pending={create.isPending}
+        error={create.error?.message ?? null}
+        onSubmit={(values) => create.mutate(values, { onSuccess: onClose })}
+        onCancel={onClose}
+      />
+    </div>
+  );
+}
+
 /** Eval Cases, harvested from production runs or written by the assistant, and frozen Dataset versions. */
 export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedStep; evaluation: StepEvaluation; mayEdit: boolean }) {
   const harvest = useStepEvaluationMutation(step, (input: { agentRunId: string; expectation: 'positive' | 'negative' }) =>
@@ -677,16 +795,21 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
   const runs = loadedAgentRuns(evaluation).filter((run) => !harvested.has(run.id));
   const [latest] = evaluation.datasets.data?.datasets ?? [];
   const [logRun, setLogRun] = React.useState<AgentRun | null>(null);
+  const [writing, setWriting] = React.useState(false);
 
   return (
     <Section
       title="Eval Cases"
-      action={mayEdit && cases.length > 0 && (
-        <button type="button" className={buttonClass} disabled={freeze.isPending} onClick={() => freeze.mutate(undefined)}>Freeze dataset</button>
+      action={mayEdit && (
+        <div className="flex gap-1.5">
+          {!writing && <button type="button" className={buttonClass} onClick={() => setWriting(true)}>Write a case</button>}
+          {cases.length > 0 && <button type="button" className={buttonClass} disabled={freeze.isPending} onClick={() => freeze.mutate(undefined)}>Freeze dataset</button>}
+        </div>
       )}
     >
+      {writing && <WriteCase step={step} cases={cases} onClose={() => setWriting(false)} />}
       {evaluation.cases.isLoading ? <Loading /> : cases.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No cases yet. Add production runs below, or ask the assistant.</p>
+        <p className="text-sm text-muted-foreground">No cases yet. Add production runs below, write one, or ask the assistant.</p>
       ) : (
         <ul className="space-y-1.5 text-sm">
           {cases.map((evalCase) => <CaseRow key={evalCase.id} step={step} evalCase={evalCase} mayEdit={mayEdit} />)}
