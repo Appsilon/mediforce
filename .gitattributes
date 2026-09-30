@@ -1,7 +1,3 @@
-# Append-only logs: take both sides on merge instead of flagging a conflict.
-# Order may interleave, but nothing is lost.
-CHANGELOG.md merge=union
-
 # Drizzle migration snapshots are auto-generated cumulative dumps of the
 # schema state. They're committed (drizzle needs them for next generate)
 # but reviewers don't read them — the SQL migration alongside is the
