@@ -73,6 +73,10 @@ export const agentRuns = pgTable(
     executorType: text('executor_type'),
     reviewerType: text('reviewer_type'),
 
+    // The OTel span the run was traced under; null when tracing is off.
+    traceId: text('trace_id'),
+    spanId: text('span_id'),
+
     startedAt: timestamp('started_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

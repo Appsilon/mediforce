@@ -75,6 +75,24 @@ function contract(name: string, factory: () => Promise<ScoreRepository>) {
       expect((await repo.list({ limit: 10 })).map((score) => score.id)).toEqual([correction.id, original.id]);
     });
 
+    it('filters production Scores by their metadata flag', async () => {
+      const live = await repo.create(buildScore({ metadata: { production: true } }));
+      const trial = await repo.create(buildScore({ metadata: { evalRunId: 'run-1' } }));
+      const bare = await repo.create(buildScore({ metadata: null }));
+
+      expect(await repo.list({ production: true, limit: 10 })).toEqual([live]);
+      expect((await repo.list({ production: false, limit: 10 })).map((score) => score.id).sort())
+        .toEqual([trial.id, bare.id].sort());
+    });
+
+    it('filters by the Evaluator version that recorded the Score', async () => {
+      const current = await repo.create(buildScore({ metadata: { production: true, evaluatorVersion: 2 } }));
+      await repo.create(buildScore({ metadata: { production: true, evaluatorVersion: 1 } }));
+      await repo.create(buildScore({ metadata: null }));
+
+      expect(await repo.list({ evaluatorVersion: 2, limit: 10 })).toEqual([current]);
+    });
+
     it('scopes by workspace', async () => {
       await repo.create(buildScore({ namespace: 'ws-1' }));
       await repo.create(buildScore({ namespace: 'ws-2' }));

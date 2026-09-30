@@ -12,6 +12,7 @@ import {
   EvalRunsSection,
   EvaluatorsSection,
   McpPolicySection,
+  DriftAlert,
   QualificationSection,
 } from './step-evaluation-sections';
 
@@ -115,6 +116,7 @@ function StepEvaluation({ step, mayEdit, editReason, mayRun, runReason }: {
       style={{ '--evaluation-columns': columns } as React.CSSProperties}
     >
       <div className="space-y-4">
+        <DriftAlert data={evaluation.drift} />
         <QualificationSection data={evaluation.qualification} />
         <BriefSection step={step} data={evaluation.brief} mayEdit={mayEdit} />
         <AcceptanceCriteriaSection step={step} data={evaluation.criteria} mayEdit={mayEdit} />

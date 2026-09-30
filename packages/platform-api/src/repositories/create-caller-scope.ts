@@ -30,6 +30,7 @@ import type {
   WorkflowAssistantInstructionsRepository,
   WorkflowSecretsRepository,
   AutoJoinRule,
+  DriftSettings,
 } from '@mediforce/platform-core';
 import type {
   CronTrigger,
@@ -113,6 +114,7 @@ export interface CallerScopeServices {
   readonly emailProviderInfo: EmailProviderInfo | null;
   readonly passwordAuthEnabled: boolean;
   readonly autoJoinWorkspaces: readonly AutoJoinRule[];
+  readonly driftSettings: DriftSettings;
 }
 
 /**
@@ -197,6 +199,7 @@ export function createCallerScope(
       emailProviderInfo: services.emailProviderInfo,
       passwordAuthEnabled: services.passwordAuthEnabled,
       autoJoinWorkspaces: services.autoJoinWorkspaces,
+      driftSettings: services.driftSettings,
     },
   };
 }

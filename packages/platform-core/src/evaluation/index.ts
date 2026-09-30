@@ -10,3 +10,4 @@ export { wilsonInterval, caseReliability, cohensKappa, type CaseReliability } fr
 export { applyStepVariant, isEmptyVariantPatch, variantPatchProblem } from './variant';
 export { describeAcceptanceCriteria, judgeAcceptanceCriteria } from './acceptance';
 export { calibrateConfidence, recommendControl, type ConfidenceOutcome } from './confidence-calibration';
+export { DEFAULT_DRIFT_SETTINGS, detectDrift, parseDriftSettings, type DriftSettings, type DriftWindows } from './drift';

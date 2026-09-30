@@ -160,6 +160,13 @@ Run a workflow with an agent step, then open http://localhost:6006 — spans
   the platform's Postgres and always keep full content (ADR-0007 D5).
 - `MEDIFORCE_OTEL_EXPORT_ALL_SPANS=true` exports non-`@mediforce/*` spans too
   (Next.js HTTP instrumentation is filtered out by default).
+- `MEDIFORCE_SCORE_EXPORT=phoenix` also writes each Score next to its Agent Run's
+  span as a Phoenix span annotation (at `PHOENIX_BASE_URL`, by default the OTLP
+  endpoint). `langfuse` needs `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY` and
+  `LANGFUSE_SECRET_KEY`. Unset = off. See
+  [Step Evaluation § Score export](../reference/step-evaluation.md#score-export).
+- `MEDIFORCE_DRIFT_WINDOW` / `MEDIFORCE_DRIFT_THRESHOLD` (default 20 / 0.15) set
+  the drift alerts (`mediforce eval drift`).
 - Container agents (claude-code, opencode, script) call their LLM **inside** the
   container, so they have no `openrouter.chat.completion` child span — only the
   platform-side `OpenRouterLlmClient` is traced. In-container tracing needs
