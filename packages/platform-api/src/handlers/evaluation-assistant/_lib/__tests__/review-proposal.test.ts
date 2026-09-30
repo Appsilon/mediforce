@@ -58,6 +58,13 @@ describe('reviewEvaluationProposal', () => {
     expect(taken).toMatchObject({ ok: false, error: expect.stringContaining('propose_evaluator_version') });
   });
 
+  it.each(['injection_ignored', 'result_stable'] as const)('proposes a %s check untried: it grades an output against its Eval Case, which a production output has not', async (name) => {
+    const review = await reviewEvaluationProposal('propose_evaluator', {
+      name: name.replace('_', '-'), rule: 'Holds on the case it was made for.', severity: 'critical', check: { kind: 'builtin', name },
+    }, fixture.scope(), STEP, []);
+    expect(review).toEqual({ ok: true, evidence: { selfTest: { unavailable: expect.stringContaining('Eval Run') } } });
+  });
+
   it('marks a check untested for a person who may not run checks, instead of dropping it', async () => {
     await fixture.processRepo.setWorkflowAccess(NAMESPACE, STEP.workflowName, { run: ['runner'], edit: ['viewer'] });
     const review = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), fixture.scope(userCaller('viewer', [NAMESPACE])), STEP, []);

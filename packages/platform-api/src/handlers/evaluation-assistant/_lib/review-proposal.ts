@@ -17,6 +17,7 @@ import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject'
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
 import { isSameStep, loadEvaluatedStep } from '../../evaluation/_lib/evaluated-step';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
+import { caseNeededByCheck } from '../../evaluation/_lib/builtin-checks';
 import { loadStepEvaluator } from './run-evaluation-tool';
 
 type Args<Name extends EvaluationAssistantProposalToolName> = z.infer<(typeof EVALUATION_ASSISTANT_PROPOSAL_TOOLS)[Name]>;
@@ -32,7 +33,8 @@ export interface PreviewedCheck {
  * it (ADR-0023 D14): the assistant's own preview of that exact check this
  * turn, or a fresh one. A check that errors on every output it is tried on
  * does not run at all, so it goes back to the model instead of to the person.
- * A caller who may not run checks still gets the proposal, marked untested.
+ * A caller who may not run checks, or a check that grades only the Eval Cases
+ * made for it, still gets the proposal, marked untested.
  */
 async function selfTest(
   scope: CallerScope,
@@ -40,6 +42,10 @@ async function selfTest(
   check: EvaluatorCheck,
   previewed: readonly PreviewedCheck[],
 ): Promise<ProposalReview> {
+  const caseNeeded = caseNeededByCheck(check);
+  if (caseNeeded !== undefined) {
+    return { ok: true, evidence: { selfTest: { unavailable: `this check grades only ${caseNeeded}, so it runs in an Eval Run over such cases` } } };
+  }
   let results = previewed.find((preview) => isDeepStrictEqual(preview.check, check))?.results;
   if (results === undefined) {
     try {

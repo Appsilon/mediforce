@@ -30,6 +30,7 @@ import { listEvalCases } from '../../evaluation/eval-cases';
 import { getEvalRun, listEvalRuns, prepareEvalRun, startEvalRun } from '../../evaluation/eval-runs';
 import { getEvalRunFailures } from '../../evaluation/eval-run-failures';
 import { previewEvaluator } from '../../evaluation/preview-evaluator';
+import { caseNeededByCheck } from '../../evaluation/_lib/builtin-checks';
 import { getAcceptanceCriteria } from '../../evaluation/acceptance-criteria';
 import { getStepQualification } from '../../evaluation/step-qualification';
 import { getOptimisation, listOptimisations, startOptimisation } from '../../evaluation/optimisations';
@@ -334,6 +335,10 @@ export async function executeEvaluationTool(
     }
     case 'preview_evaluator': {
       const { check, agentRunIds } = args as Args<'preview_evaluator'>;
+      const caseNeeded = caseNeededByCheck(check);
+      if (caseNeeded !== undefined) {
+        return { results: [], notPreviewed: `This check grades only ${caseNeeded}, which a production output has not; propose it without a preview, with the cases it needs.` };
+      }
       return previewEvaluator({ ...step, check, limit: 5, ...(agentRunIds === undefined ? {} : { agentRunIds }) }, scope);
     }
     case 'compare_variants': {
