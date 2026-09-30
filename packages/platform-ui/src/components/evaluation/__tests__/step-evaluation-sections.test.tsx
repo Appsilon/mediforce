@@ -141,6 +141,19 @@ describe('EvaluatorsSection', () => {
     }));
   });
 
+  it('offers the built-in checks by what they do', () => {
+    evaluation.createEvaluator.mockClear();
+    openForm();
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'builtin' } });
+    fireEvent.change(screen.getByLabelText('Check'), { target: { value: 'result_stable' } });
+    fireEvent.change(screen.getByLabelText('Keys'), { target: { value: 'grades, summary' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(evaluation.createEvaluator).toHaveBeenCalledWith(expect.objectContaining({
+      check: { kind: 'builtin', name: 'result_stable', keys: ['grades', 'summary'] },
+    }));
+  });
+
   it('says what is wrong with a schema that is not JSON instead of sending it', () => {
     evaluation.createEvaluator.mockClear();
     openForm();
