@@ -24,6 +24,10 @@ function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void 
       const counted = evaluator.counted ? '' : `  not counted (${evaluator.reason})`;
       output.stdout(`${evaluator.name.padEnd(24)} ${percent(evaluator.passRate)}  ${interval}  ${percent(evaluator.passAtK)}  ${percent(evaluator.passHatK)} ${percent(evaluator.flakiness)}  ${String(evaluator.errors).padStart(3)}${counted}`);
     }
+    for (const suite of variant.suites) {
+      const interval = suite.wilsonLower === null ? '' : `  [${percent(suite.wilsonLower)}, ${percent(suite.wilsonUpper)}]`;
+      output.stdout(`suite ${suite.suite.padEnd(16)} ${percent(suite.passRate)}${interval}  ${suite.passes} passed, ${suite.failures} failed, ${suite.errors} not graded`);
+    }
     for (const verdict of variant.criteria) {
       output.stdout(`criterion ${verdict.severity}: ${verdict.status.replace('_', ' ')} — ${verdict.reason}`);
     }

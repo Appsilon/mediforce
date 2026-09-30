@@ -13,6 +13,7 @@ import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { callOpenRouter } from '../../../services/openrouter-client';
 import { requireOpenRouterApiKey } from '../../../services/openrouter-key';
+import { runBuiltinCheck } from './builtin-checks';
 import type { EvaluationSubject } from './evaluation-subject';
 
 const CODE_CHECK_TIMEOUT_MS = 2 * 60_000;
@@ -89,6 +90,10 @@ export async function runEvaluatorCheck(
           label: agentRun.id.slice(0, 12),
         });
         return binary(agentRun.id, outcome.passed, outcome.comment);
+      }
+      case 'builtin': {
+        const verdict = await runBuiltinCheck(scope, check, result, evalCase);
+        return binary(agentRun.id, verdict.passed, verdict.comment);
       }
       case 'llm_judge': {
         const apiKey = await requireOpenRouterApiKey(scope, subject.instance.namespace ?? '');

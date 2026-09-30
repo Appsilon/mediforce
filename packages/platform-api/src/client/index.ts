@@ -554,6 +554,8 @@ import {
   CalibrateEvaluatorOutputSchema,
   CreateEvalCaseFromAgentRunInputSchema,
   CreatePerturbedEvalCaseInputSchema,
+  CreateRedTeamEvalCasesInputSchema,
+  CreateRedTeamEvalCasesOutputSchema,
   CreateEvalCasesFromLabelsInputSchema,
   CreateEvalCasesFromLabelsOutputSchema,
   CreateEvalCaseInputSchema,
@@ -602,6 +604,8 @@ import {
   type CalibrateEvaluatorOutput,
   type CreateEvalCaseFromAgentRunInput,
   type CreatePerturbedEvalCaseInput,
+  type CreateRedTeamEvalCasesInput,
+  type CreateRedTeamEvalCasesOutput,
   type CreateEvalCasesFromLabelsInput,
   type CreateEvalCasesFromLabelsOutput,
   type CreateEvalCaseInput,
@@ -1068,6 +1072,7 @@ export class Mediforce {
     createCase: (input: CreateEvalCaseInput) => Promise<EvalCaseOutput>;
     createCaseFromAgentRun: (input: CreateEvalCaseFromAgentRunInput) => Promise<EvalCaseOutput>;
     createPerturbedCase: (input: CreatePerturbedEvalCaseInput) => Promise<EvalCaseOutput>;
+    createRedTeamCases: (input: CreateRedTeamEvalCasesInput) => Promise<CreateRedTeamEvalCasesOutput>;
     createCasesFromLabels: (input: CreateEvalCasesFromLabelsInput) => Promise<CreateEvalCasesFromLabelsOutput>;
     archiveCase: (input: ArchiveEvalCaseInput) => Promise<EvalCaseOutput>;
     listDatasets: (input: ListEvalDatasetsInput) => Promise<ListEvalDatasetsOutput>;
@@ -2562,6 +2567,10 @@ export class Mediforce {
       createPerturbedCase: async (input) => this.sendJson(
         'POST', '/api/evaluation/cases/perturbed', CreatePerturbedEvalCaseInputSchema.parse(input),
         EvalCaseOutputSchema, 'mediforce.evaluation.createPerturbedCase',
+      ),
+      createRedTeamCases: async (input) => this.sendJson(
+        'POST', '/api/evaluation/cases/red-team', CreateRedTeamEvalCasesInputSchema.parse(input),
+        CreateRedTeamEvalCasesOutputSchema, 'mediforce.evaluation.createRedTeamCases',
       ),
       createCasesFromLabels: async (input) => {
         const { evaluatorId, ...body } = CreateEvalCasesFromLabelsInputSchema.parse(input);
