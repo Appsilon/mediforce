@@ -17,6 +17,7 @@ export {
   createPerturbedEvalCase,
   createEvalCasesFromLabels,
   archiveEvalCase,
+  updateEvalCase,
 } from './eval-cases';
 export { createRedTeamEvalCases } from './red-team-cases';
 export { getStepDrift } from './drift';

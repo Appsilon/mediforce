@@ -7,6 +7,7 @@ import {
   GetMcpEvalPolicyOutputSchema,
   ListStepAgentRunsOutputSchema,
   ListEvalCasesOutputSchema,
+  ListEvalDatasetsOutputSchema,
   ListEvaluatorsOutputSchema,
   PreviewEvaluatorOutputSchema,
 } from '@mediforce/platform-api/contract';
@@ -232,6 +233,43 @@ test.describe('Step Evaluation entities — API E2E', () => {
     );
     const { cases } = ListEvalCasesOutputSchema.parse(await casesRes.json());
     expect(cases.find((listed) => listed.id === evalCase.id)?.archived).toBe(false);
+  });
+
+  test('editing a case replaces it, and the Dataset frozen before keeps the case it froze', async ({ request }) => {
+    const { evalCase } = EvalCaseOutputSchema.parse(await post(request, '/api/evaluation/cases/from-agent-run', {
+      agentRunId, step, expectation: 'positive',
+    }, 201));
+    const { dataset } = FreezeEvalDatasetOutputSchema.parse(await post(request, '/api/evaluation/datasets', step, 201));
+
+    const outsiderEdit = await request.patch(`/api/evaluation/cases/${evalCase.id}`, {
+      headers: sessionCookieHeaders(callers.outsider), data: { expectation: 'negative' },
+    });
+    expect(outsiderEdit.status(), await outsiderEdit.text()).toBe(404);
+    const unchanged = await request.patch(`/api/evaluation/cases/${evalCase.id}`, { headers: JSON_HEADERS, data: { expectation: 'positive' } });
+    expect(unchanged.status(), await unchanged.text()).toBe(400);
+
+    const editRes = await request.patch(`/api/evaluation/cases/${evalCase.id}`, {
+      headers: JSON_HEADERS, data: { expectation: 'negative', notes: 'The output must not grade a fatal event below 5.' },
+    });
+    expect(editRes.status(), await editRes.text()).toBe(200);
+    const { evalCase: edited } = EvalCaseOutputSchema.parse(await editRes.json());
+    expect(edited).toMatchObject({ expectation: 'negative', sourceAgentRunId: agentRunId, source: 'production', archived: false });
+    expect(edited.id).not.toBe(evalCase.id);
+
+    const casesRes = await request.get(
+      `/api/evaluation/cases?namespace=${step.namespace}&workflowName=${step.workflowName}&stepId=${step.stepId}`,
+      { headers: AUTH_HEADERS },
+    );
+    const live = ListEvalCasesOutputSchema.parse(await casesRes.json()).cases.map((listed) => listed.id);
+    expect(live).toContain(edited.id);
+    expect(live).not.toContain(evalCase.id);
+    const datasetsRes = await request.get(
+      `/api/evaluation/datasets?namespace=${step.namespace}&workflowName=${step.workflowName}&stepId=${step.stepId}`,
+      { headers: AUTH_HEADERS },
+    );
+    const frozen = ListEvalDatasetsOutputSchema.parse(await datasetsRes.json()).datasets.find((listed) => listed.id === dataset.id);
+    expect(frozen?.caseIds).toContain(evalCase.id);
+    expect(frozen?.caseIds).not.toContain(edited.id);
   });
 
   test('an agent with no MCP servers has nothing to deny; an unknown server is refused', async ({ request }) => {

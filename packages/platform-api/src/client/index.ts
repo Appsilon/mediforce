@@ -546,6 +546,7 @@ import {
   AddEvaluatorVersionInputSchema,
   ApproveEvaluatorSourceInputSchema,
   ArchiveEvalCaseInputSchema,
+  UpdateEvalCaseInputSchema,
   ArchiveEvaluatorInputSchema,
   SetEvaluatorProductionInputSchema,
   ListEvaluatorLabelsInputSchema,
@@ -598,6 +599,7 @@ import {
   type AddEvaluatorVersionInput,
   type ApproveEvaluatorSourceInput,
   type ArchiveEvalCaseInput,
+  type UpdateEvalCaseInput,
   type ArchiveEvaluatorInput,
   type SetEvaluatorProductionInput,
   type ListEvaluatorLabelsInput,
@@ -1089,6 +1091,8 @@ export class Mediforce {
     createRedTeamCases: (input: CreateRedTeamEvalCasesInput) => Promise<CreateRedTeamEvalCasesOutput>;
     createCasesFromLabels: (input: CreateEvalCasesFromLabelsInput) => Promise<CreateEvalCasesFromLabelsOutput>;
     archiveCase: (input: ArchiveEvalCaseInput) => Promise<EvalCaseOutput>;
+    /** Edits a case as a new case that replaces it; the old one is archived, so frozen Datasets keep it. */
+    updateCase: (input: UpdateEvalCaseInput) => Promise<EvalCaseOutput>;
     listDatasets: (input: ListEvalDatasetsInput) => Promise<ListEvalDatasetsOutput>;
     freezeDataset: (input: FreezeEvalDatasetInput) => Promise<FreezeEvalDatasetOutput>;
     getMcpPolicy: (input: GetMcpEvalPolicyInput) => Promise<GetMcpEvalPolicyOutput>;
@@ -2600,6 +2604,11 @@ export class Mediforce {
         const { caseId, ...body } = ArchiveEvalCaseInputSchema.parse(input);
         return this.sendJson('POST', `/api/evaluation/cases/${encodeURIComponent(caseId)}/archive`, body,
           EvalCaseOutputSchema, 'mediforce.evaluation.archiveCase');
+      },
+      updateCase: async (input) => {
+        const { caseId, ...body } = UpdateEvalCaseInputSchema.parse(input);
+        return this.sendJson('PATCH', `/api/evaluation/cases/${encodeURIComponent(caseId)}`, body,
+          EvalCaseOutputSchema, 'mediforce.evaluation.updateCase');
       },
       listDatasets: async (input) => {
         const step = ListEvalDatasetsInputSchema.parse(input);

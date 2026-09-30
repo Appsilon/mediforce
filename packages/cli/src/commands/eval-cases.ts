@@ -146,6 +146,23 @@ export const evalCaseArchiveCommand = defineCommand({
   },
 });
 
+export const evalCaseEditCommand = defineCommand({
+  name: 'mediforce eval case-edit',
+  description: 'Edit an Eval Case from a JSON file of the fields to change: { name?, input?, expectation?, notes?, split? }. '
+    + 'The edit is a new case that replaces it; the old one is archived, so frozen Dataset versions keep it.',
+  args: {
+    caseId: { type: 'positional', required: true, description: 'Eval Case id' },
+    file: { type: 'string', required: true, description: 'JSON file with the changes' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const changes = readJsonFile(args.file) as Record<string, unknown>;
+    const result = await mediforce.evaluation.updateCase({ ...changes, caseId: args.caseId } as Parameters<typeof mediforce.evaluation.updateCase>[0]);
+    if (jsonMode) printJson(output, result);
+    else output.stdout(`Eval Case ${result.evalCase.id} replaces ${args.caseId}`);
+    return 0;
+  },
+});
+
 export const evalDatasetListCommand = defineCommand({
   name: 'mediforce eval dataset-list',
   description: 'List a step\'s frozen Eval Dataset versions.',

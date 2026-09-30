@@ -376,6 +376,17 @@ finished production runs not yet harvested, newest first and a page at a time
 `nextCursor` as `cursor`). Each shows its reasoning summary, and **Log** opens
 the run's execution log before you add it as good or bad.
 
+Each case in the list opens **Details**: where it came from, what it expects
+(its notes), the input the step is given, the workspace commit it starts from,
+and **Source run log** for a case made from a run. **Edit** changes its name,
+expectation, split, notes or input (`case-edit <caseId> --file`,
+`PATCH /api/evaluation/cases/:caseId`); **Archive** takes it out of the next
+freeze (`case-archive`). An edit is a new case that replaces the old one, which
+is archived, so a Dataset version frozen with the old case keeps exactly what it
+ran. A production case whose input is edited becomes `manual` — production never
+saw that input — and keeps the run it came from. MCP recordings are kept per
+case, so an edited case is recorded afresh by its next `live` trial.
+
 A **synthesized** case (`case-perturb --file`, `POST /api/evaluation/cases/perturbed`)
 is a production run's case with deliberate changes, and records what kind
 (`missing_file`, `extra_file`, `renamed_columns`, `edge_values`,

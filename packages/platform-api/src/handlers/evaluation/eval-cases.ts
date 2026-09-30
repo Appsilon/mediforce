@@ -11,6 +11,7 @@ import type {
   EvalCaseOutput,
   ListEvalCasesInputSchema,
   ListEvalCasesOutput,
+  UpdateEvalCaseInputSchema,
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { HandlerError, NotFoundError, ValidationError } from '../../errors';
@@ -242,4 +243,46 @@ export async function archiveEvalCase(
     basis: 'An archived case is left out of new Dataset versions; frozen versions keep it',
   });
   return { evalCase: { ...evalCase, archived: input.archived } };
+}
+
+/**
+ * Edits an Eval Case as a replacement: a new case with the changes, and the
+ * old one archived — a Dataset version frozen with it keeps exactly what it
+ * ran. A production case whose input is edited becomes a manual one, since
+ * production never saw that input; it keeps the run it came from.
+ */
+export async function updateEvalCase(
+  input: z.output<typeof UpdateEvalCaseInputSchema>,
+  scope: CallerScope,
+): Promise<EvalCaseOutput> {
+  const evalCase = await scope.evaluation.getCase(input.caseId);
+  if (evalCase === null) throw new NotFoundError(`Eval Case '${input.caseId}' not found`);
+  await loadEvaluatedStep(scope, stepRef(evalCase), 'edit');
+  if (evalCase.archived) throw new ValidationError(`Eval Case '${evalCase.name}' is archived — restore it before editing it`);
+
+  const { caseId: _caseId, ...changes } = input;
+  const changed = (Object.keys(changes) as Array<keyof typeof changes>)
+    .filter((field) => changes[field] !== undefined && JSON.stringify(changes[field]) !== JSON.stringify(evalCase[field]));
+  if (changed.length === 0) throw new ValidationError(`The edit changes nothing in Eval Case '${evalCase.name}'`);
+
+  const inputEdited = changed.includes('input');
+  const stored = await scope.evaluation.createCase({
+    ...evalCase,
+    ...Object.fromEntries(changed.map((field) => [field, changes[field]])),
+    id: randomUUID(),
+    source: inputEdited && evalCase.source === 'production' ? 'manual' : evalCase.source,
+    createdBy: authorId(scope),
+    createdAt: new Date().toISOString(),
+  });
+  await scope.evaluation.setCaseArchived(evalCase, true);
+  await appendEvaluationAudit(scope, {
+    action: 'eval_case.edited',
+    description: `Eval Case '${stored.name}' edited (${changed.join(', ')}); it replaces the case '${evalCase.name}', now archived`,
+    namespace: stored.namespace,
+    entityType: 'eval_case',
+    entityId: stored.id,
+    inputSnapshot: { replaces: evalCase.id, changed, ...Object.fromEntries(changed.map((field) => [field, stored[field]])) },
+    basis: 'An Eval Case edit is a new case; frozen Dataset versions keep the case they froze (ADR-0023)',
+  });
+  return { evalCase: stored };
 }

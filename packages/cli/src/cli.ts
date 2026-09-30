@@ -115,6 +115,7 @@ import {
 import {
   evalCaseAddCommand,
   evalCaseArchiveCommand,
+  evalCaseEditCommand,
   evalCaseFromRunCommand,
   evalCaseListCommand,
   evalCasePerturbCommand,
@@ -304,6 +305,7 @@ export const TREE: Record<string, BranchEntry> = {
       'case-red-team': { description: 'Add a prompt-injection or robustness suite of cases from a run', fn: evalCaseRedTeamCommand },
       'cases-from-labels': { description: 'Turn an Evaluator\'s labelled outputs into cases', fn: evalCasesFromLabelsCommand },
       'case-archive': { description: 'Archive or restore an Eval Case', fn: evalCaseArchiveCommand },
+      'case-edit': { description: 'Edit an Eval Case (a new case replaces it)', fn: evalCaseEditCommand },
       'dataset-list': { description: 'List frozen Eval Dataset versions', fn: evalDatasetListCommand },
       'dataset-freeze': { description: 'Freeze the live cases as a Dataset version', fn: evalDatasetFreezeCommand },
       'mcp-policy-get': { description: 'Show the step\'s MCP eval policy', fn: evalMcpPolicyGetCommand },

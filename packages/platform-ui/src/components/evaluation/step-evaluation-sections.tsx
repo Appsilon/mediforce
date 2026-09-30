@@ -5,7 +5,10 @@ import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
 import {
   CHAMPION_VARIANT_ID,
+  EvalCaseExpectationSchema,
   EvalCaseInputPartSchema,
+  EvalCaseInputSchema,
+  EvalCaseSplitSchema,
   EvaluatorKindSchema,
   EvaluatorSeveritySchema,
   McpEvalServerPolicySchema,
@@ -15,6 +18,9 @@ import {
   type AgentOutputSchema,
   type AgentRun,
   type BuiltinCheckName,
+  type EvalCase,
+  type EvalCaseExpectation,
+  type EvalCaseInput,
   type EvalCaseInputPart,
   type EvaluatedStep,
   type EvaluatorCheck,
@@ -36,6 +42,7 @@ import { cn } from '@/lib/utils';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { AgentLogPanel } from '@/components/agents/agent-log-panel';
+import { useAgentRun } from '@/hooks/use-agent-runs';
 import { useEvalRun, useOptimisation, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { EvalRunReport, describePatch } from './eval-run-report';
 import { QualificationStatusChip } from './step-qualification-badge';
@@ -470,6 +477,196 @@ function BuiltinCaseSuites({ step, evaluation }: { step: EvaluatedStep; evaluati
   );
 }
 
+interface CaseFormValues {
+  name: string;
+  expectation: EvalCaseExpectation;
+  split: EvalCase['split'];
+  notes: string;
+  /** The case input as JSON text: triggerPayload, previousStepOutputs and optionally previousRun. */
+  input: string;
+}
+
+export interface CaseFormResult {
+  name: string;
+  expectation: EvalCaseExpectation;
+  split: EvalCase['split'];
+  notes: string | null;
+  input: EvalCaseInput;
+}
+
+export function caseFormValues(evalCase: EvalCase): CaseFormValues {
+  return {
+    name: evalCase.name,
+    expectation: evalCase.expectation,
+    split: evalCase.split,
+    notes: evalCase.notes ?? '',
+    input: JSON.stringify(evalCase.input, null, 2),
+  };
+}
+
+/** The input text as a case input, or why it is not one. */
+export function parseCaseInput(text: string): { input: EvalCaseInput } | { error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { error: 'The input is not valid JSON.' };
+  }
+  const checked = EvalCaseInputSchema.safeParse(parsed);
+  if (checked.success === false) {
+    return { error: `The input does not fit: ${checked.error.issues.map((issue) => `${issue.path.length === 0 ? 'input' : issue.path.join('.')} — ${issue.message}`).join('; ')}` };
+  }
+  return { input: checked.data };
+}
+
+/** Name, expectation, split, notes and the input the step is given. */
+function CaseForm({ initial, inputHelp, submitLabel, pending, error, onSubmit, onCancel }: {
+  initial: CaseFormValues;
+  inputHelp: React.ReactNode;
+  submitLabel: string;
+  pending: boolean;
+  error: string | null;
+  onSubmit: (values: CaseFormResult) => void;
+  onCancel: () => void;
+}) {
+  const [values, setValues] = React.useState(initial);
+  const [inputError, setInputError] = React.useState<string | null>(null);
+  const submit = () => {
+    const parsed = parseCaseInput(values.input);
+    if ('error' in parsed) {
+      setInputError(parsed.error);
+      return;
+    }
+    setInputError(null);
+    const notes = values.notes.trim();
+    onSubmit({ name: values.name.trim(), expectation: values.expectation, split: values.split, notes: notes === '' ? null : notes, input: parsed.input });
+  };
+  const shownError = inputError ?? error;
+  return (
+    <div className="space-y-2 rounded-md bg-muted/40 p-3 text-xs" data-testid="case-form">
+      <div className="flex flex-wrap gap-2">
+        <input aria-label="Case name" className={cn(inputClass, 'min-w-48 flex-1')} placeholder="Name" value={values.name} onChange={(event) => setValues({ ...values, name: event.target.value })} />
+        <select aria-label="Expectation" className={inputClass} value={values.expectation} onChange={(event) => setValues({ ...values, expectation: EvalCaseExpectationSchema.parse(event.target.value) })}>
+          <option value="positive">positive — a correct output exists</option>
+          <option value="negative">negative — no output should be accepted</option>
+        </select>
+        <select aria-label="Split" className={inputClass} value={values.split} onChange={(event) => setValues({ ...values, split: EvalCaseSplitSchema.parse(event.target.value) })}>
+          <option value="dev">dev</option>
+          <option value="holdout">holdout</option>
+        </select>
+      </div>
+      <textarea
+        aria-label="Notes"
+        className={cn(inputClass, 'w-full min-h-16')}
+        placeholder="What the output must — or must not — do. Judges and code checks read it with the case."
+        value={values.notes}
+        onChange={(event) => setValues({ ...values, notes: event.target.value })}
+      />
+      <div className="space-y-1">
+        <div className="text-muted-foreground">{inputHelp}</div>
+        <textarea
+          aria-label="Case input"
+          className={cn(inputClass, 'w-full min-h-40 font-mono text-xs')}
+          spellCheck={false}
+          value={values.input}
+          onChange={(event) => setValues({ ...values, input: event.target.value })}
+        />
+      </div>
+      {shownError !== null && <p className="text-destructive">{shownError}</p>}
+      <div className="flex gap-2">
+        <button type="button" className={primaryButtonClass} disabled={values.name.trim() === '' || pending} onClick={submit}>{submitLabel}</button>
+        <button type="button" className={buttonClass} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+/** Opens the log of the production run a case came from; the run is fetched only when asked for. */
+function SourceRunLog({ agentRunId }: { agentRunId: string }) {
+  const [open, setOpen] = React.useState(false);
+  const { data: run, loading } = useAgentRun(open ? agentRunId : null);
+  return (
+    <>
+      <button type="button" className={buttonClass} disabled={open && loading} onClick={() => setOpen(true)}>{open && loading ? 'Loading…' : 'Source run log'}</button>
+      <AgentLogPanel run={open ? run : null} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+
+const CASE_SOURCES: Record<EvalCase['source'], string> = {
+  production: 'a production run, as it ran',
+  manual: 'written by hand',
+  synthesized: 'a production run with a deliberate change',
+};
+
+/** One Eval Case: what it gives the step and expects, its source run's log, and editing or archiving it. */
+function CaseRow({ step, evalCase, mayEdit }: { step: EvaluatedStep; evalCase: EvalCase; mayEdit: boolean }) {
+  const [editing, setEditing] = React.useState(false);
+  const edit = useStepEvaluationMutation(step, (values: CaseFormResult) => mediforce.evaluation.updateCase({
+    caseId: evalCase.id,
+    ...(values.name === evalCase.name ? {} : { name: values.name }),
+    ...(values.expectation === evalCase.expectation ? {} : { expectation: values.expectation }),
+    ...(values.split === evalCase.split ? {} : { split: values.split }),
+    ...(values.notes === evalCase.notes ? {} : { notes: values.notes }),
+    ...(JSON.stringify(values.input) === JSON.stringify(evalCase.input) ? {} : { input: values.input }),
+  }));
+  const archive = useStepEvaluationMutation(step, () => mediforce.evaluation.archiveCase({ caseId: evalCase.id, archived: true }));
+  return (
+    <li className="border-t pt-1.5 first:border-t-0 first:pt-0" data-testid="eval-case-row">
+      <div className="flex items-center gap-2">
+        <span className={cn('rounded px-1.5 text-[11px]', evalCase.expectation === 'positive' ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-700 dark:text-red-400')}>{evalCase.expectation}</span>
+        <span className="truncate">{evalCase.name}</span>
+        <span className="ml-auto shrink-0 text-xs text-muted-foreground">{evalCase.split} · {evalCase.source}{evalCase.perturbation === null ? '' : ` (${evalCase.perturbation.kind.replace(/_/g, ' ')})`}{evalCase.origin === 'assistant' ? ' · from the assistant' : ''}</span>
+      </div>
+      {editing ? (
+        <div className="mt-2">
+          <CaseForm
+            initial={caseFormValues(evalCase)}
+            inputHelp={<>What the step is given: the trigger payload and the outputs of the steps before it. Keep its shape; change the values.{evalCase.source === 'production' && ' A production case with an edited input becomes a manual one.'}</>}
+            submitLabel="Save"
+            pending={edit.isPending}
+            error={edit.error?.message ?? null}
+            onSubmit={(values) => edit.mutate(values, { onSuccess: () => setEditing(false) })}
+            onCancel={() => {
+              setEditing(false);
+              edit.reset();
+            }}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">Saving adds the edited case and archives this one: a Dataset version frozen with it keeps it, and the next freeze takes the edit.</p>
+        </div>
+      ) : (
+        <details className="mt-0.5 text-xs" data-testid="eval-case-details">
+          <summary className="cursor-pointer text-muted-foreground">Details</summary>
+          <div className="mt-1 space-y-1.5">
+            <p><span className="text-muted-foreground">Source:</span> {CASE_SOURCES[evalCase.source]}{evalCase.sourceAgentRunId !== null && <> — run <span className="font-mono">{evalCase.sourceAgentRunId.slice(0, 8)}</span></>}</p>
+            {evalCase.perturbation !== null && (
+              <p>
+                <span className="text-muted-foreground">Change ({evalCase.perturbation.kind.replace(/_/g, ' ')}):</span> {evalCase.perturbation.description}
+                {evalCase.perturbation.canary !== undefined && <> — canary <span className="font-mono">{evalCase.perturbation.canary}</span></>}
+              </p>
+            )}
+            <p><span className="text-muted-foreground">Expects:</span> {evalCase.notes ?? (evalCase.expectation === 'positive' ? 'an output that passes every counted Evaluator (no notes)' : 'no output to be accepted (no notes)')}</p>
+            <div>
+              <div className="text-muted-foreground">Input the step is given</div>
+              <pre className="mt-0.5 max-h-60 overflow-auto rounded bg-muted p-1.5 whitespace-pre-wrap">{JSON.stringify(evalCase.input, null, 2)}</pre>
+            </div>
+            {evalCase.workspaceSeedCommit !== null && (
+              <p><span className="text-muted-foreground">Starts from workspace commit</span> <span className="font-mono">{evalCase.workspaceSeedCommit.slice(0, 12)}</span></p>
+            )}
+            <p className="text-muted-foreground">Added by {evalCase.createdBy} on {evalCase.createdAt.slice(0, 16).replace('T', ' ')}{evalCase.containsProductionData ? ' · contains production data' : ''}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {evalCase.sourceAgentRunId !== null && <SourceRunLog agentRunId={evalCase.sourceAgentRunId} />}
+              {mayEdit && <button type="button" className={buttonClass} onClick={() => setEditing(true)}>Edit</button>}
+              {mayEdit && <button type="button" className={buttonClass} disabled={archive.isPending} onClick={() => archive.mutate(undefined)}>Archive</button>}
+            </div>
+            {archive.error !== null && <p className="text-destructive">{archive.error.message}</p>}
+          </div>
+        </details>
+      )}
+    </li>
+  );
+}
+
 /** Eval Cases, harvested from production runs or written by the assistant, and frozen Dataset versions. */
 export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedStep; evaluation: StepEvaluation; mayEdit: boolean }) {
   const harvest = useStepEvaluationMutation(step, (input: { agentRunId: string; expectation: 'positive' | 'negative' }) =>
@@ -491,14 +688,8 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
       {evaluation.cases.isLoading ? <Loading /> : cases.length === 0 ? (
         <p className="text-sm text-muted-foreground">No cases yet. Add production runs below, or ask the assistant.</p>
       ) : (
-        <ul className="space-y-1 text-sm">
-          {cases.map((evalCase) => (
-            <li key={evalCase.id} className="flex items-center gap-2">
-              <span className={cn('rounded px-1.5 text-[11px]', evalCase.expectation === 'positive' ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-700 dark:text-red-400')}>{evalCase.expectation}</span>
-              <span className="truncate">{evalCase.name}</span>
-              <span className="ml-auto shrink-0 text-xs text-muted-foreground">{evalCase.split} · {evalCase.source}{evalCase.perturbation === null ? '' : ` (${evalCase.perturbation.kind.replace(/_/g, ' ')})`}{evalCase.origin === 'assistant' ? ' · from the assistant' : ''}</span>
-            </li>
-          ))}
+        <ul className="space-y-1.5 text-sm">
+          {cases.map((evalCase) => <CaseRow key={evalCase.id} step={step} evalCase={evalCase} mayEdit={mayEdit} />)}
         </ul>
       )}
       {latest !== undefined && (

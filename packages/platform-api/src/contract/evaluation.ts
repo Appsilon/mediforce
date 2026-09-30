@@ -281,6 +281,20 @@ export const ArchiveEvalCaseInputSchema = z.object({
   archived: z.boolean().default(true),
 });
 
+/**
+ * Edits an Eval Case. The edit is a new case that replaces it, and the old one
+ * is archived: a frozen Dataset version keeps the case it ran, and the next
+ * one freezes the edit.
+ */
+export const UpdateEvalCaseInputSchema = z.object({
+  caseId: z.uuid(),
+  name: z.string().trim().min(1).max(200).optional(),
+  input: EvalCaseInputSchema.optional(),
+  expectation: EvalCaseExpectationSchema.optional(),
+  notes: z.string().trim().max(4000).nullable().optional(),
+  split: EvalCaseSplitSchema.optional(),
+});
+
 export const ListEvalDatasetsInputSchema = EvaluatedStepSchema;
 export const ListEvalDatasetsOutputSchema = z.object({ datasets: z.array(EvalDatasetVersionSchema) });
 
@@ -627,6 +641,7 @@ export type CreateRedTeamEvalCasesOutput = z.infer<typeof CreateRedTeamEvalCases
 export type CreateEvalCasesFromLabelsInput = z.input<typeof CreateEvalCasesFromLabelsInputSchema>;
 export type CreateEvalCasesFromLabelsOutput = z.infer<typeof CreateEvalCasesFromLabelsOutputSchema>;
 export type ArchiveEvalCaseInput = z.input<typeof ArchiveEvalCaseInputSchema>;
+export type UpdateEvalCaseInput = z.input<typeof UpdateEvalCaseInputSchema>;
 export type ListEvalDatasetsInput = z.infer<typeof ListEvalDatasetsInputSchema>;
 export type ListEvalDatasetsOutput = z.infer<typeof ListEvalDatasetsOutputSchema>;
 export type FreezeEvalDatasetInput = z.infer<typeof FreezeEvalDatasetInputSchema>;
