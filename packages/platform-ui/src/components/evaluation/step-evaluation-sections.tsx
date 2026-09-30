@@ -18,6 +18,7 @@ import {
 } from '@mediforce/platform-core';
 import {
   EvalChallengerSchema,
+  type AddEvaluatorVersionInput,
   type EvalChallenger,
   type EvaluatorView,
   type OptimisationSplitResult,
@@ -31,7 +32,16 @@ import { useEvalRun, useOptimisation, useStepEvaluation, useStepEvaluationMutati
 import { EvalRunReport, describePatch } from './eval-run-report';
 import { QualificationStatusChip } from './step-qualification-badge';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
-import { CHECK_KINDS, CheckEditor, checkFromDraft, emptyCheckDraft, type CheckDraft, type CheckDraftKind } from './evaluator-check-editor';
+import {
+  CHECK_KINDS,
+  CheckDetails,
+  CheckEditor,
+  checkFromDraft,
+  draftFromCheck,
+  emptyCheckDraft,
+  type CheckDraft,
+  type CheckDraftKind,
+} from './evaluator-check-editor';
 
 type StepEvaluation = ReturnType<typeof useStepEvaluation>;
 
@@ -103,20 +113,42 @@ export function toEvaluatorName(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 63);
 }
 
-function EvaluatorRow({ step, evaluator, mayEdit }: { step: EvaluatedStep; evaluator: EvaluatorView; mayEdit: boolean }) {
+function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
+  step: EvaluatedStep;
+  evaluator: EvaluatorView;
+  mayEdit: boolean;
+  stepOutputSchema: AgentOutputSchema | undefined;
+}) {
   const approve = useStepEvaluationMutation(step, () =>
     mediforce.evaluation.approveEvaluatorSource({ evaluatorId: evaluator.id, version: evaluator.latest.version }));
   const archive = useStepEvaluationMutation(step, () => mediforce.evaluation.archiveEvaluator({ evaluatorId: evaluator.id }));
   const production = useStepEvaluationMutation(step, (runInProduction: boolean) =>
     mediforce.evaluation.setEvaluatorProduction({ evaluatorId: evaluator.id, runInProduction }));
+  const edit = useStepEvaluationMutation(step, (changes: Omit<AddEvaluatorVersionInput, 'evaluatorId'>) =>
+    mediforce.evaluation.addEvaluatorVersion({ evaluatorId: evaluator.id, ...changes }));
+  const [editing, setEditing] = React.useState(false);
+  const [unchanged, setUnchanged] = React.useState(false);
   const check = evaluator.latest.check;
+  const saveVersion = (values: { rule: string; severity: EvaluatorSeverity; check: EvaluatorCheck }) => {
+    const changes = {
+      ...(values.rule.trim() === evaluator.latest.rule ? {} : { rule: values.rule }),
+      ...(values.severity === evaluator.latest.severity ? {} : { severity: values.severity }),
+      ...(JSON.stringify(values.check) === JSON.stringify(check) ? {} : { check: values.check }),
+    };
+    if (Object.keys(changes).length === 0) {
+      setUnchanged(true);
+      return;
+    }
+    setUnchanged(false);
+    edit.mutate(changes, { onSuccess: () => setEditing(false) });
+  };
   return (
     <li className="border-t pt-2 first:border-t-0 first:pt-0" data-testid="evaluator-row">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-sm">
             <span className="font-medium">{evaluator.name}</span>
-            <span className="ml-1.5 text-xs text-muted-foreground">v{evaluator.latest.version} · {check.kind} · {evaluator.latest.severity}{evaluator.latest.origin === 'assistant' ? ' · from the assistant' : ''}</span>
+            <span className="ml-1.5 text-xs text-muted-foreground">v{evaluator.latest.version} · {CHECK_KINDS[check.kind].label} · {evaluator.latest.severity}{evaluator.latest.origin === 'assistant' ? ' · from the assistant' : ''}</span>
           </div>
           <p className="text-xs text-muted-foreground">{evaluator.latest.rule}</p>
           <span className={cn(
@@ -150,14 +182,50 @@ function EvaluatorRow({ step, evaluator, mayEdit }: { step: EvaluatedStep; evalu
             {check.kind === 'code' && evaluator.latest.sourceApproval === null && (
               <button type="button" className={buttonClass} disabled={approve.isPending} onClick={() => approve.mutate(undefined)}>Approve source</button>
             )}
+            {!editing && <button type="button" className={buttonClass} onClick={() => setEditing(true)}>Edit</button>}
             <button type="button" className={buttonClass} disabled={archive.isPending} onClick={() => archive.mutate(undefined)}>Archive</button>
           </div>
         )}
       </div>
-      {(check.kind === 'code' || check.kind === 'llm_judge') && (
-        <details className="mt-1 text-xs">
-          <summary className="cursor-pointer text-muted-foreground">{check.kind === 'code' ? 'Source' : 'Question for the judge'}</summary>
-          <pre className="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 whitespace-pre-wrap">{check.kind === 'code' ? check.source : check.rubric}</pre>
+      {editing ? (
+        <div className="mt-2 space-y-1">
+          <p className="text-xs text-muted-foreground">
+            Saving makes v{evaluator.latest.version + 1}; Scores already written keep the version that wrote them.
+            {check.kind === 'code' && ' Changed source needs approving again.'}
+            {check.kind === 'llm_judge' && ' A changed judge needs calibrating again.'}
+          </p>
+          <EvaluatorForm
+            initial={{ name: evaluator.name, rule: evaluator.latest.rule, severity: evaluator.latest.severity, draft: draftFromCheck(check) }}
+            nameLocked
+            stepOutputSchema={stepOutputSchema}
+            submitLabel={`Save as v${evaluator.latest.version + 1}`}
+            pending={edit.isPending}
+            error={unchanged ? 'Nothing changed.' : edit.error?.message ?? null}
+            onSubmit={saveVersion}
+            onCancel={() => {
+              setEditing(false);
+              setUnchanged(false);
+            }}
+          />
+        </div>
+      ) : (
+        <details className="mt-1 text-xs" data-testid="evaluator-details">
+          <summary className="cursor-pointer text-muted-foreground">Details</summary>
+          <div className="mt-1 space-y-2">
+            <CheckDetails check={check} />
+            {evaluator.versions.length > 1 && (
+              <div>
+                <div className="font-medium">Versions</div>
+                <ul className="text-muted-foreground">
+                  {[...evaluator.versions].reverse().map((version) => (
+                    <li key={version.version}>
+                      v{version.version} · {version.createdAt.slice(0, 16).replace('T', ' ')} · {version.createdBy}{version.origin === 'assistant' ? ' · from the assistant' : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </details>
       )}
     </li>
@@ -172,8 +240,10 @@ interface EvaluatorFormValues {
 }
 
 /** Name, severity, the kind of check and its fields. The kind comes from the dropdown, never typed. */
-function EvaluatorForm({ initial, stepOutputSchema, submitLabel, pending, error, onSubmit, onCancel }: {
+function EvaluatorForm({ initial, nameLocked = false, stepOutputSchema, submitLabel, pending, error, onSubmit, onCancel }: {
   initial: EvaluatorFormValues;
+  /** An Evaluator's name is its stable handle: set once, never renamed. */
+  nameLocked?: boolean;
   stepOutputSchema: AgentOutputSchema | undefined;
   submitLabel: string;
   pending: boolean;
@@ -202,6 +272,7 @@ function EvaluatorForm({ initial, stepOutputSchema, submitLabel, pending, error,
           placeholder="Name, e.g. grades-match-ctcae"
           title="Also names the Scores it writes: lowercase letters, digits and dashes."
           value={values.name}
+          disabled={nameLocked}
           onChange={(event) => setValues({ ...values, name: toEvaluatorName(event.target.value) })}
         />
         <select aria-label="Severity" className={inputClass} value={values.severity} onChange={(event) => setValues({ ...values, severity: EvaluatorSeveritySchema.parse(event.target.value) })}>
@@ -249,7 +320,7 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
       {data.isLoading ? <Loading /> : evaluators.length === 0 && !adding ? (
         <p className="text-sm text-muted-foreground">No Evaluators yet. Ask the assistant what to check, or add one.</p>
       ) : (
-        <ul className="space-y-2">{evaluators.map((evaluator) => <EvaluatorRow key={evaluator.id} step={step} evaluator={evaluator} mayEdit={mayEdit} />)}</ul>
+        <ul className="space-y-2">{evaluators.map((evaluator) => <EvaluatorRow key={evaluator.id} step={step} evaluator={evaluator} mayEdit={mayEdit} stepOutputSchema={stepOutputSchema} />)}</ul>
       )}
       {adding && (
         <EvaluatorForm

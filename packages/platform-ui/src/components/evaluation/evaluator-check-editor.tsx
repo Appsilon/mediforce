@@ -101,6 +101,16 @@ export function emptyCheckDraft(kind: CheckDraftKind, stepOutputSchema?: AgentOu
   }
 }
 
+/** An existing check as the form edits it. */
+export function draftFromCheck(check: EvaluatorCheck): CheckDraft {
+  switch (check.kind) {
+    case 'schema': return { kind: 'schema', schemaText: JSON.stringify(check.schema, null, 2) };
+    case 'code': return { kind: 'code', runtime: check.runtime, source: check.source };
+    case 'llm_judge': return { kind: 'llm_judge', model: check.model, rubric: check.rubric, choices: check.choices };
+    case 'builtin': return { kind: 'builtin', name: check.name, keys: (check.keys ?? []).join(', ') };
+  }
+}
+
 /** The check a draft stands for, or why it does not make one. */
 export function checkFromDraft(draft: CheckDraft): { check: EvaluatorCheck } | { error: string } {
   let candidate: unknown;
@@ -317,4 +327,48 @@ function JudgeEditor({ draft, onChange }: {
       </div>
     </div>
   );
+}
+
+function Detail({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-0.5">
+      <div className="font-medium">{label}</div>
+      {children}
+    </div>
+  );
+}
+
+const preClass = 'max-h-64 overflow-auto rounded bg-muted p-2 font-mono whitespace-pre-wrap';
+
+/** Everything one check does, read-only. */
+export function CheckDetails({ check }: { check: EvaluatorCheck }) {
+  switch (check.kind) {
+    case 'schema':
+      return <Detail label="JSON Schema"><pre className={preClass}>{JSON.stringify(check.schema, null, 2)}</pre></Detail>;
+    case 'code':
+      return <Detail label={`Source (${check.runtime === 'python' ? 'Python' : 'JavaScript'})`}><pre className={preClass}>{check.source}</pre></Detail>;
+    case 'builtin':
+      return (
+        <Detail label={BUILTIN_CHECKS[check.name].label}>
+          <p className="text-muted-foreground">{BUILTIN_CHECKS[check.name].description}</p>
+          {check.keys !== undefined && <p>Compares only: <span className="font-mono">{check.keys.join(', ')}</span></p>}
+        </Detail>
+      );
+    case 'llm_judge':
+      return (
+        <div className="space-y-2">
+          <Detail label="Judge model"><span className="font-mono">{check.model}</span></Detail>
+          <Detail label="Question for the judge"><pre className={cn(preClass, 'font-sans')}>{check.rubric}</pre></Detail>
+          <Detail label="Verdicts">
+            <ul>
+              {check.choices.map((choice) => (
+                <li key={choice.label}>
+                  {choice.label} — {choice.value} ({choice.value >= JUDGE_PASS_VALUE ? 'passes' : 'fails'})
+                </li>
+              ))}
+            </ul>
+          </Detail>
+        </div>
+      );
+  }
 }
