@@ -10,13 +10,25 @@ import type {
   EvaluatorVersion,
   JudgeCalibration,
   McpEvalPolicy,
+  McpRecording,
   SourceApproval,
 } from '../schemas/evaluation';
 
+export interface McpRecordingFilter {
+  caseId?: string;
+  server?: string;
+  limit?: number;
+}
+
+export interface McpRecordedCase {
+  server: string;
+  caseId: string;
+}
+
 /**
  * Storage for the Evaluation domain (ADR-0023): Briefs, Evaluators and their
- * versions, Eval Cases, frozen Eval Dataset versions, MCP eval policies,
- * Acceptance Criteria, Eval Runs and Step Qualifications.
+ * versions, Eval Cases, frozen Eval Dataset versions, MCP eval policies and
+ * recordings, Acceptance Criteria, Eval Runs and Step Qualifications.
  * Every row carries its Step's namespace, so the authorized wrapper gates each
  * call on the namespace it names or the row it returns.
  *
@@ -54,6 +66,12 @@ export interface EvaluationRepository {
 
   getMcpPolicy(step: EvaluatedStep): Promise<McpEvalPolicy | null>;
   putMcpPolicy(policy: McpEvalPolicy): Promise<McpEvalPolicy>;
+
+  appendMcpRecording(recording: McpRecording): Promise<void>;
+  /** Oldest first; narrowed to one case and one server when `filter` names them, and to the newest `limit`. */
+  listMcpRecordings(step: EvaluatedStep, filter?: McpRecordingFilter): Promise<McpRecording[]>;
+  /** Each server and Eval Case the Step has a recording for, once — without the tapes. */
+  listMcpRecordedCases(step: EvaluatedStep): Promise<McpRecordedCase[]>;
 
   appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion>;
   /** Newest first. */

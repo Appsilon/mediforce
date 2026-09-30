@@ -225,10 +225,35 @@ export const evalTrials = pgTable(
     scoringStartedAt: timestamp('scoring_started_at', { withTimezone: true }),
     scoringAttempts: integer('scoring_attempts').notNull().default(0),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    mcpReplayMisses: jsonb('mcp_replay_misses').notNull().default([]),
   },
   (table) => ({
     runIdx: index('eval_trials_run_idx').on(table.evalRunId, table.caseId, table.variantId, table.trialIndex),
     instanceIdx: uniqueIndex('eval_trials_instance_idx').on(table.processInstanceId),
+  }),
+);
+
+/**
+ * What a live trial's MCP server answered (ADR-0023 D6): insert-only, one row
+ * per trial and server, read back by case and server for a replay.
+ */
+export const evalMcpRecordings = pgTable(
+  'eval_mcp_recordings',
+  {
+    id: uuid('id').primaryKey(),
+    workspace: workspaceColumn(),
+    workflowName: text('workflow_name').notNull(),
+    stepId: text('step_id').notNull(),
+    caseId: uuid('case_id').notNull(),
+    server: text('server').notNull(),
+    tape: jsonb('tape').notNull(),
+    evalRunId: uuid('eval_run_id').notNull().references(() => evalRuns.id, { onDelete: 'cascade' }),
+    trialId: uuid('trial_id').notNull().references(() => evalTrials.id, { onDelete: 'cascade' }),
+    recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    caseIdx: index('eval_mcp_recordings_case_idx')
+      .on(table.workspace, table.workflowName, table.stepId, table.caseId, table.server, table.recordedAt),
   }),
 );
 

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AgentOutputSnapshot, EvalCase, EvalRun, EvalTrial, Score } from '@mediforce/platform-core';
+import { mcpReplayMissesOf, type AgentOutputSnapshot, type EvalCase, type EvalRun, type EvalTrial, type Score } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { recordScore } from '../../scores/record-score';
 import { loadEvaluationSubject } from './evaluation-subject';
@@ -158,6 +158,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
     confidence: agentRun.envelope?.confidence ?? null,
     error: errors.length === 0 ? null : errors.join('; '),
     completedAt: new Date().toISOString(),
+    mcpReplayMisses: mcpReplayMissesOf(subject.trajectory),
   });
 }
 

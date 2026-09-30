@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -700,6 +700,117 @@ describe('writeMcpConfig integration', () => {
       };
       expect(parsed.mcpServers.public).toEqual({ type: 'http', url: 'https://open.example.com/mcp' });
       expect(parsed.mcpServers.public).not.toHaveProperty('headers');
+
+      await cleanup();
+    });
+  });
+
+  describe('eval trial MCP record/replay (ADR-0023 D6)', () => {
+    type CollectTarget = WriteMcpConfigTarget & {
+      storeMcpRecordings: (dir: string) => Promise<void>;
+      recordMcpReplayMisses: (dir: string) => Promise<void>;
+    };
+    const tape = { tools: [{ name: 'read_record' }], calls: [] };
+
+    it('[DATA] answers a replayed server from its tape and puts a live one behind the recording proxy', async () => {
+      const context = buildMockWorkflowAgentContext({
+        resolvedMcpConfig: {
+          servers: {
+            edc: { type: 'stdio', command: 'edc-mcp', args: ['--ro'], allowedTools: ['read_record'] },
+            meddra: { type: 'stdio', command: 'meddra-mcp', env: { MEDDRA_VERSION: '27.0' } },
+            email: { type: 'http', url: 'https://mcp.example.com/email', auth: { type: 'headers', headers: { 'X-Key': 'k-1' } } },
+            untouched: { type: 'http', url: 'https://mcp.example.com/other' },
+          },
+        },
+        mcpTapes: { replay: { edc: tape }, record: ['meddra', 'email'], onRecorded: vi.fn() },
+      });
+      await plugin.initialize(context);
+
+      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+      const parsed = JSON.parse(await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8')) as {
+        mcpServers: Record<string, Record<string, unknown>>;
+      };
+      expect(parsed.mcpServers.edc).toEqual({
+        type: 'stdio', command: 'node',
+        args: ['/output/mcp-tape/mcp-tape.mjs', 'replay', '/output/mcp-tape/edc.replay.json', '/output/mcp-tape/edc.misses.jsonl'],
+        allowedTools: ['read_record'],
+      });
+      expect(parsed.mcpServers.meddra).toEqual({
+        type: 'stdio', command: 'node',
+        args: ['/output/mcp-tape/mcp-tape.mjs', 'record', '/output/mcp-tape/meddra.tape.jsonl', 'meddra-mcp'],
+        env: { MEDDRA_VERSION: '27.0' },
+      });
+      expect(parsed.mcpServers.email).toEqual({
+        type: 'stdio', command: 'node',
+        args: ['/output/mcp-tape/mcp-tape.mjs', 'record-http', '/output/mcp-tape/email.tape.jsonl', 'https://mcp.example.com/email'],
+        env: { MCP_TAPE_HEADERS: JSON.stringify({ 'X-Key': 'k-1' }) },
+      });
+      expect(parsed.mcpServers.untouched).toEqual({ type: 'http', url: 'https://mcp.example.com/other' });
+      expect(JSON.parse(await readFile(join(tmpDir, 'mcp-tape', 'edc.replay.json'), 'utf-8'))).toEqual(tape);
+      expect(await readFile(join(tmpDir, 'mcp-tape', 'mcp-tape.mjs'), 'utf-8')).toContain('function replay');
+
+      await cleanup();
+    });
+
+    it('[DATA] hands each recorded tape back and puts replay misses into the trajectory once the agent exits', async () => {
+      const onRecorded = vi.fn().mockResolvedValue(undefined);
+      const record = vi.fn();
+      const context = buildMockWorkflowAgentContext({
+        resolvedMcpConfig: { servers: { edc: { type: 'stdio', command: 'edc-mcp' }, meddra: { type: 'stdio', command: 'meddra-mcp' } } },
+        mcpTapes: { replay: { edc: tape }, record: ['meddra'], onRecorded },
+        trajectory: { record },
+      });
+      await plugin.initialize(context);
+      await mkdir(join(tmpDir, 'mcp-tape'));
+      await writeFile(join(tmpDir, 'mcp-tape', 'meddra.tape.jsonl'), [
+        JSON.stringify({ kind: 'tools', tools: [{ name: 'lookup' }], cursor: null }),
+        JSON.stringify({ kind: 'call', tool: 'lookup', arguments: { term: 'Sepsis' }, result: { content: [{ type: 'text', text: '10040047' }] } }),
+      ].join('\n'));
+      await writeFile(join(tmpDir, 'mcp-tape', 'edc.misses.jsonl'), `${JSON.stringify({ ts: '2026-09-28T10:00:00.000Z', tool: 'read_record', arguments: { subject: '1001' } })}\n`);
+
+      await (plugin as unknown as CollectTarget).storeMcpRecordings(tmpDir);
+      await (plugin as unknown as CollectTarget).recordMcpReplayMisses(tmpDir);
+
+      expect(onRecorded).toHaveBeenCalledWith('meddra', {
+        tools: [{ name: 'lookup' }],
+        calls: [{ tool: 'lookup', arguments: { term: 'Sepsis' }, result: { content: [{ type: 'text', text: '10040047' }] } }],
+      });
+      expect(record).toHaveBeenCalledWith([
+        { ts: '2026-09-28T10:00:00.000Z', type: 'mcp_replay_miss', server: 'edc', tool: 'read_record', input: { subject: '1001' } },
+      ]);
+
+      await cleanup();
+    });
+
+    it('[ERROR] refuses to drop replay misses when the run keeps no Agent Trajectory to note them in', async () => {
+      const context = buildMockWorkflowAgentContext({
+        resolvedMcpConfig: { servers: { edc: { type: 'stdio', command: 'edc-mcp' } } },
+        mcpTapes: { replay: { edc: tape }, record: [], onRecorded: vi.fn() },
+      });
+      await plugin.initialize(context);
+      await mkdir(join(tmpDir, 'mcp-tape'));
+      await writeFile(join(tmpDir, 'mcp-tape', 'edc.misses.jsonl'), `${JSON.stringify({ ts: '2026-09-28T10:00:00.000Z', tool: 'read_record', arguments: {} })}\n`);
+
+      await expect((plugin as unknown as CollectTarget).recordMcpReplayMisses(tmpDir)).rejects.toThrow(/no Agent Trajectory/);
+
+      await cleanup();
+    });
+
+    it('[DATA] gives servers whose names differ only in punctuation files of their own', async () => {
+      const context = buildMockWorkflowAgentContext({
+        resolvedMcpConfig: { servers: { 'edc.v2': { type: 'stdio', command: 'edc-mcp' }, edc_v2: { type: 'stdio', command: 'edc-mcp' } } },
+        mcpTapes: { replay: {}, record: ['edc.v2', 'edc_v2'], onRecorded: vi.fn() },
+      });
+      await plugin.initialize(context);
+
+      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+      const parsed = JSON.parse(await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8')) as {
+        mcpServers: Record<string, { args: string[] }>;
+      };
+      expect(parsed.mcpServers['edc.v2']!.args[2]).toBe('/output/mcp-tape/edc_2e_v2.tape.jsonl');
+      expect(parsed.mcpServers.edc_v2!.args[2]).toBe('/output/mcp-tape/edc_5f_v2.tape.jsonl');
 
       await cleanup();
     });

@@ -288,6 +288,8 @@ export const EffectiveMcpEvalServerSchema = McpEvalServerPolicySchema.extend({
   name: z.string(),
   /** True when the policy does not name the server and it is denied by default. */
   defaulted: z.boolean(),
+  /** The Eval Cases a live trial recorded this server for — the ones a replay can answer. */
+  recordedCaseIds: z.array(z.uuid()),
 });
 
 export const GetMcpEvalPolicyInputSchema = EvaluatedStepSchema;

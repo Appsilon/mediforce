@@ -5,11 +5,14 @@ import { Loader2 } from 'lucide-react';
 import {
   CHAMPION_VARIANT_ID,
   EvaluatorSeveritySchema,
+  McpEvalServerPolicySchema,
   describeAcceptanceCriteria,
+  describeMcpPolicy,
   type AcceptanceCriteria,
   type EvaluatedStep,
   type EvaluatorCheck,
   type EvaluatorSeverity,
+  type McpEvalServerPolicy,
   type StepFingerprintComponent,
 } from '@mediforce/platform-core';
 import { EvalChallengerSchema, type EvalChallenger, type EvaluatorView, type PreparedEvalRun } from '@mediforce/platform-api/contract';
@@ -292,19 +295,24 @@ export function CasesSection({ step, evaluation, mayEdit }: { step: EvaluatedSte
   );
 }
 
-/** What each MCP server of the Step's agent may do in a trial (D6); unnamed servers are denied. */
+type McpEvalMode = McpEvalServerPolicy['mode'];
+
+/**
+ * What each MCP server of the Step's agent may do in a trial (D6); unnamed
+ * servers are denied. A live trial records what a server answers, per case, for
+ * a replay.
+ */
 export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep; data: StepEvaluation['mcpPolicy']; mayEdit: boolean }) {
-  const save = useStepEvaluationMutation(step, (servers: Record<string, { mode: 'live' | 'deny'; denyTools?: string[] }>) =>
+  const save = useStepEvaluationMutation(step, (servers: Record<string, McpEvalServerPolicy>) =>
     mediforce.evaluation.setMcpPolicy({ ...step, servers }));
   const servers = data.data?.servers ?? [];
   if (!data.isLoading && servers.length === 0) return null;
-  const setMode = (name: string, mode: 'live' | 'deny') => {
-    const next = Object.fromEntries(servers.filter((server) => !server.defaulted).map((server) => [
-      server.name,
-      { mode: server.mode, ...(server.denyTools === undefined ? {} : { denyTools: server.denyTools }) },
-    ]));
-    const denyTools = servers.find((server) => server.name === name)?.denyTools;
-    next[name] = { mode, ...(denyTools === undefined ? {} : { denyTools }) };
+  const policyOf = (mode: McpEvalMode, denyTools: string[] | undefined): McpEvalServerPolicy =>
+    ({ mode, ...(denyTools === undefined || mode !== 'live' ? {} : { denyTools }) });
+  const setMode = (name: string, mode: McpEvalMode) => {
+    const next = Object.fromEntries(servers.filter((server) => server.defaulted === false)
+      .map((server) => [server.name, policyOf(server.mode, server.denyTools)]));
+    next[name] = policyOf(mode, servers.find((server) => server.name === name)?.denyTools);
     save.mutate(next);
   };
   return (
@@ -314,17 +322,21 @@ export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep;
           {servers.map((server) => (
             <li key={server.name} className="flex items-center gap-2">
               <span className="font-mono text-xs">{server.name}</span>
-              {server.denyTools !== undefined && server.denyTools.length > 0 && (
+              {server.mode === 'live' && server.denyTools !== undefined && server.denyTools.length > 0 && (
                 <span className="text-xs text-muted-foreground">denied tools: {server.denyTools.join(', ')}</span>
               )}
+              <span className="text-xs text-muted-foreground">
+                recorded for {server.recordedCaseIds.length} case{server.recordedCaseIds.length === 1 ? '' : 's'}
+              </span>
               <select
                 className={cn(inputClass, 'ml-auto text-xs')}
                 value={server.mode}
                 disabled={!mayEdit || save.isPending}
-                onChange={(event) => setMode(server.name, event.target.value as 'live' | 'deny')}
+                onChange={(event) => setMode(server.name, McpEvalServerPolicySchema.shape.mode.parse(event.target.value))}
               >
                 <option value="deny">deny{server.defaulted ? ' (default)' : ''}</option>
                 <option value="live">live</option>
+                <option value="replay">replay</option>
               </select>
             </li>
           ))}
@@ -471,6 +483,7 @@ export function QualificationSection({ data }: { data: StepEvaluation['qualifica
           </p>
           <p className="text-muted-foreground">{qualification.signature.meaning} ({qualification.signature.reauthentication === 'password' ? 'password re-entered' : 'signed from the session'})</p>
           <p>Criteria: {describeAcceptanceCriteria(qualification.acceptanceCriteria)}</p>
+          <p data-testid="qualification-mcp-policy">{describeMcpPolicy(qualification.mcpPolicy)}</p>
           {qualification.deviations.map((deviation) => (
             <p key={deviation.severity} className="text-amber-700 dark:text-amber-300">Deviation ({deviation.severity}): {deviation.justification}</p>
           ))}

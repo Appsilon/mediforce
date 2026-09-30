@@ -1,4 +1,4 @@
-import { describeAcceptanceCriteria as describeCriteria, type AcceptanceCriteria } from '@mediforce/platform-core';
+import { describeAcceptanceCriteria as describeCriteria, describeMcpPolicy, type AcceptanceCriteria } from '@mediforce/platform-core';
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson } from '../output';
 import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
@@ -58,6 +58,7 @@ export const evalQualificationCommand = defineCommand({
     if (qualification === null) return 0;
     output.stdout(`signed by ${qualification.signature.signerName} at ${qualification.signature.signedAt} for '${qualification.variantLabel}' of Eval Run ${qualification.evalRunId}, Brief v${qualification.briefVersion}`);
     output.stdout(`criteria: ${describeCriteria(qualification.acceptanceCriteria)}`);
+    output.stdout(describeMcpPolicy(qualification.mcpPolicy));
     for (const deviation of qualification.deviations) output.stdout(`deviation (${deviation.severity}): ${deviation.justification}`);
     if (result.changed.length > 0) output.stdout(`changed since: ${result.changed.join(', ')}`);
     for (const change of result.evaluatorsChanged) output.stdout(`evaluators changed: ${change}`);

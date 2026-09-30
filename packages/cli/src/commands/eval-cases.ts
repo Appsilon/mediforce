@@ -192,7 +192,8 @@ export const evalMcpPolicyGetCommand = defineCommand({
     if (result.servers.length === 0) output.stdout('The step\'s agent binds no MCP servers.');
     for (const server of result.servers) {
       const denied = server.denyTools !== undefined && server.denyTools.length > 0 ? ` (denied: ${server.denyTools.join(', ')})` : '';
-      output.stdout(`${server.name.padEnd(20)} ${server.mode}${denied}${server.defaulted ? '  [default]' : ''}`);
+      const recorded = `  recorded for ${server.recordedCaseIds.length} case(s)`;
+      output.stdout(`${server.name.padEnd(20)} ${server.mode}${denied}${server.defaulted ? '  [default]' : ''}${recorded}`);
     }
     return 0;
   },
@@ -200,7 +201,7 @@ export const evalMcpPolicyGetCommand = defineCommand({
 
 export const evalMcpPolicySetCommand = defineCommand({
   name: 'mediforce eval mcp-policy-set',
-  description: 'Replace the step\'s MCP eval policy from a JSON file: { "<server>": { "mode": "live"|"deny", "denyTools"?: [] } }.',
+  description: 'Replace the step\'s MCP eval policy from a JSON file: { "<server>": { "mode": "live"|"replay"|"deny", "denyTools"?: [] } }. A live trial records each server\'s responses per case; replay answers from them.',
   args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with the servers map' } },
   async run({ args, output, mediforce, jsonMode }) {
     const servers = readJsonFile(args.file) as Parameters<typeof mediforce.evaluation.setMcpPolicy>[0]['servers'];

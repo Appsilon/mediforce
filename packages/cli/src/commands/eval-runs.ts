@@ -1,3 +1,4 @@
+import { describeMcpReport } from '@mediforce/platform-core';
 import type { ApplyStepVariantInput, EvalChallenger, EvalRunOutput } from '@mediforce/platform-api/contract';
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson, type OutputSink } from '../output';
@@ -15,6 +16,7 @@ function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void 
   }
   output.stdout(`trials: ${report.trials.scored} scored, ${report.trials.failed} failed, ${report.trials.skipped} skipped, ${report.trials.inProgress} in progress`);
   if (evalRun.acceptanceCriteria === null) output.stdout('no Acceptance Criteria frozen into this run');
+  output.stdout(describeMcpReport(report.mcp));
   for (const variant of report.variants) {
     const patch = Object.keys(variant.patch).length === 0 ? '' : `  ${JSON.stringify(variant.patch)}`;
     output.stdout(`\n${variant.id} — ${variant.label}${patch}`);

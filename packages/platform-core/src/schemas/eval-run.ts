@@ -7,6 +7,7 @@ import {
   EvaluatorKindSchema,
   EvaluatorSeveritySchema,
   McpEvalServerPolicySchema,
+  McpReplayMissSchema,
   StepVariantPatchSchema,
 } from './evaluation';
 
@@ -165,6 +166,8 @@ export const EvalTrialSchema = z.object({
   /** How many drivers have claimed it for scoring. */
   scoringAttempts: z.number().int().nonnegative(),
   completedAt: z.iso.datetime().nullable(),
+  /** Calls to a replayed MCP server that no recording answered (D6). */
+  mcpReplayMisses: z.array(McpReplayMissSchema),
 });
 
 /** One Evaluator's result over the whole run (D10). Rates are over graded trials; null when none were. */
@@ -301,9 +304,26 @@ export const VariantComparisonSchema = z.object({
   meanDurationDeltaMs: z.number().nullable(),
 });
 
+/**
+ * How the trials reached the Step's MCP servers (D6): each server by the mode
+ * it ran in, and the calls to a replayed server no recording answered. With no
+ * server `live`, no trial made a live MCP call.
+ */
+export const EvalRunMcpReportSchema = z.object({
+  live: z.array(z.string()),
+  replayed: z.array(z.string()),
+  denied: z.array(z.string()),
+  unrecordedCalls: z.array(z.object({
+    server: z.string(),
+    tool: z.string(),
+    count: z.number().int().positive(),
+  })),
+});
+
 export const EvalRunReportSchema = z.object({
   k: z.number().int().positive(),
   trials: TrialCountsSchema,
+  mcp: EvalRunMcpReportSchema,
   /** The champion first, then the challengers, as the run froze them. */
   variants: z.array(EvalRunVariantReportSchema),
   /** Every challenger against the champion. */
@@ -323,6 +343,7 @@ export type EvalRunEvaluatorReport = z.infer<typeof EvalRunEvaluatorReportSchema
 export type EvalSuite = z.infer<typeof EvalSuiteSchema>;
 export type EvalSuiteReport = z.infer<typeof EvalSuiteReportSchema>;
 export type EvalRunReport = z.infer<typeof EvalRunReportSchema>;
+export type EvalRunMcpReport = z.infer<typeof EvalRunMcpReportSchema>;
 export type EvalVariant = z.infer<typeof EvalVariantSchema>;
 export type StepFingerprintComponent = z.infer<typeof StepFingerprintComponentSchema>;
 export type StepFingerprint = z.infer<typeof StepFingerprintSchema>;
