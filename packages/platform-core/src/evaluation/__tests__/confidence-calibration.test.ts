@@ -39,16 +39,21 @@ describe('recommendControl', () => {
 
   it('recommends the lowest threshold whose outputs pass at the strictest criterion', () => {
     const recommendation = recommendControl(
-      [...outcomes(0.95, 30, 0), ...outcomes(0.6, 10, 10)],
+      [...outcomes(0.95, 30, 0), ...outcomes(0.6, 10, 20)],
       [verdict('missed', 0.8)],
     );
-    expect(recommendation).toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.95, coverage: 0.6 });
+    expect(recommendation).toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.95, coverage: 0.5 });
     expect(recommendation.reason).toMatch(/^Not every criterion was met overall/);
   });
 
   it('lets every output run unreviewed when all of them pass at the floor', () => {
     expect(recommendControl([...outcomes(0.9, 15, 0), ...outcomes(0.7, 15, 0)], [verdict('met', 0.8)]))
       .toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.7, coverage: 1 });
+  });
+
+  it('reads the floor as the literal pass rate of the outputs at or above a threshold', () => {
+    expect(recommendControl(outcomes(0.9, 8, 2), [verdict('met', 0.8)]))
+      .toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.9, coverage: 1 });
   });
 
   it('keeps review when no confidence level separates passing outputs over enough trials', () => {

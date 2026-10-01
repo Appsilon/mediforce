@@ -18,8 +18,8 @@ last_reviewed: 2026-10-01
   variant half), few-shot examples (D12), the fix loop and GEPA (D15) and a
   case's positive/negative expectation — moved to
   [ADR-0024](./0024-optimisation.md) (Proposed) and out of the UI; built-in
-  Evaluators and case suites removed (D3); a Step Qualification no longer
-  cites the Evaluation Brief (D10, D16).
+  Evaluators and case suites removed (D3); neither a Step Qualification nor
+  an Eval Run cites the Evaluation Brief (D10, D16).
 - **Vocabulary:** Evaluation, Evaluation Assistant, Evaluation Brief, Evaluator, Eval Case, Eval Dataset, Eval Run,
   Agent Trajectory, Step Fingerprint, Acceptance Criteria, Step Qualification
   — all in [`CONTEXT.md`](../../CONTEXT.md) § Evaluation domain.
@@ -141,10 +141,11 @@ source, whoever wrote it. `llm_judge` needs agreement at or above a set level wi
 at least 10 human-labelled outputs, at least 2 of them failures, per version.
 `human` is ground truth. Draft Evaluators appear in reports as "not counted".
 
-**D10 — Acceptance Criteria are fixed before the run and judged on interval
-bounds.** Criteria per severity (critical / major / minor) are frozen into the
-Eval Run. The report judges pass rates by their Wilson 95% lower bound and
-reliability by pass^k. A human signs the Step Qualification; signing despite a
+**D10 — Acceptance Criteria are fixed before the run and judged on the pass
+rate.** Criteria per severity (critical / major / minor) are frozen into the
+Eval Run. The report judges the pass rate itself — passes over graded trials,
+so 8 of 10 meets an 80% floor — and reliability by pass^k; the Wilson 95%
+interval is reported beside each rate, not judged. A human signs the Step Qualification; signing despite a
 missed criterion records a deviation with a written justification. _Amended
 2026-10-01: a Step Qualification rests on the Eval Run it was signed from and
 nothing else — its Fingerprint, Evaluator versions, MCP policy, criteria and
@@ -152,7 +153,12 @@ verdicts. It no longer cites an Evaluation Brief version, and a run prepared
 without a Brief can be signed. Beside it, a step's **validation** is derived,
 never signed: the newest finished Eval Run of the workflow version, passed or
 failed on its criteria, and `not verified` once the step's Fingerprint, its
-Evaluators, its Eval Cases or its Acceptance Criteria change since that run._
+Evaluators, its Eval Cases or its Acceptance Criteria change since that run.
+Until a step's criteria are set, every severity defaults to a 100% floor:
+every graded trial passes. Amended again the same day: floors were first
+judged on the Wilson 95% lower bound, which made a floor read as something
+other than the share of trials that passed (8 of 10 missed an 80% floor);
+every floor is now judged on the pass rate itself._
 
 **D11 — Step Qualification is informational.** A badge (Qualified / Stale /
 Not qualified) on the Step and in run views. Nothing is blocked: no Control
@@ -242,7 +248,11 @@ and the Acceptance Criteria suggestions. _Amended 2026-10-01: a Step
 Qualification no longer cites the Brief version (it used to, as its
 context-of-use statement); tying the two made a Brief a precondition of
 signing and a second thing a qualification could be wrong about. The
-qualification is linked to its Eval Run only._ The workflow assistant's per-user instructions
+qualification is linked to its Eval Run only. An Eval Run no longer records
+the Brief version in force at prepare either: nothing read it, and the Brief is
+the assistant's context, not part of what a run is judged on. It is shown and
+edited from the Evaluation Assistant's header, not as a section of the tab._
+The workflow assistant's per-user instructions
 are not reused: priorities belong to the Step, not to a person.
 
 ## Considered options

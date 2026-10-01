@@ -75,7 +75,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     await advanceEvalRunOfInstance(scope, instanceId);
   }
 
-  it('freezes the Evaluators with whether they count, denies MCP by default, and needs a budget without an estimate', async () => {
+  it('freezes the Evaluators with whether they count, denies MCP and needs 100% pass by default, and needs a budget without an estimate', async () => {
     await expect(prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 2 }, scope)).rejects.toThrow(/set budgetUsd/);
 
     const { evalRun, trials, report } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 2, budgetUsd: 5 }, scope);
@@ -86,12 +86,13 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
       ['findings-present', true, undefined],
     ]);
     expect(evalRun.mcpPolicy).toEqual({ edc: { mode: 'deny' }, email: { mode: 'deny' } });
+    expect(evalRun.acceptanceCriteria).toEqual({ critical: { minPassRate: 1 }, major: { minPassRate: 1 }, minor: { minPassRate: 1 } });
     expect(evalRun.estimate).toMatchObject({ perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 });
     expect(trials).toHaveLength(4);
     expect(report.trials).toMatchObject({ total: 4, inProgress: 4 });
   });
 
-  it('runs the champion and each challenger over every case, freezing the criteria and Brief in force', async () => {
+  it('runs the champion and each challenger over every case, freezing the criteria in force — and no Brief', async () => {
     await setEvaluationBrief({ ...STEP, text: 'Grades AEs for the DSMB.', origin: 'user' }, scope);
     await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.9 } }, origin: 'user' }, scope);
 
@@ -109,7 +110,8 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     const [champion, gpt, noEmail] = evalRun.variants;
     expect(gpt!.fingerprint!.hash).not.toBe(champion!.fingerprint!.hash);
     expect(noEmail!.fingerprint!.components.mcpServers).not.toBe(champion!.fingerprint!.components.mcpServers);
-    expect(evalRun).toMatchObject({ acceptanceCriteria: { critical: { minPassRate: 0.9 } }, briefVersion: 1 });
+    expect(evalRun).toMatchObject({ acceptanceCriteria: { critical: { minPassRate: 0.9 } } });
+    expect(evalRun).not.toHaveProperty('briefVersion');
     expect(trials).toHaveLength(2 * 3 * 2);
     expect(new Set(trials.map((trial) => trial.variantId))).toEqual(new Set(['champion', 'challenger-1', 'challenger-2']));
     expect(evalRun.estimate.variants?.map((variant) => variant.variantId)).toEqual(['champion', 'challenger-1', 'challenger-2']);

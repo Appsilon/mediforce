@@ -103,8 +103,8 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     }, 201));
     expect(prepared.evalRun).toMatchObject({
       acceptanceCriteria: { critical: { minPassRate: 0.1, minPassHatK: 1 }, major: { minPassRate: 0.5 } },
-      briefVersion: 1,
     });
+    expect(prepared.evalRun).not.toHaveProperty('briefVersion');
     expect(prepared.evalRun.variants.map((variant) => variant.id)).toEqual(['champion', 'challenger-1']);
     expect(prepared.trials).toHaveLength(2);
     await post(request, `/api/evaluation/runs/${prepared.evalRun.id}/start`, { confirmedBudgetUsd: 1 });

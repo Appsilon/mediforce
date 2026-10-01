@@ -258,7 +258,7 @@ describe('executeAgentStep', () => {
         { id: 'champion', label: 'Current step', patch: {}, fingerprint: null },
         { id: 'challenger-1', label: 'GPT-5', patch: { model: 'openai/gpt-5', prompt: 'Gather every source.' }, fingerprint: null },
       ],
-      acceptanceCriteria: null, briefVersion: null, mcpPolicy: {},
+      acceptanceCriteria: null, mcpPolicy: {},
       estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
       budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null,
     }, [{
@@ -295,7 +295,7 @@ describe('executeAgentStep', () => {
         trialsPerCase: 1, concurrency: 1,
         evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
         variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint }],
-        acceptanceCriteria: null, briefVersion: null, mcpPolicy: {},
+        acceptanceCriteria: null, mcpPolicy: {},
         estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
         budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null,
       }, [{
@@ -355,7 +355,7 @@ describe('executeAgentStep', () => {
         trialsPerCase: 1, concurrency: 1,
         evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
         variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
-        acceptanceCriteria: null, briefVersion: null, mcpPolicy,
+        acceptanceCriteria: null, mcpPolicy,
         estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
         budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null,
       }, [{

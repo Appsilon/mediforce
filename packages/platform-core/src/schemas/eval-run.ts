@@ -112,8 +112,6 @@ export const EvalRunSchema = EvaluatedStepSchema.extend({
   variants: z.array(EvalVariantSchema).min(1),
   /** Frozen at prepare (D10); null when the Step had none, and then the report judges nothing. */
   acceptanceCriteria: AcceptanceCriteriaSchema.nullable(),
-  /** The Evaluation Brief version in force at prepare. */
-  briefVersion: z.number().int().positive().nullable(),
   /** The MCP eval policy the trials ran under, one entry per server of the Step's agent (D6). */
   mcpPolicy: z.record(z.string(), McpEvalServerPolicySchema),
   estimate: EvalRunEstimateSchema,

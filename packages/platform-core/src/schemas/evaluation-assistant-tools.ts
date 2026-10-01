@@ -71,7 +71,7 @@ export const ProposeBriefToolSchema = z.object({
   text: z.string().min(1).max(4000),
 });
 
-/** A minimum pass rate, judged on its Wilson 95% lower bound (D10). */
+/** A minimum pass rate, judged on the pass rate itself (D10). */
 const PassRateFloorSchema = z.number().min(0).max(1);
 
 /**
@@ -154,7 +154,7 @@ export const ProposePerturbedCaseToolSchema = PerturbedEvalCaseSpecSchema.omit({
 
 /**
  * Propose the step's Acceptance Criteria (D10): per severity, the minimum pass
- * rate on its Wilson 95% lower bound, and optionally a minimum pass^k. Set
+ * rate, and optionally a minimum pass^k. Set
  * before the Eval Runs judged against them; accepting writes a new version.
  */
 export const ProposeAcceptanceCriteriaToolSchema = z.object({

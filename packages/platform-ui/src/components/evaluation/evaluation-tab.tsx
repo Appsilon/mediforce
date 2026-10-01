@@ -8,7 +8,6 @@ import { EvaluationAssistantPanel } from './evaluation-assistant-panel';
 import { emptyStepInput } from './written-output-form';
 import {
   AcceptanceCriteriaSection,
-  BriefSection,
   CasesSection,
   EvalRunsSection,
   EvaluatorsSection,
@@ -121,7 +120,6 @@ function StepEvaluation({ step, outputSchema, inputTemplate, mayEdit, editReason
       <div className="space-y-4">
         <DriftAlert data={evaluation.drift} />
         <AcceptanceCriteriaSection step={step} criteria={evaluation.criteria} qualification={evaluation.qualification} mayEdit={mayEdit} />
-        <BriefSection step={step} data={evaluation.brief} mayEdit={mayEdit} />
         <EvaluatorsSection
           step={step}
           data={evaluation.evaluators}
@@ -136,7 +134,7 @@ function StepEvaluation({ step, outputSchema, inputTemplate, mayEdit, editReason
       </div>
       <div className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
         <AssistantResizeHandle {...assistantWidth} />
-        <EvaluationAssistantPanel step={step} stepOutputSchema={outputSchema} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
+        <EvaluationAssistantPanel step={step} brief={evaluation.brief} stepOutputSchema={outputSchema} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
       </div>
     </div>
   );
@@ -144,8 +142,9 @@ function StepEvaluation({ step, outputSchema, inputTemplate, mayEdit, editReason
 
 /**
  * The workflow's **Evaluation** tab (ADR-0023 D14): one agent step at a time,
- * its Acceptance Criteria with whether it is validated against them, Brief,
- * Evaluators, Eval Cases, MCP eval policy and Eval Runs beside the Evaluation Assistant. Everything here lives outside the definition, so no
+ * its Acceptance Criteria with whether it is validated against them,
+ * Evaluators, Eval Cases, MCP eval policy and Eval Runs beside the Evaluation
+ * Assistant, which holds the Step's Brief. Everything here lives outside the definition, so no
  * change on this tab mints a version.
  */
 export function EvaluationTab({ handle, workflowName, steps, transitions, mayEdit, editReason }: {

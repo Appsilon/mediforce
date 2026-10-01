@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import {
   CHAMPION_VARIANT_ID,
+  DEFAULT_ACCEPTANCE_CRITERIA,
   qualificationSignatureMeaning,
   type ElectronicSignature,
   type EvalRun,
@@ -73,7 +74,7 @@ async function stepValidation(scope: CallerScope, step: EvaluatedStep, definitio
     return notVerified(`Eval Cases were added, edited or archived ${since}.`);
   }
   const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
-  if (run.acceptanceCriteria === null || JSON.stringify(criteria?.criteria ?? null) !== JSON.stringify(run.acceptanceCriteria)) {
+  if (run.acceptanceCriteria === null || JSON.stringify(criteria?.criteria ?? DEFAULT_ACCEPTANCE_CRITERIA) !== JSON.stringify(run.acceptanceCriteria)) {
     return notVerified(run.acceptanceCriteria === null ? `Eval Run ${run.id.slice(0, 8)} had no Acceptance Criteria to judge.` : `Acceptance Criteria changed ${since}.`);
   }
 

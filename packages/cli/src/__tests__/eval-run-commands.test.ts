@@ -17,7 +17,7 @@ const OUTPUT = {
     trialsPerCase: 3, concurrency: 2,
     evaluators: [{ evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
     variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
-    acceptanceCriteria: { critical: { minPassRate: 0.9 } }, briefVersion: 1,
+    acceptanceCriteria: { critical: { minPassRate: 0.9 } },
     mcpPolicy: {}, estimate: { perTrialUsd: 0.2, totalUsd: 0.6, basis: 'history', sampleSize: 5 },
     budgetUsd: 0.9, spentUsd: 0, status: 'prepared', createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
     startedAt: null, completedAt: null,

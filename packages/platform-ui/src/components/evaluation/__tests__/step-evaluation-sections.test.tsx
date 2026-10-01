@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { AcceptanceCriteriaSection, BriefSection, CasesSection, DriftAlert, EvaluatorsSection, McpPolicySection, caseFromFile, datasetDrift, toEvaluatorName, withPassRate } from '../step-evaluation-sections';
+import { AcceptanceCriteriaSection, CasesSection, DriftAlert, EvaluatorsSection, McpPolicySection, caseFromFile, datasetDrift, toEvaluatorName, withPassRate } from '../step-evaluation-sections';
 
 vi.mock('@/hooks/use-step-evaluation', () => ({
   useAgentRunIo: (agentRunId: string | null) => ({
@@ -32,7 +32,6 @@ const writtenOutputs = vi.hoisted((): unknown[] => []);
 const evaluation = vi.hoisted(() => ({
   labelOutput: vi.fn(),
   calibrateEvaluator: vi.fn(),
-  setBrief: vi.fn(),
   createEvaluator: vi.fn(),
   addEvaluatorVersion: vi.fn(),
   createCaseFromAgentRun: vi.fn(),
@@ -75,42 +74,6 @@ const evalCaseOf = (overrides: Record<string, unknown>) => ({
 vi.mock('@/lib/api-fetch', () => ({
   apiFetch: async () => new Response(JSON.stringify({ models: [] })),
 }));
-
-describe('BriefSection', () => {
-  it('renders the Evaluation Brief as Markdown', () => {
-    render(
-      <BriefSection
-        step={{ namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' }}
-        data={{
-          isLoading: false,
-          data: {
-            brief: {
-              namespace: 'acme',
-              workflowName: 'safety',
-              stepId: 'grade-aes',
-              version: 1,
-              text: 'A **critical** check.',
-              origin: 'user',
-              createdBy: 'author-1',
-              createdAt: '2026-09-24T08:00:00.000Z',
-            },
-          },
-        } as never}
-        mayEdit={false}
-      />,
-    );
-
-    expect(screen.getByText('critical').tagName).toBe('STRONG');
-    expect(screen.queryByText('A **critical** check.')).toBeNull();
-  });
-
-  it('says what the Brief is for without tying it to a Step Qualification', () => {
-    render(<BriefSection step={{ namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' }} data={{ isLoading: false, data: { brief: null } } as never} mayEdit={false} />);
-
-    expect(screen.getByTestId('brief-purpose').textContent).toContain('context of use');
-    expect(screen.getByTestId('brief-purpose').textContent).not.toContain('Qualification');
-  });
-});
 
 describe('DriftAlert', () => {
   const evaluator = {
@@ -565,22 +528,45 @@ describe('AcceptanceCriteriaSection', () => {
     expect(screen.getByTestId('qualification-changed').textContent).toContain('model');
   });
 
-  it('has one selector per severity, and saves a change as a new version keeping that severity\'s pass^k', () => {
-    evaluation.setAcceptanceCriteria.mockClear();
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ critical: { minPassRate: 0.9, minPassHatK: 1 } })} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+  it('keeps the thresholds out of sight until Set the threshold opens them', () => {
+    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ critical: { minPassRate: 0.9 } })} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
 
-    expect(screen.getAllByRole('combobox')).toHaveLength(3);
-    fireEvent.change(screen.getByLabelText('critical minimum pass rate'), { target: { value: '0.95' } });
-    expect(evaluation.setAcceptanceCriteria).toHaveBeenCalledWith({ ...step, criteria: { critical: { minPassRate: 0.95, minPassHatK: 1 } } });
-    fireEvent.change(screen.getByLabelText('minor minimum pass rate'), { target: { value: '0.5' } });
-    expect(evaluation.setAcceptanceCriteria).toHaveBeenLastCalledWith({ ...step, criteria: { critical: { minPassRate: 0.9, minPassHatK: 1 }, minor: { minPassRate: 0.5 } } });
+    expect(screen.queryByText('Acceptance Criteria')).toBeNull();
+    expect(screen.queryByText(/v2/)).toBeNull();
+    expect(screen.queryByRole('slider')).toBeNull();
+    fireEvent.click(screen.getByTestId('set-threshold'));
+    expect(screen.getAllByRole('slider')).toHaveLength(3);
   });
 
-  it('cannot clear the only severity judged', () => {
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ major: { minPassRate: 0.8 } })} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+  it('starts every severity at 100% until criteria are set', () => {
+    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf(null)} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+    fireEvent.click(screen.getByTestId('set-threshold'));
 
-    const notJudged = [...(screen.getByLabelText('major minimum pass rate') as HTMLSelectElement).options].find((option) => option.value === '')!;
-    expect(notJudged.disabled).toBe(true);
+    for (const severity of ['critical', 'major', 'minor']) {
+      expect((screen.getByLabelText(`${severity} minimum pass rate`) as HTMLInputElement).value).toBe('100');
+    }
+  });
+
+  it('saves the tuned thresholds once, on Save, keeping a severity\'s pass^k', () => {
+    evaluation.setAcceptanceCriteria.mockClear();
+    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ critical: { minPassRate: 0.9, minPassHatK: 1 } })} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+    fireEvent.click(screen.getByTestId('set-threshold'));
+
+    fireEvent.change(screen.getByLabelText('critical minimum pass rate'), { target: { value: '95' } });
+    fireEvent.click(screen.getByLabelText('judge minor'));
+    fireEvent.change(screen.getByLabelText('minor minimum pass rate'), { target: { value: '50' } });
+    expect(evaluation.setAcceptanceCriteria).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(evaluation.setAcceptanceCriteria).toHaveBeenCalledTimes(1);
+    expect(evaluation.setAcceptanceCriteria).toHaveBeenCalledWith({ ...step, criteria: { critical: { minPassRate: 0.95, minPassHatK: 1 }, minor: { minPassRate: 0.5 } } });
+  });
+
+  it('cannot stop judging the only severity judged', () => {
+    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ major: { minPassRate: 0.8 } })} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+    fireEvent.click(screen.getByTestId('set-threshold'));
+
+    expect((screen.getByLabelText('judge major') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('critical minimum pass rate') as HTMLInputElement).disabled).toBe(true);
   });
 
   it('drops a severity set to not judged', () => {

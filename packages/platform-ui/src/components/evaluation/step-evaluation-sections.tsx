@@ -2,9 +2,11 @@
 
 import * as React from 'react';
 import { z } from 'zod';
-import { CircleCheck, CircleX, Clock, Loader2, type LucideIcon } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { CircleCheck, CircleX, Clock, Loader2, X, type LucideIcon } from 'lucide-react';
 import {
   CHAMPION_VARIANT_ID,
+  DEFAULT_ACCEPTANCE_CRITERIA,
   EvalCaseInputSchema,
   EvalCaseSplitSchema,
   EvaluatorKindSchema,
@@ -34,7 +36,6 @@ import {
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
-import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { AgentLogPanel } from '@/components/agents/agent-log-panel';
 import { RunInputOutput, RunInputOutputDetails } from './run-input-output';
 import { CalibrationProgress, JudgeCalibrationPanel, labelsBySubject } from './judge-calibration';
@@ -75,51 +76,6 @@ function Loading() {
 /** Every production run of the Step loaded so far, newest first. */
 export function loadedAgentRuns(evaluation: StepEvaluation): AgentRun[] {
   return evaluation.agentRuns.data?.pages.flatMap((page) => page.runs) ?? [];
-}
-
-/** The Step's context of use (D16), versioned on every save. */
-export function BriefSection({ step, data, mayEdit }: { step: EvaluatedStep; data: StepEvaluation['brief']; mayEdit: boolean }) {
-  const [draft, setDraft] = React.useState<string | null>(null);
-  const save = useStepEvaluationMutation(step, (text: string) => mediforce.evaluation.setBrief({ ...step, text }));
-  const brief = data.data?.brief ?? null;
-  return (
-    <Section
-      title="Evaluation Brief"
-      action={mayEdit && draft === null && (
-        <button type="button" className={buttonClass} onClick={() => setDraft(brief?.text ?? '')}>{brief === null ? 'Write' : 'Edit'}</button>
-      )}
-    >
-      <p className="text-xs text-muted-foreground" data-testid="brief-purpose">
-        The step&apos;s context of use: what it is for, who relies on its output, which failures matter most. The assistant reads it on every turn to plan Evaluators and propose Acceptance Criteria.
-      </p>
-      {data.isLoading ? <Loading /> : draft !== null ? (
-        <div className="space-y-2">
-          <textarea
-            className={cn(inputClass, 'w-full min-h-24')}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="What this step is for, who relies on its output, which failures matter most."
-          />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className={primaryButtonClass}
-              disabled={draft.trim() === '' || save.isPending}
-              onClick={() => save.mutate(draft, { onSuccess: () => setDraft(null) })}
-            >Save as v{(brief?.version ?? 0) + 1}</button>
-            <button type="button" className={buttonClass} onClick={() => setDraft(null)}>Cancel</button>
-          </div>
-        </div>
-      ) : brief === null ? (
-        <p className="text-sm text-muted-foreground">No Brief yet — the step&apos;s context of use is unstated. The assistant can draft one.</p>
-      ) : (
-        <div className="space-y-1">
-          <MarkdownPresentation content={brief.text} />
-          <p className="text-xs text-muted-foreground">v{brief.version} · {brief.origin === 'assistant' ? 'drafted by the assistant' : 'written'} by {brief.createdBy}</p>
-        </div>
-      )}
-    </Section>
-  );
 }
 
 /** Typing "Grades match CTCAE" gives "grades-match-ctcae" — the only form an Evaluator name takes. */
@@ -956,8 +912,6 @@ export function DriftAlert({ data }: { data: StepEvaluation['drift'] }) {
   );
 }
 
-// A severity's minimum pass rate is one of these; a value saved elsewhere (CLI, assistant) is offered beside them.
-const PASS_RATE_CHOICES = [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1];
 const NOT_JUDGED = '';
 
 /** The criteria with one severity's pass rate changed — its pass^k kept — or, given `NOT_JUDGED`, dropped. */
@@ -967,10 +921,22 @@ export function withPassRate(criteria: AcceptanceCriteria | undefined, severity:
   return { ...others, [severity]: { ...previous, minPassRate: Number(choice) } };
 }
 
+function percent(rate: number): string {
+  return `${Math.round(rate * 1000) / 10}%`;
+}
+
+/** One line per severity: its floor, or that it is not judged. */
+function describeThresholds(criteria: AcceptanceCriteria): string {
+  return SEVERITIES.map((severity) => {
+    const criterion = criteria[severity];
+    return `${severity} ${criterion === undefined ? 'not judged' : `≥ ${percent(criterion.minPassRate)}`}`;
+  }).join(' · ');
+}
+
 const VALIDATION: Record<StepValidation['status'], { label: string; icon: LucideIcon; className: string }> = {
-  passed: { label: 'Validation passed', icon: CircleCheck, className: 'text-green-600 dark:text-green-400' },
-  failed: { label: 'Validation failed', icon: CircleX, className: 'text-red-600 dark:text-red-400' },
-  not_verified: { label: 'Not verified', icon: Clock, className: 'text-muted-foreground' },
+  passed: { label: 'Validation passed', icon: CircleCheck, className: 'border-green-600/40 bg-green-600/10 text-green-700 hover:bg-green-600/15 dark:text-green-400' },
+  failed: { label: 'Validation failed', icon: CircleX, className: 'border-red-600/40 bg-red-600/10 text-red-700 hover:bg-red-600/15 dark:text-red-400' },
+  not_verified: { label: 'Not verified', icon: Clock, className: 'border-border bg-muted/60 text-muted-foreground hover:bg-muted' },
 };
 
 /** What the Step's qualification rests on: the Eval Run it was signed from, and what changed since. */
@@ -1007,12 +973,91 @@ function QualificationDetails({ status }: { status: GetStepQualificationOutput }
 }
 
 /**
- * The floors Eval Runs are judged against (D10) — one minimum pass rate per
- * severity, on its Wilson 95% lower bound — and whether the step is validated
- * against them: the newest finished Eval Run of the workflow version, passed or
- * failed on its criteria, not verified once anything it rested on changed. The
- * signed Step Qualification, if any, opens from the same icon.
- * Each change is a new criteria version; the next Eval Run freezes the one in force.
+ * Per severity: a slider for the minimum pass rate, and whether the severity is
+ * judged at all. Nothing is saved until Save, which writes one new criteria version.
+ */
+function ThresholdDialog({ onClose, criteria, onSave, saving, error }: {
+  onClose: () => void;
+  criteria: AcceptanceCriteria;
+  onSave: (criteria: AcceptanceCriteria) => void;
+  saving: boolean;
+  error: Error | null;
+}) {
+  const [draft, setDraft] = React.useState(criteria);
+  const judged = SEVERITIES.filter((severity) => draft[severity] !== undefined);
+  const unchanged = JSON.stringify(draft) === JSON.stringify(criteria);
+  return (
+    <Dialog.Root open onOpenChange={(open) => { if (open === false) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-6 shadow-lg" data-testid="threshold-dialog">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <Dialog.Title className="text-lg font-semibold">Pass thresholds</Dialog.Title>
+              <Dialog.Description className="mt-1 text-xs text-muted-foreground">
+                Every counted Evaluator of a severity must pass at least this share of its graded trials: 8 of 10 meets 80%, and 100% means every graded trial passes.
+              </Dialog.Description>
+            </div>
+            <Dialog.Close asChild>
+              <button type="button" aria-label="Close" className="rounded-sm p-1 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+            </Dialog.Close>
+          </div>
+          <div className="space-y-4">
+            {SEVERITIES.map((severity) => {
+              const criterion = draft[severity];
+              // The schema needs one severity judged, so the last one judged cannot be cleared.
+              const lastJudged = judged.length === 1 && judged[0] === severity;
+              return (
+                <div key={severity} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <label className="flex items-center gap-2 capitalize">
+                      <input
+                        type="checkbox"
+                        aria-label={`judge ${severity}`}
+                        checked={criterion !== undefined}
+                        disabled={lastJudged}
+                        onChange={(event) => setDraft(withPassRate(draft, severity, event.target.checked ? '1' : NOT_JUDGED))}
+                      />
+                      {severity}
+                    </label>
+                    <span className="font-mono text-xs tabular-nums">{criterion === undefined ? 'not judged' : `≥ ${percent(criterion.minPassRate)}`}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    aria-label={`${severity} minimum pass rate`}
+                    className="w-full accent-primary disabled:opacity-40"
+                    value={Math.round((criterion?.minPassRate ?? 1) * 100)}
+                    disabled={criterion === undefined}
+                    onChange={(event) => setDraft(withPassRate(draft, severity, String(Number(event.target.value) / 100)))}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          {error !== null && <p className="mt-3 text-xs text-destructive">{error.message}</p>}
+          <div className="mt-6 flex justify-end gap-2">
+            <Dialog.Close asChild>
+              <button type="button" className={buttonClass}>Cancel</button>
+            </Dialog.Close>
+            <button type="button" className={primaryButtonClass} disabled={unchanged || saving} onClick={() => onSave(draft)}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+/**
+ * Whether the step is validated (D10): the newest finished Eval Run of the
+ * workflow version, passed or failed on its Acceptance Criteria, not verified
+ * once anything it rested on changed. The signed Step Qualification, if any,
+ * opens from the same status. The thresholds — every severity at 100% until
+ * set — are tuned in a dialog; the next Eval Run freezes the ones in force.
  */
 export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEdit }: {
   step: EvaluatedStep;
@@ -1021,68 +1066,59 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
   mayEdit: boolean;
 }) {
   const [showDetails, setShowDetails] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
   const save = useStepEvaluationMutation(step, (next: AcceptanceCriteria) => mediforce.evaluation.setAcceptanceCriteria({ ...step, criteria: next }));
-  const current = criteria.data?.criteria ?? null;
-  const judged = SEVERITIES.filter((severity) => current?.criteria[severity] !== undefined);
+  const effective = criteria.data?.criteria?.criteria ?? DEFAULT_ACCEPTANCE_CRITERIA;
   const status = qualification.data;
   const validation = status === undefined ? null : VALIDATION[status.validation.status];
+  const saveThresholds = (next: AcceptanceCriteria) => save.mutate(next, { onSuccess: () => setEditing(false) });
   return (
-    <Section
-      title="Acceptance Criteria"
-      action={status !== undefined && validation !== null && (
-        <InstantTooltip label={`${status.validation.reason}${status.validation.runInProgress ? ' An Eval Run is running.' : ''}`}>
-          <button
-            type="button"
-            className={cn('inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium hover:bg-muted', validation.className)}
-            aria-expanded={showDetails}
-            data-testid="validation-status"
-            data-status={status.validation.status}
-            onClick={() => setShowDetails(!showDetails)}
-          >
-            <validation.icon className="h-4 w-4" aria-hidden />
-            {validation.label}
-          </button>
+    <section className="rounded-lg border p-3 space-y-3" data-testid="acceptance-criteria">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {status === undefined || validation === null ? <Loading /> : (
+          <InstantTooltip label={`${status.validation.reason}${status.validation.runInProgress ? ' An Eval Run is running.' : ''}`}>
+            <button
+              type="button"
+              className={cn('inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-semibold', validation.className)}
+              aria-expanded={showDetails}
+              data-testid="validation-status"
+              data-status={status.validation.status}
+              onClick={() => setShowDetails(!showDetails)}
+            >
+              <validation.icon className="h-5 w-5" aria-hidden />
+              {validation.label}
+            </button>
+          </InstantTooltip>
+        )}
+        <InstantTooltip label={`${describeThresholds(effective)}. Every counted Evaluator of a severity must reach its rate.`}>
+          <span>
+            <button
+              type="button"
+              className={buttonClass}
+              disabled={mayEdit === false || criteria.isLoading}
+              data-testid="set-threshold"
+              onClick={() => { save.reset(); setEditing(true); }}
+            >Set the threshold</button>
+          </span>
         </InstantTooltip>
-      )}
-    >
-      {criteria.isLoading ? <Loading /> : (
-        <div className="grid gap-2 sm:grid-cols-3" data-testid="acceptance-criteria">
-          {SEVERITIES.map((severity) => {
-            const saved = current?.criteria[severity];
-            const choices = saved === undefined || PASS_RATE_CHOICES.includes(saved.minPassRate) ? PASS_RATE_CHOICES : [...PASS_RATE_CHOICES, saved.minPassRate].sort((left, right) => left - right);
-            // The schema needs one severity judged, so the last one judged cannot be cleared.
-            const lastJudged = judged.length === 1 && judged[0] === severity;
-            return (
-              <label key={severity} className="flex items-center gap-2 text-xs">
-                <span className="w-12 capitalize">{severity}</span>
-                <select
-                  aria-label={`${severity} minimum pass rate`}
-                  className={cn(inputClass, 'flex-1 text-xs')}
-                  value={saved === undefined ? NOT_JUDGED : String(saved.minPassRate)}
-                  disabled={mayEdit === false || save.isPending}
-                  onChange={(event) => save.mutate(withPassRate(current?.criteria, severity, event.target.value))}
-                >
-                  <option value={NOT_JUDGED} disabled={lastJudged}>Not judged</option>
-                  {choices.map((rate) => <option key={rate} value={String(rate)}>≥ {Math.round(rate * 100)}% pass</option>)}
-                </select>
-              </label>
-            );
-          })}
-        </div>
-      )}
-      <p className="text-xs text-muted-foreground">
-        {current === null
-          ? 'No criteria yet — Eval Runs judge nothing until one is set. The assistant can propose them from the step\'s risks.'
-          : `v${current.version} · ${current.origin === 'assistant' ? 'proposed by the assistant' : 'set'} by ${current.createdBy}. Every counted Evaluator of a severity must reach its rate, on the Wilson 95% lower bound.`}
-      </p>
-      {save.error !== null && <p className="text-xs text-destructive">{save.error.message}</p>}
+      </div>
       {showDetails && status !== undefined && (
         <div className="space-y-2 rounded-md bg-muted/40 p-2 text-xs">
           <p data-testid="validation-reason">{status.validation.reason}{status.validation.runInProgress && ' An Eval Run is running; this updates when it ends.'}</p>
           <QualificationDetails status={status} />
         </div>
       )}
-    </Section>
+      {editing && (
+        <ThresholdDialog
+          key={JSON.stringify(effective)}
+          onClose={() => setEditing(false)}
+          criteria={effective}
+          onSave={saveThresholds}
+          saving={save.isPending}
+          error={save.error}
+        />
+      )}
+    </section>
   );
 }
 

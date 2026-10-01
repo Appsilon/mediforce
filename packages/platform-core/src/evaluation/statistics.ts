@@ -2,9 +2,9 @@
 const Z_95 = 1.959963984540054;
 
 /**
- * Wilson score interval for a binomial proportion — the D10 judgment uses its
- * lower bound, which stays honest at the small n an Eval Run has, where the
- * normal approximation claims certainty it does not have.
+ * Wilson score interval for a binomial proportion — reported beside a pass
+ * rate to show how much an Eval Run's small n can say; it stays honest there,
+ * where the normal approximation claims certainty it does not have.
  */
 export function wilsonInterval(passes: number, total: number, z = Z_95): { lower: number; upper: number } | null {
   if (total === 0) return null;

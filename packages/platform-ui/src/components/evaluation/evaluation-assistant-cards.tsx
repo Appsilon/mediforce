@@ -269,7 +269,7 @@ export function PlanCard({ step, plan, onDraft, busy, mayEdit, editReason }: {
         ))}
       </ol>
       <p className="mt-2 text-muted-foreground">
-        Suggested Acceptance Criteria — minimum pass rate on its Wilson 95% lower bound: critical {criteria.critical}, major {criteria.major}, minor {criteria.minor}.
+        Suggested Acceptance Criteria — minimum pass rate: critical {criteria.critical}, major {criteria.major}, minor {criteria.minor}.
         The next Eval Run prepared is judged against the criteria set then.
       </p>
       <div className="mt-1 flex items-center gap-1.5">
