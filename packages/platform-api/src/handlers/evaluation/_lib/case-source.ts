@@ -1,4 +1,4 @@
-import type { EvalCaseInput, EvaluatedStep } from '@mediforce/platform-core';
+import type { EvalCaseInput, EvaluatedStep, ProcessInstance } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { ValidationError } from '../../../errors';
 import { loadEvaluatedStep } from './evaluated-step';
@@ -15,6 +15,18 @@ export interface CaseSource {
   readonly bareRepoPath: string | null;
   /** The workspace the step saw: the parent of the commit it produced. */
   readonly workspaceSeedCommit: string | null;
+}
+
+/** The trigger payload and the outputs of the steps before it — a run's step input as an Eval Case holds it. */
+export function caseInputOf(instance: ProcessInstance, stepInput: Record<string, unknown> | null): EvalCaseInput {
+  const variables = stepInput?.steps;
+  return {
+    triggerPayload: instance.triggerPayload ?? {},
+    previousStepOutputs: typeof variables === 'object' && variables !== null
+      ? variables as Record<string, unknown>
+      : {},
+    ...(instance.previousRun === undefined ? {} : { previousRun: instance.previousRun }),
+  };
 }
 
 /**
@@ -39,18 +51,11 @@ export async function loadCaseSource(
     throw new ValidationError(`Agent Run '${agentRunId}' is an eval trial, not a production run`);
   }
 
-  const variables = subject.stepInput?.steps;
   const git = subject.agentRun.envelope?.gitMetadata ?? null;
   return {
     step: runStep,
     subject,
-    input: {
-      triggerPayload: subject.instance.triggerPayload ?? {},
-      previousStepOutputs: typeof variables === 'object' && variables !== null
-        ? variables as Record<string, unknown>
-        : {},
-      ...(subject.instance.previousRun === undefined ? {} : { previousRun: subject.instance.previousRun }),
-    },
+    input: caseInputOf(subject.instance, subject.stepInput),
     bareRepoPath: git?.repoUrl ?? null,
     workspaceSeedCommit: git === null ? null : await parentCommit(git.repoUrl, git.commitSha),
   };

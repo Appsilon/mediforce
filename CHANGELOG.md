@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - Step Evaluation GEPA optimisation ([ADR-0023](docs/adr/0023-step-evaluation.md) D15): from a finished Eval Run, a container job (`mediforce-gepa` image) reflects on the step's failing dev-case trials and proposes up to three prompts, which run as challengers over dev and holdout within a budget the person grants — ranked by holdout first, since the job fitted them to dev (`mediforce eval optimise|optimisation|optimisations`, the Evaluation tab's **Optimisations**, the assistant's `start_optimisation` under an unattended budget) [#1434](https://github.com/Appsilon/mediforce/pull/1434).
+- Step Evaluation's **Built-in case suites** picks the field to change from the run's real input (no typed path), lists every case it will write — with the exact instruction each injection appends — before writing it, and adds a missing **Result unchanged** grader comparing only the result keys you tick; built-in Evaluators' **Details** spell out when they pass and fail and what they look for, and editing one no longer lets you swap which check it is.
 
 ## [1.2.0] - 2026-09-28
 

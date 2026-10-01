@@ -14,6 +14,10 @@ describe('getAgentRunIo', () => {
       agentRunId: GRADED_RUN,
       status: 'completed',
       stepInput: { events: [{ term: 'Sepsis', outcome: 'fatal' }] },
+      caseInput: {
+        triggerPayload: { studyId: 'CDISCPILOT01' },
+        previousStepOutputs: { 'extract-aes': { events: [{ term: 'Sepsis', outcome: 'fatal' }] } },
+      },
       result: { findings: [{ term: 'Sepsis', grade: 5 }] },
     });
   });

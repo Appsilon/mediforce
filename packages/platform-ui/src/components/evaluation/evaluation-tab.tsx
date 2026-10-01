@@ -133,7 +133,7 @@ function StepEvaluation({ step, outputSchema, inputTemplate, mayEdit, editReason
           stepInputTemplate={inputTemplate}
           labelCandidates={{ cases: evaluation.cases.data?.cases ?? [], runs: loadedAgentRuns(evaluation) }}
         />
-        <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
+        <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} stepOutputSchema={outputSchema} />
         <McpPolicySection step={step} data={evaluation.mcpPolicy} mayEdit={mayEdit} />
         <EvalRunsSection step={step} data={evaluation.runs} datasets={evaluation.datasets} mayRun={mayRun} runReason={runReason} mayEdit={mayEdit} editReason={editReason} />
         <OptimisationsSection step={step} data={evaluation.optimisations} runs={evaluation.runs} mayRun={mayRun} />

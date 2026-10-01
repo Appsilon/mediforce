@@ -246,6 +246,7 @@ test.describe('Step Evaluation entities — API E2E', () => {
     expect(io.agentRunId).toBe(agentRunId);
     expect(io.status).toBe('completed');
     expect(io.result).toHaveProperty('mock');
+    expect(io.caseInput.triggerPayload).toEqual(expect.any(Object));
 
     const outsider = await request.get(`/api/evaluation/agent-runs/${agentRunId}/io`, { headers: sessionCookieHeaders(callers.outsider) });
     expect(outsider.status(), await outsider.text()).toBe(404);

@@ -404,6 +404,14 @@ export {
   parseDriftSettings,
   type DriftSettings,
   type DriftWindows,
+  PROMPT_INJECTIONS,
+  caseSuiteTargets,
+  caseSuiteVariants,
+  inputValueAt,
+  type CaseSuiteTarget,
+  type CaseSuiteVariant,
+  PHI_PATTERNS,
+  findPhi,
 } from './evaluation/index';
 
 // Types (re-exported from schemas for convenience)
