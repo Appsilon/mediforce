@@ -68,21 +68,27 @@ describe('replay misses in an Agent Trajectory', () => {
 describe('describeMcpReport', () => {
   it('says no trial made a live MCP call when no server was live, and names what replay could not answer', () => {
     expect(describeMcpReport({
-      live: [], replayed: ['edc'], denied: ['email'],
+      live: [], replayed: ['edc'], denied: ['email'], recordedFirst: [],
       unrecordedCalls: [{ server: 'edc', tool: 'read_record', count: 2 }],
     })).toBe('MCP servers: edc replayed; email denied. No trial made a live MCP call. '
       + '2 replayed calls had no recording and got an error (edc/read_record ×2).');
   });
 
   it('does not claim no live call when a server was live', () => {
-    expect(describeMcpReport({ live: ['meddra'], replayed: [], denied: [], unrecordedCalls: [] })).toBe('MCP servers: meddra live.');
+    expect(describeMcpReport({ live: ['meddra'], replayed: [], denied: [], recordedFirst: [], unrecordedCalls: [] })).toBe('MCP servers: meddra live.');
+  });
+
+  it('names the cases a replayed server ran live to record, and then claims no live call', () => {
+    expect(describeMcpReport({
+      live: [], replayed: ['edc', 'meddra'], denied: [], recordedFirst: [{ server: 'edc', cases: 2 }], unrecordedCalls: [],
+    })).toBe('MCP servers: edc, meddra replayed. edc ran live for 2 cases with no recording yet, and recorded them.');
   });
 });
 
 describe('describeMcpPolicy', () => {
-  it('states each server of a frozen policy by its mode', () => {
+  it('states each server of a frozen policy by its mode, and nothing about the calls it made', () => {
     expect(describeMcpPolicy({ meddra: { mode: 'live', denyTools: ['update'] }, edc: { mode: 'replay' }, email: { mode: 'deny' } }))
       .toBe('MCP servers: meddra live; edc replayed; email denied.');
-    expect(describeMcpPolicy({ edc: { mode: 'replay' } })).toBe('MCP servers: edc replayed. No trial made a live MCP call.');
+    expect(describeMcpPolicy({ edc: { mode: 'replay' } })).toBe('MCP servers: edc replayed.');
   });
 });

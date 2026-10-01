@@ -1151,14 +1151,14 @@ const MCP_MODES: Record<McpEvalMode, { label: string; description: string }> = {
   },
   replay: {
     label: 'Replay',
-    description: 'Nothing reaches the server: calls are answered from what a live trial of the same case recorded. A call no recording answers gets an error.',
+    description: 'A case with a recording never reaches the server: its calls are answered from what a live trial of that case recorded, and a call no recording answers gets an error. A case with no recording yet runs live once and records it.',
   },
 };
 
 /**
  * What each MCP server of the Step's agent may do in a trial (D6); unnamed
  * servers are denied. A live trial records what a server answers, per case, for
- * a replay.
+ * a replay; a replayed case with no recording yet runs live and records it.
  */
 export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep; data: StepEvaluation['mcpPolicy']; mayEdit: boolean }) {
   const save = useStepEvaluationMutation(step, (servers: Record<string, McpEvalServerPolicy>) =>
@@ -1166,7 +1166,7 @@ export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep;
   const servers = data.data?.servers ?? [];
   if (!data.isLoading && servers.length === 0) return null;
   const policyOf = (mode: McpEvalMode, denyTools: string[] | undefined): McpEvalServerPolicy =>
-    ({ mode, ...(denyTools === undefined || mode !== 'live' ? {} : { denyTools }) });
+    ({ mode, ...(denyTools === undefined || mode === 'deny' ? {} : { denyTools }) });
   const setMode = (name: string, mode: McpEvalMode) => {
     const next = Object.fromEntries(servers.filter((server) => server.defaulted === false)
       .map((server) => [server.name, policyOf(server.mode, server.denyTools)]));
@@ -1176,7 +1176,7 @@ export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep;
   return (
     <Section title="MCP servers in eval trials">
       <p className="text-xs text-muted-foreground">
-        What the step&apos;s agent may do with each of its MCP servers while an Eval Run tries it. Record with Live once, then Replay for repeatable runs that touch nothing outside.
+        What the step&apos;s agent may do with each of its MCP servers while an Eval Run tries it. Replay records each case live the first time it runs, then answers from that recording — after a case&apos;s first run, its trials touch nothing outside.
       </p>
       {data.isLoading ? <Loading /> : (
         <ul className="space-y-2 text-sm">
@@ -1184,10 +1184,10 @@ export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep;
             <li key={server.name} className="space-y-0.5" data-testid="mcp-policy-server">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs">{server.name}</span>
-                {server.mode === 'live' && server.denyTools !== undefined && server.denyTools.length > 0 && (
+                {server.mode !== 'deny' && server.denyTools !== undefined && server.denyTools.length > 0 && (
                   <span className="text-xs text-muted-foreground">denied tools: {server.denyTools.join(', ')}</span>
                 )}
-                <InstantTooltip label="Replay can answer only the cases a Live trial recorded.">
+                <InstantTooltip label="Replay answers the cases recorded here; any other case runs live once to record.">
                   <span className="text-xs text-muted-foreground">
                     recorded for {server.recordedCaseIds.length} case{server.recordedCaseIds.length === 1 ? '' : 's'}
                   </span>

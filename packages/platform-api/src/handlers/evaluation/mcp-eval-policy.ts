@@ -36,9 +36,9 @@ export async function getMcpEvalPolicy(input: GetMcpEvalPolicyInput, scope: Call
  * Replaces the Step's MCP eval policy. Only servers the agent binds may be
  * named; `denyTools` on a server whose binding lists no `allowedTools` is
  * refused, as it is for step restrictions — there is no allowlist to subtract
- * from — and so is `denyTools` on a replayed server, which runs no tool. A
- * denied server keeps any `denyTools` it is sent, as it always has; they have
- * no effect.
+ * from. A replayed server's `denyTools` hold while it runs live to record a
+ * case. A denied server keeps any `denyTools` it is sent, as it always has;
+ * they have no effect.
  */
 export async function setMcpEvalPolicy(input: SetMcpEvalPolicyInput, scope: CallerScope): Promise<SetMcpEvalPolicyOutput> {
   const step = stepRef(input);
@@ -49,9 +49,6 @@ export async function setMcpEvalPolicy(input: SetMcpEvalPolicyInput, scope: Call
     const binding = bindings[name];
     if (binding === undefined) {
       throw new ValidationError(`'${name}' is not an MCP server of this step's agent (${known.join(', ') || 'it has none'})`);
-    }
-    if ((serverPolicy.denyTools?.length ?? 0) > 0 && serverPolicy.mode === 'replay') {
-      throw new ValidationError(`'${name}' is replayed, so it runs no tool to deny — make it live to deny tools one by one`);
     }
     if ((serverPolicy.denyTools?.length ?? 0) > 0 && binding.allowedTools === undefined) {
       throw new ValidationError(`'${name}' lists no allowedTools, so tools cannot be denied one by one — deny the server or list its tools on the agent`);

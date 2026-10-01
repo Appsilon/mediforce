@@ -16,13 +16,14 @@ import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, s
 
 /**
  * API E2E for MCP replay in eval trials (ADR-0023 D6): a
- * replayed server fails a trial closed while no live trial of its Eval Case
- * recorded it, and once one has, a trial runs with it answered from the
- * recording — and the report says no trial made a live MCP call.
+ * replayed server runs live for an Eval Case no live trial recorded yet, and
+ * the report counts that case as recorded by the run; once a recording exists,
+ * a trial runs with it answered from the recording — and the report says no
+ * trial made a live MCP call.
  *
  * MOCK_AGENT=true: the mock agent starts no MCP server, so a live trial
  * records nothing and a replayed one is never called. This journey proves the
- * storage, policy, fail-closed and report path. The recording is written to
+ * storage, policy, record-first and report path. The recording is written to
  * Postgres as a live trial's recording proxy would leave it; the proxy itself
  * — recording, replaying, and wiring into mcp-config.json — is covered at L1
  * (agent-runtime mcp-tape and mcp-config-integration tests).
@@ -56,7 +57,7 @@ async function recordedCaseIds(request: APIRequestContext, step: Record<string, 
 }
 
 test.describe('Step Evaluation MCP replay — API E2E', () => {
-  test('a replayed server: failed closed with no recording, answered from one without any live MCP call', async ({ request }) => {
+  test('a replayed server: run live to record a case with no recording, answered from it without any live MCP call', async ({ request }) => {
     test.setTimeout(180_000);
     const suffix = randomUUID().slice(0, 8);
 
@@ -103,13 +104,12 @@ test.describe('Step Evaluation MCP replay — API E2E', () => {
     expect(policyRes.status(), await policyRes.text()).toBe(200);
     expect(await recordedCaseIds(request, step)).toEqual([]);
 
-    // No live trial of the case recorded `meddra`: the trial fails closed.
+    // No live trial of the case recorded `meddra`: the trial runs it live to record it.
     const unrecorded = await runToEnd(request, step);
     expect(unrecorded.evalRun.mcpPolicy).toEqual({ email: { mode: 'deny' }, meddra: { mode: 'replay' } });
-    expect(unrecorded.trials[0]).toMatchObject({ status: 'failed' });
-    expect(unrecorded.trials[0]!.error).toContain(`MCP server 'meddra' is replayed, but no live trial of Eval Case '${evalCase.id}' recorded it`);
+    expect(unrecorded.trials[0]).toMatchObject({ status: 'scored' });
 
-    // What a live trial's recording proxy leaves behind.
+    // What that trial's recording proxy leaves behind.
     const sql = postgres(process.env.DATABASE_URL!, { max: 1 });
     try {
       await sql`INSERT INTO eval_mcp_recordings ${sql([{
@@ -124,6 +124,10 @@ test.describe('Step Evaluation MCP replay — API E2E', () => {
       await sql.end();
     }
     expect(await recordedCaseIds(request, step)).toEqual([evalCase.id]);
+    const recordingRunRes = await request.get(`/api/evaluation/runs/${unrecorded.evalRun.id}`, { headers: AUTH_HEADERS });
+    const recordingRun = EvalRunOutputSchema.parse(await recordingRunRes.json());
+    expect(recordingRun.report.mcp.recordedFirst).toEqual([{ server: 'meddra', cases: 1 }]);
+    expect(describeMcpReport(recordingRun.report.mcp)).not.toContain('No trial made a live MCP call.');
 
     const replayed = await runToEnd(request, step);
     const [trial] = replayed.trials;
@@ -132,7 +136,7 @@ test.describe('Step Evaluation MCP replay — API E2E', () => {
     const [first] = GetAgentTrajectoryOutputSchema.parse(await trajectoryRes.json()).entries;
     // The replayed server is kept for the agent; the undeclared `email` is denied.
     expect(first?.text).toContain('with MCP servers: meddra.');
-    expect(replayed.report.mcp).toEqual({ live: [], replayed: ['meddra'], denied: ['email'], unrecordedCalls: [] });
+    expect(replayed.report.mcp).toEqual({ live: [], replayed: ['meddra'], denied: ['email'], recordedFirst: [], unrecordedCalls: [] });
     expect(describeMcpReport(replayed.report.mcp)).toContain('No trial made a live MCP call.');
   });
 });

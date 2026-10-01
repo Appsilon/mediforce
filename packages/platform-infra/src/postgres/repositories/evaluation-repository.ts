@@ -32,6 +32,7 @@ import {
   type JudgeCalibration,
   type McpEvalPolicy,
   type McpRecordedCase,
+  type McpRecordedCaseFilter,
   type McpRecording,
   type McpRecordingFilter,
   type SourceApproval,
@@ -471,10 +472,13 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     return rows.reverse().map(toRecording);
   }
 
-  async listMcpRecordedCases(step: EvaluatedStep): Promise<McpRecordedCase[]> {
+  async listMcpRecordedCases(step: EvaluatedStep, filter: McpRecordedCaseFilter = {}): Promise<McpRecordedCase[]> {
     return this.db.selectDistinct({ server: evalMcpRecordings.server, caseId: evalMcpRecordings.caseId })
       .from(evalMcpRecordings)
-      .where(onStep(evalMcpRecordings, step));
+      .where(and(
+        onStep(evalMcpRecordings, step),
+        filter.evalRunId === undefined ? undefined : eq(evalMcpRecordings.evalRunId, filter.evalRunId),
+      ));
   }
   async appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> {
     const parsed = AcceptanceCriteriaVersionSchema.parse(criteria);

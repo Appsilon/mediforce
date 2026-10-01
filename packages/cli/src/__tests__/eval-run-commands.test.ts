@@ -25,7 +25,7 @@ const OUTPUT = {
   trials: [],
   report: {
     k: 3, trials: { total: 3, scored: 0, failed: 0, skipped: 0, inProgress: 3 },
-    mcp: { live: [], replayed: ['edc'], denied: [], unrecordedCalls: [] },
+    mcp: { live: [], replayed: ['edc'], denied: [], recordedFirst: [], unrecordedCalls: [] },
     variants: [{
       id: 'champion', label: 'Current step', patch: {}, fingerprint: null,
       trials: { total: 3, scored: 0, failed: 0, skipped: 0, inProgress: 3 },

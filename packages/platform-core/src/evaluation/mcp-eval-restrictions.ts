@@ -21,7 +21,8 @@ export function narrowMcpRestrictions(base: StepMcpRestriction = {}, extra: Step
  * `mcpRestrictions` narrowed by, for every server the step's agent binds, the
  * eval policy — `deny` (or no entry at all) disables the server, `live` keeps
  * it and adds its `denyTools`, `replay` keeps it for the trial to answer from
- * its recordings. Subtractive only, like every step restriction.
+ * its recordings and adds its `denyTools` too, for a trial that runs it live to
+ * record a case. Subtractive only, like every step restriction.
  */
 export function mcpEvalRestrictions(
   agentServerNames: readonly string[],
@@ -32,7 +33,7 @@ export function mcpEvalRestrictions(
   for (const name of agentServerNames) {
     const serverPolicy = policy[name];
     if (serverPolicy === undefined || serverPolicy.mode === 'deny') evalRestrictions[name] = { disable: true };
-    else if (serverPolicy.mode === 'live' && (serverPolicy.denyTools ?? []).length > 0) evalRestrictions[name] = { denyTools: serverPolicy.denyTools };
+    else if ((serverPolicy.denyTools ?? []).length > 0) evalRestrictions[name] = { denyTools: serverPolicy.denyTools };
   }
   return narrowMcpRestrictions(stepRestrictions, evalRestrictions);
 }

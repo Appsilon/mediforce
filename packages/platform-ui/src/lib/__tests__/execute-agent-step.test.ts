@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type {
   AgentDefinition,
   AgentOAuthToken,
+  McpEvalServerPolicy,
   OAuthProviderConfig,
   WorkflowStep,
   WorkflowDefinition,
@@ -333,7 +334,13 @@ describe('executeAgentStep', () => {
       calls: [{ tool: 'read_record', arguments: { subject: '1001' }, result: { content: [{ type: 'text', text }] } }],
     });
 
-    async function prepareTrial(instanceId: string, evalRunId: string, trialId: string, caseId: string): Promise<void> {
+    async function prepareTrial(
+      instanceId: string,
+      evalRunId: string,
+      trialId: string,
+      caseId: string,
+      mcpPolicy: Record<string, McpEvalServerPolicy> = { edc: { mode: 'replay' }, meddra: { mode: 'live' } },
+    ): Promise<void> {
       mockAgentDefinitionRepo.getById.mockResolvedValue({
         id: 'edc-agent', systemPrompt: 'Read the EDC.',
         mcpServers: {
@@ -348,7 +355,7 @@ describe('executeAgentStep', () => {
         trialsPerCase: 1, concurrency: 1,
         evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
         variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
-        acceptanceCriteria: null, briefVersion: null, mcpPolicy: { edc: { mode: 'replay' }, meddra: { mode: 'live' } },
+        acceptanceCriteria: null, briefVersion: null, mcpPolicy,
         estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
         budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null,
       }, [{
@@ -384,19 +391,26 @@ describe('executeAgentStep', () => {
       ]);
     });
 
-    it('[ERROR] fails the trial closed when no live trial of its case recorded a replayed server', async () => {
+    it('[DATA] runs a replayed server live and records it for a case no live trial recorded yet', async () => {
+      const evalRunId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+      const trialId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
       const caseId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
-      await prepareTrial('inst-eval-unrecorded', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', caseId);
-      const otherCase = { ...evaluatedStep, stepId: 'another-step' };
+      await prepareTrial('inst-eval-unrecorded', evalRunId, trialId, caseId, { meddra: { mode: 'replay' } });
+      const otherStep = { ...evaluatedStep, stepId: 'another-step' };
       await evaluationRepo.appendMcpRecording({
-        ...otherCase, id: randomUUID(), caseId, server: 'edc', tape: readTape('elsewhere'),
-        evalRunId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', trialId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', recordedAt: '2026-09-23T08:00:00.000Z',
+        ...otherStep, id: randomUUID(), caseId, server: 'meddra', tape: readTape('elsewhere'),
+        evalRunId, trialId, recordedAt: '2026-09-23T08:00:00.000Z',
       });
 
-      await expect(
-        executeAgentStep('inst-eval-unrecorded', 'gather-data', agentStep, {}, 'user-1'),
-      ).rejects.toThrow(`MCP server 'edc' is replayed, but no live trial of Eval Case '${caseId}' recorded it`);
-      expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
+      await executeAgentStep('inst-eval-unrecorded', 'gather-data', agentStep, {}, 'user-1');
+
+      const context = mockAgentRunner.runWithWorkflowStep.mock.calls[0]![1] as WorkflowAgentContext;
+      expect(context.mcpTapes?.replay).toEqual({});
+      expect(context.mcpTapes?.record).toEqual(['meddra']);
+      await context.mcpTapes!.onRecorded('meddra', readTape('first answer'));
+      expect(await evaluationRepo.listMcpRecordings(evaluatedStep, { caseId, server: 'meddra' })).toEqual([
+        expect.objectContaining({ tape: readTape('first answer'), evalRunId, trialId }),
+      ]);
     });
   });
 

@@ -307,7 +307,8 @@ export const EvalDatasetVersionSchema = EvaluatedStepSchema.extend({
 /**
  * What an eval trial may do with one MCP server (D6): `live`, optionally with
  * named tools denied; `replay`, answered from the responses a live pass of the
- * same Eval Case recorded; or `deny`. A server the policy does not name is denied.
+ * same Eval Case recorded — run live, with its denied tools, to record a case
+ * that has none; or `deny`. A server the policy does not name is denied.
  */
 export const McpEvalServerPolicySchema = z.object({
   mode: z.enum(['live', 'replay', 'deny']),

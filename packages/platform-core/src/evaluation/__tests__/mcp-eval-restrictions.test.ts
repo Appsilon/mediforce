@@ -26,6 +26,11 @@ describe('mcpEvalRestrictions (ADR-0023 D6)', () => {
     expect(mcpEvalRestrictions(['edc'], { edc: { mode: 'replay' } })).toEqual({});
   });
 
+  it('adds a replayed server\'s denied tools, for the trial that runs it live to record a case', () => {
+    expect(mcpEvalRestrictions(['edc'], { edc: { mode: 'replay', denyTools: ['write_record'] } }))
+      .toEqual({ edc: { denyTools: ['write_record'] } });
+  });
+
   it('keeps step restrictions on servers the agent no longer binds', () => {
     expect(mcpEvalRestrictions([], {}, { legacy: { disable: true } })).toEqual({ legacy: { disable: true } });
   });

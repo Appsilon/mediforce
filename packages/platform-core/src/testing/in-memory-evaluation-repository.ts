@@ -1,4 +1,4 @@
-import type { EvaluationRepository, McpRecordedCase, McpRecordingFilter } from '../interfaces/evaluation-repository';
+import type { EvaluationRepository, McpRecordedCase, McpRecordedCaseFilter, McpRecordingFilter } from '../interfaces/evaluation-repository';
 import {
   EvalRunSchema,
   EvalTrialSchema,
@@ -206,10 +206,10 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     return filter.limit === undefined ? rows : rows.slice(-filter.limit);
   }
 
-  async listMcpRecordedCases(step: EvaluatedStep): Promise<McpRecordedCase[]> {
+  async listMcpRecordedCases(step: EvaluatedStep, filter: McpRecordedCaseFilter = {}): Promise<McpRecordedCase[]> {
     const seen = new Map<string, McpRecordedCase>();
     for (const row of this.recordings) {
-      if (sameStep(row, step)) seen.set(`${row.server}\u0000${row.caseId}`, { server: row.server, caseId: row.caseId });
+      if (sameStep(row, step) && (filter.evalRunId === undefined || row.evalRunId === filter.evalRunId)) seen.set(`${row.server}\u0000${row.caseId}`, { server: row.server, caseId: row.caseId });
     }
     return [...seen.values()];
   }

@@ -447,6 +447,8 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect(recorded.sort((left, right) => left.server.localeCompare(right.server)))
         .toEqual([{ server: 'edc', caseId }, { server: 'meddra', caseId }]);
       expect(await repo.listMcpRecordedCases(otherStep)).toEqual([]);
+      expect(await repo.listMcpRecordedCases(step, { evalRunId: run.id })).toHaveLength(2);
+      expect(await repo.listMcpRecordedCases(step, { evalRunId: randomUUID() })).toEqual([]);
 
       const miss = { server: 'edc', tool: 'read_record', arguments: { subject: '9999' } };
       await repo.transitionTrial(trialId, 'scoring', { status: 'scored', mcpReplayMisses: [miss] });

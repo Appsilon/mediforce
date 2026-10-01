@@ -146,15 +146,26 @@ function judgedOnEveryTrial(verdicts: AcceptanceCriterionVerdict[], counts: Eval
     : verdict));
 }
 
-/** The servers by the mode the run froze for them, and every unanswered replayed call, counted by server and tool. */
-function mcpReport(run: EvalRun, trials: readonly EvalTrial[]): EvalRunMcpReport {
+/**
+ * The servers by the mode the run froze for them, the cases each replayed
+ * server ran live to record because none had a recording yet, and every
+ * unanswered replayed call, counted by server and tool.
+ */
+async function mcpReport(scope: CallerScope, run: EvalRun, trials: readonly EvalTrial[]): Promise<EvalRunMcpReport> {
+  const modes = mcpServersByMode(run.mcpPolicy);
+  const recordedByThisRun = modes.replayed.length === 0
+    ? []
+    : await scope.evaluation.listMcpRecordedCases(run, { evalRunId: run.id });
+  const recordedFirst = modes.replayed
+    .map((server) => ({ server, cases: recordedByThisRun.filter((recorded) => recorded.server === server).length }))
+    .filter((recorded) => recorded.cases > 0);
   const counts = new Map<string, EvalRunMcpReport['unrecordedCalls'][number]>();
   for (const miss of trials.flatMap((trial) => trial.mcpReplayMisses)) {
     const key = `${miss.server}\u0000${miss.tool}`;
     const counted = counts.get(key);
     counts.set(key, { server: miss.server, tool: miss.tool, count: (counted?.count ?? 0) + 1 });
   }
-  return { ...mcpServersByMode(run.mcpPolicy), unrecordedCalls: [...counts.values()] };
+  return { ...modes, recordedFirst, unrecordedCalls: [...counts.values()] };
 }
 
 function variantReport(
@@ -233,7 +244,7 @@ export async function buildEvalRunReport(scope: CallerScope, run: EvalRun, trial
   return {
     k: run.trialsPerCase,
     trials: trialCounts(trials),
-    mcp: mcpReport(run, trials),
+    mcp: await mcpReport(scope, run, trials),
     variants,
     comparison: champion === undefined ? [] : challengers.map((challenger) => compare(champion, challenger)),
     costUsd: trials.reduce((sum, trial) => sum + (trial.costUsd ?? 0), 0),

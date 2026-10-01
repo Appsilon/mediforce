@@ -306,13 +306,19 @@ export const VariantComparisonSchema = z.object({
 
 /**
  * How the trials reached the Step's MCP servers (D6): each server by the mode
- * it ran in, and the calls to a replayed server no recording answered. With no
- * server `live`, no trial made a live MCP call.
+ * it ran in, how many cases a replayed server ran live to record because none
+ * had a recording yet, and the calls to a replayed server no recording
+ * answered. With no server `live` and none recorded first, no trial made a
+ * live MCP call.
  */
 export const EvalRunMcpReportSchema = z.object({
   live: z.array(z.string()),
   replayed: z.array(z.string()),
   denied: z.array(z.string()),
+  recordedFirst: z.array(z.object({
+    server: z.string(),
+    cases: z.number().int().positive(),
+  })),
   unrecordedCalls: z.array(z.object({
     server: z.string(),
     tool: z.string(),

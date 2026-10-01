@@ -22,6 +22,10 @@ export interface McpRecordingFilter {
   limit?: number;
 }
 
+export interface McpRecordedCaseFilter {
+  evalRunId?: string;
+}
+
 export interface McpRecordedCase {
   server: string;
   caseId: string;
@@ -78,8 +82,8 @@ export interface EvaluationRepository {
   appendMcpRecording(recording: McpRecording): Promise<void>;
   /** Oldest first; narrowed to one case and one server when `filter` names them, and to the newest `limit`. */
   listMcpRecordings(step: EvaluatedStep, filter?: McpRecordingFilter): Promise<McpRecording[]>;
-  /** Each server and Eval Case the Step has a recording for, once — without the tapes. */
-  listMcpRecordedCases(step: EvaluatedStep): Promise<McpRecordedCase[]>;
+  /** Each server and Eval Case the Step has a recording for, once — without the tapes; only one Eval Run's when `filter` names it. */
+  listMcpRecordedCases(step: EvaluatedStep, filter?: McpRecordedCaseFilter): Promise<McpRecordedCase[]>;
 
   appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion>;
   /** Newest first. */
