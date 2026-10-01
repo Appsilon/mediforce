@@ -69,5 +69,15 @@ describe('parseToolArguments', () => {
     if (parsed.ok) return;
     expect(parsed.validationError).toBe('name: Too small: expected string to have >=1 characters');
   });
-});
 
+  it('drops an empty string the model sent for an optional field it had nothing for', () => {
+    const PerturbationSchema = z.object({
+      name: z.string().min(1),
+      perturbation: z.object({ kind: z.string(), canary: z.string().min(4).optional() }),
+    });
+    expect(parseToolArguments('propose_perturbed_case', PerturbationSchema, { name: 'empty-note', perturbation: { kind: 'edge_values', canary: '' } }))
+      .toEqual({ ok: true, data: { name: 'empty-note', perturbation: { kind: 'edge_values' } } });
+    const required = parseToolArguments('propose_perturbed_case', PerturbationSchema, { name: '', perturbation: { kind: 'edge_values' } });
+    expect(required.ok === false && required.validationError).toBe('name: Too small: expected string to have >=1 characters');
+  });
+});

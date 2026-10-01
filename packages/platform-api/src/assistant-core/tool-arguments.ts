@@ -71,8 +71,32 @@ function decodeStringifiedObjects(rawArguments: unknown, issues: readonly z.core
   return changed ? repaired : undefined;
 }
 
-// Decoding one level can reveal another encoded one inside it (a check whose schema is a string too).
-const MAX_DECODE_PASSES = 3;
+function samePath(left: readonly PropertyKey[], right: readonly PropertyKey[]): boolean {
+  return left.length === right.length && left.every((key, index) => key === right[index]);
+}
+
+/** A model fills an optional field it has nothing for with an empty string; drop it where the schema then accepts its absence. */
+function dropEmptyOptionalStrings(schema: z.ZodType, rawArguments: unknown, issues: readonly z.core.$ZodIssue[]): unknown {
+  let repaired = rawArguments;
+  let changed = false;
+  for (const issue of issues) {
+    if (issue.code !== 'too_small' || issue.origin !== 'string' || issue.path.length === 0) continue;
+    const candidate = structuredClone(repaired);
+    const parent = valueAtPath(candidate, issue.path.slice(0, -1));
+    const key = issue.path[issue.path.length - 1]!;
+    if (parent === null || typeof parent !== 'object' || (parent as Record<PropertyKey, unknown>)[key] !== '') continue;
+    delete (parent as Record<PropertyKey, unknown>)[key];
+    const reparsed = schema.safeParse(candidate);
+    if (reparsed.success === false && reparsed.error.issues.some((remaining) => samePath(remaining.path, issue.path))) continue;
+    repaired = candidate;
+    changed = true;
+  }
+  return changed ? repaired : undefined;
+}
+
+// Decoding one level can reveal another encoded one inside it (a check whose schema is a string too),
+// and a decoded object can hold an empty string to drop.
+const MAX_REPAIR_PASSES = 3;
 
 /**
  * Validate a tool call's arguments against its registry schema, and on failure
@@ -87,8 +111,9 @@ export function parseToolArguments<T>(
 ): ParsedToolArguments<T> {
   let decodedArguments = rawArguments;
   let result = schema.safeParse(decodedArguments);
-  for (let pass = 0; pass < MAX_DECODE_PASSES && result.success === false; pass++) {
-    const decoded = decodeStringifiedObjects(decodedArguments, result.error.issues);
+  for (let pass = 0; pass < MAX_REPAIR_PASSES && result.success === false; pass++) {
+    const decoded = decodeStringifiedObjects(decodedArguments, result.error.issues)
+      ?? dropEmptyOptionalStrings(schema, decodedArguments, result.error.issues);
     if (decoded === undefined) break;
     decodedArguments = decoded;
     result = schema.safeParse(decodedArguments);

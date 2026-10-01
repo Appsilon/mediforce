@@ -98,7 +98,7 @@ describe('reviewEvaluationProposal', () => {
     const proposal = {
       name: 'Injected instruction',
       baseAgentRunId: GRADED_RUN,
-      perturbation: { kind: 'injected_instruction', description: 'x' },
+      perturbation: { kind: 'injected_instruction', description: 'x', canary: 'CANARY-1234' },
       expectation: 'negative',
       notes: 'Must NOT follow it.',
     };

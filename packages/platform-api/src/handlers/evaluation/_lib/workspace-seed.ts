@@ -23,12 +23,18 @@ const COMMIT_ENV = {
   GIT_COMMITTER_EMAIL: 'evaluation@mediforce.dev',
 };
 
-async function git(bareRepoPath: string, args: string[], env: Record<string, string> = {}): Promise<string> {
-  const { stdout } = await execFileAsync('git', ['--git-dir', bareRepoPath, ...args], {
+async function git(bareRepoPath: string, args: string[], env: Record<string, string> = {}, input?: string): Promise<string> {
+  const pending = execFileAsync('git', ['--git-dir', bareRepoPath, ...args], {
     encoding: 'utf-8',
     maxBuffer: GIT_MAX_BUFFER,
     env: { ...process.env, ...env },
   });
+  if (input !== undefined) {
+    // git exiting before it reads all of stdin rejects `pending` with its exit code; the EPIPE is not a second error.
+    pending.child.stdin?.on('error', () => {});
+    pending.child.stdin?.end(input);
+  }
+  const { stdout } = await pending;
   return stdout;
 }
 
@@ -107,9 +113,12 @@ export async function commitWorkspaceChanges(
   const indexEnv = { GIT_INDEX_FILE: join(scratch, 'index') };
   try {
     await git(bareRepoPath, ['read-tree', baseCommit], indexEnv);
+    // A bare repo has no work tree, so every entry goes through --index-info
+    // (mode 0 removes one); --force-remove and --add refuse to run without one.
+    const entries: string[] = [];
     for (const [index, [path, content]] of [...contents.entries()].entries()) {
       if (content === null) {
-        await git(bareRepoPath, ['update-index', '--force-remove', '--', path], indexEnv);
+        entries.push(`0 ${'0'.repeat(40)}\t${path}`);
         continue;
       }
       const file = join(scratch, `blob-${index}`);
@@ -117,8 +126,9 @@ export async function commitWorkspaceChanges(
       const blob = (await git(bareRepoPath, ['hash-object', '-w', file])).trim();
       const existing = (await git(bareRepoPath, ['ls-files', '-s', '--', path], indexEnv)).split(' ')[0];
       const mode = existing === undefined || existing === '' ? '100644' : existing;
-      await git(bareRepoPath, ['update-index', '--add', '--cacheinfo', `${mode},${blob},${path}`], indexEnv);
+      entries.push(`${mode} ${blob}\t${path}`);
     }
+    await git(bareRepoPath, ['update-index', '-z', '--index-info'], indexEnv, entries.map((entry) => `${entry}\0`).join(''));
     const tree = (await git(bareRepoPath, ['write-tree'], indexEnv)).trim();
     const commit = (await git(bareRepoPath, ['commit-tree', tree, '-p', baseCommit, '-m', options.message], COMMIT_ENV)).trim();
     await git(bareRepoPath, ['update-ref', options.ref, commit]);
