@@ -53,10 +53,11 @@ export const evalQualificationCommand = defineCommand({
       printJson(output, result);
       return 0;
     }
+    output.stdout(`validation ${result.validation.status.replace('_', ' ')}: ${result.validation.reason}${result.validation.runInProgress ? ' (an Eval Run is running)' : ''}`);
     output.stdout(`${result.status.replace('_', ' ')}  (v${result.definitionVersion}, fingerprint ${result.fingerprint.hash.slice(0, 12)})`);
     const { qualification } = result;
     if (qualification === null) return 0;
-    output.stdout(`signed by ${qualification.signature.signerName} at ${qualification.signature.signedAt} for '${qualification.variantLabel}' of Eval Run ${qualification.evalRunId}, Brief v${qualification.briefVersion}`);
+    output.stdout(`signed by ${qualification.signature.signerName} at ${qualification.signature.signedAt} for '${qualification.variantLabel}' of Eval Run ${qualification.evalRunId}`);
     output.stdout(`criteria: ${describeCriteria(qualification.acceptanceCriteria)}`);
     output.stdout(describeMcpPolicy(qualification.mcpPolicy));
     for (const deviation of qualification.deviations) output.stdout(`deviation (${deviation.severity}): ${deviation.justification}`);

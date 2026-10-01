@@ -79,7 +79,6 @@ describe('askEvaluationAssistant', () => {
       }],
       preparedEvalRuns: [],
       startedEvalRuns: [],
-      startedOptimisations: [],
     });
     expect(requests[0]!.messages.some((message) => message.content.includes('A missed grade 5 is critical.'))).toBe(true);
     expect(await fixture.evaluationRepo.listEvaluators(STEP)).toEqual([]);
@@ -192,6 +191,8 @@ describe('askEvaluationAssistant', () => {
     expect(planAnswer).toMatchObject({ proposed: true });
     expect(refusal.error).toContain("'triggerPayload.armCode': there is nothing there to remove");
     expect(result.proposals.map((proposal) => proposal.tool)).toEqual(['propose_evaluation_plan', 'propose_perturbed_case']);
+    // The model labelled the case negative; the card leaves that to the person.
+    expect(result.proposals[1]!.arguments).not.toHaveProperty('expectation');
     expect(await fixture.evaluationRepo.listCases(STEP)).toEqual([]);
   });
 });

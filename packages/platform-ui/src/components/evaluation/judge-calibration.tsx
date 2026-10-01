@@ -195,15 +195,10 @@ export function CalibrateAction({ step, evaluator, labelCount, mayEdit, editReas
   );
 }
 
-const MARKED: Record<EvalCase['expectation'], string> = {
-  negative: 'you added it as a negative case',
-  positive: 'you added it as a positive case',
-};
-
 /**
  * Where a person labels a judge's outputs in the tab (ADR-0023 D9): the
- * production runs they already added as Eval Cases first — negatives before
- * positives, since a judge needs failures — then the other production runs.
+ * production runs they already added as Eval Cases first, with the case's
+ * notes — then the other production runs.
  * A label is about this Evaluator's rule, not the run overall.
  */
 export function JudgeCalibrationPanel({ step, evaluator, cases, runs, stepOutputSchema, stepInputTemplate, mayEdit }: {
@@ -219,10 +214,10 @@ export function JudgeCalibrationPanel({ step, evaluator, cases, runs, stepOutput
   const labels = useEvaluatorLabels(step, evaluator.id);
   const writtenOutputs = useWrittenOutputs(step).data?.writtenOutputs ?? [];
   const byOutput = labelsBySubject(labels.data?.labels ?? []);
-  const marked = new Map<string, EvalCase['expectation']>();
-  for (const evalCase of [...cases].sort((left, right) => (left.expectation === right.expectation ? 0 : left.expectation === 'negative' ? -1 : 1))) {
+  const marked = new Map<string, string>();
+  for (const evalCase of cases) {
     if (evalCase.source === 'production' && evalCase.sourceAgentRunId !== null && !marked.has(evalCase.sourceAgentRunId)) {
-      marked.set(evalCase.sourceAgentRunId, evalCase.expectation);
+      marked.set(evalCase.sourceAgentRunId, evalCase.notes ?? `you added it as the case '${evalCase.name}'`);
     }
   }
   const unlabelledMarked = [...marked].filter(([agentRunId]) => !byOutput.has(agentRunId));
@@ -255,10 +250,10 @@ export function JudgeCalibrationPanel({ step, evaluator, cases, runs, stepOutput
       {unlabelledMarked.length > 0 && (
         <section className="space-y-1">
           <h4 className="font-medium">Runs you added as Eval Cases</h4>
-          <p className="text-muted-foreground">You judged these runs already; say whether each output breaks this rule.</p>
+          <p className="text-muted-foreground">Say whether each output breaks this rule.</p>
           <ul className="space-y-2" data-testid="label-candidates-marked">
-            {unlabelledMarked.map(([agentRunId, expectation]) => (
-              <LabelOutputRow key={agentRunId} step={step} evaluatorId={evaluator.id} agentRunId={agentRunId} note={MARKED[expectation]} label={undefined} mayEdit={mayEdit} showPair={false} />
+            {unlabelledMarked.map(([agentRunId, note]) => (
+              <LabelOutputRow key={agentRunId} step={step} evaluatorId={evaluator.id} agentRunId={agentRunId} note={note} label={undefined} mayEdit={mayEdit} showPair={false} />
             ))}
           </ul>
         </section>

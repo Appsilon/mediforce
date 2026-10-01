@@ -11,7 +11,6 @@ import {
 import { ConflictError, ForbiddenError, PreconditionFailedError, ValidationError } from '../../../errors';
 import { noopRunKicker, type NoopRunKicker } from '../../../runtime/run-kicker';
 import type { CallerScope } from '../../../repositories/index';
-import { setEvaluationBrief } from '../briefs';
 import { setAcceptanceCriteria } from '../acceptance-criteria';
 import { addEvaluatorVersion, createEvaluator } from '../evaluators';
 import { createEvalCase } from '../eval-cases';
@@ -43,7 +42,6 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     await credentials.setPasswordHash('author-1', await hash(PASSWORD, 4));
     scope = withEngine(fixture.scope(undefined, { credentialsRepo: credentials }));
 
-    await setEvaluationBrief({ ...STEP, text: 'Grades AEs for the DSMB; a missed grade 5 is critical.', origin: 'user' }, scope);
     await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.1 }, major: { minPassRate: 0.9 } }, origin: 'user' }, scope);
     await createEvaluator({ ...STEP, name: 'findings-present', rule: 'The result lists findings.', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
     for (const name of ['Grade 5 sepsis', 'Grade 4 neutropenia']) {
@@ -98,7 +96,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
   const majorDeviation = { severity: 'major' as const, justification: 'No major check counts yet; a reviewer reads every grade until one does.' };
 
-  it('is not qualified until signed, then qualified for the Fingerprint it signed', async () => {
+  it('is not qualified until signed, then qualified for the Fingerprint it signed — with no Evaluation Brief', async () => {
     const before = await getStepQualification(STEP, scope);
     expect(before).toMatchObject({ status: 'not_qualified', qualification: null, definitionVersion: 1, changed: [] });
 
@@ -109,14 +107,13 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
       evalRunId,
       variantId: 'champion',
       definitionVersion: 1,
-      briefVersion: 1,
       acceptanceCriteria: { critical: { minPassRate: 0.1 }, major: { minPassRate: 0.9 } },
       deviations: [majorDeviation],
       signature: {
         signerId: 'author-1',
         signerName: 'author-1',
         reauthentication: 'password',
-        meaning: 'Approved: I reviewed this Eval Run and qualify this Step configuration for its context of use as stated in Evaluation Brief v1.',
+        meaning: 'Approved: I reviewed this Eval Run and qualify this Step configuration as it ran in it.',
       },
     });
     expect(qualification.verdicts.map((verdict) => [verdict.severity, verdict.status])).toEqual([['critical', 'met'], ['major', 'not_evaluable']]);
@@ -223,7 +220,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     expect(qualification.signature.reauthentication).toBe('session');
   });
 
-  it('signs only a finished run with criteria and a Brief frozen into it', async () => {
+  it('signs only a finished run', async () => {
     const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await expect(signStepQualification({ evalRunId: evalRun.id, variantId: 'champion', deviations: [], password: PASSWORD }, scope))
       .rejects.toBeInstanceOf(ConflictError);
@@ -234,5 +231,87 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     await cancelEvalRun({ evalRunId: evalRun.id }, scope);
     await expect(signStepQualification({ evalRunId: evalRun.id, variantId: 'champion', deviations: [majorDeviation], password: PASSWORD }, scope))
       .rejects.toThrow(/cancelled/);
+  });
+  describe('validation status — the newest finished Eval Run of the version, judged on its criteria', () => {
+    const criticalOnly = { critical: { minPassRate: 0.1 } };
+    const aCase = {
+      ...STEP,
+      name: 'Grade 3 anaemia',
+      input: { triggerPayload: { studyId: 'CDISCPILOT01' }, previousStepOutputs: { 'extract-aes': { events: [{ term: 'Anaemia' }] } } },
+      workspaceSeedCommit: null,
+      notes: null,
+      split: 'dev' as const,
+      containsProductionData: false,
+      origin: 'user' as const,
+    };
+
+    async function passedRun(): Promise<string> {
+      await setAcceptanceCriteria({ ...STEP, criteria: criticalOnly, origin: 'user' }, scope);
+      const evalRunId = await finishedRun();
+      expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'passed', evalRunId, runInProgress: false });
+      return evalRunId;
+    }
+
+    it('is not verified until an Eval Run of the version finishes', async () => {
+      expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'not_verified', evalRunId: null, runInProgress: false });
+    });
+
+    it('passes when the run met every criterion, and fails when one was missed or not judged — signed or not', async () => {
+      await passedRun();
+      await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.1 }, major: { minPassRate: 0.9 } }, origin: 'user' }, scope);
+      const evalRunId = await finishedRun();
+      const { validation } = await getStepQualification(STEP, scope);
+      expect(validation).toMatchObject({ status: 'failed', evalRunId });
+      expect(validation.reason).toContain('major');
+    });
+
+    it('resets to not verified when an Evaluator changes', async () => {
+      await passedRun();
+      const [findings] = await fixture.evaluationRepo.listEvaluators(STEP);
+      await addEvaluatorVersion({ evaluatorId: findings!.id, rule: 'The result lists every finding.', origin: 'user' }, scope);
+      const { validation } = await getStepQualification(STEP, scope);
+      expect(validation.status).toBe('not_verified');
+      expect(validation.reason).toContain("'findings-present' now v2");
+    });
+
+    it('resets to not verified when an Eval Case is added or archived', async () => {
+      await passedRun();
+      const added = await createEvalCase({ ...aCase, expectation: 'positive' }, scope);
+      expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'not_verified', reason: expect.stringContaining('Eval Cases') });
+      await fixture.evaluationRepo.setCaseArchived(added.evalCase.id, true);
+      expect((await getStepQualification(STEP, scope)).validation.status).toBe('passed');
+      const [kept] = (await fixture.evaluationRepo.listCases(STEP)).filter((evalCase) => evalCase.archived === false);
+      await fixture.evaluationRepo.setCaseArchived(kept!.id, true);
+      expect((await getStepQualification(STEP, scope)).validation.status).toBe('not_verified');
+    });
+
+    it('resets to not verified when the Acceptance Criteria change', async () => {
+      await passedRun();
+      await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.5 } }, origin: 'user' }, scope);
+      expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'not_verified', reason: expect.stringContaining('Acceptance Criteria') });
+    });
+
+    it('is tied to the workflow version: a new version is not verified until it is run', async () => {
+      await passedRun();
+      await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
+        name: WORKFLOW,
+        namespace: NAMESPACE,
+        version: 2,
+        steps: [
+          { id: 'extract-aes', name: 'Extract AEs', type: 'creation', executor: 'script', script: { runtime: 'python', inlineScript: 'print(1)' } },
+          { id: 'grade-aes', name: 'Grade AEs', type: 'creation', executor: 'agent', agentId: 'ae-grader', agent: { prompt: 'Grade each AE.', model: 'openai/gpt-5' } },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'extract-aes', to: 'grade-aes' }, { from: 'grade-aes', to: 'done' }],
+      }));
+      expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'not_verified', evalRunId: null });
+      expect((await getStepQualification({ ...STEP, definitionVersion: 1 }, scope)).validation.status).toBe('passed');
+    });
+
+    it('says when a run is under way', async () => {
+      const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+      await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
+      expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'not_verified', runInProgress: true });
+    });
   });
 });

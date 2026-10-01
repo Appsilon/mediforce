@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import {
+  CHAMPION_VARIANT_ID,
   qualificationSignatureMeaning,
   type ElectronicSignature,
   type EvalRun,
   type EvaluatedStep,
+  type EvalRunEvaluator,
+  type StepFingerprint,
   type StepQualification,
 } from '@mediforce/platform-core';
 import type {
@@ -12,6 +15,7 @@ import type {
   GetStepQualificationOutput,
   SignStepQualificationInputSchema,
   SignStepQualificationOutput,
+  StepValidation,
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, ForbiddenError, NotFoundError, PreconditionFailedError, ValidationError } from '../../errors';
@@ -21,9 +25,9 @@ import { buildEvalRunReport } from './_lib/eval-run-report';
 import { checkPassword } from '../users/_lib/check-password';
 import { changedFingerprintComponents, computeStepFingerprint } from './_lib/step-fingerprint';
 
-/** What happened to the Step's Evaluators since a qualification cited them (D7): a flag, never staleness. */
-async function evaluatorChanges(scope: CallerScope, step: EvaluatedStep, qualification: StepQualification): Promise<string[]> {
-  const cited = new Map(qualification.evaluators.map((evaluator) => [evaluator.evaluatorId, evaluator.version]));
+/** What happened to the Step's Evaluators since a qualification or an Eval Run froze them (D7). */
+async function evaluatorChanges(scope: CallerScope, step: EvaluatedStep, frozen: readonly EvalRunEvaluator[], frozenBy: string): Promise<string[]> {
+  const cited = new Map(frozen.map((evaluator) => [evaluator.evaluatorId, evaluator.version]));
   const changes: string[] = [];
   for (const evaluator of await scope.evaluation.listEvaluators(step)) {
     const citedVersion = cited.get(evaluator.id);
@@ -34,9 +38,55 @@ async function evaluatorChanges(scope: CallerScope, step: EvaluatedStep, qualifi
     const versions = await scope.evaluation.listEvaluatorVersions(evaluator.id);
     const latest = versions[versions.length - 1]!.version;
     if (citedVersion === undefined) changes.push(`'${evaluator.name}' added`);
-    else if (latest !== citedVersion) changes.push(`'${evaluator.name}' now v${latest}, qualified with v${citedVersion}`);
+    else if (latest !== citedVersion) changes.push(`'${evaluator.name}' now v${latest}, ${frozenBy} v${citedVersion}`);
   }
   return changes;
+}
+
+const FINISHED_RUN_STATUSES = new Set(['completed', 'budget_exceeded']);
+
+/**
+ * The step's validation in one Definition version: the newest finished Eval Run
+ * of that version, judged on the criteria frozen into it — reset to
+ * `not_verified` by any change to what that run rested on.
+ */
+async function stepValidation(scope: CallerScope, step: EvaluatedStep, definitionVersion: number, fingerprint: StepFingerprint): Promise<StepValidation> {
+  const runs = await scope.evaluation.listEvalRuns(step);
+  const runInProgress = runs.some((run) => run.status === 'running');
+  const run = runs.find((candidate) => candidate.definitionVersion === definitionVersion && FINISHED_RUN_STATUSES.has(candidate.status));
+  if (run === undefined) {
+    return { status: 'not_verified', evalRunId: null, reason: `No Eval Run of version ${definitionVersion} has finished yet.`, runInProgress };
+  }
+  const notVerified = (reason: string): StepValidation => ({ status: 'not_verified', evalRunId: run.id, reason, runInProgress });
+  const since = `since Eval Run ${run.id.slice(0, 8)}`;
+
+  const champion = run.variants.find((variant) => variant.id === CHAMPION_VARIANT_ID);
+  if (champion?.fingerprint == null || champion.fingerprint.hash !== fingerprint.hash) {
+    const changed = champion?.fingerprint == null ? [] : changedFingerprintComponents(champion.fingerprint, fingerprint);
+    return notVerified(`The step changed ${since}${changed.length === 0 ? '' : `: ${changed.join(', ')}`}.`);
+  }
+  const evaluatorsChanged = await evaluatorChanges(scope, step, run.evaluators, 'run with');
+  if (evaluatorsChanged.length > 0) return notVerified(`Evaluators changed ${since}: ${evaluatorsChanged.join('; ')}.`);
+  const live = (await scope.evaluation.listCases(step)).filter((evalCase) => evalCase.archived === false).map((evalCase) => evalCase.id);
+  const ran = new Set([...run.caseIds, ...run.exampleCaseIds]);
+  if (live.length !== ran.size || live.some((caseId) => ran.has(caseId) === false)) {
+    return notVerified(`Eval Cases were added, edited or archived ${since}.`);
+  }
+  const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
+  if (run.acceptanceCriteria === null || JSON.stringify(criteria?.criteria ?? null) !== JSON.stringify(run.acceptanceCriteria)) {
+    return notVerified(run.acceptanceCriteria === null ? `Eval Run ${run.id.slice(0, 8)} had no Acceptance Criteria to judge.` : `Acceptance Criteria changed ${since}.`);
+  }
+
+  const report = await buildEvalRunReport(scope, run, await scope.evaluation.listTrials(run.id));
+  const verdicts = report.variants.find((variant) => variant.id === CHAMPION_VARIANT_ID)?.criteria ?? [];
+  const unmet = verdicts.filter((verdict) => verdict.status !== 'met');
+  if (unmet.length === 0) return { status: 'passed', evalRunId: run.id, reason: `Eval Run ${run.id.slice(0, 8)} met every criterion.`, runInProgress };
+  return {
+    status: 'failed',
+    evalRunId: run.id,
+    reason: `Eval Run ${run.id.slice(0, 8)}: ${unmet.map((verdict) => `${verdict.severity} ${verdict.status === 'missed' ? 'missed' : 'not judged'}`).join(', ')}.`,
+    runInProgress,
+  };
 }
 
 /**
@@ -44,7 +94,8 @@ async function evaluatorChanges(scope: CallerScope, step: EvaluatedStep, qualifi
  * qualification binds the Step's Fingerprint as it is now — in the runnable
  * version, or the version asked about — `stale` when qualifications exist but
  * none binds it, `not_qualified` when none was ever signed. Evaluators changed
- * since the qualification shown are flagged beside it (D7).
+ * since the qualification shown are flagged beside it (D7). Beside it, the
+ * step's validation in that version (`stepValidation`).
  */
 export async function getStepQualification(
   input: z.output<typeof GetStepQualificationInputSchema>,
@@ -56,16 +107,18 @@ export async function getStepQualification(
   const history = await scope.evaluation.listQualifications(step);
   const matching = history.find((qualification) => qualification.fingerprint.hash === fingerprint.hash);
   const shown = matching ?? history[0];
+  const validation = await stepValidation(scope, step, definition.version, fingerprint);
   if (shown === undefined) {
-    return { status: 'not_qualified', qualification: null, definitionVersion: definition.version, fingerprint, changed: [], evaluatorsChanged: [], history };
+    return { status: 'not_qualified', validation, qualification: null, definitionVersion: definition.version, fingerprint, changed: [], evaluatorsChanged: [], history };
   }
   return {
     status: matching === undefined ? 'stale' : 'qualified',
+    validation,
     qualification: shown,
     definitionVersion: definition.version,
     fingerprint,
     changed: changedFingerprintComponents(shown.fingerprint, fingerprint),
-    evaluatorsChanged: await evaluatorChanges(scope, step, shown),
+    evaluatorsChanged: await evaluatorChanges(scope, step, shown.evaluators, 'qualified with'),
     history,
   };
 }
@@ -101,7 +154,7 @@ async function reauthenticate(scope: CallerScope, uid: string, password: string 
 /**
  * A person signs a Step Qualification for one variant of a finished Eval Run
  * (ADR-0023 D10) — not a cancelled one. It binds that variant's Step Fingerprint and cites the run,
- * the Brief version, the Evaluator versions, the MCP eval policy and the
+ * the Evaluator versions, the MCP eval policy and the
  * Acceptance Criteria frozen into it, with the verdict on each criterion.
  * Signing despite a criterion missed or not judged records a deviation with a
  * written justification; one without it is refused, as is a justification for
@@ -132,9 +185,6 @@ export async function signStepQualification(
   }
   if (run.acceptanceCriteria === null) {
     throw new ValidationError('No Acceptance Criteria were frozen into this Eval Run; set them and run the step again');
-  }
-  if (run.briefVersion === null) {
-    throw new ValidationError('The step had no Evaluation Brief when this Eval Run was prepared; write one and run the step again');
   }
 
   const report = await buildEvalRunReport(scope, run, trials);
@@ -167,7 +217,6 @@ export async function signStepQualification(
     variantLabel: variant.label,
     patch: variant.patch,
     fingerprint: variant.fingerprint,
-    briefVersion: run.briefVersion,
     evaluators: run.evaluators,
     mcpPolicy: run.mcpPolicy,
     acceptanceCriteria: run.acceptanceCriteria,
@@ -176,7 +225,7 @@ export async function signStepQualification(
     signature: {
       signerId: uid,
       signerName: metadata?.displayName ?? metadata?.email ?? uid,
-      meaning: qualificationSignatureMeaning(run.briefVersion),
+      meaning: qualificationSignatureMeaning(),
       signedAt: new Date().toISOString(),
       reauthentication,
     },
@@ -191,7 +240,6 @@ export async function signStepQualification(
     inputSnapshot: { evalRunId: run.id, variantId: variant.id, deviations: input.deviations },
     outputSnapshot: {
       fingerprint: qualification.fingerprint.hash,
-      briefVersion: qualification.briefVersion,
       verdicts: verdicts.map((verdict) => ({ severity: verdict.severity, status: verdict.status })),
       signature: qualification.signature,
     },

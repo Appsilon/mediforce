@@ -71,7 +71,7 @@ export async function askEvaluationAssistant(
   const [brief] = await scope.evaluation.listBriefs(step);
   const unattended: UnattendedGrant | undefined = input.unattendedBudgetUsd === undefined
     ? undefined
-    : { remainingUsd: input.unattendedBudgetUsd, started: [], startedOptimisations: [] };
+    : { remainingUsd: input.unattendedBudgetUsd, started: [] };
   const previewed: PreviewedCheck[] = [];
   const executePlatformTool = async (toolName: EvaluationAssistantPlatformToolName, args: unknown) => {
     const toolResult = await executeEvaluationTool(toolName, args, scope, { step, definition, workflowStep, ...(unattended === undefined ? {} : { unattended }) });
@@ -111,6 +111,5 @@ export async function askEvaluationAssistant(
         return prepared === null ? [] : [prepared];
       }),
     startedEvalRuns: unattended?.started ?? [],
-    startedOptimisations: unattended?.startedOptimisations ?? [],
   };
 }

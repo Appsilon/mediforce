@@ -21,7 +21,6 @@ export {
 } from './eval-cases';
 export { getAgentRunIo } from './agent-run-io';
 export { listWrittenOutputs, createWrittenOutput, archiveWrittenOutput } from './written-outputs';
-export { createRedTeamEvalCases } from './red-team-cases';
 export { getStepDrift } from './drift';
 export { listEvalDatasets, freezeEvalDataset } from './eval-datasets';
 export { getMcpEvalPolicy, setMcpEvalPolicy } from './mcp-eval-policy';

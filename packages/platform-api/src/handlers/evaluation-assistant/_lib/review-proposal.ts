@@ -1,6 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { z } from 'zod';
-import { VARIANT_FIX_PATCH_FIELDS } from '@mediforce/platform-core';
 import { validateOutputSchema } from '@mediforce/agent-runtime';
 import type {
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
@@ -13,13 +12,10 @@ import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { HandlerError } from '../../../errors';
 import { previewEvaluator } from '../../evaluation/preview-evaluator';
-import { stepPatchProblem } from '../../evaluation/_lib/step-patch-problem';
 import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
 import { isSameStep, loadEvaluatedStep } from '../../evaluation/_lib/evaluated-step';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
-import { caseNeededByCheck } from '../../evaluation/_lib/builtin-checks';
-import { redTeamSuiteVariants } from '../../evaluation/red-team-cases';
 import { loadStepEvaluator } from './run-evaluation-tool';
 
 type Args<Name extends EvaluationAssistantProposalToolName> = z.infer<(typeof EVALUATION_ASSISTANT_PROPOSAL_TOOLS)[Name]>;
@@ -35,8 +31,7 @@ export interface PreviewedCheck {
  * it (ADR-0023 D14): the assistant's own preview of that exact check this
  * turn, or a fresh one. A check that errors on every output it is tried on
  * does not run at all, so it goes back to the model instead of to the person.
- * A caller who may not run checks, or a check that grades only the Eval Cases
- * made for it, still gets the proposal, marked untested.
+ * A caller who may not run checks still gets the proposal, marked untested.
  */
 async function selfTest(
   scope: CallerScope,
@@ -44,10 +39,6 @@ async function selfTest(
   check: EvaluatorCheck,
   previewed: readonly PreviewedCheck[],
 ): Promise<ProposalReview> {
-  const caseNeeded = caseNeededByCheck(check);
-  if (caseNeeded !== undefined) {
-    return { ok: true, evidence: { selfTest: { unavailable: `this check grades only ${caseNeeded}, so it runs in an Eval Run over such cases` } } };
-  }
   let results = previewed.find((preview) => isDeepStrictEqual(preview.check, check))?.results;
   if (results === undefined) {
     try {
@@ -145,11 +136,6 @@ export async function reviewEvaluationProposal(
       }
       return refused.length === 0 ? { ok: true } : { ok: false, error: `Draft outputs must change a production run of this step: ${refused.join('; ')}` };
     }
-    case 'propose_case_suite': {
-      const proposal = args as Args<'propose_case_suite'>;
-      redTeamSuiteVariants((await loadCaseSource(scope, proposal.baseAgentRunId, step, 'read')).input, proposal);
-      return { ok: true };
-    }
     case 'propose_control_settings': {
       const { evalRunId, variantId } = args as Args<'propose_control_settings'>;
       const run = await scope.evaluation.getEvalRun(evalRunId);
@@ -177,22 +163,6 @@ export async function reviewEvaluationProposal(
       return unknown.length === 0
         ? { ok: true }
         : { ok: false, error: `Not trials of variant '${variantId}' in Eval Run '${evalRunId}': ${[...new Set(unknown)].join(', ')} — take trial ids from get_failures` };
-    }
-    case 'propose_fix': {
-      const { evalRunId, kind, patch } = args as Args<'propose_fix'>;
-      const run = await scope.evaluation.getEvalRun(evalRunId);
-      if (run === null || isSameStep(run, step) === false) {
-        return { ok: false, error: `Eval Run '${evalRunId}' is not a run of this step` };
-      }
-      const changed = Object.entries(patch).filter(([, value]) => value !== undefined).map(([field]) => field);
-      const allowed: ReadonlyArray<string> = VARIANT_FIX_PATCH_FIELDS[kind];
-      const stray = changed.filter((field) => allowed.includes(field) === false);
-      if (stray.length > 0) {
-        return { ok: false, error: `A '${kind}' fix patches ${allowed.join(' or ')}, not ${stray.join(', ')} — propose one fix per kind` };
-      }
-      const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'read');
-      const problem = await stepPatchProblem(scope, step, definition, workflowStep, patch);
-      return problem === null ? { ok: true } : { ok: false, error: `This fix cannot be tried or applied: ${problem}` };
     }
     case 'propose_eval_case': {
       const { agentRunId } = args as Args<'propose_eval_case'>;

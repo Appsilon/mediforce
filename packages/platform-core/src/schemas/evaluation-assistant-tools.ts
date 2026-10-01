@@ -1,20 +1,15 @@
 import { z } from 'zod';
 import {
   AcceptanceCriteriaSchema,
-  EvalCaseExpectationSchema,
   EvalCaseInputSchema,
-  EvalCaseInputTargetSchema,
   EvalCaseSplitSchema,
   EvaluatorCheckSchema,
   EvaluatorKindSchema,
   EvaluatorSchema,
   EvaluatorSeveritySchema,
   PerturbedEvalCaseSpecSchema,
-  RedTeamSuiteSchema,
-  StepVariantPatchSchema,
   WorkspaceFilePathSchema,
   hasPerturbationChange,
-  type StepVariantPatch,
 } from './evaluation';
 
 /**
@@ -31,7 +26,7 @@ import {
  */
 
 const AssistantCheckSchema = EvaluatorCheckSchema.describe(
-  'A JSON object, not a string or JSON-encoded string. For code use {"kind":"code","runtime":"python","source":"...script..."}; only source is a string. Choose schema, code, llm_judge or builtin (name: injection_ignored, result_stable or phi_leak) and include that kind\'s required fields.',
+  'A JSON object, not a string or JSON-encoded string. For code use {"kind":"code","runtime":"python","source":"...script..."}; only source is a string. Choose schema, code or llm_judge and include that kind\'s required fields.',
 ).meta({ examples: [
   { kind: 'schema', schema: { required: ['findings'] } },
   {
@@ -56,7 +51,7 @@ export const ProposeEvaluatorToolSchema = z.object({
   /** Why this check, and what its preview showed. */
   rationale: z.string().max(1000).optional(),
   runInProduction: z.boolean().optional()
-    .describe('Also score live production runs of the step (a guardrail). A failing critical schema, code or builtin check sends the run to the step\'s fallbackBehavior; an llm_judge only writes Scores. Counts only once the check is trusted.'),
+    .describe('Also score live production runs of the step (a guardrail). A failing critical schema or code check sends the run to the step\'s fallbackBehavior; an llm_judge only writes Scores. Counts only once the check is trusted.'),
 });
 
 /** Propose an Eval Case: from a production Agent Run, or written out. */
@@ -64,7 +59,6 @@ export const ProposeEvalCaseToolSchema = z.object({
   name: z.string().min(1).max(200),
   agentRunId: z.string().min(1).optional(),
   input: EvalCaseInputSchema.optional(),
-  expectation: EvalCaseExpectationSchema,
   notes: z.string().max(4000).optional(),
   split: EvalCaseSplitSchema.optional(),
   rationale: z.string().max(1000).optional(),
@@ -154,27 +148,9 @@ export const ProposeWrittenOutputsToolSchema = z.object({
 });
 
 /** Propose a case synthesized from a production run by changing its input or workspace. */
-export const ProposePerturbedCaseToolSchema = PerturbedEvalCaseSpecSchema.extend({
+export const ProposePerturbedCaseToolSchema = PerturbedEvalCaseSpecSchema.omit({ expectation: true }).extend({
   rationale: z.string().max(1000).optional(),
-}).refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' })
-  .refine((spec) => spec.perturbation.kind !== 'injected_instruction' || spec.perturbation.canary !== undefined, {
-    path: ['perturbation', 'canary'],
-    message: 'an injected_instruction case names the canary its injected text asks the agent to output',
-  });
-
-/**
- * Propose a built-in case suite: the platform writes its cases from one
- * production run by changing the value at `target` — three injected
- * instructions into a text field (`prompt_injection`), or rewrites that keep
- * its meaning (`robustness`) — each expecting the output the run gave.
- */
-export const ProposeCaseSuiteToolSchema = z.object({
-  suite: RedTeamSuiteSchema,
-  baseAgentRunId: z.string().min(1),
-  target: EvalCaseInputTargetSchema.describe('The value to change: part is triggerPayload, previousStepOutputs or previousRun; path walks keys below it, e.g. {"part":"triggerPayload","path":["narrative"]}. prompt_injection needs text; robustness text or an object.'),
-  split: EvalCaseSplitSchema.optional(),
-  rationale: z.string().max(1000).optional(),
-});
+}).refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' });
 
 /**
  * Propose the step's Acceptance Criteria (D10): per severity, the minimum pass
@@ -215,11 +191,11 @@ export const FailureRootCauseSchema = z.enum([
 
 /**
  * What would fix a root cause. `instruction`, `examples`, `model` and `tools`
- * are variant patches (`propose_fix`); a `guardrail` is a production Evaluator
- * (`propose_evaluator` with `runInProduction`), `control_mode` a routing change
- * (`propose_control_settings`), `evaluator` a new version of a wrong Evaluator
- * (`propose_evaluator_version`), and a `preprocessing_step` a change to the
- * workflow made in the workflow editor.
+ * are changes to the step the person makes; a `guardrail` is a production
+ * Evaluator (`propose_evaluator` with `runInProduction`), `control_mode` a
+ * routing change (`propose_control_settings`), `evaluator` a new version of a
+ * wrong Evaluator (`propose_evaluator_version`), and a `preprocessing_step` a
+ * change to the workflow made in the workflow editor.
  */
 export const FixKindSchema = z.enum([
   'instruction',
@@ -250,50 +226,18 @@ export const ProposeDiagnosisToolSchema = z.object({
   })).min(1).max(8),
 });
 
-/** The fix kinds a variant patch expresses, and the patch fields each may set. */
-export const VARIANT_FIX_PATCH_FIELDS = {
-  instruction: ['prompt', 'skillCommit'],
-  examples: ['examples'],
-  model: ['model'],
-  tools: ['allowedTools', 'mcpRestrictions'],
-} as const satisfies Record<string, ReadonlyArray<keyof StepVariantPatch>>;
-
-export const VariantFixKindSchema = FixKindSchema.extract(['instruction', 'examples', 'model', 'tools']);
-
-/**
- * A fix the step's variant patch can express, to try as a challenger on the
- * failing cases, dev and holdout before it is applied to the step.
- */
-export const ProposeFixToolSchema = z.object({
-  evalRunId: z.uuid(),
-  kind: VariantFixKindSchema,
-  label: z.string().min(1).max(120),
-  patch: StepVariantPatchSchema,
-  /** The cluster or root cause of the diagnosis this addresses. */
-  addresses: z.string().min(1).max(500),
-  rationale: z.string().min(1).max(2000),
-}).refine((value) => {
-  const allowed: ReadonlyArray<string> = VARIANT_FIX_PATCH_FIELDS[value.kind];
-  const set = Object.entries(value.patch).filter(([, entry]) => entry !== undefined).map(([field]) => field);
-  return set.length > 0 && set.every((field) => allowed.includes(field));
-}, {
-  message: 'a fix patches only its kind\'s fields, and at least one: instruction → prompt or skillCommit; examples → examples; model → model; tools → allowedTools or mcpRestrictions',
-});
-
 export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
   propose_evaluation_plan: ProposeEvaluationPlanToolSchema,
   propose_evaluator: ProposeEvaluatorToolSchema,
   propose_evaluator_version: ProposeEvaluatorVersionToolSchema,
   propose_eval_case: ProposeEvalCaseToolSchema,
   propose_perturbed_case: ProposePerturbedCaseToolSchema,
-  propose_case_suite: ProposeCaseSuiteToolSchema,
   propose_outputs_to_label: ProposeOutputsToLabelToolSchema,
   propose_written_outputs: ProposeWrittenOutputsToolSchema,
   propose_brief: ProposeBriefToolSchema,
   propose_acceptance_criteria: ProposeAcceptanceCriteriaToolSchema,
   propose_control_settings: ProposeControlSettingsToolSchema,
   propose_diagnosis: ProposeDiagnosisToolSchema,
-  propose_fix: ProposeFixToolSchema,
 } as const;
 
 const NoArguments = z.object({});
@@ -343,21 +287,13 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
     agentRunIds: z.array(z.string().min(1)).min(1).max(10).optional(),
   }),
   /**
-   * Prepare an Eval Run over the newest Dataset version — the step as it is,
-   * and up to three challengers patched over it — which the person confirms
-   * the cost of to start it.
+   * Prepare an Eval Run of the step as it is over the newest Dataset version,
+   * which the person confirms the cost of to start it.
    */
   prepare_eval_run: z.object({
     trialsPerCase: z.number().int().min(1).max(10).optional(),
     budgetUsd: z.number().positive().max(10_000).optional(),
-    challengers: z.array(z.object({
-      label: z.string().min(1).max(120),
-      patch: StepVariantPatchSchema,
-    })).max(3).optional()
-      .describe('Variants to run beside the step as it is. A patch sets model, prompt, skillCommit or allowedTools, or narrows mcpRestrictions — e.g. {"label":"GPT-5","patch":{"model":"openai/gpt-5"}}.'),
   }),
-  /** Each challenger of an Eval Run against the champion, Evaluator by Evaluator, with criteria, cost and routing per variant. */
-  compare_variants: z.object({ evalRunId: z.string().min(1) }),
   /**
    * The step's qualification: Qualified, Stale (and what changed) or Not
    * qualified, the qualification's criteria and deviations, Evaluators changed
@@ -369,27 +305,6 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
    * budget for this request and the run's budget fits what is left of it.
    */
   start_eval_run: z.object({ evalRunId: z.string().min(1) }),
-  /** The step's GEPA optimisations, newest first. */
-  list_optimisations: NoArguments,
-  /** One GEPA optimisation: its status and spend, the step as it is, and its candidate prompts ranked by dev pass rate with their holdout results. */
-  get_optimisation: z.object({ optimisationId: z.uuid() }),
-  /**
-   * Start a GEPA optimisation of the step's prompt from a finished Eval Run:
-   * a job reflects on one variant's dev-case trials and proposes prompts, which
-   * then run as challengers over dev and holdout. Refused unless the person
-   * granted an unattended budget for this request and budgetUsd fits what is
-   * left of it.
-   */
-  start_optimisation: z.object({
-    evalRunId: z.uuid(),
-    variantId: z.string().min(1).optional().describe('The variant whose dev-case trials GEPA reflects on; defaults to the champion.'),
-    budgetUsd: z.number().positive().max(10_000)
-      .describe('What the job and the candidates\' Eval Run may spend together; counted against the unattended budget.'),
-    candidates: z.number().int().min(1).max(3).optional().describe('Prompts to propose (default 3).'),
-    trialsPerCase: z.number().int().min(1).max(10).optional().describe('Trials per case in the candidates\' Eval Run (default 1).'),
-    reflectionModel: z.string().min(1).optional()
-      .describe('The model the job reflects with; the assistant\'s default model when absent. It must have a registry price.'),
-  }),
 } as const;
 
 export type EvaluationAssistantProposalToolName = keyof typeof EVALUATION_ASSISTANT_PROPOSAL_TOOLS;
@@ -402,14 +317,12 @@ export const EvaluationAssistantProposalSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('propose_evaluator_version'), arguments: ProposeEvaluatorVersionToolSchema }),
   z.object({ tool: z.literal('propose_eval_case'), arguments: ProposeEvalCaseToolSchema }),
   z.object({ tool: z.literal('propose_perturbed_case'), arguments: ProposePerturbedCaseToolSchema }),
-  z.object({ tool: z.literal('propose_case_suite'), arguments: ProposeCaseSuiteToolSchema }),
   z.object({ tool: z.literal('propose_outputs_to_label'), arguments: ProposeOutputsToLabelToolSchema }),
   z.object({ tool: z.literal('propose_written_outputs'), arguments: ProposeWrittenOutputsToolSchema }),
   z.object({ tool: z.literal('propose_brief'), arguments: ProposeBriefToolSchema }),
   z.object({ tool: z.literal('propose_acceptance_criteria'), arguments: ProposeAcceptanceCriteriaToolSchema }),
   z.object({ tool: z.literal('propose_control_settings'), arguments: ProposeControlSettingsToolSchema }),
   z.object({ tool: z.literal('propose_diagnosis'), arguments: ProposeDiagnosisToolSchema }),
-  z.object({ tool: z.literal('propose_fix'), arguments: ProposeFixToolSchema }),
 ]);
 
 export type EvaluationAssistantProposal = z.infer<typeof EvaluationAssistantProposalSchema>;

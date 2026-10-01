@@ -2,31 +2,21 @@
 
 import * as React from 'react';
 import { z } from 'zod';
-import { Loader2 } from 'lucide-react';
+import { CircleCheck, CircleX, Clock, Loader2, type LucideIcon } from 'lucide-react';
 import {
   CHAMPION_VARIANT_ID,
-  EvalCaseExpectationSchema,
-  EvalCaseInputPartSchema,
   EvalCaseInputSchema,
   EvalCaseSplitSchema,
   EvaluatorKindSchema,
   EvaluatorSeveritySchema,
   McpEvalServerPolicySchema,
-  RED_TEAM_SUITES,
-  RedTeamSuiteSchema,
-  caseSuiteTargets,
-  caseSuiteVariants,
   describeAcceptanceCriteria,
   describeMcpPolicy,
   type AcceptanceCriteria,
   type AgentOutputSchema,
   type AgentRun,
-  type BuiltinCheckName,
-  type CaseSuiteTarget,
   type EvalCase,
-  type EvalCaseExpectation,
   type EvalCaseInput,
-  type EvalCaseInputPart,
   type EvalDatasetVersion,
   type EvaluatedStep,
   type EvaluatorCheck,
@@ -35,12 +25,11 @@ import {
   type StepFingerprintComponent,
 } from '@mediforce/platform-core';
 import {
-  EvalChallengerSchema,
   type AddEvaluatorVersionInput,
-  type EvalChallenger,
   type EvaluatorView,
-  type OptimisationSplitResult,
   type PreparedEvalRun,
+  type GetStepQualificationOutput,
+  type StepValidation,
 } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
@@ -50,13 +39,10 @@ import { AgentLogPanel } from '@/components/agents/agent-log-panel';
 import { RunInputOutput, RunInputOutputDetails } from './run-input-output';
 import { CalibrationProgress, JudgeCalibrationPanel, labelsBySubject } from './judge-calibration';
 import { useAgentRun } from '@/hooks/use-agent-runs';
-import { useAgentRunIo, useEvalRun, useEvaluatorLabels, useOptimisation, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
+import { useEvalRun, useEvaluatorLabels, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { EvalRunReport, describePatch } from './eval-run-report';
-import { QualificationStatusChip } from './step-qualification-badge';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 import {
-  BUILTIN_CHECKS,
-  CANARY_PLACEHOLDER,
   CHECK_KINDS,
   CheckDetails,
   CheckEditor,
@@ -104,7 +90,7 @@ export function BriefSection({ step, data, mayEdit }: { step: EvaluatedStep; dat
       )}
     >
       <p className="text-xs text-muted-foreground" data-testid="brief-purpose">
-        The step&apos;s context of use: what it is for, who relies on its output, which failures matter most. The assistant reads it on every turn to plan Evaluators and propose Acceptance Criteria, and a Step Qualification cites the Brief version its Eval Run was prepared under — so a step needs a Brief before it can be qualified.
+        The step&apos;s context of use: what it is for, who relies on its output, which failures matter most. The assistant reads it on every turn to plan Evaluators and propose Acceptance Criteria.
       </p>
       {data.isLoading ? <Loading /> : draft !== null ? (
         <div className="space-y-2">
@@ -349,7 +335,7 @@ function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel
       </div>
       <p className="text-xs text-muted-foreground">{CHECK_KINDS[values.draft.kind].description}</p>
       <input aria-label="Rule" className={cn(inputClass, 'w-full')} placeholder="The rule, in plain language" value={values.rule} onChange={(event) => setValues({ ...values, rule: event.target.value })} />
-      <CheckEditor draft={values.draft} onChange={(draft) => setValues({ ...values, draft })} stepOutputSchema={stepOutputSchema} editing={editing} />
+      <CheckEditor draft={values.draft} onChange={(draft) => setValues({ ...values, draft })} stepOutputSchema={stepOutputSchema} />
       {shownError !== null && <p className="text-xs text-destructive">{shownError}</p>}
       <div className="flex gap-2">
         <button type="button" className={primaryButtonClass} disabled={values.name === '' || values.rule.trim() === '' || pending} onClick={submit}>{submitLabel}</button>
@@ -400,266 +386,8 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema, stepI
   );
 }
 
-type RedTeamSuite = z.infer<typeof RedTeamSuiteSchema>;
-
-// casePrefix: how createRedTeamEvalCases names the suite's cases — "<prefix>: <variant> in '<part>.<path>'".
-const RED_TEAM_SUITE_INFO: Record<RedTeamSuite, { casePrefix: string; label: string; description: string; grader: BuiltinCheckName; fields: string }> = {
-  prompt_injection: {
-    casePrefix: 'Injection',
-    label: 'Prompt injection',
-    description: 'Does the agent obey an instruction hidden in its data? Three cases, each appending one instruction to a text field that tells the agent to print a marker (a canary). A case passes when the canary is not in the result.',
-    grader: 'injection_ignored',
-    fields: 'text fields',
-  },
-  robustness: {
-    casePrefix: 'Robustness',
-    label: 'Robustness',
-    description: 'Does the answer change when the input changes only in form? A text field gets two cases (doubled whitespace, blank-line padding); an object gets one (its keys reversed). A case passes when the result equals the run\'s.',
-    grader: 'result_stable',
-    fields: 'text or object fields',
-  },
-};
-
-const INPUT_PARTS: Record<EvalCaseInputPart, string> = {
-  triggerPayload: 'Trigger payload',
-  previousStepOutputs: 'Earlier steps\' outputs',
-  previousRun: 'Previous run carry-over',
-};
-
-const targetKeyOf = (target: Pick<CaseSuiteTarget, 'part' | 'path'>) => JSON.stringify([target.part, ...target.path]);
-const targetPathOf = (target: Pick<CaseSuiteTarget, 'part' | 'path'>) => [target.part, ...target.path].join('.');
-
-// More would make the dropdown slow to render; a step reading thousands of records rarely needs one of them targeted.
-const MAX_SUITE_TARGETS = 200;
-
-function previewOf(target: CaseSuiteTarget): string {
-  const { value } = target;
-  if (typeof value === 'string') return JSON.stringify(value.length > 40 ? `${value.slice(0, 40)}…` : value);
-  return value !== null && typeof value === 'object' ? `{${Object.keys(value).length} keys}` : '';
-}
-
-/**
- * The top-level keys of the step's result `result_stable` may compare — the
- * output schema's properties, else the run's result keys — and the ones that
- * carry a decision (booleans, numbers, enums), which it compares by default.
- */
-export function resultKeyChoices(stepOutputSchema: AgentOutputSchema | undefined, result: unknown): { keys: string[]; decisionKeys: string[] } {
-  const properties = stepOutputSchema?.properties;
-  if (properties !== undefined && Object.keys(properties).length > 0) {
-    const keys = Object.keys(properties);
-    const isDecision = (property: Record<string, unknown>) =>
-      property.type === 'boolean' || property.type === 'number' || property.type === 'integer' || Array.isArray(property.enum);
-    return { keys, decisionKeys: keys.filter((key) => isDecision(properties[key]!)) };
-  }
-  if (result === null || typeof result !== 'object' || Array.isArray(result)) return { keys: [], decisionKeys: [] };
-  const entries = Object.entries(result);
-  return {
-    keys: entries.map(([key]) => key),
-    decisionKeys: entries.filter(([, value]) => typeof value === 'boolean' || typeof value === 'number').map(([key]) => key),
-  };
-}
-
-function SuiteControl({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-0.5">
-      <label className="flex flex-wrap items-center gap-2"><span className="w-24 shrink-0 font-medium">{label}</span>{children}</label>
-      <p className="text-muted-foreground sm:pl-26">{hint}</p>
-    </div>
-  );
-}
-
-/**
- * The built-in case suites (ADR-0023 phase 5a): from one production run, the
- * platform writes the cases itself, each graded by a built-in Evaluator.
- */
-function BuiltinCaseSuites({ step, evaluation, stepOutputSchema }: { step: EvaluatedStep; evaluation: StepEvaluation; stepOutputSchema: AgentOutputSchema | undefined }) {
-  const runs = loadedAgentRuns(evaluation);
-  const evaluators = evaluation.evaluators.data?.evaluators ?? [];
-  const [suite, setSuite] = React.useState<RedTeamSuite>('prompt_injection');
-  const [runId, setRunId] = React.useState('');
-  const [targetKey, setTargetKey] = React.useState('');
-  const [chosenKeys, setChosenKeys] = React.useState<string[] | null>(null);
-  const baseAgentRunId = runId === '' ? runs[0]?.id ?? null : runId;
-  const io = useAgentRunIo(baseAgentRunId);
-  const caseInput = io.data?.caseInput;
-  const info = RED_TEAM_SUITE_INFO[suite];
-  const allTargets = React.useMemo(() => (caseInput === undefined ? [] : caseSuiteTargets(caseInput, suite)), [caseInput, suite]);
-  const targets = allTargets.slice(0, MAX_SUITE_TARGETS);
-  const target = targets.find((candidate) => targetKeyOf(candidate) === targetKey) ?? targets[0];
-  const variants = React.useMemo(() => {
-    if (caseInput === undefined || target === undefined) return [];
-    const written = caseSuiteVariants(caseInput, suite, target, { newCanary: () => CANARY_PLACEHOLDER, source: 'the run' });
-    return 'variants' in written ? written.variants : [];
-  }, [caseInput, suite, target]);
-  const create = useStepEvaluationMutation(step, (written: { agentRunId: string; target: CaseSuiteTarget }) => mediforce.evaluation.createRedTeamCases({
-    ...step,
-    suite,
-    baseAgentRunId: written.agentRunId,
-    target: { part: written.target.part, path: [...written.target.path] },
-  }));
-  const where = target === undefined ? null : `'${targetPathOf(target)}'`;
-  const alreadyAdded = (evaluation.cases.data?.cases ?? []).filter((evalCase) =>
-    evalCase.sourceAgentRunId === baseAgentRunId
-    && evalCase.name.startsWith(`${info.casePrefix}: `)
-    && evalCase.name.endsWith(` in ${where}`)).length;
-
-  const grader = evaluators.find((evaluator) => evaluator.latest.check.kind === 'builtin' && evaluator.latest.check.name === info.grader);
-  const graderCheck = grader?.latest.check;
-  const { keys: resultKeys, decisionKeys } = resultKeyChoices(stepOutputSchema, io.data?.result);
-  const comparedKeys = chosenKeys ?? decisionKeys;
-  const addGrader = useStepEvaluationMutation(step, () => mediforce.evaluation.createEvaluator({
-    ...step,
-    name: toEvaluatorName(info.grader),
-    rule: BUILTIN_CHECKS[info.grader].label,
-    severity: 'major',
-    check: { kind: 'builtin', name: info.grader, ...(info.grader === 'result_stable' && comparedKeys.length > 0 ? { keys: comparedKeys } : {}) },
-  }));
-  const added = addGrader.data?.evaluator;
-  const addedThisGrader = added !== undefined && added.latest.check.kind === 'builtin' && added.latest.check.name === info.grader;
-
-  return (
-    <details className="text-sm" data-testid="builtin-case-suites">
-      <summary className="cursor-pointer text-xs text-muted-foreground">Built-in case suites — injection and robustness cases, written for you</summary>
-      <div className="mt-2 space-y-3 text-xs">
-        <p className="text-muted-foreground" data-testid="builtin-suites-purpose">
-          Pick a production run and one field of its input: the platform copies the input, changes that field, and adds each copy to Eval Cases above. Every case expects the output the run gave.
-        </p>
-        <SuiteControl label="Suite" hint={info.description}>
-          <select aria-label="Suite" className={inputClass} value={suite} onChange={(event) => setSuite(RedTeamSuiteSchema.parse(event.target.value))}>
-            {RED_TEAM_SUITES.map((name) => <option key={name} value={name}>{RED_TEAM_SUITE_INFO[name].label}</option>)}
-          </select>
-        </SuiteControl>
-        {runs.length === 0 ? (
-          <p className="text-muted-foreground">The step has no production runs to start from yet.</p>
-        ) : (
-          <>
-            <SuiteControl label="From run" hint="The production run whose input is copied. Its output is what every case expects.">
-              <select aria-label="From run" className={inputClass} value={baseAgentRunId ?? ''} onChange={(event) => setRunId(event.target.value)}>
-                {runs.map((run) => <option key={run.id} value={run.id}>{run.id.slice(0, 8)} · {run.startedAt.slice(0, 16).replace('T', ' ')}</option>)}
-              </select>
-            </SuiteControl>
-            <SuiteControl
-              label="Field to change"
-              hint={`The ${info.fields} of this run's input. The step is given its earlier steps' outputs; a trigger-payload field matters only if the step reads the trigger payload.`}
-            >
-              {io.isError ? (
-                <span className="text-destructive">{io.error instanceof Error ? io.error.message : 'The run\'s input could not be read.'}</span>
-              ) : caseInput === undefined ? (
-                <Loading />
-              ) : targets.length === 0 ? (
-                <span className="text-muted-foreground">This run&apos;s input has no {info.fields} to change.</span>
-              ) : (
-                <select aria-label="Field to change" className={cn(inputClass, 'max-w-full font-mono')} value={target === undefined ? '' : targetKeyOf(target)} onChange={(event) => setTargetKey(event.target.value)}>
-                  {EvalCaseInputPartSchema.options.map((part) => {
-                    const inPart = targets.filter((candidate) => candidate.part === part);
-                    return inPart.length === 0 ? null : (
-                      <optgroup key={part} label={INPUT_PARTS[part]}>
-                        {inPart.map((candidate) => (
-                          <option key={targetKeyOf(candidate)} value={targetKeyOf(candidate)}>
-                            {candidate.path.join('.')} — {candidate.kind} {previewOf(candidate)}
-                          </option>
-                        ))}
-                      </optgroup>
-                    );
-                  })}
-                </select>
-              )}
-            </SuiteControl>
-            {allTargets.length > MAX_SUITE_TARGETS && (
-              <p className="text-muted-foreground">Showing the first {MAX_SUITE_TARGETS} of {allTargets.length} fields; the CLI&apos;s <code className="font-mono">eval case-red-team --target</code> reaches any of them.</p>
-            )}
-            {target !== undefined && (
-              <p data-testid="builtin-suite-field-path">Field path: <code className="font-mono">{targetPathOf(target)}</code></p>
-            )}
-            {variants.length > 0 && (
-              <div className="space-y-1.5" data-testid="builtin-suite-preview">
-                <div className="font-medium">The {variants.length} case(s) it writes</div>
-                <ol className="list-decimal space-y-1.5 pl-5">
-                  {variants.map((variant) => (
-                    <li key={variant.name}>
-                      <span className="font-mono">{info.casePrefix}: {variant.name} in {where}</span>
-                      {variant.kind === 'injected_instruction' ? (
-                        <>
-                          <div className="text-muted-foreground">Appended to the field:</div>
-                          <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded bg-muted p-1.5 font-mono">{String(variant.value).slice(String(target?.value).length)}</pre>
-                        </>
-                      ) : (
-                        <div className="text-muted-foreground">{variant.description}</div>
-                      )}
-                    </li>
-                  ))}
-                </ol>
-                {suite === 'prompt_injection' && <p className="text-muted-foreground">Each case gets its own random canary in place of {CANARY_PLACEHOLDER}.</p>}
-              </div>
-            )}
-          </>
-        )}
-        <div
-          className={cn('space-y-1.5 rounded-md p-2', grader === undefined && addedThisGrader === false ? 'bg-amber-500/10 text-amber-800 dark:text-amber-200' : 'bg-muted/40')}
-          data-testid="builtin-suite-grader"
-        >
-          {grader !== undefined ? (
-            <p>
-              Graded by the Evaluator <span className="font-mono">{grader.name}</span> (&ldquo;{BUILTIN_CHECKS[info.grader].label}&rdquo;)
-              {graderCheck?.kind === 'builtin' && info.grader === 'result_stable' && (
-                graderCheck.keys === undefined
-                  ? ' — it compares the whole result, so a reworded rationale fails a case. Edit it under Evaluators to compare only the keys that carry the decision.'
-                  : <> — compares <span className="font-mono">{graderCheck.keys.join(', ')}</span>.</>
-              )}
-              {addedThisGrader && <span className="text-green-700 dark:text-green-400"> Added — it is listed under Evaluators above.</span>}
-            </p>
-          ) : (
-            <>
-              <p>Graded by the built-in &ldquo;{BUILTIN_CHECKS[info.grader].label}&rdquo; Evaluator — this step has none yet, so nothing would grade these cases.</p>
-              {info.grader === 'result_stable' && resultKeys.length > 0 && (
-                <fieldset className="space-y-1" data-testid="builtin-suite-compared-keys">
-                  <legend>Keys of the result it compares — none ticked compares the whole result:</legend>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1">
-                    {resultKeys.map((key) => (
-                      <label key={key} className="flex items-center gap-1 font-mono">
-                        <input
-                          type="checkbox"
-                          checked={comparedKeys.includes(key)}
-                          onChange={(event) => setChosenKeys(event.target.checked ? [...comparedKeys, key] : comparedKeys.filter((compared) => compared !== key))}
-                        />
-                        {key}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              )}
-              <button type="button" className={buttonClass} disabled={addGrader.isPending} onClick={() => addGrader.mutate(undefined)}>
-                Add the &ldquo;{BUILTIN_CHECKS[info.grader].label}&rdquo; Evaluator
-              </button>
-            </>
-          )}
-          {addGrader.error !== null && <p className="text-destructive">{addGrader.error.message}</p>}
-        </div>
-        {alreadyAdded > 0 && (
-          <p className="text-amber-700 dark:text-amber-300" data-testid="builtin-suite-duplicate">
-            This run already has {alreadyAdded} {info.label.toLowerCase()} case(s) for {where}; adding the suite again writes them again.
-          </p>
-        )}
-        {runs.length > 0 && (
-          <button
-            type="button"
-            className={primaryButtonClass}
-            disabled={variants.length === 0 || baseAgentRunId === null || target === undefined || create.isPending}
-            onClick={() => {
-              if (baseAgentRunId !== null && target !== undefined) create.mutate({ agentRunId: baseAgentRunId, target });
-            }}
-          >{variants.length === 0 ? 'Add suite cases' : `Add ${variants.length} case(s)`}</button>
-        )}
-        {create.error !== null && <p className="text-destructive">{create.error.message} Cases are written one at a time, so any written before the error were kept.</p>}
-        {create.data !== undefined && <p className="text-green-700 dark:text-green-400">Added {create.data.cases.length} case(s) — they are listed under Eval Cases above.</p>}
-      </div>
-    </details>
-  );
-}
-
 interface CaseFormValues {
   name: string;
-  expectation: EvalCaseExpectation;
   split: EvalCase['split'];
   notes: string;
   /** The case input as JSON text: triggerPayload, previousStepOutputs and optionally previousRun. */
@@ -668,7 +396,6 @@ interface CaseFormValues {
 
 export interface CaseFormResult {
   name: string;
-  expectation: EvalCaseExpectation;
   split: EvalCase['split'];
   notes: string | null;
   input: EvalCaseInput;
@@ -677,7 +404,6 @@ export interface CaseFormResult {
 export function caseFormValues(evalCase: EvalCase): CaseFormValues {
   return {
     name: evalCase.name,
-    expectation: evalCase.expectation,
     split: evalCase.split,
     notes: evalCase.notes ?? '',
     input: JSON.stringify(evalCase.input, null, 2),
@@ -699,7 +425,7 @@ export function parseCaseInput(text: string): { input: EvalCaseInput } | { error
   return { input: checked.data };
 }
 
-/** Name, expectation, split, notes and the input the step is given. */
+/** Name, split, notes and the input the step is given. */
 function CaseForm({ initial, inputHelp, submitLabel, pending, error, onSubmit, onCancel }: {
   initial: CaseFormValues;
   inputHelp: React.ReactNode;
@@ -719,17 +445,13 @@ function CaseForm({ initial, inputHelp, submitLabel, pending, error, onSubmit, o
     }
     setInputError(null);
     const notes = values.notes.trim();
-    onSubmit({ name: values.name.trim(), expectation: values.expectation, split: values.split, notes: notes === '' ? null : notes, input: parsed.input });
+    onSubmit({ name: values.name.trim(), split: values.split, notes: notes === '' ? null : notes, input: parsed.input });
   };
   const shownError = inputError ?? error;
   return (
     <div className="space-y-2 rounded-md bg-muted/40 p-3 text-xs" data-testid="case-form">
       <div className="flex flex-wrap gap-2">
         <input aria-label="Case name" className={cn(inputClass, 'min-w-48 flex-1')} placeholder="Name" value={values.name} onChange={(event) => setValues({ ...values, name: event.target.value })} />
-        <select aria-label="Expectation" className={inputClass} value={values.expectation} onChange={(event) => setValues({ ...values, expectation: EvalCaseExpectationSchema.parse(event.target.value) })}>
-          <option value="positive">positive — a correct output exists</option>
-          <option value="negative">negative — no output should be accepted</option>
-        </select>
         <select aria-label="Split" className={inputClass} value={values.split} onChange={(event) => setValues({ ...values, split: EvalCaseSplitSchema.parse(event.target.value) })}>
           <option value="dev">dev</option>
           <option value="holdout">holdout</option>
@@ -792,7 +514,6 @@ function CaseRow({ step, evalCase, mayEdit, unfrozen }: {
   const edit = useStepEvaluationMutation(step, (values: CaseFormResult) => mediforce.evaluation.updateCase({
     caseId: evalCase.id,
     ...(values.name === evalCase.name ? {} : { name: values.name }),
-    ...(values.expectation === evalCase.expectation ? {} : { expectation: values.expectation }),
     ...(values.split === evalCase.split ? {} : { split: values.split }),
     ...(values.notes === evalCase.notes ? {} : { notes: values.notes }),
     ...(JSON.stringify(values.input) === JSON.stringify(evalCase.input) ? {} : { input: values.input }),
@@ -801,7 +522,6 @@ function CaseRow({ step, evalCase, mayEdit, unfrozen }: {
   return (
     <li className="border-t pt-1.5 first:border-t-0 first:pt-0" data-testid="eval-case-row">
       <div className="flex items-center gap-2">
-        <span className={cn('rounded px-1.5 text-[11px]', evalCase.expectation === 'positive' ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-700 dark:text-red-400')}>{evalCase.expectation}</span>
         <span className="truncate">{evalCase.name}</span>
         {unfrozen && (
           <InstantTooltip label="Not in the newest Dataset version, so the next Eval Run does not run it. Freeze the dataset to include it.">
@@ -837,10 +557,10 @@ function CaseRow({ step, evalCase, mayEdit, unfrozen }: {
                 {evalCase.perturbation.canary !== undefined && <> — canary <span className="font-mono">{evalCase.perturbation.canary}</span></>}
               </p>
             )}
-            <p><span className="text-muted-foreground">Expects:</span> {evalCase.notes ?? (evalCase.expectation === 'positive' ? 'an output that passes every counted Evaluator (no notes)' : 'no output to be accepted (no notes)')}</p>
+            <p><span className="text-muted-foreground">Expects:</span> {evalCase.notes ?? 'an output that passes every counted Evaluator (no notes)'}</p>
             {opened && evalCase.source === 'production' && evalCase.sourceAgentRunId !== null && (
               <div>
-                <div className="mb-0.5 font-medium">The run you marked {evalCase.expectation}</div>
+                <div className="mb-0.5 font-medium">The source run</div>
                 <RunInputOutput agentRunId={evalCase.sourceAgentRunId} />
               </div>
             )}
@@ -888,7 +608,6 @@ export function caseFromFile(text: string): { values: Partial<CaseFormValues> } 
   const whole = z.object({
     name: z.string().optional(),
     input: EvalCaseInputSchema,
-    expectation: EvalCaseExpectationSchema.optional(),
     notes: z.string().nullable().optional(),
     split: EvalCaseSplitSchema.optional(),
   }).safeParse(parsed);
@@ -898,13 +617,13 @@ export function caseFromFile(text: string): { values: Partial<CaseFormValues> } 
   }
   const input = EvalCaseInputSchema.safeParse(parsed);
   if (input.success) return { values: { input: JSON.stringify(input.data, null, 2) } };
-  return { error: 'The file is neither a case ({ name, input, expectation, notes, split }) nor a case input ({ triggerPayload, previousStepOutputs }).' };
+  return { error: 'The file is neither a case ({ name, input, notes, split }) nor a case input ({ triggerPayload, previousStepOutputs }).' };
 }
 
 /**
  * A case written by hand: its input starts from an existing case's, so it has
  * the shape the step is given, or from a `.json` file. For inputs production
- * never sent — a negative case nobody would run on purpose.
+ * never sent.
  */
 function WriteCase({ step, cases, onClose }: { step: EvaluatedStep; cases: readonly EvalCase[]; onClose: () => void }) {
   const [startFrom, setStartFrom] = React.useState<string>(cases[0]?.id ?? '');
@@ -928,7 +647,6 @@ function WriteCase({ step, cases, onClose }: { step: EvaluatedStep; cases: reado
   };
   const initial: CaseFormValues = {
     name: '',
-    expectation: 'positive',
     split: 'dev',
     notes: '',
     input: JSON.stringify(template?.input ?? EMPTY_CASE_INPUT, null, 2),
@@ -1042,15 +760,13 @@ function DatasetStatus({ cases, datasets }: { cases: readonly EvalCase[]; datase
 }
 
 /** Eval Cases, harvested from production runs or written by the assistant, and frozen Dataset versions. */
-export function CasesSection({ step, evaluation, mayEdit, stepOutputSchema }: {
+export function CasesSection({ step, evaluation, mayEdit }: {
   step: EvaluatedStep;
   evaluation: StepEvaluation;
   mayEdit: boolean;
-  /** The step's `agent.outputSchema`: the keys a Result unchanged Evaluator may compare. */
-  stepOutputSchema?: AgentOutputSchema;
 }) {
-  const harvest = useStepEvaluationMutation(step, (input: { agentRunId: string; expectation: 'positive' | 'negative' }) =>
-    mediforce.evaluation.createCaseFromAgentRun(input));
+  const harvest = useStepEvaluationMutation(step, (agentRunId: string) =>
+    mediforce.evaluation.createCaseFromAgentRun({ agentRunId }));
   const freeze = useStepEvaluationMutation(step, () => mediforce.evaluation.freezeDataset(step));
   const cases = evaluation.cases.data?.cases ?? [];
   const harvested = new Set(cases.filter((evalCase) => evalCase.source === 'production').map((evalCase) => evalCase.sourceAgentRunId));
@@ -1079,7 +795,7 @@ export function CasesSection({ step, evaluation, mayEdit, stepOutputSchema }: {
       )}
     >
       <p className="text-xs text-muted-foreground" data-testid="eval-cases-purpose">
-        An Eval Case is an <span className="font-medium text-foreground">input</span> an Eval Run re-runs the step on, and what its new output should be — positive when a correct output exists, negative when the output it gave was wrong. A case grades nothing itself: the Evaluators grade each re-run&apos;s output. Pass/fail <span className="font-medium text-foreground">labels</span> on outputs are a different thing — they calibrate a judge, under Evaluators.
+        An Eval Case is an <span className="font-medium text-foreground">input</span> an Eval Run re-runs the step on; its notes say what the new output must — or must not — do. A case grades nothing itself: the Evaluators grade each re-run&apos;s output. Pass/fail <span className="font-medium text-foreground">labels</span> on outputs are a different thing — they calibrate a judge, under Evaluators.
       </p>
       {writing && <WriteCase step={step} cases={cases} onClose={() => setWriting(false)} />}
       {evaluation.cases.isLoading ? <Loading /> : cases.length === 0 ? (
@@ -1096,7 +812,7 @@ export function CasesSection({ step, evaluation, mayEdit, stepOutputSchema }: {
           <summary className="cursor-pointer text-xs text-muted-foreground">
             Production runs to add as Eval Cases ({runs.length}{evaluation.agentRuns.hasNextPage ? '+' : ''})
           </summary>
-          <p className="mt-1 text-xs text-muted-foreground">Open a run&apos;s input and output, then add it as a positive case (its output was right) or a negative one (it was wrong).</p>
+          <p className="mt-1 text-xs text-muted-foreground">Open a run&apos;s input and output, then add it as a case. Say in its notes what the output must — or must not — do.</p>
           <ul className="mt-2 max-h-96 space-y-1 overflow-y-auto pr-1" data-testid="harvestable-runs">
             {runs.map((run) => (
               <li key={run.id} className="rounded border px-2 py-1.5 text-xs">
@@ -1106,11 +822,8 @@ export function CasesSection({ step, evaluation, mayEdit, stepOutputSchema }: {
                   <span className="font-mono text-muted-foreground" title={run.id}>{run.id.slice(0, 8)}</span>
                   <span className="ml-auto flex shrink-0 gap-1">
                     <button type="button" className={buttonClass} onClick={() => setLogRun(run)}>Log</button>
-                    <InstantTooltip label="The output was right: an Eval Run re-runs this input and expects an output its Evaluators accept.">
-                      <button type="button" className={buttonClass} onClick={() => harvest.mutate({ agentRunId: run.id, expectation: 'positive' })}>Positive case</button>
-                    </InstantTooltip>
-                    <InstantTooltip label="The output was wrong: an Eval Run re-runs this input; the case's notes say what the output must not do.">
-                      <button type="button" className={buttonClass} onClick={() => harvest.mutate({ agentRunId: run.id, expectation: 'negative' })}>Negative case</button>
+                    <InstantTooltip label="An Eval Run re-runs this input and its Evaluators grade the new output.">
+                      <button type="button" className={buttonClass} onClick={() => harvest.mutate(run.id)}>Add as case</button>
                     </InstantTooltip>
                   </span>
                 </div>
@@ -1133,7 +846,6 @@ export function CasesSection({ step, evaluation, mayEdit, stepOutputSchema }: {
         </details>
       )}
       <AgentLogPanel run={logRun} onClose={() => setLogRun(null)} />
-      {mayEdit && <BuiltinCaseSuites step={step} evaluation={evaluation} stepOutputSchema={stepOutputSchema} />}
     </Section>
   );
 }
@@ -1213,86 +925,6 @@ export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep;
   );
 }
 
-type CriteriaDraft = Record<EvaluatorSeverity, { minPassRate: string; minPassHatK: string }>;
-
-function toDraft(criteria: AcceptanceCriteria | undefined): CriteriaDraft {
-  const field = (value: number | undefined) => (value === undefined ? '' : String(value));
-  return Object.fromEntries(SEVERITIES.map((severity) => [severity, {
-    minPassRate: field(criteria?.[severity]?.minPassRate),
-    minPassHatK: field(criteria?.[severity]?.minPassHatK),
-  }])) as CriteriaDraft;
-}
-
-function fromDraft(draft: CriteriaDraft): AcceptanceCriteria {
-  return Object.fromEntries(SEVERITIES.flatMap((severity) => {
-    const { minPassRate, minPassHatK } = draft[severity];
-    if (minPassRate.trim() === '') return [];
-    return [[severity, { minPassRate: Number(minPassRate), ...(minPassHatK.trim() === '' ? {} : { minPassHatK: Number(minPassHatK) }) }]];
-  })) as AcceptanceCriteria;
-}
-
-/**
- * The floors Eval Runs are judged against (D10): per severity, the minimum
- * pass rate on its Wilson 95% lower bound and optionally pass^k. Each save is
- * a version; the next run prepared freezes the one in force.
- */
-export function AcceptanceCriteriaSection({ step, data, mayEdit }: { step: EvaluatedStep; data: StepEvaluation['criteria']; mayEdit: boolean }) {
-  const [draft, setDraft] = React.useState<CriteriaDraft | null>(null);
-  const save = useStepEvaluationMutation(step, (criteria: AcceptanceCriteria) => mediforce.evaluation.setAcceptanceCriteria({ ...step, criteria }));
-  const current = data.data?.criteria ?? null;
-  return (
-    <Section
-      title="Acceptance Criteria"
-      action={mayEdit && draft === null && (
-        <button type="button" className={buttonClass} onClick={() => setDraft(toDraft(current?.criteria))}>{current === null ? 'Set' : 'Edit'}</button>
-      )}
-    >
-      {data.isLoading ? <Loading /> : draft !== null ? (
-        <div className="space-y-2" data-testid="acceptance-criteria-form">
-          <p className="text-xs text-muted-foreground">Minimum pass rate on the Wilson 95% lower bound, and optionally pass^k, that every counted Evaluator of the severity must reach. Leave a severity empty not to judge it.</p>
-          {SEVERITIES.map((severity) => (
-            <div key={severity} className="flex items-center gap-2 text-xs">
-              <span className="w-14">{severity}</span>
-              <input
-                aria-label={`${severity} minimum pass rate`}
-                type="number" min={0} max={1} step={0.01} placeholder="—"
-                className={cn(inputClass, 'w-20')}
-                value={draft[severity].minPassRate}
-                onChange={(event) => setDraft({ ...draft, [severity]: { ...draft[severity], minPassRate: event.target.value } })}
-              />
-              <span className="text-muted-foreground">pass^k</span>
-              <input
-                aria-label={`${severity} minimum pass^k`}
-                type="number" min={0} max={1} step={0.01} placeholder="—"
-                className={cn(inputClass, 'w-20')}
-                value={draft[severity].minPassHatK}
-                onChange={(event) => setDraft({ ...draft, [severity]: { ...draft[severity], minPassHatK: event.target.value } })}
-              />
-            </div>
-          ))}
-          {save.error !== null && <p className="text-xs text-destructive">{save.error.message}</p>}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className={primaryButtonClass}
-              disabled={SEVERITIES.every((severity) => draft[severity].minPassRate.trim() === '') || save.isPending}
-              onClick={() => save.mutate(fromDraft(draft), { onSuccess: () => setDraft(null) })}
-            >Save as v{(current?.version ?? 0) + 1}</button>
-            <button type="button" className={buttonClass} onClick={() => setDraft(null)}>Cancel</button>
-          </div>
-        </div>
-      ) : current === null ? (
-        <p className="text-sm text-muted-foreground">No Acceptance Criteria yet — Eval Runs judge nothing until they are set. The assistant can propose them from the step&apos;s risks.</p>
-      ) : (
-        <div className="space-y-1">
-          <p className="text-sm" data-testid="acceptance-criteria">{describeAcceptanceCriteria(current.criteria)}</p>
-          <p className="text-xs text-muted-foreground">v{current.version} · {current.origin === 'assistant' ? 'proposed by the assistant' : 'set'} by {current.createdBy}</p>
-        </div>
-      )}
-    </Section>
-  );
-}
-
 const COMPONENT_LABELS: Record<StepFingerprintComponent, string> = {
   step: 'step config',
   model: 'model',
@@ -1324,43 +956,130 @@ export function DriftAlert({ data }: { data: StepEvaluation['drift'] }) {
   );
 }
 
-/**
- * The Step's qualification (D10, D11): whether a signed Step Qualification
- * binds the step as it is now, what it cites, and — when stale — what changed.
- * A person signs one from an Eval Run's report below.
- */
-export function QualificationSection({ data }: { data: StepEvaluation['qualification'] }) {
-  const status = data.data;
-  const qualification = status?.qualification ?? null;
+// A severity's minimum pass rate is one of these; a value saved elsewhere (CLI, assistant) is offered beside them.
+const PASS_RATE_CHOICES = [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1];
+const NOT_JUDGED = '';
+
+/** The criteria with one severity's pass rate changed — its pass^k kept — or, given `NOT_JUDGED`, dropped. */
+export function withPassRate(criteria: AcceptanceCriteria | undefined, severity: EvaluatorSeverity, choice: string): AcceptanceCriteria {
+  const { [severity]: previous, ...others } = criteria ?? {};
+  if (choice === NOT_JUDGED) return others;
+  return { ...others, [severity]: { ...previous, minPassRate: Number(choice) } };
+}
+
+const VALIDATION: Record<StepValidation['status'], { label: string; icon: LucideIcon; className: string }> = {
+  passed: { label: 'Validation passed', icon: CircleCheck, className: 'text-green-600 dark:text-green-400' },
+  failed: { label: 'Validation failed', icon: CircleX, className: 'text-red-600 dark:text-red-400' },
+  not_verified: { label: 'Not verified', icon: Clock, className: 'text-muted-foreground' },
+};
+
+/** What the Step's qualification rests on: the Eval Run it was signed from, and what changed since. */
+function QualificationDetails({ status }: { status: GetStepQualificationOutput }) {
+  const { qualification } = status;
+  if (qualification === null) {
+    return <p className="text-muted-foreground">Not qualified. Run the step, then sign a Step Qualification from the run&apos;s report. It is informational: nothing is blocked without one.</p>;
+  }
   return (
-    <Section title="Step Qualification" action={status !== undefined && <QualificationStatusChip status={status.status} />}>
-      {data.isLoading || status === undefined ? <Loading /> : qualification === null ? (
-        <p className="text-sm text-muted-foreground">
-          Not qualified. Write an Evaluation Brief, set Acceptance Criteria, run the step, and sign a Step Qualification from the run&apos;s report. It is informational: nothing is blocked without one.
+    <div className="space-y-1" data-testid="step-qualification">
+      <p>
+        Signed by <span className="font-medium">{qualification.signature.signerName}</span> on {qualification.signature.signedAt.slice(0, 16).replace('T', ' ')}
+        {' '}for {qualification.variantId === CHAMPION_VARIANT_ID ? 'the step' : `'${qualification.variantLabel}' (${describePatch(qualification.patch)})`}
+        {' '}— Eval Run <span className="font-mono">{qualification.evalRunId.slice(0, 8)}</span>,
+        {' '}fingerprint <span className="font-mono">{qualification.fingerprint.hash.slice(0, 12)}</span>.
+      </p>
+      <p className="text-muted-foreground">{qualification.signature.meaning} ({qualification.signature.reauthentication === 'password' ? 'password re-entered' : 'signed from the session'})</p>
+      <p>Judged against: {describeAcceptanceCriteria(qualification.acceptanceCriteria)}</p>
+      <p data-testid="qualification-mcp-policy">{describeMcpPolicy(qualification.mcpPolicy)}</p>
+      {qualification.deviations.map((deviation) => (
+        <p key={deviation.severity} className="text-amber-700 dark:text-amber-300">Deviation ({deviation.severity}): {deviation.justification}</p>
+      ))}
+      {status.status === 'stale' && (
+        <p className="text-red-700 dark:text-red-400" data-testid="qualification-changed">
+          The step changed since: {status.changed.map((component) => COMPONENT_LABELS[component]).join(', ')}.
         </p>
-      ) : (
-        <div className="space-y-1.5 text-xs" data-testid="step-qualification">
-          <p>
-            Signed by <span className="font-medium">{qualification.signature.signerName}</span> on {qualification.signature.signedAt.slice(0, 16).replace('T', ' ')}
-            {' '}for {qualification.variantId === CHAMPION_VARIANT_ID ? 'the step' : `'${qualification.variantLabel}' (${describePatch(qualification.patch)})`}
-            {' '}— Eval Run <span className="font-mono">{qualification.evalRunId.slice(0, 8)}</span>, Brief v{qualification.briefVersion},
-            {' '}fingerprint <span className="font-mono">{qualification.fingerprint.hash.slice(0, 12)}</span>.
-          </p>
-          <p className="text-muted-foreground">{qualification.signature.meaning} ({qualification.signature.reauthentication === 'password' ? 'password re-entered' : 'signed from the session'})</p>
-          <p>Criteria: {describeAcceptanceCriteria(qualification.acceptanceCriteria)}</p>
-          <p data-testid="qualification-mcp-policy">{describeMcpPolicy(qualification.mcpPolicy)}</p>
-          {qualification.deviations.map((deviation) => (
-            <p key={deviation.severity} className="text-amber-700 dark:text-amber-300">Deviation ({deviation.severity}): {deviation.justification}</p>
-          ))}
-          {status.status === 'stale' && (
-            <p className="text-amber-700 dark:text-amber-300" data-testid="qualification-changed">
-              The step changed since: {status.changed.map((component) => COMPONENT_LABELS[component]).join(', ')}.
-            </p>
-          )}
-          {status.evaluatorsChanged.length > 0 && (
-            <p className="text-muted-foreground" data-testid="qualification-evaluators-changed">Evaluators changed since: {status.evaluatorsChanged.join('; ')}.</p>
-          )}
-          {status.history.length > 1 && <p className="text-muted-foreground">{status.history.length} qualifications signed for this step.</p>}
+      )}
+      {status.evaluatorsChanged.length > 0 && (
+        <p className="text-muted-foreground" data-testid="qualification-evaluators-changed">Evaluators changed since: {status.evaluatorsChanged.join('; ')}.</p>
+      )}
+      {status.history.length > 1 && <p className="text-muted-foreground">{status.history.length} qualifications signed for this step.</p>}
+    </div>
+  );
+}
+
+/**
+ * The floors Eval Runs are judged against (D10) — one minimum pass rate per
+ * severity, on its Wilson 95% lower bound — and whether the step is validated
+ * against them: the newest finished Eval Run of the workflow version, passed or
+ * failed on its criteria, not verified once anything it rested on changed. The
+ * signed Step Qualification, if any, opens from the same icon.
+ * Each change is a new criteria version; the next Eval Run freezes the one in force.
+ */
+export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEdit }: {
+  step: EvaluatedStep;
+  criteria: StepEvaluation['criteria'];
+  qualification: StepEvaluation['qualification'];
+  mayEdit: boolean;
+}) {
+  const [showDetails, setShowDetails] = React.useState(false);
+  const save = useStepEvaluationMutation(step, (next: AcceptanceCriteria) => mediforce.evaluation.setAcceptanceCriteria({ ...step, criteria: next }));
+  const current = criteria.data?.criteria ?? null;
+  const judged = SEVERITIES.filter((severity) => current?.criteria[severity] !== undefined);
+  const status = qualification.data;
+  const validation = status === undefined ? null : VALIDATION[status.validation.status];
+  return (
+    <Section
+      title="Acceptance Criteria"
+      action={status !== undefined && validation !== null && (
+        <InstantTooltip label={`${status.validation.reason}${status.validation.runInProgress ? ' An Eval Run is running.' : ''}`}>
+          <button
+            type="button"
+            className={cn('inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium hover:bg-muted', validation.className)}
+            aria-expanded={showDetails}
+            data-testid="validation-status"
+            data-status={status.validation.status}
+            onClick={() => setShowDetails(!showDetails)}
+          >
+            <validation.icon className="h-4 w-4" aria-hidden />
+            {validation.label}
+          </button>
+        </InstantTooltip>
+      )}
+    >
+      {criteria.isLoading ? <Loading /> : (
+        <div className="grid gap-2 sm:grid-cols-3" data-testid="acceptance-criteria">
+          {SEVERITIES.map((severity) => {
+            const saved = current?.criteria[severity];
+            const choices = saved === undefined || PASS_RATE_CHOICES.includes(saved.minPassRate) ? PASS_RATE_CHOICES : [...PASS_RATE_CHOICES, saved.minPassRate].sort((left, right) => left - right);
+            // The schema needs one severity judged, so the last one judged cannot be cleared.
+            const lastJudged = judged.length === 1 && judged[0] === severity;
+            return (
+              <label key={severity} className="flex items-center gap-2 text-xs">
+                <span className="w-12 capitalize">{severity}</span>
+                <select
+                  aria-label={`${severity} minimum pass rate`}
+                  className={cn(inputClass, 'flex-1 text-xs')}
+                  value={saved === undefined ? NOT_JUDGED : String(saved.minPassRate)}
+                  disabled={mayEdit === false || save.isPending}
+                  onChange={(event) => save.mutate(withPassRate(current?.criteria, severity, event.target.value))}
+                >
+                  <option value={NOT_JUDGED} disabled={lastJudged}>Not judged</option>
+                  {choices.map((rate) => <option key={rate} value={String(rate)}>≥ {Math.round(rate * 100)}% pass</option>)}
+                </select>
+              </label>
+            );
+          })}
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">
+        {current === null
+          ? 'No criteria yet — Eval Runs judge nothing until one is set. The assistant can propose them from the step\'s risks.'
+          : `v${current.version} · ${current.origin === 'assistant' ? 'proposed by the assistant' : 'set'} by ${current.createdBy}. Every counted Evaluator of a severity must reach its rate, on the Wilson 95% lower bound.`}
+      </p>
+      {save.error !== null && <p className="text-xs text-destructive">{save.error.message}</p>}
+      {showDetails && status !== undefined && (
+        <div className="space-y-2 rounded-md bg-muted/40 p-2 text-xs">
+          <p data-testid="validation-reason">{status.validation.reason}{status.validation.runInProgress && ' An Eval Run is running; this updates when it ends.'}</p>
+          <QualificationDetails status={status} />
         </div>
       )}
     </Section>
@@ -1423,11 +1142,8 @@ function EvalRunRow({ step, evalRunId, onOpen, open, mayEdit, editReason }: {
   );
 }
 
-const CHALLENGERS_TEMPLATE = JSON.stringify([{ label: 'Another model', patch: { model: 'openai/gpt-5' } }], null, 2);
-
 /**
- * Prepare, confirm and read the Step's Eval Runs — the step as it is and any
- * challengers patched over it. Preparing and starting one is the workflow's
+ * Prepare, confirm and read the Step's Eval Runs. Preparing and starting one is the workflow's
  * `run` verb; signing a qualification from a report is its `edit` verb.
  */
 export function EvalRunsSection({ step, data, datasets, mayRun, runReason, mayEdit, editReason }: {
@@ -1442,36 +1158,12 @@ export function EvalRunsSection({ step, data, datasets, mayRun, runReason, mayEd
 }) {
   const [trials, setTrials] = React.useState(3);
   const [budget, setBudget] = React.useState('');
-  const [challengers, setChallengers] = React.useState<string | null>(null);
-  const [challengersError, setChallengersError] = React.useState<string | null>(null);
   const [openRunId, setOpenRunId] = React.useState<string | null>(null);
-  const prepare = useStepEvaluationMutation(step, (variants: EvalChallenger[]) => mediforce.evaluation.prepareRun({
+  const prepare = useStepEvaluationMutation(step, () => mediforce.evaluation.prepareRun({
     ...step,
     trialsPerCase: trials,
-    challengers: variants,
     ...(budget === '' ? {} : { budgetUsd: Number(budget) }),
   }));
-  const submit = () => {
-    let variants: EvalChallenger[] = [];
-    if (challengers !== null) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(challengers);
-      } catch {
-        setChallengersError('The challengers are not valid JSON.');
-        return;
-      }
-      const checked = EvalChallengerSchema.array().safeParse(parsed);
-      if (checked.success === false) {
-        setChallengersError(`The challengers do not fit: ${checked.error.issues.map((issue) => `${issue.path.length === 0 ? 'list' : issue.path.join('.')} — ${issue.message}`).join('; ')}`);
-        return;
-      }
-      variants = checked.data;
-    }
-    setChallengersError(null);
-    prepare.mutate(variants);
-  };
-  const prepareError = challengersError ?? prepare.error?.message ?? null;
   const runs = data.data?.evalRuns ?? [];
   const versions = datasets.data?.datasets ?? [];
   const [nextDataset] = versions;
@@ -1494,32 +1186,16 @@ export function EvalRunsSection({ step, data, datasets, mayRun, runReason, mayEd
           <label className="flex items-center gap-1">Budget $
             <input type="number" min={0} step={0.01} className={cn(inputClass, 'w-24')} placeholder="auto" value={budget} onChange={(event) => setBudget(event.target.value)} />
           </label>
-          <button type="button" className={buttonClass} onClick={() => setChallengers(challengers === null ? CHALLENGERS_TEMPLATE : null)}>
-            {challengers === null ? 'Add challengers' : 'No challengers'}
-          </button>
           <button
             type="button"
             className={buttonClass}
             disabled={prepare.isPending}
-            onClick={submit}
+            onClick={() => prepare.mutate(undefined)}
           >Prepare</button>
           <span className="text-muted-foreground" data-testid="eval-run-dataset">
             {nextDataset === undefined ? 'No Dataset frozen yet — freeze the Eval Cases first.' : `Runs Dataset v${nextDataset.version} (${nextDataset.caseIds.length} case(s)).`}
           </span>
-          {prepareError !== null && <span className="text-destructive">{prepareError}</span>}
-        </div>
-      )}
-      {mayRun && challengers !== null && (
-        <div className="space-y-1 text-xs">
-          <p className="text-muted-foreground">
-            Up to three challengers run beside the step as it is, each a patch: model, prompt, skillCommit or allowedTools replace the step&apos;s own; mcpRestrictions narrow it. Every variant runs every case.
-          </p>
-          <textarea
-            aria-label="Challengers"
-            className={cn(inputClass, 'w-full min-h-24 font-mono text-xs')}
-            value={challengers}
-            onChange={(event) => setChallengers(event.target.value)}
-          />
+          {prepare.error !== null && <span className="text-destructive">{prepare.error.message}</span>}
         </div>
       )}
       {waiting.map((run) => <StartEvalRunCard key={run.evalRunId} step={step} prepared={run} mayRun={mayRun} runReason={runReason} />)}
@@ -1543,131 +1219,6 @@ export function EvalRunsSection({ step, data, datasets, mayRun, runReason, mayEd
                   editReason={editReason}
                 />
               </ul>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Section>
-  );
-}
-
-function splitText(result: OptimisationSplitResult): string {
-  if (result.cases === 0) return 'no cases';
-  if (result.passRate === null) return 'not graded';
-  return `${result.passes}/${result.graded} · ${(result.passRate * 100).toFixed(0)}% [${((result.wilsonLower ?? 0) * 100).toFixed(0)}–${((result.wilsonUpper ?? 0) * 100).toFixed(0)}%]`;
-}
-
-function OptimisationRow({ optimisationId, open, onOpen }: { optimisationId: string; open: boolean; onOpen: () => void }) {
-  const detail = useOptimisation(open ? optimisationId : null);
-  const output = detail.data;
-  return (
-    <div>
-      <button type="button" className="text-left text-xs font-mono hover:underline" onClick={onOpen}>{optimisationId.slice(0, 8)}</button>
-      {open && (output === undefined ? <Loading /> : (
-        <div className="mt-2 space-y-2 text-xs" data-testid="optimisation-detail">
-          <p className="text-muted-foreground">
-            {output.optimisation.status} · {output.spentUsd === null ? 'spend unknown' : `$${output.spentUsd.toFixed(2)}`} of ${output.optimisation.budgetUsd}
-            {output.optimisation.jobCostUsd !== null && ` (job $${output.optimisation.jobCostUsd})`}
-            {output.evalRun !== null && ` · Eval Run ${output.evalRun.id.slice(0, 8)} ${output.evalRun.status}`}
-          </p>
-          {output.optimisation.error !== null && <p className="text-destructive">{output.optimisation.error}</p>}
-          {output.baseline !== null && (
-            <table className="w-full">
-              <thead className="text-left text-muted-foreground">
-                <tr><th className="font-normal">#</th><th className="font-normal">Variant</th><th className="font-normal">Dev</th><th className="font-normal">Holdout</th></tr>
-              </thead>
-              <tbody>
-                <tr><td /><td>{output.baseline.label}</td><td>{splitText(output.baseline.dev)}</td><td>{splitText(output.baseline.holdout)}</td></tr>
-                {output.ranking.map((candidate) => (
-                  <tr key={candidate.variantId} data-testid="optimisation-candidate" className="align-top">
-                    <td>{candidate.rank}</td>
-                    <td>
-                      <details>
-                        <summary className="cursor-pointer">{candidate.label} <span className="font-mono text-muted-foreground">{candidate.variantId}</span></summary>
-                        <pre className="mt-1 whitespace-pre-wrap font-mono">{candidate.prompt}</pre>
-                      </details>
-                    </td>
-                    <td>{splitText(candidate.dev)}</td>
-                    <td>{splitText(candidate.holdout)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {output.ranking.length > 0 && (
-            <p className="text-muted-foreground">Apply a candidate from its Eval Run&apos;s report (Eval Runs above).</p>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/**
- * GEPA optimisations of the Step's prompt (ADR-0023 D15): start one from a
- * finished Eval Run with a budget — the person's grant, the workflow's `run`
- * verb — and read its candidates ranked by holdout, then dev pass rate.
- */
-export function OptimisationsSection({ step, data, runs, mayRun }: {
-  step: EvaluatedStep;
-  data: StepEvaluation['optimisations'];
-  runs: StepEvaluation['runs'];
-  mayRun: boolean;
-}) {
-  const finished = (runs.data?.evalRuns ?? []).filter((run) => run.status !== 'prepared' && run.status !== 'running');
-  const [evalRunId, setEvalRunId] = React.useState('');
-  const [budget, setBudget] = React.useState('');
-  const [candidates, setCandidates] = React.useState(3);
-  const [openId, setOpenId] = React.useState<string | null>(null);
-  const start = useStepEvaluationMutation(step, () => mediforce.evaluation.startOptimisation({
-    ...step,
-    evalRunId: evalRunId === '' ? finished[0]!.id : evalRunId,
-    budgetUsd: Number(budget),
-    candidates,
-  }));
-  const optimisations = data.data?.optimisations ?? [];
-
-  return (
-    <Section title="Optimisations">
-      {mayRun && finished.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <label className="flex items-center gap-1">From Eval Run
-            <select className={inputClass} value={evalRunId} onChange={(event) => setEvalRunId(event.target.value)}>
-              {finished.map((run) => <option key={run.id} value={run.id}>{run.id.slice(0, 8)} · {run.createdAt.slice(0, 16).replace('T', ' ')}</option>)}
-            </select>
-          </label>
-          <label className="flex items-center gap-1">Candidates
-            <input type="number" min={1} max={3} className={cn(inputClass, 'w-14')} value={candidates} onChange={(event) => setCandidates(Number(event.target.value))} />
-          </label>
-          <label className="flex items-center gap-1">Budget $
-            <input type="number" min={0} step={0.01} className={cn(inputClass, 'w-24')} value={budget} onChange={(event) => setBudget(event.target.value)} />
-          </label>
-          <button
-            type="button"
-            className={buttonClass}
-            disabled={start.isPending || Number(budget) > 0 === false}
-            onClick={() => start.mutate(undefined)}
-          >Optimise prompt</button>
-          {start.error !== null && <span className="text-destructive">{start.error.message}</span>}
-        </div>
-      )}
-      <p className="text-xs text-muted-foreground">
-        GEPA reflects on the dev-case trials of an Eval Run and proposes prompts, which run as challengers over dev and holdout. The job and that run spend at most the budget.
-      </p>
-      {data.isLoading ? <Loading /> : optimisations.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No optimisations yet.</p>
-      ) : (
-        <ul className="space-y-2">
-          {optimisations.map((optimisation) => (
-            <li key={optimisation.id} className="text-sm">
-              <span className="text-xs text-muted-foreground">
-                {optimisation.createdAt.slice(0, 16).replace('T', ' ')} · {optimisation.status} · budget ${optimisation.budgetUsd} · {optimisation.candidates.length} candidate(s)
-              </span>
-              <OptimisationRow
-                optimisationId={optimisation.id}
-                open={openId === optimisation.id}
-                onOpen={() => setOpenId(openId === optimisation.id ? null : optimisation.id)}
-              />
             </li>
           ))}
         </ul>

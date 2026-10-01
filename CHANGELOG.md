@@ -8,10 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Step Evaluation GEPA optimisation ([ADR-0023](docs/adr/0023-step-evaluation.md) D15): from a finished Eval Run, a container job (`mediforce-gepa` image) reflects on the step's failing dev-case trials and proposes up to three prompts, which run as challengers over dev and holdout within a budget the person grants — ranked by holdout first, since the job fitted them to dev (`mediforce eval optimise|optimisation|optimisations`, the Evaluation tab's **Optimisations**, the assistant's `start_optimisation` under an unattended budget) [#1434](https://github.com/Appsilon/mediforce/pull/1434).
-- Step Evaluation's **Built-in case suites** picks the field to change from the run's real input (no typed path), lists every case it will write — with the exact instruction each injection appends — before writing it, and adds a missing **Result unchanged** grader comparing only the result keys you tick; built-in Evaluators' **Details** spell out when they pass and fail and what they look for, and editing one no longer lets you swap which check it is.
+- Step Evaluation GEPA optimisation, backend and CLI only (`mediforce eval optimise|optimisation|optimisations`): one round of reflective prompt proposals from a finished Eval Run's failing dev trials, run as challengers within a granted budget. Parked in [ADR-0024](docs/adr/0024-optimisation.md) (Proposed) — not offered by the Evaluation tab or the assistant [#1434](https://github.com/Appsilon/mediforce/pull/1434).
 - Step Evaluation's `replay` MCP mode now records each Eval Case live the first time the case has no recording, then replays it — no more failed trials and no manual Live→Replay switch; the Eval Run report counts, per replayed server, the cases a run recorded that way (`recordedFirst`) and no longer claims "no live MCP call" when there were some.
-- A Step Evaluation judge no longer reads whether an Eval Case is positive or negative during an Eval Run, only the case's notes — the label hinted at the verdict, and calibration never gave it, so a calibrated judge could lean to fail on a negative case its own rule passes.
+- A Step Evaluation judge reads only an Eval Case's notes during an Eval Run, never whether the case is positive or negative — the label hinted at the verdict, and calibration never gave it.
 
 ## [1.2.0] - 2026-09-28
 

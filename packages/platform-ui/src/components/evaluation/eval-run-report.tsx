@@ -1,10 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { Loader2, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import {
-  CHAMPION_VARIANT_ID,
   describeAcceptanceCriteria,
   describeMcpReport,
   qualificationSignatureMeaning,
@@ -12,7 +10,6 @@ import {
   type EvalRunVariantReport,
   type EvaluatedStep,
   type StepVariantPatch,
-  type VariantComparison,
 } from '@mediforce/platform-core';
 import type { EvalRunOutput } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
@@ -142,10 +139,9 @@ function ConfidenceSection({ variant }: { variant: EvalRunVariantReport }) {
  * reads what the signature means, justifies every criterion the variant did
  * not meet, and re-enters their password where password sign-in is enabled.
  */
-function SignQualificationForm({ step, evalRunId, briefVersion, variant, onDone }: {
+function SignQualificationForm({ step, evalRunId, variant, onDone }: {
   step: EvaluatedStep;
   evalRunId: string;
-  briefVersion: number;
   variant: EvalRunVariantReport;
   onDone: () => void;
 }) {
@@ -164,7 +160,7 @@ function SignQualificationForm({ step, evalRunId, briefVersion, variant, onDone 
   return (
     <div className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-xs" data-testid="sign-qualification-form">
       <p className="font-medium">Sign a Step Qualification for {variant.label}</p>
-      <p>{qualificationSignatureMeaning(briefVersion)}</p>
+      <p>{qualificationSignatureMeaning()}</p>
       {unmet.map((verdict) => (
         <label key={verdict.severity} className="block space-y-1">
           <span>
@@ -202,99 +198,8 @@ function signingBlocked(output: EvalRunOutput, variant: EvalRunVariantReport, ma
   if (evalRun.status === 'cancelled') return 'This run was cancelled; sign on a run that finished';
   if (evalRun.status === 'prepared' || evalRun.status === 'running' || report.trials.inProgress > 0) return 'Sign once every trial is scored';
   if (evalRun.acceptanceCriteria === null) return 'No Acceptance Criteria were frozen into this run';
-  if (evalRun.briefVersion === null) return 'The step had no Evaluation Brief when this run was prepared';
   if (variant.fingerprint === null) return 'This run was prepared before Step Fingerprints';
   return null;
-}
-
-/** Why a challenger of this run cannot be applied to the step, or null when it can. */
-function applyBlocked(output: EvalRunOutput, mayEdit: boolean, editReason: string | undefined): string | null {
-  const { evalRun, report } = output;
-  if (mayEdit === false) return editReason ?? 'You may not edit this workflow';
-  if (evalRun.status === 'prepared' || evalRun.status === 'running' || evalRun.status === 'cancelled' || report.trials.inProgress > 0) return 'Apply once the run has finished and every trial is scored';
-  return null;
-}
-
-/**
- * Applying a challenger saves its patch as a new Workflow Definition version
- * (ADR-0023 D13). The person confirms, chooses whether it becomes the default
- * version, and is told whether the variant's qualification carries over.
- */
-function ApplyVariant({ step, evalRunId, variant, blocked }: {
-  step: EvaluatedStep;
-  evalRunId: string;
-  variant: EvalRunVariantReport;
-  blocked: string | null;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const [setAsDefault, setSetAsDefault] = React.useState(false);
-  const apply = useStepEvaluationMutation(step, () => mediforce.evaluation.applyVariant({
-    ...step,
-    evalRunId,
-    variantId: variant.id,
-    setAsDefault,
-  }));
-  const applied = apply.data;
-  return (
-    <div className="space-y-1" data-testid="apply-variant">
-      <InstantTooltip label={blocked ?? undefined}>
-        <span className="inline-flex">
-          <button type="button" className={buttonClass} disabled={blocked !== null || applied !== undefined} onClick={() => setOpen(true)} data-testid="apply-variant-open">
-            {applied === undefined ? 'Apply to step' : 'Applied'}
-          </button>
-        </span>
-      </InstantTooltip>
-      {applied !== undefined && (
-        <div className="space-y-0.5 text-xs" data-testid="apply-variant-result">
-          <p className="font-medium text-green-700 dark:text-green-400">
-            Saved as Workflow Definition version {applied.definitionVersion}
-            {applied.runnable ? ', which runs now use.' : '; it is not the default version, so runs still use the default.'}
-          </p>
-          {applied.variant !== null && (
-            <p className="text-muted-foreground">
-              {applied.variant.matchesFingerprint
-                ? "It matches this variant's Fingerprint: its qualification carries over."
-                : `It differs from this variant's Fingerprint (${applied.variant.changed.join(', ')}): its qualification does not carry over.`}
-            </p>
-          )}
-          {applied.warnings?.map((warning) => (
-            <p key={`${warning.stepName}:${warning.code}`} className="text-amber-700 dark:text-amber-300">{warning.stepName}: {warning.message}</p>
-          ))}
-        </div>
-      )}
-      <Dialog.Root open={open} onOpenChange={setOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 space-y-3 rounded-lg border bg-background p-6 shadow-lg" data-testid="apply-variant-dialog">
-            <div className="flex items-start justify-between gap-2">
-              <Dialog.Title className="text-base font-semibold">Apply {variant.label} to the step</Dialog.Title>
-              <Dialog.Close asChild>
-                <button type="button" aria-label="Close" className="rounded p-1 hover:bg-muted"><X className="h-4 w-4" /></button>
-              </Dialog.Close>
-            </div>
-            <Dialog.Description className="text-sm text-muted-foreground">
-              This saves a new Workflow Definition version with the variant&apos;s changes ({describePatch(variant.patch)}). Existing versions stay as they are.
-            </Dialog.Description>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" data-testid="apply-variant-default" checked={setAsDefault} onChange={(event) => setSetAsDefault(event.target.checked)} />
-              Make it the default version
-            </label>
-            {apply.error !== null && <p className="text-sm text-destructive" data-testid="apply-variant-error">{apply.error.message}</p>}
-            <div className="flex justify-end gap-2">
-              <button type="button" className={buttonClass} onClick={() => setOpen(false)}>Cancel</button>
-              <button
-                type="button"
-                className={primaryButtonClass}
-                data-testid="apply-variant-confirm"
-                disabled={apply.isPending}
-                onClick={() => apply.mutate(undefined, { onSuccess: () => setOpen(false) })}
-              >Apply to step</button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-    </div>
-  );
 }
 
 function VariantReport({ output, variant, step, mayEdit, editReason }: {
@@ -322,11 +227,10 @@ function VariantReport({ output, variant, step, mayEdit, editReason }: {
       <EvaluatorTable variant={variant} k={output.report.k} />
       {variant.criteria.length > 0 && <CriteriaVerdicts verdicts={variant.criteria} />}
       <ConfidenceSection variant={variant} />
-      {signing && output.evalRun.briefVersion !== null ? (
+      {signing ? (
         <SignQualificationForm
           step={step}
           evalRunId={output.evalRun.id}
-          briefVersion={output.evalRun.briefVersion}
           variant={variant}
           onDone={() => setSigning(false)}
         />
@@ -339,46 +243,8 @@ function VariantReport({ output, variant, step, mayEdit, editReason }: {
               </button>
             </span>
           </InstantTooltip>
-          {variant.id !== CHAMPION_VARIANT_ID && (
-            <ApplyVariant step={step} evalRunId={output.evalRun.id} variant={variant} blocked={applyBlocked(output, mayEdit, editReason)} />
-          )}
         </div>
       )}
-    </div>
-  );
-}
-
-/** Each challenger against the champion: a difference is called only when the Wilson intervals do not overlap. */
-function Comparison({ comparison, labels }: { comparison: readonly VariantComparison[]; labels: ReadonlyMap<string, string> }) {
-  return (
-    <div className="space-y-2 border-t pt-3" data-testid="variant-comparison">
-      {comparison.map((challenger) => (
-        <div key={challenger.variantId} className="space-y-1">
-          <p className="text-xs font-medium">{labels.get(challenger.variantId) ?? challenger.variantId} against the current step</p>
-          <table className="w-full text-xs">
-            <thead className="text-muted-foreground">
-              <tr className="text-left"><th className="font-medium">Evaluator</th><th className="font-medium">Current</th><th className="font-medium">Challenger</th><th className="font-medium">Δ</th><th className="font-medium">Verdict</th></tr>
-            </thead>
-            <tbody>
-              {challenger.evaluators.map((evaluator) => (
-                <tr key={evaluator.evaluatorId} className="border-t">
-                  <td className="py-1">{evaluator.name}</td>
-                  <td>{percent(evaluator.championPassRate)}</td>
-                  <td>{percent(evaluator.challengerPassRate)}</td>
-                  <td>{evaluator.delta === null ? '—' : `${evaluator.delta >= 0 ? '+' : ''}${Math.round(evaluator.delta * 100)} pp`}</td>
-                  <td className={cn(evaluator.verdict === 'better' && 'text-green-700 dark:text-green-400', evaluator.verdict === 'worse' && 'text-red-700 dark:text-red-400')}>
-                    {evaluator.verdict.replace(/_/g, ' ')}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="text-muted-foreground text-xs">
-            {challenger.meanCostDeltaUsd !== null && `Mean cost ${challenger.meanCostDeltaUsd >= 0 ? '+' : ''}$${challenger.meanCostDeltaUsd.toFixed(4)} per trial. `}
-            {challenger.meanDurationDeltaMs !== null && `Mean duration ${challenger.meanDurationDeltaMs >= 0 ? '+' : ''}${(challenger.meanDurationDeltaMs / 1000).toFixed(1)}s.`}
-          </p>
-        </div>
-      ))}
     </div>
   );
 }
@@ -386,8 +252,7 @@ function Comparison({ comparison, labels }: { comparison: readonly VariantCompar
 /**
  * An Eval Run's report (ADR-0023 D5, D10): per variant, every Evaluator's pass
  * rate with its Wilson 95% interval, pass@k, pass^k and flakiness, the verdict
- * on each Acceptance Criterion, confidence calibration and routing — then each
- * challenger against the champion. A person signs a Step Qualification for a
+ * on each Acceptance Criterion, confidence calibration and routing. A person signs a Step Qualification for a
  * variant from here.
  */
 export function EvalRunReport({ output, step, mayEdit, editReason }: {
@@ -424,7 +289,6 @@ export function EvalRunReport({ output, step, mayEdit, editReason }: {
       {report.variants.map((variant) => (
         <VariantReport key={variant.id} output={output} variant={variant} step={step} mayEdit={mayEdit} editReason={editReason} />
       ))}
-      {report.comparison.length > 0 && <Comparison comparison={report.comparison} labels={labels} />}
       {trials.some((trial) => trial.error !== null) && (
         <details className="text-xs">
           <summary className="cursor-pointer text-muted-foreground">Trial problems</summary>

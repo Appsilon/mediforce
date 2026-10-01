@@ -131,7 +131,6 @@ export async function prepareEvalRun(
       name: evaluator.name,
       version: version.version,
       kind: version.check.kind,
-      ...(version.check.kind === 'builtin' ? { builtin: version.check.name } : {}),
       severity: version.severity,
       counted: trust.trusted,
       ...(trust.trusted ? {} : { reason: trust.reason }),

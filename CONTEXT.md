@@ -509,13 +509,13 @@ _Avoid_: "validation rule", "assertion", "metric", "grader".
 
 **Eval Case**:
 One input fixture for a Workflow Step plus what its output must — or must not — contain.
-_Avoid_: "test case", "sample", "golden" (a case can be a negative one).
+_Avoid_: "test case", "sample", "golden" (a case says what to check, not the right answer).
 
 **Label**:
 A person's pass/fail on one output for one **Evaluator** — the ground truth a judge
 is calibrated against. Not an **Eval Case**: a case is an input that is re-run; a
 label is a verdict on an output that already exists.
-_Avoid_: "positive/negative" for labels (those words belong to **Eval Cases**).
+_Avoid_: "positive/negative" for labels (say pass/fail).
 
 **Written output**:
 A person's own example of a Workflow Step's output for one input, usually a real
@@ -544,13 +544,15 @@ _Avoid_: "threshold" alone (collides with `confidenceThreshold`), "target".
 **Step Qualification**:
 A signed decision that one Step Fingerprint met its acceptance criteria in an
 Eval Run; it goes stale when the Workflow Step's current Fingerprint differs.
+Not the step's **validation** — passed, failed or not verified — which is read
+from the newest finished Eval Run of the workflow version and needs no signature.
 _Avoid_: "validated", "certified", "approved step".
 
 **Eval Run**:
-One execution of an Eval Dataset against one or more variants of a Workflow Step
-(model, prompt, examples), repeated per case, producing Scores and a
-champion-vs-challenger comparison. Fits the existing Run family (Workflow Run,
-Agent Run).
+One execution of an Eval Dataset against a Workflow Step, repeated per case,
+producing Scores judged against Acceptance Criteria. (Running variants of the
+step beside it is parked in ADR-0024.) Fits the existing Run family (Workflow
+Run, Agent Run).
 _Avoid_: "Experiment" (vague, collides with nothing but explains nothing).
 
 ### Audit / observability
@@ -584,15 +586,16 @@ the user-facing immutable log.
 - An agent **Workflow Step** owns 0..N **Evaluators** and 0..N
   versioned **Eval Datasets**; neither is shared with another Workflow Step (reuse
   is by copy).
-- An agent **Workflow Step** has 0..1 **Evaluation Brief** (versioned); a **Step
-  Qualification** cites the Brief version it was judged against.
-- An **Evaluation Assistant** proposes **Evaluators**, **Eval Cases** and fixes;
+- An agent **Workflow Step** has 0..1 **Evaluation Brief** (versioned); it
+  guides the **Evaluation Assistant** and is not part of a **Step Qualification**.
+- An **Evaluation Assistant** proposes **Evaluators**, **Eval Cases** and
+  diagnoses of failures;
   a human accepts them, confirms every **Eval Run**, and alone approves code
   checks, labels calibration outputs and signs a **Step Qualification**.
 - An **Evaluator** has many versions; a version that has produced a **Score**
   never changes.
-- An **Eval Run** executes one **Eval Dataset** version against 1..N
-  variants of one **Workflow Step**; each trial is a single-step **Workflow Run**.
+- An **Eval Run** executes one **Eval Dataset** version against one
+  **Workflow Step**; each trial is a single-step **Workflow Run**.
 - A **Step Qualification** cites exactly one **Eval Run**, one
   **Step Fingerprint**, and the **Evaluator** versions it was judged by.
 

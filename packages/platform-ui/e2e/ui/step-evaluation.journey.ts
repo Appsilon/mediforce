@@ -149,7 +149,7 @@ test.describe('Step Evaluation tab', () => {
     await expect(page.getByText('Drafting the fatal-outcome check now.')).toBeVisible({ timeout: 20_000 });
   });
 
-  test('accepted criteria judge a run, and the person signs a Step Qualification from its report', async ({ page, request }) => {
+  test('accepted criteria judge a run, and the person signs a Step Qualification from its report — no Brief needed', async ({ page, request }) => {
     test.setTimeout(150_000);
     trackPageErrors(page);
     const workflowName = `e2e-eval-qualify-${randomUUID().slice(0, 8)}`;
@@ -161,10 +161,9 @@ test.describe('Step Evaluation tab', () => {
       expect(res.status(), await res.text()).toBeLessThan(300);
       return res.json();
     };
-    await post('/api/evaluation/briefs', { ...step, text: 'Grades AEs for the DSMB.' });
     await post('/api/evaluation/evaluators', { ...step, name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical', check: { kind: 'schema', schema: { required: ['summary'] } } });
     await post('/api/evaluation/evaluators', { ...step, name: 'findings-present', rule: 'The result lists findings.', severity: 'major', check: { kind: 'schema', schema: { required: ['findings'] } } });
-    await post('/api/evaluation/cases/from-agent-run', { agentRunId, expectation: 'positive' });
+    await post('/api/evaluation/cases/from-agent-run', { agentRunId });
     await post('/api/evaluation/datasets', step);
 
     const question = `What should the floors be? ${randomUUID()}`;
@@ -179,13 +178,16 @@ test.describe('Step Evaluation tab', () => {
     ]);
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
-    await expect(page.getByTestId('step-qualification-badge')).toHaveAttribute('data-status', 'not_qualified', { timeout: 10_000 });
+    await expect(page.getByTestId('validation-status')).toHaveAttribute('data-status', 'not_verified', { timeout: 10_000 });
+    await expect(page.getByTestId('validation-status')).toHaveText('Not verified');
     await page.getByTestId('evaluation-assistant-input').fill(question);
     await page.getByTestId('evaluation-assistant-send').click();
     const criteriaCard = page.getByTestId('proposal-card').filter({ hasText: 'Proposed Acceptance Criteria' });
     await criteriaCard.getByTestId('proposal-accept').click();
     await expect(criteriaCard.getByText('Accepted')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId('acceptance-criteria')).toHaveText('critical: lower bound ≥ 0.1; major: lower bound ≥ 0.5');
+    await expect(page.getByLabel('critical minimum pass rate')).toHaveValue('0.1');
+    await expect(page.getByLabel('major minimum pass rate')).toHaveValue('0.5');
+    await expect(page.getByLabel('minor minimum pass rate')).toHaveValue('');
 
     // The run is prepared and confirmed over the API; the report is read and signed in the tab.
     const prepared = EvalRunOutputSchema.parse(await post('/api/evaluation/runs', { ...step, trialsPerCase: 1, budgetUsd: 1 }));
@@ -196,87 +198,25 @@ test.describe('Step Evaluation tab', () => {
     }, { description: 'the Eval Run to complete', timeoutMs: 90_000 });
 
     await page.reload();
+    // The newest finished run of the version missed its major criterion: validation fails, signed or not.
+    await expect(page.getByTestId('validation-status')).toHaveAttribute('data-status', 'failed', { timeout: 10_000 });
     await page.getByRole('button', { name: prepared.evalRun.id.slice(0, 8) }).click();
     const report = page.getByTestId('variant-report');
     await expect(report.getByTestId('criteria-verdicts')).toContainText('critical met');
     await expect(report.getByTestId('criteria-verdicts')).toContainText('major missed');
     await report.getByTestId('sign-qualification').click();
     const form = page.getByTestId('sign-qualification-form');
-    await expect(form).toContainText('as stated in Evaluation Brief v1');
+    await expect(form).toContainText('qualify this Step configuration as it ran in it');
+    await expect(form).not.toContainText('Brief');
     await form.getByLabel('Justification for the major criterion').fill('Findings are listed downstream; a reviewer reads every grade.');
     await form.getByLabel('Your password').fill(TEST_USER_PASSWORD);
     await form.getByRole('button', { name: 'Sign' }).click();
 
-    await expect(page.getByTestId('step-qualification-badge')).toHaveAttribute('data-status', 'qualified', { timeout: 10_000 });
+    await expect(page.getByTestId('validation-status')).toHaveText('Validation failed');
+    await page.getByTestId('validation-status').click();
+    await expect(page.getByTestId('validation-reason')).toContainText('major missed');
+    await expect(page.getByTestId('step-qualification')).toContainText(`Eval Run ${prepared.evalRun.id.slice(0, 8)}`);
     await expect(page.getByTestId('step-qualification')).toContainText('Deviation (major): Findings are listed downstream');
-  });
-  test('a proposed fix is tried as a challenger, and a finished run applies it to the step', async ({ page, request }) => {
-    test.setTimeout(150_000);
-    trackPageErrors(page);
-    const workflowName = `e2e-eval-fix-${randomUUID().slice(0, 8)}`;
-    const runId = await startRun(request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE);
-    const agentRunId = (await awaitFinishedAgentRun(request, runId)).id;
-    const step = { namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes' };
-    const post = async (path: string, data: Record<string, unknown>) => {
-      const res = await request.post(path, { headers: JSON_HEADERS, data });
-      expect(res.status(), await res.text()).toBeLessThan(300);
-      return res.json();
-    };
-    await post('/api/evaluation/briefs', { ...step, text: 'Grades AEs for the DSMB.' });
-    await post('/api/evaluation/evaluators', { ...step, name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical', check: { kind: 'schema', schema: { required: ['summary'] } } });
-    await post('/api/evaluation/cases/from-agent-run', { agentRunId, expectation: 'positive' });
-    await post('/api/evaluation/datasets', step);
-
-    const fixedPrompt = 'Grade each AE by CTCAE; grade 5 is death.';
-    const prepared = EvalRunOutputSchema.parse(await post('/api/evaluation/runs', {
-      ...step, trialsPerCase: 1, budgetUsd: 1, challengers: [{ label: 'CTCAE grade 5', patch: { prompt: fixedPrompt } }],
-    }));
-    await post(`/api/evaluation/runs/${prepared.evalRun.id}/start`, { confirmedBudgetUsd: 1 });
-    await pollUntil(async () => {
-      const res = await request.get(`/api/evaluation/runs/${prepared.evalRun.id}`, { headers: AUTH_HEADERS });
-      return EvalRunOutputSchema.parse(await res.json()).evalRun.status === 'completed' ? true : null;
-    }, { description: 'the Eval Run to complete', timeoutMs: 90_000 });
-
-    const question = `How do I fix the grade 5 misses? ${randomUUID()}`;
-    await scriptOpenRouter(question, [
-      {
-        toolCalls: [{
-          name: 'propose_fix',
-          arguments: {
-            evalRunId: prepared.evalRun.id,
-            kind: 'instruction',
-            label: 'CTCAE grade 5',
-            addresses: 'Missed grade 5 (death) outcomes',
-            rationale: 'The prompt never says grade 5 is death.',
-            patch: { prompt: fixedPrompt },
-          },
-        }],
-      },
-      { content: 'The prompt never defines grade 5; here is a fix to try.' },
-    ]);
-    await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
-    await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
-    await page.getByTestId('evaluation-assistant-input').fill(question);
-    await page.getByTestId('evaluation-assistant-send').click();
-    const fixCard = page.getByTestId('fix-card');
-    await expect(fixCard).toContainText('CTCAE grade 5');
-    await expect(fixCard.getByTestId('fix-patch')).toContainText('its own prompt');
-    await fixCard.getByTestId('fix-budget').fill('1');
-    await fixCard.getByTestId('fix-try-it').click();
-    await expect(fixCard.getByTestId('fix-prepared')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId('start-eval-run-card')).toBeVisible();
-
-    // The finished run's challenger is applied from its report.
-    await page.getByRole('button', { name: prepared.evalRun.id.slice(0, 8) }).click();
-    const challengerReport = page.getByTestId('variant-report').filter({ hasText: 'CTCAE grade 5' });
-    await expect(challengerReport.getByTestId('apply-variant-open')).toBeEnabled();
-    await challengerReport.getByTestId('apply-variant-open').click();
-    const dialog = page.getByTestId('apply-variant-dialog');
-    await expect(dialog.getByTestId('apply-variant-default')).not.toBeChecked();
-    await dialog.getByTestId('apply-variant-default').check();
-    await dialog.getByTestId('apply-variant-confirm').click();
-    await expect(challengerReport.getByTestId('apply-variant-result')).toContainText('Saved as Workflow Definition version', { timeout: 10_000 });
-    await expect(challengerReport.getByTestId('apply-variant-result')).toContainText("matches this variant's Fingerprint");
   });
 
   test('an Evaluator is added through its type\'s fields, read in full, and edited into a new version', async ({ page, request }) => {
@@ -291,18 +231,19 @@ test.describe('Step Evaluation tab', () => {
 
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     const form = page.getByTestId('evaluator-form');
-    await form.getByLabel('Evaluator name').fill('No PHI in output');
-    await expect(form.getByLabel('Evaluator name')).toHaveValue('no-phi-in-output');
-    await form.getByLabel('Type').selectOption('builtin');
-    await form.getByLabel('Check').selectOption('phi_leak');
-    await form.getByLabel('Rule').fill('The output carries no patient identifiers.');
+    await form.getByLabel('Evaluator name').fill('Summary present');
+    await expect(form.getByLabel('Evaluator name')).toHaveValue('summary-present');
+    await expect(form.getByLabel('Type').locator('option')).toHaveText(['Output schema', 'Code', 'LLM judge']);
+    await form.getByLabel('Type').selectOption('schema');
+    await form.getByLabel('JSON Schema').fill('{"required": ["summary"]}');
+    await form.getByLabel('Rule').fill('The output carries a summary.');
     await form.getByRole('button', { name: 'Create' }).click();
 
-    const row = page.getByTestId('evaluator-row').filter({ hasText: 'no-phi-in-output' });
-    await expect(row).toContainText('v1 · Built-in · major', { timeout: 10_000 });
+    const row = page.getByTestId('evaluator-row').filter({ hasText: 'summary-present' });
+    await expect(row).toContainText('v1 · Output schema · major', { timeout: 10_000 });
     await expect(row.getByText('Counts')).toBeVisible();
     await row.getByText('Details', { exact: true }).click();
-    await expect(row.getByTestId('evaluator-details')).toContainText('medical record number');
+    await expect(row.getByTestId('evaluator-details')).toContainText('"summary"');
 
     await row.getByRole('button', { name: 'Edit' }).click();
     const editForm = row.getByTestId('evaluator-form');
@@ -311,7 +252,7 @@ test.describe('Step Evaluation tab', () => {
     await editForm.getByLabel('Severity').selectOption('critical');
     await editForm.getByRole('button', { name: 'Save as v2' }).click();
 
-    await expect(row).toContainText('v2 · Built-in · critical', { timeout: 10_000 });
+    await expect(row).toContainText('v2 · Output schema · critical', { timeout: 10_000 });
     await row.getByText('Details', { exact: true }).click();
     await expect(row.getByTestId('evaluator-details')).toContainText('v1 ·');
   });

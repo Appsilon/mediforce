@@ -9,7 +9,7 @@ import type {
   EvaluationAssistantPlatformToolName,
   EvaluationAssistantProposalToolName,
 } from '@mediforce/platform-core';
-import type { EvaluationAssistantProgress, PreparedEvalRun, ProposalView, StartedEvalRun, StartedOptimisation } from '@mediforce/platform-api/contract';
+import type { EvaluationAssistantProgress, PreparedEvalRun, ProposalView, StartedEvalRun } from '@mediforce/platform-api/contract';
 import { useQueryClient } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
@@ -21,7 +21,6 @@ import { StartEvalRunCard } from './step-evaluation-sections';
 import {
   ControlSettingsCard,
   DiagnosisCard,
-  FixCard,
   LabellingCard,
   DraftedOutputsCard,
   PlanCard,
@@ -53,7 +52,6 @@ interface PanelMessage {
   readonly proposals?: ProposalState[];
   readonly prepared?: PreparedEvalRun[];
   readonly started?: StartedEvalRun[];
-  readonly startedOptimisations?: StartedOptimisation[];
   readonly steps?: ActivityStep[];
 }
 
@@ -76,25 +74,19 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   preview_evaluator: 'Previewing a check on real runs',
   prepare_eval_run: 'Preparing an eval run',
   start_eval_run: 'Starting an eval run',
-  compare_variants: 'Comparing variants',
   get_qualification: 'Reading the step\'s qualification',
   propose_evaluation_plan: 'Drafting an evaluation plan',
   propose_evaluator: 'Drafting an evaluator',
   propose_evaluator_version: 'Drafting a new evaluator version',
   propose_eval_case: 'Drafting an eval case',
   propose_perturbed_case: 'Synthesizing an eval case',
-  propose_case_suite: 'Proposing a built-in case suite',
   propose_outputs_to_label: 'Picking outputs to label',
   propose_written_outputs: 'Drafting outputs to label',
   propose_brief: 'Drafting the brief',
   propose_acceptance_criteria: 'Drafting Acceptance Criteria',
   propose_control_settings: 'Recommending routing',
   get_failures: 'Reading an eval run\'s failures',
-  list_optimisations: 'Listing optimisations',
-  get_optimisation: 'Reading an optimisation',
-  start_optimisation: 'Starting a GEPA optimisation',
   propose_diagnosis: 'Diagnosing the failures',
-  propose_fix: 'Drafting a fix',
 };
 
 function toolLabel(tool: string): string {
@@ -210,7 +202,7 @@ export function EvaluationAssistantPanel({ step, stepOutputSchema, mayEdit, edit
           setActivity(turnActivity);
         },
       });
-      if (result.preparedEvalRuns.length > 0 || result.startedEvalRuns.length > 0 || result.startedOptimisations.length > 0) {
+      if (result.preparedEvalRuns.length > 0 || result.startedEvalRuns.length > 0) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId) });
       }
       setMessages([...thread, {
@@ -219,7 +211,6 @@ export function EvaluationAssistantPanel({ step, stepOutputSchema, mayEdit, edit
         proposals: result.proposals.map((proposal) => ({ proposal, status: 'open' as const })),
         prepared: result.preparedEvalRuns,
         started: result.startedEvalRuns,
-        startedOptimisations: result.startedOptimisations,
         steps: turnActivity.steps,
       }]);
     } catch (err) {
@@ -326,9 +317,6 @@ export function EvaluationAssistantPanel({ step, stepOutputSchema, mayEdit, edit
                 if (proposal.tool === 'propose_diagnosis') {
                   return <DiagnosisCard key={proposalIndex} diagnosis={proposal.arguments} />;
                 }
-                if (proposal.tool === 'propose_fix') {
-                  return <FixCard key={proposalIndex} step={step} fix={proposal.arguments} mayRun={mayRun} runReason={runReason} />;
-                }
                 if (proposal.tool === 'propose_written_outputs') {
                   return <DraftedOutputsCard key={proposalIndex} step={step} proposal={proposal.arguments} stepOutputSchema={stepOutputSchema} mayEdit={mayEdit} />;
                 }
@@ -349,11 +337,6 @@ export function EvaluationAssistantPanel({ step, stepOutputSchema, mayEdit, edit
               {message.started?.map((started) => (
                 <p key={started.evalRunId} className="rounded-md border bg-background p-2.5 text-xs" data-testid="started-eval-run">
                   Started Eval Run <span className="font-mono">{started.evalRunId.slice(0, 8)}</span> with a budget of ${started.budgetUsd}. Follow it in the Eval Runs list.
-                </p>
-              ))}
-              {message.startedOptimisations?.map((started) => (
-                <p key={started.optimisationId} className="rounded-md border bg-background p-2.5 text-xs" data-testid="started-optimisation">
-                  Started GEPA optimisation <span className="font-mono">{started.optimisationId.slice(0, 8)}</span> with a budget of ${started.budgetUsd}. Follow it under Optimisations.
                 </p>
               ))}
               {message.prepared?.map((prepared) => <StartEvalRunCard key={prepared.evalRunId} step={step} prepared={prepared} mayRun={mayRun} runReason={runReason} />)}

@@ -21,12 +21,3 @@ export { applyStepVariant, isEmptyVariantPatch, variantPatchProblem } from './va
 export { describeAcceptanceCriteria, judgeAcceptanceCriteria } from './acceptance';
 export { calibrateConfidence, recommendControl, type ConfidenceOutcome } from './confidence-calibration';
 export { DEFAULT_DRIFT_SETTINGS, detectDrift, parseDriftSettings, type DriftSettings, type DriftWindows } from './drift';
-export {
-  PROMPT_INJECTIONS,
-  caseSuiteTargets,
-  caseSuiteVariants,
-  inputValueAt,
-  type CaseSuiteTarget,
-  type CaseSuiteVariant,
-} from './case-suites';
-export { PHI_PATTERNS, findPhi } from './phi-patterns';
