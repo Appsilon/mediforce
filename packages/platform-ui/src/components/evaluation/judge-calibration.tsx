@@ -206,12 +206,13 @@ const MARKED: Record<EvalCase['expectation'], string> = {
  * positives, since a judge needs failures — then the other production runs.
  * A label is about this Evaluator's rule, not the run overall.
  */
-export function JudgeCalibrationPanel({ step, evaluator, cases, runs, stepOutputSchema, mayEdit }: {
+export function JudgeCalibrationPanel({ step, evaluator, cases, runs, stepOutputSchema, stepInputTemplate, mayEdit }: {
   step: EvaluatedStep;
   evaluator: EvaluatorView;
   cases: readonly EvalCase[];
   runs: readonly AgentRun[];
   stepOutputSchema: AgentOutputSchema | undefined;
+  stepInputTemplate?: Record<string, unknown>;
   mayEdit: boolean;
 }) {
   const [writing, setWriting] = React.useState(false);
@@ -242,7 +243,7 @@ export function JudgeCalibrationPanel({ step, evaluator, cases, runs, stepOutput
         <p className="text-muted-foreground">
           When production has no output that breaks this rule — nobody runs a bad case on purpose — change a real run&apos;s output until it does, and label it. It keeps the run&apos;s input and the step&apos;s output shape; nothing re-runs it. The assistant can draft such outputs too.
         </p>
-        {writing && <WriteOutputForm step={step} evaluator={evaluator} runs={runs} stepOutputSchema={stepOutputSchema} onClose={() => setWriting(false)} />}
+        {writing && <WriteOutputForm step={step} evaluator={evaluator} runs={runs} stepOutputSchema={stepOutputSchema} stepInputTemplate={stepInputTemplate} onClose={() => setWriting(false)} />}
         {writtenOutputs.length > 0 && (
           <ul className="space-y-2">
             {writtenOutputs.map((written) => (

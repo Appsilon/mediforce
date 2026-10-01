@@ -236,7 +236,11 @@ purpose — **Write an example** makes one: start from a production run, keep it
 input, and change its output in a form built from the step's `outputSchema`
 (one typed field per property, enumerations as choices, arrays and objects as
 JSON, changed fields marked and resettable, or the whole output as JSON), then
-**Save as fail** or **Save as pass**. It is a **written output**
+**Save as fail** or **Save as pass**. With no run to start from (**Nothing —
+write the input and output**), the input is written as JSON too, laid out empty
+in the shape the run route gives the step: the previous step's `outputSchema`
+fields at the top level, and every step that can run before it under `steps`
+(a step without an `outputSchema` as `{}`). It is a **written output**
 (`written-output-add --file`, `POST /api/evaluation/written-outputs`, with
 `label` to label it in the same write), not an Eval Case: nothing re-runs it. A
 label on it is a human Score on subject `written_output`

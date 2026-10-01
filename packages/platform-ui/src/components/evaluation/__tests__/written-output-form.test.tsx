@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { DraftedOutput, WriteOutputForm, describeChanges, emptyOutput, outputFields } from '../written-output-form';
+import { DraftedOutput, WriteOutputForm, describeChanges, emptyOutput, emptyStepInput, outputFields } from '../written-output-form';
 
 const evaluation = vi.hoisted(() => ({ createWrittenOutput: vi.fn() }));
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
@@ -47,6 +47,28 @@ describe('the output as a form', () => {
   });
 });
 
+describe('the input a step is given', () => {
+  const intake = { id: 'intake', agent: { outputSchema: { type: 'object' as const, properties: { narrative: { type: 'string' as const } } } } };
+  const review = { id: 'review' };
+  const grade = { id: 'grade-aes', agent: { outputSchema: schema } };
+  const steps = [intake, review, grade];
+
+  it('is shaped like the previous step\'s output, with every earlier step\'s output under steps', () => {
+    const transitions = [{ from: 'intake', to: 'review' }, { from: 'review', to: 'grade-aes' }, { from: 'grade-aes', to: 'review' }];
+    expect(emptyStepInput('review', { steps, transitions })).toEqual({
+      narrative: '',
+      steps: { intake: { narrative: '' }, 'grade-aes': { grade: 0, term: '', rationale: '', flags: null } },
+    });
+    expect(emptyStepInput('grade-aes', { steps, transitions })).toEqual({
+      steps: { intake: { narrative: '' }, review: {} },
+    });
+  });
+
+  it('carries no earlier output for the first step', () => {
+    expect(emptyStepInput('intake', { steps, transitions: [{ from: 'intake', to: 'review' }] })).toEqual({ steps: {} });
+  });
+});
+
 describe('WriteOutputForm', () => {
   const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
   const evaluator = { id: 'judge-1' } as never;
@@ -71,6 +93,15 @@ describe('WriteOutputForm', () => {
       origin: 'user',
       label: { evaluatorId: 'judge-1', passed: false },
     });
+  });
+
+  it('starts an input written from nothing in the shape the step is given', () => {
+    const stepInput = { narrative: '', steps: { intake: { narrative: '' } } };
+    render(<WriteOutputForm step={step} evaluator={evaluator} runs={[]} stepOutputSchema={schema} stepInputTemplate={stepInput} onClose={() => undefined} />);
+
+    expect(JSON.parse((screen.getByLabelText('Written input') as HTMLTextAreaElement).value)).toEqual(stepInput);
+    fireEvent.click(screen.getByRole('button', { name: 'Save as pass' }));
+    expect(evaluation.createWrittenOutput).toHaveBeenLastCalledWith(expect.objectContaining({ stepInput }));
   });
 
   it('offers the schema\'s choices for an enumerated field', () => {
