@@ -427,6 +427,10 @@ on; its expectation says what the new output should be, and the Evaluators grade
 it. A label (below, under calibration) is a person's pass/fail on one *output*
 for one Evaluator, and only labels calibrate a judge. The tab keeps the words
 apart: cases are positive or negative, labels pass or fail.
+An `llm_judge` grading an Eval Run trial is given the case's notes, never its
+expectation: being told the case is negative hints at the verdict, and
+calibration grades outputs with no case at all. So write a negative case's
+notes as the defect to look for, not as "this output is wrong".
 
 In the Evaluation tab, **Eval Cases → Production runs to add as Eval Cases**
 lists the Step's finished production runs not yet harvested, newest first and a
