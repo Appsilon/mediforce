@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { buildAgentRun } from '@mediforce/platform-core/testing';
 import { runEvaluatorCheck } from '../run-evaluator-check';
 import { loadEvaluationSubject } from '../evaluation-subject';
+import { createEvalCase } from '../../eval-cases';
 import { evaluationFixture, GRADED_RUN, STEP } from '../../__tests__/fixture';
 
 const judge = {
@@ -43,6 +44,34 @@ describe('runEvaluatorCheck', () => {
     expect(outcome).toMatchObject({ passed: true, value: 1, label: 'graded', comment: 'Sepsis is graded 5.', error: null });
     const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as { model: string; temperature: number };
     expect(body).toMatchObject({ model: 'anthropic/claude-haiku-4.5', temperature: 0 });
+  });
+
+  it('gives the judge the case notes but not whether the case is positive or negative', async () => {
+    const fixture = await evaluationFixture();
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: '{"reasoning": "Sepsis is graded 5.", "choice": "graded"}' }, finish_reason: 'stop' }],
+    })));
+    vi.stubGlobal('fetch', fetchMock);
+    const scope = fixture.scope();
+    Object.assign(scope, { workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) } });
+    const { evalCase } = await createEvalCase({
+      ...STEP,
+      name: 'Grade 5 sepsis',
+      input: { triggerPayload: { studyId: 'CDISCPILOT01' }, previousStepOutputs: {} },
+      workspaceSeedCommit: null,
+      expectation: 'negative',
+      notes: 'Must not grade the fatal sepsis event below 5.',
+      split: 'dev',
+      containsProductionData: false,
+      origin: 'user',
+    }, scope);
+
+    await runEvaluatorCheck(scope, judge, await loadEvaluationSubject(scope, GRADED_RUN, STEP), evalCase);
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as { messages: Array<{ content: string }> };
+    const prompt = body.messages.map((message) => message.content).join('\n');
+    expect(prompt).toContain('Must not grade the fatal sepsis event below 5.');
+    expect(prompt).not.toMatch(/negative/i);
   });
 
   it('reports what a judge call spent even when its answer is unusable', async () => {

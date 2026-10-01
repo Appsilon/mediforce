@@ -79,9 +79,7 @@ export async function runJudgeCheck(
       rubric: check.rubric,
       choices: check.choices,
       stepInput: output.stepInput,
-      expectation: evalCase === null
-        ? null
-        : [`This is a ${evalCase.expectation} case.`, evalCase.notes].filter((part) => part !== null).join(' '),
+      expectation: evalCase?.notes ?? null,
     });
     const verdict = await judge.review({
       stepId: output.stepId,
