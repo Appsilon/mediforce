@@ -267,7 +267,11 @@ when it declares one), a language and source, a judge model with the question
 it answers and its verdicts, or a built-in check — never the check's JSON.
 Each Evaluator's **Details** show the whole check and its versions; **Edit**
 saves a new version with what changed (`POST
-/api/evaluation/evaluators/:id/versions`), keeping its name and kind.
+/api/evaluation/evaluators/:id/versions`), keeping its name and kind. A
+built-in check's Details spell out when it passes and fails, which cases it
+grades and exactly what it looks for (the PHI patterns, the injected
+instructions, the compared keys); editing one changes its rule text and
+severity — and the keys `result_stable` compares — never which check it is.
 
 `evaluator-preview` (`POST /api/evaluation/evaluators/preview`) runs a draft
 check against the Step's recent production outputs (dry runs left out) and
@@ -372,9 +376,14 @@ whitespace of the target text and pads it with blank lines, or reverses the
 keys of a target object (kind `metamorphic`). Each case is positive: the output
 is what the original run gave, ignoring the injection. Files of the workspace
 are not targeted yet; a hand-written `case-perturb` covers them. The Evaluation
-tab's **Eval Cases → Built-in case suites** does the same from a chosen run,
-input part and field path, names the built-in Evaluator that grades the suite
-(with **Add it** when the step has none), and warns when the run already has
+tab's **Eval Cases → Built-in case suites** does the same from a chosen run:
+**Field to change** lists only the fields of that run's input the suite can
+change (from the run's `caseInput`, earlier steps' outputs first) and shows the
+full field path; the section lists every case it will write before writing it,
+with the exact instruction each injection appends. It names the built-in
+Evaluator that grades the suite and adds it when the step has none — for
+`result_stable` with the result keys ticked (by default the output schema's
+boolean, number and enum properties) — and warns when the run already has
 that suite for the field. The written cases are ordinary Eval Cases, opened,
 edited and archived from the list. The Evaluation Assistant proposes a suite
 with `propose_case_suite` — one card for the whole suite, checked against the
@@ -424,7 +433,8 @@ lists the Step's finished production runs not yet harvested, newest first and a
 page at a time (**Load more**; `GET /api/evaluation/agent-runs` takes the
 previous page's `nextCursor` as `cursor`). Each shows its reasoning summary,
 opens its **Input and output** — what the step was given beside what it
-returned (`eval run-io <agentRunId>`, `GET /api/evaluation/agent-runs/:agentRunId/io`)
+returned (`eval run-io <agentRunId>`, `GET /api/evaluation/agent-runs/:agentRunId/io`;
+its `caseInput` is the same input as an Eval Case made from the run holds it)
 — and **Log** opens the run's execution log before you add it as a **Positive
 case** (its output was right) or a **Negative case** (it was wrong).
 

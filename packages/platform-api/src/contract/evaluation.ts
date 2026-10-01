@@ -240,6 +240,8 @@ export const GetAgentRunIoOutputSchema = z.object({
   agentRunId: z.string(),
   status: AgentRunSchema.shape.status,
   stepInput: z.record(z.string(), z.unknown()).nullable(),
+  /** The same input as an Eval Case made from the run holds it: trigger payload, earlier steps' outputs, carry-over. */
+  caseInput: EvalCaseInputSchema,
   result: z.unknown(),
   reasoningSummary: z.string().nullable(),
   confidence: z.number().nullable(),
