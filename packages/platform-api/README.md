@@ -103,9 +103,7 @@ Eval Case, Dataset version, MCP eval policy and MCP recording by `(namespace, wo
 stepId)` and reaches it through the one `scope.evaluation` wrapper. Reads need
 only to see the workflow; writes need its `edit` verb (`_lib/evaluated-step.ts`).
 An Evaluator check that cannot run comes back as `error`, never as a failed
-output (`_lib/run-evaluator-check.ts`; the platform's own red-team checks are
-`_lib/builtin-checks.ts`, their cases `red-team-cases.ts`, and the report's
-per-suite pass rates `_lib/eval-run-report.ts`). Evaluators flagged `runInProduction`
+output (`_lib/run-evaluator-check.ts`). Evaluators flagged `runInProduction`
 (`setEvaluatorProduction`) score live runs through `_lib/production-evaluators.ts`,
 the runner's output gate: counted `schema`/`code` ones run inline and a failing
 critical one sends the run to the step's fallback; `llm_judge` ones only write
@@ -175,10 +173,12 @@ the core.
 
 A request may grant the Evaluation Assistant an unattended budget
 (`unattendedBudgetUsd`): `start_eval_run` then starts prepared runs of the step
-that fit what is left of it, as a person confirming each run's budget, and
-`start_optimisation` starts GEPA optimisations whose budgets fit it
+that fit what is left of it, as a person confirming each run's budget
 (`UnattendedGrant` in `_lib/run-evaluation-tool.ts`); the grant is recorded on the
-request's prompt audit event.
+request's prompt audit event. The assistant prepares runs of the step as it is
+only: challengers, fixes as variants and GEPA optimisations are the person's to
+start, and it never labels an Eval Case positive or negative — a case created
+without an `expectation` is positive.
 
 The Evaluation Assistant allows 32 model/tool rounds with an 8,000-token
 completion budget per call, independent of the selected model's context window.

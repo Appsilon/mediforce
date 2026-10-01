@@ -10,7 +10,7 @@ const BADGES: Record<StepQualificationStatus, { label: string; className: string
   not_qualified: { label: 'Not qualified', className: 'bg-muted text-muted-foreground' },
 };
 
-export function QualificationStatusChip({ status, title }: { status: StepQualificationStatus; title?: string }) {
+function QualificationStatusChip({ status, title }: { status: StepQualificationStatus; title?: string }) {
   const badge = BADGES[status];
   return (
     <span title={title} data-testid="step-qualification-badge" data-status={status} className={cn('rounded px-1.5 py-0.5 text-[11px] font-medium', badge.className)}>

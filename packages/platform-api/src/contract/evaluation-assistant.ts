@@ -16,8 +16,8 @@ export const AskEvaluationAssistantInputSchema = EvaluatedStepSchema.extend({
   model: z.string().min(1).optional(),
   /**
    * An unattended budget the person grants for this request (D15): the
-   * assistant may start prepared Eval Runs and GEPA optimisations of this step
-   * whose budgets together fit it. Without it, starting either is refused.
+   * assistant may start prepared Eval Runs of this step whose budgets together
+   * fit it. Without it, starting one is refused.
    */
   unattendedBudgetUsd: z.number().positive().max(10_000).optional(),
 });
@@ -32,12 +32,6 @@ export const PreparedEvalRunSchema = z.object({
 /** An Eval Run the assistant started under the request's unattended budget. */
 export const StartedEvalRunSchema = z.object({
   evalRunId: z.uuid(),
-  budgetUsd: z.number().positive(),
-});
-
-/** A GEPA optimisation the assistant started under the request's unattended budget. */
-export const StartedOptimisationSchema = z.object({
-  optimisationId: z.uuid(),
   budgetUsd: z.number().positive(),
 });
 
@@ -61,8 +55,6 @@ export const AskEvaluationAssistantOutputSchema = z.object({
   preparedEvalRuns: z.array(PreparedEvalRunSchema),
   /** Runs started under `unattendedBudgetUsd`; empty without one. */
   startedEvalRuns: z.array(StartedEvalRunSchema),
-  /** Optimisations started under `unattendedBudgetUsd`; empty without one. */
-  startedOptimisations: z.array(StartedOptimisationSchema).default([]),
 });
 
 /** One step of a turn in progress, streamed while the assistant works. */
@@ -82,7 +74,6 @@ export type AskEvaluationAssistantInput = z.infer<typeof AskEvaluationAssistantI
 export type AskEvaluationAssistantOutput = z.infer<typeof AskEvaluationAssistantOutputSchema>;
 export type PreparedEvalRun = z.infer<typeof PreparedEvalRunSchema>;
 export type StartedEvalRun = z.infer<typeof StartedEvalRunSchema>;
-export type StartedOptimisation = z.infer<typeof StartedOptimisationSchema>;
 export type EvaluationAssistantProgress = z.infer<typeof EvaluationAssistantProgressSchema>;
 export type EvaluatorSelfTest = z.infer<typeof EvaluatorSelfTestSchema>;
 export type ProposalView = z.infer<typeof ProposalViewSchema>;

@@ -135,7 +135,7 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     })]);
 
     const unsigned = GetStepQualificationOutputSchema.parse(await (await request.get(`/api/evaluation/qualification?${query}`, { headers: AUTH_HEADERS })).json());
-    expect(unsigned).toMatchObject({ status: 'not_qualified', qualification: null });
+    expect(unsigned).toMatchObject({ status: 'not_qualified', qualification: null, validation: { status: 'failed', evalRunId: finished.evalRun.id } });
 
     const signing = {
       evalRunId: finished.evalRun.id,
@@ -159,7 +159,6 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     expect(qualification).toMatchObject({
       evalRunId: finished.evalRun.id,
       variantId: 'champion',
-      briefVersion: 1,
       fingerprint: { hash: champion!.fingerprint!.hash },
       signature: { signerId: callers.member.uid, reauthentication: 'password' },
     });
@@ -174,7 +173,7 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     });
     expect(v2.status(), await v2.text()).toBe(201);
     const stale = GetStepQualificationOutputSchema.parse(await (await request.get(`/api/evaluation/qualification?${query}`, { headers: AUTH_HEADERS })).json());
-    expect(stale).toMatchObject({ status: 'stale', definitionVersion: 2, changed: ['step'] });
+    expect(stale).toMatchObject({ status: 'stale', definitionVersion: 2, changed: ['step'], validation: { status: 'not_verified', evalRunId: null } });
     const ofV1 = GetStepQualificationOutputSchema.parse(await (await request.get(`/api/evaluation/qualification?${query}&definitionVersion=1`, { headers: AUTH_HEADERS })).json());
     expect(ofV1.status).toBe('qualified');
   });

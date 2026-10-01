@@ -97,7 +97,8 @@ function verdictExpectation(value: number | undefined): EvalCaseExpectation | un
  * and the parent of the commit it produced is the workspace it saw. An
  * approved run is a positive case; a rejected one is negative, carrying the
  * reviewer's comment as what the output must not do. A run sent back for
- * revision or a recheck says neither, so the caller must.
+ * revision or a recheck, or never reviewed, is positive unless the caller
+ * says otherwise.
  */
 export async function createEvalCaseFromAgentRun(
   input: z.output<typeof CreateEvalCaseFromAgentRunInputSchema>,
@@ -105,13 +106,7 @@ export async function createEvalCaseFromAgentRun(
 ): Promise<EvalCaseOutput> {
   const source = await loadCaseSource(scope, input.agentRunId, input.step, 'edit');
   const [verdict] = await scope.scores.list({ agentRunId: input.agentRunId, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 });
-  const expectation = input.expectation ?? verdictExpectation(verdict?.value);
-  if (expectation === undefined) {
-    const why = verdict === undefined ? 'was never reviewed' : 'was sent back, neither approved nor rejected';
-    throw new ValidationError(
-      `Agent Run '${input.agentRunId}' ${why} — say whether it is a positive or negative case`,
-    );
-  }
+  const expectation = input.expectation ?? verdictExpectation(verdict?.value) ?? 'positive';
 
   const { instance, agentRun } = source.subject;
   return storeCase(scope, {

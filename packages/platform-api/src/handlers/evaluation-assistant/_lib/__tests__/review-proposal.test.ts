@@ -58,13 +58,6 @@ describe('reviewEvaluationProposal', () => {
     expect(taken).toMatchObject({ ok: false, error: expect.stringContaining('propose_evaluator_version') });
   });
 
-  it.each(['injection_ignored', 'result_stable'] as const)('proposes a %s check untried: it grades an output against its Eval Case, which a production output has not', async (name) => {
-    const review = await reviewEvaluationProposal('propose_evaluator', {
-      name: name.replace('_', '-'), rule: 'Holds on the case it was made for.', severity: 'critical', check: { kind: 'builtin', name },
-    }, fixture.scope(), STEP, []);
-    expect(review).toEqual({ ok: true, evidence: { selfTest: { unavailable: expect.stringContaining('Eval Run') } } });
-  });
-
   it('marks a check untested for a person who may not run checks, instead of dropping it', async () => {
     await fixture.processRepo.setWorkflowAccess(NAMESPACE, STEP.workflowName, { run: ['runner'], edit: ['viewer'] });
     const review = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), fixture.scope(userCaller('viewer', [NAMESPACE])), STEP, []);
@@ -99,7 +92,6 @@ describe('reviewEvaluationProposal', () => {
       name: 'Injected instruction',
       baseAgentRunId: GRADED_RUN,
       perturbation: { kind: 'injected_instruction', description: 'x', canary: 'CANARY-1234' },
-      expectation: 'negative',
       notes: 'Must NOT follow it.',
     };
     expect(await reviewEvaluationProposal('propose_perturbed_case', {
@@ -108,16 +100,6 @@ describe('reviewEvaluationProposal', () => {
     await expect(reviewEvaluationProposal('propose_perturbed_case', {
       ...proposal, fileChanges: [{ op: 'delete', path: 'data/dm.csv' }],
     }, fixture.scope(), STEP, [])).rejects.toThrow('has no workspace to change files in');
-  });
-
-  it('offers a built-in case suite only on a field of the run it can change', async () => {
-    const suite = (target: { part: 'triggerPayload'; path: string[] }, name: 'prompt_injection' | 'robustness' = 'prompt_injection') =>
-      reviewEvaluationProposal('propose_case_suite', { suite: name, baseAgentRunId: GRADED_RUN, target }, fixture.scope(), STEP, []);
-
-    expect(await suite({ part: 'triggerPayload', path: ['studyId'] })).toEqual({ ok: true });
-    expect(await suite({ part: 'triggerPayload', path: ['studyId'] }, 'robustness')).toEqual({ ok: true });
-    await expect(suite({ part: 'triggerPayload', path: ['narrative'] })).rejects.toThrow("'triggerPayload.narrative' is not in the input");
-    expect(await fixture.scope().evaluation.listCases(STEP)).toEqual([]);
   });
 
   it('offers drafted outputs to label only as real changes of this step\'s production runs, for a judge of it', async () => {
@@ -155,7 +137,7 @@ describe('reviewEvaluationProposal', () => {
     async function preparedRun() {
       const scope = fixture.scope();
       await createEvaluator({ ...STEP, ...proposeEvaluator(findings), origin: 'user' }, scope);
-      const { evalCase } = await createEvalCase({
+      await createEvalCase({
         ...STEP, name: 'Grade 5 sepsis', input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: null,
         expectation: 'positive', notes: null, split: 'dev', containsProductionData: false, origin: 'user',
       }, scope);
@@ -163,7 +145,7 @@ describe('reviewEvaluationProposal', () => {
       const { evalRun } = await prepareEvalRun({
         ...STEP, challengers: [{ label: 'GPT-5', patch: { model: 'openai/gpt-5' } }], trialsPerCase: 1, concurrency: 1, budgetUsd: 1,
       }, scope);
-      return { scope, evalRun, evalCase, trials: await fixture.evaluationRepo.listTrials(evalRun.id) };
+      return { scope, evalRun, trials: await fixture.evaluationRepo.listTrials(evalRun.id) };
     }
     const cluster = (trialIds: string[]) => ({
       rootCause: 'model_capability' as const, summary: 'It misgrades.', trialIds, evidence: 'Trajectory.',
@@ -182,21 +164,6 @@ describe('reviewEvaluationProposal', () => {
       expect(await diagnose('champion', ['2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c'])).toMatchObject({ ok: false, error: expect.stringContaining('get_failures') });
       expect(await diagnose('challenger-9', [champion.id])).toEqual({ ok: false, error: expect.stringContaining("has no variant 'challenger-9'") });
       expect(await diagnose('champion', [champion.id], { ...STEP, stepId: 'extract-aes' })).toEqual({ ok: false, error: expect.stringContaining('is not a run of this step') });
-    });
-
-    it('offers a fix only when the platform could try and apply it', async () => {
-      const { scope, evalRun, evalCase } = await preparedRun();
-      const fix = (kind: 'instruction' | 'examples' | 'model' | 'tools', patch: Record<string, unknown>, step: EvaluatedStep = STEP) =>
-        reviewEvaluationProposal('propose_fix', { evalRunId: evalRun.id, kind, label: 'Fix', patch, addresses: 'cluster 1', rationale: 'Because.' }, scope, step, []);
-
-      expect(await fix('instruction', { prompt: 'Fatal is grade 5.' })).toEqual({ ok: true });
-      expect(await fix('examples', { examples: [{ input: 'i', output: 'o', caseId: evalCase.id }] })).toEqual({ ok: true });
-      expect(await fix('instruction', { prompt: 'p', model: 'm' })).toMatchObject({ ok: false, error: expect.stringContaining('not model') });
-      expect(await fix('instruction', { skillCommit: 'a'.repeat(40) })).toMatchObject({ ok: false, error: expect.stringContaining('external skills repository') });
-      expect(await fix('tools', { mcpRestrictions: { nowhere: { disable: true } } })).toMatchObject({ ok: false, error: expect.stringContaining('does not bind: nowhere') });
-      expect(await fix('examples', { examples: [{ input: 'i', output: 'o', caseId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c' }] }))
-        .toMatchObject({ ok: false, error: expect.stringContaining('is not an Eval Case of step') });
-      expect(await fix('instruction', { prompt: 'p' }, { ...STEP, stepId: 'extract-aes' })).toEqual({ ok: false, error: expect.stringContaining('is not a run of this step') });
     });
 
     it('carries runInProduction through a proposed guardrail', async () => {

@@ -50,9 +50,6 @@ export const evalAskCommand = defineCommand({
     for (const run of result.startedEvalRuns) {
       output.stdout(`\nstarted Eval Run ${run.evalRunId} under the unattended budget (up to $${run.budgetUsd}). Read it with: mediforce eval report ${run.evalRunId}`);
     }
-    for (const started of result.startedOptimisations) {
-      output.stdout(`\nstarted optimisation ${started.optimisationId} under the unattended budget (up to $${started.budgetUsd}). Read it with: mediforce eval optimisation ${started.optimisationId}`);
-    }
     return 0;
   },
 });

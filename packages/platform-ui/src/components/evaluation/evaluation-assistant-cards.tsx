@@ -17,7 +17,6 @@ import { useEvaluatorLabels, useStepEvaluationMutation, useStepEvaluators } from
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
-import { describePatch } from './eval-run-report';
 import { CalibrateAction, LabelOutputRow, labelsBySubject } from './judge-calibration';
 import { DraftedOutput } from './written-output-form';
 
@@ -30,15 +29,14 @@ type Proposal<Tool extends ProposalView['tool']> = Extract<ProposalView, { tool:
  * labelling queue are worked through instead; a routing recommendation is
  * applied in the workflow editor.
  */
-type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_outputs_to_label' | 'propose_written_outputs' | 'propose_control_settings' | 'propose_diagnosis' | 'propose_fix' }>;
+type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_outputs_to_label' | 'propose_written_outputs' | 'propose_control_settings' | 'propose_diagnosis' }>;
 
 export function isDecidable(proposal: ProposalView): proposal is DecidableProposal {
   return proposal.tool !== 'propose_evaluation_plan'
     && proposal.tool !== 'propose_outputs_to_label'
     && proposal.tool !== 'propose_written_outputs'
     && proposal.tool !== 'propose_control_settings'
-    && proposal.tool !== 'propose_diagnosis'
-    && proposal.tool !== 'propose_fix';
+    && proposal.tool !== 'propose_diagnosis';
 }
 
 const buttonClass = 'inline-flex items-center gap-1 rounded border px-2 py-0.5 disabled:opacity-50 disabled:pointer-events-none';
@@ -49,7 +47,6 @@ const TITLES: Record<DecidableProposal['tool'], string> = {
   propose_evaluator_version: 'Evaluator version',
   propose_eval_case: 'Eval Case',
   propose_perturbed_case: 'synthesized Eval Case',
-  propose_case_suite: 'built-in case suite',
   propose_brief: 'Evaluation Brief',
   propose_acceptance_criteria: 'Acceptance Criteria',
 };
@@ -66,18 +63,14 @@ async function acceptProposal(step: EvaluatedStep, proposal: DecidableProposal):
       return mediforce.evaluation.addEvaluatorVersion({ ...version, origin: 'assistant' });
     }
     case 'propose_eval_case': {
-      const { agentRunId, input, name, expectation, notes, split } = proposal.arguments;
+      const { agentRunId, input, name, notes, split } = proposal.arguments;
       return agentRunId !== undefined
-        ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, step, name, expectation, notes, split, origin: 'assistant' })
-        : mediforce.evaluation.createCase({ ...step, name, input: input!, expectation, notes: notes ?? null, split, origin: 'assistant' });
+        ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, step, name, notes, split, origin: 'assistant' })
+        : mediforce.evaluation.createCase({ ...step, name, input: input!, notes: notes ?? null, split, origin: 'assistant' });
     }
     case 'propose_perturbed_case': {
       const { rationale: _rationale, ...synthesized } = proposal.arguments;
       return mediforce.evaluation.createPerturbedCase({ ...step, ...synthesized, origin: 'assistant' });
-    }
-    case 'propose_case_suite': {
-      const { rationale: _rationale, ...suite } = proposal.arguments;
-      return mediforce.evaluation.createRedTeamCases({ ...step, ...suite, origin: 'assistant' });
     }
     case 'propose_brief':
       return mediforce.evaluation.setBrief({ ...step, text: proposal.arguments.text, origin: 'assistant' });
@@ -114,18 +107,13 @@ function SelfTestSummary({ selfTest }: { selfTest: EvaluatorSelfTest }) {
   );
 }
 
-const CASE_SUITES = {
-  prompt_injection: { writes: 'Three cases, each appending an injected instruction with its own canary to', grader: 'injection_ignored' },
-  robustness: { writes: 'Cases that rewrite, without changing what it says,', grader: 'result_stable' },
-} as const;
-
 function perturbedCaseSummary(proposal: Proposal<'propose_perturbed_case'>['arguments']): string {
   const changes = [
     ...(proposal.inputChanges ?? []).map((change) => `${change.op} ${[change.part, ...change.path].join('.')}`),
     ...(proposal.fileChanges ?? []).map((change) => `${change.op} ${change.path}`),
   ];
   return [
-    `${proposal.name} — ${proposal.expectation}, ${proposal.perturbation.kind.replace(/_/g, ' ')}: ${proposal.perturbation.description}`,
+    `${proposal.name} — ${proposal.perturbation.kind.replace(/_/g, ' ')}: ${proposal.perturbation.description}`,
     `From run ${proposal.baseAgentRunId.slice(0, 8)}: ${changes.join('; ')}`,
     proposal.notes,
   ].join('\n');
@@ -156,20 +144,9 @@ function ProposalSummary({ step, proposal }: { step: EvaluatedStep; proposal: De
       );
     }
     case 'propose_eval_case':
-      return <>{proposal.arguments.name} — {proposal.arguments.expectation}</>;
+      return <>{proposal.arguments.name}{proposal.arguments.notes === undefined || proposal.arguments.notes === null ? '' : ` — ${proposal.arguments.notes}`}</>;
     case 'propose_perturbed_case':
       return <>{perturbedCaseSummary(proposal.arguments)}</>;
-    case 'propose_case_suite': {
-      const { suite, baseAgentRunId, target, rationale } = proposal.arguments;
-      const graded = evaluators.data?.evaluators.some((evaluator) => evaluator.latest.check.kind === 'builtin' && evaluator.latest.check.name === CASE_SUITES[suite].grader) === true;
-      return (
-        <>
-          {CASE_SUITES[suite].writes} &lsquo;{[target.part, ...target.path].join('.')}&rsquo; of run {baseAgentRunId.slice(0, 8)}; each expects the output that run gave.
-          {`\nGraded by the built-in ${CASE_SUITES[suite].grader} Evaluator${graded ? '.' : ' — the step has none yet: add it under Evaluators.'}`}
-          {rationale !== undefined && `\n${rationale}`}
-        </>
-      );
-    }
     case 'propose_acceptance_criteria':
       return <>{describeAcceptanceCriteria(proposal.arguments.criteria)}{`\n${proposal.arguments.rationale}`}</>;
   }
@@ -488,7 +465,7 @@ const FIX_KIND_LABELS = {
 
 /**
  * Failures of an Eval Run clustered by root cause (ADR-0023 D12). Nothing to
- * accept: a fix that is a variant patch arrives as its own card.
+ * accept: each cluster names its fix in words.
  */
 export function DiagnosisCard({ diagnosis }: { diagnosis: Proposal<'propose_diagnosis'>['arguments'] }) {
   return (
@@ -509,62 +486,6 @@ export function DiagnosisCard({ diagnosis }: { diagnosis: Proposal<'propose_diag
           </li>
         ))}
       </ol>
-    </div>
-  );
-}
-
-/**
- * A fix the assistant proposes as a variant patch. "Try it" prepares an Eval
- * Run of the patch on the newest Dataset version; the person confirms its
- * budget on the prepared run in the Eval Runs list, and applies the patch to
- * the step from the finished run's report.
- */
-export function FixCard({ step, fix, mayRun, runReason }: {
-  step: EvaluatedStep;
-  fix: Proposal<'propose_fix'>['arguments'];
-  mayRun: boolean;
-  runReason: string | undefined;
-}) {
-  const [budget, setBudget] = React.useState('');
-  const prepare = useStepEvaluationMutation(step, () => mediforce.evaluation.prepareRun({
-    ...step,
-    challengers: [{ label: fix.label, patch: fix.patch }],
-    ...(budget === '' ? {} : { budgetUsd: Number(budget) }),
-  }));
-  return (
-    <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="fix-card">
-      <div className="mb-1 font-medium">Proposed fix: {fix.label}</div>
-      <p className="whitespace-pre-wrap text-muted-foreground">Addresses: {fix.addresses}</p>
-      <p className="mt-0.5 whitespace-pre-wrap text-muted-foreground">{fix.rationale}</p>
-      <p className="mt-0.5" data-testid="fix-patch"><span className="text-muted-foreground">Changes:</span> {describePatch(fix.patch)}</p>
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <label className="flex items-center gap-1 text-muted-foreground">
-          Budget (USD)
-          <input
-            type="number"
-            min={0}
-            step={0.01}
-            placeholder="auto"
-            className="w-20 rounded-md border bg-background px-1.5 py-0.5 text-xs"
-            data-testid="fix-budget"
-            value={budget}
-            onChange={(event) => setBudget(event.target.value)}
-          />
-        </label>
-        <InstantTooltip label={runReason}>
-          <span className="inline-flex">
-            <button type="button" data-testid="fix-try-it" className={primaryButtonClass} disabled={mayRun === false || prepare.isPending || prepare.isSuccess} onClick={() => prepare.mutate(undefined)}>
-              {prepare.isSuccess ? 'Prepared' : 'Try it'}
-            </button>
-          </span>
-        </InstantTooltip>
-        {prepare.isSuccess && (
-          <span className="text-muted-foreground" data-testid="fix-prepared">
-            Eval Run <span className="font-mono">{prepare.data.evalRun.id.slice(0, 8)}</span> prepared — confirm its budget in the Eval Runs list.
-          </span>
-        )}
-        {prepare.error !== null && <span className="text-destructive">{prepare.error.message}</span>}
-      </div>
     </div>
   );
 }

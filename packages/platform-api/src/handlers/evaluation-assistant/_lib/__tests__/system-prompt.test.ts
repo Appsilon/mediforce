@@ -8,35 +8,40 @@ describe('Evaluation Assistant prompt', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('run it with preview_evaluator on real outputs');
   });
 
-  it('covers the plan, the cheapest reliable check, labels only the person gives, and cases synthesized as positive', () => {
+  it('covers the plan, the cheapest reliable check, and labels and case expectations only the person gives', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('call propose_evaluation_plan');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Choose the cheapest reliable kind');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('The person labels them pass or fail on the card, never you.');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('most synthesized cases are positive, with notes on what the output must NOT do');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Cases are not labelled positive or negative.');
   });
 
-  it('covers Acceptance Criteria set before a run, variant comparison without overclaiming, and routing', () => {
+  it('covers Acceptance Criteria set before a run, validation from the newest run of the version, and routing', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Propose them with propose_acceptance_criteria');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('otherwise say there is no clear difference at this sample size');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('newest finished Eval Run of its workflow version');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('it rests on that run alone');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toContain('citing the Brief');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Propose it with propose_control_settings');
   });
 
-  it('covers the fix loop: failures, diagnosis by root cause, fixes by what expresses them, examples from dev cases only', () => {
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('get_failures gives the variant\'s failing trials');
+  it('covers diagnosis: failures, root causes, fixes by what expresses them', () => {
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('get_failures gives the run\'s failing trials');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('propose_diagnosis');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('ambiguous_instruction');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('propose_fix with the patch');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('propose_evaluator with runInProduction true');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('A lower Control Mode is propose_control_settings');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('A wrong Evaluator is propose_evaluator_version');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('A preprocessing step is advice in the diagnosis');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Few-shot examples come from dev cases only — never holdout');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Start such a run only under a granted unattended budget');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('start_optimisation runs GEPA');
+  });
+
+  it('leaves variants, optimisation and built-in checks out of what it offers', () => {
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('You do not set up variants');
+    for (const gone of ['propose_fix', 'start_optimisation', 'get_optimisation', 'compare_variants', 'propose_case_suite', 'builtin', 'challenger']) {
+      expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toContain(gone);
+    }
   });
 
   it('says whether the request carries an unattended budget', () => {
-    expect(unattendedBudgetMessage(undefined)).toContain('start_eval_run and start_optimisation are refused');
+    expect(unattendedBudgetMessage(undefined)).toContain('start_eval_run is refused');
     expect(unattendedBudgetMessage(5)).toContain('unattended budget of $5');
   });
 

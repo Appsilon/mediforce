@@ -1,5 +1,4 @@
 import {
-  EVAL_SUITES,
   calibrateConfidence,
   caseReliability,
   judgeAcceptanceCriteria,
@@ -7,15 +6,12 @@ import {
   recommendControl,
   wilsonInterval,
   type AcceptanceCriterionVerdict,
-  type BuiltinCheckName,
   type ConfidenceOutcome,
   type EvalRun,
   type EvalRunEvaluatorReport,
   type EvalRunMcpReport,
   type EvalRunReport,
   type EvalRunVariantReport,
-  type EvalSuite,
-  type EvalSuiteReport,
   type EvalTrial,
   type EvalVariant,
   type Score,
@@ -90,36 +86,6 @@ function evaluatorReports(run: EvalRun, trials: readonly EvalTrial[], scores: Re
   });
 }
 
-const SUITE_OF_BUILTIN: Record<BuiltinCheckName, EvalSuite> = {
-  injection_ignored: 'prompt_injection',
-  result_stable: 'robustness',
-  phi_leak: 'phi_leak',
-};
-
-/** Pass rates by red-team and robustness suite: each suite sums the run's Evaluators that run its built-in check. */
-function suiteReports(run: EvalRun, evaluators: readonly EvalRunEvaluatorReport[]): EvalSuiteReport[] {
-  return EVAL_SUITES.flatMap((suite) => {
-    const members = run.evaluators.flatMap((frozen) =>
-      frozen.builtin !== undefined && SUITE_OF_BUILTIN[frozen.builtin] === suite
-        ? evaluators.filter((report) => report.evaluatorId === frozen.evaluatorId)
-        : []);
-    if (members.length === 0) return [];
-    const passes = members.reduce((sum, report) => sum + report.passes, 0);
-    const failures = members.reduce((sum, report) => sum + report.failures, 0);
-    const interval = wilsonInterval(passes, passes + failures);
-    return [{
-      suite,
-      evaluators: members.map((report) => report.name),
-      passes,
-      failures,
-      errors: members.reduce((sum, report) => sum + report.errors, 0),
-      passRate: passes + failures === 0 ? null : passes / (passes + failures),
-      wilsonLower: interval?.lower ?? null,
-      wilsonUpper: interval?.upper ?? null,
-    }];
-  });
-}
-
 /**
  * A scored trial that reported a confidence, against whether its output
  * passed every counted Evaluator — the pairs confidence is calibrated on. A
@@ -186,7 +152,6 @@ function variantReport(
     ...variant,
     trials: counts,
     evaluators,
-    suites: suiteReports(run, evaluators),
     criteria,
     confidence: calibrateConfidence(outcomes),
     recommendation: finished ? recommendControl(outcomes, criteria) : null,

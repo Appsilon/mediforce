@@ -4,9 +4,7 @@ import {
   AcceptanceCriteriaVersionSchema,
   AgentRunSchema,
   EvalCaseExpectationSchema,
-  EvalCaseInputPartSchema,
   EvalCaseInputSchema,
-  EvalCaseInputTargetSchema,
   EvalCaseSchema,
   EvalCaseSplitSchema,
   EvalDatasetVersionSchema,
@@ -28,8 +26,6 @@ import {
   McpEvalServerPolicySchema,
   PerturbedEvalCaseSpecSchema,
   QualificationDeviationSchema,
-  RED_TEAM_SUITES,
-  RedTeamSuiteSchema,
   ScoreSchema,
   StepFingerprintComponentSchema,
   StepFingerprintSchema,
@@ -256,7 +252,7 @@ export const CreateEvalCaseInputSchema = EvaluatedStepSchema.extend({
   name: z.string().trim().min(1).max(200),
   input: EvalCaseInputSchema,
   workspaceSeedCommit: EvalCaseSchema.shape.workspaceSeedCommit.default(null),
-  expectation: EvalCaseExpectationSchema,
+  expectation: EvalCaseExpectationSchema.default('positive'),
   notes: z.string().trim().max(4000).nullable().default(null),
   split: EvalCaseSplitSchema.default('dev'),
   containsProductionData: z.boolean().default(false),
@@ -265,9 +261,9 @@ export const CreateEvalCaseInputSchema = EvaluatedStepSchema.extend({
 
 /**
  * "Add to eval set" from a production Agent Run: its input, the outputs before
- * it and its parent commit become the case. The expectation follows the run's
- * `human_verdict` Score — approved is positive, rejected is negative with the
- * reviewer's comment — and must be given when the run was never reviewed.
+ * it and its parent commit become the case. Unless given, the expectation
+ * follows the run's `human_verdict` Score — approved is positive, rejected is
+ * negative with the reviewer's comment — and is positive otherwise.
  * With `step`, the run must be a run of that step.
  */
 export const CreateEvalCaseFromAgentRunInputSchema = z.object({
@@ -298,24 +294,6 @@ export const CreatePerturbedEvalCaseInputSchema = EvaluatedStepSchema
     origin: EvaluationOriginSchema.default('user'),
   })
   .refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' });
-
-/**
- * A red-team or robustness suite of Eval Cases from one production Agent Run
- * (ADR-0023 phase 5a). `prompt_injection` appends each of the built-in
- * injected instructions, each naming its own canary, to the string at
- * `target`; `robustness` rewrites the string (whitespace) or object (key
- * order) at `target` without changing what it says. Every case expects the
- * output of the original run.
- */
-export { RED_TEAM_SUITES };
-export const CreateRedTeamEvalCasesInputSchema = EvaluatedStepSchema.extend({
-  baseAgentRunId: z.string().min(1),
-  suite: RedTeamSuiteSchema,
-  target: EvalCaseInputTargetSchema,
-  split: EvalCaseSplitSchema.default('dev'),
-  origin: EvaluationOriginSchema.default('user'),
-});
-export const CreateRedTeamEvalCasesOutputSchema = z.object({ cases: z.array(EvalCaseSchema) });
 
 /**
  * Seeds Eval Cases from an Evaluator's labels (EvalGen): each labelled
@@ -597,8 +575,25 @@ export const ApplyStepVariantOutputSchema = z.object({
 export const GetStepQualificationInputSchema = EvaluatedStepSchema.extend({
   definitionVersion: z.coerce.number().int().positive().optional(),
 });
+/**
+ * Whether the step, in this workflow version, is validated: read from the
+ * newest finished Eval Run of that version against the criteria frozen into it.
+ * `not_verified` when there is none, or when the step's Fingerprint, its
+ * Evaluators, its live Eval Cases or its Acceptance Criteria changed since.
+ */
+export const StepValidationSchema = z.object({
+  status: z.enum(['passed', 'failed', 'not_verified']),
+  /** The run it is read from; null when no run of the version finished. */
+  evalRunId: z.uuid().nullable(),
+  /** The run's verdict, or what reset it. */
+  reason: z.string(),
+  /** An Eval Run of the step is running; the status is read again once it ends. */
+  runInProgress: z.boolean(),
+});
+
 export const GetStepQualificationOutputSchema = z.object({
   status: StepQualificationStatusSchema,
+  validation: StepValidationSchema,
   /** A signed qualification that binds this Fingerprint, else the newest one; null when there is none. */
   qualification: StepQualificationSchema.nullable(),
   definitionVersion: z.number().int().positive(),
@@ -700,8 +695,6 @@ export type CreateEvalCaseInput = z.input<typeof CreateEvalCaseInputSchema>;
 export type CreateEvalCaseFromAgentRunInput = z.input<typeof CreateEvalCaseFromAgentRunInputSchema>;
 export type EvalCaseOutput = z.infer<typeof EvalCaseOutputSchema>;
 export type CreatePerturbedEvalCaseInput = z.input<typeof CreatePerturbedEvalCaseInputSchema>;
-export type CreateRedTeamEvalCasesInput = z.input<typeof CreateRedTeamEvalCasesInputSchema>;
-export type CreateRedTeamEvalCasesOutput = z.infer<typeof CreateRedTeamEvalCasesOutputSchema>;
 export type CreateEvalCasesFromLabelsInput = z.input<typeof CreateEvalCasesFromLabelsInputSchema>;
 export type CreateEvalCasesFromLabelsOutput = z.infer<typeof CreateEvalCasesFromLabelsOutputSchema>;
 export type ArchiveEvalCaseInput = z.input<typeof ArchiveEvalCaseInputSchema>;
@@ -734,6 +727,7 @@ export type SetAcceptanceCriteriaOutput = z.infer<typeof SetAcceptanceCriteriaOu
 export type EvalChallenger = z.infer<typeof EvalChallengerSchema>;
 export type GetStepQualificationInput = z.input<typeof GetStepQualificationInputSchema>;
 export type GetStepQualificationOutput = z.infer<typeof GetStepQualificationOutputSchema>;
+export type StepValidation = z.infer<typeof StepValidationSchema>;
 export type SignStepQualificationInput = z.input<typeof SignStepQualificationInputSchema>;
 export type SignStepQualificationOutput = z.infer<typeof SignStepQualificationOutputSchema>;
 export type GetStepDriftInput = z.input<typeof GetStepDriftInputSchema>;

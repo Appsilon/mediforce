@@ -34,15 +34,15 @@ export const ElectronicSignatureSchema = z.object({
 });
 
 /** What a signature on a Step Qualification means, shown to the signer before they sign and kept with it. */
-export function qualificationSignatureMeaning(briefVersion: number): string {
-  return `Approved: I reviewed this Eval Run and qualify this Step configuration for its context of use as stated in Evaluation Brief v${briefVersion}.`;
+export function qualificationSignatureMeaning(): string {
+  return 'Approved: I reviewed this Eval Run and qualify this Step configuration as it ran in it.';
 }
 
 /**
  * A signed decision that one Step Fingerprint met its Acceptance Criteria in
  * an Eval Run (D10, D11). It cites everything the decision rested on — the
- * run, the variant and its Fingerprint, the Brief version stating the context
- * of use, the Evaluator versions and the MCP eval policy — and is never
+ * run, the variant and its Fingerprint, the Evaluator versions and the MCP
+ * eval policy — and is never
  * changed. It is informational: nothing is blocked without one.
  */
 export const StepQualificationSchema = EvaluatedStepSchema.extend({
@@ -53,7 +53,6 @@ export const StepQualificationSchema = EvaluatedStepSchema.extend({
   variantLabel: z.string(),
   patch: StepVariantPatchSchema,
   fingerprint: StepFingerprintSchema,
-  briefVersion: z.number().int().positive(),
   evaluators: z.array(EvalRunEvaluatorSchema),
   mcpPolicy: z.record(z.string(), McpEvalServerPolicySchema),
   acceptanceCriteria: AcceptanceCriteriaSchema,

@@ -14,6 +14,12 @@ last_reviewed: 2026-10-01
 - **Research:** [`../research/step-evaluation.md`](../research/step-evaluation.md)
   (landscape, capabilities, phasing), building on
   [`../research/layer2-scores-research.md`](../research/layer2-scores-research.md).
+- **Amended 2026-10-01:** optimisation — challengers and applying them (D5's
+  variant half), few-shot examples (D12), the fix loop and GEPA (D15) and a
+  case's positive/negative expectation — moved to
+  [ADR-0024](./0024-optimisation.md) (Proposed) and out of the UI; built-in
+  Evaluators and case suites removed (D3); a Step Qualification no longer
+  cites the Evaluation Brief (D10, D16).
 - **Vocabulary:** Evaluation, Evaluation Assistant, Evaluation Brief, Evaluator, Eval Case, Eval Dataset, Eval Run,
   Agent Trajectory, Step Fingerprint, Acceptance Criteria, Step Qualification
   — all in [`CONTEXT.md`](../../CONTEXT.md) § Evaluation domain.
@@ -49,7 +55,11 @@ skills), and one as system of record contradicts ADR-0007 D2. We borrow
 promptfoo's assertion vocabulary, Inspect AI's task/scorer/epoch model, and
 EvalGen's calibration loop. `code` Evaluators run in the existing
 `script-container` sandbox; `llm_judge` builds on `ReviewPlugin` +
-OpenRouter, as the layer-2 research recommends.
+OpenRouter, as the layer-2 research recommends. _Amended 2026-10-01: the
+`builtin` kind (`phi_leak`, `injection_ignored`, `result_stable`) and the
+red-team and robustness case suites it graded were removed; what they were and
+where their code is is in
+[#1441](https://github.com/Appsilon/mediforce/issues/1441)._
 
 **D4 — An eval trial is a real single-step Workflow Run.** Each trial is a
 `ProcessInstance` flagged with its `evalRunId`, entering the target Step
@@ -68,7 +78,10 @@ config, the SKILL.md content, the Agent's `systemPrompt`, the image digest,
 the effective MCP set, `outputSchema` and the workflow preamble — not to a
 Definition version. Applying a winning variant creates a Definition version as
 usual; if the Step's Fingerprint matches, the qualification carries over.
-Editing Step B never touches Step A. _Amended 2026-09-24 (Phase 3): the image
+Editing Step B never touches Step A. _Amended 2026-10-01: variants beside the
+step as it is (challengers) and applying one are parked in
+[ADR-0024](./0024-optimisation.md); an Eval Run runs the step as its runnable
+Definition version has it, and the Fingerprint binding stands._ _Amended 2026-09-24 (Phase 3): the image
 enters the Fingerprint as the reference the runtime resolves — its tag, or the
 files and commit a build uses — not a registry digest, which would need a
 registry lookup per Fingerprint. A tag re-pushed under the same name does not
@@ -132,7 +145,14 @@ at least 10 human-labelled outputs, at least 2 of them failures, per version.
 bounds.** Criteria per severity (critical / major / minor) are frozen into the
 Eval Run. The report judges pass rates by their Wilson 95% lower bound and
 reliability by pass^k. A human signs the Step Qualification; signing despite a
-missed criterion records a deviation with a written justification.
+missed criterion records a deviation with a written justification. _Amended
+2026-10-01: a Step Qualification rests on the Eval Run it was signed from and
+nothing else — its Fingerprint, Evaluator versions, MCP policy, criteria and
+verdicts. It no longer cites an Evaluation Brief version, and a run prepared
+without a Brief can be signed. Beside it, a step's **validation** is derived,
+never signed: the newest finished Eval Run of the workflow version, passed or
+failed on its criteria, and `not verified` once the step's Fingerprint, its
+Evaluators, its Eval Cases or its Acceptance Criteria change since that run._
 
 **D11 — Step Qualification is informational.** A badge (Qualified / Stale /
 Not qualified) on the Step and in run views. Nothing is blocked: no Control
@@ -141,6 +161,8 @@ stale. ADR-0007 D2's example of a model swap "gated on a green Eval Run" is
 therefore **not** adopted; a swap shows as Stale.
 
 **D12 — Few-shot examples are a structured, provenance-tracked field.**
+_Moved 2026-10-01 to [ADR-0024](./0024-optimisation.md) D5; not binding until
+that ADR is accepted._
 `agent.examples` holds `{input, output, note?}` pairs rendered as their own
 prompt section and included in the Fingerprint. Each records the Eval Case it
 came from; that case is excluded from scoring in later Eval Runs of the Step.
@@ -184,6 +206,12 @@ fail on real outputs before proposing it. Every tool wraps a headless handler
   Unattended fix attempts (Phase 4) run only under a budget the user grants per
   request.
 
+_Amended 2026-10-01: proposing fixes as challengers (`propose_fix`) and GEPA
+optimisation — the two amendment paragraphs below — moved to
+[ADR-0024](./0024-optimisation.md) and are not binding until it is accepted.
+The assistant no longer has those tools; an unattended budget covers starting
+Eval Runs only._
+
 _Amended 2026-09-29 (Phase 5): a GEPA optimisation is such an attempt. Its
 budget is granted with the request that starts it — the person's own start, or
 an assistant request's unattended budget — and covers both its job, charged at
@@ -209,10 +237,12 @@ rounds._
 **D16 — An Evaluation Brief states each Step's context of use.** A short,
 versioned text per Step — what it is for, who relies on its output, which
 failures matter most — written by the user or drafted by the assistant and
-accepted. It is sent to the assistant on every turn, seeds the evaluation plan
-and the Acceptance Criteria suggestions, and a Step Qualification cites the
-Brief version it was judged against as its context-of-use statement (step 1 of
-the FDA credibility framework). The workflow assistant's per-user instructions
+accepted. It is sent to the assistant on every turn and seeds the evaluation plan
+and the Acceptance Criteria suggestions. _Amended 2026-10-01: a Step
+Qualification no longer cites the Brief version (it used to, as its
+context-of-use statement); tying the two made a Brief a precondition of
+signing and a second thing a qualification could be wrong about. The
+qualification is linked to its Eval Run only._ The workflow assistant's per-user instructions
 are not reused: priorities belong to the Step, not to a person.
 
 ## Considered options
@@ -255,6 +285,8 @@ are not reused: priorities belong to the Step, not to a person.
   Eval Run, not an afterthought.
 - Delivery is phased (1a foundations → 1b Eval Runs with the Evaluation
   Assistant → 2 assistant planning and calibration → 3 qualification → 4 fix
-  loop → 5 optimisation and red-team); from 1b on, each phase adds tools to the
+  loop → 5 optimisation and red-team; 4 and 5 parked in
+  [ADR-0024](./0024-optimisation.md) and the built-in red-team suites removed
+  on 2026-10-01); from 1b on, each phase adds tools to the
   one assistant rather than screens. Tracked in the
   Step Evaluation epic [#1394](https://github.com/Appsilon/mediforce/issues/1394).

@@ -211,8 +211,6 @@ export const queryKeys = {
   evalRun: (evalRunId: string) => ['eval-run', evalRunId] as const,
   /** What one Agent Run's step was given and returned; fixed once the run finished. */
   agentRunIo: (agentRunId: string) => ['agent-run-io', agentRunId] as const,
-  /** One GEPA optimisation with its ranked candidates — polled alone while it proposes or evaluates. */
-  optimisation: (optimisationId: string) => ['eval-optimisation', optimisationId] as const,
   namespaceAuditEvents: (
     handle: string,
     filters: { actions: readonly string[]; actorId?: string; fromDate?: string; toDate?: string },

@@ -11,11 +11,9 @@ import {
   BriefSection,
   CasesSection,
   EvalRunsSection,
-  OptimisationsSection,
   EvaluatorsSection,
   McpPolicySection,
   DriftAlert,
-  QualificationSection,
   loadedAgentRuns,
 } from './step-evaluation-sections';
 
@@ -122,9 +120,8 @@ function StepEvaluation({ step, outputSchema, inputTemplate, mayEdit, editReason
     >
       <div className="space-y-4">
         <DriftAlert data={evaluation.drift} />
-        <QualificationSection data={evaluation.qualification} />
+        <AcceptanceCriteriaSection step={step} criteria={evaluation.criteria} qualification={evaluation.qualification} mayEdit={mayEdit} />
         <BriefSection step={step} data={evaluation.brief} mayEdit={mayEdit} />
-        <AcceptanceCriteriaSection step={step} data={evaluation.criteria} mayEdit={mayEdit} />
         <EvaluatorsSection
           step={step}
           data={evaluation.evaluators}
@@ -133,10 +130,9 @@ function StepEvaluation({ step, outputSchema, inputTemplate, mayEdit, editReason
           stepInputTemplate={inputTemplate}
           labelCandidates={{ cases: evaluation.cases.data?.cases ?? [], runs: loadedAgentRuns(evaluation) }}
         />
-        <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} stepOutputSchema={outputSchema} />
+        <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
         <McpPolicySection step={step} data={evaluation.mcpPolicy} mayEdit={mayEdit} />
         <EvalRunsSection step={step} data={evaluation.runs} datasets={evaluation.datasets} mayRun={mayRun} runReason={runReason} mayEdit={mayEdit} editReason={editReason} />
-        <OptimisationsSection step={step} data={evaluation.optimisations} runs={evaluation.runs} mayRun={mayRun} />
       </div>
       <div className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
         <AssistantResizeHandle {...assistantWidth} />
@@ -148,8 +144,8 @@ function StepEvaluation({ step, outputSchema, inputTemplate, mayEdit, editReason
 
 /**
  * The workflow's **Evaluation** tab (ADR-0023 D14): one agent step at a time,
- * its Step Qualification, Brief, Acceptance Criteria, Evaluators, Eval Cases,
- * MCP eval policy and Eval Runs beside the Evaluation Assistant. Everything here lives outside the definition, so no
+ * its Acceptance Criteria with whether it is validated against them, Brief,
+ * Evaluators, Eval Cases, MCP eval policy and Eval Runs beside the Evaluation Assistant. Everything here lives outside the definition, so no
  * change on this tab mints a version.
  */
 export function EvaluationTab({ handle, workflowName, steps, transitions, mayEdit, editReason }: {

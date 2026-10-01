@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ValidationError } from '../../../errors';
 import { recordScore } from '../../scores/record-score';
 import {
   archiveEvalCase,
@@ -65,19 +64,19 @@ describe('Eval Cases', () => {
     expect(evalCase).toMatchObject({ expectation: 'positive', split: 'holdout', notes: null });
   });
 
-  it('asks for the expectation of a run sent back for revision, rather than calling it positive', async () => {
+  it('makes a run sent back for revision positive unless the caller says otherwise', async () => {
     await reviewVerdict(fixture, GRADED_RUN, 0.5, 'Grade the sepsis event again.');
-    await expect(createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, split: 'dev', origin: 'user' }, fixture.scope()))
-      .rejects.toThrow(/sent back/);
+    const { evalCase: unsaid } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, split: 'dev', origin: 'user' }, fixture.scope());
+    expect(unsaid).toMatchObject({ expectation: 'positive', notes: 'Grade the sepsis event again.' });
     const { evalCase } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'negative', split: 'dev', origin: 'user' }, fixture.scope());
     expect(evalCase).toMatchObject({ expectation: 'negative', notes: 'Grade the sepsis event again.' });
   });
 
-  it('asks for the expectation of a run nobody reviewed', async () => {
-    await expect(createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, split: 'dev', origin: 'user' }, fixture.scope()))
-      .rejects.toBeInstanceOf(ValidationError);
-    const { evalCase } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'positive', split: 'dev', origin: 'user' }, fixture.scope());
-    expect(evalCase.expectation).toBe('positive');
+  it('makes a run nobody reviewed positive unless the caller says otherwise', async () => {
+    const { evalCase: unsaid } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, split: 'dev', origin: 'user' }, fixture.scope());
+    expect(unsaid.expectation).toBe('positive');
+    const { evalCase } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'negative', split: 'dev', origin: 'user' }, fixture.scope());
+    expect(evalCase.expectation).toBe('negative');
   });
 
   it('adds a manual case and hides archived ones from the list', async () => {

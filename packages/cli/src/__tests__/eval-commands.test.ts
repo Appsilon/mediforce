@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { evalCaseFromRunCommand, evalCasePerturbCommand, evalCaseRedTeamCommand, evalCasesFromLabelsCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
+import { evalCaseFromRunCommand, evalCasePerturbCommand, evalCasesFromLabelsCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
 import { evalDriftCommand, evalEvaluatorLabelCommand, evalEvaluatorProductionCommand } from '../commands/eval-evaluators';
 import { evalCriteriaSetCommand, evalQualificationCommand } from '../commands/eval-qualification';
 import { captureOutput, jsonResponse } from './test-helpers';
@@ -65,25 +65,6 @@ describe('mediforce eval', () => {
       ...spec, namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', inputChanges: [], split: 'dev', origin: 'user',
     });
     expect(output.stdoutLines.join('\n')).toContain('(missing_file, negative)');
-  });
-
-  it('case-red-team posts the suite and the target split into its part and path', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ cases: [] }, 201));
-    const output = captureOutput();
-    const code = await evalCaseRedTeamCommand({
-      argv: [...STEP, '--run', 'ar-1', '--suite', 'prompt_injection', '--target', 'previousStepOutputs.extract-aes.events.0.term', ...BASE],
-      env: ENV,
-      output,
-    });
-
-    expect(code).toBe(0);
-    const [url, init] = fetchSpy.mock.calls[0]!;
-    expect(url).toBe('http://localhost:5555/api/evaluation/cases/red-team');
-    expect(JSON.parse(String(init?.body))).toEqual({
-      namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', baseAgentRunId: 'ar-1', suite: 'prompt_injection',
-      target: { part: 'previousStepOutputs', path: ['extract-aes', 'events', '0', 'term'] }, split: 'dev', origin: 'user',
-    });
-    expect(output.stdoutLines).toEqual(['0 Eval Case(s) added']);
   });
 
   it('cases-from-labels reports the cases added and the outputs skipped', async () => {
@@ -214,6 +195,7 @@ describe('mediforce eval', () => {
   it('qualification asks for the version given and prints the badge', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
       status: 'not_qualified', qualification: null, definitionVersion: 3,
+      validation: { status: 'not_verified', evalRunId: null, reason: 'No Eval Run of version 3 has finished yet.', runInProgress: false },
       fingerprint: { hash: 'a'.repeat(64), components: Object.fromEntries(['step', 'model', 'systemPrompt', 'skill', 'image', 'mcpServers', 'preamble'].map((component) => [component, 'b'.repeat(64)])) },
       changed: [], evaluatorsChanged: [], history: [],
     }));
@@ -222,6 +204,6 @@ describe('mediforce eval', () => {
 
     expect(code).toBe(0);
     expect(fetchSpy.mock.calls[0]![0]).toBe('http://localhost:5555/api/evaluation/qualification?namespace=pharma-a&workflowName=ae-grading&stepId=grade-aes&definitionVersion=3');
-    expect(output.stdoutLines).toEqual([`not qualified  (v3, fingerprint ${'a'.repeat(12)})`]);
+    expect(output.stdoutLines).toEqual(['validation not verified: No Eval Run of version 3 has finished yet.', `not qualified  (v3, fingerprint ${'a'.repeat(12)})`]);
   });
 });
