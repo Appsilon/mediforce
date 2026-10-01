@@ -148,11 +148,12 @@ function JudgeProgress({ step, evaluator }: { step: EvaluatedStep; evaluator: Ev
   return <CalibrationProgress evaluator={evaluator} labels={[...labelsBySubject(labels.data?.labels ?? []).values()]} />;
 }
 
-function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema, labelCandidates }: {
+function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema, stepInputTemplate, labelCandidates }: {
   step: EvaluatedStep;
   evaluator: EvaluatorView;
   mayEdit: boolean;
   stepOutputSchema: AgentOutputSchema | undefined;
+  stepInputTemplate?: Record<string, unknown>;
   labelCandidates: LabelCandidates;
 }) {
   const [labelling, setLabelling] = React.useState(false);
@@ -231,7 +232,7 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema, labelCandida
         )}
       </div>
       {labelling && check.kind === 'llm_judge' && (
-        <JudgeCalibrationPanel step={step} evaluator={evaluator} cases={labelCandidates.cases} runs={labelCandidates.runs} stepOutputSchema={stepOutputSchema} mayEdit={mayEdit} />
+        <JudgeCalibrationPanel step={step} evaluator={evaluator} cases={labelCandidates.cases} runs={labelCandidates.runs} stepOutputSchema={stepOutputSchema} stepInputTemplate={stepInputTemplate} mayEdit={mayEdit} />
       )}
       {editing ? (
         <div className="mt-2 space-y-1">
@@ -354,13 +355,15 @@ function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel
 }
 
 /** The Step's Evaluators with whether each counts (D9); code source is approved here, by a person. */
-export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema, labelCandidates = { cases: [], runs: [] } }: {
+export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema, stepInputTemplate, labelCandidates = { cases: [], runs: [] } }: {
   step: EvaluatedStep;
   data: StepEvaluation['evaluators'];
   mayEdit: boolean;
   labelCandidates?: LabelCandidates;
   /** The step's `agent.outputSchema`, offered as the start of a schema check. */
   stepOutputSchema?: AgentOutputSchema;
+  /** The step's input with every field empty, the start of an example written from nothing. */
+  stepInputTemplate?: Record<string, unknown>;
 }) {
   const [adding, setAdding] = React.useState(false);
   const create = useStepEvaluationMutation(step, (values: { name: string; rule: string; severity: EvaluatorSeverity; check: EvaluatorCheck }) =>
@@ -372,7 +375,7 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema, label
       {data.isLoading ? <Loading /> : evaluators.length === 0 && !adding ? (
         <p className="text-sm text-muted-foreground">No Evaluators yet. Ask the assistant what to check, or add one.</p>
       ) : (
-        <ul className="space-y-2">{evaluators.map((evaluator) => <EvaluatorRow key={evaluator.id} step={step} evaluator={evaluator} mayEdit={mayEdit} stepOutputSchema={stepOutputSchema} labelCandidates={labelCandidates} />)}</ul>
+        <ul className="space-y-2">{evaluators.map((evaluator) => <EvaluatorRow key={evaluator.id} step={step} evaluator={evaluator} mayEdit={mayEdit} stepOutputSchema={stepOutputSchema} stepInputTemplate={stepInputTemplate} labelCandidates={labelCandidates} />)}</ul>
       )}
       {adding && (
         <EvaluatorForm

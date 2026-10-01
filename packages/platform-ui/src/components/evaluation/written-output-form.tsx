@@ -47,6 +47,35 @@ export function emptyOutput(schema: AgentOutputSchema | undefined): JsonObject {
   }[field.type]]));
 }
 
+interface StepGraph {
+  steps: readonly { id: string; agent?: { outputSchema?: AgentOutputSchema } }[];
+  transitions: readonly { from: string; to: string }[];
+}
+
+/**
+ * An input shaped like the one the run route gives a step, with every field
+ * empty: the previous step's output spread at the top, and the output of every
+ * step that can run before it under `steps`.
+ */
+export function emptyStepInput(stepId: string, { steps, transitions }: StepGraph): JsonObject {
+  const schemaOf = (id: string) => steps.find((candidate) => candidate.id === id)?.agent?.outputSchema;
+  const earlier = new Set<string>();
+  const pending = [stepId];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    for (const transition of transitions) {
+      if (transition.to !== current || transition.from === stepId || earlier.has(transition.from)) continue;
+      earlier.add(transition.from);
+      pending.push(transition.from);
+    }
+  }
+  const previousStepId = transitions.find((transition) => transition.to === stepId)?.from;
+  return {
+    ...(previousStepId === undefined ? {} : emptyOutput(schemaOf(previousStepId))),
+    steps: Object.fromEntries([...earlier].map((id) => [id, emptyOutput(schemaOf(id))])),
+  };
+}
+
 /** Where two outputs differ, as `path: before → after` for each changed value, deepest first. */
 export function describeChanges(before: unknown, after: unknown, path = ''): string[] {
   if (JSON.stringify(before) === JSON.stringify(after)) return [];
@@ -163,11 +192,12 @@ const FROM_NOTHING = '';
  * run — its input as it was, its output to change — and saved labelled pass
  * or fail for the judge's rule in one step.
  */
-export function WriteOutputForm({ step, evaluator, runs, stepOutputSchema, onClose }: {
+export function WriteOutputForm({ step, evaluator, runs, stepOutputSchema, stepInputTemplate = {}, onClose }: {
   step: EvaluatedStep;
   evaluator: EvaluatorView;
   runs: readonly AgentRun[];
   stepOutputSchema: AgentOutputSchema | undefined;
+  stepInputTemplate?: Record<string, unknown>;
   onClose: () => void;
 }) {
   const [runId, setRunId] = React.useState<string>(runs[0]?.id ?? FROM_NOTHING);
@@ -191,7 +221,7 @@ export function WriteOutputForm({ step, evaluator, runs, stepOutputSchema, onClo
           step={step}
           evaluator={evaluator}
           basedOnAgentRunId={runId === FROM_NOTHING ? null : runId}
-          stepInput={runId === FROM_NOTHING ? null : io.data?.stepInput ?? null}
+          stepInput={runId === FROM_NOTHING ? stepInputTemplate : io.data?.stepInput ?? null}
           base={base}
           stepOutputSchema={stepOutputSchema}
           onSaved={onClose}
@@ -222,7 +252,7 @@ export function WriteOutputFields({ step, evaluator, basedOnAgentRunId, stepInpu
   onCancel?: () => void;
 }) {
   const [result, setResult] = React.useState<JsonObject>(initial ?? base ?? emptyOutput(stepOutputSchema));
-  const [inputText, setInputText] = React.useState('{}');
+  const [inputText, setInputText] = React.useState(JSON.stringify(stepInput ?? {}, null, 2));
   const [note, setNote] = React.useState(initialNote);
   const [error, setError] = React.useState<string | null>(null);
   const save = useStepEvaluationMutation(step, (passed: boolean) => {
