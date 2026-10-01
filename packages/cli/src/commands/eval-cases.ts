@@ -282,7 +282,7 @@ export const evalMcpPolicyGetCommand = defineCommand({
 
 export const evalMcpPolicySetCommand = defineCommand({
   name: 'mediforce eval mcp-policy-set',
-  description: 'Replace the step\'s MCP eval policy from a JSON file: { "<server>": { "mode": "live"|"replay"|"deny", "denyTools"?: [] } }. A live trial records each server\'s responses per case; replay answers from them.',
+  description: 'Replace the step\'s MCP eval policy from a JSON file: { "<server>": { "mode": "live"|"replay"|"deny", "denyTools"?: [] } }. A live trial records each server\'s responses per case; replay answers from them, and runs a case with no recording yet live to record it.',
   args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with the servers map' } },
   async run({ args, output, mediforce, jsonMode }) {
     const servers = readJsonFile(args.file) as Parameters<typeof mediforce.evaluation.setMcpPolicy>[0]['servers'];

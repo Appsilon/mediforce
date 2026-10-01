@@ -616,6 +616,7 @@ export type {
   ListScoresFilter,
   EvaluationRepository,
   McpRecordedCase,
+  McpRecordedCaseFilter,
   McpRecordingFilter,
   CoworkSessionRepository,
   TriggerRepository,

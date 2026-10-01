@@ -18,6 +18,7 @@ import type {
   JudgeCalibration,
   McpEvalPolicy,
   McpRecordedCase,
+  McpRecordedCaseFilter,
   McpRecording,
   McpRecordingFilter,
   SourceApproval,
@@ -144,8 +145,8 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   listMcpRecordings = async (step: EvaluatedStep, filter?: McpRecordingFilter): Promise<McpRecording[]> =>
     this.canSeeNamespace(step.namespace) ? this.raw.listMcpRecordings(step, filter) : [];
 
-  listMcpRecordedCases = async (step: EvaluatedStep): Promise<McpRecordedCase[]> =>
-    this.canSeeNamespace(step.namespace) ? this.raw.listMcpRecordedCases(step) : [];
+  listMcpRecordedCases = async (step: EvaluatedStep, filter?: McpRecordedCaseFilter): Promise<McpRecordedCase[]> =>
+    this.canSeeNamespace(step.namespace) ? this.raw.listMcpRecordedCases(step, filter) : [];
 
   appendAcceptanceCriteria = async (criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> => {
     this.assertNamespaceWrite(criteria.namespace);

@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-09-29
+last_reviewed: 2026-10-01
 ---
 
 # Step Evaluation
@@ -458,7 +458,7 @@ freeze (`case-archive`). An edit is a new case that replaces the old one, which
 is archived, so a Dataset version frozen with the old case keeps exactly what it
 ran. A production case whose input is edited becomes `manual` — production never
 saw that input — and keeps the run it came from. MCP recordings are kept per
-case, so an edited case is recorded afresh by its next `live` trial.
+case, so an edited case is recorded afresh by its next trial, `live` or `replay`.
 
 A **synthesized** case (`case-perturb --file`, `POST /api/evaluation/cases/perturbed`)
 is a production run's case with deliberate changes, and records what kind
@@ -487,8 +487,8 @@ version it ran.
 
 Per MCP server of the Step's agent: `live`, `live` with named tools denied,
 `replay`, or `deny`. A server the policy does not name is denied in eval trials.
-Denied tools apply only to a `live` server: a `replay` server refuses them, and on
-a denied one they have no effect.
+Denied tools apply to a `live` server, and to a `replay` server while it runs
+live to record a case; on a denied server they have no effect.
 `mcp-policy-get` shows what each server does, defaults included, and which Eval
 Cases each server has a recording for.
 
@@ -500,29 +500,37 @@ Case and server once the agent exits — finished, failed or timed out. The HTTP
 proxy posts each message as it arrives (only the handshake goes in order:
 `initialize`, which carries the session, then the initialized notification), so parallel tool calls stay parallel, and relays what the server sends
 on its own stream (`list_changed`, sampling, elicitation). The proxy needs
-`node` in the agent's image; every Mediforce image has it. A `replay` server is
-never started: the proxy answers the agent from the 20 newest recordings of the
-trial's case — for each
+`node` in the agent's image; every Mediforce image has it. A `replay` server
+records first, per case: a trial whose case has no recording of it yet runs it
+live and records it, exactly as a `live` server, so the case's next trial
+replays — no need to run once with `live` and switch. For a case with a
+recording, the server is never started: the proxy answers the agent from the
+20 newest recordings of the trial's case — for each
 distinct call (tool plus arguments, key order ignored) the newest recording of
 it, the n-th identical call getting the n-th recorded result. A recording is
 kept per case and server, whichever variant made it, so a challenger replays
 what the champion's live trials recorded. It needs no OAuth
-token and reaches no network, so tools with side effects are safe to replay.
+token and reaches no network, so tools with side effects are safe to replay
+once recorded.
 
 - A call no recording answered — or made more often than any recording made
   it — gets an error result. The trial keeps it (`mcpReplayMisses`), its Agent
   Trajectory records it, and the report counts it per server and tool. A trial
   whose unanswered calls cannot all be read fails rather than count fewer.
-- A replayed server that no live trial of the case has recorded fails the trial
-  closed. Run the case with the server `live` first.
+- Recording first reaches the real server, side effects included, once per
+  case — deny the side-effecting tools on the `replay` server to keep them out
+  of that run. A trial records when the agent exits, so trials of a new case running
+  side by side in one Eval Run each run live; the next Eval Run replays them.
 - Tool lists and results are recorded in full, like the Agent Trajectory:
   they stay in the platform's database, never among the run's Output Files.
 - The proxy keeps its files in `/output/mcp-tape/`, which the agent can read
   and write like the rest of `/output`. A recording is only as trustworthy as
   the agent under evaluation that ran beside it.
 
-The report states each server's mode and says when no trial made a live MCP
-call (`report.mcp`; one line in the Evaluation tab and in `mediforce eval report`).
+The report states each server's mode, how many cases each `replay` server ran
+live to record (`recordedFirst`), and says when no trial made a live MCP call
+(`report.mcp`; one line in the Evaluation tab and in `mediforce eval report`).
+A Step Qualification cites the policy's modes only.
 
 ## Eval Runs
 

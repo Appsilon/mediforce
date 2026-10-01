@@ -309,8 +309,8 @@ export async function executeAgentStep(
  * step's agent under the Eval Run's frozen policy, denied unless the author
  * declared it live or replayed, on top of the step's own restrictions. A live
  * server's answers are recorded for the trial's Eval Case; a replayed one is
- * answered from the newest recordings of that case, and fails the trial closed
- * when there is none. Inline servers
+ * answered from the newest recordings of that case, and runs live and records
+ * when there is none, so the case's next trial replays it. Inline servers
  * bypass the agent's bindings, so no policy can deny them: the trial fails
  * closed rather than run them. So does a trial whose step no longer matches
  * the Fingerprint its variant was prepared with — its agent's model, prompt or
@@ -370,13 +370,8 @@ async function evalTrialConfig(
   const replay: McpTapeContext['replay'] = {};
   for (const server of replayed) {
     const recordings = await evaluationRepo.listMcpRecordings(evaluatedStep, { caseId: trial.caseId, server, limit: MCP_REPLAY_RECORDINGS });
-    if (recordings.length === 0) {
-      throw new Error(
-        `MCP server '${server}' is replayed, but no live trial of Eval Case '${trial.caseId}' recorded it; `
-        + `run the case with '${server}' live first`,
-      );
-    }
-    replay[server] = mergeMcpTapes(recordings.map((recording) => recording.tape));
+    if (recordings.length === 0) record.push(server);
+    else replay[server] = mergeMcpTapes(recordings.map((recording) => recording.tape));
   }
   return {
     ...patched,

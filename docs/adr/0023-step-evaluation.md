@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-09-29
+last_reviewed: 2026-10-01
 ---
 
 # 0023 — Step Evaluation: Evaluation Assistant, Evaluators, single-step Eval Runs, Step Qualification
@@ -96,7 +96,14 @@ not by variant or Fingerprint — so a challenger replays what any live trial of
 the case recorded. The proxy runs inside the agent's container and keeps its
 files where the agent can write, so a recording is only as trustworthy as the
 agent that ran beside it; isolating it from the agent is a later change
-([#1432](https://github.com/Appsilon/mediforce/issues/1432))._
+([#1432](https://github.com/Appsilon/mediforce/issues/1432))._ _Amended
+2026-10-01: a replayed server no live trial of the case recorded no longer
+fails the trial closed — it runs live for that trial and records, so `replay`
+means "record each case once, then replay it" and an author never switches a
+server from `live` to `replay` by hand. A `replay` server may name denied
+tools, which hold while it records. The report counts, per replayed server,
+the cases this run recorded that way, and claims no live MCP call only when
+there were none and no server was `live`._
 
 **D7 — Evaluators are versioned; a version that produced a Score is
 immutable.** Eval Runs record the Evaluator versions used; a Step

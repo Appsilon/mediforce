@@ -208,9 +208,29 @@ describe('buildEvalRunReport', () => {
     const report = await buildEvalRunReport(fixture.scope(), evalRun, trials);
 
     expect(report.mcp).toEqual({
-      live: [], replayed: ['edc'], denied: ['email'],
+      live: [], replayed: ['edc'], denied: ['email'], recordedFirst: [],
       unrecordedCalls: [{ server: 'edc', tool: 'read_record', count: 3 }],
     });
+  });
+
+  it('counts the cases a replayed server ran live to record in this run, because none had a recording yet', async () => {
+    const fixture = await evaluationFixture();
+    const scope = fixture.scope();
+    const evalRun = run({ mcpPolicy: { edc: { mode: 'replay' }, meddra: { mode: 'live' } } });
+    const trials = [trial(evalRun.id, CASE_A, 0), trial(evalRun.id, CASE_A, 1), trial(evalRun.id, CASE_B, 0)];
+    const tape = { tools: [], calls: [] };
+    const recording = (server: string, caseId: string, evalRunId: string, trialId: string) => scope.evaluation.appendMcpRecording({
+      ...STEP, id: randomUUID(), caseId, server, tape, evalRunId, trialId, recordedAt: '2026-09-23T08:00:00.000Z',
+    });
+    await recording('edc', CASE_A, evalRun.id, trials[0]!.id);
+    await recording('edc', CASE_A, evalRun.id, trials[1]!.id);
+    await recording('meddra', CASE_B, evalRun.id, trials[2]!.id);
+    // Recorded by an earlier Eval Run: this one replayed it.
+    await recording('edc', CASE_B, randomUUID(), randomUUID());
+
+    const report = await buildEvalRunReport(scope, evalRun, trials);
+
+    expect(report.mcp).toMatchObject({ live: ['meddra'], replayed: ['edc'], recordedFirst: [{ server: 'edc', cases: 1 }] });
   });
 
   it('recommends nothing for a variant still running', async () => {
