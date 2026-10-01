@@ -18,6 +18,7 @@ import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { StartEvalRunCard } from './step-evaluation-sections';
+import { EvaluationBriefField, EvaluationBriefToggle, type BriefQuery } from './evaluation-brief-field';
 import {
   ControlSettingsCard,
   DiagnosisCard,
@@ -137,10 +138,12 @@ function StepsSummary({ steps }: { steps: ActivityStep[] }) {
  * It reads and previews on its own; everything it would change arrives as a
  * card — a plan to draft checks from, outputs for the person to label, or a
  * proposal to accept — and an Eval Run it prepares starts only when the
- * person confirms the budget on the card.
+ * person confirms the budget on the card. The Step's Brief, which it reads on
+ * every turn, opens from the header.
  */
-export function EvaluationAssistantPanel({ step, stepOutputSchema, mayEdit, editReason, mayRun, runReason }: {
+export function EvaluationAssistantPanel({ step, brief, stepOutputSchema, mayEdit, editReason, mayRun, runReason }: {
   step: EvaluatedStep;
+  brief: BriefQuery;
   /** The step's `agent.outputSchema`: drafted outputs are edited in its shape. */
   stepOutputSchema?: AgentOutputSchema;
   mayEdit: boolean;
@@ -156,6 +159,7 @@ export function EvaluationAssistantPanel({ step, stepOutputSchema, mayEdit, edit
   const [assistantModel, setAssistantModel] = React.useState<string | undefined>(undefined);
   const [unattendedBudget, setUnattendedBudget] = React.useState('');
   const [assistantSettingsOpen, setAssistantSettingsOpen] = React.useState(false);
+  const [briefOpen, setBriefOpen] = React.useState(false);
   const assistantScrollRef = React.useRef<HTMLDivElement>(null);
   const followLatest = React.useRef(true);
   const queryClient = useQueryClient();
@@ -227,15 +231,23 @@ export function EvaluationAssistantPanel({ step, stepOutputSchema, mayEdit, edit
           <Sparkles className="h-4 w-4 shrink-0 text-primary" />
           <span className="text-sm font-semibold">Evaluation Assistant</span>
         </div>
-        <button
-          type="button"
-          onClick={() => setAssistantSettingsOpen((current) => !current)}
-          className={cn('rounded-md p-1 transition-colors hover:bg-muted', assistantSettingsOpen ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}
-          title="Assistant settings"
-          aria-label="Assistant settings"
-        >
-          <Settings className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <EvaluationBriefToggle brief={brief} open={briefOpen} onToggle={() => setBriefOpen((current) => !current)} />
+          <button
+            type="button"
+            onClick={() => setAssistantSettingsOpen((current) => !current)}
+            className={cn('rounded-md p-1 transition-colors hover:bg-muted', assistantSettingsOpen ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}
+            title="Assistant settings"
+            aria-label="Assistant settings"
+            aria-expanded={assistantSettingsOpen}
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      {/* Hidden, not unmounted: closing the Brief must not drop an unsaved edit. */}
+      <div className="shrink-0 border-b px-4 py-2" hidden={briefOpen === false}>
+        <EvaluationBriefField step={step} brief={brief} mayEdit={mayEdit} />
       </div>
       {assistantSettingsOpen && (
         <div className="shrink-0 space-y-1.5 border-b px-4 py-2">

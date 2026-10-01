@@ -28,9 +28,10 @@ agent first.
 ## The Evaluation Assistant
 
 The **Evaluation** tab of a workflow shows one agent step at a time — its
-Acceptance Criteria with whether it is validated against them, Brief,
+Acceptance Criteria with whether it is validated against them,
 Evaluators, Eval Cases, MCP eval policy and Eval Runs — beside the
-Evaluation Assistant (`mediforce eval ask`, `POST /api/evaluation/assistant`).
+Evaluation Assistant (`mediforce eval ask`, `POST /api/evaluation/assistant`),
+whose header holds the step's Brief.
 Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 
 - **Runs freely:** reading the step (config, agent prompt and system prompt,
@@ -72,14 +73,13 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
 - **Evaluation plan.** It reads the step, a few of its runs and the Brief, and
   returns a plan card: the risks, highest first — what could go wrong, how bad,
   why, the cheapest check that would catch it, the inputs worth trying it on —
-  and suggested Acceptance Criteria (minimum pass rates per severity, on the
-  Wilson 95% lower bound). A plan creates nothing; **Draft this check** on a
+  and suggested Acceptance Criteria (minimum pass rates per severity). A plan creates nothing; **Draft this check** on a
   risk asks the assistant to draft it, and **Use as Acceptance Criteria** sets
   the suggested floors.
 - **Acceptance Criteria.** From the step's risks and Brief, it proposes floors
   per severity — with pass^k where the step would run unreviewed — and says
-  how many graded trials a floor needs (30 passes out of 30 have a lower bound
-  of 0.89).
+  how many graded trials a floor needs to mean something (8 passes out of 10
+  meet a 0.8 floor, but their Wilson 95% interval runs from 0.49 to 0.94).
 - **Routing.** It explains each criterion's verdict and recommends a Control
   Mode and `confidenceThreshold` from the run's confidence calibration.
 - **Diagnosis.** After a run with failures the assistant reads them
@@ -125,8 +125,7 @@ Every proposal is checked against the platform before it is shown: an Evaluator
 name already taken, an Evaluator or run of another step, and an eval trial
 offered for labelling are refused the same way.
 
-In the web tab, Brief text is rendered as GitHub-Flavored Markdown, and the
-assistant pane uses the same model picker as the workflow editor so the model can be chosen per
+The assistant pane uses the same model picker as the workflow editor so the model can be chosen per
 conversation. While it works, the pane lists each step it takes (reading a run,
 previewing a check, drafting a card) as it happens, and keeps that list folded
 under the reply; `mediforce eval ask` prints the same steps to stderr. The pane
@@ -162,10 +161,12 @@ limit.
 
 A short text per Step — what it is for, who relies on its output, which
 failures matter most. Every write is a new version. The web tab displays the
-text as Markdown; the stored value remains the original text. The Brief guides
-the assistant; it is not a precondition of anything, and a Step Qualification
-does not cite it. An Eval Run records the Brief version in force when it was
-prepared, for reference.
+text as GitHub-Flavored Markdown behind the file icon in the Evaluation
+Assistant's header, which carries a dot once a Brief is written; the stored
+value remains the original text. The Brief is shared by everyone evaluating the
+step, unlike the workflow editor assistant's per-user instructions. It guides
+the assistant and nothing else: it is not a precondition of anything, an Eval
+Run does not record it, and a Step Qualification does not cite it.
 `mediforce eval brief-get|brief-set`, `GET|POST /api/evaluation/briefs`.
 
 ## Evaluators
@@ -453,7 +454,7 @@ step's few-shot `agent.examples` is left out of the run (`exampleCaseIds`;
 1. **Prepare** (`run-prepare`, `POST /api/evaluation/runs`) freezes the Dataset
    version (the newest unless named), the latest version of every live
    Evaluator — and whether each one counts — the MCP eval policy, the step's
-   current Acceptance Criteria and Brief version, and the Step Fingerprint,
+   current Acceptance Criteria, and the Step Fingerprint,
    and estimates the cost: the Step's mean cost over its recent production
    runs, or its model's registry price for a nominal turn when it has none,
    plus one call per `llm_judge`. The budget cap
@@ -504,12 +505,14 @@ count are marked so. Tokens and duration come from the trials' runs; cost adds
 the judge calls. Then:
 
 - **Acceptance Criteria.** Each severity the frozen criteria set is `met` when
-  every counted Evaluator of that severity reaches its floor — the pass rate's
-  Wilson 95% lower bound, and pass^k where set — `missed` when one does not,
+  every counted Evaluator of that severity reaches its floor — the pass rate
+  itself, passes over graded trials (8 of 10 meets 80%), and pass^k where
+  set — `missed` when one does not,
   and `not judged` when no counted Evaluator of that severity exists, one
   graded nothing, or — for a floor the scored trials reached — some trial
   failed or was skipped: a criterion is met on the whole Dataset.
-  A run prepared before any criteria were set judges nothing.
+  A run prepared before any criteria were set freezes the default — every
+  severity at 100%; one prepared before that default existed judges nothing.
 - **Confidence calibration.** The confidence each trial's agent reported,
   against whether its output passed every counted Evaluator — a trial some
   counted Evaluator could not grade is left out, since a missing Score is not
@@ -517,8 +520,7 @@ the judge calls. Then:
 - **Routing.** Once the trials are done, as the `autonomyLevel` to
   set: `L4` (Control Mode 4) with a `confidenceThreshold` — the lowest
   confidence at which the outputs at or above it (at least 5) passed every
-  counted Evaluator with a lower bound of at least the strictest criterion's
-  floor; below it the step's `fallbackBehavior` applies — or `L3` (Control
+  counted Evaluator at a rate of at least the strictest criterion's floor; below it the step's `fallbackBehavior` applies — or `L3` (Control
   Mode 3), a person reviewing every output, when there are no criteria, one could not be judged, the agent
   reported no confidence, or no threshold holds. A recommendation to apply in
   the workflow editor.
@@ -526,18 +528,22 @@ the judge calls. Then:
 ## Acceptance Criteria
 
 The floors a step's Eval Runs are judged against, per severity: `minPassRate`
-on the Wilson 95% lower bound, and optionally `minPassHatK`. Every write is a
-new version; an Eval Run freezes the version in force when it is prepared, so
-changing them never rejudges a run. `mediforce eval criteria-get|criteria-set
---file`, `GET|POST /api/evaluation/acceptance-criteria`.
+on the pass rate itself — 8 of 10 meets a `minPassRate` of 0.8, and 1 needs
+every graded trial to pass — and optionally `minPassHatK`. Until
+a step's criteria are set, `DEFAULT_ACCEPTANCE_CRITERIA` applies: every
+severity at 100%. Every write is a new version; an Eval Run freezes the
+version in force when it is prepared, so changing them never rejudges a run.
+`mediforce eval criteria-get|criteria-set --file`,
+`GET|POST /api/evaluation/acceptance-criteria`.
 
-In the Evaluation tab, **Acceptance Criteria** is one block at the top: a
-selector per severity — critical, major, minor — with *Not judged* or a minimum
-pass rate from 50% to 100% (a rate set elsewhere is offered too), and the step's
-validation status as one icon beside the title (see Validation below). Each
-change saves a new version at once and keeps that severity's `minPassHatK`,
-which only the CLI, the API and the assistant set. The last severity judged
-cannot be set to *Not judged*: criteria judge at least one.
+In the Evaluation tab, the top row is the step's validation status (see
+Validation below) and **Set the threshold**, whose tooltip lists the floors in
+force. The button opens a dialog with a slider per severity — critical, major,
+minor — from 0% to 100% and a checkbox for whether the severity is judged.
+Nothing is saved until **Save**, which writes one new version and keeps each
+severity's `minPassHatK`, which only the CLI, the API and the assistant set.
+The tab shows no version. The last severity judged cannot be unchecked:
+criteria judge at least one.
 
 ## Step Fingerprint
 
@@ -607,7 +613,7 @@ does not count) on the champion:
 It comes with `GET /api/evaluation/qualification` as `validation: { status,
 evalRunId, reason, runInProgress }`, as the first line of `mediforce eval
 qualification`, and in the assistant's `get_qualification`. In the Evaluation
-tab it is the icon beside **Acceptance Criteria** — **Validation passed**,
+tab it is the status at the top — **Validation passed**,
 **Validation failed** or **Not verified**, with the reason on hover; clicking it
 also shows the signed Step Qualification, if any. The tab reads it again every
 few seconds while an Eval Run of the step is running. A signed qualification

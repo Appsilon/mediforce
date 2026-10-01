@@ -1,4 +1,4 @@
-import { describeAcceptanceCriteria as describeCriteria, describeMcpPolicy, type AcceptanceCriteria } from '@mediforce/platform-core';
+import { DEFAULT_ACCEPTANCE_CRITERIA, describeAcceptanceCriteria as describeCriteria, describeMcpPolicy, type AcceptanceCriteria } from '@mediforce/platform-core';
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson } from '../output';
 import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
@@ -14,7 +14,7 @@ export const evalCriteriaGetCommand = defineCommand({
       return 0;
     }
     output.stdout(result.criteria === null
-      ? 'No Acceptance Criteria yet.'
+      ? `Not set — the default applies: ${describeCriteria(DEFAULT_ACCEPTANCE_CRITERIA)}`
       : `v${result.criteria.version} (${result.criteria.origin})  ${describeCriteria(result.criteria.criteria)}`);
     return 0;
   },

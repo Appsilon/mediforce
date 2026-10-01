@@ -203,7 +203,6 @@ export const evalRuns = pgTable(
     evaluators: jsonb('evaluators').notNull(),
     variants: jsonb('variants').notNull(),
     acceptanceCriteria: jsonb('acceptance_criteria'),
-    briefVersion: integer('brief_version'),
     mcpPolicy: jsonb('mcp_policy').notNull(),
     estimate: jsonb('estimate').notNull(),
     budgetUsd: doublePrecision('budget_usd').notNull(),

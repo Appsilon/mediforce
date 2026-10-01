@@ -378,6 +378,7 @@ export {
   applyStepVariant,
   isEmptyVariantPatch,
   variantPatchProblem,
+  DEFAULT_ACCEPTANCE_CRITERIA,
   judgeAcceptanceCriteria,
   describeAcceptanceCriteria,
   calibrateConfidence,

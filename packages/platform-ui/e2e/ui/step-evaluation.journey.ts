@@ -12,7 +12,7 @@ import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
  * L4 journeys for the workflow's Evaluation tab (ADR-0023 D14): pick the agent
  * step, ask the Evaluation Assistant, and decide its proposals — accepting the
  * Evaluator adds it to the step's list as one that counts, rejecting the Brief
- * draft leaves the Brief unwritten; a plan's risk asks the assistant to draft
+ * draft leaves the Brief, opened from the assistant's header, unwritten; a plan's risk asks the assistant to draft
  * its check; outputs it picks are labelled by the person and become Eval
  * Cases. The steps the assistant took stay listed under its reply, and the
  * panel widens from its left edge. Acceptance Criteria the assistant proposes
@@ -49,7 +49,16 @@ test.describe('Step Evaluation tab', () => {
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
     await expect(page.getByText('No Evaluators yet.')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/No Brief yet/)).toBeVisible();
+    await page.getByRole('button', { name: 'Show the step brief' }).click();
+    const briefField = page.getByTestId('evaluation-brief');
+    await expect(briefField.getByText(/No Brief yet/)).toBeVisible();
+    await briefField.getByRole('button', { name: 'Write' }).click();
+    await briefField.getByLabel('Step brief').fill('An unsaved draft');
+    await page.getByRole('button', { name: 'Hide the step brief' }).click();
+    await expect(briefField).toBeHidden();
+    await page.getByRole('button', { name: 'Show the step brief' }).click();
+    await expect(briefField.getByLabel('Step brief')).toHaveValue('An unsaved draft');
+    await briefField.getByRole('button', { name: 'Cancel' }).click();
 
     await page.getByRole('button', { name: 'Assistant settings' }).click();
     await expect(page.getByLabel('Evaluation Assistant Model')).toBeVisible();
@@ -78,7 +87,8 @@ test.describe('Step Evaluation tab', () => {
     await expect(row).toBeVisible({ timeout: 10_000 });
     await expect(row.getByText('Counts')).toBeVisible();
     await expect(row.getByText(/from the assistant/)).toBeVisible();
-    await expect(page.getByText(/No Brief yet/)).toBeVisible();
+    await expect(page.getByTestId('evaluation-brief').getByText(/No Brief yet/)).toBeVisible();
+    await expect(page.getByTestId('brief-indicator')).toHaveCount(0);
 
     const panel = page.getByTestId('evaluation-assistant');
     const narrow = (await panel.boundingBox())!.width;
@@ -185,9 +195,12 @@ test.describe('Step Evaluation tab', () => {
     const criteriaCard = page.getByTestId('proposal-card').filter({ hasText: 'Proposed Acceptance Criteria' });
     await criteriaCard.getByTestId('proposal-accept').click();
     await expect(criteriaCard.getByText('Accepted')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByLabel('critical minimum pass rate')).toHaveValue('0.1');
-    await expect(page.getByLabel('major minimum pass rate')).toHaveValue('0.5');
-    await expect(page.getByLabel('minor minimum pass rate')).toHaveValue('');
+    await page.getByTestId('set-threshold').click();
+    const thresholds = page.getByTestId('threshold-dialog');
+    await expect(thresholds.getByLabel('critical minimum pass rate')).toHaveValue('10');
+    await expect(thresholds.getByLabel('major minimum pass rate')).toHaveValue('50');
+    await expect(thresholds.getByLabel('judge minor')).not.toBeChecked();
+    await thresholds.getByRole('button', { name: 'Cancel' }).click();
 
     // The run is prepared and confirmed over the API; the report is read and signed in the tab.
     const prepared = EvalRunOutputSchema.parse(await post('/api/evaluation/runs', { ...step, trialsPerCase: 1, budgetUsd: 1 }));

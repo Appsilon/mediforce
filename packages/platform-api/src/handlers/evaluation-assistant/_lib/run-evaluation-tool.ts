@@ -1,6 +1,7 @@
 import { posix } from 'node:path';
 import type { z } from 'zod';
 import {
+  DEFAULT_ACCEPTANCE_CRITERIA,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   JUDGE_MIN_AGREEMENT,
   JUDGE_MIN_FAILURE_LABELS,
@@ -316,7 +317,6 @@ export async function executeEvaluationTool(
         status: evalRun.status,
         mcpPolicy: evalRun.mcpPolicy,
         acceptanceCriteria: evalRun.acceptanceCriteria,
-        briefVersion: evalRun.briefVersion,
         report,
         failedTrials: trials
           .filter((trial) => trial.status === 'failed' || trial.error !== null)
@@ -353,7 +353,7 @@ export async function executeEvaluationTool(
           signedBy: shown.signature.signerName,
           signedAt: shown.signature.signedAt,
         },
-        acceptanceCriteria: criteria === null ? null : { version: criteria.version, ...criteria.criteria },
+        acceptanceCriteria: criteria === null ? { default: true, ...DEFAULT_ACCEPTANCE_CRITERIA } : { version: criteria.version, ...criteria.criteria },
       };
     }
     case 'prepare_eval_run': {

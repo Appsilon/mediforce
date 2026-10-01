@@ -322,8 +322,8 @@ export const McpEvalPolicySchema = EvaluatedStepSchema.extend({
 
 /**
  * One Acceptance Criterion (D10): what every counted Evaluator of a severity
- * must reach — its pass rate's Wilson 95% lower bound, and optionally pass^k,
- * the share of cases where every trial passed.
+ * must reach — its pass rate, passes over graded trials, and optionally
+ * pass^k, the share of cases where every trial passed.
  */
 export const AcceptanceCriterionSchema = z.object({
   minPassRate: z.number().min(0).max(1),

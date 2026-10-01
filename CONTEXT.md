@@ -587,7 +587,8 @@ the user-facing immutable log.
   versioned **Eval Datasets**; neither is shared with another Workflow Step (reuse
   is by copy).
 - An agent **Workflow Step** has 0..1 **Evaluation Brief** (versioned); it
-  guides the **Evaluation Assistant** and is not part of a **Step Qualification**.
+  guides the **Evaluation Assistant** and is not part of an **Eval Run** or a
+  **Step Qualification**.
 - An **Evaluation Assistant** proposes **Evaluators**, **Eval Cases** and
   diagnoses of failures;
   a human accepts them, confirms every **Eval Run**, and alone approves code

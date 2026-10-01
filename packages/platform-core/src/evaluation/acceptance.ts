@@ -10,9 +10,9 @@ function percent(value: number): string {
 /**
  * Judges one variant's Evaluator results against the run's Acceptance
  * Criteria (ADR-0023 D10). A criterion holds for a severity when every counted
- * Evaluator of that severity reaches it: its pass rate's Wilson 95% lower
- * bound at least `minPassRate`, and its pass^k at least `minPassHatK` when
- * set. One miss is a miss; otherwise a severity with no counted Evaluator, or
+ * Evaluator of that severity reaches it: its pass rate — passes over graded
+ * trials, taken literally — at least `minPassRate`, and its pass^k at least
+ * `minPassHatK` when set. One miss is a miss; otherwise a severity with no counted Evaluator, or
  * one that graded nothing, cannot be judged. Evaluators that do not count
  * (D9) are left out.
  */
@@ -27,13 +27,13 @@ export function judgeAcceptanceCriteria(
     const lines = evaluators
       .filter((evaluator) => evaluator.counted === true && evaluator.severity === severity)
       .map((evaluator) => {
-        const passRateMet = evaluator.wilsonLower === null ? null : evaluator.wilsonLower >= criterion.minPassRate;
+        const passRateMet = evaluator.passRate === null ? null : evaluator.passRate >= criterion.minPassRate;
         const passHatKMet = criterion.minPassHatK === undefined
           ? true
           : evaluator.passHatK === null ? null : evaluator.passHatK >= criterion.minPassHatK;
         const met = passRateMet === false || passHatKMet === false ? false : passRateMet === null || passHatKMet === null ? null : true;
         const misses = [
-          passRateMet === false && `lower bound ${percent(evaluator.wilsonLower!)} < ${percent(criterion.minPassRate)}`,
+          passRateMet === false && `pass rate ${percent(evaluator.passRate!)} < ${percent(criterion.minPassRate)}`,
           passHatKMet === false && `pass^k ${percent(evaluator.passHatK!)} < ${percent(criterion.minPassHatK!)}`,
         ].filter((miss) => miss !== false);
         return {
@@ -67,14 +67,21 @@ export function judgeAcceptanceCriteria(
   });
 }
 
-/** Acceptance Criteria in words: the floor per severity, on the Wilson 95% lower bound, and pass^k where set. */
+/** Until a Step's Acceptance Criteria are set, every severity must pass every graded trial. */
+export const DEFAULT_ACCEPTANCE_CRITERIA: AcceptanceCriteria = {
+  critical: { minPassRate: 1 },
+  major: { minPassRate: 1 },
+  minor: { minPassRate: 1 },
+};
+
+/** Acceptance Criteria in words: the pass-rate floor per severity, and pass^k where set. */
 export function describeAcceptanceCriteria(criteria: AcceptanceCriteria): string {
   return SEVERITIES
     .flatMap((severity) => {
       const criterion = criteria[severity];
       if (criterion === undefined) return [];
       const passHatK = criterion.minPassHatK === undefined ? '' : `, pass^k ≥ ${criterion.minPassHatK}`;
-      return [`${severity}: lower bound ≥ ${criterion.minPassRate}${passHatK}`];
+      return [`${severity}: pass rate ≥ ${criterion.minPassRate}${passHatK}`];
     })
     .join('; ');
 }

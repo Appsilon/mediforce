@@ -1,5 +1,4 @@
 import type { AcceptanceCriterionVerdict, ConfidenceCalibration, ControlRecommendation } from '../schemas/eval-run';
-import { wilsonInterval } from './statistics';
 
 /** One graded trial: what the agent said of its output, and whether the output passed. */
 export interface ConfidenceOutcome {
@@ -44,8 +43,8 @@ export function calibrateConfidence(outcomes: readonly ConfidenceOutcome[]): Con
  * What a variant's results say about routing its outputs. Control Mode 4 with
  * a `confidenceThreshold` when some confidence level separates outputs that
  * pass: the lowest threshold whose outputs at or above it passed every counted
- * Evaluator with a Wilson 95% lower bound of at least the strictest
- * criterion's `minPassRate`, over at least a handful of trials. Below it the
+ * Evaluator at a rate of at least the strictest criterion's `minPassRate`,
+ * over at least a handful of trials. Below it the
  * step's fallback routes the output — so a step that misses its criteria
  * overall can still run unreviewed where it is confident. Control Mode 3, a
  * person reviewing every output, when there are no criteria, a criterion could
@@ -76,20 +75,20 @@ export function recommendControl(
     const covered = outcomes.filter((outcome) => outcome.confidence >= threshold);
     if (covered.length < MIN_COVERED_TRIALS) break;
     const passes = covered.filter((outcome) => outcome.passed === true).length;
-    const lower = wilsonInterval(passes, covered.length)!.lower;
-    if (lower >= target) {
+    const passRate = passes / covered.length;
+    if (passRate >= target) {
       return {
         autonomyLevel: 'L4',
         confidenceThreshold: threshold,
         coverage: covered.length / outcomes.length,
         reason: `${allMet ? 'Every criterion was met, and outputs' : 'Not every criterion was met overall, but outputs'} with confidence ${threshold} or more `
-          + `passed every counted Evaluator ${passes}/${covered.length} times (lower bound ${lower.toFixed(2)}, at least the strictest floor ${target}). `
+          + `passed every counted Evaluator ${passes}/${covered.length} times (pass rate ${passRate.toFixed(2)}, at least the strictest floor ${target}). `
           + 'Below the threshold the step\'s fallbackBehavior applies; escalate_to_human sends the output to a person.',
       };
     }
   }
   return review(
-    `No confidence level separates outputs that pass every counted Evaluator with a lower bound of ${target} `
+    `No confidence level separates outputs that pass every counted Evaluator at a rate of ${target} `
     + `over at least ${MIN_COVERED_TRIALS} trials; keep a person reviewing every output, or run more trials.`,
   );
 }

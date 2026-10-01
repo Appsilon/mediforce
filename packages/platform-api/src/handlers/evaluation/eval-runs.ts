@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import {
   CHAMPION_VARIANT_ID,
+  DEFAULT_ACCEPTANCE_CRITERIA,
   applyStepVariant,
   evaluatorTrust,
   isEmptyVariantPatch,
@@ -99,8 +100,8 @@ async function buildVariants(
  * Definition version and any challengers patched over it, a frozen Dataset
  * version less the cases any variant's few-shot examples came from (D12), the
  * Step's live Evaluator versions with whether each counts, the MCP eval policy
- * the trials will run under, the Acceptance Criteria and Brief version it will
- * be judged against, and a cost estimate. Nothing runs yet — a person confirms
+ * the trials will run under, the Acceptance Criteria it will be judged against,
+ * and a cost estimate. Nothing runs yet — a person confirms
  * the budget with `start`.
  */
 export async function prepareEvalRun(
@@ -158,7 +159,6 @@ export async function prepareEvalRun(
     );
   }
   const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
-  const [brief] = await scope.evaluation.listBriefs(step);
 
   const trialsPerVariant = caseIds.length * input.trialsPerCase;
   const trialCount = trialsPerVariant * variants.length;
@@ -180,8 +180,7 @@ export async function prepareEvalRun(
     concurrency: input.concurrency,
     evaluators: frozenEvaluators.map(({ frozen }) => frozen),
     variants,
-    acceptanceCriteria: criteria?.criteria ?? null,
-    briefVersion: brief?.version ?? null,
+    acceptanceCriteria: criteria?.criteria ?? DEFAULT_ACCEPTANCE_CRITERIA,
     mcpPolicy,
     estimate,
     budgetUsd,
@@ -227,7 +226,6 @@ export async function prepareEvalRun(
       variants,
       exampleCaseIds,
       acceptanceCriteria: run.acceptanceCriteria,
-      briefVersion: run.briefVersion,
       mcpPolicy,
       estimate,
       budgetUsd,

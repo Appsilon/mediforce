@@ -17,7 +17,7 @@ function run(overrides: Partial<EvalRun> = {}): EvalRun {
     trialsPerCase: 2, concurrency: 2,
     evaluators: [{ evaluatorId: EVALUATOR, name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
     variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
-    acceptanceCriteria: null, briefVersion: null,
+    acceptanceCriteria: null,
     mcpPolicy: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
     budgetUsd: 5, spentUsd: 0, status: 'completed', createdBy: 'a', createdAt: '2026-09-23T08:00:00.000Z', startedAt: null, completedAt: null,
     ...overrides,
@@ -124,7 +124,7 @@ describe('buildEvalRunReport', () => {
   it('calibrates the agent\'s confidence against whether counted Evaluators passed, and recommends routing', async () => {
     const fixture = await evaluationFixture();
     const scope = fixture.scope();
-    const evalRun = run({ trialsPerCase: 20, caseIds: [CASE_A], acceptanceCriteria: { critical: { minPassRate: 0.5 } } });
+    const evalRun = run({ trialsPerCase: 20, caseIds: [CASE_A], acceptanceCriteria: { critical: { minPassRate: 0.7 } } });
     // Confident trials all pass; unsure ones mostly fail. The step misses its floor overall, but not where it is confident.
     const trials = Array.from({ length: 20 }, (_unused, index) =>
       trial(evalRun.id, CASE_A, index, { confidence: index < 12 ? 0.95 : 0.4 }));

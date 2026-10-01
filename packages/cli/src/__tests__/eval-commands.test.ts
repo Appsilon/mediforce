@@ -189,7 +189,7 @@ describe('mediforce eval', () => {
     const [url, init] = fetchSpy.mock.calls[0]!;
     expect(url).toBe('http://localhost:5555/api/evaluation/acceptance-criteria');
     expect(JSON.parse(String(init?.body))).toEqual({ namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', criteria, origin: 'user' });
-    expect(output.stdoutLines).toEqual(['Acceptance Criteria v2 written: critical: lower bound ≥ 0.95, pass^k ≥ 0.9; major: lower bound ≥ 0.8']);
+    expect(output.stdoutLines).toEqual(['Acceptance Criteria v2 written: critical: pass rate ≥ 0.95, pass^k ≥ 0.9; major: pass rate ≥ 0.8']);
   });
 
   it('qualification asks for the version given and prints the badge', async () => {
