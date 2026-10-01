@@ -14,7 +14,7 @@ export interface GitWorkspace {
   remove(): void;
 }
 
-/** A real repo holding `files` as the seed commit, and a step commit that adds `graded.json`. */
+/** A real bare repo, like the workflow's, holding `files` as the seed commit and a step commit that adds `graded.json`. */
 export function gitWorkspace(files: Record<string, string>): GitWorkspace {
   const dir = mkdtempSync(join(tmpdir(), 'mediforce-eval-ws-'));
   const git = (...args: string[]) => execFileSync('git', ['-C', dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', ...args], { encoding: 'utf-8' }).trim();
@@ -29,6 +29,7 @@ export function gitWorkspace(files: Record<string, string>): GitWorkspace {
   writeFileSync(join(dir, 'graded.json'), '{"findings":[]}');
   git('add', '-A');
   git('commit', '-qm', 'step');
+  git('config', 'core.bare', 'true');
   return {
     repoPath: join(dir, '.git'),
     seedCommit,

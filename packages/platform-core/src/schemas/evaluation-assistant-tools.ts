@@ -156,7 +156,11 @@ export const ProposeWrittenOutputsToolSchema = z.object({
 /** Propose a case synthesized from a production run by changing its input or workspace. */
 export const ProposePerturbedCaseToolSchema = PerturbedEvalCaseSpecSchema.extend({
   rationale: z.string().max(1000).optional(),
-}).refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' });
+}).refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' })
+  .refine((spec) => spec.perturbation.kind !== 'injected_instruction' || spec.perturbation.canary !== undefined, {
+    path: ['perturbation', 'canary'],
+    message: 'an injected_instruction case names the canary its injected text asks the agent to output',
+  });
 
 /**
  * Propose a built-in case suite: the platform writes its cases from one
