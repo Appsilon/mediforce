@@ -72,7 +72,7 @@ function EvaluatorTable({ variant, k }: { variant: EvalRunVariantReport; k: numb
           <th className="py-1 font-medium">Flaky</th>
           <th className="py-1 font-medium">Errors</th>
           <th className="py-1 font-medium">
-            <InstantTooltip label="Judge verdicts left out of the pass rate: below the judge's minimum confidence and not accepted, or denied by a person.">
+            <InstantTooltip label="Model verdicts left out of the pass rate: a judge's below its minimum confidence and not accepted, or any denied by a person.">
               <span>Left out</span>
             </InstantTooltip>
           </th>

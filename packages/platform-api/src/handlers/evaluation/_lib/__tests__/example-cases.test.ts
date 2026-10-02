@@ -16,7 +16,7 @@ describe('exampleCasesProblem (ADR-0023 D12)', () => {
       input: { triggerPayload: { studyId: 'CDISCPILOT01' }, previousStepOutputs: {} },
       workspaceSeedCommit: null,
       expectation: 'positive',
-      notes: null,
+      expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null,
       split,
       containsProductionData: false,
       origin: 'user',

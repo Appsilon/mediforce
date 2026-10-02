@@ -27,7 +27,7 @@ export const EvaluationBriefSchema = EvaluatedStepSchema.extend({
   createdAt: z.iso.datetime(),
 });
 
-export const EvaluatorKindSchema = z.enum(['schema', 'code', 'llm_judge']);
+export const EvaluatorKindSchema = z.enum(['schema', 'code', 'llm_judge', 'expected_output']);
 export const EvaluatorSeveritySchema = z.enum(['critical', 'major', 'minor']);
 
 /** Checks the step's `result` against the structural JSON Schema subset `agent.outputSchema` uses. */
@@ -64,10 +64,29 @@ export const LlmJudgeCheckSchema = z.object({
   minConfidence: z.number().min(0).max(1).default(DEFAULT_JUDGE_MIN_CONFIDENCE),
 });
 
+/** A new agreement judge's floor: an output that agrees less with a positive case's expected output fails. */
+export const DEFAULT_MIN_AGREEMENT = 0.8;
+
+/**
+ * Compares the output with an Eval Case's expected output, the way the case
+ * says: `exact` fails on any difference; `agreement` asks `model` how far the
+ * two agree, 0–1, with `instructions` and the case's own instructions, and
+ * passes at `minAgreement`. A negative case passes when the output does not
+ * match. It grades only cases that have an expected output, never production.
+ */
+export const ExpectedOutputCheckSchema = z.object({
+  kind: z.literal('expected_output'),
+  model: z.string().min(1),
+  /** What the agreement judge should treat as trivial or decisive on every case. */
+  instructions: z.string().max(8000).optional(),
+  minAgreement: z.number().min(0).max(1).default(DEFAULT_MIN_AGREEMENT),
+});
+
 export const EvaluatorCheckSchema = z.discriminatedUnion('kind', [
   SchemaCheckSchema,
   CodeCheckSchema,
   LlmJudgeCheckSchema,
+  ExpectedOutputCheckSchema,
 ]);
 
 export const JUDGE_PASS_VALUE = 0.5;
@@ -123,8 +142,28 @@ export const EvalCaseInputSchema = z.object({
   previousRun: z.record(z.string(), z.unknown()).optional(),
 });
 
-/** An approved production output is a positive case; a rejected one is negative. */
+/**
+ * A positive case's expected output is what the step should return; a
+ * negative case's is an output it must not return. An approved production
+ * output is a positive case, a rejected one a negative case.
+ */
 export const EvalCaseExpectationSchema = z.enum(['positive', 'negative']);
+/** How an `expected_output` check compares the output with the case's expected output. */
+export const EvalCaseComparisonSchema = z.enum(['exact', 'agreement']);
+
+/**
+ * What a case expects of the output: an expected output (none when null), whether it is one
+ * to match or to avoid, how it is compared, and which Evaluators grade the case
+ * (every one of the step's when null, including ones added later).
+ */
+export const EvalCaseLabelSchema = z.object({
+  expectedOutput: z.unknown().nullable(),
+  expectation: EvalCaseExpectationSchema,
+  comparison: EvalCaseComparisonSchema,
+  /** For `agreement`: what to treat as trivial or decisive on this case. */
+  agreementInstructions: z.string().max(4000).nullable(),
+  evaluatorIds: z.array(z.uuid()).min(1).nullable(),
+});
 /** `synthesized`: a production run's input with a deliberate change — see `perturbation`. */
 export const EvalCaseSourceSchema = z.enum(['production', 'manual', 'synthesized']);
 
@@ -135,7 +174,7 @@ export const EvalCasePerturbationKindSchema = z.enum([
   'renamed_columns',
   'edge_values',
   'injected_instruction',
-  /** A change that keeps the input's meaning; the case's notes say what must not change. */
+  /** A change that keeps the input's meaning, so the output must not change. */
   'metamorphic',
   'other',
 ]);
@@ -190,9 +229,10 @@ export const PerturbedEvalCaseSpecSchema = z.object({
   perturbation: EvalCasePerturbationSchema,
   inputChanges: z.array(EvalCaseInputChangeSchema).max(20).optional(),
   fileChanges: z.array(WorkspaceFileChangeSchema).max(20).optional(),
+  expectedOutput: EvalCaseLabelSchema.shape.expectedOutput.optional(),
   expectation: EvalCaseExpectationSchema.default('positive'),
-  /** What the output must — or must not — do with the changed input. */
-  notes: z.string().min(1).max(4000),
+  comparison: EvalCaseComparisonSchema.optional(),
+  agreementInstructions: z.string().trim().max(4000).optional(),
   split: EvalCaseSplitSchema.optional(),
 });
 
@@ -200,15 +240,12 @@ export function hasPerturbationChange(spec: { inputChanges?: readonly unknown[];
   return (spec.inputChanges?.length ?? 0) + (spec.fileChanges?.length ?? 0) > 0;
 }
 
-export const EvalCaseSchema = EvaluatedStepSchema.extend({
+export const EvalCaseSchema = EvaluatedStepSchema.extend(EvalCaseLabelSchema.shape).extend({
   id: z.uuid(),
   name: z.string().min(1).max(200),
   input: EvalCaseInputSchema,
   /** Commit on the workflow's bare repo a trial's run branch starts from; null for an empty workspace. */
   workspaceSeedCommit: z.string().regex(/^[0-9a-f]{7,64}$/).nullable(),
-  expectation: EvalCaseExpectationSchema,
-  /** What the output must — or must not — contain; a rejecting reviewer's comment for a negative case. */
-  notes: z.string().max(4000).nullable(),
   source: EvalCaseSourceSchema,
   sourceAgentRunId: z.string().nullable(),
   /** Set on a `synthesized` case: what it changed about its source run's input. */
@@ -336,6 +373,8 @@ export type Evaluator = z.infer<typeof EvaluatorSchema>;
 export type EvaluatorVersion = z.infer<typeof EvaluatorVersionSchema>;
 export type EvalCaseInput = z.infer<typeof EvalCaseInputSchema>;
 export type EvalCaseExpectation = z.infer<typeof EvalCaseExpectationSchema>;
+export type EvalCaseComparison = z.infer<typeof EvalCaseComparisonSchema>;
+export type EvalCaseLabel = z.infer<typeof EvalCaseLabelSchema>;
 export type EvalCasePerturbation = z.infer<typeof EvalCasePerturbationSchema>;
 export type EvalCaseInputPart = z.infer<typeof EvalCaseInputPartSchema>;
 export type EvalCaseInputChange = z.infer<typeof EvalCaseInputChangeSchema>;

@@ -39,7 +39,7 @@ export async function evalScenario(fixture: EvaluationFixture): Promise<EvalScen
     const { evalCase } = await createEvalCase({
       ...STEP, name,
       input: { triggerPayload: { studyId: 'CDISCPILOT01' }, previousStepOutputs: { 'extract-aes': { events: [{ term: name }] } } },
-      workspaceSeedCommit: null, expectation: 'positive', notes: `${name} must be graded.`, split: 'dev',
+      workspaceSeedCommit: null, expectation: 'positive', expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'dev',
       containsProductionData: false, origin: 'user',
     }, scope);
     caseIds[name] = evalCase.id;

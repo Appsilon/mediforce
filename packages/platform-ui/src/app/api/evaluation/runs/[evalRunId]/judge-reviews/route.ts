@@ -7,7 +7,7 @@ interface RouteContext {
   params: Promise<{ evalRunId: string }>;
 }
 
-/** POST /api/evaluation/runs/:evalRunId/judge-reviews — A person accepts or denies one judge verdict after reading its rationale. */
+/** POST /api/evaluation/runs/:evalRunId/judge-reviews — A person accepts or denies one model's verdict — a judge's or an agreement score — after reading its rationale. */
 export const POST = createRouteAdapter<typeof ReviewJudgeVerdictInputSchema, z.infer<typeof ReviewJudgeVerdictInputSchema>, unknown, RouteContext>(
   ReviewJudgeVerdictInputSchema,
   async (req, ctx) => ({

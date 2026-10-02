@@ -508,11 +508,24 @@ an executable check that produces Scores.
 _Avoid_: "validation rule", "assertion", "metric", "grader".
 
 **Eval Case**:
-One input fixture for a Workflow Step plus what its output must — or must not — contain.
-_Avoid_: "test case", "sample", "golden" (a case says what to check, not the right answer).
+One input fixture for a Workflow Step, optionally with its **expected output** —
+the output to match (a *positive* case) or one the step must not return (a
+*negative* case) — and the Evaluators that grade it (every one of the Step's
+unless it names some).
+_Avoid_: "test case", "sample", "golden" (an expected output is compared exactly
+or by an agreement score, never assumed to be the only right answer), "notes"
+(cases no longer carry free-text notes).
+
+**Expected output**:
+The output an Eval Case expects of the step, compared with each trial's output
+by an `expected_output` Evaluator: an *exact match*, where any difference fails,
+or an *output agreement score* (0–1) that the check's model gives, with the
+case's own instructions on which differences are trivial or decisive.
+_Avoid_: "label" (Scores already have labels), "ground truth".
 
 **Judge review**:
-A person's decision on one LLM judge verdict, made after reading its rationale:
+A person's decision on one LLM judge verdict, or one **output agreement score**,
+made after reading its rationale:
 *accepted* counts the verdict toward the **Acceptance Criteria** whatever the
 judge's confidence; *denied* leaves it out. A denial never reverses the verdict.
 _Avoid_: "label", "override", "calibration" (judges are not calibrated).

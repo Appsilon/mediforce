@@ -19,7 +19,7 @@ describe('optimisationResults', () => {
     await createEvalCase({
       ...STEP, name: 'Grade 3 anaemia',
       input: { triggerPayload: {}, previousStepOutputs: { 'extract-aes': { events: [{ term: 'Anaemia' }] } } },
-      workspaceSeedCommit: null, expectation: 'positive', notes: null, split: 'holdout', containsProductionData: false, origin: 'user',
+      workspaceSeedCommit: null, expectation: 'positive', expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'holdout', containsProductionData: false, origin: 'user',
     }, scenario.scope);
     await freezeEvalDataset(STEP, scenario.scope);
   });

@@ -277,7 +277,10 @@ export async function executeEvaluationTool(
           expectation: evalCase.expectation,
           split: evalCase.split,
           source: evalCase.source,
-          notes: evalCase.notes,
+          expectedOutput: clip(evalCase.expectedOutput, 2000),
+          comparison: evalCase.comparison,
+          agreementInstructions: evalCase.agreementInstructions,
+          evaluatorIds: evalCase.evaluatorIds,
         })),
       };
     }

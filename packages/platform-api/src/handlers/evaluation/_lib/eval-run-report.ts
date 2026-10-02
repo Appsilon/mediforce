@@ -7,6 +7,7 @@ import {
   wilsonInterval,
   type AcceptanceCriterionVerdict,
   type ConfidenceOutcome,
+  type EvalCase,
   type EvalRun,
   type EvalRunEvaluatorReport,
   type EvalRunMcpReport,
@@ -19,8 +20,11 @@ import {
 } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import {
+  casesOfRun,
   checkOutcome,
   countedScores,
+  evaluatorsOfCase,
+  isModelVerdict,
   isPass,
   judgeConfidenceOf,
   mean,
@@ -29,6 +33,8 @@ import {
   trialScores,
   type TrialScores,
 } from './trial-scores';
+
+type RunCases = ReadonlyMap<string, EvalCase | null>;
 
 /** What the run recorded on its scored trials, by trial id. */
 async function scoresByTrial(scope: CallerScope, run: EvalRun, trials: readonly EvalTrial[]): Promise<Map<string, TrialScores>> {
@@ -46,16 +52,21 @@ function trialCounts(trials: readonly EvalTrial[]): EvalRunReport['trials'] {
   };
 }
 
+function gradesTrial(run: EvalRun, cases: RunCases, trial: EvalTrial, evaluatorId: string): boolean {
+  return evaluatorsOfCase(run, cases.get(trial.caseId) ?? null).some((candidate) => candidate.evaluatorId === evaluatorId);
+}
+
 /**
  * Per Evaluator over one variant's trials: pass rate with its Wilson 95%
  * interval, pass@k, pass^k and flakiness over cases; a trial the check could
  * not grade counts as an error, not a failure, and a judge verdict left out
  * (`checkOutcome`) as excluded. Over cases, an ungraded, excluded or failed
  * trial still counts toward k, so it can lower pass@k and pass^k but never
- * lift them.
+ * lift them. A trial of a case the Evaluator does not grade is not counted at all.
  */
-function evaluatorReports(run: EvalRun, trials: readonly EvalTrial[], scores: ReadonlyMap<string, TrialScores>): EvalRunEvaluatorReport[] {
+function evaluatorReports(run: EvalRun, trials: readonly EvalTrial[], scores: ReadonlyMap<string, TrialScores>, cases: RunCases): EvalRunEvaluatorReport[] {
   const attempted = trials.filter((trial) => trial.status === 'scored' || trial.status === 'failed');
+  const grades = (trial: EvalTrial, evaluatorId: string) => gradesTrial(run, cases, trial, evaluatorId);
   return run.evaluators.map((evaluator) => {
     let passes = 0;
     let failures = 0;
@@ -64,7 +75,7 @@ function evaluatorReports(run: EvalRun, trials: readonly EvalTrial[], scores: Re
     const outcomesByCase = new Map<string, (boolean | null)[]>();
     const recordOutcome = (caseId: string, passed: boolean | null) =>
       outcomesByCase.set(caseId, [...(outcomesByCase.get(caseId) ?? []), passed]);
-    for (const trial of attempted) {
+    for (const trial of attempted.filter((candidate) => grades(candidate, evaluator.evaluatorId))) {
       if (trial.status === 'failed') {
         recordOutcome(trial.caseId, null);
         continue;
@@ -112,11 +123,11 @@ function evaluatorReports(run: EvalRun, trials: readonly EvalTrial[], scores: Re
  * trial some counted Evaluator could not grade says nothing: a missing Score
  * is not a pass.
  */
-function confidenceOutcomes(run: EvalRun, trials: readonly EvalTrial[], scores: ReadonlyMap<string, TrialScores>): ConfidenceOutcome[] {
+function confidenceOutcomes(run: EvalRun, trials: readonly EvalTrial[], scores: ReadonlyMap<string, TrialScores>, cases: RunCases): ConfidenceOutcome[] {
   return trials.flatMap((trial) => {
     if (trial.status !== 'scored' || trial.confidence === null) return [];
     const recorded = scores.get(trial.id);
-    const passed = passedEveryCounted(run, recorded === undefined ? [] : countedScores(recorded));
+    const passed = passedEveryCounted(run, recorded === undefined ? [] : countedScores(recorded), cases.get(trial.caseId) ?? null);
     return passed === null ? [] : [{ confidence: trial.confidence, passed }];
   });
 }
@@ -160,11 +171,14 @@ function variantReport(
   variant: EvalVariant,
   trials: readonly EvalTrial[],
   scores: ReadonlyMap<string, TrialScores>,
+  cases: RunCases,
 ): EvalRunVariantReport {
-  const evaluators = evaluatorReports(run, trials, scores);
+  const evaluators = evaluatorReports(run, trials, scores, cases);
   const counts = trialCounts(trials);
-  const criteria = judgedOnEveryTrial(judgeAcceptanceCriteria(run.acceptanceCriteria, evaluators), counts);
-  const outcomes = confidenceOutcomes(run, trials, scores);
+  // An Evaluator no case selects grades nothing, so it is left out of the criteria like one that does not count.
+  const grading = evaluators.filter((evaluator) => trials.some((trial) => gradesTrial(run, cases, trial, evaluator.evaluatorId)));
+  const criteria = judgedOnEveryTrial(judgeAcceptanceCriteria(run.acceptanceCriteria, grading), counts);
+  const outcomes = confidenceOutcomes(run, trials, scores, cases);
   // Routing is recommended on a variant's finished results only.
   const finished = counts.inProgress === 0 && counts.scored > 0;
   const costs = trials.flatMap((trial) => (trial.costUsd === null ? [] : [trial.costUsd]));
@@ -215,17 +229,17 @@ function compare(champion: EvalRunVariantReport, challenger: EvalRunVariantRepor
 }
 
 /**
- * Every judge verdict on the run's scored trials, with its confidence,
- * rationale and a person's newest review — what someone reads to accept or
- * deny it.
+ * Every model's verdict on the run's scored trials — a judge's, or an
+ * expected-output agreement score — with its confidence, rationale and a
+ * person's newest review: what someone reads to accept or deny it.
  */
-async function judgeVerdicts(
-  scope: CallerScope,
+function judgeVerdicts(
   run: EvalRun,
   trials: readonly EvalTrial[],
   scores: ReadonlyMap<string, TrialScores>,
-): Promise<JudgeVerdict[]> {
-  const judges = run.evaluators.filter((evaluator) => evaluator.kind === 'llm_judge');
+  cases: RunCases,
+): JudgeVerdict[] {
+  const judges = run.evaluators.filter((evaluator) => evaluator.kind === 'llm_judge' || evaluator.kind === 'expected_output');
   if (judges.length === 0) return [];
   const variantOrder = new Map(run.variants.map((variant, index) => [variant.id, index]));
   const ordered = trials
@@ -233,12 +247,10 @@ async function judgeVerdicts(
     .sort((left, right) => (variantOrder.get(left.variantId) ?? 0) - (variantOrder.get(right.variantId) ?? 0)
       || left.caseId.localeCompare(right.caseId)
       || left.trialIndex - right.trialIndex);
-  const caseNames = new Map(await Promise.all([...new Set(ordered.map((trial) => trial.caseId))]
-    .map(async (caseId) => [caseId, (await scope.evaluation.getCase(caseId))?.name ?? null] as const)));
   return ordered.flatMap((trial) => judges.flatMap((judge): JudgeVerdict[] => {
     const recorded = scores.get(trial.id);
     const score = recorded?.checks.find((candidate) => candidate.evaluatorId === judge.evaluatorId);
-    if (score === undefined) return [];
+    if (score === undefined || isModelVerdict(score) === false) return [];
     const review = recorded?.reviews.get(judge.evaluatorId);
     const decision = reviewDecision(review);
     return [{
@@ -246,7 +258,7 @@ async function judgeVerdicts(
       trialIndex: trial.trialIndex,
       variantId: trial.variantId,
       caseId: trial.caseId,
-      caseName: caseNames.get(trial.caseId) ?? null,
+      caseName: cases.get(trial.caseId)?.name ?? null,
       agentRunId: trial.agentRunId!,
       evaluatorId: judge.evaluatorId,
       name: judge.name,
@@ -254,6 +266,7 @@ async function judgeVerdicts(
       scoreId: score.id,
       passed: isPass(score),
       ...judgeConfidenceOf(score),
+      agreement: typeof score.metadata?.agreement === 'number' ? score.metadata.agreement : null,
       rationale: score.comment,
       review: review === undefined || decision === null
         ? null
@@ -273,8 +286,9 @@ async function judgeVerdicts(
  */
 export async function buildEvalRunReport(scope: CallerScope, run: EvalRun, trials: readonly EvalTrial[]): Promise<EvalRunReport> {
   const scores = await scoresByTrial(scope, run, trials);
+  const cases = await casesOfRun(scope, run);
   const variants = run.variants.map((variant) =>
-    variantReport(run, variant, trials.filter((trial) => trial.variantId === variant.id), scores));
+    variantReport(run, variant, trials.filter((trial) => trial.variantId === variant.id), scores, cases));
   const [champion, ...challengers] = variants;
   return {
     k: run.trialsPerCase,
@@ -282,7 +296,7 @@ export async function buildEvalRunReport(scope: CallerScope, run: EvalRun, trial
     mcp: await mcpReport(scope, run, trials),
     variants,
     comparison: champion === undefined ? [] : challengers.map((challenger) => compare(champion, challenger)),
-    judgeVerdicts: await judgeVerdicts(scope, run, trials, scores),
+    judgeVerdicts: judgeVerdicts(run, trials, scores, cases),
     costUsd: trials.reduce((sum, trial) => sum + (trial.costUsd ?? 0), 0),
     inputTokens: trials.reduce((sum, trial) => sum + (trial.inputTokens ?? 0), 0),
     outputTokens: trials.reduce((sum, trial) => sum + (trial.outputTokens ?? 0), 0),

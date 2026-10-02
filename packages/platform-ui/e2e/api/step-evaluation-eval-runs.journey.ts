@@ -13,7 +13,7 @@ import { ApiError, Mediforce } from '@mediforce/platform-api/client';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE, TEST_USER_ID } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
-import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
+import { AUTH_HEADERS, JSON_HEADERS, agentStepAfterExtractWorkflow, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
 import { EVALUATION_WORKSPACE, seedEvaluationWorkspace } from '../helpers/evaluation-workspace';
 import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
 
@@ -196,6 +196,8 @@ function apiClient(baseURL: string | undefined): Mediforce {
 }
 
 test.describe('Step Evaluation judge verdicts — API E2E', () => {
+  // One seed of the evaluation workspace: parallel seeds race on its secret.
+  test.describe.configure({ mode: 'serial' });
   test.beforeAll(async () => {
     await seedEvaluationWorkspace();
   });
@@ -205,9 +207,9 @@ test.describe('Step Evaluation judge verdicts — API E2E', () => {
     const mediforce = apiClient(baseURL);
     const suffix = randomUUID().slice(0, 8);
     const workflowName = `e2e-eval-judge-${suffix}`;
-    const production = await awaitFinishedAgentRun(request, await startRun(
-      request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE,
-    ));
+    await post(request, `/api/workflow-definitions?namespace=${EVALUATION_WORKSPACE}`, agentStepAfterExtractWorkflow(workflowName, {
+      autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' },
+    }), 201);
     const step = { namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes' };
 
     const { evaluator: judge } = await mediforce.evaluation.createEvaluator({
@@ -216,17 +218,16 @@ test.describe('Step Evaluation judge verdicts — API E2E', () => {
     });
     expect(judge.trust).toEqual({ trusted: true });
 
-    // The judge reads each case's notes, so each case's notes key its scripted answer.
-    const sureNotes = `The summary names only events in the input (${suffix}, sure).`;
-    const unsureNotes = `The summary names only events in the input (${suffix}, unsure).`;
-    await scriptOpenRouter(sureNotes, [{ content: JSON.stringify({ rationale: 'Entry [1] lists the events; the summary repeats them.', passed: true, confidence: 0.95 }) }]);
-    await scriptOpenRouter(unsureNotes, [{ content: JSON.stringify({ rationale: 'The log does not show where the summary came from.', passed: false, confidence: 0.4 }) }]);
-    const { evalCase: sureCase } = await mediforce.evaluation.createCaseFromAgentRun({
-      agentRunId: production.id, step, name: 'Sure', expectation: 'positive', notes: sureNotes,
-    });
-    const { evalCase: unsureCase } = await mediforce.evaluation.createCaseFromAgentRun({
-      agentRunId: production.id, step, name: 'Unsure', expectation: 'positive', notes: unsureNotes,
-    });
+    // The judge reads the step's input — the case's `extract-aes` output — so a marker there keys its scripted answer.
+    const sureKey = `judge-key-${suffix}-sure`;
+    const unsureKey = `judge-key-${suffix}-unsure`;
+    await scriptOpenRouter(sureKey, [{ content: JSON.stringify({ rationale: 'Entry [1] lists the events; the summary repeats them.', passed: true, confidence: 0.95 }) }]);
+    await scriptOpenRouter(unsureKey, [{ content: JSON.stringify({ rationale: 'The log does not show where the summary came from.', passed: false, confidence: 0.4 }) }]);
+    const caseKeyedBy = async (name: string, judgeKey: string) => (await mediforce.evaluation.createCase({
+      ...step, name, input: { triggerPayload: {}, previousStepOutputs: { 'extract-aes': { events: [{ term: 'Sepsis' }], judgeKey } } },
+    })).evalCase;
+    const sureCase = await caseKeyedBy('Sure', sureKey);
+    const unsureCase = await caseKeyedBy('Unsure', unsureKey);
     await mediforce.evaluation.freezeDataset(step);
 
     const prepared = await mediforce.evaluation.prepareRun({ ...step, trialsPerCase: 1, concurrency: 2, budgetUsd: 1 });
@@ -272,5 +273,68 @@ test.describe('Step Evaluation judge verdicts — API E2E', () => {
     const denied = await mediforce.evaluation.getRun({ evalRunId });
     expect(judgeReport(denied)).toMatchObject({ passes: 1, failures: 0, excluded: 1, passRate: 1 });
     expect(verdictOn(denied, unsureCase.id)).toMatchObject({ passed: false, counts: false, review: { decision: 'denied' } });
+  });
+
+  test('an expected output compared exactly or by agreement, positive or negative; a case is graded only by the Evaluators it selects', async ({ request, baseURL }) => {
+    test.setTimeout(120_000);
+    const mediforce = apiClient(baseURL);
+    const suffix = randomUUID().slice(0, 8);
+    const workflowName = `e2e-eval-expected-${suffix}`;
+    const production = await awaitFinishedAgentRun(request, await startRun(
+      request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE,
+    ));
+    const step = { namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes' };
+    // What the mock agent returns on every trial of the step.
+    const mockOutput = { mock: true, summary: 'Mock output for step grade-aes' };
+
+    const { evaluator: expected } = await mediforce.evaluation.createEvaluator({
+      ...step, name: 'matches-expected', rule: 'The output matches what the case expects.', severity: 'critical',
+      check: { kind: 'expected_output', model: 'anthropic/claude-haiku-4.5', instructions: 'Wording of the summary is trivial.', minAgreement: 0.8 },
+    });
+    const { evaluator: findings } = await mediforce.evaluation.createEvaluator({
+      ...step, name: 'findings-present', rule: 'The result lists findings.', severity: 'major',
+      check: { kind: 'schema', schema: { required: ['findings'] } },
+    });
+    // It never scores production: a production run has no expected output.
+    const toProduction = await mediforce.evaluation.setEvaluatorProduction({ evaluatorId: expected.id, runInProduction: true }).then(() => null, (error: unknown) => error);
+    expect((toProduction as ApiError).status).toBe(400);
+    // A case selects only Evaluators of its own step.
+    const foreign = await mediforce.evaluation.createCaseFromAgentRun({ agentRunId: production.id, step, evaluatorIds: [randomUUID()] }).then(() => null, (error: unknown) => error);
+    expect((foreign as ApiError).status).toBe(400);
+
+    const agreementKey = `Only the mock flag matters here (${suffix}).`;
+    await scriptOpenRouter(agreementKey, [{ content: JSON.stringify({ rationale: 'The summary is worded differently; the mock flag is the same.', agreement: 0.9 }) }]);
+    const harvest = async (name: string, label: Record<string, unknown>) =>
+      (await mediforce.evaluation.createCaseFromAgentRun({ agentRunId: production.id, step, name, ...label })).evalCase;
+    const matches = await harvest('Matches exactly', { expectedOutput: mockOutput, evaluatorIds: [expected.id] });
+    const avoids = await harvest('Must not match', { expectedOutput: { ...mockOutput, mock: false }, expectation: 'negative', evaluatorIds: [expected.id] });
+    const agrees = await harvest('Agrees', { expectedOutput: { mock: true, summary: 'Mocked the AE grading.' }, comparison: 'agreement', agreementInstructions: agreementKey });
+    expect(agrees).toMatchObject({ comparison: 'agreement', agreementInstructions: agreementKey, evaluatorIds: null });
+    await mediforce.evaluation.freezeDataset(step);
+
+    const prepared = await mediforce.evaluation.prepareRun({ ...step, trialsPerCase: 1, concurrency: 3, budgetUsd: 1 });
+    const evalRunId = prepared.evalRun.id;
+    await mediforce.evaluation.startRun({ evalRunId, confirmedBudgetUsd: 1 });
+    const finished: EvalRunOutput = await pollUntil(async () => {
+      const run = await mediforce.evaluation.getRun({ evalRunId });
+      return run.evalRun.status === 'completed' ? run : null;
+    }, { description: `Eval Run ${evalRunId} to complete`, timeoutMs: 90_000 });
+
+    // The expected-output check passed all three; the schema check graded only the case that did not narrow its Evaluators — no errors for the others.
+    const byName = Object.fromEntries(finished.report.variants[0]!.evaluators.map((evaluator) => [evaluator.name, evaluator]));
+    expect(byName['matches-expected']).toMatchObject({ passes: 3, failures: 0, errors: 0, passRate: 1 });
+    expect(byName['findings-present']).toMatchObject({ passes: 0, failures: 1, errors: 0 });
+    for (const trial of finished.trials) expect(trial.status).toBe('scored');
+
+    const scoresOf = async (caseId: string) => {
+      const trial = finished.trials.find((candidate) => candidate.caseId === caseId)!;
+      return (await mediforce.scores.list({ runId: trial.processInstanceId!, stepId: 'grade-aes' })).scores;
+    };
+    const [agreement, ...rest] = (await scoresOf(agrees.id)).filter((score) => score.evaluatorId === expected.id);
+    expect(rest).toEqual([]);
+    expect(agreement).toMatchObject({ value: 1, source: 'llm_judge', metadata: { agreement: 0.9 } });
+    expect(agreement!.comment).toContain('The summary is worded differently');
+    expect((await scoresOf(avoids.id)).map((score) => [score.evaluatorId, score.value])).toEqual([[expected.id, 1]]);
+    expect((await scoresOf(matches.id)).map((score) => score.evaluatorId)).not.toContain(findings.id);
   });
 });

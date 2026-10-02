@@ -11,7 +11,7 @@ import type {
   SetEvaluatorProductionInput,
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
-import { ConflictError } from '../../errors';
+import { ConflictError, ValidationError } from '../../errors';
 import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
 import { evaluatorView, loadEvaluator } from './_lib/evaluator-view';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
@@ -30,6 +30,8 @@ export async function getEvaluator(input: GetEvaluatorInput, scope: CallerScope)
   return { evaluator: await evaluatorView(scope, await loadEvaluator(scope, input.evaluatorId)) };
 }
 
+const NOT_IN_PRODUCTION = 'An expected-output check never runs in production: a production run has no expected output to compare with';
+
 /** An Evaluator starts at version 1. A `schema` check counts at once; the others wait for the trust gate (D9). */
 export async function createEvaluator(
   input: z.output<typeof CreateEvaluatorInputSchema>,
@@ -45,6 +47,7 @@ export async function createEvaluator(
   const now = new Date().toISOString();
   const createdBy = authorId(scope);
   const runInProduction = input.runInProduction ?? false;
+  if (runInProduction === true && input.check.kind === 'expected_output') throw new ValidationError(NOT_IN_PRODUCTION);
   const evaluator = {
     ...step,
     id: randomUUID(),
@@ -98,6 +101,9 @@ export async function addEvaluatorVersion(
   const evaluator = await loadEvaluator(scope, input.evaluatorId);
   await loadEvaluatedStep(scope, stepRef(evaluator), 'edit');
   const { latest } = await evaluatorView(scope, evaluator);
+  if (input.check !== undefined && (input.check.kind === 'expected_output') !== (latest.check.kind === 'expected_output')) {
+    throw new ValidationError(`Evaluator '${evaluator.name}' is ${latest.check.kind === 'expected_output' ? 'an expected-output check and stays one' : `a ${latest.check.kind} check and cannot become an expected-output check`}`);
+  }
   const version = await scope.evaluation.appendEvaluatorVersion(evaluator, {
     evaluatorId: evaluator.id,
     version: latest.version + 1,
@@ -152,6 +158,9 @@ export async function setEvaluatorProduction(
 ): Promise<EvaluatorOutput> {
   const evaluator = await loadEvaluator(scope, input.evaluatorId);
   await loadEvaluatedStep(scope, stepRef(evaluator), 'edit');
+  if (input.runInProduction === true && (await evaluatorView(scope, evaluator)).latest.check.kind === 'expected_output') {
+    throw new ValidationError(NOT_IN_PRODUCTION);
+  }
   await scope.evaluation.setEvaluatorRunInProduction(evaluator, input.runInProduction);
   const view = await evaluatorView(scope, { ...evaluator, runInProduction: input.runInProduction });
   await appendEvaluationAudit(scope, {

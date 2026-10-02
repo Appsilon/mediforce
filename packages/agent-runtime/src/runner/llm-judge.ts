@@ -1,14 +1,13 @@
 import { z } from 'zod';
 import type { StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { ReviewPlugin, ReviewPluginContext, ReviewPluginResult } from '../interfaces/review-plugin';
+import type { LlmClient } from '../interfaces/step-executor-plugin';
 
 export interface LlmJudgeConfig {
   readonly model: string;
   readonly rubric: string;
   /** What the step was given, so "given this input, is this output good?" is answerable. */
   readonly stepInput: Record<string, unknown> | null;
-  /** What an Eval Case says the output must — or must not — contain. */
-  readonly expectation: string | null;
   /** Everything the agent did during the step — its reasoning, tool calls and their results — in order. */
   readonly trajectory: readonly StoredAgentTrajectoryEntry[];
 }
@@ -76,12 +75,12 @@ function formatTrajectory(entries: readonly StoredAgentTrajectoryEntry[]): strin
   return [...head, `… ${lines.length - head.length - tail.length} entries omitted …`, ...tail].join('\n');
 }
 
-function parseAnswer(content: string): z.infer<typeof JudgeAnswerSchema> | null {
+function parseAnswer<Answer>(content: string, schema: z.ZodType<Answer>): Answer | null {
   const start = content.indexOf('{');
   const end = content.lastIndexOf('}');
   if (start === -1 || end <= start) return null;
   try {
-    const parsed = JudgeAnswerSchema.safeParse(JSON.parse(content.slice(start, end + 1)));
+    const parsed = schema.safeParse(JSON.parse(content.slice(start, end + 1)));
     return parsed.success ? parsed.data : null;
   } catch {
     return null;
@@ -118,7 +117,6 @@ export class LlmJudgeReviewPlugin implements ReviewPlugin {
         role: 'user',
         content: [
           ...(this.config.stepInput === null ? [] : [`Step input:\n${section(this.config.stepInput)}`]),
-          ...(this.config.expectation === null ? [] : [`What the output must or must not contain:\n${this.config.expectation}`]),
           ...(this.config.trajectory.length === 0 ? [] : [`Agent log:\n${formatTrajectory(this.config.trajectory)}`]),
           `Step output:\n${section(context.executorOutput.result ?? null)}`,
           ...(context.executorOutput.reasoning_summary.length > 0 ? [`The agent's own summary:\n${context.executorOutput.reasoning_summary}`] : []),
@@ -126,7 +124,7 @@ export class LlmJudgeReviewPlugin implements ReviewPlugin {
       },
     ], this.config.model);
 
-    const answer = parseAnswer(response.content);
+    const answer = parseAnswer(response.content, JudgeAnswerSchema);
     if (answer === null) {
       throw new Error(`judge gave no usable verdict (rationale, passed, confidence 0–1): ${response.content.slice(0, 300)}`);
     }
@@ -138,4 +136,61 @@ export class LlmJudgeReviewPlugin implements ReviewPlugin {
       judgeModel: response.model,
     };
   }
+}
+
+export interface OutputAgreementConfig {
+  readonly model: string;
+  /** What the check treats as trivial or decisive on every case. */
+  readonly instructions: string | null;
+  /** What this Eval Case treats as trivial or decisive. */
+  readonly caseInstructions: string | null;
+  readonly expected: unknown;
+  readonly actual: unknown;
+}
+
+export interface OutputAgreement {
+  /** 0 when the outputs say different things, 1 when they say the same. */
+  readonly agreement: number;
+  readonly rationale: string;
+  readonly model: string;
+}
+
+const AgreementAnswerSchema = z.object({
+  rationale: z.string().trim().min(1),
+  agreement: z.number().min(0).max(1),
+});
+
+/**
+ * How far a step's output agrees with an Eval Case's expected output, 0–1,
+ * as a model reads them with the check's and the case's instructions. An
+ * answer without both throws — a comparison that did not happen must not be
+ * scored as a disagreement.
+ */
+export async function judgeOutputAgreement(llm: LlmClient, config: OutputAgreementConfig): Promise<OutputAgreement> {
+  const response = await llm.complete([
+    {
+      role: 'system',
+      content: [
+        'You compare the output of one step of a pharmaceutical workflow with the output expected of it, and score how far they agree.',
+        'agreement runs from 0 to 1: 1 when the output says the same as the expected output, 0 when it says something different. A difference that changes what a reader of the output would conclude or do lowers it a lot; a difference in form only — wording, ordering, formatting — lowers it little or not at all.',
+        ...(config.instructions === null ? [] : [`On every case:\n${config.instructions}`]),
+        'Explain your score: name each difference that mattered and why, and the ones you treated as trivial.',
+        'Answer with one JSON object and nothing else: {"rationale": "<your explanation>", "agreement": <0 to 1>}. Write the rationale before scoring.',
+      ].join('\n\n'),
+    },
+    {
+      role: 'user',
+      content: [
+        ...(config.caseInstructions === null ? [] : [`On this case:\n${config.caseInstructions}`]),
+        `Expected output:\n${section(config.expected)}`,
+        `Output:\n${section(config.actual)}`,
+      ].join('\n\n'),
+    },
+  ], config.model);
+
+  const answer = parseAnswer(response.content, AgreementAnswerSchema);
+  if (answer === null) {
+    throw new Error(`the agreement judge gave no usable agreement (rationale, agreement 0–1): ${response.content.slice(0, 300)}`);
+  }
+  return { agreement: answer.agreement, rationale: answer.rationale, model: response.model };
 }

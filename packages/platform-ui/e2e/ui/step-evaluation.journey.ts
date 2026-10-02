@@ -4,7 +4,7 @@ import { test, expect } from '../helpers/test-fixtures';
 import { TEST_USER_PASSWORD } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
 import { trackPageErrors } from '../helpers/page-errors';
-import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
+import { AUTH_HEADERS, JSON_HEADERS, agentStepAfterExtractWorkflow, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
 import { EVALUATION_WORKSPACE, seedEvaluationWorkspace } from '../helpers/evaluation-workspace';
 import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
 
@@ -143,23 +143,26 @@ test.describe('Step Evaluation tab', () => {
     trackPageErrors(page);
     const suffix = randomUUID().slice(0, 8);
     const workflowName = `e2e-eval-judge-${suffix}`;
-    const runId = await startRun(request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE);
-    const agentRunId = (await awaitFinishedAgentRun(request, runId)).id;
     const step = { namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes' };
     const post = async (path: string, data: Record<string, unknown>) => {
       const res = await request.post(path, { headers: JSON_HEADERS, data });
       expect(res.status(), await res.text()).toBeLessThan(300);
       return res.json();
     };
+    await post(`/api/workflow-definitions?namespace=${EVALUATION_WORKSPACE}`, agentStepAfterExtractWorkflow(workflowName, {
+      autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' },
+    }));
     await post('/api/evaluation/evaluators', {
       ...step, name: 'summary-grounded', rule: 'The summary is grounded in the input.', severity: 'critical',
       check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Is the summary grounded in the input?', minConfidence: 0.8 },
     });
-    // The judge reads the case's notes, which key its scripted answer.
-    const notes = `The summary names only events in the input (${suffix}).`;
+    // The judge reads the step's input — the case's `extract-aes` output — so a marker there keys its scripted answer.
+    const judgeKey = `judge-key-${suffix}`;
     const rationale = 'The log does not show where the summary came from, so the evidence is thin.';
-    await scriptOpenRouter(notes, [{ content: JSON.stringify({ rationale, passed: true, confidence: 0.5 }) }]);
-    await post('/api/evaluation/cases/from-agent-run', { agentRunId, step, name: 'Unsure', expectation: 'positive', notes });
+    await scriptOpenRouter(judgeKey, [{ content: JSON.stringify({ rationale, passed: true, confidence: 0.5 }) }]);
+    await post('/api/evaluation/cases', {
+      ...step, name: 'Unsure', input: { triggerPayload: {}, previousStepOutputs: { 'extract-aes': { events: [{ term: 'Sepsis' }], judgeKey } } },
+    });
     await post('/api/evaluation/datasets', step);
     await post('/api/evaluation/acceptance-criteria', { ...step, criteria: { critical: { minPassRate: 1 } } });
     const prepared = EvalRunOutputSchema.parse(await post('/api/evaluation/runs', { ...step, trialsPerCase: 1, budgetUsd: 1 }));
@@ -276,7 +279,7 @@ test.describe('Step Evaluation tab', () => {
     const form = page.getByTestId('evaluator-form');
     await form.getByLabel('Evaluator name').fill('Summary present');
     await expect(form.getByLabel('Evaluator name')).toHaveValue('summary-present');
-    await expect(form.getByLabel('Type').locator('option')).toHaveText(['Output schema', 'Code', 'LLM judge']);
+    await expect(form.getByLabel('Type').locator('option')).toHaveText(['Output schema', 'Code', 'LLM judge', 'Expected output']);
     await form.getByLabel('Type').selectOption('schema');
     await form.getByLabel('JSON Schema').fill('{"required": ["summary"]}');
     await form.getByLabel('Rule').fill('The output carries a summary.');
@@ -298,5 +301,47 @@ test.describe('Step Evaluation tab', () => {
     await expect(row).toContainText('v2 · Output schema · critical', { timeout: 10_000 });
     await row.getByText('Details', { exact: true }).click();
     await expect(row.getByTestId('evaluator-details')).toContainText('v1 ·');
+  });
+
+  test('a case is written with its input beside its expected output, marked negative, compared by agreement and graded only by the Evaluators ticked', async ({ page, request }) => {
+    test.setTimeout(60_000);
+    trackPageErrors(page);
+    const workflowName = `e2e-eval-case-form-${randomUUID().slice(0, 8)}`;
+    const step = { namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes' };
+    const post = async (path: string, data: Record<string, unknown>) => {
+      const res = await request.post(path, { headers: JSON_HEADERS, data });
+      expect(res.status(), await res.text()).toBeLessThan(300);
+      return res.json();
+    };
+    await post(`/api/workflow-definitions?namespace=${EVALUATION_WORKSPACE}`, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }));
+    await post('/api/evaluation/evaluators', { ...step, name: 'findings-present', rule: 'The result lists findings.', severity: 'major', check: { kind: 'schema', schema: { required: ['findings'] } } });
+    await post('/api/evaluation/evaluators', {
+      ...step, name: 'matches-expected', rule: 'The output matches what the case expects.', severity: 'critical',
+      check: { kind: 'expected_output', model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8 },
+    });
+
+    await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
+    await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await expect(page.getByTestId('evaluator-row').filter({ hasText: 'matches-expected' })).toContainText('Grades Eval Cases with an expected output only', { timeout: 10_000 });
+
+    await page.getByRole('button', { name: 'Write a case' }).click();
+    const form = page.getByTestId('case-form');
+    await expect(form.getByLabel('Notes')).toHaveCount(0);
+    await form.getByLabel('Case name').fill('Fatal sepsis graded 4');
+    await form.getByLabel('Expected output').fill('{"findings": [{"term": "Sepsis", "grade": 4}]}');
+    await form.getByLabel('Negative — the output must not match').check();
+    await form.getByLabel('Comparison').selectOption('agreement');
+    await form.getByLabel('Agreement instructions').fill('Narrative wording is trivial; the grade decides.');
+    await form.getByLabel('Only these').check();
+    await form.getByLabel('Graded by findings-present').uncheck();
+    await form.getByRole('button', { name: 'Add case' }).click();
+
+    const row = page.getByTestId('eval-case-row').filter({ hasText: 'Fatal sepsis graded 4' });
+    await expect(row).toContainText('negative · dev · manual', { timeout: 10_000 });
+    await row.getByText('Details', { exact: true }).click();
+    await expect(row.getByTestId('eval-case-expected-output')).toContainText('an output that does not match this, by output agreement score');
+    await expect(row.getByTestId('eval-case-expected-output')).toContainText('"grade": 4');
+    await expect(row.getByTestId('eval-case-expected-output')).toContainText('Narrative wording is trivial; the grade decides.');
+    await expect(row.getByTestId('eval-case-details')).toContainText('Graded by: matches-expected');
   });
 });

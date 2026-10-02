@@ -22,6 +22,24 @@ export function agentStepWorkflow(name: string, step: Record<string, unknown>): 
   };
 }
 
+/**
+ * The agent step `grade-aes` after a human step `extract-aes`, so an Eval
+ * Case's `previousStepOutputs['extract-aes']` is the input the step — and an
+ * LLM judge of it — is given. The first step of a workflow is given `{}`.
+ */
+export function agentStepAfterExtractWorkflow(name: string, step: Record<string, unknown>): Record<string, unknown> {
+  return {
+    name,
+    title: name,
+    steps: [
+      { id: 'extract-aes', name: 'Extract adverse events', type: 'creation', executor: 'human' },
+      { id: 'grade-aes', name: 'Grade adverse events', type: 'creation', executor: 'agent', ...step },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'extract-aes', to: 'grade-aes' }, { from: 'grade-aes', to: 'done' }],
+  };
+}
+
 /** Registers the workflow in a workspace (the test one by default) and starts a run; returns the run id. */
 export async function startRun(
   request: APIRequestContext,

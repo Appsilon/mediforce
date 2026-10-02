@@ -24,7 +24,7 @@ function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void 
     for (const evaluator of variant.evaluators) {
       const interval = evaluator.wilsonLower === null ? '      -      ' : `[${percent(evaluator.wilsonLower)}, ${percent(evaluator.wilsonUpper)}]`;
       const counted = evaluator.counted ? '' : `  not counted (${evaluator.reason})`;
-      const excluded = evaluator.excluded === 0 ? '' : `  ${evaluator.excluded} judge verdict(s) left out`;
+      const excluded = evaluator.excluded === 0 ? '' : `  ${evaluator.excluded} model verdict(s) left out`;
       output.stdout(`${evaluator.name.padEnd(24)} ${percent(evaluator.passRate)}  ${interval}  ${percent(evaluator.passAtK)}  ${percent(evaluator.passHatK)} ${percent(evaluator.flakiness)}  ${String(evaluator.errors).padStart(3)}${counted}${excluded}`);
     }
     for (const verdict of variant.criteria) {
@@ -37,7 +37,7 @@ function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void 
     }
   }
   const leftOut = report.judgeVerdicts.filter((verdict) => verdict.counts === false);
-  if (leftOut.length > 0) output.stdout(`\njudge verdicts left out of the criteria (review with: mediforce eval judge-review ${evalRun.id} --trial <id> --evaluator <id> --accept|--deny):`);
+  if (leftOut.length > 0) output.stdout(`\nmodel verdicts left out of the criteria (review with: mediforce eval judge-review ${evalRun.id} --trial <id> --evaluator <id> --accept|--deny):`);
   for (const verdict of leftOut) {
     const confidence = verdict.confidence === null ? 'no confidence' : `confidence ${verdict.confidence.toFixed(2)} < ${verdict.minConfidence ?? '-'}`;
     const why = verdict.review?.decision === 'denied' ? 'denied' : confidence;
@@ -174,7 +174,7 @@ export const evalRunFailuresCommand = defineCommand({
     output.stdout(`${result.variantId} — ${result.variantLabel}: ${result.total} failing trial(s)${result.total > result.failures.length ? `, showing ${result.failures.length}` : ''}`);
     for (const failure of result.failures) {
       output.stdout(`\ntrial ${failure.trialId}  case "${failure.caseName ?? failure.caseId}" (${failure.split ?? '?'}, ${failure.expectation ?? '?'})  ${failure.status}${failure.agentRunId === null ? '' : `  agent run ${failure.agentRunId}`}`);
-      if (failure.caseNotes !== null) output.stdout(`  case notes: ${failure.caseNotes}`);
+      if (failure.expectedOutput !== null) output.stdout(`  expected output (${failure.expectation === 'negative' ? 'to avoid' : 'to match'}): ${JSON.stringify(failure.expectedOutput)}`);
       if (failure.error !== null) output.stdout(`  error: ${failure.error}`);
       for (const evaluator of failure.evaluators) {
         const counted = evaluator.counted ? 'counted' : 'not counted';
@@ -224,12 +224,12 @@ export const evalApplyVariantCommand = defineCommand({
 
 export const evalJudgeReviewCommand = defineCommand({
   name: 'mediforce eval judge-review',
-  description: 'Accept or deny one llm_judge verdict on one trial of an Eval Run, after reading its rationale (mediforce eval report). '
+  description: 'Accept or deny one llm_judge verdict or expected-output agreement score on one trial of an Eval Run, after reading its rationale (mediforce eval report). '
     + 'An accepted verdict counts toward the Acceptance Criteria whatever its confidence; a denied one is left out, never reversed.',
   args: {
     evalRunId: { type: 'positional', required: true, description: 'Eval Run id' },
     trial: { type: 'string', required: true, description: 'Trial id' },
-    evaluator: { type: 'string', required: true, description: 'The judge\'s Evaluator id' },
+    evaluator: { type: 'string', required: true, description: 'The judge\'s or expected-output check\'s Evaluator id' },
     accept: { type: 'boolean', description: 'Count the verdict' },
     deny: { type: 'boolean', description: 'Leave the verdict out' },
     comment: { type: 'string', description: 'Why' },

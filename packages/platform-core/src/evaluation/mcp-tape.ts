@@ -1,4 +1,5 @@
 import type { AgentTrajectoryEntry } from '../schemas/agent-trajectory';
+import { canonicalJson } from './canonical-json';
 import type { EvalRunMcpReport } from '../schemas/eval-run';
 import { McpReplayMissSchema, type McpEvalServerPolicy, type McpReplayMiss, type McpTape, type McpTapeCall } from '../schemas/evaluation';
 
@@ -17,18 +18,6 @@ export function mcpReplayMissesOf(entries: readonly AgentTrajectoryEntry[]): Mcp
     const miss = McpReplayMissSchema.safeParse({ server: entry.server, tool: entry.tool, arguments: entry.input ?? {} });
     return miss.success ? [miss.data] : [];
   });
-}
-
-/** JSON with every object's keys sorted, so equal arguments serialize equal. */
-export function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([, entry]) => entry !== undefined)
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
-    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`).join(',')}}`;
-  }
-  return JSON.stringify(value) ?? 'null';
 }
 
 /** What a replay matches a call on: the tool and its arguments. */

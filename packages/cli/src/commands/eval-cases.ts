@@ -14,7 +14,8 @@ export const evalCaseListCommand = defineCommand({
     }
     if (result.cases.length === 0) output.stdout('No Eval Cases.');
     for (const evalCase of result.cases) {
-      output.stdout(`${evalCase.id}  ${evalCase.expectation.padEnd(8)} ${evalCase.split.padEnd(7)} ${evalCase.source.padEnd(10)} ${evalCase.name}`);
+      const compared = evalCase.expectedOutput === null ? 'no expected output' : `${evalCase.comparison} ${evalCase.expectation}`;
+      output.stdout(`${evalCase.id}  ${compared.padEnd(18)} ${evalCase.split.padEnd(7)} ${evalCase.source.padEnd(10)} ${evalCase.name}`);
     }
     return 0;
   },
@@ -39,7 +40,8 @@ export const evalRunIoCommand = defineCommand({
 
 export const evalCaseAddCommand = defineCommand({
   name: 'mediforce eval case-add',
-  description: 'Add a hand-written Eval Case from a JSON file: { name, input, expectation?, notes?, split? } (expectation defaults to positive).',
+  description: 'Add a hand-written Eval Case from a JSON file: { name, input, expectedOutput?, expectation?, comparison?, agreementInstructions?, evaluatorIds?, split? } '
+    + '(expectation defaults to positive, comparison to exact, evaluatorIds to every Evaluator of the step).',
   args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with the case' } },
   async run({ args, output, mediforce, jsonMode }) {
     const body = readJsonFile(args.file) as Record<string, unknown>;
@@ -52,11 +54,12 @@ export const evalCaseAddCommand = defineCommand({
 
 export const evalCaseFromRunCommand = defineCommand({
   name: 'mediforce eval case-from-run',
-  description: 'Add a production Agent Run to its step\'s eval set — approved runs are positive, rejected ones negative.',
+  description: 'Add a production Agent Run to its step\'s eval set — a reviewed run\'s output is the expected output: approved to match, rejected to avoid.',
   args: {
     agentRunId: { type: 'positional', required: true, description: 'Agent Run id' },
     name: { type: 'string', description: 'Case name' },
     expectation: enumArg(['positive', 'negative'] as const, { description: 'Default: from the review verdict, positive when there is none' }),
+    comparison: enumArg(['exact', 'agreement'] as const, { description: 'How the expected output is compared. Default: exact' }),
     split: enumArg(['dev', 'holdout'] as const, { description: 'Default: dev' }),
   },
   async run({ args, output, mediforce, jsonMode }) {
@@ -64,6 +67,7 @@ export const evalCaseFromRunCommand = defineCommand({
       agentRunId: args.agentRunId,
       ...(args.name !== undefined ? { name: args.name } : {}),
       ...(args.expectation !== undefined ? { expectation: args.expectation } : {}),
+      ...(args.comparison !== undefined ? { comparison: args.comparison } : {}),
       ...(args.split !== undefined ? { split: args.split } : {}),
     });
     if (jsonMode) printJson(output, result);
@@ -75,7 +79,7 @@ export const evalCaseFromRunCommand = defineCommand({
 export const evalCasePerturbCommand = defineCommand({
   name: 'mediforce eval case-perturb',
   description: 'Synthesize an Eval Case from a production run with deliberate changes, from a JSON file: '
-    + '{ name, baseAgentRunId, perturbation: { kind, description }, inputChanges?, fileChanges?, expectation?, notes, split? } (expectation defaults to positive).',
+    + '{ name, baseAgentRunId, perturbation: { kind, description }, inputChanges?, fileChanges?, expectedOutput?, expectation?, comparison?, agreementInstructions?, evaluatorIds?, split? } (expectation defaults to positive).',
   args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with the case' } },
   async run({ args, output, mediforce, jsonMode }) {
     const body = readJsonFile(args.file) as Record<string, unknown>;
@@ -103,7 +107,7 @@ export const evalCaseArchiveCommand = defineCommand({
 
 export const evalCaseEditCommand = defineCommand({
   name: 'mediforce eval case-edit',
-  description: 'Edit an Eval Case from a JSON file of the fields to change: { name?, input?, expectation?, notes?, split? }. '
+  description: 'Edit an Eval Case from a JSON file of the fields to change: { name?, input?, expectedOutput?, expectation?, comparison?, agreementInstructions?, evaluatorIds?, split? }. '
     + 'The edit is a new case that replaces it; the old one is archived, so frozen Dataset versions keep it.',
   args: {
     caseId: { type: 'positional', required: true, description: 'Eval Case id' },

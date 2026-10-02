@@ -18,6 +18,7 @@ function standing(verdict: JudgeVerdict): string {
 }
 
 function confidenceText(verdict: JudgeVerdict): string {
+  if (verdict.agreement !== null) return `agreement ${verdict.agreement}`;
   if (verdict.confidence === null) return 'no confidence reported';
   const below = verdict.minConfidence !== null && verdict.confidence < verdict.minConfidence;
   return `confidence ${verdict.confidence}${below ? ` (below ${verdict.minConfidence})` : ''}`;
@@ -95,9 +96,10 @@ function VerdictRow({ step, evalRunId, verdict, mayEdit, editReason }: {
 }
 
 /**
- * Every judge verdict of one variant (ADR-0023): pass or fail, the judge's
- * confidence against its minimum, and its rationale — what decided it and
- * why. A person accepts a verdict, so it counts however unsure the judge was,
+ * Every model's verdict of one variant (ADR-0023) — a judge's, or an
+ * expected-output agreement score: pass or fail, the judge's confidence
+ * against its minimum or the agreement, and its rationale — what decided it
+ * and why. A person accepts a verdict, so it counts however unsure the judge was,
  * or denies it, leaving it out of the Acceptance Criteria.
  */
 export function JudgeVerdicts({ step, evalRunId, verdicts, mayEdit, editReason }: {
@@ -111,7 +113,7 @@ export function JudgeVerdicts({ step, evalRunId, verdicts, mayEdit, editReason }
   return (
     <details className="text-xs" open={leftOut > 0}>
       <summary className="cursor-pointer text-muted-foreground" data-testid="judge-verdicts-summary">
-        Judge verdicts — {verdicts.length}{leftOut > 0 ? `, ${leftOut} left out of the criteria` : ''}
+        Model verdicts — {verdicts.length}{leftOut > 0 ? `, ${leftOut} left out of the criteria` : ''}
       </summary>
       <ul className="mt-1.5 space-y-2">
         {verdicts.map((verdict) => (

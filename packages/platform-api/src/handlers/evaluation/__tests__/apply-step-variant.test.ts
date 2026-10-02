@@ -122,7 +122,7 @@ describe('applyVariantToStep (ADR-0023 D5)', () => {
     await expect(applyVariantToStep({ ...STEP, patch: { mcpRestrictions: { nowhere: { disable: true } } } }, scope)).rejects.toThrow(/does not bind: nowhere/);
     const { evalCase } = await (await import('../eval-cases')).createEvalCase({
       ...STEP, name: 'Held out', input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: null,
-      expectation: 'positive', notes: null, split: 'holdout', containsProductionData: false, origin: 'user',
+      expectation: 'positive', expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'holdout', containsProductionData: false, origin: 'user',
     }, scope);
     await expect(applyVariantToStep({ ...STEP, patch: { examples: [{ input: 'i', output: 'o', caseId: evalCase.id }] } }, scope))
       .rejects.toThrow(/holdout/);

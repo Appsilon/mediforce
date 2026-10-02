@@ -98,7 +98,7 @@ describe('GEPA optimisations (ADR-0023 D15)', () => {
     const { evalCase } = await createEvalCase({
       ...STEP, name: 'Grade 3 anaemia',
       input: { triggerPayload: { studyId: 'CDISCPILOT01' }, previousStepOutputs: { 'extract-aes': { events: [{ term: 'Anaemia' }] } } },
-      workspaceSeedCommit: null, expectation: 'positive', notes: null, split: 'holdout', containsProductionData: false, origin: 'user',
+      workspaceSeedCommit: null, expectation: 'positive', expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'holdout', containsProductionData: false, origin: 'user',
     }, scope);
     holdoutCaseId = evalCase.id;
     await freezeEvalDataset(STEP, scope);

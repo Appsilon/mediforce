@@ -90,12 +90,12 @@ describe('mediforce eval runs', () => {
     expect(output.stdoutLines).toContain("1 case(s) left out: a variant's few-shot examples came from them");
   });
 
-  it('report lists the judge verdicts left out of the criteria and how to review them', async () => {
+  it('report lists the model verdicts left out of the criteria and how to review them', async () => {
     const judgeId = '5e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
     const verdict = {
       trialId: TRIAL_ID, trialIndex: 0, variantId: 'champion', caseId: '2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', caseName: 'Grade 5 sepsis',
       agentRunId: 'agent-run-1', evaluatorId: judgeId, name: 'death-graded-5', severity: 'critical', scoreId: '7e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c',
-      passed: false, confidence: 0.4, minConfidence: 0.8, rationale: 'Grade 4 given for a fatal AE.', review: null, counts: false,
+      passed: false, confidence: 0.4, minConfidence: 0.8, agreement: null, rationale: 'Grade 4 given for a fatal AE.', review: null, counts: false,
     };
     const judgeReport = {
       ...OUTPUT.report.variants[0]!.evaluators[0]!,
@@ -111,7 +111,7 @@ describe('mediforce eval runs', () => {
 
     expect(await evalRunGetCommand({ argv: [RUN_ID, ...BASE], env: ENV, output })).toBe(0);
     const printed = output.stdoutLines.join('\n');
-    expect(printed).toContain('1 judge verdict(s) left out');
+    expect(printed).toContain('1 model verdict(s) left out');
     expect(printed).toContain(`mediforce eval judge-review ${RUN_ID} --trial <id> --evaluator <id> --accept|--deny`);
     expect(printed).toContain(`trial ${TRIAL_ID}  death-graded-5 (${judgeId})  fail, confidence 0.40 < 0.8  champion "Grade 5 sepsis"`);
     expect(printed).not.toContain('8e2a3c4d');
@@ -152,7 +152,7 @@ describe('mediforce eval failures', () => {
     evalRunId: RUN_ID, variantId: 'challenger-1', variantLabel: 'GPT-5', total: 2,
     failures: [{
       trialId: TRIAL_ID, trialIndex: 0, status: 'scored', caseId: '2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', caseName: 'Grade 5 sepsis',
-      split: 'dev', expectation: 'positive', caseNotes: 'Must grade the death as 5.', agentRunId: 'agent-run-1', error: null,
+      split: 'dev', expectation: 'negative', expectedOutput: { findings: [{ term: 'Sepsis', grade: 4 }] }, agentRunId: 'agent-run-1', error: null,
       evaluators: [{
         evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', severity: 'critical', kind: 'schema',
         counted: true, outcome: 'failed', comment: 'findings missing', error: null,
@@ -169,7 +169,8 @@ describe('mediforce eval failures', () => {
     expect(fetchSpy.mock.calls[0]![0]).toBe(`http://localhost:5555/api/evaluation/runs/${RUN_ID}/failures?variantId=challenger-1&limit=1`);
     const printed = output.stdoutLines.join('\n');
     expect(printed).toContain('challenger-1 — GPT-5: 2 failing trial(s), showing 1');
-    expect(printed).toContain('case "Grade 5 sepsis" (dev, positive)');
+    expect(printed).toContain('case "Grade 5 sepsis" (dev, negative)');
+    expect(printed).toContain('expected output (to avoid): {"findings":[{"term":"Sepsis","grade":4}]}');
     expect(printed).toContain('failed findings-present (critical schema, counted): findings missing');
   });
 

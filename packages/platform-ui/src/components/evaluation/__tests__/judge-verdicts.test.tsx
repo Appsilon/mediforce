@@ -22,7 +22,7 @@ function verdictOf(overrides: Partial<JudgeVerdict>): JudgeVerdict {
     trialId: '1e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', trialIndex: 0, variantId: 'champion',
     caseId: '2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', caseName: 'Sepsis, fatal', agentRunId: 'agent-run-1',
     evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'grades-justified', severity: 'critical',
-    scoreId: '4e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', passed: false, confidence: 0.6, minConfidence: 0.8,
+    scoreId: '4e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', passed: false, confidence: 0.6, minConfidence: 0.8, agreement: null,
     rationale: 'Log entry [4] reads the fatal outcome, yet the output grades sepsis 3.',
     review: null, counts: false,
     ...overrides,
@@ -45,7 +45,7 @@ describe('JudgeVerdicts', () => {
     expect(unsure!.textContent).toContain('left out — below its minimum confidence');
     expect(unsure!.textContent).toContain('Log entry [4] reads the fatal outcome, yet the output grades sepsis 3.');
     expect(confident!.textContent).toContain('counts');
-    expect(screen.getByTestId('judge-verdicts-summary').textContent).toBe('Judge verdicts — 2, 1 left out of the criteria');
+    expect(screen.getByTestId('judge-verdicts-summary').textContent).toBe('Model verdicts — 2, 1 left out of the criteria');
   });
 
   it('accepts a verdict, so it counts', () => {

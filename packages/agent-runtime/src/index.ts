@@ -50,7 +50,14 @@ export type { BuildSource } from './plugins/container-plugin';
 export type { AgentEventLog } from './runner/agent-event-log';
 export { PluginRegistry, PluginNotFoundError } from './runner/plugin-registry';
 export { OpenRouterLlmClient } from './runner/llm-client';
-export { LlmJudgeReviewPlugin, type LlmJudgeConfig, type LlmJudgeResult } from './runner/llm-judge';
+export {
+  LlmJudgeReviewPlugin,
+  judgeOutputAgreement,
+  type LlmJudgeConfig,
+  type LlmJudgeResult,
+  type OutputAgreement,
+  type OutputAgreementConfig,
+} from './runner/llm-judge';
 export { PluginRunner } from './runner/plugin-runner';
 export type { PluginRunResult } from './runner/plugin-runner';
 export { AgentRunner } from './runner/agent-runner';

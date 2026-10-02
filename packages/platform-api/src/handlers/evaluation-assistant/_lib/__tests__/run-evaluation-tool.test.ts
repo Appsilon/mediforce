@@ -201,7 +201,7 @@ describe('executeEvaluationTool', () => {
       check: { kind: 'schema', schema: { required: ['findings'] } },
       agentRunIds: [GRADED_RUN],
     }, scope, context);
-    expect(result).toEqual({ results: [{ agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: null, comment: null, error: null }] });
+    expect(result).toEqual({ results: [{ agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: null, agreement: null, comment: null, error: null }] });
   });
 
   it('reads the SKILL.md the runtime loads — `<skillsDir>/<skill>` — and none for a prompt-only step', async () => {
@@ -229,7 +229,7 @@ describe('executeEvaluationTool', () => {
       input: { triggerPayload: {}, previousStepOutputs: {} },
       workspaceSeedCommit: null,
       expectation: 'positive',
-      notes: null,
+      expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null,
       split: 'dev',
       containsProductionData: false,
       origin: 'user',
@@ -252,7 +252,7 @@ describe('executeEvaluationTool', () => {
       input: { triggerPayload: {}, previousStepOutputs: {} },
       workspaceSeedCommit: null,
       expectation: 'positive',
-      notes: null,
+      expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null,
       split: 'dev',
       containsProductionData: false,
       origin: 'user',

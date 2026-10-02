@@ -1,7 +1,8 @@
 export { evaluatorTrust, type EvaluatorTrust } from './trust';
+export { evaluatorAppliesToCase, outputDifferences } from './expected-output';
 export { inlineMcpServerNames, mcpEvalRestrictions } from './mcp-eval-restrictions';
+export { canonicalJson } from './canonical-json';
 export {
-  canonicalJson,
   describeMcpPolicy,
   describeMcpReport,
   mcpServersByMode,

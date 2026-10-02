@@ -22,17 +22,19 @@ describe('mediforce eval', () => {
       evalCase: {
         namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes',
         id: '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'From run', input: { triggerPayload: {}, previousStepOutputs: {} },
-        workspaceSeedCommit: null, expectation: 'negative', notes: null, source: 'production', sourceAgentRunId: 'ar-1', perturbation: null, origin: 'user',
+        workspaceSeedCommit: null, expectation: 'negative', expectedOutput: { summary: 'ungraded' }, comparison: 'agreement', agreementInstructions: null, evaluatorIds: null, source: 'production', sourceAgentRunId: 'ar-1', perturbation: null, origin: 'user',
         split: 'holdout', containsProductionData: true, archived: false, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
       },
     }, 201));
     const output = captureOutput();
-    const code = await evalCaseFromRunCommand({ argv: ['ar-1', '--expectation', 'negative', '--split', 'holdout', ...BASE], env: ENV, output });
+    const code = await evalCaseFromRunCommand({ argv: ['ar-1', '--expectation', 'negative', '--comparison', 'agreement', '--split', 'holdout', ...BASE], env: ENV, output });
 
     expect(code).toBe(0);
     const [url, init] = fetchSpy.mock.calls[0]!;
     expect(url).toBe('http://localhost:5555/api/evaluation/cases/from-agent-run');
-    expect(JSON.parse(String(init?.body))).toEqual({ agentRunId: 'ar-1', expectation: 'negative', split: 'holdout', origin: 'user' });
+    expect(JSON.parse(String(init?.body))).toEqual({
+      agentRunId: 'ar-1', expectation: 'negative', comparison: 'agreement', agreementInstructions: null, evaluatorIds: null, split: 'holdout', origin: 'user',
+    });
     expect(output.stdoutLines.join('\n')).toContain('(negative, holdout)');
   });
 
@@ -44,15 +46,15 @@ describe('mediforce eval', () => {
       baseAgentRunId: 'ar-1',
       perturbation: { kind: 'missing_file', description: 'dm.csv removed' },
       fileChanges: [{ op: 'delete', path: 'data/dm.csv' }],
+      expectedOutput: { subjects: [] },
       expectation: 'negative',
-      notes: 'Must NOT invent demographics.',
     };
     writeFileSync(file, JSON.stringify(spec));
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
       evalCase: {
         namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes',
         id: '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'Demographics missing', input: { triggerPayload: {}, previousStepOutputs: {} },
-        workspaceSeedCommit: 'a1b2c3d4', expectation: 'negative', notes: 'Must NOT invent demographics.', source: 'synthesized', sourceAgentRunId: 'ar-1',
+        workspaceSeedCommit: 'a1b2c3d4', expectation: 'negative', expectedOutput: { subjects: [] }, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, source: 'synthesized', sourceAgentRunId: 'ar-1',
         perturbation: spec.perturbation, origin: 'user', split: 'dev', containsProductionData: true, archived: false, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
       },
     }, 201));
@@ -64,6 +66,7 @@ describe('mediforce eval', () => {
     expect(url).toBe('http://localhost:5555/api/evaluation/cases/perturbed');
     expect(JSON.parse(String(init?.body))).toEqual({
       ...spec, namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', inputChanges: [], split: 'dev', origin: 'user',
+      comparison: 'exact', agreementInstructions: null, evaluatorIds: null,
     });
     expect(output.stdoutLines.join('\n')).toContain('(missing_file, negative)');
   });
