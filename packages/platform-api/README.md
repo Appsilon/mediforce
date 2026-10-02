@@ -118,7 +118,7 @@ workspace it changes is read with agent-runtime's `listCommitFiles` and
 
 An Eval Run is driven by `driveEvalRun` (`_lib/drive-eval-run.ts`), which is
 idempotent and moves trials only by conditional transitions — so the start
-handler, the auto-runner (when a trial's run ends) and the heartbeat can all
+handler, the auto-runner (when a trial's run ends or pauses) and the heartbeat can all
 call it without starting or scoring a trial twice. Claiming a trial names the
 Workflow Run it creates, and a claim held past its lease — a driver that died
 before creating that run, or mid-scoring — is taken over, skipping Evaluators

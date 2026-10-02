@@ -6,7 +6,7 @@ import { resolveDefinitionModels } from '@/lib/resolve-agent-defaults';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { advanceEvalRunOfInstance, checkRetiredModels } from '@mediforce/platform-api/handlers';
 import { defaultBuildScope } from '@/lib/route-adapter';
-import { resolveCoworkOutputSchema, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstanceRepository } from '@mediforce/platform-core';
+import { resolveCoworkOutputSchema, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -70,6 +70,20 @@ async function failRunIfStepAttemptsExceeded(
     updatedAt: new Date().toISOString(),
   });
   return true;
+}
+
+/**
+ * An eval trial's run ended or paused (ADR-0023 D4): score it and start the
+ * next trial of its Eval Run. As the system: the trial belongs to the Eval
+ * Run, not to whoever kicked this request. A no-op for any other run.
+ */
+async function advanceEvalRunOfTrial(instance: ProcessInstance): Promise<void> {
+  if (instance.evalRunId === undefined) return;
+  try {
+    await advanceEvalRunOfInstance(defaultBuildScope({ kind: 'apiKey', isSystemActor: true }), instance.id);
+  } catch (err) {
+    console.error(`[auto-runner] Failed to advance the Eval Run of trial '${instance.id}':`, err);
+  }
 }
 
 export async function POST(
@@ -190,6 +204,7 @@ export async function POST(
         });
         releaseRunLock(instanceId);
         runLockAcquired = false;
+        after(() => advanceEvalRunOfTrial(initialInstance));
         return NextResponse.json(
           { error: 'Missing environment variables', missing: allMissing, instanceId },
           { status: 422 },
@@ -227,6 +242,7 @@ export async function POST(
         });
         releaseRunLock(instanceId);
         runLockAcquired = false;
+        after(() => advanceEvalRunOfTrial(initialInstance));
         return NextResponse.json(
           { error: message, unknownModels, instanceId },
           { status: 422 },
@@ -244,6 +260,7 @@ export async function POST(
         });
         releaseRunLock(instanceId);
         runLockAcquired = false;
+        after(() => advanceEvalRunOfTrial(initialInstance));
         return NextResponse.json(
           { error: retired.message, retiredModels: retired.refs, instanceId },
           { status: 422 },
@@ -968,16 +985,7 @@ export async function POST(
         releaseRunLock(instanceId);
       }
 
-      // An eval trial's run ended (ADR-0023 D4): score it and start the next
-      // trial of its Eval Run. As the system: the trial belongs to the Eval
-      // Run, not to whoever kicked this request.
-      if (initialInstance.evalRunId !== undefined) {
-        try {
-          await advanceEvalRunOfInstance(defaultBuildScope({ kind: 'apiKey', isSystemActor: true }), instanceId);
-        } catch (err) {
-          console.error(`[auto-runner] Failed to advance the Eval Run of trial '${instanceId}':`, err);
-        }
-      }
+      await advanceEvalRunOfTrial(initialInstance);
     });
 
     return NextResponse.json(

@@ -539,6 +539,8 @@ step's few-shot `agent.examples` is left out of the run (`exampleCaseIds`;
    leave trials out.
 4. When a trial's run ends, every frozen Evaluator grades its Agent Run and
    writes a Score (`source: deterministic` or `llm_judge`, `metadata.evalRunId`).
+   A trial whose run pauses before its Step starts — a missing secret, an
+   unknown or retired model — fails with the run's error, and the next trial starts.
    Trials start `concurrency` at a time, round by round — each case's k-th
    trial; once spend reaches the budget the rest
    are skipped and the run ends `budget_exceeded`. A trial's cost is its Agent
