@@ -5,12 +5,14 @@ import {
   DEFAULT_ACCEPTANCE_CRITERIA,
   inlineMcpServerNames,
   qualificationSignatureMeaning,
+  type AcceptanceCriteria,
   type ElectronicSignature,
   type EvalRun,
   type EvaluatedStep,
   type EvalRunEvaluator,
   type StepFingerprint,
   type StepQualification,
+  type WorkflowStep,
 } from '@mediforce/platform-core';
 import type {
   GetStepQualificationInputSchema,
@@ -24,26 +26,60 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, ForbiddenError, NotFoundError, PreconditionFailedError, ValidationError } from '../../errors';
-import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
+import { inlineMcpReason, loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
 import { appendEvaluationAudit } from './_lib/audit';
 import { buildEvalRunReport } from './_lib/eval-run-report';
 import { checkPassword } from '../users/_lib/check-password';
 import { changedFingerprintComponents, computeStepFingerprint } from './_lib/step-fingerprint';
 
+/** One of the Step's Evaluators with its newest version — `null` once archived. */
+interface StepEvaluator {
+  readonly id: string;
+  readonly name: string;
+  readonly latestVersion: number | null;
+}
+
+/**
+ * The Step's own Evaluation rows — the same in every Definition version — each
+ * read at most once, however many versions' validations ask for it.
+ */
+interface StepRows {
+  readonly runs: () => Promise<readonly EvalRun[]>;
+  readonly evaluators: () => Promise<readonly StepEvaluator[]>;
+  readonly liveCaseIds: () => Promise<readonly string[]>;
+  readonly criteria: () => Promise<AcceptanceCriteria>;
+}
+
+function once<Value>(read: () => Promise<Value>): () => Promise<Value> {
+  let pending: Promise<Value> | undefined;
+  return () => (pending ??= read());
+}
+
+function stepRows(scope: CallerScope, step: EvaluatedStep): StepRows {
+  return {
+    runs: once(() => scope.evaluation.listEvalRuns(step)),
+    evaluators: once(async () => Promise.all((await scope.evaluation.listEvaluators(step)).map(async (evaluator) => ({
+      id: evaluator.id,
+      name: evaluator.name,
+      latestVersion: evaluator.archived === true ? null : (await scope.evaluation.listEvaluatorVersions(evaluator.id)).at(-1)!.version,
+    })))),
+    liveCaseIds: once(async () => (await scope.evaluation.listCases(step)).filter((evalCase) => evalCase.archived === false).map((evalCase) => evalCase.id)),
+    criteria: once(async () => (await scope.evaluation.listAcceptanceCriteria(step))[0]?.criteria ?? DEFAULT_ACCEPTANCE_CRITERIA),
+  };
+}
+
 /** What happened to the Step's Evaluators since a qualification or an Eval Run froze them (D7). */
-async function evaluatorChanges(scope: CallerScope, step: EvaluatedStep, frozen: readonly EvalRunEvaluator[], frozenBy: string): Promise<string[]> {
+function evaluatorChanges(evaluators: readonly StepEvaluator[], frozen: readonly EvalRunEvaluator[], frozenBy: string): string[] {
   const cited = new Map(frozen.map((evaluator) => [evaluator.evaluatorId, evaluator.version]));
   const changes: string[] = [];
-  for (const evaluator of await scope.evaluation.listEvaluators(step)) {
+  for (const evaluator of evaluators) {
     const citedVersion = cited.get(evaluator.id);
-    if (evaluator.archived === true) {
+    if (evaluator.latestVersion === null) {
       if (citedVersion !== undefined) changes.push(`'${evaluator.name}' archived`);
       continue;
     }
-    const versions = await scope.evaluation.listEvaluatorVersions(evaluator.id);
-    const latest = versions[versions.length - 1]!.version;
     if (citedVersion === undefined) changes.push(`'${evaluator.name}' added`);
-    else if (latest !== citedVersion) changes.push(`'${evaluator.name}' now v${latest}, ${frozenBy} v${citedVersion}`);
+    else if (evaluator.latestVersion !== citedVersion) changes.push(`'${evaluator.name}' now v${evaluator.latestVersion}, ${frozenBy} v${citedVersion}`);
   }
   return changes;
 }
@@ -53,17 +89,22 @@ const FINISHED_RUN_STATUSES = new Set(['completed', 'budget_exceeded']);
 /**
  * The step's validation in one Definition version: the newest finished Eval Run
  * of that version, judged on the criteria frozen into it — reset to
- * `not_verified` by any change to what that run rested on. `runs` are the
- * step's Eval Runs, newest first; its Fingerprint is computed only when one of
- * that version finished.
+ * `not_verified` by any change to what that run rested on. A step that declares
+ * MCP servers inline cannot be evaluated, so it stays `not_verified`. Its
+ * Fingerprint is computed only when a run of that version finished.
  */
 async function stepValidation(
   scope: CallerScope,
-  step: EvaluatedStep,
+  rows: StepRows,
+  workflowStep: WorkflowStep,
   definitionVersion: number,
-  runs: readonly EvalRun[],
   stepFingerprint: () => Promise<StepFingerprint>,
 ): Promise<StepValidation> {
+  const inlineServers = inlineMcpServerNames(workflowStep);
+  if (inlineServers.length > 0) {
+    return { status: 'not_verified', evalRunId: null, reason: `The step ${inlineMcpReason(inlineServers)}.`, runInProgress: false };
+  }
+  const runs = await rows.runs();
   const runInProgress = runs.some((run) => run.status === 'running');
   const run = runs.find((candidate) => candidate.definitionVersion === definitionVersion && FINISHED_RUN_STATUSES.has(candidate.status));
   if (run === undefined) {
@@ -78,15 +119,14 @@ async function stepValidation(
     const changed = champion?.fingerprint == null ? [] : changedFingerprintComponents(champion.fingerprint, fingerprint);
     return notVerified(`The step changed ${since}${changed.length === 0 ? '' : `: ${changed.join(', ')}`}.`);
   }
-  const evaluatorsChanged = await evaluatorChanges(scope, step, run.evaluators, 'run with');
+  const evaluatorsChanged = evaluatorChanges(await rows.evaluators(), run.evaluators, 'run with');
   if (evaluatorsChanged.length > 0) return notVerified(`Evaluators changed ${since}: ${evaluatorsChanged.join('; ')}.`);
-  const live = (await scope.evaluation.listCases(step)).filter((evalCase) => evalCase.archived === false).map((evalCase) => evalCase.id);
+  const live = await rows.liveCaseIds();
   const ran = new Set([...run.caseIds, ...run.exampleCaseIds]);
   if (live.length !== ran.size || live.some((caseId) => ran.has(caseId) === false)) {
     return notVerified(`Eval Cases were added, edited or archived ${since}.`);
   }
-  const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
-  if (run.acceptanceCriteria === null || JSON.stringify(criteria?.criteria ?? DEFAULT_ACCEPTANCE_CRITERIA) !== JSON.stringify(run.acceptanceCriteria)) {
+  if (run.acceptanceCriteria === null || JSON.stringify(await rows.criteria()) !== JSON.stringify(run.acceptanceCriteria)) {
     return notVerified(run.acceptanceCriteria === null ? `Eval Run ${run.id.slice(0, 8)} had no Acceptance Criteria to judge.` : `Acceptance Criteria changed ${since}.`);
   }
 
@@ -120,7 +160,8 @@ export async function getStepQualification(
   const history = await scope.evaluation.listQualifications(step);
   const matching = history.find((qualification) => qualification.fingerprint.hash === fingerprint.hash);
   const shown = matching ?? history[0];
-  const validation = await stepValidation(scope, step, definition.version, await scope.evaluation.listEvalRuns(step), async () => fingerprint);
+  const rows = stepRows(scope, step);
+  const validation = await stepValidation(scope, rows, workflowStep, definition.version, async () => fingerprint);
   if (shown === undefined) {
     return { status: 'not_qualified', validation, qualification: null, definitionVersion: definition.version, fingerprint, changed: [], evaluatorsChanged: [], history };
   }
@@ -131,16 +172,16 @@ export async function getStepQualification(
     definitionVersion: definition.version,
     fingerprint,
     changed: changedFingerprintComponents(shown.fingerprint, fingerprint),
-    evaluatorsChanged: await evaluatorChanges(scope, step, shown.evaluators, 'qualified with'),
+    evaluatorsChanged: evaluatorChanges(await rows.evaluators(), shown.evaluators, 'qualified with'),
     history,
   };
 }
 
 /**
- * Whether each version of a workflow is verified: every agent step's
+ * Whether each live version of a workflow is verified: every agent step's
  * validation in that version (`stepValidation`), rolled up — `passed` when all
- * passed, `failed` when any failed, else `not_verified`. A step that declares
- * MCP servers inline cannot be evaluated, so it stays `not_verified`.
+ * passed, `failed` when any failed, else `not_verified`. Archived versions are
+ * not evaluated, so they are left out.
  */
 export async function getWorkflowValidation(
   input: z.output<typeof GetWorkflowValidationInputSchema>,
@@ -148,35 +189,25 @@ export async function getWorkflowValidation(
 ): Promise<GetWorkflowValidationOutput> {
   const definitions = await scope.workflowDefinitions.listVersions(input.namespace, input.workflowName);
   if (definitions.length === 0) throw new NotFoundError(`Workflow '${input.workflowName}' not found`);
-  const runsByStep = new Map<string, Promise<EvalRun[]>>();
-  const stepRuns = (step: EvaluatedStep) => {
-    if (runsByStep.has(step.stepId) === false) runsByStep.set(step.stepId, scope.evaluation.listEvalRuns(step));
-    return runsByStep.get(step.stepId)!;
+  const rowsByStep = new Map<string, StepRows>();
+  const rowsOf = (stepId: string): StepRows => {
+    if (rowsByStep.has(stepId) === false) rowsByStep.set(stepId, stepRows(scope, { namespace: input.namespace, workflowName: input.workflowName, stepId }));
+    return rowsByStep.get(stepId)!;
   };
 
-  const versions: WorkflowVersionValidation[] = [];
-  for (const definition of [...definitions].sort((left, right) => right.version - left.version)) {
-    const steps: WorkflowVersionValidation['steps'] = [];
-    for (const workflowStep of definition.steps) {
-      if (workflowStep.executor !== 'agent') continue;
-      const step: EvaluatedStep = { namespace: input.namespace, workflowName: input.workflowName, stepId: workflowStep.id };
-      const inlineServers = inlineMcpServerNames(workflowStep);
-      const validation: StepValidation = inlineServers.length > 0
-        ? {
-          status: 'not_verified',
-          evalRunId: null,
-          reason: `The step declares MCP servers inline (${inlineServers.join(', ')}); move them onto its agent to evaluate it.`,
-          runInProgress: false,
-        }
-        : await stepValidation(scope, step, definition.version, await stepRuns(step), () => computeStepFingerprint(scope, definition, workflowStep));
-      steps.push({ stepId: workflowStep.id, stepName: workflowStep.name, validation });
-    }
+  const live = definitions.filter((definition) => definition.archived !== true).sort((left, right) => right.version - left.version);
+  const versions = await Promise.all(live.map(async (definition): Promise<WorkflowVersionValidation> => {
+    const steps = await Promise.all(definition.steps.filter((workflowStep) => workflowStep.executor === 'agent').map(async (workflowStep) => ({
+      stepId: workflowStep.id,
+      stepName: workflowStep.name,
+      validation: await stepValidation(scope, rowsOf(workflowStep.id), workflowStep, definition.version, () => computeStepFingerprint(scope, definition, workflowStep)),
+    })));
     const statuses = steps.map((entry) => entry.validation.status);
     const status = statuses.includes('failed')
       ? 'failed'
       : statuses.length > 0 && statuses.every((stepStatus) => stepStatus === 'passed') ? 'passed' : 'not_verified';
-    versions.push({ definitionVersion: definition.version, status, steps });
-  }
+    return { definitionVersion: definition.version, status, steps };
+  }));
   return { versions };
 }
 
@@ -227,7 +258,7 @@ export async function signStepQualification(
   const run = await scope.evaluation.getEvalRun(input.evalRunId);
   if (run === null) throw new NotFoundError(`Eval Run '${input.evalRunId}' not found`);
   const step = stepRef(run);
-  await loadEvaluatedStep(scope, step, 'edit');
+  await loadEvaluatedStep(scope, step, 'edit', run.definitionVersion);
 
   const trials = await scope.evaluation.listTrials(run.id);
   const inFlight = trials.some((trial) => trial.status === 'pending' || trial.status === 'running' || trial.status === 'scoring');

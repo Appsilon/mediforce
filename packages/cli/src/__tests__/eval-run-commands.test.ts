@@ -77,6 +77,17 @@ describe('mediforce eval runs', () => {
     expect(printed).not.toContain('left out');
   });
 
+  it('run-prepare --version prepares that version\'s step, and refuses one that is not a positive integer', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(OUTPUT, 201));
+    const output = captureOutput();
+    expect(await evalRunPrepareCommand({ argv: [...STEP_ARGV, '--version', '1', ...BASE], env: ENV, output })).toBe(0);
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body))).toMatchObject({ stepId: 'grade-aes', definitionVersion: 1 });
+
+    expect(await evalRunPrepareCommand({ argv: [...STEP_ARGV, '--version', 'v1', ...BASE], env: ENV, output })).toBe(2);
+    expect(output.stderrLines).toContain('--trials, --concurrency and --version must be positive integers');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('run-start sends the confirmed budget, and says how many cases few-shot examples left out', async () => {
     const running = { ...OUTPUT.evalRun, status: 'running', exampleCaseIds: ['6e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c'] };
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ...OUTPUT, evalRun: running }));
@@ -232,6 +243,15 @@ describe('mediforce eval ask --unattended-budget', () => {
     expect(code).toBe(0);
     expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body))).toMatchObject({ unattendedBudgetUsd: 3 });
     expect(output.stdoutLines.join('\n')).toContain(`started Eval Run ${RUN_ID} under the unattended budget (up to $2)`);
+  });
+
+  it('asks about the step as --version has it, and refuses a version that is not a positive integer', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ...reply, startedEvalRuns: [] }));
+    const output = captureOutput();
+    expect(await evalAskCommand({ argv: [...STEP_ARGV, 'Hello', '--version', '2', ...BASE], env: ENV, output })).toBe(0);
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body))).toMatchObject({ definitionVersion: 2 });
+    expect(await evalAskCommand({ argv: [...STEP_ARGV, 'Hello', '--version', '0', ...BASE], env: ENV, output })).toBe(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it('sends no grant by default, and refuses a budget that is not a positive number', async () => {

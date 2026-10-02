@@ -77,7 +77,7 @@ export interface WorkflowEditorCanvasProps {
   ) => void;
   onDirtyChange?: (dirty: boolean) => void;
   stepErrors?: Record<string, Record<string, string>>;
-  /** Per agent step id, its evaluation in the version being edited. */
+  /** Per agent step id, its evaluation in the version being edited — shown only while the step is as saved. */
   stepEvaluation?: Map<string, StepEvaluationMark>;
 }
 
@@ -144,6 +144,12 @@ export function WorkflowEditorCanvas({
     }
     return map.size > 0 ? map : undefined;
   }, [dockerAvailable, dockerImages, editedSteps]);
+  const savedStepEvaluation = useMemo(() => {
+    if (stepEvaluation === undefined) return undefined;
+    const saved = new Map(initialSteps.map((step) => [step.id, JSON.stringify(step)]));
+    const unchanged = new Set(editedSteps.filter((step) => saved.get(step.id) === JSON.stringify(step)).map((step) => step.id));
+    return new Map([...stepEvaluation].filter(([stepId]) => unchanged.has(stepId)));
+  }, [stepEvaluation, initialSteps, editedSteps]);
 
   const editedStepsRef = useRef(editedSteps);
   const editedTransitionsRef = useRef(editedTransitions);
@@ -1018,7 +1024,7 @@ export function WorkflowEditorCanvas({
             selectedStepId={selectedStepId}
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
             warningStepIds={warningStepIds}
-            stepEvaluation={stepEvaluation}
+            stepEvaluation={savedStepEvaluation}
             canMoveUp={canMoveUpSet}
             canMoveDown={canMoveDownSet}
             onUndo={undoEdit}

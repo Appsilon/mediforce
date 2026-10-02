@@ -1442,9 +1442,11 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
  * The card a prepared Eval Run waits on: the person starts it by confirming
  * the budget shown (D15). The only place `confirmedBudgetUsd` is sent from.
  */
-export function StartEvalRunCard({ step, prepared, mayRun, runReason }: {
+export function StartEvalRunCard({ step, prepared, otherVersion, mayRun, runReason }: {
   step: EvaluatedStep;
   prepared: PreparedEvalRun;
+  /** The workflow version the run was prepared for, when it is not the one shown. */
+  otherVersion?: number;
   mayRun: boolean;
   runReason: string | undefined;
 }) {
@@ -1453,7 +1455,7 @@ export function StartEvalRunCard({ step, prepared, mayRun, runReason }: {
   return (
     <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm" data-testid="start-eval-run-card">
       <p>
-        Eval Run of {prepared.trials} trial(s)
+        Eval Run of {prepared.trials} trial(s){otherVersion === undefined ? '' : ` on v${otherVersion}`}
         {prepared.estimatedUsd === null ? ' — no cost estimate' : ` — estimated $${prepared.estimatedUsd}`}.
       </p>
       <div className="mt-2 flex items-center gap-2">
@@ -1500,7 +1502,11 @@ function EvalRunRow({ step, evalRunId, onOpen, open, mayEdit, editReason }: {
  */
 export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRun, runReason, mayEdit, editReason }: {
   step: EvaluatedStep;
-  /** The workflow version whose step a new run runs; only that version's runs are listed. */
+  /**
+   * The workflow version whose step a new run runs. Its finished runs are
+   * listed; a prepared or running run of any version stays listed, so it can
+   * be started or followed from here.
+   */
   definitionVersion: number;
   data: StepEvaluation['runs'];
   /** The Step's frozen Dataset versions, newest first: the one a new run takes, and the one each run ran. */
@@ -1519,16 +1525,20 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
     trialsPerCase: trials,
     ...(budget === '' ? {} : { budgetUsd: Number(budget) }),
   }));
-  const runs = (data.data?.evalRuns ?? []).filter((run) => run.definitionVersion === definitionVersion);
+  const runs = (data.data?.evalRuns ?? []).filter((run) => run.definitionVersion === definitionVersion || run.status === 'prepared' || run.status === 'running');
+  const otherVersion = (run: { definitionVersion: number }) => (run.definitionVersion === definitionVersion ? undefined : run.definitionVersion);
   const versions = datasets.data?.datasets ?? [];
   const [nextDataset] = versions;
   const datasetVersion = new Map(versions.map((dataset) => [dataset.id, dataset.version]));
   // Prepared here, by the assistant or from the CLI: each waits for a person to confirm its budget.
-  const waiting: PreparedEvalRun[] = runs.filter((run) => run.status === 'prepared').map((run) => ({
-    evalRunId: run.id,
-    budgetUsd: run.budgetUsd,
-    estimatedUsd: run.estimate.totalUsd,
-    trials: run.caseIds.length * run.trialsPerCase * run.variants.length,
+  const waiting: { prepared: PreparedEvalRun; otherVersion: number | undefined }[] = runs.filter((run) => run.status === 'prepared').map((run) => ({
+    prepared: {
+      evalRunId: run.id,
+      budgetUsd: run.budgetUsd,
+      estimatedUsd: run.estimate.totalUsd,
+      trials: run.caseIds.length * run.trialsPerCase * run.variants.length,
+    },
+    otherVersion: otherVersion(run),
   }));
 
   return (
@@ -1553,7 +1563,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
           {prepare.error !== null && <span className="text-destructive">{prepare.error.message}</span>}
         </div>
       )}
-      {waiting.map((run) => <StartEvalRunCard key={run.evalRunId} step={step} prepared={run} mayRun={mayRun} runReason={runReason} />)}
+      {waiting.map((run) => <StartEvalRunCard key={run.prepared.evalRunId} step={step} prepared={run.prepared} otherVersion={run.otherVersion} mayRun={mayRun} runReason={runReason} />)}
       {data.isLoading ? <Loading /> : runs.length === 0 ? (
         <p className="text-sm text-muted-foreground">No Eval Runs of v{definitionVersion} yet.</p>
       ) : (
@@ -1561,7 +1571,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
           {runs.map((run) => (
             <li key={run.id} className="text-sm">
               <span className="text-xs text-muted-foreground">
-                {run.createdAt.slice(0, 16).replace('T', ' ')} · {run.status}{datasetVersion.has(run.datasetVersionId) ? ` · Dataset v${datasetVersion.get(run.datasetVersionId)}` : ''} · ${run.spentUsd.toFixed(2)} of ${run.budgetUsd}
+                {run.createdAt.slice(0, 16).replace('T', ' ')}{otherVersion(run) === undefined ? '' : ` · v${run.definitionVersion}`} · {run.status}{datasetVersion.has(run.datasetVersionId) ? ` · Dataset v${datasetVersion.get(run.datasetVersionId)}` : ''} · ${run.spentUsd.toFixed(2)} of ${run.budgetUsd}
                 {run.variants.length > 1 && ` · ${run.variants.length} variants`}
               </span>
               <ul>

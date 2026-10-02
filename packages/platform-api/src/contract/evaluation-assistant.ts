@@ -9,6 +9,8 @@ import { PreviewEvaluatorOutputSchema } from './evaluation';
  * by confirming its budget.
  */
 export const AskEvaluationAssistantInputSchema = EvaluatedStepSchema.extend({
+  /** The Workflow Definition version whose step the assistant reads and runs; its runnable version when absent. */
+  definitionVersion: z.number().int().positive().optional(),
   messages: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string().max(20_000),

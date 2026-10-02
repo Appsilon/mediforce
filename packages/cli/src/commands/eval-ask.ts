@@ -1,4 +1,4 @@
-import { defineCommand } from '../define-command';
+import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson } from '../output';
 import { STEP_ARGS, stepFrom } from './eval-step-args';
 
@@ -8,10 +8,16 @@ export const evalAskCommand = defineCommand({
   args: {
     ...STEP_ARGS,
     message: { type: 'positional', required: true, description: 'What to ask' },
+    version: { type: 'string', description: 'Workflow Definition version whose step the assistant reads and runs (default: the runnable one)' },
     model: { type: 'string', description: 'OpenRouter model id' },
     'unattended-budget': { type: 'string', description: 'USD the assistant may spend starting prepared Eval Runs during this request, without asking (default: none — starting a run is refused)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
+    const version = parsePositiveIntArg(args.version);
+    if (version === 'invalid') {
+      output.stderr('--version must be a positive integer');
+      return 2;
+    }
     const unattendedBudget = args['unattended-budget'] === undefined ? undefined : Number(args['unattended-budget']);
     if (unattendedBudget !== undefined && (Number.isFinite(unattendedBudget) === false || unattendedBudget <= 0)) {
       output.stderr('--unattended-budget must be a positive number of USD');
@@ -19,6 +25,7 @@ export const evalAskCommand = defineCommand({
     }
     const result = await mediforce.evaluation.askAssistant({
       ...stepFrom(args),
+      ...(version !== undefined ? { definitionVersion: version } : {}),
       messages: [{ role: 'user', content: args.message }],
       ...(args.model !== undefined ? { model: args.model } : {}),
       ...(unattendedBudget !== undefined ? { unattendedBudgetUsd: unattendedBudget } : {}),

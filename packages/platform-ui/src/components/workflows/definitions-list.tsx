@@ -11,7 +11,7 @@ import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
 import { useWorkflowValidation } from '@/hooks/use-step-evaluation';
-import { VersionValidationBadge, evaluationHref } from '@/components/evaluation/validation-status';
+import { VersionValidationBadge } from '@/components/evaluation/validation-status';
 
 interface DefinitionsListProps {
   workflowName: string;
@@ -137,7 +137,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
               {/* Right: metadata + actions */}
               <div className="flex items-center gap-4 shrink-0 ml-4">
                 {validated !== undefined && (
-                  <VersionValidationBadge version={validated} href={evaluationHref(handle, workflowName, def.version)} />
+                  <VersionValidationBadge handle={handle} workflowName={workflowName} version={validated} />
                 )}
                 <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
                   {def.stepCount} steps

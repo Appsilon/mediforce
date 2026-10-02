@@ -34,7 +34,8 @@ function preparedRun(result: unknown): PreparedEvalRun | null {
 
 /**
  * One turn with a Step's Evaluation Assistant (ADR-0023 D14–D16), on the
- * shared assistant core. Reads and `preview_evaluator` run as the caller;
+ * shared assistant core, about the Step as `definitionVersion` has it — its
+ * runnable version when absent. Reads and `preview_evaluator` run as the caller;
  * plans, Evaluators and their new versions, cases (harvested or synthesized),
  * outputs to label and Brief drafts come back as proposals, each reviewed
  * against the platform first — a proposed check carries its self-test on
@@ -51,7 +52,7 @@ export async function askEvaluationAssistant(
   onProgress?: (event: EvaluationAssistantProgress) => void,
 ): Promise<AskEvaluationAssistantOutput> {
   const step = stepRef(input);
-  const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'read');
+  const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'read', input.definitionVersion);
   const apiKey = await requireOpenRouterApiKey(scope, step.namespace);
   const model = input.model ?? EVALUATION_ASSISTANT_DEFAULT_MODEL;
 

@@ -134,8 +134,10 @@ function StepsSummary({ steps }: { steps: ActivityStep[] }) {
  * person confirms the budget on the card. The Step's Brief, which it reads on
  * every turn, opens from the header.
  */
-export function EvaluationAssistantPanel({ step, brief, mayEdit, editReason, mayRun, runReason }: {
+export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEdit, editReason, mayRun, runReason }: {
   step: EvaluatedStep;
+  /** The workflow version whose step the assistant reads and runs. */
+  definitionVersion: number;
   brief: BriefQuery;
   mayEdit: boolean;
   editReason: string | undefined;
@@ -185,6 +187,7 @@ export function EvaluationAssistantPanel({ step, brief, mayEdit, editReason, may
     try {
       const result = await mediforce.evaluation.askAssistant({
         ...step,
+        definitionVersion,
         messages: thread.map((message) => ({
           role: message.role,
           content: [message.content, ...(message.proposals ?? []).map(({ proposal }) => `[proposal: ${JSON.stringify(proposal)}]`)].join('\n'),

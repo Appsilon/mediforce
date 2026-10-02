@@ -589,7 +589,7 @@ export const WorkflowVersionValidationSchema = z.object({
   steps: z.array(StepVersionValidationSchema),
 });
 
-/** Every version of the workflow the caller sees, newest first. */
+/** Every live (not archived) version of the workflow the caller sees, newest first. */
 export const GetWorkflowValidationOutputSchema = z.object({ versions: z.array(WorkflowVersionValidationSchema) });
 
 /**

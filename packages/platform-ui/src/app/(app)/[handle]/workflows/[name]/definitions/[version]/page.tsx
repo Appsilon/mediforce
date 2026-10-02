@@ -40,7 +40,6 @@ export default function WorkflowDefinitionVersionPage() {
 
   const { definition, loading } = useWorkflowVersion(decodedName, handle, versionNumber);
   const { latestVersion } = useWorkflowVersions(decodedName, handle);
-  // Each agent step's evaluation in this version, marked on its box and linked to the Evaluation tab.
   const { data: validation } = useWorkflowValidation(handle, decodedName);
   const stepEvaluation = useMemo(() => {
     const version = validation?.versions.find((candidate) => candidate.definitionVersion === versionNumber);

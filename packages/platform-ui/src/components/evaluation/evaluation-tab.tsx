@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { pickRunnableVersion, type AgentOutputSchema, type EvaluatedStep } from '@mediforce/platform-core';
+import type { AgentOutputSchema, EvaluatedStep } from '@mediforce/platform-core';
 import { useStepEvaluation, useWorkflowValidation } from '@/hooks/use-step-evaluation';
 import { useWorkflowRunGate } from '@/hooks/use-workflow-access';
 import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
@@ -131,7 +131,7 @@ function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit, editRe
       </div>
       <div className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
         <AssistantResizeHandle {...assistantWidth} />
-        <EvaluationAssistantPanel step={step} brief={evaluation.brief} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
+        <EvaluationAssistantPanel step={step} definitionVersion={definitionVersion} brief={evaluation.brief} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
       </div>
     </div>
   );
@@ -142,16 +142,19 @@ const selectClass = 'rounded-md border bg-background px-2 py-1 text-sm';
 /**
  * The workflow's **Evaluation** tab (ADR-0023 D14): one agent step of one
  * workflow version at a time — the runnable version unless `?version=` names
- * another, the step `?step=` names or the first. Each version reads Verified,
+ * another live one (archived versions are not evaluated), the step `?step=`
+ * names or the first. Each version reads Verified,
  * Failed or Not verified across its agent steps, each step its validation in
  * that version. Its Acceptance Criteria, Evaluators, Eval Cases and Eval Runs
  * sit beside the Evaluation Assistant, which holds the Step's Brief. Everything
  * here lives outside the definition, so no change on this tab mints a version;
  * an Eval Run runs the step as the selected version has it.
  */
-export function EvaluationTab({ handle, workflowName, mayEdit, editReason }: {
+export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, editReason }: {
   handle: string;
   workflowName: string;
+  /** The version a run of the workflow uses; null when none is runnable. */
+  runnableVersion: number | null;
   mayEdit: boolean;
   editReason: string | undefined;
 }) {
@@ -162,11 +165,10 @@ export function EvaluationTab({ handle, workflowName, mayEdit, editReason }: {
   const { versions, defaultVersion, loading: versionsLoading } = useWorkflowVersions(workflowName, handle);
   const validation = useWorkflowValidation(handle, workflowName);
 
+  const liveVersions = versions.filter((version) => version.archived !== true);
   const requestedVersion = Number(searchParams.get('version'));
-  const selectedVersion = versions.some((version) => version.version === requestedVersion)
-    ? requestedVersion
-    : (pickRunnableVersion(versions, defaultVersion)?.version ?? null);
-  const { definition, loading: definitionLoading } = useWorkflowVersion(workflowName, handle, selectedVersion);
+  const selectedVersion = liveVersions.some((version) => version.version === requestedVersion) ? requestedVersion : runnableVersion;
+  const { definition, loading: definitionLoading, error: definitionError } = useWorkflowVersion(workflowName, handle, selectedVersion);
 
   const select = (next: { version?: number; step?: string }) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -179,6 +181,9 @@ export function EvaluationTab({ handle, workflowName, mayEdit, editReason }: {
     router.replace(`${pathname}?${params}`, { scroll: false });
   };
 
+  if (definitionError !== null) {
+    return <p className="text-sm text-destructive">Version {selectedVersion} could not be loaded: {definitionError.message}</p>;
+  }
   if (versionsLoading || definitionLoading || (selectedVersion !== null && definition === null)) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
@@ -187,7 +192,6 @@ export function EvaluationTab({ handle, workflowName, mayEdit, editReason }: {
   }
   const versionStatus = new Map((validation.data?.versions ?? []).map((version) => [version.definitionVersion, version]));
   const stepStatus = new Map((versionStatus.get(selectedVersion)?.steps ?? []).map((step) => [step.stepId, step.validation.status]));
-  const listedVersions = versions.filter((version) => version.archived !== true || version.version === selectedVersion);
   const agentSteps = definition.steps.filter((step) => step.executor === 'agent');
   const selected = agentSteps.find((step) => step.id === searchParams.get('step')) ?? agentSteps[0];
 
@@ -212,7 +216,7 @@ export function EvaluationTab({ handle, workflowName, mayEdit, editReason }: {
             value={selectedVersion}
             onChange={(event) => select({ version: Number(event.target.value) })}
           >
-            {listedVersions.map((version) => <option key={version.version} value={version.version}>{versionOption(version.version)}</option>)}
+            {liveVersions.map((version) => <option key={version.version} value={version.version}>{versionOption(version.version)}</option>)}
           </select>
         </label>
         {selected !== undefined && (
