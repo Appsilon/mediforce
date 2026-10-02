@@ -540,12 +540,11 @@ describe('Freezing a Dataset', () => {
     expect(drift.dropped).toBe(1);
   });
 
-  it('says an Eval Run runs a saved snapshot, and that nothing is saved yet', () => {
+  it('explains Save beside the button and shows no Dataset status before the first Save', () => {
     render(<CasesSection step={step} evaluation={withDatasets([evalCaseOf({})], [])} mayEdit={true} />);
 
-    const status = screen.getByTestId('dataset-status').textContent;
-    expect(status).toContain('An Eval Run does not run the list above');
-    expect(status).toContain('Nothing saved yet');
+    expect(screen.getByTestId('eval-cases-save-help')).not.toBeNull();
+    expect(screen.queryByTestId('dataset-status')).toBeNull();
   });
 
   it('marks unsaved cases, enables Save and warns before the page is left', () => {

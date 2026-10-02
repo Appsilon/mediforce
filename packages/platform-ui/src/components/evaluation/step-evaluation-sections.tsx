@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Bot, CircleCheck, CircleX, Clock, Loader2, X, type LucideIcon } from 'lucide-react';
+import { Bot, CircleCheck, CircleX, Clock, Info, Loader2, X, type LucideIcon } from 'lucide-react';
 import {
   CHAMPION_VARIANT_ID,
   DEFAULT_ACCEPTANCE_CRITERIA,
@@ -1043,15 +1043,11 @@ export function datasetDrift(cases: readonly EvalCase[], dataset: EvalDatasetVer
  */
 function DatasetStatus({ cases, datasets }: { cases: readonly EvalCase[]; datasets: readonly EvalDatasetVersion[] }) {
   const [latest] = datasets;
+  if (latest === undefined) return null;
   const { unfrozen, dropped } = datasetDrift(cases, latest);
   return (
     <div className="space-y-1 rounded-md bg-muted/40 p-2 text-xs" data-testid="dataset-status">
-      <p className="text-muted-foreground">
-        An Eval Run does not run the list above: it runs a <span className="font-medium text-foreground">Dataset</span> — a numbered snapshot of the live cases taken by <span className="font-medium text-foreground">Save</span>. A snapshot never changes, so every Eval Run can be read against exactly the cases it ran. Save again after adding, editing or removing cases.
-      </p>
-      {latest === undefined ? (
-        <p className="text-amber-700 dark:text-amber-300">Nothing saved yet — an Eval Run cannot be prepared until the cases are saved.</p>
-      ) : unfrozen.size === 0 && dropped === 0 ? (
+      {unfrozen.size === 0 && dropped === 0 ? (
         <p>The next Eval Run runs <span className="font-medium">Dataset v{latest.version}</span>: all {latest.caseIds.length} live case(s){latest.containsProductionData ? ' — contains production data' : ''}.</p>
       ) : (
         <p className="text-amber-700 dark:text-amber-300">
@@ -1060,18 +1056,16 @@ function DatasetStatus({ cases, datasets }: { cases: readonly EvalCase[]; datase
           {dropped > 0 && ` it still has ${dropped} case(s) archived or replaced since`}. Save to make v{latest.version + 1}.
         </p>
       )}
-      {datasets.length > 0 && (
-        <details>
-          <summary className="cursor-pointer text-muted-foreground">Versions ({datasets.length})</summary>
-          <ul className="mt-1 space-y-0.5 text-muted-foreground" data-testid="dataset-versions">
-            {datasets.map((dataset) => (
-              <li key={dataset.id}>
-                v{dataset.version} · {dataset.createdAt.slice(0, 16).replace('T', ' ')} · {dataset.caseIds.length} case(s) · {dataset.createdBy}{dataset.containsProductionData ? ' · contains production data' : ''}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      <details>
+        <summary className="cursor-pointer text-muted-foreground">Versions ({datasets.length})</summary>
+        <ul className="mt-1 space-y-0.5 text-muted-foreground" data-testid="dataset-versions">
+          {datasets.map((dataset) => (
+            <li key={dataset.id}>
+              v{dataset.version} · {dataset.createdAt.slice(0, 16).replace('T', ' ')} · {dataset.caseIds.length} case(s) · {dataset.createdBy}{dataset.containsProductionData ? ' · contains production data' : ''}
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }
@@ -1139,6 +1133,11 @@ export function CasesSection({ step, evaluation, mayEdit }: {
           <InstantTooltip label={hasUnsavedChanges ? `Snapshot the ${cases.length} live case(s) as Dataset v${(latest?.version ?? 0) + 1}, which the next Eval Run runs.` : 'No unsaved changes.'}>
             <span className="inline-flex">
               <button type="button" className={primaryButtonClass} disabled={save.isPending || !hasUnsavedChanges} onClick={() => save.mutate(undefined)}>{save.isPending ? 'Saving…' : 'Save'}</button>
+            </span>
+          </InstantTooltip>
+          <InstantTooltip label="An Eval Run does not run the list below: it runs a Dataset — a numbered snapshot of the live cases taken by Save. A snapshot never changes, so every Eval Run can be read against exactly the cases it ran. Save again after adding, editing or removing cases.">
+            <span className="inline-flex items-center text-muted-foreground" aria-label="What Save does" data-testid="eval-cases-save-help">
+              <Info className="h-4 w-4" />
             </span>
           </InstantTooltip>
         </div>
@@ -1551,7 +1550,7 @@ export function EvalRunsSection({ step, data, datasets, mayRun, runReason, mayEd
             disabled={prepare.isPending}
             onClick={() => prepare.mutate(undefined)}
           >Prepare</button>
-          <span className="text-muted-foreground" data-testid="eval-run-dataset">
+          <span className={nextDataset === undefined ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'} data-testid="eval-run-dataset">
             {nextDataset === undefined ? 'No Dataset saved yet — save the Eval Cases first.' : `Runs Dataset v${nextDataset.version} (${nextDataset.caseIds.length} case(s)).`}
           </span>
           {prepare.error !== null && <span className="text-destructive">{prepare.error.message}</span>}
