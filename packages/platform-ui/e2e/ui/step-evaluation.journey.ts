@@ -338,7 +338,8 @@ test.describe('Step Evaluation tab', () => {
     await expect(page.getByTestId('case-dialog')).toHaveCount(0);
 
     const row = page.getByTestId('eval-case-row').filter({ hasText: 'Fatal sepsis graded 4' });
-    await expect(row).toContainText('negative · manual', { timeout: 10_000 });
+    await expect(row.getByLabel('Negative', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(row.getByTestId('eval-case-evaluators')).toHaveText('1 selected evaluator');
     await row.getByText('Details', { exact: true }).click();
     await expect(row.getByTestId('eval-case-expected-output')).toContainText('An output that does not match this, by output agreement score');
     await expect(row.getByTestId('eval-case-expected-output')).toContainText('"grade": 4');

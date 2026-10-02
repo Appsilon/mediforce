@@ -372,7 +372,7 @@ describe('Eval Case view and edit', () => {
       unmount();
       return text;
     });
-    expect(marks).toEqual(['as run', 'as run', 'edited', 'edited', 'edited']);
+    expect(marks).toEqual(['from run', 'from run', 'edited from run', 'edited from run', 'edited from run']);
   });
 
   it('opens the source run\'s log from the details, for a person who cannot edit too', () => {

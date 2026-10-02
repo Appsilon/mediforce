@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
-import { CircleCheck, CircleX, Clock, Loader2, X, type LucideIcon } from 'lucide-react';
+import { Bot, CircleCheck, CircleX, Clock, Loader2, X, type LucideIcon } from 'lucide-react';
 import {
   CHAMPION_VARIANT_ID,
   DEFAULT_ACCEPTANCE_CRITERIA,
@@ -699,16 +699,30 @@ function CaseRunMark({ evalCase }: { evalCase: EvalCase }) {
   ];
   return changes.length === 0 ? (
     <InstantTooltip label="Gives the step what the source run was given, and expects what it returned.">
-      <span className="shrink-0 rounded bg-muted px-1.5 text-[11px] text-muted-foreground" data-testid="eval-case-run-mark">as run</span>
+      <span className="shrink-0 rounded bg-muted px-1.5 text-[11px] text-muted-foreground" data-testid="eval-case-run-mark">from run</span>
     </InstantTooltip>
   ) : (
     <InstantTooltip label={`Edited: ${changes.join('; ')}.`}>
-      <span className="shrink-0 rounded bg-amber-500/10 px-1.5 text-[11px] text-amber-700 dark:text-amber-300" data-testid="eval-case-run-mark">edited</span>
+      <span className="shrink-0 rounded bg-amber-500/10 px-1.5 text-[11px] text-amber-700 dark:text-amber-300" data-testid="eval-case-run-mark">edited from run</span>
     </InstantTooltip>
   );
 }
 
-/** One Eval Case: its labels, editing and archiving it, and in its details what it gives the step and expects. */
+/** Whether a case expects an output that matches its expected output, or one that does not. */
+function CaseExpectationIcon({ evalCase }: { evalCase: EvalCase }) {
+  if (evalCase.expectedOutput === null) return null;
+  return evalCase.expectation === 'positive' ? (
+    <InstantTooltip label="Positive — the output must match the expected output.">
+      <CircleCheck className="h-4 w-4 shrink-0 text-emerald-600" aria-label="Positive" data-testid="eval-case-expectation" />
+    </InstantTooltip>
+  ) : (
+    <InstantTooltip label="Negative — the output must not match the expected output.">
+      <CircleX className="h-4 w-4 shrink-0 text-destructive" aria-label="Negative" data-testid="eval-case-expectation" />
+    </InstantTooltip>
+  );
+}
+
+/** One Eval Case: what it expects, which Evaluators grade it, editing and removing it, and in its details what it gives the step and expects. */
 function CaseRow({ step, evalCase, evaluators, mayEdit, unfrozen, selected, onSelect }: {
   step: EvaluatedStep;
   evalCase: EvalCase;
@@ -722,7 +736,7 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unfrozen, selected, onSe
   const [editing, setEditing] = React.useState(false);
   const edit = useStepEvaluationMutation(step, (values: CaseFormResult) =>
     mediforce.evaluation.updateCase({ caseId: evalCase.id, ...caseChanges(evalCase, values) }));
-  const archive = useStepEvaluationMutation(step, () => mediforce.evaluation.archiveCase({ caseId: evalCase.id, archived: true }));
+  const remove = useStepEvaluationMutation(step, () => mediforce.evaluation.archiveCase({ caseId: evalCase.id, archived: true }));
   const closeEdit = () => {
     setEditing(false);
     edit.reset();
@@ -730,29 +744,39 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unfrozen, selected, onSe
   const gradedBy = evalCase.evaluatorIds === null
     ? 'all evaluators'
     : evalCase.evaluatorIds.map((evaluatorId) => evaluators.find((evaluator) => evaluator.id === evaluatorId)?.name ?? evaluatorId.slice(0, 8)).join(', ');
-  const labels = (
-    <span className="text-xs text-muted-foreground">
-      {evalCase.expectedOutput === null ? '' : `${evalCase.expectation} · `}{evalCase.source}{evalCase.perturbation === null ? '' : ` (${evalCase.perturbation.kind.replace(/_/g, ' ')})`}{evalCase.origin === 'assistant' ? ' · from the assistant' : ''}
-    </span>
-  );
   return (
     <li className="border-t pt-1.5 first:border-t-0 first:pt-0" data-testid="eval-case-row">
       <div className="flex items-center gap-2">
         {mayEdit && <input type="checkbox" aria-label={`Select ${evalCase.name}`} checked={selected} onChange={(event) => onSelect(event.target.checked)} />}
+        <CaseExpectationIcon evalCase={evalCase} />
         <span className="truncate">{evalCase.name}</span>
+        <CaseRunMark evalCase={evalCase} />
+        {evalCase.perturbation !== null && (
+          <InstantTooltip label={evalCase.perturbation.description}>
+            <span className="shrink-0 rounded bg-muted px-1.5 text-[11px] text-muted-foreground" data-testid="eval-case-perturbation">{evalCase.perturbation.kind.replace(/_/g, ' ')}</span>
+          </InstantTooltip>
+        )}
+        {evalCase.origin === 'assistant' && (
+          <InstantTooltip label="Added by the assistant.">
+            <Bot className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Added by the assistant" />
+          </InstantTooltip>
+        )}
         {unfrozen && (
           <InstantTooltip label="Not in the newest Dataset version, so the next Eval Run does not run it. Freeze the dataset to include it.">
             <span className="shrink-0 rounded bg-amber-500/10 px-1.5 text-[11px] text-amber-700 dark:text-amber-300" data-testid="eval-case-unfrozen">not frozen</span>
           </InstantTooltip>
         )}
         <span className="ml-auto flex shrink-0 items-center gap-1.5">
-          {evalCase.perturbation === null ? labels : <InstantTooltip label={evalCase.perturbation.description}>{labels}</InstantTooltip>}
-          <CaseRunMark evalCase={evalCase} />
+          <InstantTooltip label={`Graded by ${gradedBy}.`}>
+            <span className="text-xs text-muted-foreground" data-testid="eval-case-evaluators">
+              {evalCase.evaluatorIds === null ? 'All evaluators' : `${evalCase.evaluatorIds.length} selected evaluator${evalCase.evaluatorIds.length === 1 ? '' : 's'}`}
+            </span>
+          </InstantTooltip>
           {mayEdit && <button type="button" className={buttonClass} onClick={() => setEditing(true)}>Edit</button>}
-          {mayEdit && <button type="button" className={buttonClass} disabled={archive.isPending} onClick={() => archive.mutate(undefined)}>Archive</button>}
+          {mayEdit && <button type="button" className={buttonClass} disabled={remove.isPending} onClick={() => remove.mutate(undefined)}>Remove</button>}
         </span>
       </div>
-      {archive.error !== null && <p className="text-xs text-destructive">{archive.error.message}</p>}
+      {remove.error !== null && <p className="text-xs text-destructive">{remove.error.message}</p>}
       <details className="mt-0.5 text-xs" data-testid="eval-case-details">
         <summary className="cursor-pointer text-muted-foreground">Details</summary>
         <div className="mt-1 space-y-1.5">
@@ -770,7 +794,7 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unfrozen, selected, onSe
       {editing && (
         <CaseDialog
           title={`Edit ${evalCase.name}`}
-          description="Saving adds the edited case and archives this one: a Dataset version frozen with it keeps it, and the next freeze takes the edit."
+          description="Saving adds the edited case and removes this one: a Dataset version frozen with it keeps it, and the next freeze takes the edit."
           onClose={closeEdit}
         >
           <CaseForm
