@@ -522,6 +522,9 @@ step's few-shot `agent.examples` is left out of the run (`exampleCaseIds`;
    runs, or its model's registry price for a nominal turn when it has none,
    plus one call per `llm_judge`. The budget cap
    defaults to 1.5× the estimate; with no estimate it must be given.
+   A run whose trials the auto-runner would pause on a model — one the
+   registry does not list or has retired, in the version or a challenger — is
+   refused, at prepare and again at start, naming the model.
 2. **Start** (`run-start --confirm-budget <usd>`) needs the budget echoed back —
    the person confirming what the run may spend. Without it the start is
    refused, which is also how an assistant's attempt to start one ends.

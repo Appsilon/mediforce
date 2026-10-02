@@ -225,6 +225,29 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
       expect(trial.error).toContain('CTCAE_API_KEY');
     }
   });
+
+  test('an Eval Run of a step on a model the registry does not list is refused before any trial runs', async ({ request }) => {
+    const workflowName = `e2e-eval-unknown-model-${randomUUID().slice(0, 8)}`;
+    await post(request, `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, agentStepWorkflow(workflowName, {
+      autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.', model: 'nonexistent/model-that-does-not-exist' },
+    }), 201);
+    const step = { namespace: TEST_ORG_HANDLE, workflowName, stepId: 'grade-aes' };
+    await post(request, '/api/evaluation/evaluators', {
+      ...step, name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical',
+      check: { kind: 'schema', schema: { required: ['summary'] } },
+    }, 201);
+    await post(request, '/api/evaluation/cases', {
+      ...step, name: 'Grade 4 neutropenia', expectation: 'positive',
+      input: { triggerPayload: { studyId: 'CDISCPILOT01' }, previousStepOutputs: {} },
+    }, 201);
+    await post(request, '/api/evaluation/datasets', step, 201);
+
+    const refused = await request.post('/api/evaluation/runs', {
+      headers: JSON_HEADERS, data: { ...step, trialsPerCase: 1, concurrency: 1, budgetUsd: 1 },
+    });
+    expect(refused.status(), await refused.text()).toBe(400);
+    expect(await refused.text()).toContain("Unknown model(s): model 'nonexistent/model-that-does-not-exist'");
+  });
 });
 
 function apiClient(baseURL: string | undefined): Mediforce {

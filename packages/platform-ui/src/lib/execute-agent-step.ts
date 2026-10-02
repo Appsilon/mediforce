@@ -19,6 +19,7 @@ import {
   type StepExecutorServices,
 } from '@mediforce/agent-runtime';
 import {
+  applyAgentModel,
   applyStepVariant,
   inlineMcpServerNames,
   mcpEvalRestrictions,
@@ -37,7 +38,7 @@ import { buildProductionOutputGate } from './production-output-gate';
 import { changedFingerprintComponents, computeStepFingerprint } from '@mediforce/platform-api/services';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
-import { applyAgentModel, resolveAgentDefaults } from './resolve-agent-defaults';
+import { resolveAgentDefaults } from './resolve-agent-defaults';
 
 export interface WorkflowAgentStepResult {
   instanceId: string;

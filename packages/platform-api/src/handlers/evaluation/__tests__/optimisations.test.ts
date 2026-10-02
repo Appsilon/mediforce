@@ -89,7 +89,10 @@ describe('GEPA optimisations (ADR-0023 D15)', () => {
     Object.assign(scope, {
       workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) },
       // $3 per million input tokens, $15 per million output: the job's 10k + 1k tokens cost $0.045.
-      models: { list: async () => [{ id: REFLECTION_MODEL, pricing: { input: 0.000003, output: 0.000015 } }] },
+      models: { list: async () => [
+        { id: REFLECTION_MODEL, pricing: { input: 0.000003, output: 0.000015 }, retiredAt: null },
+        { id: 'openai/gpt-5', pricing: { input: 0.000003, output: 0.000015 }, retiredAt: null },
+      ] },
     });
     // The champion fails on neutropenia, so there is something to reflect on.
     sourceRunId = await finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5, challengers: [] },
