@@ -126,8 +126,8 @@ describe('executeEvaluationTool', () => {
       outputSchema: { required: ['findings'] },
       additionalTools: ['WebFetch'],
       mcpServers: [
-        { name: 'edc', inProduction: ['read_record'], inEvalTrials: { mode: 'deny', defaulted: true } },
-        { name: 'email', inProduction: 'all tools', inEvalTrials: { mode: 'deny', defaulted: true } },
+        { name: 'edc', inProduction: ['read_record'], inEvalTrials: { mode: 'live', defaulted: true } },
+        { name: 'email', inProduction: 'all tools', inEvalTrials: { mode: 'live', defaulted: true } },
       ],
       upstreamSteps: [{ id: 'extract-aes', name: 'Extract AEs', executor: 'script' }],
     });

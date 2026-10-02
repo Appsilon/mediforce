@@ -10,7 +10,6 @@ import {
   CasesSection,
   EvalRunsSection,
   EvaluatorsSection,
-  McpPolicySection,
   DriftAlert,
 } from './step-evaluation-sections';
 
@@ -124,7 +123,6 @@ function StepEvaluation({ step, outputSchema, mayEdit, editReason, mayRun, runRe
           stepOutputSchema={outputSchema}
         />
         <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
-        <McpPolicySection step={step} data={evaluation.mcpPolicy} mayEdit={mayEdit} />
         <EvalRunsSection step={step} data={evaluation.runs} datasets={evaluation.datasets} mayRun={mayRun} runReason={runReason} mayEdit={mayEdit} editReason={editReason} />
       </div>
       <div className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
@@ -138,7 +136,7 @@ function StepEvaluation({ step, outputSchema, mayEdit, editReason, mayRun, runRe
 /**
  * The workflow's **Evaluation** tab (ADR-0023 D14): one agent step at a time,
  * its Acceptance Criteria with whether it is validated against them,
- * Evaluators, Eval Cases, MCP eval policy and Eval Runs beside the Evaluation
+ * Evaluators, Eval Cases and Eval Runs beside the Evaluation
  * Assistant, which holds the Step's Brief. Everything here lives outside the definition, so no
  * change on this tab mints a version.
  */

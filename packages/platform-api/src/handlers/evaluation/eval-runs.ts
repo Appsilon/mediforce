@@ -35,6 +35,7 @@ import { buildEvalRunReport } from './_lib/eval-run-report';
 import { driveEvalRun } from './_lib/drive-eval-run';
 import { computeStepFingerprint } from './_lib/step-fingerprint';
 import { exampleCasesProblem } from './_lib/example-cases';
+import { DEFAULT_MCP_EVAL_SERVER_POLICY } from './mcp-eval-policy';
 
 async function loadEvalRun(scope: CallerScope, evalRunId: string): Promise<EvalRun> {
   const run = await scope.evaluation.getEvalRun(evalRunId);
@@ -144,7 +145,7 @@ export async function prepareEvalRun(
   const agentServers = Object.keys(agent?.mcpServers ?? {});
   const policy = await scope.evaluation.getMcpPolicy(step);
   const mcpPolicy: Record<string, McpEvalServerPolicy> = Object.fromEntries(
-    agentServers.map((name) => [name, policy?.servers[name] ?? { mode: 'deny' as const }]),
+    agentServers.map((name) => [name, policy?.servers[name] ?? DEFAULT_MCP_EVAL_SERVER_POLICY]),
   );
   const variants = await buildVariants(scope, step, definition, workflowStep, agentServers, input.challengers);
   const exampleSources = new Set([

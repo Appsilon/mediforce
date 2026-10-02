@@ -4,11 +4,14 @@ import type {
   SetMcpEvalPolicyInput,
   SetMcpEvalPolicyOutput,
 } from '../../contract/evaluation';
-import type { AgentMcpBinding } from '@mediforce/platform-core';
+import type { AgentMcpBinding, McpEvalServerPolicy } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
 import { loadEvaluatedStep, stepRef, type LoadedStep } from './_lib/evaluated-step';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
+
+/** What a server the Step's MCP eval policy does not name does in a trial. */
+export const DEFAULT_MCP_EVAL_SERVER_POLICY: McpEvalServerPolicy = { mode: 'live' };
 
 /** The MCP servers the Step's agent binds — what an eval policy speaks about. */
 async function agentBindings(scope: CallerScope, loaded: LoadedStep): Promise<Record<string, AgentMcpBinding>> {
@@ -26,7 +29,7 @@ export async function getMcpEvalPolicy(input: GetMcpEvalPolicyInput, scope: Call
     const serverPolicy = policy?.servers[name];
     const recordedCaseIds = recorded.filter((entry) => entry.server === name).map((entry) => entry.caseId).sort();
     return serverPolicy === undefined
-      ? { name, mode: 'deny' as const, defaulted: true, recordedCaseIds }
+      ? { name, ...DEFAULT_MCP_EVAL_SERVER_POLICY, defaulted: true, recordedCaseIds }
       : { name, ...serverPolicy, defaulted: false, recordedCaseIds };
   });
   return { policy, servers };
@@ -68,7 +71,7 @@ export async function setMcpEvalPolicy(input: SetMcpEvalPolicyInput, scope: Call
     entityType: 'mcp_eval_policy',
     entityId: `${step.workflowName}/${step.stepId}`,
     inputSnapshot: { ...step, servers: input.servers },
-    basis: 'MCP servers are denied in eval trials unless declared live or replayed (ADR-0023 D6)',
+    basis: 'MCP servers run live in eval trials unless declared replayed or denied (ADR-0023 D6)',
   });
   return { policy };
 }
