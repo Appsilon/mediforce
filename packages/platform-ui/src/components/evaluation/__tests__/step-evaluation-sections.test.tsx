@@ -37,6 +37,7 @@ const evaluation = vi.hoisted(() => ({
   archiveCase: vi.fn(),
 }));
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 vi.mock('@/components/agents/agent-log-panel', () => ({
   AgentRunLog: ({ run }: { run: { id: string } }) => <div data-testid="agent-run-log">{run.id}</div>,
@@ -553,28 +554,34 @@ describe('Freezing a Dataset', () => {
     expect(drift.dropped).toBe(1);
   });
 
-  it('says an Eval Run runs a frozen snapshot, and that nothing is frozen yet', () => {
+  it('says an Eval Run runs a saved snapshot, and that nothing is saved yet', () => {
     render(<CasesSection step={step} evaluation={withDatasets([evalCaseOf({})], [])} mayEdit={true} />);
 
     const status = screen.getByTestId('dataset-status').textContent;
     expect(status).toContain('An Eval Run does not run the list above');
-    expect(status).toContain('Nothing frozen yet');
+    expect(status).toContain('Nothing saved yet');
   });
 
-  it('marks the cases the next Eval Run will not run until the next freeze', () => {
+  it('marks unsaved cases, enables Save and warns before the page is left', () => {
     render(<CasesSection step={step} evaluation={withDatasets([evalCaseOf({ id: 'c-2', name: 'Edited' }), evalCaseOf({ id: 'c-1' })], [datasetOf(1, ['c-1'])])} mayEdit={true} />);
 
-    expect(screen.getByTestId('dataset-status').textContent).toContain('runs Dataset v1 (1 case(s)), which is behind the list: 1 case(s) added or edited since are not in it. Freeze to make v2.');
-    expect(screen.getAllByTestId('eval-case-unfrozen')).toHaveLength(1);
-    expect((screen.getByRole('button', { name: 'Freeze dataset' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByTestId('dataset-status').textContent).toContain('runs Dataset v1 (1 case(s)), which is behind the list: 1 case(s) added or edited since are not in it. Save to make v2.');
+    expect(screen.getAllByTestId('eval-case-unsaved')).toHaveLength(1);
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
+    const leaving = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(leaving);
+    expect(leaving.defaultPrevented).toBe(true);
   });
 
-  it('has nothing to freeze when the newest version has every live case', () => {
+  it('has nothing to save when the newest version has every live case', () => {
     render(<CasesSection step={step} evaluation={withDatasets([evalCaseOf({ id: 'c-1' })], [datasetOf(2, ['c-1']), datasetOf(1, ['c-1'])])} mayEdit={true} />);
 
     expect(screen.getByTestId('dataset-status').textContent).toContain('The next Eval Run runs Dataset v2: all 1 live case(s)');
-    expect(screen.queryByTestId('eval-case-unfrozen')).toBeNull();
-    expect((screen.getByRole('button', { name: 'Freeze dataset' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByTestId('eval-case-unsaved')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    const leaving = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(leaving);
+    expect(leaving.defaultPrevented).toBe(false);
     expect(screen.getByTestId('dataset-versions').children).toHaveLength(2);
   });
 });

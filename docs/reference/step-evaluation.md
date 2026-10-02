@@ -434,15 +434,16 @@ workspace — is refused. It is built from production data, so it is flagged as
 containing it. It takes the same expected output, expectation, comparison and
 Evaluators as a written case.
 
-`dataset-freeze` (**Freeze dataset** in the tab) freezes the live cases into a
+`dataset-freeze` (**Save** in the tab) freezes the live cases into a
 numbered Eval Dataset version. A version never changes, and an Eval Run runs one
 — by default the newest — never the live list, so every run can be read against
 exactly the cases it ran. Adding, editing or archiving a case therefore reaches
 the next Eval Run only after the next freeze. The tab says which version the next
 run takes and whether it is behind the list (cases added or edited since are
-tagged *not frozen*), lists the versions, and disables **Freeze dataset** while
-the newest version already has every live case; each Eval Run names the Dataset
-version it ran.
+tagged *unsaved*), lists the versions, and disables **Save** while the newest
+version already has every live case; while it does not, leaving or reloading the
+page asks first (the same guard as the workflow definition editor). Each Eval Run
+names the Dataset version it ran.
 
 ## MCP eval policy
 
