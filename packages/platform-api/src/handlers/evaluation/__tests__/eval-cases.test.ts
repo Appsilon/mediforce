@@ -4,14 +4,11 @@ import {
   archiveEvalCase,
   createEvalCase,
   createEvalCaseFromAgentRun,
-  createEvalCasesFromLabels,
   createPerturbedEvalCase,
   listEvalCases,
   updateEvalCase,
 } from '../eval-cases';
 import { freezeEvalDataset } from '../eval-datasets';
-import { createEvaluator } from '../evaluators';
-import { labelEvaluatorOutput } from '../evaluator-trust';
 import { listCommitFiles, readCommitFile } from '@mediforce/agent-runtime';
 import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture } from './fixture';
 import { gitWorkspace } from './git-workspace';
@@ -237,33 +234,5 @@ describe('Eval Cases', () => {
     await expect(createPerturbedEvalCase({ ...base, inputChanges: [{ op: 'remove', part: 'triggerPayload', path: ['armCode'] }], fileChanges: [] }, fixture.scope()))
       .rejects.toThrow('there is nothing there to remove');
     expect((await listEvalCases(STEP, fixture.scope())).cases).toEqual([]);
-  });
-
-  it('seeds cases from an Evaluator\'s labels — pass positive, fail negative — skipping outputs already cases', async () => {
-    const scope = fixture.scope();
-    const { evaluator } = await createEvaluator({
-      ...STEP, name: 'grades-justified', rule: 'Every grade is justified by the source record.', severity: 'major',
-      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Is every AE graded?', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
-      origin: 'user',
-    }, scope);
-    await labelEvaluatorOutput({ evaluatorId: evaluator.id, agentRunId: GRADED_RUN, passed: true }, scope);
-    await labelEvaluatorOutput({ evaluatorId: evaluator.id, agentRunId: UNGRADED_RUN, passed: false, comment: 'No grades at all.' }, scope);
-
-    const first = await createEvalCasesFromLabels({ evaluatorId: evaluator.id, split: 'dev' }, scope);
-    const again = await createEvalCasesFromLabels({ evaluatorId: evaluator.id, split: 'dev' }, scope);
-
-    const seeded = first.cases.map((evalCase) => [evalCase.sourceAgentRunId, evalCase.expectation, evalCase.notes]);
-    expect(seeded).toHaveLength(2);
-    expect(seeded).toEqual(expect.arrayContaining([
-      [UNGRADED_RUN, 'negative', "Fails 'grades-justified': Every grade is justified by the source record. — No grades at all."],
-      [GRADED_RUN, 'positive', "Passes 'grades-justified': Every grade is justified by the source record."],
-    ]));
-    expect(first.skipped).toEqual([]);
-    expect(again.cases).toEqual([]);
-    expect(again.skipped).toHaveLength(2);
-    expect(again.skipped).toEqual(expect.arrayContaining([
-      { agentRunId: UNGRADED_RUN, reason: 'already a case' },
-      { agentRunId: GRADED_RUN, reason: 'already a case' },
-    ]));
   });
 });

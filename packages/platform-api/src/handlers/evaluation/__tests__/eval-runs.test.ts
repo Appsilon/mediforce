@@ -261,10 +261,10 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   async function withJudge(prices: ReadonlyArray<{ id: string; pricing: { input: number; output: number } }>) {
     await createEvaluator({
       ...STEP, name: 'grades-present', rule: 'Every AE carries a grade.', severity: 'major', origin: 'user',
-      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Every AE carries a grade.', choices: [{ label: 'graded', value: 1 }, { label: 'ungraded', value: 0 }] },
+      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Every AE carries a grade.', minConfidence: 0.7 },
     }, scope);
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({
-      choices: [{ message: { content: '{"reasoning": "Graded.", "choice": "graded"}' }, finish_reason: 'stop' }],
+      choices: [{ message: { content: '{"rationale": "Every AE is graded.", "passed": true, "confidence": 0.75}' }, finish_reason: 'stop' }],
       usage: { prompt_tokens: 4000, completion_tokens: 500 },
     }))));
     Object.assign(scope, {
@@ -288,6 +288,8 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     expect(report.costUsd).toBeCloseTo(0.513, 10);
     const [judgeScore] = await fixture.scoreRepo.list({ name: 'grades-present', limit: 50 });
     expect(judgeScore?.metadata?.judgeCostUsd).toBeCloseTo(0.0065, 10);
+    expect(judgeScore).toMatchObject({ comment: 'Every AE is graded.', metadata: { judgeConfidence: 0.75, judgeMinConfidence: 0.7 } });
+    expect(report.judgeVerdicts.map((verdict) => [verdict.passed, verdict.confidence, verdict.counts])).toEqual([[true, 0.75, true], [true, 0.75, true]]);
   });
 
   it('says so on the trial when the judge\'s model has no registry price', async () => {

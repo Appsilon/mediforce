@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-10-01
+last_reviewed: 2026-10-02
 ---
 
 # 0023 — Step Evaluation: Evaluation Assistant, Evaluators, single-step Eval Runs, Step Qualification
@@ -20,6 +20,10 @@ last_reviewed: 2026-10-01
   [ADR-0024](./0024-optimisation.md) (Proposed) and out of the UI; built-in
   Evaluators and case suites removed (D3); neither a Step Qualification nor
   an Eval Run cites the Evaluation Brief (D10, D16).
+- **Amended 2026-10-02:** an `llm_judge` is no longer calibrated against human
+  labels; it reads the agent's Trajectory, answers pass/fail with a confidence
+  and a rationale, and each verdict is gated by its `minConfidence` and a
+  person's review (D3, D9, D15). Labels and written outputs are removed.
 - **Vocabulary:** Evaluation, Evaluation Assistant, Evaluation Brief, Evaluator, Eval Case, Eval Dataset, Eval Run,
   Agent Trajectory, Step Fingerprint, Acceptance Criteria, Step Qualification
   — all in [`CONTEXT.md`](../../CONTEXT.md) § Evaluation domain.
@@ -140,6 +144,18 @@ without reaching into the run's step events.
 source, whoever wrote it. `llm_judge` needs agreement at or above a set level with
 at least 10 human-labelled outputs, at least 2 of them failures, per version.
 `human` is ground truth. Draft Evaluators appear in reports as "not counted".
+_Amended 2026-10-02: judge calibration is removed — labelling enough outputs,
+failures above all, cost more than it bought, and agreement on a few labels
+said little about the next verdict. An `llm_judge` counts on creation and is
+gated verdict by verdict instead. It reads the step's input, its Trajectory
+(D8) and its output, and answers pass or fail with a confidence and a rationale
+— what decided the verdict and why. A verdict below its version's
+`minConfidence` (0.8 by default) is reported but left out of the criteria. A
+person reads the rationale in the report and accepts the verdict, so it counts
+whatever its confidence, or denies it, so it is left out; a denial never
+reverses the verdict. The review is a human Score that a later review
+supersedes. Labels, written outputs and the cases seeded from labels went with
+calibration._
 
 **D10 — Acceptance Criteria are fixed before the run and judged on the pass
 rate.** Criteria per severity (critical / major / minor) are frozen into the
@@ -186,7 +202,7 @@ the same fallback route; the retry shares the step's timeout.
 
 **D14 — One Evaluation Assistant, built on the workflow assistant's
 blocks.** A single assistant per Step covers the whole Evaluation: suggest a
-plan, draft Evaluators and Eval Cases, help calibrate, prepare and explain Eval
+plan, draft Evaluators and Eval Cases, prepare and explain Eval
 Runs, diagnose failures, propose fixes. It reuses the workflow editor
 assistant's design — an OpenRouter tool-calling loop, Zod tool registries in
 `platform-core`, *mutation* tools returned as proposals versus *platform* tools
@@ -208,7 +224,8 @@ fail on real outputs before proposing it. Every tool wraps a headless handler
   Evaluation Brief drafts, fix variants, changes to the Step itself.
 - *Prepares; the user confirms with the cost shown:* starting an Eval Run.
 - *Never:* signing a Step Qualification, approving a `code` Evaluator's
-  source, labelling calibration outputs — D9 and D10 require these to be human.
+  source, accepting or denying a judge's verdict (amended 2026-10-02; was
+  labelling calibration outputs) — D9 and D10 require these to be human.
   Unattended fix attempts (Phase 4) run only under a budget the user grants per
   request.
 

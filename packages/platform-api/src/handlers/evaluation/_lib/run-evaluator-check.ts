@@ -1,9 +1,4 @@
-import {
-  JUDGE_PASS_VALUE,
-  type AgentOutputEnvelope,
-  type EvalCase,
-  type EvaluatorCheck,
-} from '@mediforce/platform-core';
+import type { EvalCase, EvaluatorCheck } from '@mediforce/platform-core';
 import {
   LlmJudgeReviewPlugin,
   runCodeCheck,
@@ -19,7 +14,8 @@ import type { EvaluationSubject } from './evaluation-subject';
 type LlmJudgeCheck = Extract<EvaluatorCheck, { kind: 'llm_judge' }>;
 
 const CODE_CHECK_TIMEOUT_MS = 2 * 60_000;
-const JUDGE_MAX_OUTPUT_TOKENS = 1000;
+/** Room for a rationale that cites what decided the verdict. */
+const JUDGE_MAX_OUTPUT_TOKENS = 2000;
 
 /** The tokens one LLM judge call spent, for whoever pays for it. */
 export interface JudgeUsage {
@@ -46,64 +42,44 @@ function openRouterJudgeClient(apiKey: string, model: string, onUsage: (usage: J
 }
 
 function binary(agentRunId: string, passed: boolean, comment: string | null): EvaluatorOutcome {
-  return { agentRunId, passed, value: passed ? 1 : 0, label: passed ? 'pass' : 'fail', comment, error: null };
-}
-
-/** An output a judge reads: a production run's, or a person's written one (then `processInstanceId` is null). */
-export interface JudgedOutput {
-  readonly id: string;
-  readonly namespace: string;
-  readonly stepId: string;
-  readonly processInstanceId: string | null;
-  readonly envelope: AgentOutputEnvelope;
-  readonly stepInput: Record<string, unknown> | null;
+  return { agentRunId, passed, value: passed ? 1 : 0, label: passed ? 'pass' : 'fail', confidence: null, comment, error: null };
 }
 
 /**
- * Asks an `llm_judge` about one output. A judge that answers with no listed
- * choice comes back as `error`, never as a failed output. The outcome's
- * `agentRunId` is the output's id.
+ * Asks an `llm_judge` about one Agent Run: its input, its log and its output.
+ * A judge that gives no usable verdict comes back as `error`, never as a
+ * failed output.
  */
-export async function runJudgeCheck(
+async function runJudgeCheck(
   scope: CallerScope,
   check: LlmJudgeCheck,
-  output: JudgedOutput,
+  subject: EvaluationSubject,
   evalCase: EvalCase | null,
-  onJudgeUsage: (usage: JudgeUsage) => void = () => {},
+  onJudgeUsage: (usage: JudgeUsage) => void,
 ): Promise<EvaluatorOutcome> {
-  try {
-    const apiKey = await requireOpenRouterApiKey(scope, output.namespace);
-    const judge = new LlmJudgeReviewPlugin({
-      model: check.model,
-      rubric: check.rubric,
-      choices: check.choices,
-      stepInput: output.stepInput,
-      expectation: evalCase?.notes ?? null,
-    });
-    const verdict = await judge.review({
-      stepId: output.stepId,
-      processInstanceId: output.processInstanceId ?? '',
-      executorOutput: output.envelope,
-      iterationNumber: 0,
-      llm: openRouterJudgeClient(apiKey, check.model, onJudgeUsage),
-    });
-    return {
-      agentRunId: output.id,
-      passed: verdict.value >= JUDGE_PASS_VALUE,
-      value: verdict.value,
-      label: verdict.choice,
-      comment: verdict.reasoning,
-      error: null,
-    };
-  } catch (err) {
-    return { agentRunId: output.id, passed: null, value: null, label: null, comment: null, error: err instanceof Error ? err.message : String(err) };
-  }
+  const { agentRun } = subject;
+  const apiKey = await requireOpenRouterApiKey(scope, subject.instance.namespace ?? '');
+  const judge = new LlmJudgeReviewPlugin({
+    model: check.model,
+    rubric: check.rubric,
+    stepInput: subject.stepInput,
+    expectation: evalCase?.notes ?? null,
+    trajectory: subject.trajectory,
+  });
+  const verdict = await judge.review({
+    stepId: agentRun.stepId,
+    processInstanceId: agentRun.processInstanceId,
+    executorOutput: agentRun.envelope!,
+    iterationNumber: 0,
+    llm: openRouterJudgeClient(apiKey, check.model, onJudgeUsage),
+  });
+  return { ...binary(agentRun.id, verdict.passed, verdict.reasoning), confidence: verdict.confidence };
 }
 
 /**
  * Applies one check to one Agent Run's output. A run with no `result` fails
  * every check without running it. A check that cannot run — a crashing
- * script, a judge that names no choice — comes back as `error`, never as a
+ * script, a judge with no usable verdict — comes back as `error`, never as a
  * failed output: an Evaluator's defect is not the agent's. `onJudgeUsage`
  * hears every judge call made, including one whose answer was unusable.
  */
@@ -145,14 +121,7 @@ export async function runEvaluatorCheck(
         return binary(agentRun.id, outcome.passed, outcome.comment);
       }
       case 'llm_judge':
-        return await runJudgeCheck(scope, check, {
-          id: agentRun.id,
-          namespace: subject.instance.namespace ?? '',
-          stepId: agentRun.stepId,
-          processInstanceId: agentRun.processInstanceId,
-          envelope,
-          stepInput: subject.stepInput,
-        }, evalCase, onJudgeUsage);
+        return await runJudgeCheck(scope, check, subject, evalCase, onJudgeUsage);
     }
   } catch (err) {
     return {
@@ -160,6 +129,7 @@ export async function runEvaluatorCheck(
       passed: null,
       value: null,
       label: null,
+      confidence: null,
       comment: null,
       error: err instanceof Error ? err.message : String(err),
     };

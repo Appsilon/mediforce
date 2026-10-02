@@ -83,92 +83,6 @@ export const evalEvaluatorApproveCommand = defineCommand({
   },
 });
 
-export const evalEvaluatorLabelCommand = defineCommand({
-  name: 'mediforce eval evaluator-label',
-  description: 'Label one output pass or fail for an Evaluator — a production run\'s (--agent-run) or a written one (--written-output) — ground truth for judge calibration.',
-  args: {
-    evaluatorId: { type: 'positional', required: true, description: 'Evaluator id' },
-    'agent-run': { type: 'string', description: 'Agent Run id' },
-    'written-output': { type: 'string', description: 'Written output id' },
-    pass: { type: 'boolean', description: 'The output passes' },
-    fail: { type: 'boolean', description: 'The output fails' },
-    comment: { type: 'string', description: 'Why' },
-    uid: { type: 'string', description: 'Who labels (required with an API key)' },
-  },
-  async run({ args, output, mediforce, jsonMode }) {
-    if ((args.pass === true) === (args.fail === true)) {
-      output.stderr('Pass exactly one of --pass or --fail');
-      return 2;
-    }
-    if ((args['agent-run'] === undefined) === (args['written-output'] === undefined)) {
-      output.stderr('Pass exactly one of --agent-run or --written-output');
-      return 2;
-    }
-    const result = await mediforce.evaluation.labelOutput({
-      evaluatorId: args.evaluatorId,
-      ...(args['agent-run'] !== undefined ? { agentRunId: args['agent-run'] } : {}),
-      ...(args['written-output'] !== undefined ? { writtenOutputId: args['written-output'] } : {}),
-      passed: args.pass === true,
-      ...(args.comment !== undefined ? { comment: args.comment } : {}),
-      ...(args.uid !== undefined ? { uid: args.uid } : {}),
-    });
-    if (jsonMode) printJson(output, result);
-    else output.stdout(`Labelled ${result.score.subject.id} ${result.score.label}`);
-    return 0;
-  },
-});
-
-export const evalEvaluatorLabelsCommand = defineCommand({
-  name: 'mediforce eval evaluator-labels',
-  description: 'List the pass/fail labels people gave an Evaluator\'s outputs — the newest per Agent Run.',
-  args: { evaluatorId: { type: 'positional', required: true, description: 'Evaluator id' } },
-  async run({ args, output, mediforce, jsonMode }) {
-    const result = await mediforce.evaluation.listLabels({ evaluatorId: args.evaluatorId });
-    if (jsonMode) {
-      printJson(output, result);
-      return 0;
-    }
-    if (result.labels.length === 0) output.stdout('No labels.');
-    for (const label of result.labels) {
-      output.stdout(`${label.subject.id}  ${(label.label ?? '').padEnd(4)} ${label.createdBy}${label.comment === null ? '' : `  ${label.comment}`}`);
-    }
-    return 0;
-  },
-});
-
-export const evalEvaluatorCalibrateCommand = defineCommand({
-  name: 'mediforce eval evaluator-calibrate',
-  description: 'Run an llm_judge over the labelled outputs and record its agreement with the labels.',
-  args: {
-    evaluatorId: { type: 'positional', required: true, description: 'Evaluator id' },
-    version: { type: 'string', description: 'Version (default: latest)' },
-  },
-  async run({ args, output, mediforce, jsonMode }) {
-    const version = parsePositiveIntArg(args.version);
-    if (version === 'invalid') {
-      output.stderr('--version must be a positive integer');
-      return 2;
-    }
-    const result = await mediforce.evaluation.calibrateEvaluator({
-      evaluatorId: args.evaluatorId,
-      ...(version !== undefined ? { version } : {}),
-    });
-    if (jsonMode) {
-      printJson(output, result);
-      return 0;
-    }
-    const calibration = result.evaluator.latest.calibration;
-    output.stdout(describeEvaluator(result.evaluator));
-    if (calibration !== null) {
-      const kappa = typeof calibration.kappa === 'number' ? `, κ ${calibration.kappa.toFixed(2)}` : '';
-      output.stdout(`agreement ${calibration.agreement.toFixed(2)}${kappa} on ${calibration.labelCount} labels (${calibration.failureLabelCount} failures)`);
-    }
-    for (const miss of result.disagreements) output.stdout(`  disagrees on ${miss.agentRunId}: person ${miss.humanPassed ? 'pass' : 'fail'}, judge ${miss.judgePassed ? 'pass' : 'fail'}`);
-    for (const failure of result.errors) output.stdout(`  could not grade ${failure.agentRunId}: ${failure.error}`);
-    return 0;
-  },
-});
-
 export const evalEvaluatorPreviewCommand = defineCommand({
   name: 'mediforce eval evaluator-preview',
   description: 'Run a draft check (JSON file) against the step\'s recent outputs. Writes nothing.',
@@ -188,7 +102,8 @@ export const evalEvaluatorPreviewCommand = defineCommand({
       return 0;
     }
     for (const outcome of result.results) {
-      const verdict = outcome.error !== null ? `error: ${outcome.error}` : `${outcome.label ?? ''} ${outcome.comment ?? ''}`;
+      const confidence = outcome.confidence === null ? '' : ` (confidence ${outcome.confidence.toFixed(2)})`;
+      const verdict = outcome.error !== null ? `error: ${outcome.error}` : `${outcome.label ?? ''}${confidence} ${outcome.comment ?? ''}`;
       output.stdout(`${outcome.agentRunId}  ${verdict}`);
     }
     return 0;

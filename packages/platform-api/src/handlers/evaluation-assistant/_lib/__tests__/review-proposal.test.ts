@@ -13,7 +13,7 @@ const judge = {
   kind: 'llm_judge' as const,
   model: 'anthropic/claude-haiku-4.5',
   rubric: 'Is every AE graded?',
-  choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }],
+  minConfidence: 0.8,
 };
 
 describe('reviewEvaluationProposal', () => {
@@ -40,7 +40,7 @@ describe('reviewEvaluationProposal', () => {
   });
 
   it('reuses the assistant\'s own preview of the same check this turn', async () => {
-    const results = [{ agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', comment: 'from the turn', error: null }];
+    const results = [{ agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: null, comment: 'from the turn', error: null }];
     const review = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), fixture.scope(), STEP, [
       { check: { kind: 'schema', schema: { required: ['summary'] } }, results: [] },
       { check: findings, results },
@@ -74,19 +74,6 @@ describe('reviewEvaluationProposal', () => {
       .rejects.toThrow('is not an Evaluator of this step');
   });
 
-  it('lets only the step\'s production runs be offered for labelling', async () => {
-    const { evaluator } = await createEvaluator({ ...STEP, ...proposeEvaluator(judge, 'grades-justified'), origin: 'user' }, fixture.scope());
-    await fixture.instanceRepo.update('run-ungraded', { evalRunId: 'eval-run-1' });
-    const review = await reviewEvaluationProposal('propose_outputs_to_label', {
-      evaluatorId: evaluator.id,
-      outputs: [{ agentRunId: GRADED_RUN, why: 'graded' }, { agentRunId: UNGRADED_RUN, why: 'trial' }, { agentRunId: 'no-such-run', why: '?' }],
-    }, fixture.scope(), STEP, []);
-    expect(review).toEqual({
-      ok: false,
-      error: `Only this step's production runs can be labelled: ${UNGRADED_RUN} (an eval trial); no-such-run (Agent Run 'no-such-run' not found)`,
-    });
-  });
-
   it('checks a synthesized case\'s changes against its run', async () => {
     const proposal = {
       name: 'Injected instruction',
@@ -100,19 +87,6 @@ describe('reviewEvaluationProposal', () => {
     await expect(reviewEvaluationProposal('propose_perturbed_case', {
       ...proposal, fileChanges: [{ op: 'delete', path: 'data/dm.csv' }],
     }, fixture.scope(), STEP, [])).rejects.toThrow('has no workspace to change files in');
-  });
-
-  it('offers drafted outputs to label only as real changes of this step\'s production runs, for a judge of it', async () => {
-    const { evaluator } = await createEvaluator({ ...STEP, ...proposeEvaluator(judge, 'grades-correct'), origin: 'user' }, fixture.scope());
-    const draft = (result: Record<string, unknown>, basedOnAgentRunId = GRADED_RUN) =>
-      reviewEvaluationProposal('propose_written_outputs', { evaluatorId: evaluator.id, outputs: [{ basedOnAgentRunId, result, why: 'A fatal event graded 2.' }] }, fixture.scope(), STEP, []);
-
-    expect(await draft({ findings: [{ term: 'Sepsis', grade: 2 }] })).toEqual({ ok: true });
-    expect(await draft({ findings: [{ term: 'Sepsis', grade: 5 }] })).toEqual({
-      ok: false,
-      error: expect.stringContaining('is the run\'s own output'),
-    });
-    expect(await draft({ findings: [] }, 'no-such-run')).toEqual({ ok: false, error: expect.stringContaining("'no-such-run'") });
   });
 
   it('offers routing only for a run and variant of this step', async () => {

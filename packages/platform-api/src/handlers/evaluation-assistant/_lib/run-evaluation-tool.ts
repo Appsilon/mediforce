@@ -3,10 +3,6 @@ import type { z } from 'zod';
 import {
   DEFAULT_ACCEPTANCE_CRITERIA,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
-  JUDGE_MIN_AGREEMENT,
-  JUDGE_MIN_FAILURE_LABELS,
-  JUDGE_MIN_LABELS,
-  JUDGE_PASS_VALUE,
   type Evaluator,
   type EvaluatedStep,
   type EvaluationAssistantPlatformToolName,
@@ -21,9 +17,8 @@ import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
 import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
 import { isSameStep } from '../../evaluation/_lib/evaluated-step';
-import { evaluatorView, loadEvaluator } from '../../evaluation/_lib/evaluator-view';
+import { loadEvaluator } from '../../evaluation/_lib/evaluator-view';
 import { isBinary } from '../../evaluation/_lib/workspace-seed';
-import { evaluatorLabels } from '../../evaluation/evaluator-trust';
 import { HUMAN_VERDICT_SCORE_NAME } from '../../scores/record-human-verdict';
 import { listEvaluators } from '../../evaluation/evaluators';
 import { listEvalCases } from '../../evaluation/eval-cases';
@@ -257,22 +252,6 @@ export async function executeEvaluationTool(
       if (content === null) throw new NotFoundError(`The workspace of Agent Run '${agentRunId}' has no file '${path}'`);
       if (isBinary(content)) return { path, size: content.length, binary: true };
       return { path, size: content.length, content: clip(content.toString('utf-8'), 20_000) };
-    }
-    case 'get_calibration': {
-      const { evaluatorId } = args as Args<'get_calibration'>;
-      const view = await evaluatorView(scope, await loadStepEvaluator(scope, step, evaluatorId));
-      const labels = await evaluatorLabels(scope, view);
-      return {
-        name: view.name,
-        version: view.latest.version,
-        kind: view.latest.check.kind,
-        rule: view.latest.rule,
-        labels: labels.map((label) => ({ agentRunId: label.subject.id, passed: label.value >= JUDGE_PASS_VALUE, comment: label.comment })),
-        needs: { labels: JUDGE_MIN_LABELS, failureLabels: JUDGE_MIN_FAILURE_LABELS, agreement: JUDGE_MIN_AGREEMENT },
-        calibration: view.latest.calibration,
-        counts: view.trust.trusted,
-        ...(view.trust.trusted ? {} : { notCountedBecause: view.trust.reason }),
-      };
     }
     case 'list_evaluators': {
       const { evaluators } = await listEvaluators(step, scope);

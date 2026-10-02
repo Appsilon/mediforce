@@ -21,8 +21,8 @@ import { workspaces } from './workspace';
  * step_id)`, with no foreign key to a Workflow Definition — Evaluation lives
  * outside the immutable definition (ADR-0023 D2) and survives its versions.
  * Versioned tables are append-only; `evaluator_versions` takes in-place writes
- * only for `source_approval` and `calibration`, which describe a version
- * without changing what it checks.
+ * only for `source_approval`, which describes a version without changing what
+ * it checks.
  */
 const workspaceColumn = () =>
   text('workspace')
@@ -76,7 +76,6 @@ export const evaluatorVersions = pgTable(
     check: jsonb('check').notNull(),
     origin: text('origin').notNull(),
     sourceApproval: jsonb('source_approval'),
-    calibration: jsonb('calibration'),
     createdBy: text('created_by').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -109,23 +108,6 @@ export const evalCases = pgTable(
   },
   (table) => ({
     stepIdx: index('eval_cases_step_idx').on(table.workspace, table.workflowName, table.stepId, table.createdAt.desc()),
-  }),
-);
-
-/** Written outputs (ADR-0023 D9): the record whole, listed by Step. `archived` is its only in-place write. */
-export const evalWrittenOutputs = pgTable(
-  'eval_written_outputs',
-  {
-    id: uuid('id').primaryKey(),
-    workspace: workspaceColumn(),
-    workflowName: text('workflow_name').notNull(),
-    stepId: text('step_id').notNull(),
-    archived: boolean('archived').notNull().default(false),
-    record: jsonb('record').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
-  },
-  (table) => ({
-    stepIdx: index('eval_written_outputs_step_idx').on(table.workspace, table.workflowName, table.stepId, table.createdAt.desc()),
   }),
 );
 

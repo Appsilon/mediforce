@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ValidationError } from '../../../errors';
 import { createEvaluator } from '../evaluators';
-import { approveEvaluatorSource, calibrateEvaluator, labelEvaluatorOutput, listEvaluatorLabels } from '../evaluator-trust';
-import { evaluationFixture, GRADED_RUN, STEP, UNGRADED_RUN, type EvaluationFixture } from './fixture';
+import { CreateEvaluatorInputSchema } from '../../../contract/evaluation';
+import { approveEvaluatorSource } from '../evaluator-trust';
+import { evaluationFixture, STEP, type EvaluationFixture } from './fixture';
 
 describe('approveEvaluatorSource', () => {
   let fixture: EvaluationFixture;
@@ -31,60 +32,18 @@ describe('approveEvaluatorSource', () => {
   });
 });
 
-describe('labels and calibration', () => {
-  let fixture: EvaluationFixture;
-  beforeEach(async () => { fixture = await evaluationFixture(); });
-  afterEach(() => { vi.unstubAllGlobals(); });
-
-  async function judge() {
-    const { evaluator } = await createEvaluator({
+describe('an llm_judge', () => {
+  it('counts from creation, holding a new judge to a minimum confidence of 0.8', async () => {
+    const fixture = await evaluationFixture();
+    const { evaluator } = await createEvaluator(CreateEvaluatorInputSchema.parse({
       ...STEP,
       name: 'grades-justified',
       rule: 'Every grade is justified by the source record.',
       severity: 'major',
-      check: {
-        kind: 'llm_judge',
-        model: 'anthropic/claude-haiku-4.5',
-        rubric: 'Is every AE graded?',
-        choices: [{ label: 'graded', value: 1 }, { label: 'ungraded', value: 0 }],
-      },
-      origin: 'user',
-    }, fixture.scope());
-    return evaluator;
-  }
+      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Is every grade justified by the source record?' },
+    }), fixture.scope());
 
-  it('stores a label as a human Score that a relabel supersedes', async () => {
-    const evaluator = await judge();
-    const first = await labelEvaluatorOutput({ evaluatorId: evaluator.id, agentRunId: GRADED_RUN, passed: false }, fixture.scope());
-    const second = await labelEvaluatorOutput({ evaluatorId: evaluator.id, agentRunId: GRADED_RUN, passed: true, comment: 'Sepsis graded 5.' }, fixture.scope());
-
-    expect(first.score).toMatchObject({ source: 'human', name: 'grades-justified', value: 0, evaluatorId: evaluator.id, supersedes: null });
-    expect(second.score).toMatchObject({ value: 1, label: 'pass', comment: 'Sepsis graded 5.', supersedes: first.score.id, createdBy: 'author-1' });
-    const { labels } = await listEvaluatorLabels({ evaluatorId: evaluator.id }, fixture.scope());
-    expect(labels.map((label) => label.id)).toEqual([second.score.id]);
-  });
-
-  it('records how often the judge agreed with the latest labels', async () => {
-    const evaluator = await judge();
-    await labelEvaluatorOutput({ evaluatorId: evaluator.id, agentRunId: GRADED_RUN, passed: true }, fixture.scope());
-    await labelEvaluatorOutput({ evaluatorId: evaluator.id, agentRunId: UNGRADED_RUN, passed: false }, fixture.scope());
-    // The judge calls every output graded — right on one, wrong on the other.
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({
-      choices: [{ message: { content: '{"reasoning": "All events carry a grade.", "choice": "graded"}' }, finish_reason: 'stop' }],
-    }))));
-    const scope = fixture.scope();
-    Object.assign(scope, { workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) } });
-
-    const result = await calibrateEvaluator({ evaluatorId: evaluator.id }, scope);
-
-    // Agreeing on half while saying "graded" to everything is agreement by chance alone: κ 0.
-    expect(result.evaluator.latest.calibration).toMatchObject({ agreement: 0.5, kappa: 0, labelCount: 2, failureLabelCount: 1 });
-    expect(result.disagreements).toEqual([{ agentRunId: UNGRADED_RUN, humanPassed: false, judgePassed: true }]);
-    expect(result.evaluator.trust).toEqual({ trusted: false, reason: 'calibrated on 2 labels, needs 10' });
-  });
-
-  it('refuses to calibrate with nothing labelled', async () => {
-    const evaluator = await judge();
-    await expect(calibrateEvaluator({ evaluatorId: evaluator.id }, fixture.scope())).rejects.toBeInstanceOf(ValidationError);
+    expect(evaluator.trust).toEqual({ trusted: true });
+    expect(evaluator.latest.check).toMatchObject({ kind: 'llm_judge', minConfidence: 0.8 });
   });
 });

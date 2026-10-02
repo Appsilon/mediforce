@@ -16,8 +16,6 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
       confidence: null,
     },
   }),
-  useEvaluatorLabels: () => ({ data: { labels: judgeLabels } }),
-  useWrittenOutputs: () => ({ data: { writtenOutputs: writtenOutputs } }),
   useStepEvaluationMutation: (_step: unknown, mutationFn: (value: unknown) => unknown) => ({
     mutate: (value: unknown) => { void mutationFn(value); },
     isPending: false,
@@ -26,12 +24,7 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
   }),
 }),);
 
-const judgeLabels = vi.hoisted((): unknown[] => []);
-const writtenOutputs = vi.hoisted((): unknown[] => []);
-
 const evaluation = vi.hoisted(() => ({
-  labelOutput: vi.fn(),
-  calibrateEvaluator: vi.fn(),
   createEvaluator: vi.fn(),
   addEvaluatorVersion: vi.fn(),
   createCaseFromAgentRun: vi.fn(),
@@ -142,13 +135,14 @@ describe('EvaluatorsSection', () => {
     }));
   });
 
-  it('builds a judge from a question and verdicts, defaulting the model', async () => {
+  it('builds a judge from a question and a minimum confidence, defaulting the model', async () => {
     evaluation.createEvaluator.mockClear();
     openForm();
     fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'llm_judge' } });
     await waitFor(() => expect((screen.getByLabelText('Judge model') as HTMLSelectElement).disabled).toBe(false));
     fireEvent.change(screen.getByLabelText('Question for the judge'), { target: { value: 'Is every grade justified?' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Good / acceptable / poor' }));
+    expect((screen.getByLabelText('Minimum confidence') as HTMLInputElement).value).toBe('0.8');
+    fireEvent.change(screen.getByLabelText('Minimum confidence'), { target: { value: '0.9' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
     expect(evaluation.createEvaluator).toHaveBeenCalledWith(expect.objectContaining({
@@ -156,7 +150,7 @@ describe('EvaluatorsSection', () => {
         kind: 'llm_judge',
         model: 'anthropic/claude-sonnet-4',
         rubric: 'Is every grade justified?',
-        choices: [{ label: 'good', value: 1 }, { label: 'acceptable', value: 0.5 }, { label: 'poor', value: 0 }],
+        minConfidence: 0.9,
       },
     }));
   });
@@ -188,13 +182,13 @@ describe('Evaluator view and edit', () => {
   const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
   const version = {
     evaluatorId: '5b0f2f3e-8f5c-4c55-9d0a-3f1f7c1b2a10', version: 1, rule: 'Every grade is justified.', severity: 'major',
-    check: { kind: 'llm_judge', model: 'anthropic/claude-sonnet-4', rubric: 'Is every grade justified?', choices: [{ label: 'pass', value: 1 }, { label: 'fail', value: 0 }] },
-    origin: 'user', sourceApproval: null, calibration: null, createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z',
+    check: { kind: 'llm_judge', model: 'anthropic/claude-sonnet-4', rubric: 'Is every grade justified?', minConfidence: 0.75 },
+    origin: 'user', sourceApproval: null, createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z',
   };
   const evaluator = {
     ...step, id: version.evaluatorId, name: 'grades-justified', archived: false, runInProduction: false,
     createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z',
-    latest: version, versions: [version], trust: { trusted: false, reason: 'not calibrated' }, production: { active: false },
+    latest: version, versions: [version], trust: { trusted: true }, production: { active: false },
   };
   const renderRow = () => render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [evaluator] } } as never} mayEdit={true} />);
 
@@ -204,7 +198,9 @@ describe('Evaluator view and edit', () => {
     const details = screen.getByTestId('evaluator-details');
     expect(details.textContent).toContain('Is every grade justified?');
     expect(details.textContent).toContain('anthropic/claude-sonnet-4');
-    expect(details.textContent).toContain('fail — 0 (fails)');
+    expect(details.textContent).toContain('Minimum confidence0.75');
+    expect(screen.getByTestId('evaluator-row').textContent).toContain('min confidence 0.75');
+    expect(screen.queryByRole('button', { name: 'Label outputs' })).toBeNull();
   });
 
   it('saves only what changed as a new version, keeping the name', async () => {
@@ -407,86 +403,6 @@ describe('Freezing a Dataset', () => {
     expect(screen.queryByTestId('eval-case-unfrozen')).toBeNull();
     expect((screen.getByRole('button', { name: 'Freeze dataset' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByTestId('dataset-versions').children).toHaveLength(2);
-  });
-});
-
-describe('Labelling a judge from the Evaluators section', () => {
-  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
-  const judge = {
-    id: 'judge-1', name: 'rationale-grounded', archived: false, runInProduction: false, production: { active: false, reason: null },
-    trust: { trusted: false, reason: 'not calibrated' },
-    latest: {
-      version: 1, rule: 'The rationale cites the labs.', severity: 'major', origin: 'user', sourceApproval: null, calibration: null,
-      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Cited?', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
-      createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z',
-    },
-    versions: [],
-  };
-  const run = (id: string) => ({ id, status: 'completed', fallbackReason: null, startedAt: '2026-09-24T08:00:00.000Z', envelope: null });
-
-  function openPanel(cases: unknown[], runs: unknown[]) {
-    render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [judge] } } as never} mayEdit={true} labelCandidates={{ cases, runs } as never} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Label outputs' }));
-  }
-
-  it('shows how far the judge is from counting', () => {
-    judgeLabels.splice(0, judgeLabels.length, { subject: { type: 'agent_run', id: 'run-a' }, value: 0, comment: null });
-    render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [judge] } } as never} mayEdit={false} />);
-
-    expect(screen.getByTestId('calibration-progress').textContent).toBe('1/10 labels · 1/2 fails · not calibrated');
-    judgeLabels.splice(0, judgeLabels.length);
-  });
-
-  it('offers the runs added as Eval Cases first, with their notes, and leaves out outputs already labelled', () => {
-    judgeLabels.splice(0, judgeLabels.length, { subject: { type: 'agent_run', id: 'run-labelled' }, value: 1, comment: null });
-    openPanel(
-      [
-        evalCaseOf({ id: 'c-1', sourceAgentRunId: 'run-good', notes: 'Grades the sepsis 5.' }),
-        evalCaseOf({ id: 'c-2', sourceAgentRunId: 'run-bad', name: 'Neutropenia', notes: null }),
-        evalCaseOf({ id: 'c-3', sourceAgentRunId: 'run-labelled' }),
-      ],
-      [run('run-good'), run('run-other')],
-    );
-
-    const marked = screen.getByTestId('label-candidates-marked').querySelectorAll('[data-testid="label-output"]');
-    expect([...marked].map((row) => row.textContent)).toEqual([
-      expect.stringContaining('Grades the sepsis 5.'),
-      expect.stringContaining('you added it as the case \'Neutropenia\''),
-    ]);
-    expect(marked[1]!.textContent).toContain('run-bad');
-    expect(screen.getByTestId('label-candidates-runs').textContent).toContain('run-othe');
-    expect(screen.getByTestId('label-candidates-runs').textContent).not.toContain('run-good');
-    expect(screen.getByTestId('labelled-outputs').textContent).toContain('labelled pass');
-    judgeLabels.splice(0, judgeLabels.length);
-  });
-
-  it('lists written examples with what they changed and their label, apart from the production outputs', () => {
-    writtenOutputs.splice(0, writtenOutputs.length, {
-      id: 'w-1', basedOnAgentRunId: 'run-base', stepInput: { narrative: 'x' }, result: { grade: 'output of run-base, edited' },
-      note: 'Grade 4 written as 2.', origin: 'user', archived: false,
-    });
-    judgeLabels.splice(0, judgeLabels.length, { subject: { type: 'written_output', id: 'w-1' }, value: 0, comment: null });
-    openPanel([], []);
-
-    const row = screen.getByTestId('written-output');
-    expect(row.textContent).toContain('labelled fail');
-    expect(row.textContent).toContain('Grade 4 written as 2.');
-    expect(screen.getByTestId('written-output-changes').textContent).toBe('Changed: grade: "output of run-base" → "output of run-base, edited"');
-    expect(screen.queryByTestId('labelled-outputs')).toBeNull();
-    expect(screen.getByTestId('calibration-progress').textContent).toContain('1/10 labels · 1/2 fails');
-    fireEvent.click([...row.querySelectorAll('button')].find((button) => button.textContent === 'Pass')!);
-    expect(evaluation.labelOutput).toHaveBeenCalledWith({ evaluatorId: 'judge-1', writtenOutputId: 'w-1', passed: true });
-    writtenOutputs.splice(0, writtenOutputs.length);
-    judgeLabels.splice(0, judgeLabels.length);
-  });
-
-  it('labels an output for the judge\'s rule', () => {
-    openPanel([evalCaseOf({ expectation: 'negative', sourceAgentRunId: 'run-bad' })], []);
-    const row = screen.getByTestId('label-candidates-marked').querySelector('[data-testid="label-output"]') as HTMLElement;
-    fireEvent.change(row.querySelector('input')!, { target: { value: 'Grade not tied to ANC.' } });
-    fireEvent.click([...row.querySelectorAll('button')].find((button) => button.textContent === 'Fail')!);
-
-    expect(evaluation.labelOutput).toHaveBeenCalledWith({ evaluatorId: 'judge-1', agentRunId: 'run-bad', passed: false, comment: 'Grade not tied to ANC.' });
   });
 });
 

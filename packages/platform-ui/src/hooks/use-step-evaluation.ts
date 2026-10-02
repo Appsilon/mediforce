@@ -16,9 +16,7 @@ type Section =
   | 'agent-runs'
   | 'criteria'
   | 'drift'
-  | 'written-outputs'
-  | `qualification:${number | 'runnable'}`
-  | `labels:${string}`;
+  | `qualification:${number | 'runnable'}`;
 
 const STEP_AGENT_RUNS_PAGE = 20;
 
@@ -42,24 +40,6 @@ export function useStepEvaluators(step: EvaluatedStep) {
   return useQuery({
     queryKey: sectionKey(step, 'evaluators'),
     queryFn: () => mediforce.evaluation.listEvaluators(step),
-    retry: stopRetryOn4xx,
-  });
-}
-
-/** The Step's live written outputs, newest first; refreshed by every write on the Step. */
-export function useWrittenOutputs(step: EvaluatedStep) {
-  return useQuery({
-    queryKey: sectionKey(step, 'written-outputs'),
-    queryFn: () => mediforce.evaluation.listWrittenOutputs(step),
-    retry: stopRetryOn4xx,
-  });
-}
-
-/** The person's labels on one Evaluator's outputs; refreshed by every write on the Step. */
-export function useEvaluatorLabels(step: EvaluatedStep, evaluatorId: string) {
-  return useQuery({
-    queryKey: sectionKey(step, `labels:${evaluatorId}`),
-    queryFn: () => mediforce.evaluation.listLabels({ evaluatorId }),
     retry: stopRetryOn4xx,
   });
 }
@@ -116,6 +96,22 @@ export function useStepEvaluationMutation<TInput, TOutput>(
     onSuccess: () => queryClient.invalidateQueries({
       queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId),
     }),
+  });
+}
+
+/** A write that changes one Eval Run's report: refreshes the run, and the Step's sections its validation shows in. */
+export function useEvalRunMutation<TInput, TOutput>(
+  step: EvaluatedStep,
+  evalRunId: string,
+  write: (input: TInput) => Promise<TOutput>,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: write,
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.evalRun(evalRunId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId) }),
+    ]),
   });
 }
 

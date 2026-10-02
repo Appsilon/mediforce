@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-01
+last_reviewed: 2026-10-02
 ---
 
 # Step Evaluation
@@ -40,14 +40,13 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   configuration production refuses shows as such — and as trials see them,
   SKILL.md, the steps upstream of it), its
   production runs with the reviewer's verdict and their trajectories, the
-  workspace files a run started from, Evaluators with their labels and
-  calibration, cases, Eval Runs and reports, a run's failing trials
+  workspace files a run started from, Evaluators, cases, Eval Runs and
+  reports — with every judge verdict's rationale and review — a run's failing trials
   (`get_failures`), the step's qualification and Acceptance
   Criteria (`get_qualification`), and `preview_evaluator` — it
   tries a check on real outputs before proposing it.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
-  written or synthesized), outputs
-  for a judge's person to label (`propose_written_outputs`), Brief drafts and Acceptance Criteria come back as
+  written or synthesized), Brief drafts and Acceptance Criteria come back as
   cards to accept, edit or reject. Accepting one is the same write the forms
   make, recorded with `origin: assistant`. A routing recommendation (Control
   Mode and `confidenceThreshold`) comes back as a card to apply in the
@@ -65,8 +64,8 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   fit is refused with the amount left. The response lists them as
   `startedEvalRuns: [{ evalRunId, budgetUsd }]`, and the request's
   audit event records the grant. Without the field nothing changes.
-- **Never:** approving a `code` check's source, labelling outputs, signing a
-  Step Qualification. There is no tool for these.
+- **Never:** approving a `code` check's source, accepting or denying a judge's
+  verdict, signing a Step Qualification. There is no tool for these.
 
 The step's Brief is sent to the assistant on every turn. What it can help with:
 
@@ -109,12 +108,10 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   output — a turn that proposes a judge the assistant did not preview takes
   longer and costs more. A refined rule is a proposed new version of the
   Evaluator.
-- **Calibration help.** For a judge, it picks the outputs most worth labelling
-  — ones reviewers rejected, ones its preview failed, ones unlike those already
-  labelled — and returns them as a labelling card. The person labels each pass
-  or fail, can refine the rule and rubric as a new version while labelling,
-  calibrates (agreement and Cohen's κ, with the outputs the judge disagreed on),
-  and turns the labelled outputs into Eval Cases.
+- **Judges.** It writes a rubric that names what passes, what fails and the
+  evidence that decides it. After a run it reads the judge verdicts a person
+  denied or the judge was unsure of, says what the person seems to mean by the
+  rule, and proposes a sharper rubric as a new version.
 - **Case synthesis.** It proposes a case built from a real production run with
   a deliberate change — an instruction injected into the data, an edge value,
   renamed columns, a missing or extra file — with notes on what the output
@@ -122,8 +119,8 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   to the person.
 
 Every proposal is checked against the platform before it is shown: an Evaluator
-name already taken, an Evaluator or run of another step, and an eval trial
-offered for labelling are refused the same way.
+name already taken, or an Evaluator or run of another step, is refused the same
+way.
 
 The assistant pane uses the same model picker as the workflow editor so the model can be chosen per
 conversation. While it works, the pane lists each step it takes (reading a run,
@@ -177,61 +174,41 @@ One rule in plain language plus the check behind it. Three kinds:
 |---|---|---|
 | `schema` | `result` against the JSON Schema subset `agent.outputSchema` uses | at once |
 | `code` | a `python` or `javascript` script in the `script-container` sandbox (no network) | after a person approves that version's source |
-| `llm_judge` | a model reads the rubric, reasons, then picks one of 2–6 choices, each worth 0–1 (≥ 0.5 passes) | after calibration: ≥ 10 human labels, ≥ 2 of them failures, agreement ≥ 0.8 |
+| `llm_judge` | a model reads the step's input, the agent's Trajectory and its output, explains its judgment, then answers pass or fail with a confidence 0–1 | at once; each verdict below its `minConfidence` is left out unless a person accepts it |
 
 A `code` check reads `/output/input.json` — `{ result, stepInput, trajectory,
 case }` — and the step's workspace commit read-only at `/workspace`, and writes
 `/output/result.json` as `{ "passed": boolean, "comment"?: string }`. A check
-that crashes, or a judge that names no choice, is an *error*, never a failed
-output.
+that crashes, or a judge that gives no usable verdict, is an *error*, never a
+failed output.
 
-Every change is a new immutable version; approval and calibration attach to one
-version. A judge is calibrated against human labels: `evaluator-label
---pass|--fail` records a human Score on an Agent Run (`evaluator-labels` lists
-the newest per run), `evaluator-calibrate` runs the judge over the labelled
-runs and stores the agreement and Cohen's κ — agreement beyond what the
-pass/fail mix gives by chance. Labels belong to the Evaluator, not a version,
-so a refined rule is recalibrated against the same labels. Only agreement
-decides whether a judge counts. `cases-from-labels <evaluatorId>` turns every
-labelled production output that is not yet a case into one, noting the rule,
-the label and the person's comment.
+Every change is a new immutable version; a `code` version's source approval
+attaches to it.
 
-Why a judge needs this: its verdict is a model's opinion, and its Scores feed
-Acceptance Criteria and a Step Qualification. The minimum failures matter as
-much as the count — a judge that passes everything agrees perfectly with an
-all-pass set of labels and catches nothing. In the Evaluation tab each judge
-shows its progress (`labels · fails · agreement`) and **Label outputs** opens
-the labelling: the production runs already added as Eval Cases first, each with
-its case's notes (the label asks whether the output breaks *this* rule), then the
-other loaded production runs, each with its input and
-output; then **Calibrate**.
+An `llm_judge` check is `{ kind, model, rubric, minConfidence }`
+(`minConfidence` 0–1, 0.8 when not set). The judge is given the step's input,
+the Eval Case's notes, the agent's whole Trajectory — its reasoning, every tool
+call and tool result, numbered, long logs cut in the middle — its output and
+its own summary. It must explain its judgment — what exactly decided the
+verdict and why, citing the input, the output and log entries by number — and
+answer `{ "rationale", "passed", "confidence" }`. The Score is `1`/`0` with
+label `pass`/`fail`, the rationale as its comment, and
+`metadata.judgeConfidence` and `metadata.judgeMinConfidence`.
 
-When production has no output that breaks the rule — nobody runs a bad case on
-purpose — **Write an example** makes one: start from a production run, keep its
-input, and change its output in a form built from the step's `outputSchema`
-(one typed field per property, enumerations as choices, arrays and objects as
-JSON, changed fields marked and resettable, or the whole output as JSON), then
-**Save as fail** or **Save as pass**. With no run to start from (**Nothing —
-write the input and output**), the input is written as JSON too, laid out empty
-in the shape the run route gives the step: the previous step's `outputSchema`
-fields at the top level, and every step that can run before it under `steps`
-(a step without an `outputSchema` as `{}`). It is a **written output**
-(`written-output-add --file`, `POST /api/evaluation/written-outputs`, with
-`label` to label it in the same write), not an Eval Case: nothing re-runs it. A
-label on it is a human Score on subject `written_output`
-(`evaluator-label <evaluatorId> --written-output <id>`), and calibration asks the
-judge about it exactly as about a production output — its result, the input it
-kept, no agent summary. `written-output-archive` takes one out of every judge's
-labels and calibration; `cases-from-labels` skips written outputs, since only a
-production run can become a case.
+A verdict whose confidence is below its `minConfidence` is shown in the report
+but left out of the pass rate the Acceptance Criteria read. A person reads each
+verdict's rationale in the report and reviews it:
 
-The Evaluation Assistant drafts such outputs with `propose_written_outputs`: up
-to five production runs' results with values changed to break (or nearly break)
-a judge's rule, each with why. The platform sends a draft back to the model when
-it is not a change of one of the step's production runs or breaks the step's
-`outputSchema`. The card shows what each draft changed; the person may edit it,
-and **Save as fail** / **Save as pass** saves it as a written output with
-`origin: assistant` and the person's label — the assistant never labels.
+- **Accept** — the verdict counts, however unsure the judge was.
+- **Deny** — the verdict is left out, however confident the judge was. It is
+  never reversed into the opposite verdict.
+
+A review is a human Score (`judge_review`, label `accepted` or `denied`, the
+person's optional comment) that a later review supersedes
+(`mediforce eval judge-review <evalRunId> --trial <id> --evaluator <id>
+--accept|--deny [--comment …]`, `POST /api/evaluation/runs/:id/judge-reviews`,
+`edit` verb; an API key names the reviewer with `uid`). A judge Score recorded
+before judges reported a confidence counts as it did.
 
 `evaluator-archive` archives or restores an Evaluator; `evaluator-production`
 sets whether it also runs in production (see below).
@@ -239,7 +216,7 @@ sets whether it also runs in production (see below).
 In the Evaluation tab, **Evaluators → Add** picks the kind from a dropdown and
 shows its fields — a JSON Schema (started from the step's `agent.outputSchema`
 when it declares one), a language and source, a judge model with the question
-it answers and its verdicts — never the check's JSON.
+it answers and its minimum confidence — never the check's JSON.
 Each Evaluator's **Details** show the whole check and its versions; **Edit**
 saves a new version with what changed (`POST
 /api/evaluation/evaluators/:id/versions`), keeping its name and kind.
@@ -272,7 +249,8 @@ confidence and autonomy routing, `AgentRunner` hands it to the gate
   `errorMessage`, an activity-log line and part of the `agent.run` audit event.
   Failing `major` and `minor` ones only write Scores.
 - `llm_judge` runs asynchronously after the run has moved on and only writes a
-  Score (`source: llm_judge`, its cost in `metadata.judgeCostUsd`). Its errors
+  Score (`source: llm_judge`, its cost in `metadata.judgeCostUsd`, its
+  confidence as in an Eval Run). Its errors
   are logged and never block or fail the step.
 - A check that cannot run, or a gate that throws, never fails the run; it is
   recorded in the activity log.
@@ -335,10 +313,8 @@ from a production run. Cases are `dev` or
 `holdout`, carry a *contains production data* flag, and an `origin` — `user`,
 or `assistant` for an accepted Evaluation Assistant proposal.
 
-An Eval Case is not a label. A case is an *input* an Eval Run re-runs the step
-on; the Evaluators grade the new output. A label (below, under calibration) is a
-person's pass/fail on one *output* for one Evaluator, and only labels calibrate
-a judge. An `llm_judge` grading an Eval Run trial is given the case's notes, so
+A case is an *input* an Eval Run re-runs the step on; the Evaluators grade the
+new output. An `llm_judge` grading an Eval Run trial is given the case's notes, so
 write them as what to look for — "the fatal event must be grade 5" — not as a
 verdict on the output.
 
@@ -498,8 +474,10 @@ The **report** (`mediforce eval report <id>`, `GET /api/evaluation/runs/:id`)
 is computed from those Scores. Per Evaluator: pass rate with its Wilson 95%
 interval, pass@k (a case passes if any of its k trials does), pass^k (all of
 them do), flakiness (its trials disagree), and checks that could not grade a
-trial as errors. A trial that could not be graded, or failed before producing
-an Agent Run, stays out of the pass rate but still counts toward its case's k,
+trial as errors, and judge verdicts left out (below `minConfidence` and not
+accepted, or denied) as *left out*. A trial that could not be graded, whose
+judge verdict was left out, or that failed before producing an Agent Run, stays
+out of the pass rate but still counts toward its case's k,
 so it can lower pass@k and pass^k, never lift them. Evaluators that do not
 count are marked so. Tokens and duration come from the trials' runs; cost adds
 the judge calls. Then:
@@ -509,10 +487,14 @@ the judge calls. Then:
   itself, passes over graded trials (8 of 10 meets 80%), and pass^k where
   set — `missed` when one does not,
   and `not judged` when no counted Evaluator of that severity exists, one
-  graded nothing, or — for a floor the scored trials reached — some trial
+  graded nothing it counts (a judge whose every verdict was left out), or — for a floor the scored trials reached — some trial
   failed or was skipped: a criterion is met on the whole Dataset.
   A run prepared before any criteria were set freezes the default — every
   severity at 100%; one prepared before that default existed judges nothing.
+- **Judge verdicts.** Every judge verdict per trial — case, pass or fail, the
+  judge's confidence against its minimum, whether it counts, the rationale
+  and any review — with **Accept** and **Deny** for a person with `edit`
+  (`report.judgeVerdicts`; `mediforce eval report` lists those left out).
 - **Confidence calibration.** The confidence each trial's agent reported,
   against whether its output passed every counted Evaluator — a trial some
   counted Evaluator could not grade is left out, since a missing Score is not

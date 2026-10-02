@@ -5,7 +5,7 @@ import { recordScore } from '../../scores/record-score';
 import { loadEvaluationSubject } from './evaluation-subject';
 import { loadModelPrices } from './model-prices';
 import { runEvaluatorCheck, type JudgeUsage } from './run-evaluator-check';
-import { scoresOfTrial } from './trial-scores';
+import { judgeConfidenceMetadata, scoresOfTrial } from './trial-scores';
 
 /**
  * How long a driver may hold a trial — between claiming it and creating its
@@ -136,6 +136,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
         caseId: trial.caseId,
         evaluatorVersion: frozen.version,
         counted: frozen.counted,
+        ...judgeConfidenceMetadata(version.check, outcome.confidence),
         ...(judgeUsages.length === 0 ? {} : { judgeCostUsd: checkCostUsd }),
       },
       namespace: run.namespace,

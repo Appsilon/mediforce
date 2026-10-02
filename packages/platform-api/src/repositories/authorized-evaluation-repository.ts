@@ -8,14 +8,12 @@ import type {
   EvalOptimisation,
   EvalOptimisationStatus,
   EvalCase,
-  WrittenOutput,
   EvalDatasetVersion,
   EvaluatedStep,
   EvaluationBrief,
   EvaluationRepository,
   Evaluator,
   EvaluatorVersion,
-  JudgeCalibration,
   McpEvalPolicy,
   McpRecordedCase,
   McpRecordedCaseFilter,
@@ -83,11 +81,6 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
     await this.raw.setSourceApproval(evaluator.id, version, approval);
   };
 
-  setCalibration = async (evaluator: Evaluator, version: number, calibration: JudgeCalibration): Promise<void> => {
-    this.assertNamespaceWrite(evaluator.namespace);
-    await this.raw.setCalibration(evaluator.id, version, calibration);
-  };
-
   createCase = async (evalCase: EvalCase): Promise<EvalCase> => {
     this.assertNamespaceWrite(evalCase.namespace);
     return this.raw.createCase(evalCase);
@@ -101,21 +94,6 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   setCaseArchived = async (evalCase: EvalCase, archived: boolean): Promise<void> => {
     this.assertNamespaceWrite(evalCase.namespace);
     await this.raw.setCaseArchived(evalCase.id, archived);
-  };
-
-  createWrittenOutput = async (writtenOutput: WrittenOutput): Promise<WrittenOutput> => {
-    this.assertNamespaceWrite(writtenOutput.namespace);
-    return this.raw.createWrittenOutput(writtenOutput);
-  };
-
-  getWrittenOutput = async (id: string): Promise<WrittenOutput | null> => this.visible(await this.raw.getWrittenOutput(id));
-
-  listWrittenOutputs = async (step: EvaluatedStep): Promise<WrittenOutput[]> =>
-    this.canSeeNamespace(step.namespace) ? this.raw.listWrittenOutputs(step) : [];
-
-  setWrittenOutputArchived = async (writtenOutput: WrittenOutput, archived: boolean): Promise<void> => {
-    this.assertNamespaceWrite(writtenOutput.namespace);
-    await this.raw.setWrittenOutputArchived(writtenOutput.id, archived);
   };
 
   appendDatasetVersion = async (dataset: EvalDatasetVersion): Promise<EvalDatasetVersion> => {

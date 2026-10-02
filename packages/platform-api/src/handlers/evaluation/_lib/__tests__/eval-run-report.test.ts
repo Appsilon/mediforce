@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import type { EvalRun, EvalTrial } from '@mediforce/platform-core';
+import type { EvalRun, EvalTrial, Score } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../../repositories/index';
 import { recordScore } from '../../../scores/record-score';
 import { buildEvalRunReport } from '../eval-run-report';
+import { recordJudgeReview } from '../../judge-reviews';
 import { evaluationFixture, NAMESPACE, STEP } from '../../__tests__/fixture';
 
 const EVALUATOR = '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
@@ -39,6 +40,18 @@ async function score(scope: CallerScope, evalRun: EvalRun, scored: EvalTrial, va
     subject: { type: 'agent_run', id: scored.agentRunId! }, name: 'findings-present', value, label: null, comment: null,
     source: 'deterministic', createdBy: null, metadata: { evalRunId: evalRun.id, trialId: scored.id }, namespace: NAMESPACE,
     processInstanceId: scored.processInstanceId, stepId: STEP.stepId, evaluatorId, supersedes: null, basis: 'test',
+  }, scope);
+}
+
+const JUDGE = { evaluatorId: EVALUATOR, name: 'grades-justified', version: 1, kind: 'llm_judge', severity: 'critical', counted: true } as const;
+
+/** A judge's verdict on a trial, as the driver records it. */
+async function judgeScore(scope: CallerScope, evalRun: EvalRun, scored: EvalTrial, passed: boolean, confidence?: number): Promise<Score> {
+  return recordScore({
+    subject: { type: 'agent_run', id: scored.agentRunId! }, name: JUDGE.name, value: passed ? 1 : 0, label: passed ? 'pass' : 'fail',
+    comment: 'The agent graded sepsis 5 after reading the fatal outcome.', source: 'llm_judge', createdBy: null,
+    metadata: { evalRunId: evalRun.id, trialId: scored.id, ...(confidence === undefined ? {} : { judgeConfidence: confidence, judgeMinConfidence: 0.8 }) },
+    namespace: NAMESPACE, processInstanceId: scored.processInstanceId, stepId: STEP.stepId, evaluatorId: EVALUATOR, supersedes: null, basis: 'test',
   }, scope);
 }
 
@@ -219,5 +232,76 @@ describe('buildEvalRunReport', () => {
     await score(scope, evalRun, trials[0]!, 1);
 
     expect((await buildEvalRunReport(scope, evalRun, trials)).variants[0]!.recommendation).toBeNull();
+  });
+
+  it('leaves a judge verdict below its minimum confidence out of the criteria, unless a person accepted it', async () => {
+    const fixture = await evaluationFixture();
+    const scope = fixture.scope();
+    const evalRun = run({ trialsPerCase: 3, caseIds: [CASE_A], evaluators: [JUDGE], acceptanceCriteria: { critical: { minPassRate: 1 } } });
+    const trials = [trial(evalRun.id, CASE_A, 0), trial(evalRun.id, CASE_A, 1), trial(evalRun.id, CASE_A, 2)];
+    await judgeScore(scope, evalRun, trials[0]!, true, 0.9);
+    await judgeScore(scope, evalRun, trials[1]!, false, 0.6);
+    const accepted = await judgeScore(scope, evalRun, trials[2]!, false, 0.5);
+    await recordJudgeReview(scope, { run: evalRun, trial: trials[2]!, judgeScore: accepted, decision: 'accepted', comment: null, reviewedBy: 'reviewer-1' });
+
+    const report = await buildEvalRunReport(scope, evalRun, trials);
+
+    expect(report.variants[0]!.evaluators[0]).toMatchObject({ passes: 1, failures: 1, excluded: 1, passRate: 0.5 });
+    expect(report.variants[0]!.criteria[0]!.status).toBe('missed');
+    expect(report.judgeVerdicts.map((verdict) => [verdict.trialId, verdict.passed, verdict.confidence, verdict.review?.decision ?? null, verdict.counts])).toEqual([
+      [trials[0]!.id, true, 0.9, null, true],
+      [trials[1]!.id, false, 0.6, null, false],
+      [trials[2]!.id, false, 0.5, 'accepted', true],
+    ]);
+    expect(report.judgeVerdicts[0]).toMatchObject({
+      variantId: 'champion', caseId: CASE_A, evaluatorId: EVALUATOR, name: 'grades-justified', severity: 'critical',
+      minConfidence: 0.8, rationale: 'The agent graded sepsis 5 after reading the fatal outcome.',
+    });
+  });
+
+  it('never counts a denied verdict, however confident — and a later review replaces an earlier one', async () => {
+    const fixture = await evaluationFixture();
+    const scope = fixture.scope();
+    const evalRun = run({ trialsPerCase: 2, caseIds: [CASE_A], evaluators: [JUDGE], acceptanceCriteria: { critical: { minPassRate: 1 } } });
+    const trials = [trial(evalRun.id, CASE_A, 0), trial(evalRun.id, CASE_A, 1)];
+    await judgeScore(scope, evalRun, trials[0]!, true, 0.9);
+    const denied = await judgeScore(scope, evalRun, trials[1]!, false, 0.95);
+    const review = { run: evalRun, trial: trials[1]!, judgeScore: denied, comment: null, reviewedBy: 'reviewer-1' } as const;
+    await recordJudgeReview(scope, { ...review, decision: 'accepted' });
+    await recordJudgeReview(scope, { ...review, decision: 'denied', comment: 'The fatal outcome is in the source; the judge misread it.' });
+
+    const report = await buildEvalRunReport(scope, evalRun, trials);
+
+    expect(report.variants[0]!.evaluators[0]).toMatchObject({ passes: 1, failures: 0, excluded: 1, passRate: 1 });
+    expect(report.variants[0]!.criteria[0]!.status).toBe('met');
+    expect(report.judgeVerdicts[1]).toMatchObject({
+      counts: false,
+      review: { decision: 'denied', reviewedBy: 'reviewer-1', comment: 'The fatal outcome is in the source; the judge misread it.' },
+    });
+  });
+
+  it('cannot judge a criterion whose judge left every verdict out', async () => {
+    const fixture = await evaluationFixture();
+    const scope = fixture.scope();
+    const evalRun = run({ trialsPerCase: 1, caseIds: [CASE_A], evaluators: [JUDGE], acceptanceCriteria: { critical: { minPassRate: 0.5 } } });
+    const trials = [trial(evalRun.id, CASE_A, 0)];
+    await judgeScore(scope, evalRun, trials[0]!, true, 0.4);
+
+    const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
+
+    expect(champion!.criteria[0]).toMatchObject({ status: 'not_evaluable', reason: expect.stringMatching(/1 verdict left out/) });
+  });
+
+  it('counts a judge verdict recorded before judges reported confidence', async () => {
+    const fixture = await evaluationFixture();
+    const scope = fixture.scope();
+    const evalRun = run({ trialsPerCase: 1, caseIds: [CASE_A], evaluators: [JUDGE] });
+    const trials = [trial(evalRun.id, CASE_A, 0)];
+    await judgeScore(scope, evalRun, trials[0]!, true);
+
+    const report = await buildEvalRunReport(scope, evalRun, trials);
+
+    expect(report.variants[0]!.evaluators[0]).toMatchObject({ passes: 1, excluded: 0 });
+    expect(report.judgeVerdicts[0]).toMatchObject({ confidence: null, minConfidence: null, counts: true });
   });
 });

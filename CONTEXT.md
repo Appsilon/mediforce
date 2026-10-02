@@ -511,17 +511,11 @@ _Avoid_: "validation rule", "assertion", "metric", "grader".
 One input fixture for a Workflow Step plus what its output must — or must not — contain.
 _Avoid_: "test case", "sample", "golden" (a case says what to check, not the right answer).
 
-**Label**:
-A person's pass/fail on one output for one **Evaluator** — the ground truth a judge
-is calibrated against. Not an **Eval Case**: a case is an input that is re-run; a
-label is a verdict on an output that already exists.
-_Avoid_: "positive/negative" for labels (say pass/fail).
-
-**Written output**:
-A person's own example of a Workflow Step's output for one input, usually a real
-run's output changed so that it breaks a rule, labelled to calibrate a judge where
-production has no such output. Nothing re-runs it.
-_Avoid_: "synthetic run", "fake run" (it is never an Agent Run), "Eval Case".
+**Judge review**:
+A person's decision on one LLM judge verdict, made after reading its rationale:
+*accepted* counts the verdict toward the **Acceptance Criteria** whatever the
+judge's confidence; *denied* leaves it out. A denial never reverses the verdict.
+_Avoid_: "label", "override", "calibration" (judges are not calibrated).
 
 **Eval Dataset**:
 A versioned, frozen set of Eval Cases for one Workflow Step, drawn from production
@@ -592,7 +586,7 @@ the user-facing immutable log.
 - An **Evaluation Assistant** proposes **Evaluators**, **Eval Cases** and
   diagnoses of failures;
   a human accepts them, confirms every **Eval Run**, and alone approves code
-  checks, labels calibration outputs and signs a **Step Qualification**.
+  checks, makes every **Judge review** and signs a **Step Qualification**.
 - An **Evaluator** has many versions; a version that has produced a **Score**
   never changes.
 - An **Eval Run** executes one **Eval Dataset** version against one

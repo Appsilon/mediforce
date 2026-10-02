@@ -1,12 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
-import { JUDGE_PASS_VALUE, type EvalCase, type EvalCaseExpectation } from '@mediforce/platform-core';
+import type { EvalCase, EvalCaseExpectation } from '@mediforce/platform-core';
 import type {
   ArchiveEvalCaseInputSchema,
   CreateEvalCaseFromAgentRunInputSchema,
   CreateEvalCaseInputSchema,
-  CreateEvalCasesFromLabelsInputSchema,
-  CreateEvalCasesFromLabelsOutput,
   CreatePerturbedEvalCaseInputSchema,
   EvalCaseOutput,
   ListEvalCasesInputSchema,
@@ -14,14 +12,12 @@ import type {
   UpdateEvalCaseInputSchema,
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
-import { HandlerError, NotFoundError, ValidationError } from '../../errors';
+import { NotFoundError, ValidationError } from '../../errors';
 import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
 import { loadCaseSource } from './_lib/case-source';
 import { perturbCase } from './_lib/perturb-case';
 import { commitWorkspaceChanges } from './_lib/workspace-seed';
-import { evaluatorView, loadEvaluator } from './_lib/evaluator-view';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
-import { evaluatorLabels } from './evaluator-trust';
 import { HUMAN_VERDICT_SCORE_NAME } from '../scores/record-human-verdict';
 
 export async function listEvalCases(
@@ -170,58 +166,6 @@ export async function createPerturbedEvalCase(
     createdBy: authorId(scope),
     createdAt: new Date().toISOString(),
   });
-}
-
-/**
- * Seeds Eval Cases from an Evaluator's labels (EvalGen): every labelled
- * production output that is not already a live case from that run becomes
- * one — a pass positive, a fail negative, noting the rule and the person's
- * comment. The newest label per output decides.
- */
-export async function createEvalCasesFromLabels(
-  input: z.output<typeof CreateEvalCasesFromLabelsInputSchema>,
-  scope: CallerScope,
-): Promise<CreateEvalCasesFromLabelsOutput> {
-  const evaluator = await loadEvaluator(scope, input.evaluatorId);
-  const step = stepRef(evaluator);
-  await loadEvaluatedStep(scope, step, 'edit');
-  const { latest } = await evaluatorView(scope, evaluator);
-  const existing = new Set((await scope.evaluation.listCases(step))
-    .filter((evalCase) => evalCase.archived === false && evalCase.source === 'production')
-    .map((evalCase) => evalCase.sourceAgentRunId));
-
-  const cases: EvalCase[] = [];
-  const skipped: CreateEvalCasesFromLabelsOutput['skipped'] = [];
-  for (const label of await evaluatorLabels(scope, evaluator)) {
-    const agentRunId = label.subject.id;
-    if (label.subject.type === 'written_output') {
-      skipped.push({ agentRunId, reason: 'a written output, not a production run' });
-      continue;
-    }
-    if (existing.has(agentRunId)) {
-      skipped.push({ agentRunId, reason: 'already a case' });
-      continue;
-    }
-    try {
-      const passed = label.value >= JUDGE_PASS_VALUE;
-      const verdict = `${passed ? 'Passes' : 'Fails'} '${evaluator.name}': ${latest.rule}`;
-      const notes = [verdict, label.comment].filter((part) => part !== null && part !== '').join(' — ').slice(0, 4000);
-      const { evalCase } = await createEvalCaseFromAgentRun({
-        agentRunId,
-        step,
-        expectation: passed ? 'positive' : 'negative',
-        notes,
-        split: input.split,
-        origin: 'user',
-      }, scope);
-      cases.push(evalCase);
-      existing.add(agentRunId);
-    } catch (err) {
-      if (err instanceof HandlerError === false || err.code === 'forbidden') throw err;
-      skipped.push({ agentRunId, reason: err.message });
-    }
-  }
-  return { cases, skipped };
 }
 
 export async function archiveEvalCase(

@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
+import { JudgeVerdicts } from './judge-verdicts';
 
 function percent(value: number | null): string {
   return value === null ? '—' : `${Math.round(value * 100)}%`;
@@ -70,6 +71,11 @@ function EvaluatorTable({ variant, k }: { variant: EvalRunVariantReport; k: numb
           <th className="py-1 font-medium">pass^{k}</th>
           <th className="py-1 font-medium">Flaky</th>
           <th className="py-1 font-medium">Errors</th>
+          <th className="py-1 font-medium">
+            <InstantTooltip label="Judge verdicts left out of the pass rate: below the judge's minimum confidence and not accepted, or denied by a person.">
+              <span>Left out</span>
+            </InstantTooltip>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -86,6 +92,7 @@ function EvaluatorTable({ variant, k }: { variant: EvalRunVariantReport; k: numb
             <td className="py-1.5">{percent(evaluator.passHatK)}</td>
             <td className="py-1.5">{percent(evaluator.flakiness)}</td>
             <td className="py-1.5">{evaluator.errors}</td>
+            <td className="py-1.5">{evaluator.excluded}</td>
           </tr>
         ))}
       </tbody>
@@ -211,6 +218,7 @@ function VariantReport({ output, variant, step, mayEdit, editReason }: {
 }) {
   const [signing, setSigning] = React.useState(false);
   const blocked = signingBlocked(output, variant, mayEdit, editReason);
+  const verdicts = output.report.judgeVerdicts.filter((verdict) => verdict.variantId === variant.id);
   return (
     <div className="space-y-2 border-t pt-3 first:border-t-0 first:pt-0" data-testid="variant-report">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -226,6 +234,7 @@ function VariantReport({ output, variant, step, mayEdit, editReason }: {
       </div>
       <EvaluatorTable variant={variant} k={output.report.k} />
       {variant.criteria.length > 0 && <CriteriaVerdicts verdicts={variant.criteria} />}
+      {verdicts.length > 0 && <JudgeVerdicts step={step} evalRunId={output.evalRun.id} verdicts={verdicts} mayEdit={mayEdit} editReason={editReason} />}
       <ConfidenceSection variant={variant} />
       {signing ? (
         <SignQualificationForm
@@ -252,8 +261,9 @@ function VariantReport({ output, variant, step, mayEdit, editReason }: {
 /**
  * An Eval Run's report (ADR-0023 D5, D10): per variant, every Evaluator's pass
  * rate with its Wilson 95% interval, pass@k, pass^k and flakiness, the verdict
- * on each Acceptance Criterion, confidence calibration and routing. A person signs a Step Qualification for a
- * variant from here.
+ * on each Acceptance Criterion, every judge verdict with its rationale for a
+ * person to accept or deny, confidence calibration and routing. A person signs
+ * a Step Qualification for a variant from here.
  */
 export function EvalRunReport({ output, step, mayEdit, editReason }: {
   output: EvalRunOutput;

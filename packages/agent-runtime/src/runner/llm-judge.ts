@@ -1,35 +1,79 @@
 import { z } from 'zod';
-import type { JudgeChoice } from '@mediforce/platform-core';
-import { JUDGE_PASS_VALUE } from '@mediforce/platform-core';
+import type { StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { ReviewPlugin, ReviewPluginContext, ReviewPluginResult } from '../interfaces/review-plugin';
 
 export interface LlmJudgeConfig {
   readonly model: string;
   readonly rubric: string;
-  readonly choices: readonly JudgeChoice[];
   /** What the step was given, so "given this input, is this output good?" is answerable. */
   readonly stepInput: Record<string, unknown> | null;
   /** What an Eval Case says the output must — or must not — contain. */
   readonly expectation: string | null;
+  /** Everything the agent did during the step — its reasoning, tool calls and their results — in order. */
+  readonly trajectory: readonly StoredAgentTrajectoryEntry[];
 }
 
 export interface LlmJudgeResult extends ReviewPluginResult {
-  readonly choice: string;
-  readonly value: number;
+  readonly passed: boolean;
   readonly judgeModel: string;
 }
 
 const JudgeAnswerSchema = z.object({
-  reasoning: z.string().min(1),
-  choice: z.string().min(1),
+  rationale: z.string().trim().min(1),
+  passed: z.boolean(),
+  confidence: z.number().min(0).max(1),
 });
 
 /** Keeps a judge prompt bounded when an input or output is a large document. */
 const MAX_SECTION_CHARS = 20_000;
+/** The agent's log may run long; its start and end are kept, the middle is cut. */
+const MAX_TRAJECTORY_CHARS = 60_000;
+const MAX_ENTRY_CHARS = 2_000;
+
+function truncate(text: string, limit: number): string {
+  return text.length > limit ? `${text.slice(0, limit)}\n… (truncated)` : text;
+}
 
 function section(value: unknown): string {
-  const text = JSON.stringify(value, null, 2) ?? 'null';
-  return text.length > MAX_SECTION_CHARS ? `${text.slice(0, MAX_SECTION_CHARS)}\n… (truncated)` : text;
+  return truncate(JSON.stringify(value, null, 2) ?? 'null', MAX_SECTION_CHARS);
+}
+
+function entryBody(entry: StoredAgentTrajectoryEntry): string {
+  if (entry.text !== undefined) return entry.text;
+  if (entry.input !== undefined) return JSON.stringify(entry.input);
+  if (typeof entry.content === 'string') return entry.content;
+  return JSON.stringify(entry.content ?? null);
+}
+
+function entryLine(entry: StoredAgentTrajectoryEntry): string {
+  const kind = [entry.type, entry.subtype].filter((part) => part !== undefined).join('/');
+  const tool = entry.tool ?? entry.tool_name;
+  return `[${entry.seq}] ${kind}${tool === undefined ? '' : ` ${tool}`}: ${truncate(entryBody(entry), MAX_ENTRY_CHARS)}`;
+}
+
+/** The log, one numbered line per entry; over budget, as many entries from each end as fit. */
+function formatTrajectory(entries: readonly StoredAgentTrajectoryEntry[]): string {
+  const lines = entries.map(entryLine);
+  if (lines.join('\n').length <= MAX_TRAJECTORY_CHARS) return lines.join('\n');
+  const head: string[] = [];
+  const tail: string[] = [];
+  let used = 0;
+  let front = 0;
+  let back = lines.length - 1;
+  while (front <= back) {
+    const fromFront = head.length <= tail.length;
+    const line = fromFront ? lines[front]! : lines[back]!;
+    if (used + line.length > MAX_TRAJECTORY_CHARS) break;
+    used += line.length + 1;
+    if (fromFront) {
+      head.push(line);
+      front += 1;
+    } else {
+      tail.unshift(line);
+      back -= 1;
+    }
+  }
+  return [...head, `… ${lines.length - head.length - tail.length} entries omitted …`, ...tail].join('\n');
 }
 
 function parseAnswer(content: string): z.infer<typeof JudgeAnswerSchema> | null {
@@ -45,24 +89,29 @@ function parseAnswer(content: string): z.infer<typeof JudgeAnswerSchema> | null 
 }
 
 /**
- * An `llm_judge` Evaluator (ADR-0023 D3) on the `ReviewPlugin` seam: reasoning
- * before the verdict, and a verdict that is one of a few discrete choices
- * mapped to a 0–1 value (layer-2 research § 3). A choice at or above 0.5
- * approves. An answer that names no listed choice throws — a judge that did
- * not judge must not be scored as a failure of the output.
+ * An `llm_judge` Evaluator (ADR-0023 D3) on the `ReviewPlugin` seam. The judge
+ * reads what the step was given, what it returned and the agent's whole log,
+ * explains what decided its verdict, then answers pass or fail with how
+ * confident it is. An answer without all three throws — a judge that did not
+ * judge must not be scored as a failure of the output.
  */
 export class LlmJudgeReviewPlugin implements ReviewPlugin {
   constructor(private readonly config: LlmJudgeConfig) {}
 
   async review(context: ReviewPluginContext): Promise<LlmJudgeResult> {
-    const labels = this.config.choices.map((choice) => `"${choice.label}"`).join(', ');
     const response = await context.llm.complete([
       {
         role: 'system',
         content: [
-          'You grade the output of one step of a pharmaceutical workflow against a rubric.',
+          'You grade one step of a pharmaceutical workflow against a rubric. You see what the step was given, the agent\'s log of everything it did — its reasoning, every tool call and every tool result, in order — and what it returned.',
           `Rubric:\n${this.config.rubric}`,
-          `Answer with one JSON object and nothing else: {"reasoning": "<why, citing the output>", "choice": <one of ${labels}>}. Write the reasoning before choosing.`,
+          [
+            'A person reads your rationale to accept or deny your verdict, so explain your judgment. Say what exactly contributed to the decision and why:',
+            'cite the parts of the input, the output and the log entries (by their [number]) that decided it, follow the agent\'s reasoning to where it went right or wrong,',
+            'and name anything you could not verify.',
+          ].join(' '),
+          'confidence is how sure you are of your verdict, from 0 to 1: lower it when the evidence is incomplete, ambiguous or the rubric does not clearly decide the case.',
+          'Answer with one JSON object and nothing else: {"rationale": "<your explanation>", "passed": <true or false>, "confidence": <0 to 1>}. Write the rationale before deciding.',
         ].join('\n\n'),
       },
       {
@@ -70,6 +119,7 @@ export class LlmJudgeReviewPlugin implements ReviewPlugin {
         content: [
           ...(this.config.stepInput === null ? [] : [`Step input:\n${section(this.config.stepInput)}`]),
           ...(this.config.expectation === null ? [] : [`What the output must or must not contain:\n${this.config.expectation}`]),
+          ...(this.config.trajectory.length === 0 ? [] : [`Agent log:\n${formatTrajectory(this.config.trajectory)}`]),
           `Step output:\n${section(context.executorOutput.result ?? null)}`,
           ...(context.executorOutput.reasoning_summary.length > 0 ? [`The agent's own summary:\n${context.executorOutput.reasoning_summary}`] : []),
         ].join('\n\n'),
@@ -77,18 +127,14 @@ export class LlmJudgeReviewPlugin implements ReviewPlugin {
     ], this.config.model);
 
     const answer = parseAnswer(response.content);
-    const choice = answer === null
-      ? undefined
-      : this.config.choices.find((candidate) => candidate.label === answer.choice);
-    if (answer === null || choice === undefined) {
-      throw new Error(`judge answered with no listed choice (${labels}): ${response.content.slice(0, 300)}`);
+    if (answer === null) {
+      throw new Error(`judge gave no usable verdict (rationale, passed, confidence 0–1): ${response.content.slice(0, 300)}`);
     }
     return {
-      verdict: choice.value >= JUDGE_PASS_VALUE ? 'approve' : 'reject',
-      reasoning: answer.reasoning,
-      confidence: choice.value,
-      choice: choice.label,
-      value: choice.value,
+      verdict: answer.passed ? 'approve' : 'reject',
+      passed: answer.passed,
+      reasoning: answer.rationale,
+      confidence: answer.confidence,
       judgeModel: response.model,
     };
   }

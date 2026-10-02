@@ -12,8 +12,8 @@ describe('previewEvaluator', () => {
     const { results } = await previewEvaluator({ ...STEP, check: findingsSchema, limit: 5 }, fixture.scope());
 
     expect(results).toEqual(expect.arrayContaining([
-      { agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', comment: null, error: null },
-      { agentRunId: UNGRADED_RUN, passed: false, value: 0, label: 'fail', comment: 'missing required keys: findings', error: null },
+      { agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: null, comment: null, error: null },
+      { agentRunId: UNGRADED_RUN, passed: false, value: 0, label: 'fail', confidence: null, comment: 'missing required keys: findings', error: null },
     ]));
     expect(await fixture.scoreRepo.list({ limit: 10 })).toEqual([]);
     expect(await fixture.evaluationRepo.listEvaluators(STEP)).toEqual([]);

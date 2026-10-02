@@ -89,8 +89,9 @@ authenticated, and only these two may do that.
 
 **Every Score goes through `recordScore`** (`handlers/scores/record-score.ts`),
 which appends its `score.created` audit event. There is no generic Score write
-route: Scores arrive from task completion (Control Mode 3 verdicts) and from a
-person labelling an output for an Evaluator (`labelEvaluatorOutput`). With
+route: Scores arrive from task completion (Control Mode 3 verdicts), from
+Evaluators, and from a person accepting or denying a judge verdict of an Eval
+Run (`reviewJudgeVerdict`, `judge-reviews.ts`). With
 `MEDIFORCE_SCORE_EXPORT` set, `services/score-export.ts` wraps the Score
 repository and also sends each Score of a traced Agent Run to Phoenix or
 Langfuse. It only writes, runs in the background, and never fails the Score
@@ -108,7 +109,7 @@ output (`_lib/run-evaluator-check.ts`). Evaluators flagged `runInProduction`
 the runner's output gate: counted `schema`/`code` ones run inline and a failing
 critical one sends the run to the step's fallback; `llm_judge` ones only write
 Scores, asynchronously (D13). Nothing here approves a `code` check's
-source or labels an output on anyone's behalf: both record the person who did
+source or reviews a judge verdict on anyone's behalf: both record the person who did
 it, and an API key must name them. A synthesized Eval Case's file changes are the
 one write outside Postgres: a commit on the workflow's bare repo, kept by the
 ref `refs/mediforce/eval-seeds/<caseId>` (`_lib/workspace-seed.ts`); the
@@ -128,7 +129,11 @@ it is claimed for scoring — plus each LLM judge call, charged as it is made an
 kept on the Score it produced (`_lib/model-prices.ts` prices those). An Eval
 Run's report is computed from the Scores on read, never stored — per variant,
 with the verdict on each frozen Acceptance Criterion and the confidence
-calibration, from platform-core's pure rules. A variant is a patch the
+calibration, from platform-core's pure rules. Which Scores count is one rule,
+`checkOutcome` in `_lib/trial-scores.ts`: a judge verdict below its
+`minConfidence` is left out unless a person accepted it, and a denied one is
+always left out; the report, the failures list, optimisation results and GEPA's
+reflective dataset all read it. A variant is a patch the
 runtime applies to its trials (platform-ui's `execute-agent-step.ts` reads the
 trial's variant); the driver does not know variants exist. Applying a variant to the step
 (`apply-step-variant.ts`) saves it through `registerWorkflow`, not a second write path, so a

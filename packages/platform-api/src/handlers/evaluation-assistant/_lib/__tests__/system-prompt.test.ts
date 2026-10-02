@@ -3,15 +3,16 @@ import { EVALUATION_ASSISTANT_SYSTEM_PROMPT, briefMessage, unattendedBudgetMessa
 
 describe('Evaluation Assistant prompt', () => {
   it('states the authority tiers of ADR-0023 D15', () => {
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Never approve a code check\'s source, label outputs for calibration, or sign a Step Qualification');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Never approve a code check\'s source, accept or deny a judge\'s verdict, or sign a Step Qualification');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('start_eval_run is refused without the person\'s confirmation');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('run it with preview_evaluator on real outputs');
   });
 
-  it('covers the plan, the cheapest reliable check, and labels and case expectations only the person gives', () => {
+  it('covers the plan, the cheapest reliable check, judge verdicts and case expectations only the person reviews', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('call propose_evaluation_plan');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Choose the cheapest reliable kind');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('The person labels them pass or fail on the card, never you.');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('minConfidence');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toMatch(/get_calibration|propose_outputs_to_label|propose_written_outputs/);
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Cases are not labelled positive or negative.');
   });
 

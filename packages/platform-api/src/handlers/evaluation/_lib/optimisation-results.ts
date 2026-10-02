@@ -7,7 +7,7 @@ import {
 } from '@mediforce/platform-core';
 import type { OptimisationSplitResult, OptimisationVariantResult } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
-import { mean, passedEveryCounted, scoresOfTrial } from './trial-scores';
+import { countedScores, mean, passedEveryCounted, trialScores } from './trial-scores';
 
 function splitResult(caseCount: number, verdicts: readonly (boolean | null)[]): OptimisationSplitResult {
   const graded = verdicts.filter((verdict) => verdict !== null);
@@ -45,7 +45,7 @@ export async function optimisationResults(
   const splits = new Map<string, EvalCase['split'] | null>(await Promise.all(run.caseIds.map(async (caseId) =>
     [caseId, (await scope.evaluation.getCase(caseId))?.split ?? null] as const)));
   const verdicts = new Map(await Promise.all(trials.map(async (trial) =>
-    [trial.id, trial.status === 'scored' ? passedEveryCounted(run, await scoresOfTrial(scope, run, trial)) : null] as const)));
+    [trial.id, trial.status === 'scored' ? passedEveryCounted(run, countedScores(await trialScores(scope, run, trial))) : null] as const)));
 
   const resultOf = (variantId: string, label: string, prompt: string | null): OptimisationVariantResult => {
     const ofVariant = trials.filter((trial) => trial.variantId === variantId);

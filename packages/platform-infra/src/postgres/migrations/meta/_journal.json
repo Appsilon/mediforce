@@ -477,6 +477,13 @@
       "when": 1789641801400,
       "tag": "0067_drop_eval_run_brief_version",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1789641801500,
+      "tag": "0068_drop_judge_calibration",
+      "breakpoints": true
     }
   ]
 }

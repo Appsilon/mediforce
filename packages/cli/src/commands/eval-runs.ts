@@ -24,7 +24,8 @@ function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void 
     for (const evaluator of variant.evaluators) {
       const interval = evaluator.wilsonLower === null ? '      -      ' : `[${percent(evaluator.wilsonLower)}, ${percent(evaluator.wilsonUpper)}]`;
       const counted = evaluator.counted ? '' : `  not counted (${evaluator.reason})`;
-      output.stdout(`${evaluator.name.padEnd(24)} ${percent(evaluator.passRate)}  ${interval}  ${percent(evaluator.passAtK)}  ${percent(evaluator.passHatK)} ${percent(evaluator.flakiness)}  ${String(evaluator.errors).padStart(3)}${counted}`);
+      const excluded = evaluator.excluded === 0 ? '' : `  ${evaluator.excluded} judge verdict(s) left out`;
+      output.stdout(`${evaluator.name.padEnd(24)} ${percent(evaluator.passRate)}  ${interval}  ${percent(evaluator.passAtK)}  ${percent(evaluator.passHatK)} ${percent(evaluator.flakiness)}  ${String(evaluator.errors).padStart(3)}${counted}${excluded}`);
     }
     for (const verdict of variant.criteria) {
       output.stdout(`criterion ${verdict.severity}: ${verdict.status.replace('_', ' ')} — ${verdict.reason}`);
@@ -34,6 +35,13 @@ function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void 
       const threshold = variant.recommendation.confidenceThreshold === null ? '' : ` above confidence ${variant.recommendation.confidenceThreshold}`;
       output.stdout(`routing: ${variant.recommendation.autonomyLevel}${threshold} — ${variant.recommendation.reason}`);
     }
+  }
+  const leftOut = report.judgeVerdicts.filter((verdict) => verdict.counts === false);
+  if (leftOut.length > 0) output.stdout(`\njudge verdicts left out of the criteria (review with: mediforce eval judge-review ${evalRun.id} --trial <id> --evaluator <id> --accept|--deny):`);
+  for (const verdict of leftOut) {
+    const confidence = verdict.confidence === null ? 'no confidence' : `confidence ${verdict.confidence.toFixed(2)} < ${verdict.minConfidence ?? '-'}`;
+    const why = verdict.review?.decision === 'denied' ? 'denied' : confidence;
+    output.stdout(`  trial ${verdict.trialId}  ${verdict.name} (${verdict.evaluatorId})  ${verdict.passed ? 'pass' : 'fail'}, ${why}  ${verdict.variantId} "${verdict.caseName ?? verdict.caseId}"`);
   }
   for (const comparison of report.comparison) {
     output.stdout(`\n${comparison.variantId} vs champion:`);
@@ -210,6 +218,39 @@ export const evalApplyVariantCommand = defineCommand({
         : `differs from ${result.variant.variantId}'s fingerprint in: ${result.variant.changed.join(', ') || 'unknown (no frozen fingerprint)'}`);
     }
     for (const warning of result.warnings ?? []) output.stderr(`warning: ${warning.message}`);
+    return 0;
+  },
+});
+
+export const evalJudgeReviewCommand = defineCommand({
+  name: 'mediforce eval judge-review',
+  description: 'Accept or deny one llm_judge verdict on one trial of an Eval Run, after reading its rationale (mediforce eval report). '
+    + 'An accepted verdict counts toward the Acceptance Criteria whatever its confidence; a denied one is left out, never reversed.',
+  args: {
+    evalRunId: { type: 'positional', required: true, description: 'Eval Run id' },
+    trial: { type: 'string', required: true, description: 'Trial id' },
+    evaluator: { type: 'string', required: true, description: 'The judge\'s Evaluator id' },
+    accept: { type: 'boolean', description: 'Count the verdict' },
+    deny: { type: 'boolean', description: 'Leave the verdict out' },
+    comment: { type: 'string', description: 'Why' },
+    uid: { type: 'string', description: 'Who reviews (required with an API key)' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    if ((args.accept === true) === (args.deny === true)) {
+      output.stderr('Pass exactly one of --accept or --deny');
+      return 2;
+    }
+    const decision = args.accept === true ? 'accepted' : 'denied';
+    const result = await mediforce.evaluation.reviewJudgeVerdict({
+      evalRunId: args.evalRunId,
+      trialId: args.trial,
+      evaluatorId: args.evaluator,
+      decision,
+      ...(args.comment !== undefined ? { comment: args.comment } : {}),
+      ...(args.uid !== undefined ? { uid: args.uid } : {}),
+    });
+    if (jsonMode) printJson(output, result);
+    else output.stdout(`Judge verdict on trial ${args.trial} ${decision}`);
     return 0;
   },
 });

@@ -548,23 +548,11 @@ import {
   ArchiveEvalCaseInputSchema,
   UpdateEvalCaseInputSchema,
   GetAgentRunIoInputSchema,
-  ListWrittenOutputsInputSchema,
-  ListWrittenOutputsOutputSchema,
-  CreateWrittenOutputInputSchema,
-  CreateWrittenOutputOutputSchema,
-  ArchiveWrittenOutputInputSchema,
-  WrittenOutputOutputSchema,
   GetAgentRunIoOutputSchema,
   ArchiveEvaluatorInputSchema,
   SetEvaluatorProductionInputSchema,
-  ListEvaluatorLabelsInputSchema,
-  ListEvaluatorLabelsOutputSchema,
-  CalibrateEvaluatorInputSchema,
-  CalibrateEvaluatorOutputSchema,
   CreateEvalCaseFromAgentRunInputSchema,
   CreatePerturbedEvalCaseInputSchema,
-  CreateEvalCasesFromLabelsInputSchema,
-  CreateEvalCasesFromLabelsOutputSchema,
   CreateEvalCaseInputSchema,
   CreateEvaluatorInputSchema,
   EvalCaseOutputSchema,
@@ -586,8 +574,6 @@ import {
   GetEvaluatorInputSchema,
   GetMcpEvalPolicyInputSchema,
   GetMcpEvalPolicyOutputSchema,
-  LabelEvaluatorOutputInputSchema,
-  LabelEvaluatorOutputOutputSchema,
   ListEvalCasesInputSchema,
   ListEvalCasesOutputSchema,
   ListEvalDatasetsInputSchema,
@@ -607,23 +593,11 @@ import {
   type ArchiveEvalCaseInput,
   type UpdateEvalCaseInput,
   type GetAgentRunIoInput,
-  type ListWrittenOutputsInput,
-  type ListWrittenOutputsOutput,
-  type CreateWrittenOutputInput,
-  type CreateWrittenOutputOutput,
-  type ArchiveWrittenOutputInput,
-  type WrittenOutputOutput,
   type GetAgentRunIoOutput,
   type ArchiveEvaluatorInput,
   type SetEvaluatorProductionInput,
-  type ListEvaluatorLabelsInput,
-  type ListEvaluatorLabelsOutput,
-  type CalibrateEvaluatorInput,
-  type CalibrateEvaluatorOutput,
   type CreateEvalCaseFromAgentRunInput,
   type CreatePerturbedEvalCaseInput,
-  type CreateEvalCasesFromLabelsInput,
-  type CreateEvalCasesFromLabelsOutput,
   type CreateEvalCaseInput,
   type CreateEvaluatorInput,
   type EvalCaseOutput,
@@ -645,8 +619,6 @@ import {
   type GetEvaluatorInput,
   type GetMcpEvalPolicyInput,
   type GetMcpEvalPolicyOutput,
-  type LabelEvaluatorOutputInput,
-  type LabelEvaluatorOutputOutput,
   type ListEvalCasesInput,
   type ListEvalCasesOutput,
   type ListEvalDatasetsInput,
@@ -677,6 +649,8 @@ import {
   type ListEvalRunsOutput,
   GetEvalRunFailuresInputSchema,
   GetEvalRunFailuresOutputSchema,
+  ReviewJudgeVerdictInputSchema,
+  ReviewJudgeVerdictOutputSchema,
   ApplyStepVariantInputSchema,
   ApplyStepVariantOutputSchema,
   StartOptimisationInputSchema,
@@ -686,6 +660,8 @@ import {
   EvalOptimisationOutputSchema,
   type GetEvalRunFailuresInput,
   type GetEvalRunFailuresOutput,
+  type ReviewJudgeVerdictInput,
+  type ReviewJudgeVerdictOutput,
   type ApplyStepVariantInput,
   type ApplyStepVariantOutput,
   type StartOptimisationInput,
@@ -1091,22 +1067,14 @@ export class Mediforce {
     archiveEvaluator: (input: ArchiveEvaluatorInput) => Promise<EvaluatorOutput>;
     setEvaluatorProduction: (input: SetEvaluatorProductionInput) => Promise<EvaluatorOutput>;
     approveEvaluatorSource: (input: ApproveEvaluatorSourceInput) => Promise<EvaluatorOutput>;
-    labelOutput: (input: LabelEvaluatorOutputInput) => Promise<LabelEvaluatorOutputOutput>;
-    listLabels: (input: ListEvaluatorLabelsInput) => Promise<ListEvaluatorLabelsOutput>;
-    calibrateEvaluator: (input: CalibrateEvaluatorInput) => Promise<CalibrateEvaluatorOutput>;
     previewEvaluator: (input: PreviewEvaluatorInput) => Promise<PreviewEvaluatorOutput>;
     listStepAgentRuns: (input: ListStepAgentRunsInput) => Promise<ListStepAgentRunsOutput>;
     /** What one Agent Run's step was given and what it returned. */
     getAgentRunIo: (input: GetAgentRunIoInput) => Promise<GetAgentRunIoOutput>;
-    /** A person's written examples of the step's output, labelled to calibrate a judge. */
-    listWrittenOutputs: (input: ListWrittenOutputsInput) => Promise<ListWrittenOutputsOutput>;
-    createWrittenOutput: (input: CreateWrittenOutputInput) => Promise<CreateWrittenOutputOutput>;
-    archiveWrittenOutput: (input: ArchiveWrittenOutputInput) => Promise<WrittenOutputOutput>;
     listCases: (input: ListEvalCasesInput) => Promise<ListEvalCasesOutput>;
     createCase: (input: CreateEvalCaseInput) => Promise<EvalCaseOutput>;
     createCaseFromAgentRun: (input: CreateEvalCaseFromAgentRunInput) => Promise<EvalCaseOutput>;
     createPerturbedCase: (input: CreatePerturbedEvalCaseInput) => Promise<EvalCaseOutput>;
-    createCasesFromLabels: (input: CreateEvalCasesFromLabelsInput) => Promise<CreateEvalCasesFromLabelsOutput>;
     archiveCase: (input: ArchiveEvalCaseInput) => Promise<EvalCaseOutput>;
     /** Edits a case as a new case that replaces it; the old one is archived, so frozen Datasets keep it. */
     updateCase: (input: UpdateEvalCaseInput) => Promise<EvalCaseOutput>;
@@ -1120,6 +1088,8 @@ export class Mediforce {
     listRuns: (input: ListEvalRunsInput) => Promise<ListEvalRunsOutput>;
     cancelRun: (input: CancelEvalRunInput) => Promise<EvalRunOutput>;
     getRunFailures: (input: GetEvalRunFailuresInput) => Promise<GetEvalRunFailuresOutput>;
+    /** A person accepts or denies one judge verdict of an Eval Run after reading its rationale. */
+    reviewJudgeVerdict: (input: ReviewJudgeVerdictInput) => Promise<ReviewJudgeVerdictOutput>;
     applyVariant: (input: ApplyStepVariantInput) => Promise<ApplyStepVariantOutput>;
     startOptimisation: (input: StartOptimisationInput) => Promise<EvalOptimisationOutput>;
     getOptimisation: (input: GetOptimisationInput) => Promise<EvalOptimisationOutput>;
@@ -2557,43 +2527,10 @@ export class Mediforce {
         return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/approve`, body,
           EvaluatorOutputSchema, 'mediforce.evaluation.approveEvaluatorSource');
       },
-      labelOutput: async (input) => {
-        const { evaluatorId, ...body } = LabelEvaluatorOutputInputSchema.parse(input);
-        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/labels`, body,
-          LabelEvaluatorOutputOutputSchema, 'mediforce.evaluation.labelOutput');
-      },
-      listLabels: async (input) => {
-        const { evaluatorId } = ListEvaluatorLabelsInputSchema.parse(input);
-        return this.getJson(`/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/labels`, ListEvaluatorLabelsOutputSchema, 'mediforce.evaluation.listLabels');
-      },
-      calibrateEvaluator: async (input) => {
-        const { evaluatorId, ...body } = CalibrateEvaluatorInputSchema.parse(input);
-        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/calibrate`, body,
-          CalibrateEvaluatorOutputSchema, 'mediforce.evaluation.calibrateEvaluator');
-      },
       previewEvaluator: async (input) => this.sendJson(
         'POST', '/api/evaluation/evaluators/preview', PreviewEvaluatorInputSchema.parse(input),
         PreviewEvaluatorOutputSchema, 'mediforce.evaluation.previewEvaluator',
       ),
-      listWrittenOutputs: async (input) => {
-        const validated = ListWrittenOutputsInputSchema.parse(input);
-        const qs = toSearchParams({
-          namespace: validated.namespace,
-          workflowName: validated.workflowName,
-          stepId: validated.stepId,
-          includeArchived: validated.includeArchived === undefined ? undefined : String(validated.includeArchived),
-        });
-        return this.getJson(`/api/evaluation/written-outputs${qs}`, ListWrittenOutputsOutputSchema, 'mediforce.evaluation.listWrittenOutputs');
-      },
-      createWrittenOutput: async (input) => this.sendJson(
-        'POST', '/api/evaluation/written-outputs', CreateWrittenOutputInputSchema.parse(input),
-        CreateWrittenOutputOutputSchema, 'mediforce.evaluation.createWrittenOutput',
-      ),
-      archiveWrittenOutput: async (input) => {
-        const { writtenOutputId, ...body } = ArchiveWrittenOutputInputSchema.parse(input);
-        return this.sendJson('POST', `/api/evaluation/written-outputs/${encodeURIComponent(writtenOutputId)}/archive`, body,
-          WrittenOutputOutputSchema, 'mediforce.evaluation.archiveWrittenOutput');
-      },
       getAgentRunIo: async (input) => {
         const { agentRunId } = GetAgentRunIoInputSchema.parse(input);
         return this.getJson(`/api/evaluation/agent-runs/${encodeURIComponent(agentRunId)}/io`, GetAgentRunIoOutputSchema, 'mediforce.evaluation.getAgentRunIo');
@@ -2631,11 +2568,6 @@ export class Mediforce {
         'POST', '/api/evaluation/cases/perturbed', CreatePerturbedEvalCaseInputSchema.parse(input),
         EvalCaseOutputSchema, 'mediforce.evaluation.createPerturbedCase',
       ),
-      createCasesFromLabels: async (input) => {
-        const { evaluatorId, ...body } = CreateEvalCasesFromLabelsInputSchema.parse(input);
-        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/cases-from-labels`, body,
-          CreateEvalCasesFromLabelsOutputSchema, 'mediforce.evaluation.createCasesFromLabels');
-      },
       archiveCase: async (input) => {
         const { caseId, ...body } = ArchiveEvalCaseInputSchema.parse(input);
         return this.sendJson('POST', `/api/evaluation/cases/${encodeURIComponent(caseId)}/archive`, body,
@@ -2688,6 +2620,11 @@ export class Mediforce {
         const { evalRunId, variantId, limit } = GetEvalRunFailuresInputSchema.parse(input);
         const qs = toSearchParams({ variantId, limit: String(limit) });
         return this.getJson(`/api/evaluation/runs/${encodeURIComponent(evalRunId)}/failures${qs}`, GetEvalRunFailuresOutputSchema, 'mediforce.evaluation.getRunFailures');
+      },
+      reviewJudgeVerdict: async (input) => {
+        const { evalRunId, ...body } = ReviewJudgeVerdictInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/runs/${encodeURIComponent(evalRunId)}/judge-reviews`, body,
+          ReviewJudgeVerdictOutputSchema, 'mediforce.evaluation.reviewJudgeVerdict');
       },
       applyVariant: async (input) => this.sendJson(
         'POST', '/api/evaluation/variants/apply', ApplyStepVariantInputSchema.parse(input),

@@ -3,11 +3,10 @@
 import * as React from 'react';
 import {
   CodeCheckSchema,
+  DEFAULT_JUDGE_MIN_CONFIDENCE,
   EvaluatorCheckSchema,
-  JUDGE_PASS_VALUE,
   type AgentOutputSchema,
   type EvaluatorCheck,
-  type JudgeChoice,
 } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
@@ -19,7 +18,7 @@ type CodeRuntime = (typeof CodeCheckSchema.shape.runtime.options)[number];
 export type CheckDraft =
   | { kind: 'schema'; schemaText: string }
   | { kind: 'code'; runtime: CodeRuntime; source: string }
-  | { kind: 'llm_judge'; model: string; rubric: string; choices: JudgeChoice[] };
+  | { kind: 'llm_judge'; model: string; rubric: string; minConfidence: number };
 
 export type CheckDraftKind = CheckDraft['kind'];
 
@@ -34,7 +33,7 @@ export const CHECK_KINDS: Record<CheckDraftKind, { label: string; description: s
   },
   llm_judge: {
     label: 'LLM judge',
-    description: 'A model reads the step\'s input and output, reasons about your question, then picks one of your verdicts. Use it for what code cannot check: meaning, tone, clinical judgement.',
+    description: 'A model reads the step\'s input, the agent\'s log and its output, explains its judgment, then answers pass or fail with a confidence. Use it for what code cannot check: meaning, tone, clinical judgement.',
   },
 };
 
@@ -59,13 +58,6 @@ const CODE_TEMPLATES: Record<CodeRuntime, string> = {
   ].join('\n'),
 };
 
-const VERDICT_PRESETS: { label: string; choices: JudgeChoice[] }[] = [
-  { label: 'Pass / fail', choices: [{ label: 'pass', value: 1 }, { label: 'fail', value: 0 }] },
-  { label: 'Good / acceptable / poor', choices: [{ label: 'good', value: 1 }, { label: 'acceptable', value: 0.5 }, { label: 'poor', value: 0 }] },
-];
-// LlmJudgeCheckSchema.choices bounds.
-const MIN_VERDICTS = 2;
-const MAX_VERDICTS = 6;
 const DEFAULT_JUDGE_MODEL = 'anthropic/claude-sonnet-4';
 
 /** The step's own `agent.outputSchema`, when it declares one, is the natural start for a schema check. */
@@ -73,7 +65,7 @@ export function emptyCheckDraft(kind: CheckDraftKind, stepOutputSchema?: AgentOu
   switch (kind) {
     case 'schema': return { kind, schemaText: JSON.stringify(stepOutputSchema ?? { type: 'object', required: [] }, null, 2) };
     case 'code': return { kind, runtime: 'python', source: CODE_TEMPLATES.python };
-    case 'llm_judge': return { kind, model: DEFAULT_JUDGE_MODEL, rubric: '', choices: VERDICT_PRESETS[0]!.choices };
+    case 'llm_judge': return { kind, model: DEFAULT_JUDGE_MODEL, rubric: '', minConfidence: DEFAULT_JUDGE_MIN_CONFIDENCE };
   }
 }
 
@@ -82,7 +74,7 @@ export function draftFromCheck(check: EvaluatorCheck): CheckDraft {
   switch (check.kind) {
     case 'schema': return { kind: 'schema', schemaText: JSON.stringify(check.schema, null, 2) };
     case 'code': return { kind: 'code', runtime: check.runtime, source: check.source };
-    case 'llm_judge': return { kind: 'llm_judge', model: check.model, rubric: check.rubric, choices: check.choices };
+    case 'llm_judge': return { kind: 'llm_judge', model: check.model, rubric: check.rubric, minConfidence: check.minConfidence };
   }
 }
 
@@ -107,7 +99,7 @@ export function checkFromDraft(draft: CheckDraft): { check: EvaluatorCheck } | {
         kind: 'llm_judge',
         model: draft.model.trim(),
         rubric: draft.rubric.trim(),
-        choices: draft.choices.map((choice) => ({ ...choice, label: choice.label.trim() })),
+        minConfidence: draft.minConfidence,
       };
       break;
   }
@@ -199,8 +191,6 @@ function JudgeEditor({ draft, onChange }: {
   draft: Extract<CheckDraft, { kind: 'llm_judge' }>;
   onChange: (draft: CheckDraft) => void;
 }) {
-  const setChoice = (index: number, choice: JudgeChoice) =>
-    onChange({ ...draft, choices: draft.choices.map((existing, at) => (at === index ? choice : existing)) });
   return (
     <div className="space-y-3">
       <Field label="Judge model">
@@ -213,7 +203,7 @@ function JudgeEditor({ draft, onChange }: {
       </Field>
       <Field
         label="Question for the judge"
-        hint="The judge sees the step's input, its output, the agent's own summary and the Eval Case's notes. Say what a good output does and what makes it fail; it writes its reasoning, then picks a verdict."
+        hint="The judge sees the step's input, the agent's whole log — its reasoning, tool calls and their results — its output and the Eval Case's notes. Say what a good output does and what makes it fail; it explains what decided its verdict, then answers pass or fail."
       >
         <textarea
           aria-label="Question for the judge"
@@ -223,52 +213,18 @@ function JudgeEditor({ draft, onChange }: {
           onChange={(event) => onChange({ ...draft, rubric: event.target.value })}
         />
       </Field>
-      <div className="space-y-1.5" role="group" aria-label="Verdicts">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-medium">Verdicts</span>
-          <span className="flex gap-1">
-            {VERDICT_PRESETS.map((preset) => (
-              <button key={preset.label} type="button" className={buttonClass} onClick={() => onChange({ ...draft, choices: preset.choices })}>{preset.label}</button>
-            ))}
-          </span>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          The judge answers with exactly one of these. Each scores 0 to 1; {JUDGE_PASS_VALUE} or more counts as a pass.
-        </p>
-        {draft.choices.map((choice, index) => (
-          <div key={index} className="flex items-center gap-2" data-testid="judge-verdict">
-            <input
-              aria-label={`Verdict ${index + 1}`}
-              className={cn(inputClass, 'flex-1')}
-              value={choice.label}
-              onChange={(event) => setChoice(index, { ...choice, label: event.target.value })}
-            />
-            <input
-              aria-label={`Verdict ${index + 1} score`}
-              type="number" min={0} max={1} step={0.1}
-              className={cn(inputClass, 'w-20')}
-              value={choice.value}
-              onChange={(event) => setChoice(index, { ...choice, value: Number(event.target.value) })}
-            />
-            <span className={cn('w-16 text-xs', choice.value >= JUDGE_PASS_VALUE ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400')}>
-              {choice.value >= JUDGE_PASS_VALUE ? 'passes' : 'fails'}
-            </span>
-            <button
-              type="button"
-              aria-label={`Remove verdict ${index + 1}`}
-              className={buttonClass}
-              disabled={draft.choices.length <= MIN_VERDICTS}
-              onClick={() => onChange({ ...draft, choices: draft.choices.filter((_, at) => at !== index) })}
-            >×</button>
-          </div>
-        ))}
-        <button
-          type="button"
-          className={buttonClass}
-          disabled={draft.choices.length >= MAX_VERDICTS}
-          onClick={() => onChange({ ...draft, choices: [...draft.choices, { label: '', value: 0 }] })}
-        >Add verdict</button>
-      </div>
+      <Field
+        label="Minimum confidence"
+        hint="A verdict the judge is less confident of (0 to 1) is shown in the report but left out of the Acceptance Criteria, unless a person accepts it."
+      >
+        <input
+          aria-label="Minimum confidence"
+          type="number" min={0} max={1} step={0.05}
+          className={cn(inputClass, 'block w-24')}
+          value={draft.minConfidence}
+          onChange={(event) => onChange({ ...draft, minConfidence: Number(event.target.value) })}
+        />
+      </Field>
     </div>
   );
 }
@@ -296,15 +252,7 @@ export function CheckDetails({ check }: { check: EvaluatorCheck }) {
         <div className="space-y-2">
           <Detail label="Judge model"><span className="font-mono">{check.model}</span></Detail>
           <Detail label="Question for the judge"><pre className={cn(preClass, 'font-sans')}>{check.rubric}</pre></Detail>
-          <Detail label="Verdicts">
-            <ul>
-              {check.choices.map((choice, index) => (
-                <li key={index}>
-                  {choice.label} — {choice.value} ({choice.value >= JUDGE_PASS_VALUE ? 'passes' : 'fails'})
-                </li>
-              ))}
-            </ul>
-          </Detail>
+          <Detail label="Minimum confidence">{check.minConfidence}</Detail>
         </div>
       );
   }

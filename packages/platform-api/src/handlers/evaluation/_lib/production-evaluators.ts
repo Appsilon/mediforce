@@ -10,6 +10,7 @@ import { recordScore } from '../../scores/record-score';
 import { evaluatorProduction } from './evaluator-view';
 import type { EvaluationSubject } from './evaluation-subject';
 import { loadModelPrices } from './model-prices';
+import { judgeConfidenceMetadata } from './trial-scores';
 import { runEvaluatorCheck, type JudgeUsage } from './run-evaluator-check';
 
 interface ProductionEvaluator {
@@ -67,6 +68,7 @@ async function scoreProduction(
       production: true,
       evaluatorVersion: version.version,
       counted: true,
+      ...judgeConfidenceMetadata(version.check, outcome.confidence),
       ...(judgeUsages.length === 0 ? {} : { judgeCostUsd }),
     },
     namespace: subject.instance.namespace ?? evaluator.namespace,

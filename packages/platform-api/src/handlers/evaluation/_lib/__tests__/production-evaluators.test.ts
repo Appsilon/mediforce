@@ -16,7 +16,7 @@ const judge: EvaluatorCheck = {
   kind: 'llm_judge',
   model: 'anthropic/claude-haiku-4.5',
   rubric: 'Every AE carries a grade.',
-  choices: [{ label: 'graded', value: 1 }, { label: 'ungraded', value: 0 }],
+  minConfidence: 0.8,
 };
 const code: EvaluatorCheck = { kind: 'code', runtime: 'python', source: 'print(1)' };
 
@@ -31,7 +31,7 @@ async function addEvaluator(
   const version: EvaluatorVersion = {
     evaluatorId: id, version: 1, rule: `${name} rule`, severity: options.severity ?? 'critical', check, origin: 'user',
     sourceApproval: options.approved === true ? { approvedBy: 'reviewer-1', approvedAt: now } : null,
-    calibration: null, createdBy: 'author-1', createdAt: now,
+    createdBy: 'author-1', createdAt: now,
   };
   await fixture.evaluationRepo.createEvaluator(
     { ...STEP, id, name, archived: false, runInProduction: options.runInProduction ?? true, createdBy: 'author-1', createdAt: now },
@@ -106,12 +106,9 @@ describe('production Evaluators (ADR-0023 D13)', () => {
   });
 
   it('runs an llm_judge asynchronously and only writes its Score', async () => {
-    const id = await addEvaluator(fixture, 'grades-present', judge, { runInProduction: true });
-    await fixture.evaluationRepo.setCalibration(id, 1, {
-      agreement: 0.9, kappa: 0.8, labelCount: 12, failureLabelCount: 3, calibratedAt: '2026-09-23T09:00:00.000Z',
-    } as Parameters<typeof fixture.evaluationRepo.setCalibration>[2]);
+    await addEvaluator(fixture, 'grades-present', judge, { runInProduction: true });
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({
-      choices: [{ message: { content: '{"reasoning": "Ungraded.", "choice": "ungraded"}' }, finish_reason: 'stop' }],
+      choices: [{ message: { content: '{"rationale": "No AE carries a grade.", "passed": false, "confidence": 0.9}' }, finish_reason: 'stop' }],
     }))));
     const scope = fixture.scope();
     Object.assign(scope, { workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) } });
@@ -122,15 +119,13 @@ describe('production Evaluators (ADR-0023 D13)', () => {
     expect(judges).toHaveLength(1);
     await Promise.all(judges);
     expect((await fixture.scoreRepo.list({ agentRunId: UNGRADED_RUN, limit: 100 }))[0]).toMatchObject({
-      name: 'grades-present', source: 'llm_judge', value: 0, metadata: { production: true },
+      name: 'grades-present', source: 'llm_judge', value: 0, comment: 'No AE carries a grade.',
+      metadata: { production: true, judgeConfidence: 0.9, judgeMinConfidence: 0.8 },
     });
   });
 
   it('never fails the step because an llm_judge could not run', async () => {
-    const id = await addEvaluator(fixture, 'grades-present', judge);
-    await fixture.evaluationRepo.setCalibration(id, 1, {
-      agreement: 0.9, kappa: 0.8, labelCount: 12, failureLabelCount: 3, calibratedAt: '2026-09-23T09:00:00.000Z',
-    } as Parameters<typeof fixture.evaluationRepo.setCalibration>[2]);
+    await addEvaluator(fixture, 'grades-present', judge);
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const { verdict, judges } = await score(UNGRADED_RUN);

@@ -9,10 +9,13 @@ import {
   ListScoresOutputSchema,
   type EvalRunOutput,
 } from '@mediforce/platform-api/contract';
+import { ApiError, Mediforce } from '@mediforce/platform-api/client';
 import { test, expect } from '../helpers/test-fixtures';
-import { TEST_ORG_HANDLE } from '../helpers/constants';
+import { TEST_ORG_HANDLE, TEST_USER_ID } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
 import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
+import { EVALUATION_WORKSPACE, seedEvaluationWorkspace } from '../helpers/evaluation-workspace';
+import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
 
 /**
  * API E2E for Eval Runs (ADR-0023 D4, D6, D10, Step Evaluation 1b): Evaluators
@@ -184,5 +187,90 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
     });
     expect(leaky.status(), await leaky.text()).toBe(400);
     expect(await leaky.text()).toContain('holdout cases are never offered as examples');
+  });
+});
+
+function apiClient(baseURL: string | undefined): Mediforce {
+  if (baseURL === undefined) throw new Error('Playwright baseURL is not configured — cannot build an API client');
+  return new Mediforce({ apiKey: process.env.PLATFORM_API_KEY ?? 'test-api-key', baseUrl: baseURL });
+}
+
+test.describe('Step Evaluation judge verdicts — API E2E', () => {
+  test.beforeAll(async () => {
+    await seedEvaluationWorkspace();
+  });
+
+  test('a judge verdict below its minConfidence is left out until a person accepts it; a denied one stays out', async ({ request, baseURL }) => {
+    test.setTimeout(120_000);
+    const mediforce = apiClient(baseURL);
+    const suffix = randomUUID().slice(0, 8);
+    const workflowName = `e2e-eval-judge-${suffix}`;
+    const production = await awaitFinishedAgentRun(request, await startRun(
+      request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE,
+    ));
+    const step = { namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes' };
+
+    const { evaluator: judge } = await mediforce.evaluation.createEvaluator({
+      ...step, name: 'summary-grounded', rule: 'The summary is grounded in the input.', severity: 'critical',
+      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Is the summary grounded in the input?', minConfidence: 0.8 },
+    });
+    expect(judge.trust).toEqual({ trusted: true });
+
+    // The judge reads each case's notes, so each case's notes key its scripted answer.
+    const sureNotes = `The summary names only events in the input (${suffix}, sure).`;
+    const unsureNotes = `The summary names only events in the input (${suffix}, unsure).`;
+    await scriptOpenRouter(sureNotes, [{ content: JSON.stringify({ rationale: 'Entry [1] lists the events; the summary repeats them.', passed: true, confidence: 0.95 }) }]);
+    await scriptOpenRouter(unsureNotes, [{ content: JSON.stringify({ rationale: 'The log does not show where the summary came from.', passed: false, confidence: 0.4 }) }]);
+    const { evalCase: sureCase } = await mediforce.evaluation.createCaseFromAgentRun({
+      agentRunId: production.id, step, name: 'Sure', expectation: 'positive', notes: sureNotes,
+    });
+    const { evalCase: unsureCase } = await mediforce.evaluation.createCaseFromAgentRun({
+      agentRunId: production.id, step, name: 'Unsure', expectation: 'positive', notes: unsureNotes,
+    });
+    await mediforce.evaluation.freezeDataset(step);
+
+    const prepared = await mediforce.evaluation.prepareRun({ ...step, trialsPerCase: 1, concurrency: 2, budgetUsd: 1 });
+    const evalRunId = prepared.evalRun.id;
+    await mediforce.evaluation.startRun({ evalRunId, confirmedBudgetUsd: 1 });
+    const finished: EvalRunOutput = await pollUntil(async () => {
+      const run = await mediforce.evaluation.getRun({ evalRunId });
+      return run.evalRun.status === 'completed' ? run : null;
+    }, { description: `Eval Run ${evalRunId} to complete`, timeoutMs: 90_000 });
+
+    const judgeReport = (output: EvalRunOutput) =>
+      output.report.variants[0]!.evaluators.find((evaluator) => evaluator.evaluatorId === judge.id);
+    const verdictOn = (output: EvalRunOutput, caseId: string) =>
+      output.report.judgeVerdicts.find((verdict) => verdict.caseId === caseId);
+
+    // The unsure verdict is left out of the pass rate the criteria read; the sure one counts.
+    expect(judgeReport(finished)).toMatchObject({ passes: 1, failures: 0, excluded: 1, passRate: 1 });
+    expect(verdictOn(finished, sureCase.id)).toMatchObject({ passed: true, confidence: 0.95, minConfidence: 0.8, review: null, counts: true });
+    const unsure = verdictOn(finished, unsureCase.id)!;
+    expect(unsure).toMatchObject({
+      passed: false, confidence: 0.4, minConfidence: 0.8, rationale: 'The log does not show where the summary came from.', review: null, counts: false,
+    });
+
+    // An API key has no identity of its own: the reviewer must be named.
+    const anonymous = await mediforce.evaluation.reviewJudgeVerdict({ evalRunId, trialId: unsure.trialId, evaluatorId: judge.id, decision: 'accepted' })
+      .then(() => null, (error: unknown) => error);
+    expect(anonymous).toBeInstanceOf(ApiError);
+    expect((anonymous as ApiError).status).toBe(400);
+
+    // Accepted, it counts whatever the judge's confidence.
+    const { score } = await mediforce.evaluation.reviewJudgeVerdict({
+      evalRunId, trialId: unsure.trialId, evaluatorId: judge.id, decision: 'accepted', comment: 'Read the log; the fail is right.', uid: TEST_USER_ID,
+    });
+    expect(score).toMatchObject({ source: 'human', label: 'accepted', createdBy: TEST_USER_ID, evaluatorId: judge.id });
+    const accepted = await mediforce.evaluation.getRun({ evalRunId });
+    expect(judgeReport(accepted)).toMatchObject({ passes: 1, failures: 1, excluded: 0, passRate: 0.5 });
+    expect(verdictOn(accepted, unsureCase.id)).toMatchObject({
+      passed: false, counts: true, review: { decision: 'accepted', reviewedBy: TEST_USER_ID, comment: 'Read the log; the fail is right.' },
+    });
+
+    // Denied, it is left out again — never reversed into a pass.
+    await mediforce.evaluation.reviewJudgeVerdict({ evalRunId, trialId: unsure.trialId, evaluatorId: judge.id, decision: 'denied', uid: TEST_USER_ID });
+    const denied = await mediforce.evaluation.getRun({ evalRunId });
+    expect(judgeReport(denied)).toMatchObject({ passes: 1, failures: 0, excluded: 1, passRate: 1 });
+    expect(verdictOn(denied, unsureCase.id)).toMatchObject({ passed: false, counts: false, review: { decision: 'denied' } });
   });
 });
