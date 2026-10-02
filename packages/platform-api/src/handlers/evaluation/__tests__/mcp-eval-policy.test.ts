@@ -4,17 +4,17 @@ import { getMcpEvalPolicy, setMcpEvalPolicy } from '../mcp-eval-policy';
 import { evaluationFixture, STEP } from './fixture';
 
 describe('MCP eval policy', () => {
-  it('denies every server of the step\'s agent until declared safe', async () => {
+  it('runs every server of the step\'s agent live until declared otherwise', async () => {
     const fixture = await evaluationFixture();
     expect((await getMcpEvalPolicy(STEP, fixture.scope())).servers).toEqual([
-      { name: 'edc', mode: 'deny', defaulted: true, recordedCaseIds: [] },
-      { name: 'email', mode: 'deny', defaulted: true, recordedCaseIds: [] },
+      { name: 'edc', mode: 'live', defaulted: true, recordedCaseIds: [] },
+      { name: 'email', mode: 'live', defaulted: true, recordedCaseIds: [] },
     ]);
 
     await setMcpEvalPolicy({ ...STEP, servers: { edc: { mode: 'live', denyTools: ['write_record'] } } }, fixture.scope());
     expect((await getMcpEvalPolicy(STEP, fixture.scope())).servers).toEqual([
       { name: 'edc', mode: 'live', denyTools: ['write_record'], defaulted: false, recordedCaseIds: [] },
-      { name: 'email', mode: 'deny', defaulted: true, recordedCaseIds: [] },
+      { name: 'email', mode: 'live', defaulted: true, recordedCaseIds: [] },
     ]);
   });
 
@@ -30,7 +30,7 @@ describe('MCP eval policy', () => {
 
     expect((await getMcpEvalPolicy(STEP, fixture.scope())).servers).toEqual([
       { name: 'edc', mode: 'replay', defaulted: false, recordedCaseIds: [caseId] },
-      { name: 'email', mode: 'deny', defaulted: true, recordedCaseIds: [] },
+      { name: 'email', mode: 'live', defaulted: true, recordedCaseIds: [] },
     ]);
   });
 

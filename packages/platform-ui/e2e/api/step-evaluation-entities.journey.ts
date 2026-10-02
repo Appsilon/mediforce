@@ -34,7 +34,7 @@ import { seedPostgresOrganizationNamespace, seedPostgresWorkspaceMember } from '
  * API E2E for the Evaluation entities of ADR-0023 phase 1b: a step's
  * Evaluators with their trust gate, a draft check previewed against a real
  * production output, "add to eval set" from that run, a frozen Eval Dataset,
- * and the default-deny MCP eval policy — all scoped to the step's workspace.
+ * and the MCP eval policy — all scoped to the step's workspace.
  *
  * The production run is driven with MOCK_AGENT=true (result `{ mock, summary }`);
  * `code` checks run locally under ALLOW_LOCAL_AGENTS=true.

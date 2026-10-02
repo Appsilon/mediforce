@@ -75,7 +75,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     await advanceEvalRunOfInstance(scope, instanceId);
   }
 
-  it('freezes the Evaluators with whether they count, denies MCP and needs 100% pass by default, and needs a budget without an estimate', async () => {
+  it('freezes the Evaluators with whether they count, runs MCP live and needs 100% pass by default, and needs a budget without an estimate', async () => {
     await expect(prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 2 }, scope)).rejects.toThrow(/set budgetUsd/);
 
     const { evalRun, trials, report } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 2, budgetUsd: 5 }, scope);
@@ -85,7 +85,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
       ['fatal-flagged', false, 'source not approved'],
       ['findings-present', true, undefined],
     ]);
-    expect(evalRun.mcpPolicy).toEqual({ edc: { mode: 'deny' }, email: { mode: 'deny' } });
+    expect(evalRun.mcpPolicy).toEqual({ edc: { mode: 'live' }, email: { mode: 'live' } });
     expect(evalRun.acceptanceCriteria).toEqual({ critical: { minPassRate: 1 }, major: { minPassRate: 1 }, minor: { minPassRate: 1 } });
     expect(evalRun.estimate).toMatchObject({ perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 });
     expect(trials).toHaveLength(4);

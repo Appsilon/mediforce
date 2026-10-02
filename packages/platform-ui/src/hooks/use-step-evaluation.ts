@@ -11,7 +11,6 @@ type Section =
   | 'evaluators'
   | 'cases'
   | 'datasets'
-  | 'mcp-policy'
   | 'runs'
   | 'agent-runs'
   | 'criteria'
@@ -66,7 +65,6 @@ export function useStepEvaluation(step: EvaluatedStep) {
     evaluators: useStepEvaluators(step),
     cases: useQuery({ queryKey: sectionKey(step, 'cases'), queryFn: () => mediforce.evaluation.listCases(step), ...options }),
     datasets: useQuery({ queryKey: sectionKey(step, 'datasets'), queryFn: () => mediforce.evaluation.listDatasets(step), ...options }),
-    mcpPolicy: useQuery({ queryKey: sectionKey(step, 'mcp-policy'), queryFn: () => mediforce.evaluation.getMcpPolicy(step), ...options }),
     runs: useQuery({ queryKey: sectionKey(step, 'runs'), queryFn: () => mediforce.evaluation.listRuns(step), ...options }),
     criteria: useQuery({ queryKey: sectionKey(step, 'criteria'), queryFn: () => mediforce.evaluation.getAcceptanceCriteria(step), ...options }),
     qualification: useStepQualification(step),

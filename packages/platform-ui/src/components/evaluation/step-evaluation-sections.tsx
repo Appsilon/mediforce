@@ -13,7 +13,6 @@ import {
   EvalCaseSplitSchema,
   EvaluatorKindSchema,
   EvaluatorSeveritySchema,
-  McpEvalServerPolicySchema,
   describeAcceptanceCriteria,
   describeMcpPolicy,
   type AcceptanceCriteria,
@@ -27,7 +26,6 @@ import {
   type EvaluatedStep,
   type EvaluatorCheck,
   type EvaluatorSeverity,
-  type McpEvalServerPolicy,
   type StepFingerprintComponent,
 } from '@mediforce/platform-core';
 import {
@@ -1202,81 +1200,6 @@ export function CasesSection({ step, evaluation, mayEdit }: {
       {cases.length > 0 && <DatasetStatus cases={cases} datasets={datasets} />}
       {save.error !== null && <p className="text-xs text-destructive">{save.error.message}</p>}
       {mayEdit && <UnsavedChangesGuard when={hasUnsavedChanges} />}
-    </Section>
-  );
-}
-
-type McpEvalMode = McpEvalServerPolicy['mode'];
-
-const MCP_MODES: Record<McpEvalMode, { label: string; description: string }> = {
-  deny: {
-    label: 'Deny',
-    description: 'The agent cannot use this server during a trial — its tools are not offered.',
-  },
-  live: {
-    label: 'Live',
-    description: 'Calls go to the real server. Every call and its answer is recorded per case, so later runs can replay it.',
-  },
-  replay: {
-    label: 'Replay',
-    description: 'A case with a recording never reaches the server: its calls are answered from what a live trial of that case recorded, and a call no recording answers gets an error. A case with no recording yet runs live once and records it.',
-  },
-};
-
-/**
- * What each MCP server of the Step's agent may do in a trial (D6); unnamed
- * servers are denied. A live trial records what a server answers, per case, for
- * a replay; a replayed case with no recording yet runs live and records it.
- */
-export function McpPolicySection({ step, data, mayEdit }: { step: EvaluatedStep; data: StepEvaluation['mcpPolicy']; mayEdit: boolean }) {
-  const save = useStepEvaluationMutation(step, (servers: Record<string, McpEvalServerPolicy>) =>
-    mediforce.evaluation.setMcpPolicy({ ...step, servers }));
-  const servers = data.data?.servers ?? [];
-  if (!data.isLoading && servers.length === 0) return null;
-  const policyOf = (mode: McpEvalMode, denyTools: string[] | undefined): McpEvalServerPolicy =>
-    ({ mode, ...(denyTools === undefined || mode === 'deny' ? {} : { denyTools }) });
-  const setMode = (name: string, mode: McpEvalMode) => {
-    const next = Object.fromEntries(servers.filter((server) => server.defaulted === false)
-      .map((server) => [server.name, policyOf(server.mode, server.denyTools)]));
-    next[name] = policyOf(mode, servers.find((server) => server.name === name)?.denyTools);
-    save.mutate(next);
-  };
-  return (
-    <Section title="MCP servers in eval trials">
-      <p className="text-xs text-muted-foreground">
-        What the step&apos;s agent may do with each of its MCP servers while an Eval Run tries it. Replay records each case live the first time it runs, then answers from that recording — after a case&apos;s first run, its trials touch nothing outside.
-      </p>
-      {data.isLoading ? <Loading /> : (
-        <ul className="space-y-2 text-sm">
-          {servers.map((server) => (
-            <li key={server.name} className="space-y-0.5" data-testid="mcp-policy-server">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs">{server.name}</span>
-                {server.mode !== 'deny' && server.denyTools !== undefined && server.denyTools.length > 0 && (
-                  <span className="text-xs text-muted-foreground">denied tools: {server.denyTools.join(', ')}</span>
-                )}
-                <InstantTooltip label="Replay answers the cases recorded here; any other case runs live once to record.">
-                  <span className="text-xs text-muted-foreground">
-                    recorded for {server.recordedCaseIds.length} case{server.recordedCaseIds.length === 1 ? '' : 's'}
-                  </span>
-                </InstantTooltip>
-                <select
-                  aria-label={`${server.name} mode`}
-                  className={cn(inputClass, 'ml-auto text-xs')}
-                  value={server.mode}
-                  disabled={!mayEdit || save.isPending}
-                  onChange={(event) => setMode(server.name, McpEvalServerPolicySchema.shape.mode.parse(event.target.value))}
-                >
-                  {McpEvalServerPolicySchema.shape.mode.options.map((mode) => (
-                    <option key={mode} value={mode}>{MCP_MODES[mode].label}{mode === 'deny' && server.defaulted ? ' (default)' : ''}</option>
-                  ))}
-                </select>
-              </div>
-              <p className="text-xs text-muted-foreground">{MCP_MODES[server.mode].description}</p>
-            </li>
-          ))}
-        </ul>
-      )}
     </Section>
   );
 }

@@ -21,7 +21,7 @@ import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
  * API E2E for Eval Runs (ADR-0023 D4, D6, D10, Step Evaluation 1b): Evaluators
  * and an Eval Dataset built from a production run, an Eval Run started only on
  * a confirmed budget, its trials run as real single-step Workflow Runs with
- * the default-deny MCP eval policy applied, and a report whose numbers are the
+ * the MCP eval policy applied (undeclared servers live), and a report whose numbers are the
  * Scores those trials received. Trials stay out of run lists and the Agents
  * history.
  *
@@ -88,7 +88,7 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
     await post(request, '/api/evaluation/cases/from-agent-run', { agentRunId: production.id, expectation: 'positive' }, 201);
     await post(request, '/api/evaluation/datasets', step, 201);
     const policyRes = await request.put('/api/evaluation/mcp-policy', {
-      headers: JSON_HEADERS, data: { ...step, servers: { meddra: { mode: 'live' } } },
+      headers: JSON_HEADERS, data: { ...step, servers: { email: { mode: 'deny' } } },
     });
     expect(policyRes.status(), await policyRes.text()).toBe(200);
 
@@ -119,7 +119,7 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
       const instanceRes = await request.get(`/api/processes/${trial.processInstanceId}`, { headers: AUTH_HEADERS });
       expect(instanceRes.status()).toBe(200);
       expect(await instanceRes.json()).toMatchObject({ evalRunId: prepared.evalRun.id, status: 'completed' });
-      // The undeclared `email` server was denied; `meddra` ran live.
+      // The denied `email` server was removed; the undeclared `meddra` ran live.
       expect(await trajectoryText(request, trial.agentRunId!)).toContain('with MCP servers: meddra.');
     }
 

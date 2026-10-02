@@ -2,11 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { inlineMcpServerNames, mcpEvalRestrictions, narrowMcpRestrictions } from '../mcp-eval-restrictions';
 
 describe('mcpEvalRestrictions (ADR-0023 D6)', () => {
-  it('denies every server the policy does not name', () => {
-    expect(mcpEvalRestrictions(['edc-read', 'email'], {})).toEqual({
-      'edc-read': { disable: true },
-      email: { disable: true },
-    });
+  it('keeps every server the policy does not name', () => {
+    expect(mcpEvalRestrictions(['edc-read', 'email'], {})).toEqual({});
   });
 
   it('keeps a live server and adds its denied tools to the step restriction', () => {

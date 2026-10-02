@@ -28,7 +28,7 @@ agent first.
 
 The **Evaluation** tab of a workflow shows one agent step at a time — its
 Acceptance Criteria with whether it is validated against them,
-Evaluators, Eval Cases, MCP eval policy and Eval Runs — beside the
+Evaluators, Eval Cases and Eval Runs — beside the
 Evaluation Assistant (`mediforce eval ask`, `POST /api/evaluation/assistant`),
 whose header holds the step's Brief.
 Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
@@ -448,11 +448,13 @@ names the Dataset version it ran.
 ## MCP eval policy
 
 Per MCP server of the Step's agent: `live`, `live` with named tools denied,
-`replay`, or `deny`. A server the policy does not name is denied in eval trials.
+`replay`, or `deny`. A server the policy does not name runs live in eval trials.
 Denied tools apply to a `live` server, and to a `replay` server while it runs
 live to record a case; on a denied server they have no effect.
 `mcp-policy-get` shows what each server does, defaults included, and which Eval
-Cases each server has a recording for.
+Cases each server has a recording for. The policy is set through the CLI
+(`mcp-policy-set`) or `PUT /api/evaluation/mcp-policy`; the Evaluation tab does
+not show it.
 
 **Record and replay.** Every trial with a `live` server records what that
 server answered: the trial's `mcp-config.json` starts the server behind a small
@@ -515,7 +517,7 @@ step's few-shot `agent.examples` is left out of the run (`exampleCaseIds`;
    enters the Step directly with the case's trigger payload and earlier step
    outputs, its workspace branched from the case's seed commit, and stops after
    the Step: no review task, no escalation, no next step. MCP servers the policy
-   does not declare `live` or `replay` are removed from the agent's config; a Step that
+   declares `deny` are removed from the agent's config; a Step that
    declares MCP servers inline cannot be evaluated at all. Just before the
    agent runs, the trial recomputes the Step Fingerprint; if the
    step or its agent changed since the run was prepared (model, system prompt,

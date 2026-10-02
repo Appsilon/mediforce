@@ -279,7 +279,7 @@ export const FreezeEvalDatasetOutputSchema = z.object({ dataset: EvalDatasetVers
 /** How one of the Step agent's MCP servers behaves in a trial, defaults applied. */
 export const EffectiveMcpEvalServerSchema = McpEvalServerPolicySchema.extend({
   name: z.string(),
-  /** True when the policy does not name the server and it is denied by default. */
+  /** True when the policy does not name the server and it runs live by default. */
   defaulted: z.boolean(),
   /** The Eval Cases a live trial recorded this server for — the ones a replay can answer. */
   recordedCaseIds: z.array(z.uuid()),

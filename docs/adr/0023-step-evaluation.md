@@ -125,7 +125,10 @@ means "record each case once, then replay it" and an author never switches a
 server from `live` to `replay` by hand. A `replay` server may name denied
 tools, which hold while it records. The report counts, per replayed server,
 the cases this run recorded that way, and claims no live MCP call only when
-there were none and no server was `live`._
+there were none and no server was `live`._ _Amended 2026-10-02: default-live.
+A server the policy does not name runs `live` in trials (recording each case),
+not denied; `deny` and `replay` stay available through the CLI and API. The
+Evaluation tab no longer shows the policy._
 
 **D7 — Evaluators are versioned; a version that produced a Score is
 immutable.** Eval Runs record the Evaluator versions used; a Step

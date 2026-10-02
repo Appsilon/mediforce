@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { AcceptanceCriteriaSection, CasesSection, DriftAlert, EvaluatorsSection, McpPolicySection, caseFromFile, datasetDrift, toEvaluatorName, withPassRate } from '../step-evaluation-sections';
+import { AcceptanceCriteriaSection, CasesSection, DriftAlert, EvaluatorsSection, caseFromFile, datasetDrift, toEvaluatorName, withPassRate } from '../step-evaluation-sections';
 
 const verdicts = vi.hoisted((): Record<string, 'positive' | 'negative'> => ({}));
 
@@ -94,20 +94,6 @@ describe('DriftAlert', () => {
     render(<DriftAlert data={{ data: { window: 20, threshold: 0.15, evaluators: [{ ...evaluator, drifting: false }] } } as never} />);
 
     expect(screen.queryByRole('alert')).toBeNull();
-  });
-});
-
-describe('McpPolicySection', () => {
-  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
-  const server = { name: 'meddra', mode: 'deny', defaulted: true, recordedCaseIds: [] };
-
-  it('says what the mode each server is in does in a trial', () => {
-    render(<McpPolicySection step={step} data={{ isLoading: false, data: { servers: [server, { ...server, name: 'ctcae', mode: 'replay', defaulted: false }] } } as never} mayEdit={true} />);
-
-    const [meddra, ctcae] = screen.getAllByTestId('mcp-policy-server');
-    expect(meddra!.textContent).toContain('cannot use this server during a trial');
-    expect(ctcae!.textContent).toContain('answered from what a live trial of that case recorded');
-    expect(ctcae!.textContent).toContain('runs live once and records it');
   });
 });
 

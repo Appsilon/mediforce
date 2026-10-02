@@ -99,7 +99,7 @@ test.describe('Step Evaluation MCP replay — API E2E', () => {
     }, 201));
     await post(request, '/api/evaluation/datasets', step, 201);
     const policyRes = await request.put('/api/evaluation/mcp-policy', {
-      headers: JSON_HEADERS, data: { ...step, servers: { meddra: { mode: 'replay' } } },
+      headers: JSON_HEADERS, data: { ...step, servers: { email: { mode: 'deny' }, meddra: { mode: 'replay' } } },
     });
     expect(policyRes.status(), await policyRes.text()).toBe(200);
     expect(await recordedCaseIds(request, step)).toEqual([]);
@@ -134,7 +134,7 @@ test.describe('Step Evaluation MCP replay — API E2E', () => {
     expect(trial).toMatchObject({ status: 'scored', mcpReplayMisses: [] });
     const trajectoryRes = await request.get(`/api/agent-runs/${trial!.agentRunId}/trajectory`, { headers: AUTH_HEADERS });
     const [first] = GetAgentTrajectoryOutputSchema.parse(await trajectoryRes.json()).entries;
-    // The replayed server is kept for the agent; the undeclared `email` is denied.
+    // The replayed server is kept for the agent; the denied `email` is not.
     expect(first?.text).toContain('with MCP servers: meddra.');
     expect(replayed.report.mcp).toEqual({ live: [], replayed: ['meddra'], denied: ['email'], recordedFirst: [], unrecordedCalls: [] });
     expect(describeMcpReport(replayed.report.mcp)).toContain('No trial made a live MCP call.');
