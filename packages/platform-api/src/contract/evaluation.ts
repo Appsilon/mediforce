@@ -178,6 +178,8 @@ export const GetAgentRunIoOutputSchema = z.object({
   result: z.unknown(),
   reasoningSummary: z.string().nullable(),
   confidence: z.number().nullable(),
+  /** What a person's review makes of `result`: approved is a positive case, rejected a negative one; null when neither. */
+  verdictExpectation: EvalCaseExpectationSchema.nullable(),
 });
 
 export const ListEvalCasesInputSchema = EvaluatedStepSchema.extend({
@@ -204,12 +206,14 @@ export const CreateEvalCaseInputSchema = EvaluatedStepSchema.extend({
  * it and its parent commit become the case. A run a person reviewed gives the
  * case its output as the expected output — approved as positive, rejected as
  * negative; an unreviewed run gives none. `expectedOutput` and `expectation`
- * override that. With `step`, the run must be a run of that step.
+ * override that. An `input` other than the run's makes a manual case that
+ * keeps the run it came from. With `step`, the run must be a run of that step.
  */
 export const CreateEvalCaseFromAgentRunInputSchema = z.object({
   agentRunId: z.string().min(1),
   step: EvaluatedStepSchema.optional(),
   name: z.string().trim().min(1).max(200).optional(),
+  input: EvalCaseInputSchema.optional(),
   expectedOutput: EvalCaseSchema.shape.expectedOutput.optional(),
   expectation: EvalCaseExpectationSchema.optional(),
   comparison: EvalCaseComparisonSchema.default('exact'),

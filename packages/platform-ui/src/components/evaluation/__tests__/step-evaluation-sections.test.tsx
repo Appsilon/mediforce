@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { AcceptanceCriteriaSection, CasesSection, DriftAlert, EvaluatorsSection, McpPolicySection, caseFromFile, datasetDrift, toEvaluatorName, withPassRate } from '../step-evaluation-sections';
+
+const verdicts = vi.hoisted((): Record<string, 'positive' | 'negative'> => ({}));
 
 vi.mock('@/hooks/use-step-evaluation', () => ({
   useAgentRunIo: (agentRunId: string | null) => ({
@@ -14,6 +16,7 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
       result: { grade: `output of ${agentRunId}` },
       reasoningSummary: null,
       confidence: null,
+      verdictExpectation: verdicts[agentRunId] ?? null,
     },
   }),
   useStepEvaluationMutation: (_step: unknown, mutationFn: (value: unknown) => unknown) => ({
@@ -36,7 +39,7 @@ const evaluation = vi.hoisted(() => ({
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
 
 vi.mock('@/components/agents/agent-log-panel', () => ({
-  AgentLogPanel: ({ run }: { run: { id: string } | null }) => (run === null ? null : <div data-testid="agent-log-panel">{run.id}</div>),
+  AgentRunLog: ({ run }: { run: { id: string } }) => <div data-testid="agent-run-log">{run.id}</div>,
 }));
 
 vi.mock('@/hooks/use-agent-runs', () => ({
@@ -239,7 +242,7 @@ describe('Evaluator view and edit', () => {
   });
 });
 
-describe('Production runs to add as Eval Cases', () => {
+describe('Adding an Eval Case from a production run', () => {
   const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
   const agentRun = (id: string, summary: string) => ({
     id, status: 'completed', fallbackReason: null, startedAt: '2026-09-24T08:00:00.000Z', envelope: { reasoning_summary: summary },
@@ -250,38 +253,80 @@ describe('Production runs to add as Eval Cases', () => {
     datasets: { data: { datasets: [] } },
     evaluators: { data: { evaluators: [] } },
   }) as never;
+  const openDialog = () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Add case' }));
+    return within(screen.getByTestId('case-dialog'));
+  };
 
-  it('lists every loaded page with what each run did, and loads more on request', () => {
+  it('has one way to add a case, and offers every loaded run to start from, loading more on request', () => {
     const fetchNextPage = vi.fn();
     render(<CasesSection step={step} evaluation={withRuns([[agentRun('run-a', 'Graded 3 events.')], [agentRun('run-b', 'No events found.')]], { hasNextPage: true, fetchNextPage })} mayEdit={true} />);
+    expect(screen.queryByRole('button', { name: 'Write a case' })).toBeNull();
+    const dialog = openDialog();
 
-    expect(screen.getByText('Production runs to add as Eval Cases (2+)')).toBeTruthy();
-    expect(screen.getByTestId('harvestable-runs').textContent).toContain('Graded 3 events.');
-    expect(screen.getByTestId('harvestable-runs').textContent).toContain('No events found.');
-    fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+    const options = Array.from((dialog.getByLabelText('Start from') as HTMLSelectElement).options).map((option) => option.textContent);
+    expect(options.filter((option) => option?.includes('run-a') === true || option?.includes('run-b') === true)).toHaveLength(2);
+    expect(dialog.getByTestId('add-case').textContent).toContain('Graded 3 events.');
+    fireEvent.click(dialog.getByRole('button', { name: 'Load more runs' }));
     expect(fetchNextPage).toHaveBeenCalled();
   });
 
-  it('shows a run\'s input and output before it is added, fetched only when opened', () => {
+  it('fills the input and the expected output from the run, and marks each as the run had it until changed', () => {
+    evaluation.createCaseFromAgentRun.mockClear();
     render(<CasesSection step={step} evaluation={withRuns([[agentRun('run-a', 'Graded 3 events.')]], { hasNextPage: false })} mayEdit={true} />);
-    expect(screen.queryByTestId('run-input-output')).toBeNull();
+    const dialog = openDialog();
 
-    const details = screen.getByText('Input and output').closest('details')!;
-    details.open = true;
-    fireEvent(details, new Event('toggle'));
-    expect(screen.getByTestId('run-input').textContent).toContain('input of run-a');
-    expect(screen.getByTestId('run-output').textContent).toContain('output of run-a');
-    fireEvent.click(screen.getByRole('button', { name: 'Add as case' }));
-    expect(evaluation.createCaseFromAgentRun).toHaveBeenCalledWith({ agentRunId: 'run-a' });
+    expect(JSON.parse((dialog.getByLabelText('Case input') as HTMLTextAreaElement).value)).toEqual({ triggerPayload: { narrative: 'input of run-a' }, previousStepOutputs: {} });
+    expect(JSON.parse((dialog.getByLabelText('Expected output') as HTMLTextAreaElement).value)).toEqual({ grade: 'output of run-a' });
+    expect(dialog.getByTestId('case-output-mark').textContent).toBe('As the source run');
+    expect(dialog.getByTestId('case-form').textContent).toContain('Nobody reviewed this run');
+
+    fireEvent.change(dialog.getByLabelText('Expected output'), { target: { value: '{"grade": 4}' } });
+    expect(dialog.getByTestId('case-output-mark').textContent).toBe('Edited');
+    fireEvent.click(dialog.getByRole('button', { name: 'Use the source run\'s output' }));
+    expect(dialog.getByTestId('case-output-mark').textContent).toBe('As the source run');
+
+    const edited = { triggerPayload: { narrative: 'an edited narrative' }, previousStepOutputs: {} };
+    fireEvent.change(dialog.getByLabelText('Case input'), { target: { value: JSON.stringify(edited) } });
+    expect(dialog.getByTestId('case-input-mark').textContent).toBe('Edited');
+    fireEvent.click(dialog.getByRole('button', { name: 'Add case' }));
+
+    expect(evaluation.createCaseFromAgentRun).toHaveBeenCalledWith({
+      agentRunId: 'run-a', step, name: 'From run run-a (2026-09-24)', split: 'dev', input: edited,
+      expectedOutput: { grade: 'output of run-a' }, expectation: 'positive', comparison: 'exact', agreementInstructions: null, evaluatorIds: null,
+    });
   });
 
-  it('opens a run\'s log', () => {
-    render(<CasesSection step={step} evaluation={withRuns([[agentRun('run-a', 'Graded 3 events.')]], { hasNextPage: false })} mayEdit={true} />);
+  it('starts from the newest run that is not a case yet, so adding at once makes no duplicate', () => {
+    const evaluationWithCase = {
+      cases: { isLoading: false, data: { cases: [evalCaseOf({ sourceAgentRunId: 'run-a' })] } },
+      agentRuns: { data: { pages: [{ runs: [agentRun('run-a', ''), agentRun('run-b', '')] }] }, hasNextPage: false },
+      datasets: { data: { datasets: [] } },
+      evaluators: { data: { evaluators: [] } },
+    } as never;
+    render(<CasesSection step={step} evaluation={evaluationWithCase} mayEdit={true} />);
+    const dialog = openDialog();
+    expect((dialog.getByLabelText('Start from') as HTMLSelectElement).value).toBe('run:run-b');
+  });
 
-    expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
-    expect(screen.queryByTestId('agent-log-panel')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Log' }));
-    expect(screen.getByTestId('agent-log-panel').textContent).toBe('run-a');
+  it('starts a rejected run\'s case as negative', () => {
+    verdicts['run-rejected'] = 'negative';
+    render(<CasesSection step={step} evaluation={withRuns([[agentRun('run-rejected', '')]], { hasNextPage: false })} mayEdit={true} />);
+    const dialog = openDialog();
+
+    expect((dialog.getByLabelText('Negative — the output must not match') as HTMLInputElement).checked).toBe(true);
+    expect(dialog.getByTestId('case-form').textContent).not.toContain('Nobody reviewed this run');
+  });
+
+  it('opens the run\'s log inside the dialog, fetched only when opened', () => {
+    render(<CasesSection step={step} evaluation={withRuns([[agentRun('run-a', 'Graded 3 events.')]], { hasNextPage: false })} mayEdit={true} />);
+    const dialog = openDialog();
+    expect(dialog.queryByTestId('agent-run-log')).toBeNull();
+
+    const log = dialog.getByTestId('source-run-log') as HTMLDetailsElement;
+    log.open = true;
+    fireEvent(log, new Event('toggle'));
+    expect(dialog.getByTestId('agent-run-log').textContent).toBe('run-a');
   });
 });
 
@@ -298,32 +343,49 @@ describe('Eval Case view and edit', () => {
     evaluators: { data: { evaluators } },
   }) as never;
 
-  it('shows what a case gives the step and what it expects, and opens its source run\'s log', () => {
-    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={false} />);
+  it('shows only what a case gives the step and what it expects, with Edit beside its labels', () => {
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={true} />);
 
     const details = screen.getByTestId('eval-case-details');
-    expect(screen.getByTestId('eval-case-expected-output').textContent).toContain('an output that matches this, by exact match');
+    expect(screen.getByTestId('eval-case-expected-output').textContent).toContain('An output that matches this, by exact match');
     expect(screen.getByTestId('eval-case-expected-output').textContent).toContain('"grade": 5');
-    expect(details.textContent).toContain('Graded by: every Evaluator of the step');
-    expect(details.textContent).toContain('"studyId": "CDISCPILOT01"');
-    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Source run log' }));
-    expect(screen.getByTestId('agent-log-panel').textContent).toBe('run-00000001');
+    expect(details.textContent).toContain('Graded by: all evaluators');
+    expect(screen.getByTestId('eval-case-input').textContent).toContain('"studyId": "CDISCPILOT01"');
+    expect(details.textContent).not.toContain('Source:');
+    expect(details.textContent).not.toContain('The source run');
+    expect(details.textContent).not.toContain('Added by');
+    expect(within(details).queryByRole('button', { name: 'Edit' })).toBeNull();
+    expect(within(screen.getByTestId('eval-case-row')).getByRole('button', { name: 'Edit' })).toBeTruthy();
   });
 
-  it('shows the input and output of the run a production case came from', () => {
-    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={false} />);
-    const details = screen.getByTestId('eval-case-details') as HTMLDetailsElement;
-    details.open = true;
-    fireEvent(details, new Event('toggle'));
-
-    expect(details.textContent).toContain('The source run');
-    expect(screen.getByTestId('run-output').textContent).toContain('output of run-00000001');
+  it('marks a case made from a run edited once it no longer gives or expects what the run did', () => {
+    const asRun = { input: { triggerPayload: { narrative: 'input of run-00000001' }, previousStepOutputs: {} }, expectedOutput: { grade: 'output of run-00000001' } };
+    const marks = [
+      evalCaseOf(asRun),
+      evalCaseOf({ ...asRun, source: 'manual' }),
+      evalCaseOf({ ...asRun, expectedOutput: { grade: 5 } }),
+      evalCaseOf({ ...asRun, expectedOutput: null }),
+      evalCaseOf({ ...asRun, source: 'manual', input: { triggerPayload: {}, previousStepOutputs: {} } }),
+    ].map((evalCase) => {
+      const { unmount } = render(<CasesSection step={step} evaluation={withCase(evalCase)} mayEdit={false} />);
+      const text = screen.getByTestId('eval-case-run-mark').textContent;
+      unmount();
+      return text;
+    });
+    expect(marks).toEqual(['as run', 'as run', 'edited', 'edited', 'edited']);
   });
 
-  it('names the Evaluators a case selects', () => {
-    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ evaluatorIds: ['e-schema'] }))} mayEdit={false} />);
-    expect(screen.getByTestId('eval-case-details').textContent).toContain('Graded by: findings-present');
+  it('opens the source run\'s log from the details, for a person who cannot edit too', () => {
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ source: 'synthesized' }))} mayEdit={false} />);
+    const log = screen.getByTestId('source-run-log') as HTMLDetailsElement;
+    log.open = true;
+    fireEvent(log, new Event('toggle'));
+    expect(screen.getByTestId('agent-run-log').textContent).toBe('run-00000001');
+  });
+
+  it('does not mark a case written by hand', () => {
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ source: 'manual', sourceAgentRunId: null }))} mayEdit={false} />);
+    expect(screen.queryByTestId('eval-case-run-mark')).toBeNull();
   });
 
   it('saves only what changed: an agreement comparison with the case\'s own instructions', () => {
@@ -345,7 +407,7 @@ describe('Eval Case view and edit', () => {
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={true} />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.click(screen.getByLabelText('Negative — the output must not match'));
-    fireEvent.click(screen.getByLabelText('Only these'));
+    fireEvent.click(screen.getByLabelText('Selected evaluators'));
     fireEvent.click(screen.getByLabelText('Graded by findings-present'));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -358,12 +420,13 @@ describe('Eval Case view and edit', () => {
     expect(screen.getByTestId('case-comparison').textContent).toContain('The step has no Expected output check yet');
   });
 
-  it('offers the comparison only once there is an expected output, and saves clearing it as none', () => {
+  it('offers positive or negative and the comparison even with no expected output, and saves clearing it as none', () => {
     evaluation.updateCase.mockClear();
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={true} />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByLabelText('Expected output'), { target: { value: '' } });
-    expect(screen.queryByTestId('case-comparison')).toBeNull();
+    expect(screen.getByTestId('case-comparison').textContent).toContain('only the Evaluators grade the case');
+    expect(screen.getByLabelText('Comparison')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(evaluation.updateCase).toHaveBeenCalledWith({ caseId: 'c-1', expectedOutput: null });
@@ -381,7 +444,7 @@ describe('Eval Case view and edit', () => {
     fireEvent.click(screen.getByLabelText('Select One'));
     fireEvent.click(screen.getByLabelText('Select Three'));
     fireEvent.click(screen.getByRole('button', { name: 'Set evaluators…' }));
-    fireEvent.click(screen.getByLabelText('Only these'));
+    fireEvent.click(screen.getByLabelText('Selected evaluators'));
     fireEvent.click(screen.getByLabelText('Graded by matches-expected'));
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 
@@ -402,7 +465,7 @@ describe('Eval Case view and edit', () => {
   });
 });
 
-describe('Writing an Eval Case', () => {
+describe('Adding an Eval Case by hand', () => {
   const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
   const withCases = (cases: unknown[]) => ({
     cases: { isLoading: false, data: { cases } },
@@ -414,7 +477,7 @@ describe('Writing an Eval Case', () => {
   it('starts from an existing case\'s input, so it keeps the shape the step is given, and its workspace', () => {
     const source = evalCaseOf({ workspaceSeedCommit: 'abc1234' });
     render(<CasesSection step={step} evaluation={withCases([source])} mayEdit={true} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Write a case' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add case' }));
 
     expect(JSON.parse((screen.getByLabelText('Case input') as HTMLTextAreaElement).value)).toEqual(source.input);
     const input = { ...source.input, triggerPayload: { studyId: 'NOT-A-STUDY' } };
@@ -432,7 +495,7 @@ describe('Writing an Eval Case', () => {
   it('takes the expected output beside the input', () => {
     evaluation.createCase.mockClear();
     render(<CasesSection step={step} evaluation={withCases([])} mayEdit={true} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Write a case' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add case' }));
     fireEvent.change(screen.getByLabelText('Case name'), { target: { value: 'Fatal sepsis' } });
     fireEvent.change(screen.getByLabelText('Expected output'), { target: { value: '{"findings": [{"term": "Sepsis", "grade": 5}]}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add case' }));
@@ -445,7 +508,7 @@ describe('Writing an Eval Case', () => {
   it('says what is wrong with an expected output that is not JSON instead of sending it', () => {
     evaluation.createCase.mockClear();
     render(<CasesSection step={step} evaluation={withCases([])} mayEdit={true} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Write a case' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add case' }));
     fireEvent.change(screen.getByLabelText('Case name'), { target: { value: 'Broken' } });
     fireEvent.change(screen.getByLabelText('Expected output'), { target: { value: '{grade: 5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add case' }));
@@ -456,7 +519,7 @@ describe('Writing an Eval Case', () => {
 
   it('fills the form from a .json file of a whole case', async () => {
     render(<CasesSection step={step} evaluation={withCases([])} mayEdit={true} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Write a case' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add case' }));
     const written = { name: 'Grade 4 neutropenia', input: { triggerPayload: {}, previousStepOutputs: { 'extract-aes': { events: [] } } }, expectedOutput: { grade: 4 }, expectation: 'negative' };
     fireEvent.change(screen.getByLabelText('Case file'), { target: { files: [new File([JSON.stringify(written)], 'neutropenia.json', { type: 'application/json' })] } });
 

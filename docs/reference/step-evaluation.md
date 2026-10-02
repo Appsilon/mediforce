@@ -366,45 +366,57 @@ A harvested case takes the run's output as its expected output when a person
 reviewed the run: approved, a positive case; rejected, a negative one. A run
 sent back for revision or never reviewed gives none. An `expectedOutput` in the
 request (`null` for none) replaces the run's output and is positive unless
-`expectation` says otherwise — the verdict labels only the run's own output. `case-from-run` takes `--expectation` and `--comparison`.
+`expectation` says otherwise — the verdict labels only the run's own output. `case-from-run` takes `--expectation`, `--comparison` and `--input-file` (a case input other than the run's makes a `manual` case that keeps the run).
 
-In the Evaluation tab, **Eval Cases → Production runs to add as Eval Cases**
-lists the Step's finished production runs not yet harvested, newest first and a
-page at a time (**Load more**; `GET /api/evaluation/agent-runs` takes the
-previous page's `nextCursor` as `cursor`). Each shows its reasoning summary,
-opens its **Input and output** — what the step was given beside what it
-returned (`eval run-io <agentRunId>`, `GET /api/evaluation/agent-runs/:agentRunId/io`;
-its `caseInput` is the same input as an Eval Case made from the run holds it)
-— and **Log** opens the run's execution log before you **Add as case**.
+In the Evaluation tab, **Eval Cases → Add case** is the one way to add a case:
+a dialog that starts from a production run, an existing case's input, a `.json`
+file, or an empty input. **Start from** lists the Step's finished production
+runs, newest first and a page at a time (**Load more runs**; `GET
+/api/evaluation/agent-runs` takes the previous page's `nextCursor` as `cursor`),
+marking runs that already have a case; it starts on the newest run that has none. Starting from a run fills the **Input**
+with what its step was given and the **Expected output** with what it returned
+(`eval run-io <agentRunId>`, `GET /api/evaluation/agent-runs/:agentRunId/io`; its
+`caseInput` is the same input as an Eval Case made from the run holds it, and its
+`verdictExpectation` is what a person's review makes of the output: approved
+positive, rejected negative, `null` unreviewed). The case then starts positive or
+negative from that review. Each side is marked **As the source run** or
+**Edited**, with **Use the source run's input** / **output** to put the run's
+back, and **Source run log** opens the run's execution log inline. It is saved
+with `POST /api/evaluation/cases/from-agent-run` carrying the form's `input`:
+an input other than the run's makes a `manual` case that keeps the run it came
+from.
 
-**Write a case** covers inputs production has not sent — an input the step must
-refuse, a record that should trip a rule. The form shows the **Input** beside
-the **Expected output** (left empty for none); once there is an expected output
-it asks whether the case is positive or negative and how to compare it — exact
-match or output agreement score, with instructions for this case — and under
-**Graded by** whether every Evaluator grades the case or only the ones ticked. Its input starts from an existing case's,
-so it keeps the shape the step is given (and that case's workspace commit), or
-from a `.json` file: a whole case as `case-add --file` takes it (`{ name, input,
+Starting from anything else covers inputs production has not sent — an input
+the step must refuse, a record that should trip a rule. An existing case's input
+keeps the shape the step is given (and that case's workspace commit); a `.json`
+file is a whole case as `case-add --file` takes it (`{ name, input,
 expectedOutput?, expectation?, comparison?, agreementInstructions?, split? }` —
-`evaluatorIds` from a file is ignored, as they belong to the step it was written for), or only its input (`{ triggerPayload,
-previousStepOutputs, previousRun? }`). It is saved with `POST /api/evaluation/cases`
-as a `manual` case, flagged as containing production data when the case it
-started from was.
+`evaluatorIds` from a file is ignored, as they belong to the step it was written
+for), or only its input (`{ triggerPayload, previousStepOutputs, previousRun?
+}`). It is saved with `POST /api/evaluation/cases` as a `manual` case, flagged as
+containing production data when the case it started from was.
 
-Each case in the list opens **Details**: where it came from, what it expects
-(its expected output, positive or negative, how it is compared, and the
-Evaluators that grade it), for a production case the input and output of its source run
-(for a synthesized one, its source run's, before the change), the input an Eval
-Run gives the step, the workspace commit it starts from, and **Source run log**
-for a case made from a run. **Edit** changes its name,
-split, input, expected output and how it is compared, or the Evaluators that
-grade it (`case-edit <caseId> --file`, `PATCH /api/evaluation/cases/:caseId`);
-**Use the source run's output** fills a production case's expected output with
-what its run returned. Ticking cases in the list and **Set evaluators…** sets
-the Evaluators of all of them at once, one edit per case that changes; **Archive** takes it out of the next
-freeze (`case-archive`). An edit is a new case that replaces the old one, which
-is archived, so a Dataset version frozen with the old case keeps exactly what it
-ran. A production case whose input is edited becomes `manual` — production never
+Either way the form shows the **Input** beside the **Expected output** (left
+empty for none), whether the case is **positive** or **negative**, how it is
+**compared** — exact match or output agreement score, with instructions for this
+case — and under **Graded by** **All evaluators** or **Selected evaluators**,
+which opens a checkbox per Evaluator.
+
+Each case in the list shows its labels (positive or negative, split, source),
+for a case made from a run whether it is **as run** or **edited** — its input
+differs from what the run was given, or its expected output (none included)
+from what the run returned — and **Edit** and **Archive** beside them. Its
+**Details** show only what the case gives the step and what it expects: its
+input, its expected output and how it is compared, and the Evaluators that grade
+it — plus **Source run log** for a case made from a run, synthesized ones
+included. **Edit** opens the same dialog to
+change its name, split, input, expected output and how it is compared, or the
+Evaluators that grade it (`case-edit <caseId> --file`, `PATCH
+/api/evaluation/cases/:caseId`). Ticking cases in the list and **Set
+evaluators…** sets the Evaluators of all of them at once, one edit per case that
+changes; **Archive** takes it out of the next freeze (`case-archive`). An edit
+is a new case that replaces the old one, which is archived, so a Dataset version
+frozen with the old case keeps exactly what it ran. A production case whose input is edited becomes `manual` — production never
 saw that input — and keeps the run it came from. MCP recordings are kept per
 case, so an edited case is recorded afresh by its next trial, `live` or `replay`.
 
