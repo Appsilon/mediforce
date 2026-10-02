@@ -1,9 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import type { AgentOutputSchema, EvaluatedStep, WorkflowStep } from '@mediforce/platform-core';
-import { useStepEvaluation } from '@/hooks/use-step-evaluation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { pickRunnableVersion, type AgentOutputSchema, type EvaluatedStep } from '@mediforce/platform-core';
+import { useStepEvaluation, useWorkflowValidation } from '@/hooks/use-step-evaluation';
 import { useWorkflowRunGate } from '@/hooks/use-workflow-access';
+import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
+import { VALIDATION_STATUS } from './validation-status';
 import { EvaluationAssistantPanel } from './evaluation-assistant-panel';
 import {
   AcceptanceCriteriaSection,
@@ -94,15 +97,16 @@ function AssistantResizeHandle({ width, resize, persist, commit }: ReturnType<ty
   );
 }
 
-function StepEvaluation({ step, outputSchema, mayEdit, editReason, mayRun, runReason }: {
+function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit, editReason, mayRun, runReason }: {
   step: EvaluatedStep;
+  definitionVersion: number;
   outputSchema: AgentOutputSchema | undefined;
   mayEdit: boolean;
   editReason: string | undefined;
   mayRun: boolean;
   runReason: string | undefined;
 }) {
-  const evaluation = useStepEvaluation(step);
+  const evaluation = useStepEvaluation(step, definitionVersion);
   const layoutRef = React.useRef<HTMLDivElement>(null);
   const assistantWidth = useAssistantWidth(layoutRef);
   // min() keeps a remembered width from squeezing the sections on a narrower window.
@@ -123,7 +127,7 @@ function StepEvaluation({ step, outputSchema, mayEdit, editReason, mayRun, runRe
           stepOutputSchema={outputSchema}
         />
         <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
-        <EvalRunsSection step={step} data={evaluation.runs} datasets={evaluation.datasets} mayRun={mayRun} runReason={runReason} mayEdit={mayEdit} editReason={editReason} />
+        <EvalRunsSection step={step} definitionVersion={definitionVersion} data={evaluation.runs} datasets={evaluation.datasets} mayRun={mayRun} runReason={runReason} mayEdit={mayEdit} editReason={editReason} />
       </div>
       <div className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
         <AssistantResizeHandle {...assistantWidth} />
@@ -133,42 +137,112 @@ function StepEvaluation({ step, outputSchema, mayEdit, editReason, mayRun, runRe
   );
 }
 
+const selectClass = 'rounded-md border bg-background px-2 py-1 text-sm';
+
 /**
- * The workflow's **Evaluation** tab (ADR-0023 D14): one agent step at a time,
- * its Acceptance Criteria with whether it is validated against them,
- * Evaluators, Eval Cases and Eval Runs beside the Evaluation
- * Assistant, which holds the Step's Brief. Everything here lives outside the definition, so no
- * change on this tab mints a version.
+ * The workflow's **Evaluation** tab (ADR-0023 D14): one agent step of one
+ * workflow version at a time — the runnable version unless `?version=` names
+ * another, the step `?step=` names or the first. Each version reads Verified,
+ * Failed or Not verified across its agent steps, each step its validation in
+ * that version. Its Acceptance Criteria, Evaluators, Eval Cases and Eval Runs
+ * sit beside the Evaluation Assistant, which holds the Step's Brief. Everything
+ * here lives outside the definition, so no change on this tab mints a version;
+ * an Eval Run runs the step as the selected version has it.
  */
-export function EvaluationTab({ handle, workflowName, steps, mayEdit, editReason }: {
+export function EvaluationTab({ handle, workflowName, mayEdit, editReason }: {
   handle: string;
   workflowName: string;
-  steps: readonly WorkflowStep[];
   mayEdit: boolean;
   editReason: string | undefined;
 }) {
-  const agentSteps = steps.filter((step) => step.executor === 'agent');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { mayRun, reason: runReason } = useWorkflowRunGate(handle, workflowName);
-  const [stepId, setStepId] = React.useState<string | null>(null);
-  const selected = agentSteps.find((step) => step.id === stepId) ?? agentSteps[0];
+  const { versions, defaultVersion, loading: versionsLoading } = useWorkflowVersions(workflowName, handle);
+  const validation = useWorkflowValidation(handle, workflowName);
 
-  if (selected === undefined) {
-    return <p className="text-sm text-muted-foreground">This workflow has no agent steps to evaluate.</p>;
+  const requestedVersion = Number(searchParams.get('version'));
+  const selectedVersion = versions.some((version) => version.version === requestedVersion)
+    ? requestedVersion
+    : (pickRunnableVersion(versions, defaultVersion)?.version ?? null);
+  const { definition, loading: definitionLoading } = useWorkflowVersion(workflowName, handle, selectedVersion);
+
+  const select = (next: { version?: number; step?: string }) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', 'evaluation');
+    if (next.version !== undefined) {
+      params.set('version', String(next.version));
+      params.delete('step');
+    }
+    if (next.step !== undefined) params.set('step', next.step);
+    router.replace(`${pathname}?${params}`, { scroll: false });
+  };
+
+  if (versionsLoading || definitionLoading || (selectedVersion !== null && definition === null)) {
+    return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
+  if (selectedVersion === null || definition === null) {
+    return <p className="text-sm text-muted-foreground">This workflow has no version to evaluate.</p>;
+  }
+  const versionStatus = new Map((validation.data?.versions ?? []).map((version) => [version.definitionVersion, version]));
+  const stepStatus = new Map((versionStatus.get(selectedVersion)?.steps ?? []).map((step) => [step.stepId, step.validation.status]));
+  const listedVersions = versions.filter((version) => version.archived !== true || version.version === selectedVersion);
+  const agentSteps = definition.steps.filter((step) => step.executor === 'agent');
+  const selected = agentSteps.find((step) => step.id === searchParams.get('step')) ?? agentSteps[0];
+
+  const versionOption = (version: number) => {
+    const status = versionStatus.get(version);
+    const display = status === undefined || status.steps.length === 0 ? '' : ` — ${VALIDATION_STATUS[status.status].symbol} ${VALIDATION_STATUS[status.status].versionLabel}`;
+    return `v${version}${version === defaultVersion ? ' (default)' : ''}${display}`;
+  };
+  const stepOption = (stepId: string, name: string) => {
+    const status = stepStatus.get(stepId);
+    return status === undefined ? name : `${name} — ${VALIDATION_STATUS[status].symbol} ${VALIDATION_STATUS[status].label.toLowerCase()}`;
+  };
+
   return (
     <div className="space-y-4">
-      <label className="flex items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Step</span>
-        <select
-          data-testid="evaluation-step-select"
-          className="rounded-md border bg-background px-2 py-1 text-sm"
-          value={selected.id}
-          onChange={(event) => setStepId(event.target.value)}
-        >
-          {agentSteps.map((step) => <option key={step.id} value={step.id}>{step.name}</option>)}
-        </select>
-      </label>
-      <StepEvaluation key={selected.id} step={{ namespace: handle, workflowName, stepId: selected.id }} outputSchema={selected.agent?.outputSchema} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
+      <div className="flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Version</span>
+          <select
+            data-testid="evaluation-version-select"
+            className={selectClass}
+            value={selectedVersion}
+            onChange={(event) => select({ version: Number(event.target.value) })}
+          >
+            {listedVersions.map((version) => <option key={version.version} value={version.version}>{versionOption(version.version)}</option>)}
+          </select>
+        </label>
+        {selected !== undefined && (
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Step</span>
+            <select
+              data-testid="evaluation-step-select"
+              className={selectClass}
+              value={selected.id}
+              onChange={(event) => select({ step: event.target.value })}
+            >
+              {agentSteps.map((step) => <option key={step.id} value={step.id}>{stepOption(step.id, step.name)}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
+      {selected === undefined ? (
+        <p className="text-sm text-muted-foreground">Version {selectedVersion} has no agent steps to evaluate.</p>
+      ) : (
+        <StepEvaluation
+          key={`${selectedVersion}:${selected.id}`}
+          step={{ namespace: handle, workflowName, stepId: selected.id }}
+          definitionVersion={selectedVersion}
+          outputSchema={selected.agent?.outputSchema}
+          mayEdit={mayEdit}
+          editReason={editReason}
+          mayRun={mayRun}
+          runReason={runReason}
+        />
+      )}
     </div>
   );
 }

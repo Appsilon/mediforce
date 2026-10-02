@@ -5,6 +5,7 @@ import {
   GetAcceptanceCriteriaOutputSchema,
   GetAgentTrajectoryOutputSchema,
   GetStepQualificationOutputSchema,
+  GetWorkflowValidationOutputSchema,
   SignStepQualificationOutputSchema,
   type EvalRunOutput,
 } from '@mediforce/platform-api/contract';
@@ -176,5 +177,22 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     expect(stale).toMatchObject({ status: 'stale', definitionVersion: 2, changed: ['step'], validation: { status: 'not_verified', evalRunId: null } });
     const ofV1 = GetStepQualificationOutputSchema.parse(await (await request.get(`/api/evaluation/qualification?${query}&definitionVersion=1`, { headers: AUTH_HEADERS })).json());
     expect(ofV1.status).toBe('qualified');
+
+    // Each version reads its own verdict across its agent steps, newest first.
+    const workflowQuery = new URLSearchParams({ namespace: TEST_ORG_HANDLE, workflowName }).toString();
+    const validationRes = await request.get(`/api/evaluation/workflow-validation?${workflowQuery}`, { headers: AUTH_HEADERS });
+    expect(validationRes.status(), await validationRes.text()).toBe(200);
+    expect(GetWorkflowValidationOutputSchema.parse(await validationRes.json())).toMatchObject({
+      versions: [
+        { definitionVersion: 2, status: 'not_verified', steps: [{ stepId: 'grade-aes', validation: { status: 'not_verified', evalRunId: null } }] },
+        { definitionVersion: 1, status: 'failed', steps: [{ stepId: 'grade-aes', validation: { status: 'failed', evalRunId: finished.evalRun.id } }] },
+      ],
+    });
+    const hidden = await request.get(`/api/evaluation/workflow-validation?${workflowQuery}`, { headers: sessionCookieHeaders(callers.outsider) });
+    expect(hidden.status(), await hidden.text()).toBe(404);
+
+    // A run prepared for the older version runs the step as that version has it.
+    const ofOlder = EvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs', { ...step, definitionVersion: 1, trialsPerCase: 1, budgetUsd: 1 }, 201));
+    expect(ofOlder.evalRun).toMatchObject({ definitionVersion: 1, status: 'prepared' });
   });
 });

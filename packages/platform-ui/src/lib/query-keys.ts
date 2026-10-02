@@ -207,6 +207,9 @@ export const queryKeys = {
     section: (namespace: string, workflowName: string, stepId: string, section: string) =>
       ['evaluation', namespace, workflowName, stepId, section] as const,
   },
+  /** Whether each version of a workflow is verified; every Evaluation write refreshes it. */
+  workflowValidation: (namespace: string, workflowName: string) =>
+    ['workflow-validation', namespace, workflowName] as const,
   /** One Eval Run with its trials and report — its own domain so it polls alone while running. */
   evalRun: (evalRunId: string) => ['eval-run', evalRunId] as const,
   /** What one Agent Run's step was given and returned; fixed once the run finished. */

@@ -326,6 +326,8 @@ export const EvalChallengerSchema = z.object({
  * estimates the cost. Nothing runs until `start`.
  */
 export const PrepareEvalRunInputSchema = EvaluatedStepSchema.extend({
+  /** The Workflow Definition version whose step runs; its runnable version when absent. */
+  definitionVersion: z.number().int().positive().optional(),
   datasetVersionId: z.uuid().optional(),
   challengers: z.array(EvalChallengerSchema).max(3).default([]),
   trialsPerCase: z.number().int().min(1).max(10).default(3),
@@ -567,6 +569,29 @@ export const GetStepQualificationOutputSchema = z.object({
   history: z.array(StepQualificationSchema),
 });
 
+/** Whether each version of a workflow is verified, one agent step at a time. */
+export const GetWorkflowValidationInputSchema = EvaluatedStepSchema.pick({ namespace: true, workflowName: true });
+
+export const StepVersionValidationSchema = z.object({
+  stepId: z.string(),
+  stepName: z.string(),
+  validation: StepValidationSchema,
+});
+
+/**
+ * One version of the workflow: `passed` (verified) when every agent step's
+ * validation in it passed, `failed` when any failed, else `not_verified` —
+ * also when it has no agent step.
+ */
+export const WorkflowVersionValidationSchema = z.object({
+  definitionVersion: z.number().int().positive(),
+  status: StepValidationSchema.shape.status,
+  steps: z.array(StepVersionValidationSchema),
+});
+
+/** Every version of the workflow the caller sees, newest first. */
+export const GetWorkflowValidationOutputSchema = z.object({ versions: z.array(WorkflowVersionValidationSchema) });
+
 /**
  * Drift alerts: per production Evaluator of the Step, the mean of its newest
  * `window` production Scores against the `window` before them, for its latest
@@ -673,6 +698,9 @@ export type EvalChallenger = z.infer<typeof EvalChallengerSchema>;
 export type GetStepQualificationInput = z.input<typeof GetStepQualificationInputSchema>;
 export type GetStepQualificationOutput = z.infer<typeof GetStepQualificationOutputSchema>;
 export type StepValidation = z.infer<typeof StepValidationSchema>;
+export type GetWorkflowValidationInput = z.infer<typeof GetWorkflowValidationInputSchema>;
+export type GetWorkflowValidationOutput = z.infer<typeof GetWorkflowValidationOutputSchema>;
+export type WorkflowVersionValidation = z.infer<typeof WorkflowVersionValidationSchema>;
 export type SignStepQualificationInput = z.input<typeof SignStepQualificationInputSchema>;
 export type SignStepQualificationOutput = z.infer<typeof SignStepQualificationOutputSchema>;
 export type GetStepDriftInput = z.input<typeof GetStepDriftInputSchema>;

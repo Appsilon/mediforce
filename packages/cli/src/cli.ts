@@ -134,7 +134,7 @@ import {
 } from './commands/eval-runs';
 import { evalAskCommand } from './commands/eval-ask';
 import { evalOptimiseCommand, evalOptimisationGetCommand, evalOptimisationListCommand } from './commands/eval-optimisations';
-import { evalCriteriaGetCommand, evalCriteriaSetCommand, evalQualificationCommand } from './commands/eval-qualification';
+import { evalCriteriaGetCommand, evalCriteriaSetCommand, evalQualificationCommand, evalValidationCommand } from './commands/eval-qualification';
 import { namespaceUpdateCommand } from './commands/namespace-update';
 import { namespaceDeleteCommand } from './commands/namespace-delete';
 import { namespaceResetCommand } from './commands/namespace-reset';
@@ -317,6 +317,7 @@ export const TREE: Record<string, BranchEntry> = {
       'criteria-get': { description: 'Print a step\'s Acceptance Criteria', fn: evalCriteriaGetCommand },
       'criteria-set': { description: 'Set a step\'s Acceptance Criteria from a JSON file', fn: evalCriteriaSetCommand },
       qualification: { description: 'Print a step\'s qualification: Qualified, Stale or Not qualified', fn: evalQualificationCommand },
+      validation: { description: 'Print whether each version of a workflow is verified, step by step', fn: evalValidationCommand },
       drift: { description: 'Print drift alerts: production Evaluators whose rolling Score mean dropped', fn: evalDriftCommand },
       ask: { description: 'Ask the step\'s Evaluation Assistant (proposals are printed, not applied)', fn: evalAskCommand },
     },

@@ -66,3 +66,24 @@ export const evalQualificationCommand = defineCommand({
     return 0;
   },
 });
+
+export const evalValidationCommand = defineCommand({
+  name: 'mediforce eval validation',
+  description: 'Print whether each version of a workflow is verified — every agent step passed its Acceptance Criteria in it — with each step\'s validation.',
+  args: {
+    namespace: { type: 'string', required: true, description: 'Workspace handle' },
+    workflow: { type: 'string', required: true, description: 'Workflow name' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.getWorkflowValidation({ namespace: args.namespace, workflowName: args.workflow });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    for (const version of result.versions) {
+      output.stdout(`v${version.definitionVersion}  ${version.status === 'passed' ? 'verified' : version.status.replace('_', ' ')}`);
+      for (const step of version.steps) output.stdout(`  ${step.stepId}  ${step.validation.status.replace('_', ' ')}: ${step.validation.reason}`);
+    }
+    return 0;
+  },
+});

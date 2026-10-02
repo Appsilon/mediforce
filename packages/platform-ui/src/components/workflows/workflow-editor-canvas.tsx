@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { X, HelpCircle, Save, KeyRound, Code2, FileCode, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle, Square } from 'lucide-react';
-import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
+import { WorkflowDiagram, type StepEvaluationMark } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import {
   WorkflowStepSchema,
@@ -77,6 +77,8 @@ export interface WorkflowEditorCanvasProps {
   ) => void;
   onDirtyChange?: (dirty: boolean) => void;
   stepErrors?: Record<string, Record<string, string>>;
+  /** Per agent step id, its evaluation in the version being edited. */
+  stepEvaluation?: Map<string, StepEvaluationMark>;
 }
 
 /**
@@ -109,6 +111,7 @@ export function WorkflowEditorCanvas({
   onChange,
   onDirtyChange,
   stepErrors,
+  stepEvaluation,
 }: WorkflowEditorCanvasProps) {
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
   const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'settings' | 'notifications' | 'files' | 'add-block' | null>(null);
@@ -1015,6 +1018,7 @@ export function WorkflowEditorCanvas({
             selectedStepId={selectedStepId}
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
             warningStepIds={warningStepIds}
+            stepEvaluation={stepEvaluation}
             canMoveUp={canMoveUpSet}
             canMoveDown={canMoveDownSet}
             onUndo={undoEdit}

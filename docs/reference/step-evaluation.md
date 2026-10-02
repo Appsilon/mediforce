@@ -26,9 +26,12 @@ agent first.
 
 ## The Evaluation Assistant
 
-The **Evaluation** tab of a workflow shows one agent step at a time — its
+The **Evaluation** tab of a workflow shows one agent step of one workflow
+version at a time — picked with the **Version** selector (the runnable version
+unless `?version=` names another) and then the **Step** selector (`?step=`),
+each option marked with its validation (see Validation below) — its
 Acceptance Criteria with whether it is validated against them,
-Evaluators, Eval Cases and Eval Runs — beside the
+Evaluators, Eval Cases and that version's Eval Runs — beside the
 Evaluation Assistant (`mediforce eval ask`, `POST /api/evaluation/assistant`),
 whose header holds the step's Brief.
 Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
@@ -497,8 +500,9 @@ A Step Qualification cites the policy's modes only.
 
 ## Eval Runs
 
-An Eval Run runs the Step, as its runnable Definition version has it, over a
-frozen Dataset version: every case, `trialsPerCase` times. A case cited by the
+An Eval Run runs the Step, as its runnable Definition version has it — or the
+version named (`run-prepare --version N`, `definitionVersion`; the tab prepares
+for the version selected) — over a frozen Dataset version: every case, `trialsPerCase` times. A case cited by the
 step's few-shot `agent.examples` is left out of the run (`exampleCaseIds`;
 [ADR-0024](../adr/0024-optimisation.md) D5).
 
@@ -679,3 +683,13 @@ tab it is the status at the top — **Validation passed**,
 also shows the signed Step Qualification, if any. The tab reads it again every
 few seconds while an Eval Run of the step is running. A signed qualification
 does not change it, and it blocks nothing.
+
+A **workflow version** is **Verified** when every agent step's validation in it
+passed, **Failed** when any failed, and **Not verified** otherwise (also with
+no agent step, where no badge is shown). `mediforce eval validation`,
+`GET /api/evaluation/workflow-validation?namespace=&workflowName=` list every
+version, newest first, with each agent step's validation. The **Definitions**
+tab shows the badge on each version, linking to that version on the Evaluation
+tab; in the workflow editor, each agent step's box carries its validation icon
+for the version being edited, linking to the Evaluation tab on that step and
+version. Steps added since the version was saved carry none.

@@ -263,6 +263,18 @@ test.describe('Step Evaluation tab', () => {
     await expect(page.getByTestId('validation-reason')).toContainText('major missed');
     await expect(page.getByTestId('step-qualification')).toContainText(`Eval Run ${prepared.evalRun.id.slice(0, 8)}`);
     await expect(page.getByTestId('step-qualification')).toContainText('Deviation (major): Findings are listed downstream');
+
+    // The version reads Failed in the selector and on the Definitions tab; its agent step's box in the editor links back here.
+    await expect(page.getByTestId('evaluation-version-select').locator('option:checked')).toHaveText(/v1.*Failed/);
+    await page.getByRole('tab', { name: 'Definitions' }).click();
+    await expect(page.getByTestId('version-validation-badge')).toHaveAttribute('data-status', 'failed', { timeout: 10_000 });
+    await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}/definitions/1`);
+    const mark = page.getByTestId('step-evaluation-mark');
+    await expect(mark).toHaveAttribute('data-status', 'failed', { timeout: 15_000 });
+    await mark.click();
+    await expect(page).toHaveURL(/tab=evaluation&version=1&step=grade-aes/);
+    await expect(page.getByTestId('evaluation-version-select')).toHaveValue('1', { timeout: 15_000 });
+    await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes');
   });
 
   test('an Evaluator is added through its type\'s fields, read in full, and edited into a new version', async ({ page, request }) => {

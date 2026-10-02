@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
+import { useWorkflowValidation } from '@/hooks/use-step-evaluation';
+import { VersionValidationBadge, evaluationHref } from '@/components/evaluation/validation-status';
 
 interface DefinitionsListProps {
   workflowName: string;
@@ -24,6 +26,8 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
   // reason rather than hidden, so a member knows there is a role to ask for.
   const { mayEdit, reason: editReason } = useWorkflowEditGate(handle, workflowName);
   const [archivingVersion, setArchivingVersion] = React.useState<number | null>(null);
+  const validation = useWorkflowValidation(handle, workflowName);
+  const versionValidation = new Map((validation.data?.versions ?? []).map((version) => [version.definitionVersion, version]));
 
   const archivedCount = definitions.filter((d) => d.archived === true).length;
   const visibleDefinitions = showArchived
@@ -106,6 +110,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
           const isArchived = def.archived === true;
           const canSetDefault = !isDefault && !isArchived;
           const isArchiving = archivingVersion === def.version;
+          const validated = versionValidation.get(def.version);
 
           return (
             <div
@@ -131,6 +136,9 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
 
               {/* Right: metadata + actions */}
               <div className="flex items-center gap-4 shrink-0 ml-4">
+                {validated !== undefined && (
+                  <VersionValidationBadge version={validated} href={evaluationHref(handle, workflowName, def.version)} />
+                )}
                 <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
                   {def.stepCount} steps
                 </span>

@@ -567,6 +567,8 @@ import {
   SetAcceptanceCriteriaOutputSchema,
   GetStepQualificationInputSchema,
   GetStepQualificationOutputSchema,
+  GetWorkflowValidationInputSchema,
+  GetWorkflowValidationOutputSchema,
   SignStepQualificationInputSchema,
   SignStepQualificationOutputSchema,
   GetStepDriftInputSchema,
@@ -612,6 +614,8 @@ import {
   type SetAcceptanceCriteriaOutput,
   type GetStepQualificationInput,
   type GetStepQualificationOutput,
+  type GetWorkflowValidationInput,
+  type GetWorkflowValidationOutput,
   type SignStepQualificationInput,
   type SignStepQualificationOutput,
   type GetStepDriftInput,
@@ -1097,6 +1101,8 @@ export class Mediforce {
     getAcceptanceCriteria: (input: GetAcceptanceCriteriaInput) => Promise<GetAcceptanceCriteriaOutput>;
     setAcceptanceCriteria: (input: SetAcceptanceCriteriaInput) => Promise<SetAcceptanceCriteriaOutput>;
     getQualification: (input: GetStepQualificationInput) => Promise<GetStepQualificationOutput>;
+    /** Whether each version of a workflow is verified: every agent step's validation in it. */
+    getWorkflowValidation: (input: GetWorkflowValidationInput) => Promise<GetWorkflowValidationOutput>;
     signQualification: (input: SignStepQualificationInput) => Promise<SignStepQualificationOutput>;
     getDrift: (input: GetStepDriftInput) => Promise<GetStepDriftOutput>;
     // `signal` aborts the request: an assistant turn is long enough that a person will want to stop it.
@@ -2661,6 +2667,11 @@ export class Mediforce {
           definitionVersion: validated.definitionVersion === undefined ? undefined : String(validated.definitionVersion),
         });
         return this.getJson(`/api/evaluation/qualification${qs}`, GetStepQualificationOutputSchema, 'mediforce.evaluation.getQualification');
+      },
+      getWorkflowValidation: async (input) => {
+        const workflow = GetWorkflowValidationInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/workflow-validation${toSearchParams(workflow)}`,
+          GetWorkflowValidationOutputSchema, 'mediforce.evaluation.getWorkflowValidation');
       },
       signQualification: async (input) => this.sendJson(
         'POST', '/api/evaluation/qualification', SignStepQualificationInputSchema.parse(input),

@@ -3,6 +3,7 @@ import type { z } from 'zod';
 import {
   CHAMPION_VARIANT_ID,
   DEFAULT_ACCEPTANCE_CRITERIA,
+  inlineMcpServerNames,
   qualificationSignatureMeaning,
   type ElectronicSignature,
   type EvalRun,
@@ -14,9 +15,12 @@ import {
 import type {
   GetStepQualificationInputSchema,
   GetStepQualificationOutput,
+  GetWorkflowValidationInputSchema,
+  GetWorkflowValidationOutput,
   SignStepQualificationInputSchema,
   SignStepQualificationOutput,
   StepValidation,
+  WorkflowVersionValidation,
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, ForbiddenError, NotFoundError, PreconditionFailedError, ValidationError } from '../../errors';
@@ -49,10 +53,17 @@ const FINISHED_RUN_STATUSES = new Set(['completed', 'budget_exceeded']);
 /**
  * The step's validation in one Definition version: the newest finished Eval Run
  * of that version, judged on the criteria frozen into it — reset to
- * `not_verified` by any change to what that run rested on.
+ * `not_verified` by any change to what that run rested on. `runs` are the
+ * step's Eval Runs, newest first; its Fingerprint is computed only when one of
+ * that version finished.
  */
-async function stepValidation(scope: CallerScope, step: EvaluatedStep, definitionVersion: number, fingerprint: StepFingerprint): Promise<StepValidation> {
-  const runs = await scope.evaluation.listEvalRuns(step);
+async function stepValidation(
+  scope: CallerScope,
+  step: EvaluatedStep,
+  definitionVersion: number,
+  runs: readonly EvalRun[],
+  stepFingerprint: () => Promise<StepFingerprint>,
+): Promise<StepValidation> {
   const runInProgress = runs.some((run) => run.status === 'running');
   const run = runs.find((candidate) => candidate.definitionVersion === definitionVersion && FINISHED_RUN_STATUSES.has(candidate.status));
   if (run === undefined) {
@@ -60,6 +71,7 @@ async function stepValidation(scope: CallerScope, step: EvaluatedStep, definitio
   }
   const notVerified = (reason: string): StepValidation => ({ status: 'not_verified', evalRunId: run.id, reason, runInProgress });
   const since = `since Eval Run ${run.id.slice(0, 8)}`;
+  const fingerprint = await stepFingerprint();
 
   const champion = run.variants.find((variant) => variant.id === CHAMPION_VARIANT_ID);
   if (champion?.fingerprint == null || champion.fingerprint.hash !== fingerprint.hash) {
@@ -108,7 +120,7 @@ export async function getStepQualification(
   const history = await scope.evaluation.listQualifications(step);
   const matching = history.find((qualification) => qualification.fingerprint.hash === fingerprint.hash);
   const shown = matching ?? history[0];
-  const validation = await stepValidation(scope, step, definition.version, fingerprint);
+  const validation = await stepValidation(scope, step, definition.version, await scope.evaluation.listEvalRuns(step), async () => fingerprint);
   if (shown === undefined) {
     return { status: 'not_qualified', validation, qualification: null, definitionVersion: definition.version, fingerprint, changed: [], evaluatorsChanged: [], history };
   }
@@ -122,6 +134,50 @@ export async function getStepQualification(
     evaluatorsChanged: await evaluatorChanges(scope, step, shown.evaluators, 'qualified with'),
     history,
   };
+}
+
+/**
+ * Whether each version of a workflow is verified: every agent step's
+ * validation in that version (`stepValidation`), rolled up — `passed` when all
+ * passed, `failed` when any failed, else `not_verified`. A step that declares
+ * MCP servers inline cannot be evaluated, so it stays `not_verified`.
+ */
+export async function getWorkflowValidation(
+  input: z.output<typeof GetWorkflowValidationInputSchema>,
+  scope: CallerScope,
+): Promise<GetWorkflowValidationOutput> {
+  const definitions = await scope.workflowDefinitions.listVersions(input.namespace, input.workflowName);
+  if (definitions.length === 0) throw new NotFoundError(`Workflow '${input.workflowName}' not found`);
+  const runsByStep = new Map<string, Promise<EvalRun[]>>();
+  const stepRuns = (step: EvaluatedStep) => {
+    if (runsByStep.has(step.stepId) === false) runsByStep.set(step.stepId, scope.evaluation.listEvalRuns(step));
+    return runsByStep.get(step.stepId)!;
+  };
+
+  const versions: WorkflowVersionValidation[] = [];
+  for (const definition of [...definitions].sort((left, right) => right.version - left.version)) {
+    const steps: WorkflowVersionValidation['steps'] = [];
+    for (const workflowStep of definition.steps) {
+      if (workflowStep.executor !== 'agent') continue;
+      const step: EvaluatedStep = { namespace: input.namespace, workflowName: input.workflowName, stepId: workflowStep.id };
+      const inlineServers = inlineMcpServerNames(workflowStep);
+      const validation: StepValidation = inlineServers.length > 0
+        ? {
+          status: 'not_verified',
+          evalRunId: null,
+          reason: `The step declares MCP servers inline (${inlineServers.join(', ')}); move them onto its agent to evaluate it.`,
+          runInProgress: false,
+        }
+        : await stepValidation(scope, step, definition.version, await stepRuns(step), () => computeStepFingerprint(scope, definition, workflowStep));
+      steps.push({ stepId: workflowStep.id, stepName: workflowStep.name, validation });
+    }
+    const statuses = steps.map((entry) => entry.validation.status);
+    const status = statuses.includes('failed')
+      ? 'failed'
+      : statuses.length > 0 && statuses.every((stepStatus) => stepStatus === 'passed') ? 'passed' : 'not_verified';
+    versions.push({ definitionVersion: definition.version, status, steps });
+  }
+  return { versions };
 }
 
 /**

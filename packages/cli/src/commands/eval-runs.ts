@@ -57,6 +57,7 @@ export const evalRunPrepareCommand = defineCommand({
   description: 'Prepare an Eval Run of a step and print its cost estimate. Nothing runs until run-start.',
   args: {
     ...STEP_ARGS,
+    version: { type: 'string', description: 'Workflow Definition version whose step runs (default: the runnable one)' },
     dataset: { type: 'string', description: 'Eval Dataset version id (default: the newest)' },
     trials: { type: 'string', description: 'Trials per case (default: 3)' },
     concurrency: { type: 'string', description: 'Trials at once (default: 2)' },
@@ -66,12 +67,14 @@ export const evalRunPrepareCommand = defineCommand({
   async run({ args, output, mediforce, jsonMode }) {
     const trials = parsePositiveIntArg(args.trials);
     const concurrency = parsePositiveIntArg(args.concurrency);
-    if (trials === 'invalid' || concurrency === 'invalid') {
-      output.stderr('--trials and --concurrency must be positive integers');
+    const version = parsePositiveIntArg(args.version);
+    if (trials === 'invalid' || concurrency === 'invalid' || version === 'invalid') {
+      output.stderr('--trials, --concurrency and --version must be positive integers');
       return 2;
     }
     const result = await mediforce.evaluation.prepareRun({
       ...stepFrom(args),
+      ...(version !== undefined ? { definitionVersion: version } : {}),
       ...(args.dataset !== undefined ? { datasetVersionId: args.dataset } : {}),
       ...(trials !== undefined ? { trialsPerCase: trials } : {}),
       ...(concurrency !== undefined ? { concurrency } : {}),
