@@ -1,11 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import type { AgentOutputSchema, EvaluatedStep, Transition, WorkflowStep } from '@mediforce/platform-core';
+import type { AgentOutputSchema, EvaluatedStep, WorkflowStep } from '@mediforce/platform-core';
 import { useStepEvaluation } from '@/hooks/use-step-evaluation';
 import { useWorkflowRunGate } from '@/hooks/use-workflow-access';
 import { EvaluationAssistantPanel } from './evaluation-assistant-panel';
-import { emptyStepInput } from './written-output-form';
 import {
   AcceptanceCriteriaSection,
   CasesSection,
@@ -13,7 +12,6 @@ import {
   EvaluatorsSection,
   McpPolicySection,
   DriftAlert,
-  loadedAgentRuns,
 } from './step-evaluation-sections';
 
 const ASSISTANT_WIDTH_KEY = 'mediforce.evaluation-assistant.width';
@@ -97,10 +95,9 @@ function AssistantResizeHandle({ width, resize, persist, commit }: ReturnType<ty
   );
 }
 
-function StepEvaluation({ step, outputSchema, inputTemplate, mayEdit, editReason, mayRun, runReason }: {
+function StepEvaluation({ step, outputSchema, mayEdit, editReason, mayRun, runReason }: {
   step: EvaluatedStep;
   outputSchema: AgentOutputSchema | undefined;
-  inputTemplate: Record<string, unknown>;
   mayEdit: boolean;
   editReason: string | undefined;
   mayRun: boolean;
@@ -125,8 +122,6 @@ function StepEvaluation({ step, outputSchema, inputTemplate, mayEdit, editReason
           data={evaluation.evaluators}
           mayEdit={mayEdit}
           stepOutputSchema={outputSchema}
-          stepInputTemplate={inputTemplate}
-          labelCandidates={{ cases: evaluation.cases.data?.cases ?? [], runs: loadedAgentRuns(evaluation) }}
         />
         <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
         <McpPolicySection step={step} data={evaluation.mcpPolicy} mayEdit={mayEdit} />
@@ -134,7 +129,7 @@ function StepEvaluation({ step, outputSchema, inputTemplate, mayEdit, editReason
       </div>
       <div className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
         <AssistantResizeHandle {...assistantWidth} />
-        <EvaluationAssistantPanel step={step} brief={evaluation.brief} stepOutputSchema={outputSchema} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
+        <EvaluationAssistantPanel step={step} brief={evaluation.brief} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
       </div>
     </div>
   );
@@ -147,11 +142,10 @@ function StepEvaluation({ step, outputSchema, inputTemplate, mayEdit, editReason
  * Assistant, which holds the Step's Brief. Everything here lives outside the definition, so no
  * change on this tab mints a version.
  */
-export function EvaluationTab({ handle, workflowName, steps, transitions, mayEdit, editReason }: {
+export function EvaluationTab({ handle, workflowName, steps, mayEdit, editReason }: {
   handle: string;
   workflowName: string;
   steps: readonly WorkflowStep[];
-  transitions: readonly Transition[];
   mayEdit: boolean;
   editReason: string | undefined;
 }) {
@@ -176,7 +170,7 @@ export function EvaluationTab({ handle, workflowName, steps, transitions, mayEdi
           {agentSteps.map((step) => <option key={step.id} value={step.id}>{step.name}</option>)}
         </select>
       </label>
-      <StepEvaluation key={selected.id} step={{ namespace: handle, workflowName, stepId: selected.id }} outputSchema={selected.agent?.outputSchema} inputTemplate={emptyStepInput(selected.id, { steps, transitions })} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
+      <StepEvaluation key={selected.id} step={{ namespace: handle, workflowName, stepId: selected.id }} outputSchema={selected.agent?.outputSchema} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
     </div>
   );
 }

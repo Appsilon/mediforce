@@ -48,21 +48,20 @@ export const CodeCheckSchema = z.object({
   source: z.string().min(1).max(64_000),
 });
 
-/** One answer a judge may give. A choice passes when its `value` is at least 0.5. */
-export const JudgeChoiceSchema = z.object({
-  label: z.string().min(1).max(40),
-  value: z.number().min(0).max(1),
-});
+/** A new judge's floor: verdicts it is less confident of stay out of the Acceptance Criteria. */
+export const DEFAULT_JUDGE_MIN_CONFIDENCE = 0.8;
 
-/** An LLM judge: reasoning first, then one of a few discrete choices (layer-2 research § 3). */
+/**
+ * An LLM judge: it reads the step's input, the agent's log and its output,
+ * explains what decided its verdict, then answers pass or fail with a
+ * confidence. A verdict below `minConfidence` is reported but does not count
+ * toward the Acceptance Criteria.
+ */
 export const LlmJudgeCheckSchema = z.object({
   kind: z.literal('llm_judge'),
   model: z.string().min(1),
   rubric: z.string().min(1).max(8000),
-  choices: z.array(JudgeChoiceSchema).min(2).max(6)
-    .refine((choices) => new Set(choices.map((choice) => choice.label)).size === choices.length, {
-      message: 'choice labels must be unique',
-    }),
+  minConfidence: z.number().min(0).max(1).default(DEFAULT_JUDGE_MIN_CONFIDENCE),
 });
 
 export const EvaluatorCheckSchema = z.discriminatedUnion('kind', [
@@ -77,20 +76,6 @@ export const JUDGE_PASS_VALUE = 0.5;
 export const SourceApprovalSchema = z.object({
   approvedBy: z.string().min(1),
   approvedAt: z.iso.datetime(),
-});
-
-/** How often a judge version agreed with human labels on the same Agent Runs (D9). */
-export const JudgeCalibrationSchema = z.object({
-  agreement: z.number().min(0).max(1),
-  /**
-   * Cohen's κ — agreement beyond what the label mix gives by chance. Null when
-   * it is undefined (every label and verdict the same); absent on calibrations
-   * recorded before it was.
-   */
-  kappa: z.number().min(-1).max(1).nullable().optional(),
-  labelCount: z.number().int().nonnegative(),
-  failureLabelCount: z.number().int().nonnegative(),
-  calibratedAt: z.iso.datetime(),
 });
 
 /** Evaluator identity. What it checks lives on its versions. */
@@ -112,7 +97,7 @@ export const EvaluatorSchema = EvaluatedStepSchema.extend({
 /**
  * One immutable version of an Evaluator (D7). A change is a new version, so a
  * version that produced a Score never changes under the Scores it produced.
- * Approval and calibration attach to a version; they are not part of what it checks.
+ * A `code` version's source approval attaches to it; it is not part of what it checks.
  */
 export const EvaluatorVersionSchema = z.object({
   evaluatorId: z.uuid(),
@@ -123,7 +108,6 @@ export const EvaluatorVersionSchema = z.object({
   check: EvaluatorCheckSchema,
   origin: EvaluationOriginSchema,
   sourceApproval: SourceApprovalSchema.nullable(),
-  calibration: JudgeCalibrationSchema.nullable(),
   createdBy: z.string().min(1),
   createdAt: z.iso.datetime(),
 });
@@ -232,28 +216,6 @@ export const EvalCaseSchema = EvaluatedStepSchema.extend({
   origin: EvaluationOriginSchema,
   split: EvalCaseSplitSchema,
   containsProductionData: z.boolean(),
-  archived: z.boolean(),
-  createdBy: z.string().min(1),
-  createdAt: z.iso.datetime(),
-});
-
-/**
- * A person's own example of the Step's output for one input (ADR-0023 D9):
- * labelled pass or fail for a judge where production has no such output —
- * above all a failure nobody would run on purpose. Usually started from a
- * production run's input and output with values changed. It is not an Eval
- * Case: nothing re-runs it; a judge grades it only while being calibrated.
- */
-export const WrittenOutputSchema = EvaluatedStepSchema.extend({
-  id: z.uuid(),
-  /** What the step was given; the production run's own input when started from one. */
-  stepInput: z.record(z.string(), z.unknown()).nullable(),
-  result: z.record(z.string(), z.unknown()),
-  /** The production run it was started from; null when written from nothing. */
-  basedOnAgentRunId: z.string().nullable(),
-  /** What it changed or shows, in words. */
-  note: z.string().max(2000).nullable(),
-  origin: EvaluationOriginSchema,
   archived: z.boolean(),
   createdBy: z.string().min(1),
   createdAt: z.iso.datetime(),
@@ -369,12 +331,9 @@ export type EvaluationBrief = z.infer<typeof EvaluationBriefSchema>;
 export type EvaluatorKind = z.infer<typeof EvaluatorKindSchema>;
 export type EvaluatorSeverity = z.infer<typeof EvaluatorSeveritySchema>;
 export type EvaluatorCheck = z.infer<typeof EvaluatorCheckSchema>;
-export type JudgeChoice = z.infer<typeof JudgeChoiceSchema>;
 export type SourceApproval = z.infer<typeof SourceApprovalSchema>;
-export type JudgeCalibration = z.infer<typeof JudgeCalibrationSchema>;
 export type Evaluator = z.infer<typeof EvaluatorSchema>;
 export type EvaluatorVersion = z.infer<typeof EvaluatorVersionSchema>;
-export type WrittenOutput = z.infer<typeof WrittenOutputSchema>;
 export type EvalCaseInput = z.infer<typeof EvalCaseInputSchema>;
 export type EvalCaseExpectation = z.infer<typeof EvalCaseExpectationSchema>;
 export type EvalCasePerturbation = z.infer<typeof EvalCasePerturbationSchema>;

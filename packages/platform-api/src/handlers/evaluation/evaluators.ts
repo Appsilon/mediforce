@@ -62,7 +62,6 @@ export async function createEvaluator(
     check: input.check,
     origin: input.origin,
     sourceApproval: null,
-    calibration: null,
     createdBy,
     createdAt: now,
   });
@@ -89,8 +88,8 @@ export async function createEvaluator(
 
 /**
  * A change to an Evaluator is a new version (D7): the ones before it keep
- * meaning what they meant for the Scores they produced. Approval and
- * calibration belong to a version, so a new version starts without them.
+ * meaning what they meant for the Scores they produced. A source approval
+ * belongs to a version, so a new version starts without one.
  */
 export async function addEvaluatorVersion(
   input: z.output<typeof AddEvaluatorVersionInputSchema>,
@@ -107,7 +106,6 @@ export async function addEvaluatorVersion(
     check: input.check ?? latest.check,
     origin: input.origin,
     sourceApproval: null,
-    calibration: null,
     createdBy: authorId(scope),
     createdAt: new Date().toISOString(),
   });

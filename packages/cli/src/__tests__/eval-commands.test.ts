@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { evalCaseFromRunCommand, evalCasePerturbCommand, evalCasesFromLabelsCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
-import { evalDriftCommand, evalEvaluatorLabelCommand, evalEvaluatorProductionCommand } from '../commands/eval-evaluators';
+import { evalCaseFromRunCommand, evalCasePerturbCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
+import { evalDriftCommand, evalEvaluatorProductionCommand } from '../commands/eval-evaluators';
 import { evalCriteriaSetCommand, evalQualificationCommand } from '../commands/eval-qualification';
+import { evalJudgeReviewCommand } from '../commands/eval-runs';
 import { captureOutput, jsonResponse } from './test-helpers';
 
 const ENV = { MEDIFORCE_API_KEY: 'k' };
@@ -67,27 +68,42 @@ describe('mediforce eval', () => {
     expect(output.stdoutLines.join('\n')).toContain('(missing_file, negative)');
   });
 
-  it('cases-from-labels reports the cases added and the outputs skipped', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ cases: [], skipped: [{ agentRunId: 'ar-1', reason: 'already a case' }] }, 201));
+  it('judge-review posts the decision for one judge verdict on one trial', async () => {
+    const evalRunId = '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
+    const trialId = '1e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
+    const evaluatorId = '2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      score: {
+        id: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', subject: { type: 'agent_run', id: 'ar-1' }, name: 'judge_review', value: 1, label: 'accepted',
+        comment: 'Rationale holds up', source: 'human', createdBy: 'u-1', metadata: { evalRunId, trialId, judgeReview: 'accepted' },
+        namespace: 'pharma-a', processInstanceId: null, stepId: 'grade-aes', evaluatorId, supersedes: null, createdAt: '2026-09-23T08:00:00.000Z',
+      },
+    }, 201));
     const output = captureOutput();
-    const code = await evalCasesFromLabelsCommand({ argv: ['0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', ...BASE], env: ENV, output });
+    const code = await evalJudgeReviewCommand({
+      argv: [evalRunId, '--trial', trialId, '--evaluator', evaluatorId, '--accept', '--comment', 'Rationale holds up', ...BASE], env: ENV, output,
+    });
 
     expect(code).toBe(0);
-    expect(fetchSpy.mock.calls[0]![0]).toBe('http://localhost:5555/api/evaluation/evaluators/0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c/cases-from-labels');
-    expect(output.stdoutLines).toEqual(['0 Eval Case(s) added', '  skipped ar-1: already a case']);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe(`http://localhost:5555/api/evaluation/runs/${evalRunId}/judge-reviews`);
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({ trialId, evaluatorId, decision: 'accepted', comment: 'Rationale holds up' });
+    expect(output.stdoutLines).toEqual([`Judge verdict on trial ${trialId} accepted`]);
   });
 
-  it('evaluator-label refuses both or neither of --pass and --fail', async () => {
+  it('judge-review refuses both or neither of --accept and --deny', async () => {
     const output = captureOutput();
-    const code = await evalEvaluatorLabelCommand({ argv: ['0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', '--agent-run', 'ar-1', ...BASE], env: ENV, output });
-    expect(code).toBe(2);
+    const ids = ['0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', '--trial', '1e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', '--evaluator', '2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c'];
+    expect(await evalJudgeReviewCommand({ argv: [...ids, ...BASE], env: ENV, output })).toBe(2);
+    expect(await evalJudgeReviewCommand({ argv: [...ids, '--accept', '--deny', ...BASE], env: ENV, output })).toBe(2);
   });
 
   it('evaluator-production --on posts the flag and prints that it waits until it counts', async () => {
     const evaluatorId = '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
     const latest = {
       evaluatorId, version: 1, rule: 'A fatal AE is graded 5.', severity: 'critical', check: { kind: 'code', runtime: 'python', source: 'print(1)' },
-      origin: 'user', sourceApproval: null, calibration: null, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
+      origin: 'user', sourceApproval: null, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
     };
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
       evaluator: {

@@ -60,14 +60,14 @@ describe('reflectiveDataset', () => {
   it('keeps every counted Evaluator in the feedback — a passing verdict\'s comment, and one that errored', async () => {
     await createEvaluator({
       ...STEP, name: 'grades-present', rule: 'Every AE carries a grade.', severity: 'major', origin: 'user',
-      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Every AE carries a grade.', choices: [{ label: 'graded', value: 1 }, { label: 'ungraded', value: 0 }] },
+      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Every AE carries a grade.', minConfidence: 0.8 },
     }, scenario.scope);
     let judgeCalls = 0;
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => {
       judgeCalls += 1;
       return judgeCalls === 1
         ? new Response(JSON.stringify({
-          choices: [{ message: { content: '{"reasoning": "Every AE is graded.", "choice": "graded"}' }, finish_reason: 'stop' }],
+          choices: [{ message: { content: '{"rationale": "Every AE is graded.", "passed": true, "confidence": 0.9}' }, finish_reason: 'stop' }],
           usage: { prompt_tokens: 100, completion_tokens: 20 },
         }))
         : new Response('upstream down', { status: 500 });
@@ -77,9 +77,7 @@ describe('reflectiveDataset', () => {
       models: { list: async () => [{ id: 'anthropic/claude-haiku-4.5', pricing: { input: 0.000001, output: 0.000005 } }] },
     });
     const evalRunId = await finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5, challengers: [] }, () => ({ findings: ['graded'] }));
-    const finished = (await fixture.evaluationRepo.getEvalRun(evalRunId))!;
-    // An untrusted judge is frozen uncounted; count it, as a calibrated one would be.
-    const run = { ...finished, evaluators: finished.evaluators.map((evaluator) => ({ ...evaluator, counted: true })) };
+    const run = (await fixture.evaluationRepo.getEvalRun(evalRunId))!;
 
     const records = await reflectiveDataset(scenario.scope, run, 'champion');
 

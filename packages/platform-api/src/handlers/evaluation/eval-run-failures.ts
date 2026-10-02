@@ -8,7 +8,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
-import { isPass, scoresOfTrial } from './_lib/trial-scores';
+import { checkOutcome, trialScores } from './_lib/trial-scores';
 
 /** The part of a trial's error that names one Evaluator — how the driver records a check that could not run. */
 function evaluatorError(trial: EvalTrial, name: string): string {
@@ -17,10 +17,10 @@ function evaluatorError(trial: EvalTrial, name: string): string {
   return found === undefined ? 'no Score recorded' : found.slice(prefix.length);
 }
 
-/** The Evaluators that failed or could not grade a scored trial. */
+/** The Evaluators that failed or could not grade a scored trial; a judge verdict left out is neither. */
 async function evaluatorFailures(scope: CallerScope, run: EvalRun, trial: EvalTrial): Promise<TrialEvaluatorFailure[]> {
   if (trial.status !== 'scored') return [];
-  const scores = await scoresOfTrial(scope, run, trial);
+  const { checks, reviews } = await trialScores(scope, run, trial);
   return run.evaluators.flatMap((evaluator): TrialEvaluatorFailure[] => {
     const base = {
       evaluatorId: evaluator.evaluatorId,
@@ -29,9 +29,11 @@ async function evaluatorFailures(scope: CallerScope, run: EvalRun, trial: EvalTr
       kind: evaluator.kind,
       counted: evaluator.counted,
     };
-    const score = scores.find((candidate) => candidate.evaluatorId === evaluator.evaluatorId);
+    const score = checks.find((candidate) => candidate.evaluatorId === evaluator.evaluatorId);
     if (score === undefined) return [{ ...base, outcome: 'errored', comment: null, error: evaluatorError(trial, evaluator.name) }];
-    return isPass(score) ? [] : [{ ...base, outcome: 'failed', comment: score.comment, error: null }];
+    return checkOutcome(score, reviews.get(evaluator.evaluatorId)) === 'fail'
+      ? [{ ...base, outcome: 'failed', comment: score.comment, error: null }]
+      : [];
   });
 }
 

@@ -21,8 +21,8 @@ import {
  * person's own form uses. *Platform* tools run as the person asking — reads,
  * a draft check against real outputs, preparing an Eval Run, and starting one
  * only under an unattended budget the person granted for the request. Nothing here
- * signs a Step Qualification, approves a check's source or labels an output:
- * D15 keeps those human, so there is no tool to call.
+ * signs a Step Qualification, approves a check's source or reviews a judge's
+ * verdict: D15 keeps those human, so there is no tool to call.
  */
 
 const AssistantCheckSchema = EvaluatorCheckSchema.describe(
@@ -33,7 +33,7 @@ const AssistantCheckSchema = EvaluatorCheckSchema.describe(
     kind: 'code', runtime: 'python',
     source: 'import json\nwith open("/output/input.json") as handle:\n    data = json.load(handle)\nwith open("/output/result.json", "w") as handle:\n    json.dump({"passed": "findings" in data["result"]}, handle)',
   },
-  { kind: 'llm_judge', model: 'anthropic/claude-sonnet-4', rubric: 'Does the result explain its findings?', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
+  { kind: 'llm_judge', model: 'anthropic/claude-sonnet-4', rubric: 'Does the result explain its findings?', minConfidence: 0.8 },
 ] });
 
 /** Models name rules in prose or snake_case; an Evaluator's name is kebab-case. */
@@ -51,7 +51,7 @@ export const ProposeEvaluatorToolSchema = z.object({
   /** Why this check, and what its preview showed. */
   rationale: z.string().max(1000).optional(),
   runInProduction: z.boolean().optional()
-    .describe('Also score live production runs of the step (a guardrail). A failing critical schema or code check sends the run to the step\'s fallbackBehavior; an llm_judge only writes Scores. Counts only once the check is trusted.'),
+    .describe('Also score live production runs of the step (a guardrail). A failing critical schema or code check sends the run to the step\'s fallbackBehavior; an llm_judge only writes Scores. A code check counts only once a person approves its source.'),
 });
 
 /** Propose an Eval Case: from a production Agent Run, or written out. */
@@ -106,45 +106,10 @@ export const ProposeEvaluatorVersionToolSchema = z.object({
   rule: z.string().min(1).max(2000).optional(),
   severity: EvaluatorSeveritySchema.optional(),
   check: EvaluatorCheckSchema.optional(),
-  /** What changed and why — a calibration disagreement, a preview. */
+  /** What changed and why — a judge rationale a person denied, a preview. */
   rationale: z.string().max(1000).optional(),
 }).refine((value) => value.rule !== undefined || value.severity !== undefined || value.check !== undefined, {
   message: 'change at least one of rule, severity or check',
-});
-
-/**
- * The outputs most worth a person's pass/fail label for an Evaluator — the
- * ground truth a judge is calibrated against (D9, EvalGen). The person labels
- * them; the assistant never does.
- */
-export const ProposeOutputsToLabelToolSchema = z.object({
-  evaluatorId: z.uuid(),
-  outputs: z.array(z.object({
-    agentRunId: z.string().min(1),
-    /** Why this output is worth labelling. */
-    why: z.string().min(1).max(300),
-  })).min(1).max(20)
-    .refine((outputs) => new Set(outputs.map((output) => output.agentRunId)).size === outputs.length, {
-      message: 'each agentRunId once',
-    }),
-});
-
-/**
- * Drafts of the step's output for a judge's person to label (ADR-0023 D9):
- * each a production run's result with values changed so that it breaks — or
- * nearly breaks — the Evaluator's rule, where production has too few such
- * outputs. The person labels each one pass or fail and it is saved as a
- * written output; the assistant never labels.
- */
-export const ProposeWrittenOutputsToolSchema = z.object({
-  evaluatorId: z.uuid(),
-  outputs: z.array(z.object({
-    basedOnAgentRunId: z.string().min(1),
-    result: z.record(z.string(), z.unknown())
-      .describe('The whole output: the run\'s result with the values changed, keeping every other key and the step\'s outputSchema.'),
-    /** What it changes and why it should break the rule. */
-    why: z.string().min(1).max(300),
-  })).min(1).max(5),
 });
 
 /** Propose a case synthesized from a production run by changing its input or workspace. */
@@ -232,8 +197,6 @@ export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
   propose_evaluator_version: ProposeEvaluatorVersionToolSchema,
   propose_eval_case: ProposeEvalCaseToolSchema,
   propose_perturbed_case: ProposePerturbedCaseToolSchema,
-  propose_outputs_to_label: ProposeOutputsToLabelToolSchema,
-  propose_written_outputs: ProposeWrittenOutputsToolSchema,
   propose_brief: ProposeBriefToolSchema,
   propose_acceptance_criteria: ProposeAcceptanceCriteriaToolSchema,
   propose_control_settings: ProposeControlSettingsToolSchema,
@@ -266,8 +229,6 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
   /** One text file of that workspace. */
   read_workspace_file: z.object({ agentRunId: z.string().min(1), path: WorkspaceFilePathSchema }),
   list_evaluators: NoArguments,
-  /** An Evaluator's human labels and its latest calibration: agreement, κ, what it still needs to count. */
-  get_calibration: z.object({ evaluatorId: z.uuid() }),
   list_eval_cases: NoArguments,
   list_eval_runs: NoArguments,
   /** One Eval Run's report, to explain it. */
@@ -317,8 +278,6 @@ export const EvaluationAssistantProposalSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('propose_evaluator_version'), arguments: ProposeEvaluatorVersionToolSchema }),
   z.object({ tool: z.literal('propose_eval_case'), arguments: ProposeEvalCaseToolSchema }),
   z.object({ tool: z.literal('propose_perturbed_case'), arguments: ProposePerturbedCaseToolSchema }),
-  z.object({ tool: z.literal('propose_outputs_to_label'), arguments: ProposeOutputsToLabelToolSchema }),
-  z.object({ tool: z.literal('propose_written_outputs'), arguments: ProposeWrittenOutputsToolSchema }),
   z.object({ tool: z.literal('propose_brief'), arguments: ProposeBriefToolSchema }),
   z.object({ tool: z.literal('propose_acceptance_criteria'), arguments: ProposeAcceptanceCriteriaToolSchema }),
   z.object({ tool: z.literal('propose_control_settings'), arguments: ProposeControlSettingsToolSchema }),

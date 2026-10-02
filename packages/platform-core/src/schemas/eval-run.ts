@@ -171,6 +171,8 @@ export const EvalRunEvaluatorReportSchema = EvalRunEvaluatorSchema.extend({
   failures: z.number().int().nonnegative(),
   /** Trials the check could not grade; not in the rate. */
   errors: z.number().int().nonnegative(),
+  /** Judge verdicts left out of the rate: below the judge's `minConfidence` and not accepted by a person, or denied by one. */
+  excluded: z.number().int().nonnegative(),
   passRate: z.number().min(0).max(1).nullable(),
   /** Wilson 95% interval on the pass rate. */
   wilsonLower: z.number().min(0).max(1).nullable(),
@@ -298,6 +300,41 @@ export const EvalRunMcpReportSchema = z.object({
   })),
 });
 
+/** A person's review of one judge verdict: `accepted` counts it, `denied` leaves it out. Neither reverses it. */
+export const JudgeReviewDecisionSchema = z.enum(['accepted', 'denied']);
+
+/**
+ * One judge's verdict on one trial, as a person reviews it: pass or fail, how
+ * confident the judge was, and its rationale — what decided the verdict and why.
+ */
+export const JudgeVerdictSchema = z.object({
+  trialId: z.uuid(),
+  trialIndex: z.number().int().nonnegative(),
+  variantId: z.string(),
+  caseId: z.uuid(),
+  /** Null when the case no longer exists. */
+  caseName: z.string().nullable(),
+  agentRunId: z.string(),
+  evaluatorId: z.uuid(),
+  name: z.string(),
+  severity: EvaluatorSeveritySchema,
+  /** The judge's Score. */
+  scoreId: z.uuid(),
+  passed: z.boolean(),
+  /** Null on verdicts recorded before judges reported a confidence. */
+  confidence: z.number().min(0).max(1).nullable(),
+  minConfidence: z.number().min(0).max(1).nullable(),
+  rationale: z.string().nullable(),
+  review: z.object({
+    decision: JudgeReviewDecisionSchema,
+    reviewedBy: z.string().nullable(),
+    reviewedAt: z.iso.datetime(),
+    comment: z.string().nullable(),
+  }).nullable(),
+  /** Whether it counts toward the Acceptance Criteria. */
+  counts: z.boolean(),
+});
+
 export const EvalRunReportSchema = z.object({
   k: z.number().int().positive(),
   trials: TrialCountsSchema,
@@ -306,6 +343,8 @@ export const EvalRunReportSchema = z.object({
   variants: z.array(EvalRunVariantReportSchema),
   /** Every challenger against the champion. */
   comparison: z.array(VariantComparisonSchema),
+  /** Every judge verdict on a scored trial, by variant, case and trial. */
+  judgeVerdicts: z.array(JudgeVerdictSchema),
   costUsd: z.number().nonnegative(),
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
@@ -328,3 +367,5 @@ export type ConfidenceCalibration = z.infer<typeof ConfidenceCalibrationSchema>;
 export type ControlRecommendation = z.infer<typeof ControlRecommendationSchema>;
 export type EvalRunVariantReport = z.infer<typeof EvalRunVariantReportSchema>;
 export type VariantComparison = z.infer<typeof VariantComparisonSchema>;
+export type JudgeReviewDecision = z.infer<typeof JudgeReviewDecisionSchema>;
+export type JudgeVerdict = z.infer<typeof JudgeVerdictSchema>;

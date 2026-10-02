@@ -38,9 +38,8 @@ import { cn } from '@/lib/utils';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { AgentLogPanel } from '@/components/agents/agent-log-panel';
 import { RunInputOutput, RunInputOutputDetails } from './run-input-output';
-import { CalibrationProgress, JudgeCalibrationPanel, labelsBySubject } from './judge-calibration';
 import { useAgentRun } from '@/hooks/use-agent-runs';
-import { useEvalRun, useEvaluatorLabels, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
+import { useEvalRun, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { EvalRunReport, describePatch } from './eval-run-report';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 import {
@@ -83,27 +82,12 @@ export function toEvaluatorName(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 63);
 }
 
-/** What a judge may be labelled on: the Step's Eval Cases (their source runs first) and its loaded production runs. */
-export interface LabelCandidates {
-  cases: readonly EvalCase[];
-  runs: readonly AgentRun[];
-}
-
-/** A judge's labels so far, against what it needs to count. */
-function JudgeProgress({ step, evaluator }: { step: EvaluatedStep; evaluator: EvaluatorView }) {
-  const labels = useEvaluatorLabels(step, evaluator.id);
-  return <CalibrationProgress evaluator={evaluator} labels={[...labelsBySubject(labels.data?.labels ?? []).values()]} />;
-}
-
-function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema, stepInputTemplate, labelCandidates }: {
+function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
   step: EvaluatedStep;
   evaluator: EvaluatorView;
   mayEdit: boolean;
   stepOutputSchema: AgentOutputSchema | undefined;
-  stepInputTemplate?: Record<string, unknown>;
-  labelCandidates: LabelCandidates;
 }) {
-  const [labelling, setLabelling] = React.useState(false);
   const approve = useStepEvaluationMutation(step, () =>
     mediforce.evaluation.approveEvaluatorSource({ evaluatorId: evaluator.id, version: evaluator.latest.version }));
   const archive = useStepEvaluationMutation(step, () => mediforce.evaluation.archiveEvaluator({ evaluatorId: evaluator.id }));
@@ -133,19 +117,17 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema, stepInputTem
         <div className="min-w-0">
           <div className="text-sm">
             <span className="font-medium">{evaluator.name}</span>
-            <span className="ml-1.5 text-xs text-muted-foreground">v{evaluator.latest.version} · {CHECK_KINDS[check.kind].label} · {evaluator.latest.severity}{evaluator.latest.origin === 'assistant' ? ' · from the assistant' : ''}</span>
+            <span className="ml-1.5 text-xs text-muted-foreground">
+              v{evaluator.latest.version} · {CHECK_KINDS[check.kind].label} · {evaluator.latest.severity}
+              {check.kind === 'llm_judge' && ` · min confidence ${check.minConfidence}`}
+              {evaluator.latest.origin === 'assistant' ? ' · from the assistant' : ''}
+            </span>
           </div>
           <p className="text-xs text-muted-foreground">{evaluator.latest.rule}</p>
           <span className={cn(
             'mt-1 inline-block rounded px-1.5 py-0.5 text-[11px] font-medium',
             evaluator.trust.trusted ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
           )}>{evaluator.trust.trusted ? 'Counts' : `Not counted — ${evaluator.trust.reason}`}</span>
-          {check.kind === 'llm_judge' && (
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <JudgeProgress step={step} evaluator={evaluator} />
-              <button type="button" className={buttonClass} onClick={() => setLabelling(!labelling)}>{labelling ? 'Hide labelling' : 'Label outputs'}</button>
-            </div>
-          )}
           <label className="mt-1.5 flex items-center gap-1.5 text-xs" data-testid="evaluator-production">
             <input
               type="checkbox"
@@ -160,13 +142,6 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema, stepInputTem
               </span>
             )}
           </label>
-          {evaluator.latest.calibration !== null && (
-            <span className="ml-1.5 text-[11px] text-muted-foreground">
-              agreement {evaluator.latest.calibration.agreement.toFixed(2)}
-              {typeof evaluator.latest.calibration.kappa === 'number' && ` · κ ${evaluator.latest.calibration.kappa.toFixed(2)}`}
-              {' '}on {evaluator.latest.calibration.labelCount} labels
-            </span>
-          )}
         </div>
         {mayEdit && (
           <div className="flex shrink-0 gap-1.5">
@@ -178,15 +153,11 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema, stepInputTem
           </div>
         )}
       </div>
-      {labelling && check.kind === 'llm_judge' && (
-        <JudgeCalibrationPanel step={step} evaluator={evaluator} cases={labelCandidates.cases} runs={labelCandidates.runs} stepOutputSchema={stepOutputSchema} stepInputTemplate={stepInputTemplate} mayEdit={mayEdit} />
-      )}
       {editing ? (
         <div className="mt-2 space-y-1">
           <p className="text-xs text-muted-foreground">
             Saving makes v{evaluator.latest.version + 1}; Scores already written keep the version that wrote them.
             {check.kind === 'code' && ' The new version needs its source approved again before it counts, whatever changed.'}
-            {check.kind === 'llm_judge' && ' The new version needs calibrating again before it counts, whatever changed.'}
           </p>
           <EvaluatorForm
             initial={{ name: evaluator.name, rule: evaluator.latest.rule, severity: evaluator.latest.severity, draft: draftFromCheck(check) }}
@@ -302,15 +273,12 @@ function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel
 }
 
 /** The Step's Evaluators with whether each counts (D9); code source is approved here, by a person. */
-export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema, stepInputTemplate, labelCandidates = { cases: [], runs: [] } }: {
+export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
   step: EvaluatedStep;
   data: StepEvaluation['evaluators'];
   mayEdit: boolean;
-  labelCandidates?: LabelCandidates;
   /** The step's `agent.outputSchema`, offered as the start of a schema check. */
   stepOutputSchema?: AgentOutputSchema;
-  /** The step's input with every field empty, the start of an example written from nothing. */
-  stepInputTemplate?: Record<string, unknown>;
 }) {
   const [adding, setAdding] = React.useState(false);
   const create = useStepEvaluationMutation(step, (values: { name: string; rule: string; severity: EvaluatorSeverity; check: EvaluatorCheck }) =>
@@ -322,7 +290,7 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema, stepI
       {data.isLoading ? <Loading /> : evaluators.length === 0 && !adding ? (
         <p className="text-sm text-muted-foreground">No Evaluators yet. Ask the assistant what to check, or add one.</p>
       ) : (
-        <ul className="space-y-2">{evaluators.map((evaluator) => <EvaluatorRow key={evaluator.id} step={step} evaluator={evaluator} mayEdit={mayEdit} stepOutputSchema={stepOutputSchema} stepInputTemplate={stepInputTemplate} labelCandidates={labelCandidates} />)}</ul>
+        <ul className="space-y-2">{evaluators.map((evaluator) => <EvaluatorRow key={evaluator.id} step={step} evaluator={evaluator} mayEdit={mayEdit} stepOutputSchema={stepOutputSchema} />)}</ul>
       )}
       {adding && (
         <EvaluatorForm
@@ -751,7 +719,7 @@ export function CasesSection({ step, evaluation, mayEdit }: {
       )}
     >
       <p className="text-xs text-muted-foreground" data-testid="eval-cases-purpose">
-        An Eval Case is an <span className="font-medium text-foreground">input</span> an Eval Run re-runs the step on; its notes say what the new output must — or must not — do. A case grades nothing itself: the Evaluators grade each re-run&apos;s output. Pass/fail <span className="font-medium text-foreground">labels</span> on outputs are a different thing — they calibrate a judge, under Evaluators.
+        An Eval Case is an <span className="font-medium text-foreground">input</span> an Eval Run re-runs the step on; its notes say what the new output must — or must not — do. A case grades nothing itself: the Evaluators grade each re-run&apos;s output.
       </p>
       {writing && <WriteCase step={step} cases={cases} onClose={() => setWriting(false)} />}
       {evaluation.cases.isLoading ? <Loading /> : cases.length === 0 ? (

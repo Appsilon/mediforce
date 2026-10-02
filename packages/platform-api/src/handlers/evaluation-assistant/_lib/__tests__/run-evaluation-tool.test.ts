@@ -7,7 +7,6 @@ import { createTestScope } from '../../../../repositories/__tests__/create-test-
 import { loadEvaluatedStep } from '../../../evaluation/_lib/evaluated-step';
 import { createEvalCase } from '../../../evaluation/eval-cases';
 import { createEvaluator } from '../../../evaluation/evaluators';
-import { labelEvaluatorOutput } from '../../../evaluation/evaluator-trust';
 import { freezeEvalDataset } from '../../../evaluation/eval-datasets';
 import { prepareEvalRun } from '../../../evaluation/eval-runs';
 import { setAcceptanceCriteria } from '../../../evaluation/acceptance-criteria';
@@ -190,30 +189,6 @@ describe('executeEvaluationTool', () => {
     }
   });
 
-  it('shows a judge\'s labels and what it still needs to count', async () => {
-    const { scope, context } = await setup();
-    const { evaluator } = await createEvaluator({
-      ...STEP, name: 'grades-justified', rule: 'Every grade is justified.', severity: 'major',
-      check: { kind: 'llm_judge', model: 'm', rubric: 'r', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
-      origin: 'user',
-    }, scope);
-    await labelEvaluatorOutput({ evaluatorId: evaluator.id, agentRunId: UNGRADED_RUN, passed: false, comment: 'No grades.' }, scope);
-
-    expect(await executeEvaluationTool('get_calibration', { evaluatorId: evaluator.id }, scope, context)).toEqual({
-      name: 'grades-justified',
-      version: 1,
-      kind: 'llm_judge',
-      rule: 'Every grade is justified.',
-      labels: [{ agentRunId: UNGRADED_RUN, passed: false, comment: 'No grades.' }],
-      needs: { labels: 10, failureLabels: 2, agreement: 0.8 },
-      calibration: null,
-      counts: false,
-      notCountedBecause: 'not calibrated',
-    });
-    await expect(executeEvaluationTool('get_calibration', { evaluatorId: evaluator.id }, scope, { ...context, step: { ...STEP, stepId: 'extract-aes' } }))
-      .rejects.toThrow('is not an Evaluator of this step');
-  });
-
   it('reads a production run\'s input and result', async () => {
     const { scope, context } = await setup();
     const result = await executeEvaluationTool('get_agent_run', { agentRunId: GRADED_RUN }, scope, context);
@@ -226,7 +201,7 @@ describe('executeEvaluationTool', () => {
       check: { kind: 'schema', schema: { required: ['findings'] } },
       agentRunIds: [GRADED_RUN],
     }, scope, context);
-    expect(result).toEqual({ results: [{ agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', comment: null, error: null }] });
+    expect(result).toEqual({ results: [{ agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: null, comment: null, error: null }] });
   });
 
   it('reads the SKILL.md the runtime loads — `<skillsDir>/<skill>` — and none for a prompt-only step', async () => {

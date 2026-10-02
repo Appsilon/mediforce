@@ -20,8 +20,8 @@ const judge: { frozen: EvalRunEvaluator; version: EvaluatorVersion } = {
   frozen: { evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'grounded', version: 1, kind: 'llm_judge', severity: 'major', counted: false },
   version: {
     evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', version: 1, rule: 'Grades are grounded.', severity: 'major',
-    check: { kind: 'llm_judge', model: 'judge/model', rubric: 'r', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
-    origin: 'user', sourceApproval: null, calibration: null, createdBy: 'a', createdAt: '2026-09-23T08:00:00.000Z',
+    check: { kind: 'llm_judge', model: 'judge/model', rubric: 'r', minConfidence: 0.8 },
+    origin: 'user', sourceApproval: null, createdBy: 'a', createdAt: '2026-09-23T08:00:00.000Z',
   },
 };
 

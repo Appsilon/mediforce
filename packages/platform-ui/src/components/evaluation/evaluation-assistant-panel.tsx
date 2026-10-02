@@ -4,7 +4,6 @@ import * as React from 'react';
 import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
 import { EVALUATION_ASSISTANT_DEFAULT_MODEL } from '@mediforce/platform-core';
 import type {
-  AgentOutputSchema,
   EvaluatedStep,
   EvaluationAssistantPlatformToolName,
   EvaluationAssistantProposalToolName,
@@ -22,8 +21,6 @@ import { EvaluationBriefField, EvaluationBriefToggle, type BriefQuery } from './
 import {
   ControlSettingsCard,
   DiagnosisCard,
-  LabellingCard,
-  DraftedOutputsCard,
   PlanCard,
   ProposalCard,
   isDecidable,
@@ -68,7 +65,6 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   list_workspace_files: 'Listing a run\'s workspace files',
   read_workspace_file: 'Reading a workspace file',
   list_evaluators: 'Listing evaluators',
-  get_calibration: 'Reading a judge\'s calibration',
   list_eval_cases: 'Listing eval cases',
   list_eval_runs: 'Listing eval runs',
   get_eval_run_report: 'Reading an eval run report',
@@ -81,8 +77,6 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   propose_evaluator_version: 'Drafting a new evaluator version',
   propose_eval_case: 'Drafting an eval case',
   propose_perturbed_case: 'Synthesizing an eval case',
-  propose_outputs_to_label: 'Picking outputs to label',
-  propose_written_outputs: 'Drafting outputs to label',
   propose_brief: 'Drafting the brief',
   propose_acceptance_criteria: 'Drafting Acceptance Criteria',
   propose_control_settings: 'Recommending routing',
@@ -136,16 +130,13 @@ function StepsSummary({ steps }: { steps: ActivityStep[] }) {
 /**
  * The Evaluation Assistant (ADR-0023 D14–D15) beside the Step's evaluation.
  * It reads and previews on its own; everything it would change arrives as a
- * card — a plan to draft checks from, outputs for the person to label, or a
- * proposal to accept — and an Eval Run it prepares starts only when the
+ * card — a plan to draft checks from, or a proposal to accept — and an Eval Run it prepares starts only when the
  * person confirms the budget on the card. The Step's Brief, which it reads on
  * every turn, opens from the header.
  */
-export function EvaluationAssistantPanel({ step, brief, stepOutputSchema, mayEdit, editReason, mayRun, runReason }: {
+export function EvaluationAssistantPanel({ step, brief, mayEdit, editReason, mayRun, runReason }: {
   step: EvaluatedStep;
   brief: BriefQuery;
-  /** The step's `agent.outputSchema`: drafted outputs are edited in its shape. */
-  stepOutputSchema?: AgentOutputSchema;
   mayEdit: boolean;
   editReason: string | undefined;
   mayRun: boolean;
@@ -292,7 +283,7 @@ export function EvaluationAssistantPanel({ step, brief, stepOutputSchema, mayEdi
       >
         {messages.length === 0 && (
           <p className="text-xs text-muted-foreground">
-            Ask for an evaluation plan, turn a rule into a check tried on real runs, pick outputs for you to label,
+            Ask for an evaluation plan, turn a rule into a check tried on real runs,
             synthesize edge cases, prepare an Eval Run or explain a report. It proposes; you decide.
           </p>
         )}
@@ -328,12 +319,6 @@ export function EvaluationAssistantPanel({ step, brief, stepOutputSchema, mayEdi
                 }
                 if (proposal.tool === 'propose_diagnosis') {
                   return <DiagnosisCard key={proposalIndex} diagnosis={proposal.arguments} />;
-                }
-                if (proposal.tool === 'propose_written_outputs') {
-                  return <DraftedOutputsCard key={proposalIndex} step={step} proposal={proposal.arguments} stepOutputSchema={stepOutputSchema} mayEdit={mayEdit} />;
-                }
-                if (proposal.tool === 'propose_outputs_to_label') {
-                  return <LabellingCard key={proposalIndex} step={step} proposal={proposal.arguments} mayEdit={mayEdit} editReason={editReason} />;
                 }
                 return isDecidable(proposal) && (
                   <ProposalCard

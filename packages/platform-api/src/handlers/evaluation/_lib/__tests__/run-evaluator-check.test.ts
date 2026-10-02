@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { buildAgentRun } from '@mediforce/platform-core/testing';
+import { InMemoryAgentTrajectoryRepository, buildAgentRun } from '@mediforce/platform-core/testing';
 import { runEvaluatorCheck } from '../run-evaluator-check';
 import { loadEvaluationSubject } from '../evaluation-subject';
 import { createEvalCase } from '../../eval-cases';
@@ -9,8 +9,10 @@ const judge = {
   kind: 'llm_judge' as const,
   model: 'anthropic/claude-haiku-4.5',
   rubric: 'Every AE carries a grade.',
-  choices: [{ label: 'graded', value: 1 }, { label: 'ungraded', value: 0 }],
+  minConfidence: 0.8,
 };
+
+const ANSWER = '{"rationale": "Sepsis is graded 5, as the fatal outcome requires.", "passed": true, "confidence": 0.85}';
 
 describe('runEvaluatorCheck', () => {
   afterEach(() => {
@@ -25,31 +27,39 @@ describe('runEvaluatorCheck', () => {
     const subject = await loadEvaluationSubject(fixture.scope(), 'errored', STEP);
     const outcome = await runEvaluatorCheck(fixture.scope(), judge, subject, null);
     expect(outcome).toEqual({
-      agentRunId: 'errored', passed: false, value: 0, label: 'fail',
+      agentRunId: 'errored', passed: false, value: 0, label: 'fail', confidence: null,
       comment: 'The Agent Run produced no result (status: error)', error: null,
     });
   });
 
-  it('asks the judge through the platform\'s OpenRouter seam and maps its choice', async () => {
+  it('asks the judge through the platform\'s OpenRouter seam, with the agent\'s log, and keeps its confidence and rationale', async () => {
     const fixture = await evaluationFixture();
     const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({
-      choices: [{ message: { content: '{"reasoning": "Sepsis is graded 5.", "choice": "graded"}' }, finish_reason: 'stop' }],
+      choices: [{ message: { content: ANSWER }, finish_reason: 'stop' }],
     })));
     vi.stubGlobal('fetch', fetchMock);
-    const scope = fixture.scope();
+    const agentTrajectoryRepo = new InMemoryAgentTrajectoryRepository(fixture.agentRunRepo);
+    await agentTrajectoryRepo.append(GRADED_RUN, [
+      { seq: 0, ts: '2026-09-22T09:00:00.000Z', type: 'assistant', text: 'Sepsis was fatal, so it is grade 5.' },
+    ]);
+    const scope = fixture.scope(undefined, { agentTrajectoryRepo });
     Object.assign(scope, { workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) } });
 
     const outcome = await runEvaluatorCheck(scope, judge, await loadEvaluationSubject(scope, GRADED_RUN, STEP), null);
 
-    expect(outcome).toMatchObject({ passed: true, value: 1, label: 'graded', comment: 'Sepsis is graded 5.', error: null });
-    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as { model: string; temperature: number };
+    expect(outcome).toEqual({
+      agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: 0.85,
+      comment: 'Sepsis is graded 5, as the fatal outcome requires.', error: null,
+    });
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as { model: string; temperature: number; messages: Array<{ content: string }> };
     expect(body).toMatchObject({ model: 'anthropic/claude-haiku-4.5', temperature: 0 });
+    expect(body.messages[1]!.content).toContain('Sepsis was fatal, so it is grade 5.');
   });
 
   it('gives the judge the case notes but not whether the case is positive or negative', async () => {
     const fixture = await evaluationFixture();
     const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({
-      choices: [{ message: { content: '{"reasoning": "Sepsis is graded 5.", "choice": "graded"}' }, finish_reason: 'stop' }],
+      choices: [{ message: { content: ANSWER }, finish_reason: 'stop' }],
     })));
     vi.stubGlobal('fetch', fetchMock);
     const scope = fixture.scope();

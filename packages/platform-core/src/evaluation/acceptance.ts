@@ -7,14 +7,21 @@ function percent(value: number): string {
   return `${Math.round(value * 1000) / 10}%`;
 }
 
+/** Why an Evaluator has no rate: it graded nothing, or every verdict it gave was left out. */
+function notGraded(evaluator: EvalRunEvaluatorReport): string {
+  if (evaluator.excluded === 0) return `${evaluator.name} graded no trial`;
+  const verdicts = evaluator.excluded === 1 ? 'verdict' : 'verdicts';
+  return `${evaluator.name} counted no trial: ${evaluator.excluded} ${verdicts} left out — below its minimum confidence, or denied by a person`;
+}
+
 /**
  * Judges one variant's Evaluator results against the run's Acceptance
  * Criteria (ADR-0023 D10). A criterion holds for a severity when every counted
  * Evaluator of that severity reaches it: its pass rate — passes over graded
  * trials, taken literally — at least `minPassRate`, and its pass^k at least
  * `minPassHatK` when set. One miss is a miss; otherwise a severity with no counted Evaluator, or
- * one that graded nothing, cannot be judged. Evaluators that do not count
- * (D9) are left out.
+ * one that graded nothing it counts, cannot be judged. Evaluators that do not
+ * count (D9) are left out.
  */
 export function judgeAcceptanceCriteria(
   criteria: AcceptanceCriteria | null,
@@ -44,7 +51,7 @@ export function judgeAcceptanceCriteria(
             passHatK: evaluator.passHatK,
             met,
           },
-          explanation: met === false ? `${evaluator.name}: ${misses.join(', ')}` : met === null ? `${evaluator.name} graded no trial` : null,
+          explanation: met === false ? `${evaluator.name}: ${misses.join(', ')}` : met === null ? notGraded(evaluator) : null,
         };
       });
 

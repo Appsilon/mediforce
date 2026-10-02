@@ -11,6 +11,7 @@ function report(overrides: Partial<EvalRunEvaluatorReport> & Pick<EvalRunEvaluat
     passes: 30,
     failures: 0,
     errors: 0,
+    excluded: 0,
     passRate: 1,
     wilsonLower: 0.886,
     wilsonUpper: 1,

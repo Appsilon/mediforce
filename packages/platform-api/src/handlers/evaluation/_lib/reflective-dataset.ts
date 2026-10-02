@@ -1,8 +1,8 @@
 import type { GepaReflectiveRecord } from '@mediforce/agent-runtime';
-import type { EvalCase, EvalRun, EvalTrial, Score, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
+import type { EvalCase, EvalRun, EvalTrial, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { loadEvaluationSubject } from './evaluation-subject';
-import { isPass, passedEveryCounted, scoresOfTrial } from './trial-scores';
+import { checkOutcome, countedScores, passedEveryCounted, trialScores, type TrialScores } from './trial-scores';
 
 /** What one job reflects on at most: its prompt must fit the reflection model's context many times over. */
 const MAX_RECORDS = 12;
@@ -25,9 +25,11 @@ function toolCallSummary(trajectory: readonly StoredAgentTrajectoryEntry[]): str
 interface GradedTrial {
   readonly trial: EvalTrial;
   readonly evalCase: EvalCase;
-  readonly scores: Score[];
+  readonly scores: TrialScores;
   readonly failing: boolean;
 }
+
+const VERDICT_WORDS = { pass: 'PASS', fail: 'FAIL', excluded: 'LEFT OUT' } as const;
 
 /**
  * GEPA's reflective dataset (its `Inputs`, `Generated Outputs`, `Feedback`)
@@ -51,16 +53,16 @@ export async function reflectiveDataset(scope: CallerScope, run: EvalRun, varian
     if (trial.variantId !== variantId || trial.status !== 'scored' || trial.agentRunId === null) continue;
     const evalCase = await scope.evaluation.getCase(trial.caseId);
     if (evalCase === null || evalCase.split !== 'dev') continue;
-    const scores = await scoresOfTrial(scope, run, trial);
-    graded.push({ trial, evalCase, scores, failing: passedEveryCounted(run, scores) !== true });
+    const scores = await trialScores(scope, run, trial);
+    graded.push({ trial, evalCase, scores, failing: passedEveryCounted(run, countedScores(scores)) !== true });
   }
   const chosen = [...graded.filter((row) => row.failing), ...graded.filter((row) => row.failing === false)].slice(0, MAX_RECORDS);
 
   return Promise.all(chosen.map(async ({ trial, evalCase, scores }) => {
     const subject = await loadEvaluationSubject(scope, trial.agentRunId!);
     const verdicts = counted.map((evaluator) => {
-      const score = scores.find((candidate) => candidate.evaluatorId === evaluator.evaluatorId);
-      const verdict = score === undefined ? 'ERROR' : isPass(score) ? 'PASS' : 'FAIL';
+      const score = scores.checks.find((candidate) => candidate.evaluatorId === evaluator.evaluatorId);
+      const verdict = score === undefined ? 'ERROR' : VERDICT_WORDS[checkOutcome(score, scores.reviews.get(evaluator.evaluatorId))];
       const rule = rules.get(evaluator.evaluatorId);
       const comment = score === undefined || score.comment === null ? '' : ` — ${score.comment}`;
       return `${verdict} ${evaluator.name} (${evaluator.severity})${rule === null || rule === undefined ? '' : `: ${rule}`}${comment}`;

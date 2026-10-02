@@ -5,9 +5,6 @@ import {
   EvaluatorOutputSchema,
   FreezeEvalDatasetOutputSchema,
   GetAgentRunIoOutputSchema,
-  CreateWrittenOutputOutputSchema,
-  ListWrittenOutputsOutputSchema,
-  ListEvaluatorLabelsOutputSchema,
   GetMcpEvalPolicyOutputSchema,
   ListStepAgentRunsOutputSchema,
   ListEvalCasesOutputSchema,
@@ -180,7 +177,7 @@ test.describe('Step Evaluation entities — API E2E', () => {
       check: { kind: 'schema', schema: { required: ['findings'] } },
     }));
     expect(preview.results).toEqual([
-      { agentRunId, passed: false, value: 0, label: 'fail', comment: 'missing required keys: findings', error: null },
+      { agentRunId, passed: false, value: 0, label: 'fail', confidence: null, comment: 'missing required keys: findings', error: null },
     ]);
 
     const code = PreviewEvaluatorOutputSchema.parse(await post(request, '/api/evaluation/evaluators/preview', {
@@ -193,7 +190,7 @@ test.describe('Step Evaluation entities — API E2E', () => {
       },
     }));
     expect(code.results).toEqual([
-      { agentRunId, passed: true, value: 1, label: 'pass', comment: '2 trajectory entries', error: null },
+      { agentRunId, passed: true, value: 1, label: 'pass', confidence: null, comment: '2 trajectory entries', error: null },
     ]);
 
     const scoresRes = await request.get(`/api/scores?agentRunId=${agentRunId}`, { headers: AUTH_HEADERS });
@@ -201,17 +198,14 @@ test.describe('Step Evaluation entities — API E2E', () => {
   });
 
   test('a production run becomes an Eval Case, and the live cases freeze into a Dataset version', async ({ request }) => {
-    const unreviewed = await request.post('/api/evaluation/cases/from-agent-run', {
-      headers: JSON_HEADERS, data: { agentRunId },
-    });
-    expect(unreviewed.status(), await unreviewed.text()).toBe(400);
     const otherStep = await request.post('/api/evaluation/cases/from-agent-run', {
       headers: JSON_HEADERS, data: { agentRunId, expectation: 'positive', step: { ...step, stepId: 'another-step' } },
     });
     expect(otherStep.status(), await otherStep.text()).toBe(400);
 
+    // An unreviewed run needs no expectation: it is harvested as positive.
     const { evalCase } = EvalCaseOutputSchema.parse(await post(request, '/api/evaluation/cases/from-agent-run', {
-      agentRunId, step, expectation: 'positive', split: 'holdout', origin: 'assistant',
+      agentRunId, step, split: 'holdout', origin: 'assistant',
     }, 201));
     expect(evalCase).toMatchObject({
       ...step,
@@ -250,49 +244,6 @@ test.describe('Step Evaluation entities — API E2E', () => {
 
     const outsider = await request.get(`/api/evaluation/agent-runs/${agentRunId}/io`, { headers: sessionCookieHeaders(callers.outsider) });
     expect(outsider.status(), await outsider.text()).toBe(404);
-  });
-
-  test('a written output keeps its run\'s input, is labelled for a judge, and leaves the labels once archived', async ({ request }) => {
-    const { evaluator } = EvaluatorOutputSchema.parse(await post(request, '/api/evaluation/evaluators', {
-      ...step,
-      name: 'summary-grounded',
-      rule: 'The summary is grounded in the input.',
-      severity: 'major',
-      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Grounded?', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
-    }, 201));
-    const created = CreateWrittenOutputOutputSchema.parse(await post(request, '/api/evaluation/written-outputs', {
-      ...step,
-      basedOnAgentRunId: agentRunId,
-      result: { mock: true, summary: 'A summary that invents a grade 5 event.' },
-      note: 'Invented event.',
-      label: { evaluatorId: evaluator.id, passed: false },
-      uid: TEST_USER_ID,
-    }, 201));
-    const { writtenOutput } = created;
-    expect(writtenOutput).toMatchObject({ basedOnAgentRunId: agentRunId, note: 'Invented event.', archived: false });
-    expect(created.score).toMatchObject({ subject: { type: 'written_output', id: writtenOutput.id }, label: 'fail' });
-
-    const outsider = await request.get(
-      `/api/evaluation/written-outputs?namespace=${step.namespace}&workflowName=${step.workflowName}&stepId=${step.stepId}`,
-      { headers: sessionCookieHeaders(callers.outsider) },
-    );
-    expect(outsider.status(), await outsider.text()).not.toBe(200);
-    const listRes = await request.get(
-      `/api/evaluation/written-outputs?namespace=${step.namespace}&workflowName=${step.workflowName}&stepId=${step.stepId}`,
-      { headers: AUTH_HEADERS },
-    );
-    expect(ListWrittenOutputsOutputSchema.parse(await listRes.json()).writtenOutputs.map((row) => row.id)).toContain(writtenOutput.id);
-
-    await post(request, `/api/evaluation/evaluators/${evaluator.id}/labels`, { writtenOutputId: writtenOutput.id, passed: true, uid: TEST_USER_ID }, 201);
-    const both = await request.post(`/api/evaluation/evaluators/${evaluator.id}/labels`, {
-      headers: JSON_HEADERS, data: { writtenOutputId: writtenOutput.id, agentRunId, passed: true, uid: TEST_USER_ID },
-    });
-    expect(both.status(), await both.text()).toBe(400);
-    const labels = async () => ListEvaluatorLabelsOutputSchema.parse(await (await request.get(`/api/evaluation/evaluators/${evaluator.id}/labels`, { headers: AUTH_HEADERS })).json()).labels;
-    expect((await labels()).map((label) => [label.subject.id, label.label])).toEqual([[writtenOutput.id, 'pass']]);
-
-    await post(request, `/api/evaluation/written-outputs/${writtenOutput.id}/archive`, { archived: true });
-    expect(await labels()).toEqual([]);
   });
 
   test('editing a case replaces it, and the Dataset frozen before keeps the case it froze', async ({ request }) => {
@@ -410,16 +361,6 @@ test.describe('Step Evaluation entities — API E2E', () => {
         headers: sessionCookieHeaders(editor), data: { ...gatedStep, servers: {} },
       });
       expect(policy.status(), await policy.text()).toBe(200);
-
-      const { evaluator: stored } = EvaluatorOutputSchema.parse(await created.json());
-      const refusedSeed = await request.post(`/api/evaluation/evaluators/${stored.id}/cases-from-labels`, {
-        headers: sessionCookieHeaders(runner), data: {},
-      });
-      expect(refusedSeed.status(), await refusedSeed.text()).toBe(403);
-      const seeded = await request.post(`/api/evaluation/evaluators/${stored.id}/cases-from-labels`, {
-        headers: sessionCookieHeaders(editor), data: {},
-      });
-      expect(seeded.status(), await seeded.text()).toBe(201);
     });
 
     test('previewing a check runs the step\'s outputs, so it needs the workflow\'s run role', async ({ request }) => {

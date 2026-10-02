@@ -11,7 +11,7 @@ actually executes and whether its result is trustworthy enough to continue.
 
 | Directory | Holds |
 |---|---|
-| `src/runner/` | `AgentRunner`, `PluginRegistry`, `FallbackHandler`, step executors, `OpenRouterLlmClient`, the `LlmJudgeReviewPlugin` behind `llm_judge` Evaluators, OTel tracing |
+| `src/runner/` | `AgentRunner`, `PluginRegistry`, `FallbackHandler`, step executors, `OpenRouterLlmClient`, the `LlmJudgeReviewPlugin` behind `llm_judge` Evaluators (reads the step's input, Trajectory and output; answers pass/fail, confidence and rationale), OTel tracing |
 | `src/plugins/` | `BaseContainerAgentPlugin` and the concrete plugins, and the code-check and GEPA containers Step Evaluation runs — see [`src/plugins/README.md`](src/plugins/README.md) |
 | `src/interfaces/` | `StepExecutorPlugin`, review and step-executor contracts |
 | `src/mcp/` | Per-step MCP resolution (`resolveMcpForStep`); the record/replay proxy an eval trial runs in an MCP server's place (`mcp-tape.ts`, ADR-0023 D6) |

@@ -11,7 +11,7 @@ describe('evaluatorView', () => {
     const version = {
       evaluatorId: evaluator.id, version: 1, rule: 'A fatal AE is flagged.', severity: 'critical' as const,
       check: { kind: 'code' as const, runtime: 'python' as const, source: 'print(1)' }, origin: 'user' as const,
-      sourceApproval: null, calibration: null, createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z',
+      sourceApproval: null, createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z',
     };
     await fixture.evaluationRepo.createEvaluator(evaluator, version);
 

@@ -57,7 +57,6 @@ function buildVersion(evaluatorId: string, overrides: Partial<EvaluatorVersion> 
     check: { kind: 'code', runtime: 'python', source: 'import json\nprint(json.dumps({"passed": True}))' },
     origin: 'user',
     sourceApproval: null,
-    calibration: null,
     createdBy: 'author-1',
     createdAt: '2026-09-23T08:00:00.000Z',
     ...overrides,
@@ -107,7 +106,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       await expect(repo.appendBrief({ ...base, version: 2, text: 'x', createdAt: '2026-09-23T10:00:00.000Z' })).rejects.toThrow();
     });
 
-    it('round-trips an Evaluator with its versions, approval and calibration', async () => {
+    it('round-trips an Evaluator with its versions and approval', async () => {
       const evaluator = buildEvaluator();
       const first = buildVersion(evaluator.id);
       await repo.createEvaluator(evaluator, first);
@@ -118,22 +117,36 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
           kind: 'llm_judge',
           model: 'anthropic/claude-sonnet-4',
           rubric: 'Is the grade justified by the source record?',
-          choices: [{ label: 'justified', value: 1 }, { label: 'unjustified', value: 0 }],
+          minConfidence: 0.7,
         },
         origin: 'assistant',
         createdAt: '2026-09-23T09:00:00.000Z',
       }));
       const approval = { approvedBy: 'reviewer-1', approvedAt: '2026-09-23T10:00:00.000Z' };
-      const calibration = { agreement: 0.9, kappa: 0.74, labelCount: 10, failureLabelCount: 2, calibratedAt: '2026-09-23T11:00:00.000Z' };
       await repo.setSourceApproval(evaluator.id, 1, approval);
-      await repo.setCalibration(evaluator.id, 2, calibration);
 
       expect(await repo.getEvaluator(evaluator.id)).toEqual(evaluator);
       expect(await repo.listEvaluatorVersions(evaluator.id)).toEqual([
         { ...first, sourceApproval: approval },
-        { ...second, calibration },
+        second,
       ]);
       await expect(repo.appendEvaluatorVersion(buildVersion(evaluator.id, { version: 2 }))).rejects.toThrow();
+    });
+
+    it('reads a judge version stored with choices, before minConfidence, at the default floor', async () => {
+      const evaluator = buildEvaluator();
+      const legacyCheck = {
+        kind: 'llm_judge',
+        model: 'anthropic/claude-sonnet-4',
+        rubric: 'Is the grade justified by the source record?',
+        choices: [{ label: 'justified', value: 1 }, { label: 'unjustified', value: 0 }],
+      } as unknown as EvaluatorVersion['check'];
+      await repo.createEvaluator(evaluator, buildVersion(evaluator.id, { check: legacyCheck }));
+
+      const [version] = await repo.listEvaluatorVersions(evaluator.id);
+      expect(version!.check).toEqual({
+        kind: 'llm_judge', model: 'anthropic/claude-sonnet-4', rubric: 'Is the grade justified by the source record?', minConfidence: 0.8,
+      });
     });
 
     it('lists a step\'s Evaluators by name, refuses a duplicate name, archives', async () => {
@@ -192,31 +205,6 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect(await repo.listCases(step)).toEqual([synthesized, newer, { ...older, archived: true }]);
       expect(await repo.getCase(newer.id)).toEqual(newer);
       expect(await repo.listCases(otherStep)).toEqual([]);
-    });
-
-    it('round-trips written outputs, newest first per step, and archives them', async () => {
-      const written = (id: string, createdAt: string, target: EvaluatedStep = step) => ({
-        ...target,
-        id,
-        stepInput: { events: [{ term: 'Neutropenia', anc: 0.4 }] },
-        result: { grade: 2, rationale: 'Not tied to the ANC.' },
-        basedOnAgentRunId: 'agent-run-1',
-        note: 'Grade 4 written as 2.',
-        origin: 'user' as const,
-        archived: false,
-        createdBy: 'author-1',
-        createdAt,
-      });
-      const older = written(randomUUID(), '2026-09-23T08:00:00.000Z');
-      const newer = written(randomUUID(), '2026-09-23T09:00:00.000Z');
-      await repo.createWrittenOutput(older);
-      await repo.createWrittenOutput(newer);
-      await repo.createWrittenOutput(written(randomUUID(), '2026-09-23T10:00:00.000Z', otherStep));
-      await repo.setWrittenOutputArchived(older.id, true);
-
-      expect((await repo.listWrittenOutputs(step)).map((row) => [row.id, row.archived])).toEqual([[newer.id, false], [older.id, true]]);
-      expect(await repo.getWrittenOutput(newer.id)).toEqual(newer);
-      expect(await repo.getWrittenOutput(randomUUID())).toBeNull();
     });
 
     it('freezes Dataset versions, newest first, unique per step', async () => {

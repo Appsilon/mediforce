@@ -3,38 +3,29 @@
 import * as React from 'react';
 import { Check, X } from 'lucide-react';
 import {
-  JUDGE_MIN_AGREEMENT,
-  JUDGE_MIN_FAILURE_LABELS,
-  JUDGE_MIN_LABELS,
   describeAcceptanceCriteria,
-  type AgentOutputSchema,
   type EvaluatedStep,
 } from '@mediforce/platform-core';
 import type { EvaluatorSelfTest, ProposalView } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
-import { useEvaluatorLabels, useStepEvaluationMutation, useStepEvaluators } from '@/hooks/use-step-evaluation';
+import { useStepEvaluationMutation, useStepEvaluators } from '@/hooks/use-step-evaluation';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
-import { CalibrateAction, LabelOutputRow, labelsBySubject } from './judge-calibration';
-import { DraftedOutput } from './written-output-form';
 
 export type ProposalStatus = 'open' | 'accepted' | 'rejected';
 
 type Proposal<Tool extends ProposalView['tool']> = Extract<ProposalView, { tool: Tool }>;
 
 /**
- * The proposals a person accepts or rejects as they stand. A plan and a
- * labelling queue are worked through instead; a routing recommendation is
- * applied in the workflow editor.
+ * The proposals a person accepts or rejects as they stand. A plan is worked
+ * through instead; a routing recommendation is applied in the workflow editor.
  */
-type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_outputs_to_label' | 'propose_written_outputs' | 'propose_control_settings' | 'propose_diagnosis' }>;
+type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_control_settings' | 'propose_diagnosis' }>;
 
 export function isDecidable(proposal: ProposalView): proposal is DecidableProposal {
   return proposal.tool !== 'propose_evaluation_plan'
-    && proposal.tool !== 'propose_outputs_to_label'
-    && proposal.tool !== 'propose_written_outputs'
     && proposal.tool !== 'propose_control_settings'
     && proposal.tool !== 'propose_diagnosis';
 }
@@ -306,140 +297,6 @@ export function ControlSettingsCard({ proposal }: { proposal: Proposal<'propose_
         From Eval Run <span className="font-mono">{proposal.evalRunId.slice(0, 8)}</span>, variant {proposal.variantId}. Apply it in the workflow editor;
         Control Mode and confidence threshold are not part of the Step Fingerprint, so a qualification stays valid.
       </p>
-    </div>
-  );
-}
-
-/**
- * Calibration help (ADR-0023 D9, EvalGen): the outputs the assistant picked
- * for the person to label. The person labels — the assistant never does —
- * refines the rule as the labels show what it should mean, calibrates a judge
- * against the labels, and can keep the labelled outputs as Eval Cases.
- */
-export function LabellingCard({ step, proposal, mayEdit, editReason }: {
-  step: EvaluatedStep;
-  proposal: Proposal<'propose_outputs_to_label'>['arguments'];
-  mayEdit: boolean;
-  editReason: string | undefined;
-}) {
-  const evaluators = useStepEvaluators(step);
-  const labels = useEvaluatorLabels(step, proposal.evaluatorId);
-  const evaluator = evaluators.data?.evaluators.find((candidate) => candidate.id === proposal.evaluatorId);
-  const [refining, setRefining] = React.useState<{ rule: string; rubric: string } | null>(null);
-  const refine = useStepEvaluationMutation(step, (draft: { rule: string; rubric: string }) => {
-    if (evaluator === undefined) throw new Error('That Evaluator is no longer live.');
-    const check = evaluator.latest.check;
-    return mediforce.evaluation.addEvaluatorVersion({
-      evaluatorId: proposal.evaluatorId,
-      rule: draft.rule,
-      ...(check.kind === 'llm_judge' && draft.rubric !== check.rubric ? { check: { ...check, rubric: draft.rubric } } : {}),
-    });
-  });
-  const seed = useStepEvaluationMutation(step, () => mediforce.evaluation.createCasesFromLabels({ evaluatorId: proposal.evaluatorId }));
-
-  if (evaluator === undefined) {
-    return <div className="rounded-md border bg-background p-2.5 text-xs text-muted-foreground">{evaluators.isLoading ? 'Loading…' : 'That Evaluator is no longer live.'}</div>;
-  }
-  const byRun = labelsBySubject(labels.data?.labels ?? []);
-  const all = [...byRun.values()];
-  const failures = all.filter((label) => label.passed === false).length;
-  const check = evaluator.latest.check;
-  const actionError = seed.error;
-  const refinedUnchanged = refining !== null
-    && refining.rule.trim() === evaluator.latest.rule
-    && (check.kind !== 'llm_judge' || refining.rubric === check.rubric);
-
-  return (
-    <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="labelling-card">
-      <div className="mb-1 font-medium">Label outputs for {evaluator.name} v{evaluator.latest.version}</div>
-      {refining === null ? (
-        <div className="space-y-0.5">
-          <p>{evaluator.latest.rule}</p>
-          {check.kind === 'llm_judge' && <p className="whitespace-pre-wrap text-muted-foreground">Question for the judge: {check.rubric}</p>}
-          {mayEdit && (
-            <button type="button" className={buttonClass} onClick={() => setRefining({ rule: evaluator.latest.rule, rubric: check.kind === 'llm_judge' ? check.rubric : '' })}>
-              Refine the rule
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-1">
-          <textarea aria-label="Rule" className="w-full min-h-12 rounded border bg-background p-1.5" value={refining.rule} onChange={(event) => setRefining({ ...refining, rule: event.target.value })} />
-          {check.kind === 'llm_judge' && (
-            <textarea aria-label="Question for the judge" className="w-full min-h-20 rounded border bg-background p-1.5" value={refining.rubric} onChange={(event) => setRefining({ ...refining, rubric: event.target.value })} />
-          )}
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              className={primaryButtonClass}
-              disabled={refining.rule.trim() === '' || refinedUnchanged || refine.isPending}
-              onClick={() => refine.mutate(refining, { onSuccess: () => setRefining(null) })}
-            >Save as v{evaluator.latest.version + 1}</button>
-            <button type="button" className={buttonClass} onClick={() => setRefining(null)}>Cancel</button>
-          </div>
-          {refine.error !== null && <p className="text-destructive">{refine.error.message}</p>}
-        </div>
-      )}
-      <ul className="mt-2 space-y-2">
-        {proposal.outputs.map((output) => (
-          <LabelOutputRow key={output.agentRunId} step={step} evaluatorId={proposal.evaluatorId} agentRunId={output.agentRunId} note={output.why} label={byRun.get(output.agentRunId)} mayEdit={mayEdit} />
-        ))}
-      </ul>
-      <p className="mt-2 text-muted-foreground" data-testid="label-counts">
-        {all.length} output(s) labelled, {failures} fail{check.kind === 'llm_judge'
-          ? ` — a judge counts after ${JUDGE_MIN_LABELS} labels, ${JUDGE_MIN_FAILURE_LABELS} of them failures, at agreement ${JUDGE_MIN_AGREEMENT} or better`
-          : ''}.
-      </p>
-      {seed.data !== undefined && (
-        <div className="mt-0.5 text-muted-foreground" data-testid="cases-from-labels-result">
-          <p>{seed.data.cases.length} Eval Case(s) added{seed.data.skipped.length > 0 ? `, ${seed.data.skipped.length} skipped:` : '.'}</p>
-          {seed.data.skipped.length > 0 && (
-            <ul className="list-disc pl-4">
-              {seed.data.skipped.map((skipped) => <li key={skipped.agentRunId}><span className="font-mono">{skipped.agentRunId.slice(0, 8)}</span> — {skipped.reason}</li>)}
-            </ul>
-          )}
-        </div>
-      )}
-      {actionError !== null && <p className="mt-0.5 text-destructive">{actionError.message}</p>}
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {check.kind === 'llm_judge' && <CalibrateAction step={step} evaluator={evaluator} labelCount={all.length} mayEdit={mayEdit} editReason={editReason} />}
-        <InstantTooltip label={editReason}>
-          <span className="inline-flex">
-            <button type="button" className={buttonClass} disabled={mayEdit === false || all.length === 0 || seed.isPending} onClick={() => seed.mutate(undefined)}>
-              Add labelled outputs as Eval Cases
-            </button>
-          </span>
-        </InstantTooltip>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Outputs the assistant drafted for a judge (ADR-0023 D9) — real runs' results
- * changed to break the rule, where production has too few failures. The
- * person labels each one pass or fail, which saves it as a written output;
- * the assistant never labels.
- */
-export function DraftedOutputsCard({ step, proposal, stepOutputSchema, mayEdit }: {
-  step: EvaluatedStep;
-  proposal: Proposal<'propose_written_outputs'>['arguments'];
-  stepOutputSchema: AgentOutputSchema | undefined;
-  mayEdit: boolean;
-}) {
-  const evaluators = useStepEvaluators(step);
-  const evaluator = evaluators.data?.evaluators.find((candidate) => candidate.id === proposal.evaluatorId);
-  return (
-    <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="drafted-outputs-card">
-      <div className="mb-1 font-medium">Draft outputs to label{evaluator === undefined ? '' : ` for ${evaluator.name}`}</div>
-      <p className="text-muted-foreground">
-        Changed from real runs to break the rule. Label each one yourself: it is saved as a written example and counts toward calibrating the judge. Open &ldquo;Edit the output&rdquo; to adjust a draft first.
-      </p>
-      <ul className="mt-2 space-y-2">
-        {proposal.outputs.map((draft, index) => (
-          <DraftedOutput key={index} step={step} evaluatorId={proposal.evaluatorId} draft={draft} stepOutputSchema={stepOutputSchema} mayEdit={mayEdit} />
-        ))}
-      </ul>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { z } from 'zod';
-import { validateOutputSchema } from '@mediforce/agent-runtime';
 import type {
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EvaluatedStep,
@@ -12,9 +11,8 @@ import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { HandlerError } from '../../../errors';
 import { previewEvaluator } from '../../evaluation/preview-evaluator';
-import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
-import { isSameStep, loadEvaluatedStep } from '../../evaluation/_lib/evaluated-step';
+import { isSameStep } from '../../evaluation/_lib/evaluated-step';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
 import { loadStepEvaluator } from './run-evaluation-tool';
 
@@ -91,50 +89,10 @@ export async function reviewEvaluationProposal(
       if (evaluator.archived) return { ok: false, error: `Evaluator '${evaluator.name}' is archived` };
       return check === undefined ? { ok: true } : selfTest(scope, step, check, previewed);
     }
-    case 'propose_outputs_to_label': {
-      const { evaluatorId, outputs } = args as Args<'propose_outputs_to_label'>;
-      await loadStepEvaluator(scope, step, evaluatorId);
-      const refused: string[] = [];
-      for (const { agentRunId } of outputs) {
-        try {
-          const subject = await loadEvaluationSubject(scope, agentRunId, step);
-          if (subject.instance.evalRunId !== undefined) refused.push(`${agentRunId} (an eval trial)`);
-        } catch (err) {
-          if (err instanceof HandlerError === false) throw err;
-          refused.push(`${agentRunId} (${err.message})`);
-        }
-      }
-      return refused.length === 0
-        ? { ok: true }
-        : { ok: false, error: `Only this step's production runs can be labelled: ${refused.join('; ')}` };
-    }
     case 'propose_perturbed_case': {
       const proposal = args as Args<'propose_perturbed_case'>;
       await perturbCase(await loadCaseSource(scope, proposal.baseAgentRunId, step, 'read'), proposal);
       return { ok: true };
-    }
-    case 'propose_written_outputs': {
-      const { evaluatorId, outputs } = args as Args<'propose_written_outputs'>;
-      const evaluator = await loadStepEvaluator(scope, step, evaluatorId);
-      if (evaluator.archived) return { ok: false, error: `Evaluator '${evaluator.name}' is archived` };
-      const { step: workflowStep } = await loadEvaluatedStep(scope, step, 'read');
-      const outputSchema = workflowStep.agent?.outputSchema;
-      const refused: string[] = [];
-      for (const { basedOnAgentRunId, result } of outputs) {
-        try {
-          const subject = await loadEvaluationSubject(scope, basedOnAgentRunId, step);
-          if (subject.instance.evalRunId !== undefined) refused.push(`${basedOnAgentRunId}: an eval trial, not a production run`);
-          else if (isDeepStrictEqual(subject.agentRun.envelope?.result ?? null, result)) refused.push(`${basedOnAgentRunId}: the draft is the run's own output — change it, or propose_outputs_to_label the run`);
-          else {
-            const violation = outputSchema === undefined ? null : validateOutputSchema(result, outputSchema);
-            if (violation !== null) refused.push(`${basedOnAgentRunId}: the draft breaks the step's outputSchema (${violation}) — keep its shape and change values`);
-          }
-        } catch (err) {
-          if (err instanceof HandlerError === false) throw err;
-          refused.push(`${basedOnAgentRunId}: ${err.message}`);
-        }
-      }
-      return refused.length === 0 ? { ok: true } : { ok: false, error: `Draft outputs must change a production run of this step: ${refused.join('; ')}` };
     }
     case 'propose_control_settings': {
       const { evalRunId, variantId } = args as Args<'propose_control_settings'>;

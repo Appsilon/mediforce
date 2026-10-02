@@ -9,11 +9,9 @@ import type {
   EvaluationBrief,
   Evaluator,
   EvaluatorVersion,
-  JudgeCalibration,
   McpEvalPolicy,
   McpRecording,
   SourceApproval,
-  WrittenOutput,
 } from '../schemas/evaluation';
 
 export interface McpRecordingFilter {
@@ -40,8 +38,7 @@ export interface McpRecordedCase {
  *
  * Versioned rows are append-only: a Brief, Acceptance Criteria or Evaluator
  * change is a new version, and the only in-place writes are the ones that do
- * not change what was checked — archiving, a source approval, a calibration
- * result. A signed Step Qualification is never changed.
+ * not change what was checked — archiving, a source approval. A signed Step Qualification is never changed.
  */
 export interface EvaluationRepository {
   appendBrief(brief: EvaluationBrief): Promise<EvaluationBrief>;
@@ -57,19 +54,12 @@ export interface EvaluationRepository {
   /** Oldest first. */
   listEvaluatorVersions(evaluatorId: string): Promise<EvaluatorVersion[]>;
   setSourceApproval(evaluatorId: string, version: number, approval: SourceApproval): Promise<void>;
-  setCalibration(evaluatorId: string, version: number, calibration: JudgeCalibration): Promise<void>;
 
   createCase(evalCase: EvalCase): Promise<EvalCase>;
   getCase(id: string): Promise<EvalCase | null>;
   /** Newest first, archived cases included. */
   listCases(step: EvaluatedStep): Promise<EvalCase[]>;
   setCaseArchived(id: string, archived: boolean): Promise<void>;
-
-  createWrittenOutput(writtenOutput: WrittenOutput): Promise<WrittenOutput>;
-  getWrittenOutput(id: string): Promise<WrittenOutput | null>;
-  /** Newest first, archived ones included. */
-  listWrittenOutputs(step: EvaluatedStep): Promise<WrittenOutput[]>;
-  setWrittenOutputArchived(id: string, archived: boolean): Promise<void>;
 
   appendDatasetVersion(dataset: EvalDatasetVersion): Promise<EvalDatasetVersion>;
   getDatasetVersion(id: string): Promise<EvalDatasetVersion | null>;

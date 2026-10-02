@@ -8,7 +8,6 @@ import {
   EvalCaseSchema,
   EvalCaseSplitSchema,
   EvalDatasetVersionSchema,
-  WrittenOutputSchema,
   EvalOptimisationSchema,
   EvalRunReportSchema,
   EvalRunSchema,
@@ -32,6 +31,7 @@ import {
   StepQualificationSchema,
   StepQualificationStatusSchema,
   StepVariantPatchSchema,
+  JudgeReviewDecisionSchema,
   hasPerturbationChange,
 } from '@mediforce/platform-core';
 import { RegistrationWarningSchema } from './workflows';
@@ -74,7 +74,7 @@ export const EvaluatorProductionSchema = z.object({
   reason: z.string().optional(),
 });
 
-/** An Evaluator with its versions and whether its latest version counts (D9). */
+/** An Evaluator with its versions and whether its latest version counts (D9): a `code` one once its source is approved. */
 export const EvaluatorViewSchema = EvaluatorSchema.extend({
   latest: EvaluatorVersionSchema,
   /** Oldest first. */
@@ -130,43 +130,15 @@ export const ApproveEvaluatorSourceInputSchema = z.object({
   uid: z.string().min(1).optional(),
 });
 
-/** A human label on one Agent Run's output for this Evaluator, the ground truth a judge is calibrated against. */
-export const LabelEvaluatorOutputInputSchema = z.object({
-  evaluatorId: z.uuid(),
-  /** A production run's output; or `writtenOutputId`, a person's written one. */
-  agentRunId: z.string().min(1).optional(),
-  writtenOutputId: z.uuid().optional(),
-  passed: z.boolean(),
-  comment: z.string().trim().max(2000).optional(),
-  uid: z.string().min(1).optional(),
-}).refine((value) => (value.agentRunId === undefined) !== (value.writtenOutputId === undefined), {
-  message: 'give exactly one of agentRunId (a production output) or writtenOutputId (a written one)',
-});
-export const LabelEvaluatorOutputOutputSchema = z.object({ score: ScoreSchema });
-
-/** The person's labels on this Evaluator's outputs — the newest per Agent Run, newest first. */
-export const ListEvaluatorLabelsInputSchema = z.object({ evaluatorId: z.uuid() });
-export const ListEvaluatorLabelsOutputSchema = z.object({ labels: z.array(ScoreSchema) });
-
-export const CalibrateEvaluatorInputSchema = z.object({
-  evaluatorId: z.uuid(),
-  /** Defaults to the latest version. */
-  version: z.number().int().positive().optional(),
-});
-export const CalibrateEvaluatorOutputSchema = z.object({
-  evaluator: EvaluatorViewSchema,
-  /** Labelled runs where the judge disagreed with the person. */
-  disagreements: z.array(z.object({ agentRunId: z.string(), humanPassed: z.boolean(), judgePassed: z.boolean() })),
-  /** Labelled runs the judge could not grade; they do not count toward agreement. */
-  errors: z.array(z.object({ agentRunId: z.string(), error: z.string() })),
-});
-
 /** One check applied to one Agent Run's output. `error` means the check itself failed. */
 export const EvaluatorOutcomeSchema = z.object({
   agentRunId: z.string(),
   passed: z.boolean().nullable(),
   value: z.number().min(0).max(1).nullable(),
   label: z.string().nullable(),
+  /** An `llm_judge`'s confidence in its verdict; null for other checks. */
+  confidence: z.number().min(0).max(1).nullable(),
+  /** The check's comment; an `llm_judge`'s rationale — what decided its verdict and why. */
   comment: z.string().nullable(),
   error: z.string().nullable(),
 });
@@ -191,44 +163,6 @@ export const ListStepAgentRunsOutputSchema = z.object({
   /** Present while older runs remain. */
   nextCursor: z.string().optional(),
 });
-
-export const ListWrittenOutputsInputSchema = EvaluatedStepSchema.extend({
-  includeArchived: QueryBooleanSchema.optional(),
-});
-export const ListWrittenOutputsOutputSchema = z.object({ writtenOutputs: z.array(WrittenOutputSchema) });
-
-/**
- * A person's written example of the step's output (ADR-0023 D9), usually
- * started from a production run — its input taken as it was — and labelled
- * for a judge in the same write when `label` is given.
- */
-export const CreateWrittenOutputInputSchema = EvaluatedStepSchema.extend({
-  basedOnAgentRunId: z.string().min(1).optional(),
-  /** What the step was given; defaults to the input of `basedOnAgentRunId`. */
-  stepInput: z.record(z.string(), z.unknown()).nullable().optional(),
-  result: z.record(z.string(), z.unknown()),
-  note: z.string().trim().max(2000).optional(),
-  origin: EvaluationOriginSchema.default('user'),
-  label: z.object({
-    evaluatorId: z.uuid(),
-    passed: z.boolean(),
-    comment: z.string().trim().max(2000).optional(),
-  }).optional(),
-  /** Who labels, when an API key writes the label. */
-  uid: z.string().min(1).optional(),
-});
-export const CreateWrittenOutputOutputSchema = z.object({
-  writtenOutput: WrittenOutputSchema,
-  /** The label written with it; null without `label`. */
-  score: ScoreSchema.nullable(),
-});
-
-/** An archived written output leaves every Evaluator's labels and calibration. */
-export const ArchiveWrittenOutputInputSchema = z.object({
-  writtenOutputId: z.uuid(),
-  archived: z.boolean().default(true),
-});
-export const WrittenOutputOutputSchema = z.object({ writtenOutput: WrittenOutputSchema });
 
 /** One Agent Run as an input/output pair: what its step was given and what it returned. */
 export const GetAgentRunIoInputSchema = z.object({ agentRunId: z.string().min(1) });
@@ -294,21 +228,6 @@ export const CreatePerturbedEvalCaseInputSchema = EvaluatedStepSchema
     origin: EvaluationOriginSchema.default('user'),
   })
   .refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' });
-
-/**
- * Seeds Eval Cases from an Evaluator's labels (EvalGen): each labelled
- * production output that is not a case yet becomes one — a pass positive, a
- * fail negative — so calibrating a check also builds the dataset.
- */
-export const CreateEvalCasesFromLabelsInputSchema = z.object({
-  evaluatorId: z.uuid(),
-  split: EvalCaseSplitSchema.default('dev'),
-});
-export const CreateEvalCasesFromLabelsOutputSchema = z.object({
-  cases: z.array(EvalCaseSchema),
-  /** Labelled outputs that did not become a case, and why. */
-  skipped: z.array(z.object({ agentRunId: z.string(), reason: z.string() })),
-});
 
 export const ArchiveEvalCaseInputSchema = z.object({
   caseId: z.uuid(),
@@ -458,6 +377,23 @@ export const EvalTrialFailureSchema = z.object({
   error: z.string().nullable(),
   evaluators: z.array(TrialEvaluatorFailureSchema),
 });
+
+/**
+ * A person accepts or denies one judge verdict on one trial of an Eval Run,
+ * after reading its rationale. `accepted` counts it toward the Acceptance
+ * Criteria whatever the judge's confidence; `denied` leaves it out — it is
+ * never reversed. A later review replaces an earlier one.
+ */
+export const ReviewJudgeVerdictInputSchema = z.object({
+  evalRunId: z.uuid(),
+  trialId: z.uuid(),
+  evaluatorId: z.uuid(),
+  decision: JudgeReviewDecisionSchema,
+  comment: z.string().trim().max(2000).optional(),
+  /** Who reviews, for an apiKey caller; a session caller is always itself. */
+  uid: z.string().min(1).optional(),
+});
+export const ReviewJudgeVerdictOutputSchema = z.object({ score: ScoreSchema });
 
 export const GetEvalRunFailuresOutputSchema = z.object({
   evalRunId: z.uuid(),
@@ -670,23 +606,11 @@ export type ArchiveEvaluatorInput = z.input<typeof ArchiveEvaluatorInputSchema>;
 export type SetEvaluatorProductionInput = z.infer<typeof SetEvaluatorProductionInputSchema>;
 export type EvaluatorProduction = z.infer<typeof EvaluatorProductionSchema>;
 export type ApproveEvaluatorSourceInput = z.infer<typeof ApproveEvaluatorSourceInputSchema>;
-export type LabelEvaluatorOutputInput = z.infer<typeof LabelEvaluatorOutputInputSchema>;
-export type LabelEvaluatorOutputOutput = z.infer<typeof LabelEvaluatorOutputOutputSchema>;
-export type ListEvaluatorLabelsInput = z.infer<typeof ListEvaluatorLabelsInputSchema>;
-export type ListEvaluatorLabelsOutput = z.infer<typeof ListEvaluatorLabelsOutputSchema>;
-export type CalibrateEvaluatorInput = z.infer<typeof CalibrateEvaluatorInputSchema>;
-export type CalibrateEvaluatorOutput = z.infer<typeof CalibrateEvaluatorOutputSchema>;
 export type EvaluatorOutcome = z.infer<typeof EvaluatorOutcomeSchema>;
 export type PreviewEvaluatorInput = z.input<typeof PreviewEvaluatorInputSchema>;
 export type PreviewEvaluatorOutput = z.infer<typeof PreviewEvaluatorOutputSchema>;
 export type ListStepAgentRunsInput = z.input<typeof ListStepAgentRunsInputSchema>;
 export type ListStepAgentRunsOutput = z.infer<typeof ListStepAgentRunsOutputSchema>;
-export type ListWrittenOutputsInput = z.input<typeof ListWrittenOutputsInputSchema>;
-export type ListWrittenOutputsOutput = z.infer<typeof ListWrittenOutputsOutputSchema>;
-export type CreateWrittenOutputInput = z.input<typeof CreateWrittenOutputInputSchema>;
-export type CreateWrittenOutputOutput = z.infer<typeof CreateWrittenOutputOutputSchema>;
-export type ArchiveWrittenOutputInput = z.input<typeof ArchiveWrittenOutputInputSchema>;
-export type WrittenOutputOutput = z.infer<typeof WrittenOutputOutputSchema>;
 export type GetAgentRunIoInput = z.input<typeof GetAgentRunIoInputSchema>;
 export type GetAgentRunIoOutput = z.infer<typeof GetAgentRunIoOutputSchema>;
 export type ListEvalCasesInput = z.input<typeof ListEvalCasesInputSchema>;
@@ -695,8 +619,6 @@ export type CreateEvalCaseInput = z.input<typeof CreateEvalCaseInputSchema>;
 export type CreateEvalCaseFromAgentRunInput = z.input<typeof CreateEvalCaseFromAgentRunInputSchema>;
 export type EvalCaseOutput = z.infer<typeof EvalCaseOutputSchema>;
 export type CreatePerturbedEvalCaseInput = z.input<typeof CreatePerturbedEvalCaseInputSchema>;
-export type CreateEvalCasesFromLabelsInput = z.input<typeof CreateEvalCasesFromLabelsInputSchema>;
-export type CreateEvalCasesFromLabelsOutput = z.infer<typeof CreateEvalCasesFromLabelsOutputSchema>;
 export type ArchiveEvalCaseInput = z.input<typeof ArchiveEvalCaseInputSchema>;
 export type UpdateEvalCaseInput = z.input<typeof UpdateEvalCaseInputSchema>;
 export type ListEvalDatasetsInput = z.infer<typeof ListEvalDatasetsInputSchema>;
@@ -718,6 +640,8 @@ export type GetEvalRunFailuresInput = z.input<typeof GetEvalRunFailuresInputSche
 export type GetEvalRunFailuresOutput = z.infer<typeof GetEvalRunFailuresOutputSchema>;
 export type EvalTrialFailure = z.infer<typeof EvalTrialFailureSchema>;
 export type TrialEvaluatorFailure = z.infer<typeof TrialEvaluatorFailureSchema>;
+export type ReviewJudgeVerdictInput = z.infer<typeof ReviewJudgeVerdictInputSchema>;
+export type ReviewJudgeVerdictOutput = z.infer<typeof ReviewJudgeVerdictOutputSchema>;
 export type ApplyStepVariantInput = z.input<typeof ApplyStepVariantInputSchema>;
 export type ApplyStepVariantOutput = z.infer<typeof ApplyStepVariantOutputSchema>;
 export type GetAcceptanceCriteriaInput = z.infer<typeof GetAcceptanceCriteriaInputSchema>;

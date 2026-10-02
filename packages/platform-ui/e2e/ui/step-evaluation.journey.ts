@@ -13,8 +13,8 @@ import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
  * step, ask the Evaluation Assistant, and decide its proposals — accepting the
  * Evaluator adds it to the step's list as one that counts, rejecting the Brief
  * draft leaves the Brief, opened from the assistant's header, unwritten; a plan's risk asks the assistant to draft
- * its check; outputs it picks are labelled by the person and become Eval
- * Cases. The steps the assistant took stay listed under its reply, and the
+ * its check; a person reads a judge's rationale in a run's report and accepts
+ * the verdict it was unsure of, so it counts. The steps the assistant took stay listed under its reply, and the
  * panel widens from its left edge. Acceptance Criteria the assistant proposes
  * are set on accepting them, and a person signs a Step Qualification from a
  * finished run's report. The model is the scripted mock OpenRouter.
@@ -100,22 +100,12 @@ test.describe('Step Evaluation tab', () => {
     await expect.poll(async () => (await panel.boundingBox())!.width).toBeGreaterThan(narrow + 100);
   });
 
-  test('a plan drafts its checks one risk at a time; the person labels the outputs the assistant picks', async ({ page, request }) => {
+  test('a plan drafts its checks one risk at a time', async ({ page, request }) => {
     test.setTimeout(90_000);
     trackPageErrors(page);
-    const workflowName = `e2e-eval-label-${randomUUID().slice(0, 8)}`;
+    const workflowName = `e2e-eval-plan-${randomUUID().slice(0, 8)}`;
     const runId = await startRun(request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE);
-    const agentRunId = (await awaitFinishedAgentRun(request, runId)).id;
-    const judgeRes = await request.post('/api/evaluation/evaluators', {
-      headers: JSON_HEADERS,
-      data: {
-        namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes',
-        name: 'grades-justified', rule: 'Every grade is justified by the source record.', severity: 'major',
-        check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Is every AE graded?', choices: [{ label: 'yes', value: 1 }, { label: 'no', value: 0 }] },
-      },
-    });
-    expect(judgeRes.status(), await judgeRes.text()).toBe(201);
-    const { evaluator } = (await judgeRes.json()) as { evaluator: { id: string } };
+    await awaitFinishedAgentRun(request, runId);
 
     const question = `Plan the evaluation. ${randomUUID()}`;
     await scriptOpenRouter(question, [
@@ -129,10 +119,9 @@ test.describe('Step Evaluation tab', () => {
               acceptanceCriteria: { critical: 0.95, major: 0.8, minor: 0.6 },
             },
           },
-          { name: 'propose_outputs_to_label', arguments: { evaluatorId: evaluator.id, outputs: [{ agentRunId, why: 'It carries no grades at all.' }] } },
         ],
       },
-      { content: 'Here is the plan. Label the output I picked so the judge can be calibrated.' },
+      { content: 'Here is the plan.' },
       { content: 'Drafting the fatal-outcome check now.' },
     ]);
 
@@ -142,21 +131,62 @@ test.describe('Step Evaluation tab', () => {
     await page.getByTestId('evaluation-assistant-send').click();
     await expect(page.getByText('Here is the plan.')).toBeVisible({ timeout: 20_000 });
 
-    // The person labels the picked output; the labels become an Eval Case.
-    const labelling = page.getByTestId('labelling-card');
-    await expect(labelling.getByText('Label outputs for grades-justified v1')).toBeVisible();
-    await labelling.getByTestId('label-output').getByRole('button', { name: 'Fail' }).click();
-    await expect(labelling.getByText('labelled fail')).toBeVisible({ timeout: 10_000 });
-    await expect(labelling.getByTestId('label-counts')).toContainText('1 output(s) labelled, 1 fail');
-    await labelling.getByRole('button', { name: 'Add labelled outputs as Eval Cases' }).click();
-    await expect(labelling.getByText('1 Eval Case(s) added.')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/From run .* \(\d{4}-\d{2}-\d{2}\)/)).toBeVisible();
-
     // A risk of the plan asks the assistant to draft its check.
     const plan = page.getByTestId('plan-card');
     await expect(plan.getByTestId('plan-risk')).toHaveCount(1);
     await plan.getByRole('button', { name: 'Draft this check' }).click();
     await expect(page.getByText('Drafting the fatal-outcome check now.')).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('a person reads a judge\'s rationale in the report and accepts a verdict it was unsure of, so it counts', async ({ page, request }) => {
+    test.setTimeout(150_000);
+    trackPageErrors(page);
+    const suffix = randomUUID().slice(0, 8);
+    const workflowName = `e2e-eval-judge-${suffix}`;
+    const runId = await startRun(request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE);
+    const agentRunId = (await awaitFinishedAgentRun(request, runId)).id;
+    const step = { namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes' };
+    const post = async (path: string, data: Record<string, unknown>) => {
+      const res = await request.post(path, { headers: JSON_HEADERS, data });
+      expect(res.status(), await res.text()).toBeLessThan(300);
+      return res.json();
+    };
+    await post('/api/evaluation/evaluators', {
+      ...step, name: 'summary-grounded', rule: 'The summary is grounded in the input.', severity: 'critical',
+      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Is the summary grounded in the input?', minConfidence: 0.8 },
+    });
+    // The judge reads the case's notes, which key its scripted answer.
+    const notes = `The summary names only events in the input (${suffix}).`;
+    const rationale = 'The log does not show where the summary came from, so the evidence is thin.';
+    await scriptOpenRouter(notes, [{ content: JSON.stringify({ rationale, passed: true, confidence: 0.5 }) }]);
+    await post('/api/evaluation/cases/from-agent-run', { agentRunId, step, name: 'Unsure', expectation: 'positive', notes });
+    await post('/api/evaluation/datasets', step);
+    await post('/api/evaluation/acceptance-criteria', { ...step, criteria: { critical: { minPassRate: 1 } } });
+    const prepared = EvalRunOutputSchema.parse(await post('/api/evaluation/runs', { ...step, trialsPerCase: 1, budgetUsd: 1 }));
+    await post(`/api/evaluation/runs/${prepared.evalRun.id}/start`, { confirmedBudgetUsd: 1 });
+    await pollUntil(async () => {
+      const res = await request.get(`/api/evaluation/runs/${prepared.evalRun.id}`, { headers: AUTH_HEADERS });
+      return EvalRunOutputSchema.parse(await res.json()).evalRun.status === 'completed' ? true : null;
+    }, { description: 'the Eval Run to complete', timeoutMs: 90_000 });
+
+    await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
+    await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await page.getByRole('button', { name: prepared.evalRun.id.slice(0, 8) }).click();
+    const report = page.getByTestId('variant-report');
+    // Below its minimum confidence, the judge's only verdict is left out: the critical criterion cannot be judged.
+    await expect(report.getByTestId('criteria-verdicts')).toContainText('critical not judged');
+    const verdict = report.getByTestId('judge-verdict');
+    await expect(verdict).toContainText('confidence 0.5 (below 0.8)');
+    await expect(verdict).toContainText('left out — below its minimum confidence');
+    await expect(verdict.getByTestId('judge-rationale')).toHaveText(rationale);
+
+    await verdict.getByRole('button', { name: 'Accept' }).click();
+    await verdict.getByLabel('Why (optional)').fill('The summary matches the input; the judge was right to pass it.');
+    await verdict.getByRole('button', { name: 'Confirm accept' }).click();
+
+    await expect(verdict).toContainText('counts — accepted by', { timeout: 10_000 });
+    await expect(verdict).toContainText('The summary matches the input; the judge was right to pass it.');
+    await expect(report.getByTestId('criteria-verdicts')).toContainText('critical met');
   });
 
   test('accepted criteria judge a run, and the person signs a Step Qualification from its report — no Brief needed', async ({ page, request }) => {
