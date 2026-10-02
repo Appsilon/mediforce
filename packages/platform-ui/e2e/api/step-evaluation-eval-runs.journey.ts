@@ -188,6 +188,43 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
     expect(leaky.status(), await leaky.text()).toBe(400);
     expect(await leaky.text()).toContain('holdout cases are never offered as examples');
   });
+
+  test('a trial whose run pauses before it starts fails, and the Eval Run moves on to the next trial', async ({ request }) => {
+    test.setTimeout(60_000);
+    const workflowName = `e2e-eval-paused-${randomUUID().slice(0, 8)}`;
+    await post(request, `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, agentStepWorkflow(workflowName, {
+      autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' }, env: { CTCAE_API_KEY: '{{CTCAE_API_KEY}}' },
+    }), 201);
+    const step = { namespace: TEST_ORG_HANDLE, workflowName, stepId: 'grade-aes' };
+    await post(request, '/api/evaluation/evaluators', {
+      ...step, name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical',
+      check: { kind: 'schema', schema: { required: ['summary'] } },
+    }, 201);
+    await post(request, '/api/evaluation/cases', {
+      ...step, name: 'Grade 4 neutropenia', expectation: 'positive',
+      input: { triggerPayload: { studyId: 'CDISCPILOT01' }, previousStepOutputs: {} },
+    }, 201);
+    await post(request, '/api/evaluation/datasets', step, 201);
+
+    const prepared = EvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs', {
+      ...step, trialsPerCase: 2, concurrency: 1, budgetUsd: 1,
+    }, 201));
+    await post(request, `/api/evaluation/runs/${prepared.evalRun.id}/start`, { confirmedBudgetUsd: 1 });
+
+    const finished: EvalRunOutput = await pollUntil(
+      async () => {
+        const res = await request.get(`/api/evaluation/runs/${prepared.evalRun.id}`, { headers: AUTH_HEADERS });
+        const body = EvalRunOutputSchema.parse(await res.json());
+        return body.evalRun.status === 'completed' ? body : null;
+      },
+      { description: `Eval Run ${prepared.evalRun.id} to complete`, timeoutMs: 30_000 },
+    );
+    expect(finished.trials).toHaveLength(2);
+    for (const trial of finished.trials) {
+      expect(trial.status).toBe('failed');
+      expect(trial.error).toContain('CTCAE_API_KEY');
+    }
+  });
 });
 
 function apiClient(baseURL: string | undefined): Mediforce {
