@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Bot, CircleCheck, CircleX, Clock, Info, Loader2, X, type LucideIcon } from 'lucide-react';
+import { Bot, Info, Loader2, X } from 'lucide-react';
 import {
   CHAMPION_VARIANT_ID,
   DEFAULT_ACCEPTANCE_CRITERIA,
@@ -33,7 +33,6 @@ import {
   type EvaluatorView,
   type PreparedEvalRun,
   type GetStepQualificationOutput,
-  type StepValidation,
 } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
@@ -44,6 +43,7 @@ import { useAgentRun } from '@/hooks/use-agent-runs';
 import { useAgentRunIo, useEvalRun, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { EvalRunReport, describePatch } from './eval-run-report';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
+import { VALIDATION_STATUS } from './validation-status';
 import {
   CHECK_KINDS,
   CheckDetails,
@@ -1255,12 +1255,6 @@ function describeThresholds(criteria: AcceptanceCriteria): string {
   }).join(' · ');
 }
 
-const VALIDATION: Record<StepValidation['status'], { label: string; icon: LucideIcon; className: string }> = {
-  passed: { label: 'Validation passed', icon: CircleCheck, className: 'border-green-600/40 bg-green-600/10 text-green-700 hover:bg-green-600/15 dark:text-green-400' },
-  failed: { label: 'Validation failed', icon: CircleX, className: 'border-red-600/40 bg-red-600/10 text-red-700 hover:bg-red-600/15 dark:text-red-400' },
-  not_verified: { label: 'Not verified', icon: Clock, className: 'border-border bg-muted/60 text-muted-foreground hover:bg-muted' },
-};
-
 /** What the Step's qualification rests on: the Eval Run it was signed from, and what changed since. */
 function QualificationDetails({ status }: { status: GetStepQualificationOutput }) {
   const { qualification } = status;
@@ -1392,7 +1386,7 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
   const save = useStepEvaluationMutation(step, (next: AcceptanceCriteria) => mediforce.evaluation.setAcceptanceCriteria({ ...step, criteria: next }));
   const effective = criteria.data?.criteria?.criteria ?? DEFAULT_ACCEPTANCE_CRITERIA;
   const status = qualification.data;
-  const validation = status === undefined ? null : VALIDATION[status.validation.status];
+  const validation = status === undefined ? null : VALIDATION_STATUS[status.validation.status];
   const saveThresholds = (next: AcceptanceCriteria) => save.mutate(next, { onSuccess: () => setEditing(false) });
   return (
     <section className="rounded-lg border p-3 space-y-3" data-testid="acceptance-criteria">
@@ -1401,7 +1395,7 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
           <InstantTooltip label={`${status.validation.reason}${status.validation.runInProgress ? ' An Eval Run is running.' : ''}`}>
             <button
               type="button"
-              className={cn('inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-semibold', validation.className)}
+              className={cn('inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-semibold', validation.buttonClassName)}
               aria-expanded={showDetails}
               data-testid="validation-status"
               data-status={status.validation.status}
@@ -1504,8 +1498,10 @@ function EvalRunRow({ step, evalRunId, onOpen, open, mayEdit, editReason }: {
  * Prepare, confirm and read the Step's Eval Runs. Preparing and starting one is the workflow's
  * `run` verb; signing a qualification from a report is its `edit` verb.
  */
-export function EvalRunsSection({ step, data, datasets, mayRun, runReason, mayEdit, editReason }: {
+export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRun, runReason, mayEdit, editReason }: {
   step: EvaluatedStep;
+  /** The workflow version whose step a new run runs; only that version's runs are listed. */
+  definitionVersion: number;
   data: StepEvaluation['runs'];
   /** The Step's frozen Dataset versions, newest first: the one a new run takes, and the one each run ran. */
   datasets: StepEvaluation['datasets'];
@@ -1519,10 +1515,11 @@ export function EvalRunsSection({ step, data, datasets, mayRun, runReason, mayEd
   const [openRunId, setOpenRunId] = React.useState<string | null>(null);
   const prepare = useStepEvaluationMutation(step, () => mediforce.evaluation.prepareRun({
     ...step,
+    definitionVersion,
     trialsPerCase: trials,
     ...(budget === '' ? {} : { budgetUsd: Number(budget) }),
   }));
-  const runs = data.data?.evalRuns ?? [];
+  const runs = (data.data?.evalRuns ?? []).filter((run) => run.definitionVersion === definitionVersion);
   const versions = datasets.data?.datasets ?? [];
   const [nextDataset] = versions;
   const datasetVersion = new Map(versions.map((dataset) => [dataset.id, dataset.version]));
@@ -1558,7 +1555,7 @@ export function EvalRunsSection({ step, data, datasets, mayRun, runReason, mayEd
       )}
       {waiting.map((run) => <StartEvalRunCard key={run.evalRunId} step={step} prepared={run} mayRun={mayRun} runReason={runReason} />)}
       {data.isLoading ? <Loading /> : runs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No Eval Runs yet.</p>
+        <p className="text-sm text-muted-foreground">No Eval Runs of v{definitionVersion} yet.</p>
       ) : (
         <ul className="space-y-2">
           {runs.map((run) => (

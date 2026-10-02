@@ -1,12 +1,15 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Save } from 'lucide-react';
 import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
 import { useWorkflowTriggers } from '@/hooks/use-workflow-triggers';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
+import type { StepEvaluationMark } from '@/components/workflows/workflow-diagram';
+import { VALIDATION_STATUS, evaluationHref } from '@/components/evaluation/validation-status';
+import { useWorkflowValidation } from '@/hooks/use-step-evaluation';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { StartRunButton } from '@/components/processes/start-run-button';
@@ -37,6 +40,16 @@ export default function WorkflowDefinitionVersionPage() {
 
   const { definition, loading } = useWorkflowVersion(decodedName, handle, versionNumber);
   const { latestVersion } = useWorkflowVersions(decodedName, handle);
+  // Each agent step's evaluation in this version, marked on its box and linked to the Evaluation tab.
+  const { data: validation } = useWorkflowValidation(handle, decodedName);
+  const stepEvaluation = useMemo(() => {
+    const version = validation?.versions.find((candidate) => candidate.definitionVersion === versionNumber);
+    return new Map<string, StepEvaluationMark>((version?.steps ?? []).map((step) => [step.stepId, {
+      status: step.validation.status,
+      title: `Evaluation: ${VALIDATION_STATUS[step.validation.status].label.toLowerCase()} — ${step.validation.reason}`,
+      href: evaluationHref(handle, decodedName, versionNumber, step.stepId),
+    }]));
+  }, [validation, versionNumber, handle, decodedName]);
   // Hand-startable gate reads the unified triggers table (ADR-0011 / Issue #930),
   // the same source of truth as the server guard. Stay optimistic while rows load.
   const { triggers, loading: triggersLoading } = useWorkflowTriggers(decodedName, handle);
@@ -315,6 +328,7 @@ export default function WorkflowDefinitionVersionPage() {
         initialSteps={definition.steps}
         initialTransitions={definition.transitions}
         initialInputForNextRun={definition.inputForNextRun}
+        stepEvaluation={stepEvaluation}
         workflowName={decodedName}
         namespace={handle}
         workflowExternalSkillsRepo={definition.externalSkillsRepo}

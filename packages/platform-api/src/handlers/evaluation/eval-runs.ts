@@ -98,8 +98,8 @@ async function buildVariants(
 
 /**
  * Prepares an Eval Run (ADR-0023 D4, D5, D10): the Step at its runnable
- * Definition version and any challengers patched over it, a frozen Dataset
- * version less the cases any variant's few-shot examples came from (D12), the
+ * Definition version — or the `definitionVersion` given — and any
+ * challengers patched over it, a frozen Dataset version less the cases any variant's few-shot examples came from (D12), the
  * Step's live Evaluator versions with whether each counts, the MCP eval policy
  * the trials will run under, the Acceptance Criteria it will be judged against,
  * and a cost estimate. Nothing runs yet — a person confirms
@@ -110,7 +110,7 @@ export async function prepareEvalRun(
   scope: CallerScope,
 ): Promise<EvalRunOutput> {
   const step = stepRef(input);
-  const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'run');
+  const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'run', input.definitionVersion);
 
   const dataset = input.datasetVersionId === undefined
     ? (await scope.evaluation.listDatasetVersions(step))[0]

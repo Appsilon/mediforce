@@ -197,6 +197,7 @@ export {
   getAcceptanceCriteria,
   setAcceptanceCriteria,
   getStepQualification,
+  getWorkflowValidation,
   signStepQualification,
   getEvalRunFailures,
   reviewJudgeVerdict,

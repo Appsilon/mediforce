@@ -16,7 +16,7 @@ import { addEvaluatorVersion, createEvaluator } from '../evaluators';
 import { createEvalCase } from '../eval-cases';
 import { freezeEvalDataset } from '../eval-datasets';
 import { advanceEvalRunOfInstance, cancelEvalRun, prepareEvalRun, startEvalRun } from '../eval-runs';
-import { getStepQualification, signStepQualification } from '../step-qualification';
+import { getStepQualification, getWorkflowValidation, signStepQualification } from '../step-qualification';
 import { evaluationFixture, NAMESPACE, STEP, WORKFLOW, type EvaluationFixture } from './fixture';
 
 const PASSWORD = 'correct horse battery';
@@ -69,10 +69,10 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
   }
 
   /** Runs every trial of a fresh Eval Run to a scored result with findings — but the first `failing`, which end without an Agent Run. */
-  async function finishedRun(failing = 0): Promise<string> {
+  async function finishedRun(failing = 0, definitionVersion?: number): Promise<string> {
     const kicksBefore = kicker.kicks.length;
     const { evalRun } = await prepareEvalRun({
-      ...STEP, trialsPerCase: 1, concurrency: 4, budgetUsd: 5,
+      ...STEP, definitionVersion, trialsPerCase: 1, concurrency: 4, budgetUsd: 5,
       challengers: [{ label: 'GPT-5', patch: { model: 'openai/gpt-5' } }],
     }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
@@ -306,6 +306,41 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
       }));
       expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'not_verified', evalRunId: null });
       expect((await getStepQualification({ ...STEP, definitionVersion: 1 }, scope)).validation.status).toBe('passed');
+    });
+
+    it('rolls each workflow version up across its agent steps; a run prepared for an older version verifies that version', async () => {
+      await setAcceptanceCriteria({ ...STEP, criteria: criticalOnly, origin: 'user' }, scope);
+      await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
+        name: WORKFLOW,
+        namespace: NAMESPACE,
+        version: 2,
+        steps: [
+          { id: 'extract-aes', name: 'Extract AEs', type: 'creation', executor: 'script', script: { runtime: 'python', inlineScript: 'print(1)' } },
+          { id: 'grade-aes', name: 'Grade AEs', type: 'creation', executor: 'agent', agentId: 'ae-grader', agent: { prompt: 'Grade each AE by its CTCAE grade.' } },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'extract-aes', to: 'grade-aes' }, { from: 'grade-aes', to: 'done' }],
+      }));
+      const workflow = { namespace: NAMESPACE, workflowName: WORKFLOW };
+      expect(await getWorkflowValidation(workflow, scope)).toMatchObject({
+        versions: [
+          { definitionVersion: 2, status: 'not_verified', steps: [{ stepId: 'grade-aes', stepName: 'Grade AEs', validation: { status: 'not_verified', evalRunId: null } }] },
+          { definitionVersion: 1, status: 'not_verified' },
+        ],
+      });
+
+      const evalRunId = await finishedRun(0, 1);
+      expect(await getWorkflowValidation(workflow, scope)).toMatchObject({
+        versions: [
+          { definitionVersion: 2, status: 'not_verified' },
+          { definitionVersion: 1, status: 'passed', steps: [{ stepId: 'grade-aes', validation: { status: 'passed', evalRunId } }] },
+        ],
+      });
+
+      await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.1 }, major: { minPassRate: 0.9 } }, origin: 'user' }, scope);
+      await finishedRun(0, 2);
+      const [newest] = (await getWorkflowValidation(workflow, scope)).versions;
+      expect(newest).toMatchObject({ definitionVersion: 2, status: 'failed' });
     });
 
     it('says when a run is under way', async () => {

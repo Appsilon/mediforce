@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { evalCaseFromRunCommand, evalCasePerturbCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
 import { evalDriftCommand, evalEvaluatorProductionCommand } from '../commands/eval-evaluators';
-import { evalCriteriaSetCommand, evalQualificationCommand } from '../commands/eval-qualification';
+import { evalCriteriaSetCommand, evalQualificationCommand, evalValidationCommand } from '../commands/eval-qualification';
 import { evalJudgeReviewCommand } from '../commands/eval-runs';
 import { captureOutput, jsonResponse } from './test-helpers';
 
@@ -224,5 +224,25 @@ describe('mediforce eval', () => {
     expect(code).toBe(0);
     expect(fetchSpy.mock.calls[0]![0]).toBe('http://localhost:5555/api/evaluation/qualification?namespace=pharma-a&workflowName=ae-grading&stepId=grade-aes&definitionVersion=3');
     expect(output.stdoutLines).toEqual(['validation not verified: No Eval Run of version 3 has finished yet.', `not qualified  (v3, fingerprint ${'a'.repeat(12)})`]);
+  });
+
+  it('validation prints each workflow version and its agent steps', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      versions: [
+        { definitionVersion: 2, status: 'passed', steps: [{ stepId: 'grade-aes', stepName: 'Grade AEs', validation: { status: 'passed', evalRunId: 'f7a1c2d3-0000-4000-8000-000000000001', reason: 'Eval Run f7a1c2d3 met every criterion.', runInProgress: false } }] },
+        { definitionVersion: 1, status: 'not_verified', steps: [{ stepId: 'grade-aes', stepName: 'Grade AEs', validation: { status: 'not_verified', evalRunId: null, reason: 'No Eval Run of version 1 has finished yet.', runInProgress: false } }] },
+      ],
+    }));
+    const output = captureOutput();
+    const code = await evalValidationCommand({ argv: ['--namespace', 'pharma-a', '--workflow', 'ae-grading', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    expect(fetchSpy.mock.calls[0]![0]).toBe('http://localhost:5555/api/evaluation/workflow-validation?namespace=pharma-a&workflowName=ae-grading');
+    expect(output.stdoutLines).toEqual([
+      'v2  verified',
+      '  grade-aes  passed: Eval Run f7a1c2d3 met every criterion.',
+      'v1  not verified',
+      '  grade-aes  not verified: No Eval Run of version 1 has finished yet.',
+    ]);
   });
 });

@@ -23,8 +23,11 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { User, Bot, Terminal, Trash2, Plus, Search, ArrowUp, ArrowDown, ArrowRight, AlertTriangle, Zap, Wand2, Undo2, Redo2 } from 'lucide-react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
+import type { StepValidation } from '@mediforce/platform-api/contract';
+import { VALIDATION_STATUS } from '@/components/evaluation/validation-status';
 import {
   getControlMode,
   CONTROL_MODE_LABELS,
@@ -121,6 +124,13 @@ type BackBranch = {
   targetName?: string;
 };
 
+/** An agent step's evaluation in the version shown: its validation, and where the Evaluation tab opens on it. */
+export interface StepEvaluationMark {
+  status: StepValidation['status'];
+  title: string;
+  href: string;
+}
+
 type StepNodeData = {
   label: string;
   stepType: string;
@@ -130,6 +140,7 @@ type StepNodeData = {
   hasError?: boolean;
   hasWarning?: boolean;
   warningTooltip?: string;
+  evaluation?: StepEvaluationMark;
   onDelete?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -270,6 +281,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
           <span className={cn('text-[10px] font-semibold truncate', typeConfig.color)}>
             {typeConfig.label}
           </span>
+          {data.evaluation !== undefined && <StepEvaluationLink evaluation={data.evaluation} />}
         </div>
 
         {/* Row 2: step name, max 2 lines */}
@@ -305,6 +317,23 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
         )}
       </div>
     </>
+  );
+}
+
+function StepEvaluationLink({ evaluation }: { evaluation: StepEvaluationMark }) {
+  const display = VALIDATION_STATUS[evaluation.status];
+  return (
+    <Link
+      href={evaluation.href}
+      title={evaluation.title}
+      aria-label={evaluation.title}
+      data-testid="step-evaluation-mark"
+      data-status={evaluation.status}
+      onClick={(event) => event.stopPropagation()}
+      className={cn('nodrag shrink-0 rounded p-0.5 hover:bg-muted', display.textClassName)}
+    >
+      <display.icon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+    </Link>
   );
 }
 
@@ -623,6 +652,8 @@ interface WorkflowDiagramProps {
   selectedStepId?: string | null;
   errorStepIds?: Set<string>;
   warningStepIds?: Map<string, string>;
+  /** Per agent step id, its evaluation mark; steps without one show none. */
+  stepEvaluation?: Map<string, StepEvaluationMark>;
   canMoveUp?: Set<string>;
   canMoveDown?: Set<string>;
   onUndo?: () => void;
@@ -633,7 +664,7 @@ interface WorkflowDiagramProps {
   addBlockActive?: boolean;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, onPaneClick, selectedStepId, errorStepIds, warningStepIds, canMoveUp, canMoveDown, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive }: WorkflowDiagramProps) {
+export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, onPaneClick, selectedStepId, errorStepIds, warningStepIds, stepEvaluation, canMoveUp, canMoveDown, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive }: WorkflowDiagramProps) {
   const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition),
     [definition],
@@ -650,6 +681,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
           hasError: errorStepIds?.has(n.id) ?? false,
           hasWarning: warningStepIds?.has(n.id) ?? false,
           warningTooltip: warningStepIds?.get(n.id),
+          evaluation: stepEvaluation?.get(n.id),
           onDelete: onNodeDelete && d.stepType !== 'terminal' ? () => onNodeDelete(n.id) : undefined,
           onMoveUp: onNodeMoveUp && canMoveUp?.has(n.id) ? () => onNodeMoveUp(n.id) : undefined,
           onMoveDown: onNodeMoveDown && canMoveDown?.has(n.id) ? () => onNodeMoveDown(n.id) : undefined,
@@ -670,7 +702,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
       return e;
     });
     return { nodes: styledNodes as Node[], edges: styledEdges };
-  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, warningStepIds, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, canMoveUp, canMoveDown]);
+  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, warningStepIds, stepEvaluation, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, canMoveUp, canMoveDown]);
 
   // Controlled node state, lazily seeded from computedNodes so XYFlow never sees an
   // empty array on first render (an empty seed would throw XYFlow error #015 on drag).

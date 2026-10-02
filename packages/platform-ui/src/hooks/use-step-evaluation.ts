@@ -57,8 +57,23 @@ export function useStepQualification(step: EvaluatedStep, definitionVersion?: nu
   });
 }
 
-/** Every read the Evaluation tab shows for one agent Step (ADR-0023). */
-export function useStepEvaluation(step: EvaluatedStep) {
+/**
+ * Whether each version of the workflow is verified, one agent step at a time —
+ * polled while an Eval Run of any step is running.
+ */
+export function useWorkflowValidation(namespace: string, workflowName: string) {
+  return useQuery({
+    queryKey: queryKeys.workflowValidation(namespace, workflowName),
+    queryFn: () => mediforce.evaluation.getWorkflowValidation({ namespace, workflowName }),
+    retry: stopRetryOn4xx,
+    refetchInterval: (query) => (
+      query.state.data?.versions.some((version) => version.steps.some((step) => step.validation.runInProgress)) === true ? 5000 : false
+    ),
+  });
+}
+
+/** Every read the Evaluation tab shows for one agent Step (ADR-0023), its validation in `definitionVersion`. */
+export function useStepEvaluation(step: EvaluatedStep, definitionVersion: number) {
   const options = { retry: stopRetryOn4xx } as const;
   return {
     brief: useQuery({ queryKey: sectionKey(step, 'brief'), queryFn: () => mediforce.evaluation.getBrief(step), ...options }),
@@ -67,7 +82,7 @@ export function useStepEvaluation(step: EvaluatedStep) {
     datasets: useQuery({ queryKey: sectionKey(step, 'datasets'), queryFn: () => mediforce.evaluation.listDatasets(step), ...options }),
     runs: useQuery({ queryKey: sectionKey(step, 'runs'), queryFn: () => mediforce.evaluation.listRuns(step), ...options }),
     criteria: useQuery({ queryKey: sectionKey(step, 'criteria'), queryFn: () => mediforce.evaluation.getAcceptanceCriteria(step), ...options }),
-    qualification: useStepQualification(step),
+    qualification: useStepQualification(step, definitionVersion),
     drift: useQuery({ queryKey: sectionKey(step, 'drift'), queryFn: () => mediforce.evaluation.getDrift(step), ...options }),
     agentRuns: useInfiniteQuery({
       queryKey: sectionKey(step, 'agent-runs'),
@@ -91,9 +106,10 @@ export function useStepEvaluationMutation<TInput, TOutput>(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: write,
-    onSuccess: () => queryClient.invalidateQueries({
-      queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId),
-    }),
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.workflowValidation(step.namespace, step.workflowName) }),
+    ]),
   });
 }
 
@@ -109,6 +125,7 @@ export function useEvalRunMutation<TInput, TOutput>(
     onSuccess: () => Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.evalRun(evalRunId) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.workflowValidation(step.namespace, step.workflowName) }),
     ]),
   });
 }
