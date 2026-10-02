@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { AgentOutputEnvelope, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
-import { LlmJudgeReviewPlugin } from '../llm-judge';
+import { LlmJudgeReviewPlugin, judgeOutputAgreement } from '../llm-judge';
 import type { LlmClient } from '../../interfaces/step-executor-plugin';
 
 const envelope = {
@@ -24,7 +24,6 @@ function judge(llm: LlmClient, entries: StoredAgentTrajectoryEntry[] = trajector
     model: 'anthropic/claude-haiku-4.5',
     rubric: 'A fatal event must be graded 5.',
     stepInput: { events: [{ term: 'Sepsis', outcome: 'fatal' }] },
-    expectation: 'Must not grade the fatal sepsis event below 5.',
     trajectory: entries,
   });
   return plugin.review({ stepId: 'grade-aes', processInstanceId: 'run-1', executorOutput: envelope, iterationNumber: 0, llm });
@@ -52,7 +51,6 @@ describe('LlmJudgeReviewPlugin', () => {
     expect(model).toBe('anthropic/claude-haiku-4.5');
     expect(messages[0]!.content).toMatch(/explain/i);
     expect(messages[0]!.content).toMatch(/what exactly contributed/i);
-    expect(messages[1]!.content).toContain('Must not grade the fatal sepsis event below 5.');
     expect(messages[1]!.content).toContain('"grade": 5');
   });
 
@@ -92,5 +90,38 @@ describe('LlmJudgeReviewPlugin', () => {
   it('reads an answer wrapped in a code fence', async () => {
     const result = await judge(answering('```json\n{"rationale": "r", "passed": false, "confidence": 0.55}\n```'));
     expect(result).toMatchObject({ passed: false, confidence: 0.55 });
+  });
+});
+
+describe('judgeOutputAgreement', () => {
+  const compare = (llm: LlmClient, caseInstructions: string | null = 'Differences in summary are trivial; a changed grade means low agreement.') => judgeOutputAgreement(llm, {
+    model: 'anthropic/claude-haiku-4.5',
+    instructions: 'Wording is never decisive.',
+    caseInstructions,
+    expected: { events: [{ term: 'Sepsis', grade: 5 }], summary: 'One fatal event.' },
+    actual: { events: [{ term: 'Sepsis', grade: 4 }], summary: 'A fatal event.' },
+  });
+
+  it('returns how far the output agrees with the expected output, and why', async () => {
+    const llm = answering('{"rationale": "The grade changed from 5 to 4.", "agreement": 0.2}');
+    expect(await compare(llm)).toEqual({ agreement: 0.2, rationale: 'The grade changed from 5 to 4.', model: 'anthropic/claude-haiku-4.5' });
+
+    const [messages, model] = vi.mocked(llm.complete).mock.calls[0]!;
+    expect(model).toBe('anthropic/claude-haiku-4.5');
+    expect(messages[0]!.content).toContain('Wording is never decisive.');
+    expect(messages[1]!.content).toContain('a changed grade means low agreement');
+    expect(messages[1]!.content).toContain('"grade": 5');
+    expect(messages[1]!.content).toContain('"grade": 4');
+  });
+
+  it('leaves out case instructions a case does not give', async () => {
+    const llm = answering('{"rationale": "r", "agreement": 1}');
+    await compare(llm, null);
+    expect(vi.mocked(llm.complete).mock.calls[0]![0][1]!.content).not.toMatch(/this case/i);
+  });
+
+  it('throws on an answer without an agreement from 0 to 1, so it is never scored as a disagreement', async () => {
+    await expect(compare(answering('{"rationale": "r", "agreement": 7}'))).rejects.toThrow(/no usable agreement/);
+    await expect(compare(answering('They mostly agree.'))).rejects.toThrow(/no usable agreement/);
   });
 });

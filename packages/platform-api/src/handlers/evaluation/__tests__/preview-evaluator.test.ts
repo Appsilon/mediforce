@@ -12,11 +12,17 @@ describe('previewEvaluator', () => {
     const { results } = await previewEvaluator({ ...STEP, check: findingsSchema, limit: 5 }, fixture.scope());
 
     expect(results).toEqual(expect.arrayContaining([
-      { agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: null, comment: null, error: null },
-      { agentRunId: UNGRADED_RUN, passed: false, value: 0, label: 'fail', confidence: null, comment: 'missing required keys: findings', error: null },
+      { agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: null, agreement: null, comment: null, error: null },
+      { agentRunId: UNGRADED_RUN, passed: false, value: 0, label: 'fail', confidence: null, agreement: null, comment: 'missing required keys: findings', error: null },
     ]));
     expect(await fixture.scoreRepo.list({ limit: 10 })).toEqual([]);
     expect(await fixture.evaluationRepo.listEvaluators(STEP)).toEqual([]);
+  });
+
+  it('refuses an expected-output check: a production output has no expected output to compare with', async () => {
+    const fixture = await evaluationFixture();
+    await expect(previewEvaluator({ ...STEP, check: { kind: 'expected_output', model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8 }, limit: 5 }, fixture.scope()))
+      .rejects.toThrow('cannot be tried on one');
   });
 
   it('is refused to a member who may not run the workflow — a preview runs check code and spends the model key', async () => {

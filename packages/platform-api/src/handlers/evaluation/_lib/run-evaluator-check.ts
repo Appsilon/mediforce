@@ -1,6 +1,7 @@
-import type { EvalCase, EvaluatorCheck } from '@mediforce/platform-core';
+import { outputDifferences, type EvalCase, type EvaluatorCheck } from '@mediforce/platform-core';
 import {
   LlmJudgeReviewPlugin,
+  judgeOutputAgreement,
   runCodeCheck,
   validateOutputSchema,
   type LlmClient,
@@ -12,6 +13,7 @@ import { requireOpenRouterApiKey } from '../../../services/openrouter-key';
 import type { EvaluationSubject } from './evaluation-subject';
 
 type LlmJudgeCheck = Extract<EvaluatorCheck, { kind: 'llm_judge' }>;
+type ExpectedOutputCheck = Extract<EvaluatorCheck, { kind: 'expected_output' }>;
 
 const CODE_CHECK_TIMEOUT_MS = 2 * 60_000;
 /** Room for a rationale that cites what decided the verdict. */
@@ -42,7 +44,7 @@ function openRouterJudgeClient(apiKey: string, model: string, onUsage: (usage: J
 }
 
 function binary(agentRunId: string, passed: boolean, comment: string | null): EvaluatorOutcome {
-  return { agentRunId, passed, value: passed ? 1 : 0, label: passed ? 'pass' : 'fail', confidence: null, comment, error: null };
+  return { agentRunId, passed, value: passed ? 1 : 0, label: passed ? 'pass' : 'fail', confidence: null, agreement: null, comment, error: null };
 }
 
 /**
@@ -54,7 +56,6 @@ async function runJudgeCheck(
   scope: CallerScope,
   check: LlmJudgeCheck,
   subject: EvaluationSubject,
-  evalCase: EvalCase | null,
   onJudgeUsage: (usage: JudgeUsage) => void,
 ): Promise<EvaluatorOutcome> {
   const { agentRun } = subject;
@@ -63,7 +64,6 @@ async function runJudgeCheck(
     model: check.model,
     rubric: check.rubric,
     stepInput: subject.stepInput,
-    expectation: evalCase?.notes ?? null,
     trajectory: subject.trajectory,
   });
   const verdict = await judge.review({
@@ -74,6 +74,45 @@ async function runJudgeCheck(
     llm: openRouterJudgeClient(apiKey, check.model, onJudgeUsage),
   });
   return { ...binary(agentRun.id, verdict.passed, verdict.reasoning), confidence: verdict.confidence };
+}
+
+/**
+ * Compares the output with the case's expected output: `exact` passes only
+ * on no difference at all, `agreement` at the check's `minAgreement`. A
+ * negative case's expected output is one to avoid, so the verdict reverses.
+ */
+async function runExpectedOutputCheck(
+  scope: CallerScope,
+  check: ExpectedOutputCheck,
+  subject: EvaluationSubject,
+  evalCase: EvalCase | null,
+  result: unknown,
+  onJudgeUsage: (usage: JudgeUsage) => void,
+): Promise<EvaluatorOutcome> {
+  const { agentRun } = subject;
+  if (evalCase === null || evalCase.expectedOutput === null) {
+    throw new Error('an expected-output check grades only an Eval Case trial whose case has an expected output');
+  }
+  const negative = evalCase.expectation === 'negative';
+  if (evalCase.comparison === 'exact') {
+    const differences = outputDifferences(evalCase.expectedOutput, result);
+    const matches = differences.length === 0;
+    const comment = matches
+      ? `The output matches the expected output exactly${negative ? ' — an output this case must not get' : ''}.`
+      : `The output differs from the expected output${negative ? ', as this case requires' : ''}: ${differences.join('; ')}`;
+    return binary(agentRun.id, matches !== negative, comment);
+  }
+  const apiKey = await requireOpenRouterApiKey(scope, subject.instance.namespace ?? '');
+  const { agreement, rationale } = await judgeOutputAgreement(openRouterJudgeClient(apiKey, check.model, onJudgeUsage), {
+    model: check.model,
+    instructions: check.instructions ?? null,
+    caseInstructions: evalCase.agreementInstructions,
+    expected: evalCase.expectedOutput,
+    actual: result,
+  });
+  const agrees = agreement >= check.minAgreement;
+  const floor = negative ? `a negative case passes below ${check.minAgreement}` : `passes at ${check.minAgreement}`;
+  return { ...binary(agentRun.id, agrees !== negative, `Agreement ${agreement} (${floor}). ${rationale}`), agreement };
 }
 
 /**
@@ -121,7 +160,9 @@ export async function runEvaluatorCheck(
         return binary(agentRun.id, outcome.passed, outcome.comment);
       }
       case 'llm_judge':
-        return await runJudgeCheck(scope, check, subject, evalCase, onJudgeUsage);
+        return await runJudgeCheck(scope, check, subject, onJudgeUsage);
+      case 'expected_output':
+        return await runExpectedOutputCheck(scope, check, subject, evalCase, result, onJudgeUsage);
     }
   } catch (err) {
     return {
@@ -130,6 +171,7 @@ export async function runEvaluatorCheck(
       value: null,
       label: null,
       confidence: null,
+      agreement: null,
       comment: null,
       error: err instanceof Error ? err.message : String(err),
     };

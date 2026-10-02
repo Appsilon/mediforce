@@ -4,6 +4,7 @@ import * as React from 'react';
 import {
   CodeCheckSchema,
   DEFAULT_JUDGE_MIN_CONFIDENCE,
+  DEFAULT_MIN_AGREEMENT,
   EvaluatorCheckSchema,
   type AgentOutputSchema,
   type EvaluatorCheck,
@@ -18,7 +19,8 @@ type CodeRuntime = (typeof CodeCheckSchema.shape.runtime.options)[number];
 export type CheckDraft =
   | { kind: 'schema'; schemaText: string }
   | { kind: 'code'; runtime: CodeRuntime; source: string }
-  | { kind: 'llm_judge'; model: string; rubric: string; minConfidence: number };
+  | { kind: 'llm_judge'; model: string; rubric: string; minConfidence: number }
+  | { kind: 'expected_output'; model: string; instructions: string; minAgreement: number };
 
 export type CheckDraftKind = CheckDraft['kind'];
 
@@ -34,6 +36,10 @@ export const CHECK_KINDS: Record<CheckDraftKind, { label: string; description: s
   llm_judge: {
     label: 'LLM judge',
     description: 'A model reads the step\'s input, the agent\'s log and its output, explains its judgment, then answers pass or fail with a confidence. Use it for what code cannot check: meaning, tone, clinical judgement.',
+  },
+  expected_output: {
+    label: 'Expected output',
+    description: 'Compares the output with each Eval Case\'s expected output, the way the case says: an exact match, where any difference fails, or an agreement score from 0 to 1 that the model below gives. A negative case passes when the output does not match. It grades only cases with an expected output, and never runs in production.',
   },
 };
 
@@ -66,6 +72,7 @@ export function emptyCheckDraft(kind: CheckDraftKind, stepOutputSchema?: AgentOu
     case 'schema': return { kind, schemaText: JSON.stringify(stepOutputSchema ?? { type: 'object', required: [] }, null, 2) };
     case 'code': return { kind, runtime: 'python', source: CODE_TEMPLATES.python };
     case 'llm_judge': return { kind, model: DEFAULT_JUDGE_MODEL, rubric: '', minConfidence: DEFAULT_JUDGE_MIN_CONFIDENCE };
+    case 'expected_output': return { kind, model: DEFAULT_JUDGE_MODEL, instructions: '', minAgreement: DEFAULT_MIN_AGREEMENT };
   }
 }
 
@@ -75,6 +82,7 @@ export function draftFromCheck(check: EvaluatorCheck): CheckDraft {
     case 'schema': return { kind: 'schema', schemaText: JSON.stringify(check.schema, null, 2) };
     case 'code': return { kind: 'code', runtime: check.runtime, source: check.source };
     case 'llm_judge': return { kind: 'llm_judge', model: check.model, rubric: check.rubric, minConfidence: check.minConfidence };
+    case 'expected_output': return { kind: 'expected_output', model: check.model, instructions: check.instructions ?? '', minAgreement: check.minAgreement };
   }
 }
 
@@ -100,6 +108,15 @@ export function checkFromDraft(draft: CheckDraft): { check: EvaluatorCheck } | {
         model: draft.model.trim(),
         rubric: draft.rubric.trim(),
         minConfidence: draft.minConfidence,
+      };
+      break;
+    case 'expected_output':
+      if (draft.model.trim() === '') return { error: 'Pick the model that scores agreement.' };
+      candidate = {
+        kind: 'expected_output',
+        model: draft.model.trim(),
+        ...(draft.instructions.trim() === '' ? {} : { instructions: draft.instructions.trim() }),
+        minAgreement: draft.minAgreement,
       };
       break;
   }
@@ -184,7 +201,51 @@ export function CheckEditor({ draft, onChange, stepOutputSchema }: {
       );
     case 'llm_judge':
       return <JudgeEditor draft={draft} onChange={onChange} />;
+    case 'expected_output':
+      return <AgreementJudgeEditor draft={draft} onChange={onChange} />;
   }
+}
+
+function AgreementJudgeEditor({ draft, onChange }: {
+  draft: Extract<CheckDraft, { kind: 'expected_output' }>;
+  onChange: (draft: CheckDraft) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <Field label="Agreement judge model" hint="Scores cases compared by agreement; an exact comparison calls no model.">
+        <ModelPicker
+          ariaLabel="Agreement judge model"
+          className={cn(inputClass, 'w-full')}
+          value={draft.model === '' ? undefined : draft.model}
+          onChange={(model) => onChange({ ...draft, model: model ?? '' })}
+        />
+      </Field>
+      <Field
+        label="Instructions for every case"
+        hint="The judge sees only the expected output and the output, plus these and the case's own instructions. Say which differences are trivial and which change what the output means."
+      >
+        <textarea
+          aria-label="Agreement instructions"
+          className={cn(inputClass, 'w-full min-h-20')}
+          placeholder="Wording and order of free text are trivial. A changed CTCAE grade, term or seriousness flag means low agreement."
+          value={draft.instructions}
+          onChange={(event) => onChange({ ...draft, instructions: event.target.value })}
+        />
+      </Field>
+      <Field
+        label="Minimum agreement"
+        hint="A positive case passes at this agreement (0 to 1) or above; a negative case passes below it."
+      >
+        <input
+          aria-label="Minimum agreement"
+          type="number" min={0} max={1} step={0.05}
+          className={cn(inputClass, 'block w-24')}
+          value={draft.minAgreement}
+          onChange={(event) => onChange({ ...draft, minAgreement: Number(event.target.value) })}
+        />
+      </Field>
+    </div>
+  );
 }
 
 function JudgeEditor({ draft, onChange }: {
@@ -203,7 +264,7 @@ function JudgeEditor({ draft, onChange }: {
       </Field>
       <Field
         label="Question for the judge"
-        hint="The judge sees the step's input, the agent's whole log — its reasoning, tool calls and their results — its output and the Eval Case's notes. Say what a good output does and what makes it fail; it explains what decided its verdict, then answers pass or fail."
+        hint="The judge sees the step's input, the agent's whole log — its reasoning, tool calls and their results — and its output. Say what a good output does and what makes it fail; it explains what decided its verdict, then answers pass or fail."
       >
         <textarea
           aria-label="Question for the judge"
@@ -253,6 +314,14 @@ export function CheckDetails({ check }: { check: EvaluatorCheck }) {
           <Detail label="Judge model"><span className="font-mono">{check.model}</span></Detail>
           <Detail label="Question for the judge"><pre className={cn(preClass, 'font-sans')}>{check.rubric}</pre></Detail>
           <Detail label="Minimum confidence">{check.minConfidence}</Detail>
+        </div>
+      );
+    case 'expected_output':
+      return (
+        <div className="space-y-2">
+          <Detail label="Agreement judge model"><span className="font-mono">{check.model}</span></Detail>
+          {check.instructions !== undefined && <Detail label="Instructions for every case"><pre className={cn(preClass, 'font-sans')}>{check.instructions}</pre></Detail>}
+          <Detail label="Minimum agreement">{check.minAgreement}</Detail>
         </div>
       );
   }

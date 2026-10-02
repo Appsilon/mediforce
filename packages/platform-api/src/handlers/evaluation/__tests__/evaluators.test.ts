@@ -71,6 +71,19 @@ describe('Evaluators', () => {
     expect(events.map((event) => event.action)).toContain('evaluator.production_enabled');
   });
 
+  it('never runs an expected-output check in production, and keeps it one', async () => {
+    const check = { kind: 'expected_output' as const, model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8 };
+    const input = { ...STEP, name: 'matches-expected', rule: 'The output matches the expected output.', severity: 'critical' as const, check, origin: 'user' as const };
+    await expect(createEvaluator({ ...input, runInProduction: true }, fixture.scope())).rejects.toThrow('never runs in production');
+
+    const { evaluator } = await createEvaluator(input, fixture.scope());
+    expect(evaluator.trust).toEqual({ trusted: true });
+    await expect(setEvaluatorProduction({ evaluatorId: evaluator.id, runInProduction: true }, fixture.scope())).rejects.toThrow('never runs in production');
+    await expect(addEvaluatorVersion({ evaluatorId: evaluator.id, check: findingsSchema, origin: 'user' }, fixture.scope())).rejects.toThrow('stays one');
+    const { evaluator: changed } = await addEvaluatorVersion({ evaluatorId: evaluator.id, check: { ...check, minAgreement: 0.9 }, origin: 'user' }, fixture.scope());
+    expect(changed.latest.check).toMatchObject({ minAgreement: 0.9 });
+  });
+
   it('says a flagged Evaluator that does not count yet waits for it', async () => {
     const { evaluator } = await createEvaluator(
       { ...STEP, name: 'grade-5-flagged', rule: 'r', severity: 'critical', check: { kind: 'code', runtime: 'python', source: 'print(1)' }, origin: 'user', runInProduction: true },

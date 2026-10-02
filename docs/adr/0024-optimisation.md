@@ -10,9 +10,10 @@ last_reviewed: 2026-10-01
 - **Date:** 2026-10-01
 - **Authors:** Krystian Zielinski (@Griphu), with Claude
 - **Takes out of:** [ADR-0023](./0023-step-evaluation.md) — the variant half of
-  D5, D12, the Phase 4 fix loop of D15 and its 2026-09-29 GEPA amendment, and
-  the positive/negative expectation of an Eval Case. ADR-0023 stays binding for
-  everything else; none of what is listed here is binding until this ADR is
+  D5, D12, the Phase 4 fix loop of D15 and its 2026-09-29 GEPA amendment. The
+  positive/negative expectation of an Eval Case was parked here too; on
+  2026-10-02 it went back to ADR-0023 (D17) as the expectation of a case's
+  expected output. ADR-0023 stays binding for everything else; none of what is listed here is binding until this ADR is
   accepted.
 - **Code reference:** every mechanism below was built and tested at commit
   [`aa8ac636`](https://github.com/Appsilon/mediforce/tree/aa8ac636f773342f4fdbd90f5d9529ccdb92d651)
@@ -47,12 +48,10 @@ the Evaluation Assistant no longer reach it.
 | **Fix loop** | The assistant clusters an Eval Run's failures by root cause (`propose_diagnosis`, kept) and proposed each fix that a patch can express as a challenger (`propose_fix`), with a **Try it** card that prepared the run. | `ProposeFixToolSchema` in `platform-core/src/schemas/evaluation-assistant-tools.ts`, `FixCard` in `platform-ui/src/components/evaluation/evaluation-assistant-cards.tsx`, L3 `e2e/api/step-evaluation-fix-loop.journey.ts` |
 | **GEPA optimisation** | One round of GEPA's reflective proposal step over a finished run's failing **dev** trials, in its own container (`mediforce-gepa`) with network for the reflection model; its candidate prompts run as challengers over dev and holdout and are ranked by holdout Wilson lower bound, then dev, then cost. One budget covers the job and that run. | `agent-runtime/src/plugins/gepa-job.ts`, `container/Dockerfile.gepa`, `handlers/evaluation/optimisations.ts`, `_lib/optimisation-results.ts`, `platform-core/src/schemas/eval-optimisation.ts`, migration `0065_eval_optimisations.sql`, CLI `eval optimise|optimisation|optimisations`, L3 `e2e/api/step-evaluation-optimisation.journey.ts` |
 | **Assistant tools** | `compare_variants`, `list_optimisations`, `get_optimisation`, `start_optimisation` (under an unattended budget), `challengers` on `prepare_eval_run`, `propose_fix`. | `EVALUATION_ASSISTANT_PLATFORM_TOOLS` / `…_PROPOSAL_TOOLS`, `handlers/evaluation-assistant/_lib/run-evaluation-tool.ts` |
-| **Case expectation** | An Eval Case is `positive` (a correct output exists) or `negative` (no output should be accepted). Harvesting followed the reviewer's verdict; `cases-from-labels` mapped pass → positive, fail → negative. GEPA used it as feedback; a judge was already not told it (it reads the case's notes). | `EvalCaseExpectationSchema` in `platform-core/src/schemas/evaluation.ts`, `handlers/evaluation/eval-cases.ts` |
+| **Case expectation** | _Returned to ADR-0023 D17 on 2026-10-02._ Was: an Eval Case is `positive` (a correct output exists) or `negative` (no output should be accepted), used only as GEPA feedback. Now it says whether a case's expected output is one to match or to avoid. | `EvalCaseExpectationSchema` in `platform-core/src/schemas/evaluation.ts` |
 | **Web UI** | Challenger JSON on **Eval Runs → Prepare**, the comparison table and **Apply to step** in a run's report, the **Optimisations** section, the **Positive case / Negative case** buttons and the expectation selector on a case. | `platform-ui/src/components/evaluation/step-evaluation-sections.tsx` (`EvalRunsSection`, `OptimisationsSection`, `CasesSection`, `CaseForm`), `eval-run-report.tsx` (`Comparison`, `ApplyVariant`) |
 
-What stays today: every case still stores an `expectation` so nothing is lost
-— `positive` unless a caller sets it, or the harvested run's reviewer rejected
-it — and an Eval Run's report still has one variant per challenger a CLI caller
+What stays today: an Eval Run's report still has one variant per challenger a CLI caller
 adds.
 
 ## Decisions (proposed)
@@ -85,11 +84,9 @@ Eval Run a person can read and stop; the job reflects on dev trials only;
 candidates are ranked by holdout first; a start whose worst case leaves nothing
 of the grant is refused.
 
-**D7 — Whether a case expects acceptance is a property optimisation needs, not
-evaluation.** Evaluation grades outputs with Evaluators and a case's notes; a
-case's expectation is feedback for a search. If optimisation comes back, decide
-whether it needs a separate field or can read the notes and Evaluator verdicts
-alone.
+**D7 — Superseded by ADR-0023 D17.** The expectation is now evaluation's: it
+says whether a case's expected output is one to match or to avoid. GEPA's
+reflective records read it with the expected output.
 
 ## Open questions before accepting
 
@@ -97,7 +94,6 @@ alone.
   tab of its own) and whether the assistant drives it or a form does.
 - Whether GEPA should stay one round per job (D6) or run a bounded multi-round
   loop with per-round checkpoints.
-- D7: keep `expectation`, or drop it and its column.
 - Whether to delete the parked backend instead of keeping it; the pinned
   commit makes deletion recoverable.
 

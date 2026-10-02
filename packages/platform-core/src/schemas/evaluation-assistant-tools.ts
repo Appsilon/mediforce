@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import {
   AcceptanceCriteriaSchema,
+  EvalCaseComparisonSchema,
+  EvalCaseExpectationSchema,
   EvalCaseInputSchema,
+  EvalCaseLabelSchema,
   EvalCaseSplitSchema,
   EvaluatorCheckSchema,
   EvaluatorKindSchema,
@@ -34,6 +37,7 @@ const AssistantCheckSchema = EvaluatorCheckSchema.describe(
     source: 'import json\nwith open("/output/input.json") as handle:\n    data = json.load(handle)\nwith open("/output/result.json", "w") as handle:\n    json.dump({"passed": "findings" in data["result"]}, handle)',
   },
   { kind: 'llm_judge', model: 'anthropic/claude-sonnet-4', rubric: 'Does the result explain its findings?', minConfidence: 0.8 },
+  { kind: 'expected_output', model: 'anthropic/claude-sonnet-4', instructions: 'Wording of free text is trivial; a changed grade or term is not.', minAgreement: 0.8 },
 ] });
 
 /** Models name rules in prose or snake_case; an Evaluator's name is kebab-case. */
@@ -59,7 +63,11 @@ export const ProposeEvalCaseToolSchema = z.object({
   name: z.string().min(1).max(200),
   agentRunId: z.string().min(1).optional(),
   input: EvalCaseInputSchema.optional(),
-  notes: z.string().max(4000).optional(),
+  /** The output the step should return — or, for a negative case, must not return. */
+  expectedOutput: EvalCaseLabelSchema.shape.expectedOutput.optional(),
+  expectation: EvalCaseExpectationSchema.optional(),
+  comparison: EvalCaseComparisonSchema.optional(),
+  agreementInstructions: z.string().max(4000).optional(),
   split: EvalCaseSplitSchema.optional(),
   rationale: z.string().max(1000).optional(),
 }).refine((value) => (value.agentRunId === undefined) !== (value.input === undefined), {
@@ -113,7 +121,7 @@ export const ProposeEvaluatorVersionToolSchema = z.object({
 });
 
 /** Propose a case synthesized from a production run by changing its input or workspace. */
-export const ProposePerturbedCaseToolSchema = PerturbedEvalCaseSpecSchema.omit({ expectation: true }).extend({
+export const ProposePerturbedCaseToolSchema = PerturbedEvalCaseSpecSchema.extend({
   rationale: z.string().max(1000).optional(),
 }).refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' });
 

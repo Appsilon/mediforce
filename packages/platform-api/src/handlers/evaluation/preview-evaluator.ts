@@ -1,10 +1,13 @@
 import type { z } from 'zod';
 import type { PreviewEvaluatorInputSchema, PreviewEvaluatorOutput } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
+import { ValidationError } from '../../errors';
 import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
 import { loadEvaluationSubject } from './_lib/evaluation-subject';
 import { runEvaluatorCheck } from './_lib/run-evaluator-check';
 import { listStepProductionAgentRuns } from './_lib/step-agent-runs';
+
+export const EXPECTED_OUTPUT_NOT_PREVIEWED = 'An expected-output check compares an Eval Case trial\'s output with the case\'s expected output; a production output has none, so it cannot be tried on one.';
 
 /**
  * Runs a draft check against existing outputs of the Step and writes nothing —
@@ -18,6 +21,7 @@ export async function previewEvaluator(
 ): Promise<PreviewEvaluatorOutput> {
   const step = stepRef(input);
   await loadEvaluatedStep(scope, step, 'run');
+  if (input.check.kind === 'expected_output') throw new ValidationError(EXPECTED_OUTPUT_NOT_PREVIEWED);
   const agentRunIds = input.agentRunIds
     ?? (await listStepProductionAgentRuns(scope, step, input.limit)).map((run) => run.id);
 

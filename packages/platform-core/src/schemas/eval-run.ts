@@ -171,7 +171,7 @@ export const EvalRunEvaluatorReportSchema = EvalRunEvaluatorSchema.extend({
   failures: z.number().int().nonnegative(),
   /** Trials the check could not grade; not in the rate. */
   errors: z.number().int().nonnegative(),
-  /** Judge verdicts left out of the rate: below the judge's `minConfidence` and not accepted by a person, or denied by one. */
+  /** Model verdicts left out of the rate: a judge's below its `minConfidence` and not accepted by a person, or any denied by one. */
   excluded: z.number().int().nonnegative(),
   passRate: z.number().min(0).max(1).nullable(),
   /** Wilson 95% interval on the pass rate. */
@@ -304,8 +304,9 @@ export const EvalRunMcpReportSchema = z.object({
 export const JudgeReviewDecisionSchema = z.enum(['accepted', 'denied']);
 
 /**
- * One judge's verdict on one trial, as a person reviews it: pass or fail, how
- * confident the judge was, and its rationale — what decided the verdict and why.
+ * One model's verdict on one trial, as a person reviews it — a judge's, or an
+ * expected-output agreement score: pass or fail, how confident the judge was
+ * or how far the output agreed, and its rationale — what decided the verdict and why.
  */
 export const JudgeVerdictSchema = z.object({
   trialId: z.uuid(),
@@ -324,6 +325,8 @@ export const JudgeVerdictSchema = z.object({
   /** Null on verdicts recorded before judges reported a confidence. */
   confidence: z.number().min(0).max(1).nullable(),
   minConfidence: z.number().min(0).max(1).nullable(),
+  /** An expected-output check's agreement score; null on a judge's verdict. */
+  agreement: z.number().min(0).max(1).nullable(),
   rationale: z.string().nullable(),
   review: z.object({
     decision: JudgeReviewDecisionSchema,
@@ -343,7 +346,7 @@ export const EvalRunReportSchema = z.object({
   variants: z.array(EvalRunVariantReportSchema),
   /** Every challenger against the champion. */
   comparison: z.array(VariantComparisonSchema),
-  /** Every judge verdict on a scored trial, by variant, case and trial. */
+  /** Every model's verdict on a scored trial — judges' and agreement scores — by variant, case and trial. */
   judgeVerdicts: z.array(JudgeVerdictSchema),
   costUsd: z.number().nonnegative(),
   inputTokens: z.number().int().nonnegative(),

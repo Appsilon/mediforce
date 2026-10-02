@@ -45,7 +45,7 @@ describe('getEvalRunFailures (ADR-0023 D14)', () => {
       caseName: 'Grade 4 neutropenia',
       split: 'dev',
       expectation: 'positive',
-      caseNotes: 'Grade 4 neutropenia must be graded.',
+      expectedOutput: null,
       agentRunId: expect.any(String),
       error: null,
       evaluators: [expect.objectContaining({

@@ -10,7 +10,7 @@ import type { ProposalReview } from '../../../assistant-core';
 import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { HandlerError } from '../../../errors';
-import { previewEvaluator } from '../../evaluation/preview-evaluator';
+import { EXPECTED_OUTPUT_NOT_PREVIEWED, previewEvaluator } from '../../evaluation/preview-evaluator';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
 import { isSameStep } from '../../evaluation/_lib/evaluated-step';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
@@ -37,6 +37,9 @@ async function selfTest(
   check: EvaluatorCheck,
   previewed: readonly PreviewedCheck[],
 ): Promise<ProposalReview> {
+  if (check.kind === 'expected_output') {
+    return { ok: true, evidence: { selfTest: { unavailable: EXPECTED_OUTPUT_NOT_PREVIEWED } } };
+  }
   let results = previewed.find((preview) => isDeepStrictEqual(preview.check, check))?.results;
   if (results === undefined) {
     try {

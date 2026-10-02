@@ -90,8 +90,8 @@ authenticated, and only these two may do that.
 **Every Score goes through `recordScore`** (`handlers/scores/record-score.ts`),
 which appends its `score.created` audit event. There is no generic Score write
 route: Scores arrive from task completion (Control Mode 3 verdicts), from
-Evaluators, and from a person accepting or denying a judge verdict of an Eval
-Run (`reviewJudgeVerdict`, `judge-reviews.ts`). With
+Evaluators, and from a person accepting or denying a judge verdict or agreement
+score of an Eval Run (`reviewJudgeVerdict`, `judge-reviews.ts`). With
 `MEDIFORCE_SCORE_EXPORT` set, `services/score-export.ts` wraps the Score
 repository and also sends each Score of a traced Agent Run to Phoenix or
 Langfuse. It only writes, runs in the background, and never fails the Score
@@ -131,8 +131,8 @@ Run's report is computed from the Scores on read, never stored — per variant,
 with the verdict on each frozen Acceptance Criterion and the confidence
 calibration, from platform-core's pure rules. Which Scores count is one rule,
 `checkOutcome` in `_lib/trial-scores.ts`: a judge verdict below its
-`minConfidence` is left out unless a person accepted it, and a denied one is
-always left out; the report, the failures list, optimisation results and GEPA's
+`minConfidence` is left out unless a person accepted it, and a denied one — a
+judge's or an agreement score's — is always left out; the report, the failures list, optimisation results and GEPA's
 reflective dataset all read it. A variant is a patch the
 runtime applies to its trials (platform-ui's `execute-agent-step.ts` reads the
 trial's variant); the driver does not know variants exist. Applying a variant to the step
@@ -182,8 +182,8 @@ that fit what is left of it, as a person confirming each run's budget
 (`UnattendedGrant` in `_lib/run-evaluation-tool.ts`); the grant is recorded on the
 request's prompt audit event. The assistant prepares runs of the step as it is
 only: challengers, fixes as variants and GEPA optimisations are the person's to
-start, and it never labels an Eval Case positive or negative — a case created
-without an `expectation` is positive.
+start. A case it proposes may carry an expected output with its expectation;
+one created without an `expectation` is positive.
 
 The Evaluation Assistant allows 32 model/tool rounds with an 8,000-token
 completion budget per call, independent of the selected model's context window.

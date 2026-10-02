@@ -1,5 +1,5 @@
 import type { GepaReflectiveRecord } from '@mediforce/agent-runtime';
-import type { EvalCase, EvalRun, EvalTrial, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
+import { evaluatorAppliesToCase, type EvalCase, type EvalRun, type EvalTrial, type StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { loadEvaluationSubject } from './evaluation-subject';
 import { checkOutcome, countedScores, passedEveryCounted, trialScores, type TrialScores } from './trial-scores';
@@ -37,7 +37,7 @@ const VERDICT_WORDS = { pass: 'PASS', fail: 'FAIL', excluded: 'LEFT OUT' } as co
  * holdout cases are what the candidates are checked on afterwards, so the job
  * never sees them. Feedback is each counted Evaluator's verdict — PASS, FAIL,
  * or ERROR when it gave none — with its rule and comment, the trial's
- * Evaluator errors, and the case's expectation and notes. Trials that did not
+ * Evaluator errors, and the output the case expects or must not get. Trials that did not
  * pass every counted Evaluator come first.
  */
 export async function reflectiveDataset(scope: CallerScope, run: EvalRun, variantId: string): Promise<GepaReflectiveRecord[]> {
@@ -54,13 +54,13 @@ export async function reflectiveDataset(scope: CallerScope, run: EvalRun, varian
     const evalCase = await scope.evaluation.getCase(trial.caseId);
     if (evalCase === null || evalCase.split !== 'dev') continue;
     const scores = await trialScores(scope, run, trial);
-    graded.push({ trial, evalCase, scores, failing: passedEveryCounted(run, countedScores(scores)) !== true });
+    graded.push({ trial, evalCase, scores, failing: passedEveryCounted(run, countedScores(scores), evalCase) !== true });
   }
   const chosen = [...graded.filter((row) => row.failing), ...graded.filter((row) => row.failing === false)].slice(0, MAX_RECORDS);
 
   return Promise.all(chosen.map(async ({ trial, evalCase, scores }) => {
     const subject = await loadEvaluationSubject(scope, trial.agentRunId!);
-    const verdicts = counted.map((evaluator) => {
+    const verdicts = counted.filter((evaluator) => evaluatorAppliesToCase(evaluator, evalCase)).map((evaluator) => {
       const score = scores.checks.find((candidate) => candidate.evaluatorId === evaluator.evaluatorId);
       const verdict = score === undefined ? 'ERROR' : VERDICT_WORDS[checkOutcome(score, scores.reviews.get(evaluator.evaluatorId))];
       const rule = rules.get(evaluator.evaluatorId);
@@ -74,8 +74,9 @@ export async function reflectiveDataset(scope: CallerScope, run: EvalRun, varian
       }),
       'Generated Outputs': `${clipped(subject.agentRun.envelope?.result ?? null)}\n\nTool calls: ${toolCallSummary(subject.trajectory)}`,
       Feedback: [
-        `The output of this case should be ${evalCase.expectation === 'positive' ? 'accepted' : 'rejected'}.`,
-        ...(evalCase.notes === null ? [] : [`Notes on the case: ${evalCase.notes}`]),
+        ...(evalCase.expectedOutput === null ? [] : [
+          `The output ${evalCase.expectation === 'positive' ? 'should match' : 'must not match'}: ${clipped(evalCase.expectedOutput)}`,
+        ]),
         ...verdicts,
         ...(trial.error === null ? [] : [`Evaluator errors: ${trial.error}`]),
       ].join('\n'),

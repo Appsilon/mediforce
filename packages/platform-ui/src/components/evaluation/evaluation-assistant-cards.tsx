@@ -54,10 +54,10 @@ async function acceptProposal(step: EvaluatedStep, proposal: DecidableProposal):
       return mediforce.evaluation.addEvaluatorVersion({ ...version, origin: 'assistant' });
     }
     case 'propose_eval_case': {
-      const { agentRunId, input, name, notes, split } = proposal.arguments;
+      const { agentRunId, input, rationale: _rationale, ...written } = proposal.arguments;
       return agentRunId !== undefined
-        ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, step, name, notes, split, origin: 'assistant' })
-        : mediforce.evaluation.createCase({ ...step, name, input: input!, notes: notes ?? null, split, origin: 'assistant' });
+        ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, step, ...written, origin: 'assistant' })
+        : mediforce.evaluation.createCase({ ...step, ...written, input: input!, origin: 'assistant' });
     }
     case 'propose_perturbed_case': {
       const { rationale: _rationale, ...synthesized } = proposal.arguments;
@@ -98,6 +98,13 @@ function SelfTestSummary({ selfTest }: { selfTest: EvaluatorSelfTest }) {
   );
 }
 
+/** What a proposed case expects of the output, in a line; null when it gives no expected output. */
+function expectedOutputSummary(proposal: { expectedOutput?: unknown; expectation?: string; comparison?: string }): string | null {
+  if (proposal.expectedOutput === undefined || proposal.expectedOutput === null) return null;
+  const how = proposal.comparison === 'agreement' ? 'by agreement score' : 'exactly';
+  return `${proposal.expectation === 'negative' ? 'Must not match' : 'Must match'}, ${how}: ${JSON.stringify(proposal.expectedOutput)}`;
+}
+
 function perturbedCaseSummary(proposal: Proposal<'propose_perturbed_case'>['arguments']): string {
   const changes = [
     ...(proposal.inputChanges ?? []).map((change) => `${change.op} ${[change.part, ...change.path].join('.')}`),
@@ -106,7 +113,7 @@ function perturbedCaseSummary(proposal: Proposal<'propose_perturbed_case'>['argu
   return [
     `${proposal.name} — ${proposal.perturbation.kind.replace(/_/g, ' ')}: ${proposal.perturbation.description}`,
     `From run ${proposal.baseAgentRunId.slice(0, 8)}: ${changes.join('; ')}`,
-    proposal.notes,
+    ...[expectedOutputSummary(proposal)].filter((line) => line !== null),
   ].join('\n');
 }
 
@@ -135,7 +142,7 @@ function ProposalSummary({ step, proposal }: { step: EvaluatedStep; proposal: De
       );
     }
     case 'propose_eval_case':
-      return <>{proposal.arguments.name}{proposal.arguments.notes === undefined || proposal.arguments.notes === null ? '' : ` — ${proposal.arguments.notes}`}</>;
+      return <>{[proposal.arguments.name, expectedOutputSummary(proposal.arguments)].filter((line) => line !== null).join('\n')}</>;
     case 'propose_perturbed_case':
       return <>{perturbedCaseSummary(proposal.arguments)}</>;
     case 'propose_acceptance_criteria':

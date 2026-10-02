@@ -10,8 +10,7 @@ How an author checks that one agent Workflow Step can be trusted for its
 context of use. The design and its reasons are
 [ADR-0023](../adr/0023-step-evaluation.md); the vocabulary is `CONTEXT.md`
 § Evaluation domain. This page is what exists today. Optimisation — challenger
-variants, applying them, fix variants, GEPA and a case's positive/negative
-expectation — is parked in [ADR-0024](../adr/0024-optimisation.md) (Proposed):
+variants, applying them, fix variants and GEPA — is parked in [ADR-0024](../adr/0024-optimisation.md) (Proposed):
 its REST routes and CLI commands still exist but are outside the supported
 surface, and neither the tab nor the assistant offers them.
 
@@ -114,9 +113,10 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   rule, and proposes a sharper rubric as a new version.
 - **Case synthesis.** It proposes a case built from a real production run with
   a deliberate change — an instruction injected into the data, an edge value,
-  renamed columns, a missing or extra file — with notes on what the output
-  must or must not do. A change that does not apply to that run goes back to the assistant instead of
-  to the person.
+  renamed columns, a missing or extra file — with an expected output when it
+  knows one: the source run's for a change that keeps the meaning, or a
+  negative case's output the agent must not return. A change that does not
+  apply to that run goes back to the assistant instead of to the person.
 
 Every proposal is checked against the platform before it is shown: an Evaluator
 name already taken, or an Evaluator or run of another step, is refused the same
@@ -168,13 +168,14 @@ Run does not record it, and a Step Qualification does not cite it.
 
 ## Evaluators
 
-One rule in plain language plus the check behind it. Three kinds:
+One rule in plain language plus the check behind it. Four kinds:
 
 | Kind | Check | Counts (D9) |
 |---|---|---|
 | `schema` | `result` against the JSON Schema subset `agent.outputSchema` uses | at once |
 | `code` | a `python` or `javascript` script in the `script-container` sandbox (no network) | after a person approves that version's source |
 | `llm_judge` | a model reads the step's input, the agent's Trajectory and its output, explains its judgment, then answers pass or fail with a confidence 0–1 | at once; each verdict below its `minConfidence` is left out unless a person accepts it |
+| `expected_output` | `result` against the Eval Case's expected output — an exact match, or an agreement score 0–1 from its model; see [Expected outputs](#expected-outputs) | at once |
 
 A `code` check reads `/output/input.json` — `{ result, stepInput, trajectory,
 case }` — and the step's workspace commit read-only at `/workspace`, and writes
@@ -187,9 +188,9 @@ attaches to it.
 
 An `llm_judge` check is `{ kind, model, rubric, minConfidence }`
 (`minConfidence` 0–1, 0.8 when not set). The judge is given the step's input,
-the Eval Case's notes, the agent's whole Trajectory — its reasoning, every tool
-call and tool result, numbered, long logs cut in the middle — its output and
-its own summary. It must explain its judgment — what exactly decided the
+the agent's whole Trajectory — its reasoning, every tool call and tool result,
+numbered, long logs cut in the middle — its output and its own summary. It is
+not told a case's expected output or whether the case is negative. It must explain its judgment — what exactly decided the
 verdict and why, citing the input, the output and log entries by number — and
 answer `{ "rationale", "passed", "confidence" }`. The Score is `1`/`0` with
 label `pass`/`fail`, the rationale as its comment, and
@@ -208,10 +209,41 @@ person's optional comment) that a later review supersedes
 (`mediforce eval judge-review <evalRunId> --trial <id> --evaluator <id>
 --accept|--deny [--comment …]`, `POST /api/evaluation/runs/:id/judge-reviews`,
 `edit` verb; an API key names the reviewer with `uid`). A judge Score recorded
-before judges reported a confidence counts as it did.
+before judges reported a confidence counts as it did. An `expected_output`
+check's agreement score is a model's verdict too, reviewed the same way; an
+exact comparison is not reviewable.
 
 `evaluator-archive` archives or restores an Evaluator; `evaluator-production`
 sets whether it also runs in production (see below).
+
+### Expected outputs
+
+An `expected_output` check is `{ kind, model, instructions?, minAgreement }`
+(`minAgreement` 0–1, 0.8 when not set) and grades only Eval Run trials of a
+case that has an expected output. The case says how it is compared:
+
+- **`exact`** — the output must equal the expected output; object key order is
+  ignored, anything else that differs fails, and the comment lists the first
+  differing paths (`findings.0.grade: expected 5, got 4`). No model is called.
+- **`agreement`** — the check's `model` reads only the expected output and the
+  output, with the check's `instructions` (for every case) and the case's
+  `agreementInstructions` (this case only, e.g. "differences in the narrative
+  are trivial; a changed grade means low agreement"), explains which
+  differences mattered and answers `{ "rationale", "agreement" }`. It passes at
+  `minAgreement`. The Score keeps the agreement in `metadata.agreement` and is
+  written with source `llm_judge`; its judge cost is charged to the run. A
+  person can accept or deny it like a judge's verdict (see the judge review
+  above): 0.81 against a floor of 0.8 counts until someone reading the
+  rationale denies it.
+
+A **negative** case's expected output is one the step must not return, so the
+verdict reverses: it passes when the output differs (exact) or agrees below
+`minAgreement` (agreement). A comparison that gives no usable agreement is an
+error, never a failed output. The check cannot be previewed (`evaluator-preview`
+refuses it: a production output has no expected output) and never runs in
+production — `runInProduction` is refused for it — and a version keeps its kind:
+an `expected_output` Evaluator stays one, and no other kind becomes one. In the
+tab, a case whose expected output no Expected output check grades says so.
 
 In the Evaluation tab, **Evaluators → Add** picks the kind from a dropdown and
 shows its fields — a JSON Schema (started from the step's `agent.outputSchema`
@@ -307,16 +339,34 @@ same name on a span replaces the older one there.
 ## Eval Cases and Datasets
 
 An Eval Case is one input for the Step — the trigger payload, the outputs of the
-steps before it, and the workspace commit it starts from — with notes on what
-its output must or must not contain. `case-from-run <agentRunId>` harvests one
-from a production run. Cases are `dev` or
-`holdout`, carry a *contains production data* flag, and an `origin` — `user`,
-or `assistant` for an accepted Evaluation Assistant proposal.
+steps before it, and the workspace commit it starts from — and optionally the
+output expected of it. `case-from-run <agentRunId>` harvests one from a
+production run. Cases are `dev` or `holdout`, carry a *contains production
+data* flag, and an `origin` — `user`, or `assistant` for an accepted Evaluation
+Assistant proposal.
 
 A case is an *input* an Eval Run re-runs the step on; the Evaluators grade the
-new output. An `llm_judge` grading an Eval Run trial is given the case's notes, so
-write them as what to look for — "the fatal event must be grade 5" — not as a
-verdict on the output.
+new output. What a case expects of that output:
+
+- `expectedOutput` — JSON the output is compared with by an
+  [`expected_output`](#expected-outputs) check, or `null` for none.
+- `expectation` — `positive` (the output must match it) or `negative` (the
+  output must not); it matters only with an expected output.
+- `comparison` — `exact` or `agreement`, with `agreementInstructions` for an
+  agreement on this case.
+- `evaluatorIds` — the Evaluators that grade the case, or `null` for every
+  Evaluator of the step, including ones added later. A case selects only
+  live (not archived) Evaluators of its own step. An Evaluator a case does not select — or an
+  `expected_output` check on a case with no expected output — does not grade its
+  trials: the report leaves them out of that Evaluator's pass rate, errors and
+  pass@k/pass^k, failures do not list it, and a trial passes when every counted
+  Evaluator that grades its case passed.
+
+A harvested case takes the run's output as its expected output when a person
+reviewed the run: approved, a positive case; rejected, a negative one. A run
+sent back for revision or never reviewed gives none. An `expectedOutput` in the
+request (`null` for none) replaces the run's output and is positive unless
+`expectation` says otherwise — the verdict labels only the run's own output. `case-from-run` takes `--expectation` and `--comparison`.
 
 In the Evaluation tab, **Eval Cases → Production runs to add as Eval Cases**
 lists the Step's finished production runs not yet harvested, newest first and a
@@ -328,21 +378,30 @@ its `caseInput` is the same input as an Eval Case made from the run holds it)
 — and **Log** opens the run's execution log before you **Add as case**.
 
 **Write a case** covers inputs production has not sent — an input the step must
-refuse, a record that should trip a rule. Its input starts from an existing case's,
+refuse, a record that should trip a rule. The form shows the **Input** beside
+the **Expected output** (left empty for none); once there is an expected output
+it asks whether the case is positive or negative and how to compare it — exact
+match or output agreement score, with instructions for this case — and under
+**Graded by** whether every Evaluator grades the case or only the ones ticked. Its input starts from an existing case's,
 so it keeps the shape the step is given (and that case's workspace commit), or
 from a `.json` file: a whole case as `case-add --file` takes it (`{ name, input,
-notes?, split? }`), or only its input (`{ triggerPayload,
+expectedOutput?, expectation?, comparison?, agreementInstructions?, split? }` —
+`evaluatorIds` from a file is ignored, as they belong to the step it was written for), or only its input (`{ triggerPayload,
 previousStepOutputs, previousRun? }`). It is saved with `POST /api/evaluation/cases`
 as a `manual` case, flagged as containing production data when the case it
 started from was.
 
 Each case in the list opens **Details**: where it came from, what it expects
-(its notes), for a production case the input and output of its source run
+(its expected output, positive or negative, how it is compared, and the
+Evaluators that grade it), for a production case the input and output of its source run
 (for a synthesized one, its source run's, before the change), the input an Eval
 Run gives the step, the workspace commit it starts from, and **Source run log**
 for a case made from a run. **Edit** changes its name,
-split, notes or input (`case-edit <caseId> --file`,
-`PATCH /api/evaluation/cases/:caseId`); **Archive** takes it out of the next
+split, input, expected output and how it is compared, or the Evaluators that
+grade it (`case-edit <caseId> --file`, `PATCH /api/evaluation/cases/:caseId`);
+**Use the source run's output** fills a production case's expected output with
+what its run returned. Ticking cases in the list and **Set evaluators…** sets
+the Evaluators of all of them at once, one edit per case that changes; **Archive** takes it out of the next
 freeze (`case-archive`). An edit is a new case that replaces the old one, which
 is archived, so a Dataset version frozen with the old case keeps exactly what it
 ran. A production case whose input is edited becomes `manual` — production never
@@ -360,7 +419,8 @@ the workflow's bare repo, kept by the ref `refs/mediforce/eval-seeds/<caseId>`,
 which the case starts from. A change that does not apply — removing what is not
 there, editing a file that is missing or binary, file changes on a run with no
 workspace — is refused. It is built from production data, so it is flagged as
-containing it.
+containing it. It takes the same expected output, expectation, comparison and
+Evaluators as a written case.
 
 `dataset-freeze` (**Freeze dataset** in the tab) freezes the live cases into a
 numbered Eval Dataset version. A version never changes, and an Eval Run runs one
@@ -488,11 +548,15 @@ the judge calls. Then:
   set — `missed` when one does not,
   and `not judged` when no counted Evaluator of that severity exists, one
   graded nothing it counts (a judge whose every verdict was left out), or — for a floor the scored trials reached — some trial
-  failed or was skipped: a criterion is met on the whole Dataset.
+  failed or was skipped: a criterion is met on the whole Dataset. An Evaluator
+  that grades no case of the run — an `expected_output` check while no case
+  has an expected output, or one every case leaves unselected — is left out of
+  the criteria, like one that does not count.
   A run prepared before any criteria were set freezes the default — every
   severity at 100%; one prepared before that default existed judges nothing.
-- **Judge verdicts.** Every judge verdict per trial — case, pass or fail, the
-  judge's confidence against its minimum, whether it counts, the rationale
+- **Model verdicts.** Every judge verdict and agreement score per trial — case,
+  pass or fail, the judge's confidence against its minimum or the agreement,
+  whether it counts, the rationale
   and any review — with **Accept** and **Deny** for a person with `edit`
   (`report.judgeVerdicts`; `mediforce eval report` lists those left out).
 - **Confidence calibration.** The confidence each trial's agent reported,

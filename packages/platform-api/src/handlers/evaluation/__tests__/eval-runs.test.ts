@@ -45,7 +45,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
         input: { triggerPayload: { studyId: 'CDISCPILOT01' }, previousStepOutputs: { 'extract-aes': { events: [{ term: name }] } } },
         workspaceSeedCommit: 'a1b2c3d4',
         expectation: 'positive',
-        notes: null,
+        expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null,
         split: 'dev',
         containsProductionData: false,
         origin: 'user',
@@ -145,7 +145,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
 
     const { evalCase: holdout } = await createEvalCase({
       ...STEP, name: 'Grade 3 rash', input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: null,
-      expectation: 'positive', notes: null, split: 'holdout', containsProductionData: false, origin: 'user',
+      expectation: 'positive', expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'holdout', containsProductionData: false, origin: 'user',
     }, scope);
     await expect(prepareEvalRun({
       ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5,

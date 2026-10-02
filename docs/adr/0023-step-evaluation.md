@@ -24,6 +24,11 @@ last_reviewed: 2026-10-02
   labels; it reads the agent's Trajectory, answers pass/fail with a confidence
   and a rationale, and each verdict is gated by its `minConfidence` and a
   person's review (D3, D9, D15). Labels and written outputs are removed.
+- **Amended 2026-10-02 (D17):** an Eval Case carries an expected output with a
+  positive/negative expectation, an `expected_output` Evaluator compares it
+  exactly or by an agreement score, and a case names the Evaluators that grade
+  it. Case notes are removed. The expectation is back from ADR-0024 with a
+  meaning evaluation reads.
 - **Vocabulary:** Evaluation, Evaluation Assistant, Evaluation Brief, Evaluator, Eval Case, Eval Dataset, Eval Run,
   Agent Trajectory, Step Fingerprint, Acceptance Criteria, Step Qualification
   — all in [`CONTEXT.md`](../../CONTEXT.md) § Evaluation domain.
@@ -155,7 +160,8 @@ person reads the rationale in the report and accepts the verdict, so it counts
 whatever its confidence, or denies it, so it is left out; a denial never
 reverses the verdict. The review is a human Score that a later review
 supersedes. Labels, written outputs and the cases seeded from labels went with
-calibration._
+calibration. A written output was a person's corrected answer kept to calibrate
+a judge against — not an expected output (D17), which grades the agent._
 
 **D10 — Acceptance Criteria are fixed before the run and judged on the pass
 rate.** Criteria per severity (critical / major / minor) are frozen into the
@@ -271,6 +277,35 @@ the assistant's context, not part of what a run is judged on. It is shown and
 edited from the Evaluation Assistant's header, not as a section of the tab._
 The workflow assistant's per-user instructions
 are not reused: priorities belong to the Step, not to a person.
+
+**D17 — A case may expect an output, and names the Evaluators that grade it.**
+_Added 2026-10-02._ Rules say what any output must do; many steps also have a
+known right answer — or a known wrong one — for a given input, which a rule
+restates badly. So an Eval Case carries an optional `expectedOutput`, an
+`expectation` (`positive`: the output must match it; `negative`: it must not)
+and a `comparison`: `exact`, where any difference fails, or `agreement`, where a
+model scores 0–1 how far the outputs agree. The comparison is an Evaluator kind,
+`expected_output` (`model`, `instructions`, `minAgreement`), not a built-in, so
+it has a severity, versions, a report row and a place in the Acceptance
+Criteria like any other check, and one model choice serves every case; a case
+adds its own `agreementInstructions` (what is trivial, what decides). It counts
+at once (D9) — an exact match needs no trust; an agreement verdict is a model's,
+so like a judge's it is listed in the report for a person to accept or deny
+(D9) — never runs in production (D13: production has no
+expected output), is never previewed, and its kind is fixed across versions.
+A case's `evaluatorIds` (null: every Evaluator of the Step) say which
+Evaluators grade it; an Evaluator a case does not select is *not applicable*
+to its trials — neither a pass, a failure nor an error — and one that grades no
+case of a run is left out of its Acceptance Criteria, like one that does not
+count, so an expected-output check before any case has an expected output does
+not leave a severity unjudged. The comparison is chosen per case, not on the
+Evaluator: editing a case makes a new case, so a run's cases fix what each
+comparison measured. A harvested run a person
+reviewed brings its output as the expected output: approved positive, rejected
+negative. Free-text case notes, which only an `llm_judge` read, are removed: a
+rule belongs in an Evaluator, an answer in the expected output. The `llm_judge`
+is told neither, so its verdict stays a judgement of the output against its
+rubric.
 
 ## Considered options
 

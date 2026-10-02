@@ -37,7 +37,6 @@ describe('reflectiveDataset', () => {
       'Generated Outputs': expect.stringMatching(/"summary": "no findings"[\s\S]*Tool calls: none/),
       Feedback: expect.stringContaining('FAIL findings-present (critical): The result lists findings.'),
     });
-    expect(records[0]!.Feedback).toContain('The output of this case should be accepted.\nNotes on the case: Grade 4 neutropenia must be graded.');
     expect(records[1]!.Feedback).toContain('PASS findings-present (critical)');
     expect(await reflectiveDataset(scenario.scope, run, 'challenger-1')).toEqual([]);
   });
@@ -46,7 +45,7 @@ describe('reflectiveDataset', () => {
     await createEvalCase({
       ...STEP, name: 'Grade 3 anaemia',
       input: { triggerPayload: {}, previousStepOutputs: { 'extract-aes': { events: [{ term: 'Anaemia' }] } } },
-      workspaceSeedCommit: null, expectation: 'positive', notes: null, split: 'holdout', containsProductionData: false, origin: 'user',
+      workspaceSeedCommit: null, expectation: 'positive', expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'holdout', containsProductionData: false, origin: 'user',
     }, scenario.scope);
     await freezeEvalDataset(STEP, scenario.scope);
     const evalRunId = await finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5, challengers: [] }, () => ({ summary: 'none' }));

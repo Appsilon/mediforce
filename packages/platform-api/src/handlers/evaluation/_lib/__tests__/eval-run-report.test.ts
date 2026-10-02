@@ -86,6 +86,53 @@ describe('buildEvalRunReport', () => {
     expect(report.costUsd).toBeCloseTo(0.4, 10);
   });
 
+  it('leaves out of an Evaluator\'s results the trials of cases it does not grade — neither errors nor toward k', async () => {
+    const fixture = await evaluationFixture();
+    const scope = fixture.scope();
+    const expectedOutput = { evaluatorId: SECOND_EVALUATOR, name: 'matches-expected', version: 1, kind: 'expected_output', severity: 'critical', counted: true } as const;
+    const evalRun = run({ evaluators: [...run().evaluators, expectedOutput] });
+    const caseFields = {
+      ...STEP, input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: null, expectation: 'positive', comparison: 'exact',
+      agreementInstructions: null, source: 'manual', sourceAgentRunId: null, perturbation: null, origin: 'user', split: 'dev',
+      containsProductionData: false, archived: false, createdBy: 'a', createdAt: '2026-09-23T08:00:00.000Z',
+    } as const;
+    // Case A has an expected output and selects only the expected-output check; case B has none, so that check does not grade it.
+    await fixture.evaluationRepo.createCase({ ...caseFields, id: CASE_A, name: 'A', expectedOutput: { findings: [] }, evaluatorIds: [SECOND_EVALUATOR] });
+    await fixture.evaluationRepo.createCase({ ...caseFields, id: CASE_B, name: 'B', expectedOutput: null, evaluatorIds: null });
+    const trials = [trial(evalRun.id, CASE_A, 0), trial(evalRun.id, CASE_A, 1), trial(evalRun.id, CASE_B, 0), trial(evalRun.id, CASE_B, 1, { status: 'failed', agentRunId: null })];
+    await score(scope, evalRun, trials[0]!, 1, SECOND_EVALUATOR);
+    await score(scope, evalRun, trials[1]!, 0, SECOND_EVALUATOR);
+    await score(scope, evalRun, trials[2]!, 1);
+
+    const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
+
+    expect(champion!.evaluators.map(({ name, passes, failures, errors, passHatK }) => ({ name, passes, failures, errors, passHatK }))).toEqual([
+      { name: 'findings-present', passes: 1, failures: 0, errors: 0, passHatK: 0 },
+      { name: 'matches-expected', passes: 1, failures: 1, errors: 0, passHatK: 0 },
+    ]);
+  });
+
+  it('leaves out of the criteria an Evaluator that grades no case of the run, like one that does not count', async () => {
+    const fixture = await evaluationFixture();
+    const scope = fixture.scope();
+    const expectedOutput = { evaluatorId: SECOND_EVALUATOR, name: 'matches-expected', version: 1, kind: 'expected_output', severity: 'critical', counted: true } as const;
+    const evalRun = run({ trialsPerCase: 1, evaluators: [...run().evaluators, expectedOutput], acceptanceCriteria: { critical: { minPassRate: 1 } } });
+    const caseFields = {
+      ...STEP, input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: null, expectation: 'positive', comparison: 'exact',
+      agreementInstructions: null, source: 'manual', sourceAgentRunId: null, perturbation: null, origin: 'user', split: 'dev',
+      containsProductionData: false, archived: false, createdBy: 'a', createdAt: '2026-09-23T08:00:00.000Z', expectedOutput: null, evaluatorIds: null,
+    } as const;
+    // No case has an expected output yet, so the expected-output check grades nothing.
+    await fixture.evaluationRepo.createCase({ ...caseFields, id: CASE_A, name: 'A' });
+    await fixture.evaluationRepo.createCase({ ...caseFields, id: CASE_B, name: 'B' });
+    const trials = [trial(evalRun.id, CASE_A, 0), trial(evalRun.id, CASE_B, 0)];
+    for (const scored of trials) await score(scope, evalRun, scored, 1);
+
+    const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
+
+    expect(champion!.criteria[0]).toMatchObject({ status: 'met', evaluators: [{ name: 'findings-present', met: true }] });
+  });
+
   it('counts a failed trial against its case\'s k, but not in the pass rate', async () => {
     const fixture = await evaluationFixture();
     const scope = fixture.scope();
@@ -290,6 +337,29 @@ describe('buildEvalRunReport', () => {
     const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
 
     expect(champion!.criteria[0]).toMatchObject({ status: 'not_evaluable', reason: expect.stringMatching(/1 verdict left out/) });
+  });
+
+  it('lists an expected-output agreement score for review, and leaves a denied one out — but not an exact comparison', async () => {
+    const fixture = await evaluationFixture();
+    const scope = fixture.scope();
+    const expectedOutput = { ...JUDGE, name: 'matches-expected', kind: 'expected_output' } as const;
+    const evalRun = run({ trialsPerCase: 2, caseIds: [CASE_A], evaluators: [expectedOutput], acceptanceCriteria: { critical: { minPassRate: 1 } } });
+    const trials = [trial(evalRun.id, CASE_A, 0), trial(evalRun.id, CASE_A, 1)];
+    await score(scope, evalRun, trials[0]!, 1);
+    const agreement = await recordScore({
+      subject: { type: 'agent_run', id: trials[1]!.agentRunId! }, name: expectedOutput.name, value: 1, label: 'pass',
+      comment: 'Agreement 0.81 (passes at 0.8). The CTCAE grade differs by one.', source: 'llm_judge', createdBy: null,
+      metadata: { evalRunId: evalRun.id, trialId: trials[1]!.id, agreement: 0.81 },
+      namespace: NAMESPACE, processInstanceId: trials[1]!.processInstanceId, stepId: STEP.stepId, evaluatorId: EVALUATOR, supersedes: null, basis: 'test',
+    }, scope);
+    await recordJudgeReview(scope, { run: evalRun, trial: trials[1]!, judgeScore: agreement, decision: 'denied', comment: null, reviewedBy: 'reviewer-1' });
+
+    const report = await buildEvalRunReport(scope, evalRun, trials);
+
+    expect(report.variants[0]!.evaluators[0]).toMatchObject({ passes: 1, excluded: 1 });
+    expect(report.judgeVerdicts.map((verdict) => [verdict.trialId, verdict.review?.decision ?? null, verdict.counts])).toEqual([
+      [trials[1]!.id, 'denied', false],
+    ]);
   });
 
   it('counts a judge verdict recorded before judges reported confidence', async () => {

@@ -75,11 +75,33 @@ describe('reviewJudgeVerdict', () => {
     expect((await fixture.auditRepo.getByEntity('score', score.id)).map((event) => event.action)).toEqual(['score.created']);
   });
 
-  it('only reviews an llm_judge verdict the trial has', async () => {
+  it('only reviews a model\'s verdict the trial has', async () => {
     await expect(reviewJudgeVerdict({ evalRunId: evalRun.id, trialId: trial.id, evaluatorId: SCHEMA_CHECK, decision: 'accepted' }, scope))
-      .rejects.toThrow(/not an llm_judge/);
+      .rejects.toThrow(/not a model's verdict/);
     await expect(reviewJudgeVerdict({ evalRunId: evalRun.id, trialId: randomUUID(), evaluatorId: JUDGE, decision: 'accepted' }, scope))
       .rejects.toThrow(/no trial/);
+  });
+
+  it('reviews an expected-output agreement score like a judge verdict', async () => {
+    const agreementCheck = randomUUID();
+    const withAgreement: EvalRun = {
+      ...evalRun, id: randomUUID(),
+      evaluators: [{ evaluatorId: agreementCheck, name: 'matches-expected', version: 1, kind: 'expected_output', severity: 'critical', counted: true }],
+    };
+    const agreementTrial = { ...trial, id: randomUUID(), evalRunId: withAgreement.id };
+    await fixture.evaluationRepo.createEvalRun(withAgreement, [agreementTrial]);
+    await recordScore({
+      subject: { type: 'agent_run', id: 'trial-agent-run' }, name: 'matches-expected', value: 1, label: 'pass',
+      comment: 'Agreement 0.81 (passes at 0.8). The CTCAE grade differs by one.', source: 'llm_judge', createdBy: null,
+      metadata: { evalRunId: withAgreement.id, trialId: agreementTrial.id, agreement: 0.81 }, namespace: NAMESPACE, processInstanceId: 'trial-run',
+      stepId: STEP.stepId, evaluatorId: agreementCheck, supersedes: null, basis: 'test',
+    }, scope);
+
+    await reviewJudgeVerdict({ evalRunId: withAgreement.id, trialId: agreementTrial.id, evaluatorId: agreementCheck, decision: 'denied' }, scope);
+
+    const { report } = await getEvalRun({ evalRunId: withAgreement.id }, scope);
+    expect(report.judgeVerdicts).toEqual([expect.objectContaining({ name: 'matches-expected', counts: false })]);
+    expect(report.variants[0]!.criteria[0]!.status).toBe('not_evaluable');
   });
 
   it('needs the workflow\'s edit verb, and a named person for an API key', async () => {

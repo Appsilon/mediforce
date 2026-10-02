@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
-import type { EvalCase, EvalCaseExpectation } from '@mediforce/platform-core';
+import type { EvalCase, EvalCaseExpectation, EvalCaseLabel, EvaluatedStep } from '@mediforce/platform-core';
 import type {
   ArchiveEvalCaseInputSchema,
   CreateEvalCaseFromAgentRunInputSchema,
@@ -29,7 +29,26 @@ export async function listEvalCases(
   return { cases: input.includeArchived === true ? cases : cases.filter((evalCase) => !evalCase.archived) };
 }
 
+/** A case selects only live Evaluators of its own step: an archived one is in no Eval Run, so it would grade nothing. */
+async function checkSelectedEvaluators(scope: CallerScope, step: EvaluatedStep, evaluatorIds: readonly string[] | null): Promise<void> {
+  if (evaluatorIds === null) return;
+  const own = new Set((await scope.evaluation.listEvaluators(step)).filter((evaluator) => evaluator.archived === false).map((evaluator) => evaluator.id));
+  const foreign = evaluatorIds.filter((evaluatorId) => own.has(evaluatorId) === false);
+  if (foreign.length > 0) throw new ValidationError(`Step '${step.stepId}' has no live Evaluator ${foreign.map((evaluatorId) => `'${evaluatorId}'`).join(', ')}`);
+}
+
+function labelOf(input: EvalCaseLabel): EvalCaseLabel {
+  return {
+    expectedOutput: input.expectedOutput,
+    expectation: input.expectation,
+    comparison: input.comparison,
+    agreementInstructions: input.agreementInstructions,
+    evaluatorIds: input.evaluatorIds,
+  };
+}
+
 async function storeCase(scope: CallerScope, evalCase: EvalCase): Promise<EvalCaseOutput> {
+  await checkSelectedEvaluators(scope, stepRef(evalCase), evalCase.evaluatorIds);
   const stored = await scope.evaluation.createCase(evalCase);
   await appendEvaluationAudit(scope, {
     action: 'eval_case.created',
@@ -45,6 +64,9 @@ async function storeCase(scope: CallerScope, evalCase: EvalCase): Promise<EvalCa
       perturbation: stored.perturbation,
       origin: stored.origin,
       expectation: stored.expectation,
+      hasExpectedOutput: stored.expectedOutput !== null,
+      comparison: stored.comparison,
+      evaluatorIds: stored.evaluatorIds,
       split: stored.split,
       containsProductionData: stored.containsProductionData,
     },
@@ -66,8 +88,7 @@ export async function createEvalCase(
     name: input.name,
     input: input.input,
     workspaceSeedCommit: input.workspaceSeedCommit,
-    expectation: input.expectation,
-    notes: input.notes,
+    ...labelOf(input),
     source: 'manual',
     sourceAgentRunId: null,
     perturbation: null,
@@ -91,10 +112,9 @@ function verdictExpectation(value: number | undefined): EvalCaseExpectation | un
  * "Add to eval set" from a production Agent Run (ADR-0023 D4): the trigger
  * payload and the outputs of the steps before it rebuild the step's input,
  * and the parent of the commit it produced is the workspace it saw. An
- * approved run is a positive case; a rejected one is negative, carrying the
- * reviewer's comment as what the output must not do. A run sent back for
- * revision or a recheck, or never reviewed, is positive unless the caller
- * says otherwise.
+ * approved run's output is the case's expected output, to match; a rejected
+ * run's is one to avoid. A run sent back for revision or a recheck, or never
+ * reviewed, gives no expected output unless the caller gives one.
  */
 export async function createEvalCaseFromAgentRun(
   input: z.output<typeof CreateEvalCaseFromAgentRunInputSchema>,
@@ -102,17 +122,18 @@ export async function createEvalCaseFromAgentRun(
 ): Promise<EvalCaseOutput> {
   const source = await loadCaseSource(scope, input.agentRunId, input.step, 'edit');
   const [verdict] = await scope.scores.list({ agentRunId: input.agentRunId, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 });
-  const expectation = input.expectation ?? verdictExpectation(verdict?.value) ?? 'positive';
-
+  const verdictLabel = verdictExpectation(verdict?.value);
   const { instance, agentRun } = source.subject;
+  // The verdict labels the run's own output; an expected output the caller gives (null included) is one to match unless it says otherwise.
+  const fromRun = input.expectedOutput === undefined;
+  const expectedOutput = fromRun ? (verdictLabel === undefined ? null : agentRun.envelope?.result ?? null) : input.expectedOutput;
   return storeCase(scope, {
     ...source.step,
     id: randomUUID(),
     name: input.name ?? `From run ${instance.id.slice(0, 8)} (${agentRun.startedAt.slice(0, 10)})`,
     input: source.input,
     workspaceSeedCommit: source.workspaceSeedCommit,
-    expectation,
-    notes: input.notes ?? verdict?.comment ?? null,
+    ...labelOf({ ...input, expectedOutput, expectation: input.expectation ?? (fromRun ? verdictLabel : undefined) ?? 'positive' }),
     source: 'production',
     sourceAgentRunId: input.agentRunId,
     perturbation: null,
@@ -154,8 +175,7 @@ export async function createPerturbedEvalCase(
     name: input.name,
     input: perturbed.input,
     workspaceSeedCommit,
-    expectation: input.expectation,
-    notes: input.notes,
+    ...labelOf(input),
     source: 'synthesized',
     sourceAgentRunId: input.baseAgentRunId,
     perturbation: input.perturbation,
@@ -208,6 +228,7 @@ export async function updateEvalCase(
     .filter((field) => changes[field] !== undefined && JSON.stringify(changes[field]) !== JSON.stringify(evalCase[field]));
   if (changed.length === 0) throw new ValidationError(`The edit changes nothing in Eval Case '${evalCase.name}'`);
 
+  if (changed.includes('evaluatorIds')) await checkSelectedEvaluators(scope, stepRef(evalCase), changes.evaluatorIds ?? null);
   const inputEdited = changed.includes('input');
   const stored = await scope.evaluation.createCase({
     ...evalCase,

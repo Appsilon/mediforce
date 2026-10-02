@@ -484,6 +484,13 @@
       "when": 1789641801500,
       "tag": "0068_drop_judge_calibration",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1789641801600,
+      "tag": "0069_eval_case_expected_output",
+      "breakpoints": true
     }
   ]
 }

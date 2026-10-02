@@ -3,6 +3,7 @@ import {
   AcceptanceCriteriaSchema,
   AcceptanceCriteriaVersionSchema,
   AgentRunSchema,
+  EvalCaseComparisonSchema,
   EvalCaseExpectationSchema,
   EvalCaseInputSchema,
   EvalCaseSchema,
@@ -138,6 +139,8 @@ export const EvaluatorOutcomeSchema = z.object({
   label: z.string().nullable(),
   /** An `llm_judge`'s confidence in its verdict; null for other checks. */
   confidence: z.number().min(0).max(1).nullable(),
+  /** An `expected_output` agreement judge's score, 0–1; null for other checks and exact comparisons. */
+  agreement: z.number().min(0).max(1).nullable(),
   /** The check's comment; an `llm_judge`'s rationale — what decided its verdict and why. */
   comment: z.string().nullable(),
   error: z.string().nullable(),
@@ -186,8 +189,11 @@ export const CreateEvalCaseInputSchema = EvaluatedStepSchema.extend({
   name: z.string().trim().min(1).max(200),
   input: EvalCaseInputSchema,
   workspaceSeedCommit: EvalCaseSchema.shape.workspaceSeedCommit.default(null),
+  expectedOutput: EvalCaseSchema.shape.expectedOutput.default(null),
   expectation: EvalCaseExpectationSchema.default('positive'),
-  notes: z.string().trim().max(4000).nullable().default(null),
+  comparison: EvalCaseComparisonSchema.default('exact'),
+  agreementInstructions: z.string().trim().max(4000).nullable().default(null),
+  evaluatorIds: EvalCaseSchema.shape.evaluatorIds.default(null),
   split: EvalCaseSplitSchema.default('dev'),
   containsProductionData: z.boolean().default(false),
   origin: EvaluationOriginSchema.default('user'),
@@ -195,17 +201,20 @@ export const CreateEvalCaseInputSchema = EvaluatedStepSchema.extend({
 
 /**
  * "Add to eval set" from a production Agent Run: its input, the outputs before
- * it and its parent commit become the case. Unless given, the expectation
- * follows the run's `human_verdict` Score — approved is positive, rejected is
- * negative with the reviewer's comment — and is positive otherwise.
- * With `step`, the run must be a run of that step.
+ * it and its parent commit become the case. A run a person reviewed gives the
+ * case its output as the expected output — approved as positive, rejected as
+ * negative; an unreviewed run gives none. `expectedOutput` and `expectation`
+ * override that. With `step`, the run must be a run of that step.
  */
 export const CreateEvalCaseFromAgentRunInputSchema = z.object({
   agentRunId: z.string().min(1),
   step: EvaluatedStepSchema.optional(),
   name: z.string().trim().min(1).max(200).optional(),
+  expectedOutput: EvalCaseSchema.shape.expectedOutput.optional(),
   expectation: EvalCaseExpectationSchema.optional(),
-  notes: z.string().trim().max(4000).optional(),
+  comparison: EvalCaseComparisonSchema.default('exact'),
+  agreementInstructions: z.string().trim().max(4000).nullable().default(null),
+  evaluatorIds: EvalCaseSchema.shape.evaluatorIds.default(null),
   split: EvalCaseSplitSchema.default('dev'),
   origin: EvaluationOriginSchema.default('user'),
 });
@@ -221,7 +230,10 @@ export const CreatePerturbedEvalCaseInputSchema = EvaluatedStepSchema
   .extend(PerturbedEvalCaseSpecSchema.shape)
   .extend({
     name: z.string().trim().min(1).max(200),
-    notes: z.string().trim().min(1).max(4000),
+    expectedOutput: EvalCaseSchema.shape.expectedOutput.default(null),
+    comparison: EvalCaseComparisonSchema.default('exact'),
+    agreementInstructions: z.string().trim().max(4000).nullable().default(null),
+    evaluatorIds: EvalCaseSchema.shape.evaluatorIds.default(null),
     inputChanges: PerturbedEvalCaseSpecSchema.shape.inputChanges.unwrap().default([]),
     fileChanges: PerturbedEvalCaseSpecSchema.shape.fileChanges.unwrap().default([]),
     split: EvalCaseSplitSchema.default('dev'),
@@ -243,8 +255,11 @@ export const UpdateEvalCaseInputSchema = z.object({
   caseId: z.uuid(),
   name: z.string().trim().min(1).max(200).optional(),
   input: EvalCaseInputSchema.optional(),
+  expectedOutput: EvalCaseSchema.shape.expectedOutput.optional(),
   expectation: EvalCaseExpectationSchema.optional(),
-  notes: z.string().trim().max(4000).nullable().optional(),
+  comparison: EvalCaseComparisonSchema.optional(),
+  agreementInstructions: z.string().trim().max(4000).nullable().optional(),
+  evaluatorIds: EvalCaseSchema.shape.evaluatorIds.optional(),
   split: EvalCaseSplitSchema.optional(),
 });
 
@@ -372,15 +387,17 @@ export const EvalTrialFailureSchema = z.object({
   caseName: z.string().nullable(),
   split: EvalCaseSplitSchema.nullable(),
   expectation: EvalCaseExpectationSchema.nullable(),
-  caseNotes: z.string().nullable(),
+  /** The output the case expects — or, when negative, must not get; null when it has none or no longer exists. */
+  expectedOutput: z.unknown().nullable(),
   agentRunId: z.string().nullable(),
   error: z.string().nullable(),
   evaluators: z.array(TrialEvaluatorFailureSchema),
 });
 
 /**
- * A person accepts or denies one judge verdict on one trial of an Eval Run,
- * after reading its rationale. `accepted` counts it toward the Acceptance
+ * A person accepts or denies one model's verdict — a judge's, or an
+ * expected-output agreement score — on one trial of an Eval Run, after
+ * reading its rationale. `accepted` counts it toward the Acceptance
  * Criteria whatever the judge's confidence; `denied` leaves it out — it is
  * never reversed. A later review replaces an earlier one.
  */

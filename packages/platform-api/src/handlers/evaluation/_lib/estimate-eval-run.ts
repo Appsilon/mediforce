@@ -47,7 +47,8 @@ async function historicalUsage(scope: CallerScope, step: EvaluatedStep): Promise
  * mean historical cost, or its model's registry price for a nominal turn when
  * it has no history. A challenger on another model is that model's price for
  * the tokens the Step's runs used, or a nominal turn. Every variant adds one
- * judge call per `llm_judge` Evaluator.
+ * judge call per `llm_judge` Evaluator and `expected_output` check — for the
+ * latter an upper bound, since an exact comparison calls no model.
  */
 export async function estimateEvalRun(
   scope: CallerScope,
@@ -68,7 +69,7 @@ export async function estimateEvalRun(
 
   let judgeCost = 0;
   for (const { version } of evaluators) {
-    if (version.check.kind !== 'llm_judge') continue;
+    if (version.check.kind !== 'llm_judge' && version.check.kind !== 'expected_output') continue;
     judgeCost += priceOf(version.check.model, NOMINAL_JUDGE_TOKENS) ?? 0;
   }
 

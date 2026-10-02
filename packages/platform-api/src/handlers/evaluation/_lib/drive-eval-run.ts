@@ -5,7 +5,7 @@ import { recordScore } from '../../scores/record-score';
 import { loadEvaluationSubject } from './evaluation-subject';
 import { loadModelPrices } from './model-prices';
 import { runEvaluatorCheck, type JudgeUsage } from './run-evaluator-check';
-import { judgeConfidenceMetadata, scoresOfTrial } from './trial-scores';
+import { evaluatorsOfCase, judgeConfidenceMetadata, scoresOfTrial } from './trial-scores';
 
 /**
  * How long a driver may hold a trial — between claiming it and creating its
@@ -65,9 +65,9 @@ async function claimForScoring(scope: CallerScope, run: EvalRun, trial: EvalTria
 }
 
 /**
- * Applies the run's frozen Evaluator versions to one finished trial the caller
- * holds the `scoring` claim on, and records a Score per Evaluator that could
- * grade it. An Evaluator that already scored this trial — before a driver died
+ * Applies the run's frozen Evaluator versions that grade the trial's case to
+ * one finished trial the caller holds the `scoring` claim on, and records a
+ * Score per Evaluator that could grade it. An Evaluator that already scored this trial — before a driver died
  * mid-scoring — is not run again. Each judge call is charged to the run as it
  * is made, and a Score keeps what its judge cost, so a trial's cost survives
  * a takeover.
@@ -95,7 +95,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
   const alreadyScored = new Set(earlier.map((score) => score.evaluatorId));
   let judgeCostUsd = earlier.reduce((sum, score) => sum + judgeCostOf(score), 0);
   const errors: string[] = [];
-  for (const frozen of run.evaluators) {
+  for (const frozen of evaluatorsOfCase(run, evalCase)) {
     if (alreadyScored.has(frozen.evaluatorId)) continue;
     // Keep the claim fresh, so a long pass over many Evaluators never looks like a dead driver's.
     await scope.evaluation.transitionTrial(trial, 'scoring', { scoringStartedAt: new Date().toISOString() });
@@ -128,7 +128,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
       value: outcome.value,
       label: outcome.label,
       comment: outcome.comment,
-      source: frozen.kind === 'llm_judge' ? 'llm_judge' : 'deterministic',
+      source: frozen.kind === 'llm_judge' || outcome.agreement !== null ? 'llm_judge' : 'deterministic',
       createdBy: null,
       metadata: {
         evalRunId: run.id,
@@ -137,6 +137,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
         evaluatorVersion: frozen.version,
         counted: frozen.counted,
         ...judgeConfidenceMetadata(version.check, outcome.confidence),
+        ...(outcome.agreement === null ? {} : { agreement: outcome.agreement }),
         ...(judgeUsages.length === 0 ? {} : { judgeCostUsd: checkCostUsd }),
       },
       namespace: run.namespace,

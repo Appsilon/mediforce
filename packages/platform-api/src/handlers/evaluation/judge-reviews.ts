@@ -5,7 +5,7 @@ import { NotFoundError, ValidationError } from '../../errors';
 import { resolveTargetUid } from '../_helpers';
 import { recordScore } from '../scores/record-score';
 import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
-import { trialScores } from './_lib/trial-scores';
+import { isModelVerdict, trialScores } from './_lib/trial-scores';
 
 /** The name of the human Score a person's review of a judge's verdict is recorded as. */
 export const JUDGE_REVIEW_SCORE_NAME = 'judge_review';
@@ -50,8 +50,9 @@ export async function recordJudgeReview(scope: CallerScope, review: JudgeReview)
 
 
 /**
- * A person accepts or denies one judge verdict on one trial of an Eval Run,
- * having read its rationale. `accepted` counts it toward the Acceptance
+ * A person accepts or denies one model's verdict — a judge's, or an
+ * expected-output agreement score — on one trial of an Eval Run, having read
+ * its rationale. `accepted` counts it toward the Acceptance
  * Criteria whatever the judge's confidence; `denied` leaves it out — never
  * reversed. There is deliberately no assistant tool for this (D15).
  */
@@ -67,9 +68,11 @@ export async function reviewJudgeVerdict(
   if (trial === undefined) throw new NotFoundError(`Eval Run '${run.id}' has no trial '${input.trialId}'`);
   const judge = run.evaluators.find((evaluator) => evaluator.evaluatorId === input.evaluatorId);
   if (judge === undefined) throw new NotFoundError(`Eval Run '${run.id}' did not run Evaluator '${input.evaluatorId}'`);
-  if (judge.kind !== 'llm_judge') throw new ValidationError(`Evaluator '${judge.name}' is not an llm_judge; only a judge's verdict is reviewed`);
   const judgeScore = (await trialScores(scope, run, trial)).checks.find((score) => score.evaluatorId === judge.evaluatorId);
-  if (judgeScore === undefined) throw new NotFoundError(`Judge '${judge.name}' gave no verdict on trial '${trial.id}'`);
+  if (judgeScore === undefined) throw new NotFoundError(`Evaluator '${judge.name}' gave no verdict on trial '${trial.id}'`);
+  if (isModelVerdict(judgeScore) === false) {
+    throw new ValidationError(`Evaluator '${judge.name}''s verdict on trial '${trial.id}' is not a model's verdict; only a judge's verdict or an agreement score is reviewed`);
+  }
 
   const score = await recordJudgeReview(scope, {
     run,

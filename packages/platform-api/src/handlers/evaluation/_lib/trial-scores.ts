@@ -1,6 +1,9 @@
 import {
   JUDGE_PASS_VALUE,
+  evaluatorAppliesToCase,
+  type EvalCase,
   type EvalRun,
+  type EvalRunEvaluator,
   type EvalTrial,
   type EvaluatorCheck,
   type JudgeReviewDecision,
@@ -40,6 +43,11 @@ export async function trialScores(scope: CallerScope, run: EvalRun, trial: EvalT
 /** The Scores an Eval Run's Evaluators gave one of its trials. */
 export async function scoresOfTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial): Promise<readonly Score[]> {
   return (await trialScores(scope, run, trial)).checks;
+}
+
+/** Whether a model gave this Score — a judge's verdict or an agreement score — so a person can accept or deny it. */
+export function isModelVerdict(score: Score): boolean {
+  return score.source === 'llm_judge';
 }
 
 export function isPass(score: Score): boolean {
@@ -83,12 +91,26 @@ export function countedScores(scores: TrialScores): Score[] {
   return scores.checks.filter((score) => checkOutcome(score, scores.reviews.get(score.evaluatorId ?? '')) !== 'excluded');
 }
 
+/** What decides which of a run's Evaluators grade a case; a case no longer found is graded by all of them. */
+export type CaseSelection = Pick<EvalCase, 'evaluatorIds' | 'expectedOutput'> | null;
+
+/** The cases an Eval Run runs, by id; null for one no longer found. */
+export async function casesOfRun(scope: CallerScope, run: EvalRun): Promise<Map<string, EvalCase | null>> {
+  return new Map(await Promise.all(run.caseIds.map(async (caseId) => [caseId, await scope.evaluation.getCase(caseId)] as const)));
+}
+
+/** The run's Evaluators that grade a trial of this case. */
+export function evaluatorsOfCase(run: EvalRun, evalCase: CaseSelection): EvalRunEvaluator[] {
+  return evalCase === null ? run.evaluators : run.evaluators.filter((evaluator) => evaluatorAppliesToCase(evaluator, evalCase));
+}
+
 /**
- * Whether a trial's Scores pass every counted Evaluator of the run; null when
- * none counts or one of them did not grade it — a missing Score is not a pass.
+ * Whether a trial's Scores pass every counted Evaluator that grades its case;
+ * null when none counts or one of them did not grade it — a missing Score is
+ * not a pass.
  */
-export function passedEveryCounted(run: EvalRun, scores: readonly Score[]): boolean | null {
-  const counted = new Set(run.evaluators.filter((evaluator) => evaluator.counted === true).map((evaluator) => evaluator.evaluatorId));
+export function passedEveryCounted(run: EvalRun, scores: readonly Score[], evalCase: CaseSelection): boolean | null {
+  const counted = new Set(evaluatorsOfCase(run, evalCase).filter((evaluator) => evaluator.counted === true).map((evaluator) => evaluator.evaluatorId));
   if (counted.size === 0) return null;
   const graded = scores.filter((score) => score.evaluatorId !== null && counted.has(score.evaluatorId));
   return new Set(graded.map((score) => score.evaluatorId)).size < counted.size ? null : graded.every(isPass);

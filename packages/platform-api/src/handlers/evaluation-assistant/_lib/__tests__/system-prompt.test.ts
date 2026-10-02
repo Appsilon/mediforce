@@ -13,7 +13,8 @@ describe('Evaluation Assistant prompt', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Choose the cheapest reliable kind');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('minConfidence');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toMatch(/get_calibration|propose_outputs_to_label|propose_written_outputs/);
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Cases are not labelled positive or negative.');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('negative, an output it must not return');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toContain('notes');
   });
 
   it('covers Acceptance Criteria set before a run, validation from the newest run of the version, and routing', () => {
