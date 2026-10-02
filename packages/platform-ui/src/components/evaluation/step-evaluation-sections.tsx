@@ -40,6 +40,7 @@ import {
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { AgentRunLog } from '@/components/agents/agent-log-panel';
 import { useAgentRun } from '@/hooks/use-agent-runs';
 import { useAgentRunIo, useEvalRun, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
@@ -709,27 +710,27 @@ function CaseRunMark({ evalCase }: { evalCase: EvalCase }) {
 }
 
 /** Whether a case expects an output that matches its expected output, or one that does not. */
-function CaseExpectationIcon({ evalCase }: { evalCase: EvalCase }) {
+function CaseExpectationMark({ evalCase }: { evalCase: EvalCase }) {
   if (evalCase.expectedOutput === null) return null;
   return evalCase.expectation === 'positive' ? (
-    <InstantTooltip label="Positive — the output must match the expected output.">
-      <CircleCheck className="h-4 w-4 shrink-0 text-emerald-600" aria-label="Positive" data-testid="eval-case-expectation" />
+    <InstantTooltip label="The output must match the expected output.">
+      <span className="shrink-0 rounded bg-emerald-500/10 px-1.5 text-[11px] text-emerald-700 dark:text-emerald-300" data-testid="eval-case-expectation">positive</span>
     </InstantTooltip>
   ) : (
-    <InstantTooltip label="Negative — the output must not match the expected output.">
-      <CircleX className="h-4 w-4 shrink-0 text-destructive" aria-label="Negative" data-testid="eval-case-expectation" />
+    <InstantTooltip label="The output must not match the expected output.">
+      <span className="shrink-0 rounded bg-red-500/10 px-1.5 text-[11px] text-red-700 dark:text-red-300" data-testid="eval-case-expectation">negative</span>
     </InstantTooltip>
   );
 }
 
 /** One Eval Case: what it expects, which Evaluators grade it, editing and removing it, and in its details what it gives the step and expects. */
-function CaseRow({ step, evalCase, evaluators, mayEdit, unfrozen, selected, onSelect }: {
+function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSelect }: {
   step: EvaluatedStep;
   evalCase: EvalCase;
   evaluators: readonly EvaluatorView[];
   mayEdit: boolean;
   /** Not in the newest Dataset version, so the next Eval Run does not run it. */
-  unfrozen: boolean;
+  unsaved: boolean;
   selected: boolean;
   onSelect: (selected: boolean) => void;
 }) {
@@ -748,9 +749,9 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unfrozen, selected, onSe
     <li className="border-t pt-1.5 first:border-t-0 first:pt-0" data-testid="eval-case-row">
       <div className="flex items-center gap-2">
         {mayEdit && <input type="checkbox" aria-label={`Select ${evalCase.name}`} checked={selected} onChange={(event) => onSelect(event.target.checked)} />}
-        <CaseExpectationIcon evalCase={evalCase} />
         <span className="truncate">{evalCase.name}</span>
         <CaseRunMark evalCase={evalCase} />
+        <CaseExpectationMark evalCase={evalCase} />
         {evalCase.perturbation !== null && (
           <InstantTooltip label={evalCase.perturbation.description}>
             <span className="shrink-0 rounded bg-muted px-1.5 text-[11px] text-muted-foreground" data-testid="eval-case-perturbation">{evalCase.perturbation.kind.replace(/_/g, ' ')}</span>
@@ -761,12 +762,17 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unfrozen, selected, onSe
             <Bot className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Added by the assistant" />
           </InstantTooltip>
         )}
-        {unfrozen && (
-          <InstantTooltip label="Not in the newest Dataset version, so the next Eval Run does not run it. Freeze the dataset to include it.">
-            <span className="shrink-0 rounded bg-amber-500/10 px-1.5 text-[11px] text-amber-700 dark:text-amber-300" data-testid="eval-case-unfrozen">not frozen</span>
+        {unsaved && (
+          <InstantTooltip label="Not in the newest Dataset version, so the next Eval Run does not run it. Save to include it.">
+            <span className="shrink-0 rounded bg-amber-500/10 px-1.5 text-[11px] text-amber-700 dark:text-amber-300" data-testid="eval-case-unsaved">unsaved</span>
           </InstantTooltip>
         )}
         <span className="ml-auto flex shrink-0 items-center gap-1.5">
+          {evalCase.expectedOutput !== null && (
+            <span className="text-xs text-muted-foreground" data-testid="eval-case-comparison">
+              {evalCase.comparison === 'exact' ? 'Exact match' : 'Agreement score'} ·
+            </span>
+          )}
           <InstantTooltip label={`Graded by ${gradedBy}.`}>
             <span className="text-xs text-muted-foreground" data-testid="eval-case-evaluators">
               {evalCase.evaluatorIds === null ? 'All evaluators' : `${evalCase.evaluatorIds.length} selected evaluator${evalCase.evaluatorIds.length === 1 ? '' : 's'}`}
@@ -794,7 +800,7 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unfrozen, selected, onSe
       {editing && (
         <CaseDialog
           title={`Edit ${evalCase.name}`}
-          description="Saving adds the edited case and removes this one: a Dataset version frozen with it keeps it, and the next freeze takes the edit."
+          description="Saving adds the edited case and removes this one: a Dataset version saved with it keeps it, and the next Save takes the edit."
           onClose={closeEdit}
         >
           <CaseForm
@@ -1043,17 +1049,17 @@ function DatasetStatus({ cases, datasets }: { cases: readonly EvalCase[]; datase
   return (
     <div className="space-y-1 rounded-md bg-muted/40 p-2 text-xs" data-testid="dataset-status">
       <p className="text-muted-foreground">
-        An Eval Run does not run the list above: it runs a <span className="font-medium text-foreground">Dataset</span> — a numbered snapshot of the live cases taken by <span className="font-medium text-foreground">Freeze dataset</span>. A snapshot never changes, so every Eval Run can be read against exactly the cases it ran. Freeze again after adding, editing or archiving cases.
+        An Eval Run does not run the list above: it runs a <span className="font-medium text-foreground">Dataset</span> — a numbered snapshot of the live cases taken by <span className="font-medium text-foreground">Save</span>. A snapshot never changes, so every Eval Run can be read against exactly the cases it ran. Save again after adding, editing or removing cases.
       </p>
       {latest === undefined ? (
-        <p className="text-amber-700 dark:text-amber-300">Nothing frozen yet — an Eval Run cannot be prepared until the cases are frozen.</p>
+        <p className="text-amber-700 dark:text-amber-300">Nothing saved yet — an Eval Run cannot be prepared until the cases are saved.</p>
       ) : unfrozen.size === 0 && dropped === 0 ? (
         <p>The next Eval Run runs <span className="font-medium">Dataset v{latest.version}</span>: all {latest.caseIds.length} live case(s){latest.containsProductionData ? ' — contains production data' : ''}.</p>
       ) : (
         <p className="text-amber-700 dark:text-amber-300">
           The next Eval Run runs <span className="font-medium">Dataset v{latest.version}</span> ({latest.caseIds.length} case(s)), which is behind the list:
           {unfrozen.size > 0 && ` ${unfrozen.size} case(s) added or edited since are not in it`}{unfrozen.size > 0 && dropped > 0 && ';'}
-          {dropped > 0 && ` it still has ${dropped} case(s) archived or replaced since`}. Freeze to make v{latest.version + 1}.
+          {dropped > 0 && ` it still has ${dropped} case(s) archived or replaced since`}. Save to make v{latest.version + 1}.
         </p>
       )}
       {datasets.length > 0 && (
@@ -1093,7 +1099,7 @@ function SetCaseEvaluators({ step, cases, evaluators, onDone }: {
     <div className="space-y-2 rounded-md bg-muted/40 p-3 text-xs" data-testid="set-case-evaluators">
       <p className="font-medium">Evaluators for the {cases.length} selected case(s)</p>
       <EvaluatorSelection evaluators={evaluators} value={evaluatorIds} onChange={setEvaluatorIds} />
-      <p className="text-muted-foreground">Each changed case is saved as a new case that replaces it, so Dataset versions frozen with the old one keep it.</p>
+      <p className="text-muted-foreground">Each changed case is saved as a new case that replaces it, so Dataset versions saved with the old one keep it.</p>
       {apply.error !== null && <p className="text-destructive">{apply.error.message}</p>}
       <div className="flex gap-2">
         <button
@@ -1108,18 +1114,18 @@ function SetCaseEvaluators({ step, cases, evaluators, onDone }: {
   );
 }
 
-/** Eval Cases, added from production runs, by hand or by the assistant, and frozen Dataset versions. */
+/** Eval Cases, added from production runs, by hand or by the assistant, and the Dataset versions Save snapshots them into. */
 export function CasesSection({ step, evaluation, mayEdit }: {
   step: EvaluatedStep;
   evaluation: StepEvaluation;
   mayEdit: boolean;
 }) {
-  const freeze = useStepEvaluationMutation(step, () => mediforce.evaluation.freezeDataset(step));
+  const save = useStepEvaluationMutation(step, () => mediforce.evaluation.freezeDataset(step));
   const cases = evaluation.cases.data?.cases ?? [];
   const datasets = evaluation.datasets.data?.datasets ?? [];
   const [latest] = datasets;
   const { unfrozen, dropped } = datasetDrift(cases, latest);
-  const upToDate = latest !== undefined && unfrozen.size === 0 && dropped === 0;
+  const hasUnsavedChanges = cases.length > 0 && (latest === undefined || unfrozen.size > 0 || dropped > 0);
   const [adding, setAdding] = React.useState(false);
   const evaluators = evaluation.evaluators.data?.evaluators ?? [];
   const [selectedIds, setSelectedIds] = React.useState<ReadonlySet<string>>(new Set());
@@ -1132,13 +1138,11 @@ export function CasesSection({ step, evaluation, mayEdit }: {
       action={mayEdit && (
         <div className="flex gap-1.5">
           <button type="button" className={buttonClass} onClick={() => setAdding(true)}>Add case</button>
-          {cases.length > 0 && (
-            <InstantTooltip label={upToDate ? `Dataset v${latest.version} already has every live case.` : `Snapshot the ${cases.length} live case(s) as Dataset v${(latest?.version ?? 0) + 1}, which the next Eval Run runs.`}>
-              <span className="inline-flex">
-                <button type="button" className={buttonClass} disabled={freeze.isPending || upToDate} onClick={() => freeze.mutate(undefined)}>Freeze dataset</button>
-              </span>
-            </InstantTooltip>
-          )}
+          <InstantTooltip label={hasUnsavedChanges ? `Snapshot the ${cases.length} live case(s) as Dataset v${(latest?.version ?? 0) + 1}, which the next Eval Run runs.` : 'No unsaved changes.'}>
+            <span className="inline-flex">
+              <button type="button" className={primaryButtonClass} disabled={save.isPending || !hasUnsavedChanges} onClick={() => save.mutate(undefined)}>{save.isPending ? 'Saving…' : 'Save'}</button>
+            </span>
+          </InstantTooltip>
         </div>
       )}
     >
@@ -1183,7 +1187,7 @@ export function CasesSection({ step, evaluation, mayEdit }: {
               evalCase={evalCase}
               evaluators={evaluators}
               mayEdit={mayEdit}
-              unfrozen={latest !== undefined && unfrozen.has(evalCase.id)}
+              unsaved={latest !== undefined && unfrozen.has(evalCase.id)}
               selected={selectedIds.has(evalCase.id)}
               onSelect={(selected) => setSelectedIds((current) => {
                 const next = new Set(current);
@@ -1196,7 +1200,8 @@ export function CasesSection({ step, evaluation, mayEdit }: {
         </ul>
       )}
       {cases.length > 0 && <DatasetStatus cases={cases} datasets={datasets} />}
-      {freeze.error !== null && <p className="text-xs text-destructive">{freeze.error.message}</p>}
+      {save.error !== null && <p className="text-xs text-destructive">{save.error.message}</p>}
+      {mayEdit && <UnsavedChangesGuard when={hasUnsavedChanges} />}
     </Section>
   );
 }
@@ -1624,7 +1629,7 @@ export function EvalRunsSection({ step, data, datasets, mayRun, runReason, mayEd
             onClick={() => prepare.mutate(undefined)}
           >Prepare</button>
           <span className="text-muted-foreground" data-testid="eval-run-dataset">
-            {nextDataset === undefined ? 'No Dataset frozen yet — freeze the Eval Cases first.' : `Runs Dataset v${nextDataset.version} (${nextDataset.caseIds.length} case(s)).`}
+            {nextDataset === undefined ? 'No Dataset saved yet — save the Eval Cases first.' : `Runs Dataset v${nextDataset.version} (${nextDataset.caseIds.length} case(s)).`}
           </span>
           {prepare.error !== null && <span className="text-destructive">{prepare.error.message}</span>}
         </div>
