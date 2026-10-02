@@ -233,6 +233,24 @@ test.describe('Step Evaluation entities — API E2E', () => {
     expect(cases.find((listed) => listed.id === evalCase.id)?.archived).toBe(false);
   });
 
+  test('a case started from a run with its input edited is manual, and keeps the run it came from', async ({ request }) => {
+    const ioRes = await request.get(`/api/evaluation/agent-runs/${agentRunId}/io`, { headers: AUTH_HEADERS });
+    const { caseInput } = GetAgentRunIoOutputSchema.parse(await ioRes.json());
+
+    const { evalCase: asRan } = EvalCaseOutputSchema.parse(await post(request, '/api/evaluation/cases/from-agent-run', {
+      agentRunId, step, input: caseInput,
+    }, 201));
+    expect(asRan).toMatchObject({ source: 'production', sourceAgentRunId: agentRunId, input: caseInput });
+
+    const edited = { ...caseInput, triggerPayload: { ...caseInput.triggerPayload, studyId: 'NOT-A-STUDY' } };
+    const { evalCase } = EvalCaseOutputSchema.parse(await post(request, '/api/evaluation/cases/from-agent-run', {
+      agentRunId, step, name: 'Unknown study', input: edited,
+    }, 201));
+    expect(evalCase).toMatchObject({
+      name: 'Unknown study', source: 'manual', sourceAgentRunId: agentRunId, input: edited, containsProductionData: true,
+    });
+  });
+
   test('a production run reads as its input/output pair, only inside its workspace', async ({ request }) => {
     const res = await request.get(`/api/evaluation/agent-runs/${agentRunId}/io`, { headers: AUTH_HEADERS });
     expect(res.status(), await res.text()).toBe(200);

@@ -303,7 +303,7 @@ test.describe('Step Evaluation tab', () => {
     await expect(row.getByTestId('evaluator-details')).toContainText('v1 ·');
   });
 
-  test('a case is written with its input beside its expected output, marked negative, compared by agreement and graded only by the Evaluators ticked', async ({ page, request }) => {
+  test('a case is added in a dialog with its input beside its expected output, marked negative, compared by agreement and graded only by the selected Evaluators', async ({ page, request }) => {
     test.setTimeout(60_000);
     trackPageErrors(page);
     const workflowName = `e2e-eval-case-form-${randomUUID().slice(0, 8)}`;
@@ -324,22 +324,23 @@ test.describe('Step Evaluation tab', () => {
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
     await expect(page.getByTestId('evaluator-row').filter({ hasText: 'matches-expected' })).toContainText('Grades Eval Cases with an expected output only', { timeout: 10_000 });
 
-    await page.getByRole('button', { name: 'Write a case' }).click();
-    const form = page.getByTestId('case-form');
+    await page.getByRole('button', { name: 'Add case' }).click();
+    const form = page.getByTestId('case-dialog').getByTestId('case-form');
     await expect(form.getByLabel('Notes')).toHaveCount(0);
     await form.getByLabel('Case name').fill('Fatal sepsis graded 4');
     await form.getByLabel('Expected output').fill('{"findings": [{"term": "Sepsis", "grade": 4}]}');
     await form.getByLabel('Negative — the output must not match').check();
     await form.getByLabel('Comparison').selectOption('agreement');
     await form.getByLabel('Agreement instructions').fill('Narrative wording is trivial; the grade decides.');
-    await form.getByLabel('Only these').check();
+    await form.getByLabel('Selected evaluators').check();
     await form.getByLabel('Graded by findings-present').uncheck();
     await form.getByRole('button', { name: 'Add case' }).click();
+    await expect(page.getByTestId('case-dialog')).toHaveCount(0);
 
     const row = page.getByTestId('eval-case-row').filter({ hasText: 'Fatal sepsis graded 4' });
     await expect(row).toContainText('negative · dev · manual', { timeout: 10_000 });
     await row.getByText('Details', { exact: true }).click();
-    await expect(row.getByTestId('eval-case-expected-output')).toContainText('an output that does not match this, by output agreement score');
+    await expect(row.getByTestId('eval-case-expected-output')).toContainText('An output that does not match this, by output agreement score');
     await expect(row.getByTestId('eval-case-expected-output')).toContainText('"grade": 4');
     await expect(row.getByTestId('eval-case-expected-output')).toContainText('Narrative wording is trivial; the grade decides.');
     await expect(row.getByTestId('eval-case-details')).toContainText('Graded by: matches-expected');

@@ -1,9 +1,10 @@
-import type { EvalCaseInput, EvaluatedStep, ProcessInstance } from '@mediforce/platform-core';
+import type { EvalCaseExpectation, EvalCaseInput, EvaluatedStep, ProcessInstance } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { ValidationError } from '../../../errors';
 import { loadEvaluatedStep } from './evaluated-step';
 import { loadEvaluationSubject, type EvaluationSubject } from './evaluation-subject';
 import { parentCommit } from './workspace-seed';
+import { HUMAN_VERDICT_SCORE_NAME } from '../../scores/record-human-verdict';
 
 /** What an Eval Case taken from a production Agent Run starts from. */
 export interface CaseSource {
@@ -59,4 +60,12 @@ export async function loadCaseSource(
     bareRepoPath: git?.repoUrl ?? null,
     workspaceSeedCommit: git === null ? null : await parentCommit(git.repoUrl, git.commitSha),
   };
+}
+
+/** A person's newest verdict on a run's output: approved (1) is positive, rejected (0) negative; revise and recheck (0.5) are neither. */
+export async function loadVerdictExpectation(scope: CallerScope, agentRunId: string): Promise<EvalCaseExpectation | null> {
+  const [verdict] = await scope.scores.list({ agentRunId, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 });
+  if (verdict?.value === 1) return 'positive';
+  if (verdict?.value === 0) return 'negative';
+  return null;
 }

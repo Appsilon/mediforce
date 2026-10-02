@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import type { z } from 'zod';
-import type { EvalCase, EvalCaseExpectation, EvalCaseLabel, EvaluatedStep } from '@mediforce/platform-core';
+import type { EvalCase, EvalCaseLabel, EvaluatedStep } from '@mediforce/platform-core';
 import type {
   ArchiveEvalCaseInputSchema,
   CreateEvalCaseFromAgentRunInputSchema,
@@ -14,11 +15,10 @@ import type {
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError, ValidationError } from '../../errors';
 import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
-import { loadCaseSource } from './_lib/case-source';
+import { loadCaseSource, loadVerdictExpectation } from './_lib/case-source';
 import { perturbCase } from './_lib/perturb-case';
 import { commitWorkspaceChanges } from './_lib/workspace-seed';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
-import { HUMAN_VERDICT_SCORE_NAME } from '../scores/record-human-verdict';
 
 export async function listEvalCases(
   input: z.output<typeof ListEvalCasesInputSchema>,
@@ -101,40 +101,35 @@ export async function createEvalCase(
   });
 }
 
-/** Approved (1) is positive, rejected (0) negative; revise and recheck (0.5) are neither. */
-function verdictExpectation(value: number | undefined): EvalCaseExpectation | undefined {
-  if (value === 1) return 'positive';
-  if (value === 0) return 'negative';
-  return undefined;
-}
-
 /**
  * "Add to eval set" from a production Agent Run (ADR-0023 D4): the trigger
  * payload and the outputs of the steps before it rebuild the step's input,
  * and the parent of the commit it produced is the workspace it saw. An
  * approved run's output is the case's expected output, to match; a rejected
  * run's is one to avoid. A run sent back for revision or a recheck, or never
- * reviewed, gives no expected output unless the caller gives one.
+ * reviewed, gives no expected output unless the caller gives one. An input
+ * other than the run's is one production never saw: the case is manual, and
+ * keeps the run it came from.
  */
 export async function createEvalCaseFromAgentRun(
   input: z.output<typeof CreateEvalCaseFromAgentRunInputSchema>,
   scope: CallerScope,
 ): Promise<EvalCaseOutput> {
   const source = await loadCaseSource(scope, input.agentRunId, input.step, 'edit');
-  const [verdict] = await scope.scores.list({ agentRunId: input.agentRunId, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 });
-  const verdictLabel = verdictExpectation(verdict?.value);
+  const verdictLabel = await loadVerdictExpectation(scope, input.agentRunId);
   const { instance, agentRun } = source.subject;
   // The verdict labels the run's own output; an expected output the caller gives (null included) is one to match unless it says otherwise.
   const fromRun = input.expectedOutput === undefined;
-  const expectedOutput = fromRun ? (verdictLabel === undefined ? null : agentRun.envelope?.result ?? null) : input.expectedOutput;
+  const expectedOutput = fromRun ? (verdictLabel === null ? null : agentRun.envelope?.result ?? null) : input.expectedOutput;
+  const caseInput = input.input ?? source.input;
   return storeCase(scope, {
     ...source.step,
     id: randomUUID(),
     name: input.name ?? `From run ${instance.id.slice(0, 8)} (${agentRun.startedAt.slice(0, 10)})`,
-    input: source.input,
+    input: caseInput,
     workspaceSeedCommit: source.workspaceSeedCommit,
-    ...labelOf({ ...input, expectedOutput, expectation: input.expectation ?? (fromRun ? verdictLabel : undefined) ?? 'positive' }),
-    source: 'production',
+    ...labelOf({ ...input, expectedOutput, expectation: input.expectation ?? (fromRun ? verdictLabel : null) ?? 'positive' }),
+    source: isDeepStrictEqual(caseInput, source.input) ? 'production' : 'manual',
     sourceAgentRunId: input.agentRunId,
     perturbation: null,
     origin: input.origin,

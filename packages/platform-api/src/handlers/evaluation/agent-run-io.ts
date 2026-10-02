@@ -2,7 +2,7 @@ import type { GetAgentRunIoInput, GetAgentRunIoOutput } from '../../contract/eva
 import type { CallerScope } from '../../repositories/index';
 import { loadEvaluatedStep } from './_lib/evaluated-step';
 import { loadGatedAgentRun, loadStepInput } from './_lib/evaluation-subject';
-import { caseInputOf } from './_lib/case-source';
+import { caseInputOf, loadVerdictExpectation } from './_lib/case-source';
 
 /**
  * One Agent Run as an input/output pair: what its step was given and what it
@@ -21,5 +21,6 @@ export async function getAgentRunIo(input: GetAgentRunIoInput, scope: CallerScop
     result: agentRun.envelope?.result ?? null,
     reasoningSummary: agentRun.envelope?.reasoning_summary ?? null,
     confidence: agentRun.envelope?.confidence ?? null,
+    verdictExpectation: await loadVerdictExpectation(scope, agentRun.id),
   };
 }

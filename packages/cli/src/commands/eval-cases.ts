@@ -61,11 +61,13 @@ export const evalCaseFromRunCommand = defineCommand({
     expectation: enumArg(['positive', 'negative'] as const, { description: 'Default: from the review verdict, positive when there is none' }),
     comparison: enumArg(['exact', 'agreement'] as const, { description: 'How the expected output is compared. Default: exact' }),
     split: enumArg(['dev', 'holdout'] as const, { description: 'Default: dev' }),
+    inputFile: { type: 'string', description: 'JSON file with the case input to use instead of the run\'s; one that differs makes a manual case that keeps the run' },
   },
   async run({ args, output, mediforce, jsonMode }) {
     const result = await mediforce.evaluation.createCaseFromAgentRun({
       agentRunId: args.agentRunId,
       ...(args.name !== undefined ? { name: args.name } : {}),
+      ...(args.inputFile !== undefined ? { input: readJsonFile(args.inputFile) as Parameters<typeof mediforce.evaluation.createCaseFromAgentRun>[0]['input'] } : {}),
       ...(args.expectation !== undefined ? { expectation: args.expectation } : {}),
       ...(args.comparison !== undefined ? { comparison: args.comparison } : {}),
       ...(args.split !== undefined ? { split: args.split } : {}),

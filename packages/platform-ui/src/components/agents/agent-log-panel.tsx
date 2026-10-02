@@ -20,6 +20,15 @@ function resolveLogFile(events: AgentEvent[]): string | null {
   return fullPath.split('/').pop() ?? null;
 }
 
+/** One agent run's execution log, as the AgentRunner wrote it. */
+export function AgentRunLog({ run }: { run: AgentRun }) {
+  const { data: events, loading } = useAgentEvents(run.processInstanceId, run.stepId, undefined);
+  const logFile = resolveLogFile(events);
+  if (loading) return <p className="text-xs text-muted-foreground py-8 text-center">Loading…</p>;
+  if (logFile === null) return <p className="text-xs text-muted-foreground py-8 text-center">no data</p>;
+  return <AgentLogViewer logFiles={[{ stepId: run.stepId, file: logFile, executor: 'agent' }]} />;
+}
+
 /**
  * Right-side overlay showing one agent run's execution log. Slides in over
  * the table (fixed position + backdrop) rather than squeezing it — the
@@ -27,12 +36,6 @@ function resolveLogFile(events: AgentEvent[]): string | null {
  */
 export function AgentLogPanel({ run, onClose }: { run: AgentRun | null; onClose: () => void }) {
   const isOpen = run !== null;
-  const { data: events, loading } = useAgentEvents(
-    run?.processInstanceId ?? null,
-    run?.stepId ?? null,
-    undefined,
-  );
-  const logFile = run !== null ? resolveLogFile(events) : null;
 
   return (
     <>
@@ -64,13 +67,7 @@ export function AgentLogPanel({ run, onClose }: { run: AgentRun | null; onClose:
           </button>
         </div>
         <div className="flex-1 min-h-0 p-4 flex flex-col overflow-hidden">
-          {run === null ? null : loading ? (
-            <p className="text-xs text-muted-foreground py-8 text-center">Loading…</p>
-          ) : logFile !== null ? (
-            <AgentLogViewer logFiles={[{ stepId: run.stepId, file: logFile, executor: 'agent' }]} />
-          ) : (
-            <p className="text-xs text-muted-foreground py-8 text-center">no data</p>
-          )}
+          {run !== null && <AgentRunLog run={run} />}
         </div>
       </div>
     </>
