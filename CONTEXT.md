@@ -555,6 +555,12 @@ Not the step's **validation** — passed, failed or not verified — which is re
 from the newest finished Eval Run of the workflow version and needs no signature.
 _Avoid_: "validated", "certified", "approved step".
 
+**Verified** *(Workflow Definition version)*:
+A Workflow Definition version in which every agent Workflow Step's validation
+passed; **failed** when any step's failed, otherwise **not verified**. Read,
+never signed. Archived versions are not evaluated, so they have none.
+_Avoid_: "validated version", "qualified version" (only a step is qualified).
+
 **Eval Run**:
 One execution of an Eval Dataset against a Workflow Step, repeated per case,
 producing Scores judged against Acceptance Criteria. (Running variants of the

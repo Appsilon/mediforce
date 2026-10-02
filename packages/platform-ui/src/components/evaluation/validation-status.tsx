@@ -50,7 +50,7 @@ export function evaluationHref(handle: string, workflowName: string, definitionV
 }
 
 /** What a version's status rests on: each agent step's validation in it. */
-export function describeVersionValidation(version: WorkflowVersionValidation): string {
+function describeVersionValidation(version: WorkflowVersionValidation): string {
   if (version.steps.length === 0) return 'No agent steps to verify.';
   return version.steps
     .map((step) => `${step.stepName}: ${VALIDATION_STATUS[step.validation.status].label.toLowerCase()}`)
@@ -59,15 +59,19 @@ export function describeVersionValidation(version: WorkflowVersionValidation): s
 
 /**
  * A workflow version's badge: Verified when every agent step passed its
- * Acceptance Criteria in it. Links to the version on the Evaluation tab.
+ * Acceptance Criteria in it. Links to the version on the Evaluation tab, on
+ * its first failed step, else its first not verified one, else its first.
  * Renders nothing for a version without agent steps.
  */
-export function VersionValidationBadge({ version, href }: { version: WorkflowVersionValidation; href: string }) {
+export function VersionValidationBadge({ handle, workflowName, version }: { handle: string; workflowName: string; version: WorkflowVersionValidation }) {
   if (version.steps.length === 0) return null;
   const display = VALIDATION_STATUS[version.status];
+  const shown = version.steps.find((step) => step.validation.status === 'failed')
+    ?? version.steps.find((step) => step.validation.status === 'not_verified')
+    ?? version.steps[0]!;
   return (
     <Link
-      href={href}
+      href={evaluationHref(handle, workflowName, version.definitionVersion, shown.stepId)}
       title={describeVersionValidation(version)}
       data-testid="version-validation-badge"
       data-status={version.status}

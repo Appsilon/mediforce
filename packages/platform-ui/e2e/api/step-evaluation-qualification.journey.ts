@@ -194,5 +194,34 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     // A run prepared for the older version runs the step as that version has it.
     const ofOlder = EvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs', { ...step, definitionVersion: 1, trialsPerCase: 1, budgetUsd: 1 }, 201));
     expect(ofOlder.evalRun).toMatchObject({ definitionVersion: 1, status: 'prepared' });
+
+    // A v3 without the step: its Evaluation still reads, a run of v1 is stopped as v1 has it, and an unpinned run has no step to run.
+    const v3 = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+      headers: JSON_HEADERS,
+      data: {
+        name: workflowName,
+        title: workflowName,
+        steps: [
+          { id: 'grade-events', name: 'Grade events', type: 'creation', executor: 'agent', autonomyLevel: 'L4', agentId: agent.id, agent: { prompt: 'Grade each event.' } },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'grade-events', to: 'done' }],
+      },
+    });
+    expect(v3.status(), await v3.text()).toBe(201);
+    const runsRes = await request.get(`/api/evaluation/runs?${query}`, { headers: AUTH_HEADERS });
+    expect(runsRes.status(), await runsRes.text()).toBe(200);
+    const unpinned = await request.post('/api/evaluation/runs', { headers: JSON_HEADERS, data: { ...step, trialsPerCase: 1, budgetUsd: 1 } });
+    expect(unpinned.status(), await unpinned.text()).toBe(404);
+    const cancelled = EvalRunOutputSchema.parse(await post(request, `/api/evaluation/runs/${ofOlder.evalRun.id}/cancel`, {}));
+    expect(cancelled.evalRun.status).toBe('cancelled');
+
+    // An archived version is not evaluated: no run is prepared for it, and it is left out of the verdicts.
+    const archived = await request.post(`/api/workflow-definitions/${workflowName}/versions/1/archive?namespace=${TEST_ORG_HANDLE}`, { headers: JSON_HEADERS, data: { archived: true } });
+    expect(archived.ok(), await archived.text()).toBe(true);
+    const ofArchived = await request.post('/api/evaluation/runs', { headers: JSON_HEADERS, data: { ...step, definitionVersion: 1, trialsPerCase: 1, budgetUsd: 1 } });
+    expect(ofArchived.status(), await ofArchived.text()).toBe(400);
+    const liveValidation = GetWorkflowValidationOutputSchema.parse(await (await request.get(`/api/evaluation/workflow-validation?${workflowQuery}`, { headers: AUTH_HEADERS })).json());
+    expect(liveValidation.versions.map((version) => version.definitionVersion)).toEqual([3, 2]);
   });
 });

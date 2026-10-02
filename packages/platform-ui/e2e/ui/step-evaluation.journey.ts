@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { EvalRunOutputSchema } from '@mediforce/platform-api/contract';
+import { EvalRunOutputSchema, ListEvalRunsOutputSchema } from '@mediforce/platform-api/contract';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_USER_PASSWORD } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
@@ -275,6 +275,25 @@ test.describe('Step Evaluation tab', () => {
     await expect(page).toHaveURL(/tab=evaluation&version=1&step=grade-aes/);
     await expect(page.getByTestId('evaluation-version-select')).toHaveValue('1', { timeout: 15_000 });
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes');
+
+    // With a newer runnable version, a run prepared on v1 runs v1 — and stays in view on v2 until it is started.
+    const v2 = await request.post(`/api/workflow-definitions?namespace=${EVALUATION_WORKSPACE}`, {
+      headers: JSON_HEADERS,
+      data: agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade every AE by CTCAE v5.' } }),
+    });
+    expect(v2.status(), await v2.text()).toBe(201);
+    await page.reload();
+    await expect(page.getByTestId('evaluation-version-select')).toHaveValue('1', { timeout: 15_000 });
+    await page.getByLabel('Budget $').fill('1');
+    await page.getByRole('button', { name: 'Prepare', exact: true }).click();
+    const startCard = page.getByTestId('start-eval-run-card');
+    await expect(startCard).toBeVisible({ timeout: 10_000 });
+    await expect(startCard).not.toContainText('on v1');
+    const runsRes = await request.get(`/api/evaluation/runs?${new URLSearchParams(step)}`, { headers: AUTH_HEADERS });
+    expect(ListEvalRunsOutputSchema.parse(await runsRes.json()).evalRuns.find((run) => run.status === 'prepared')).toMatchObject({ definitionVersion: 1 });
+    await page.getByTestId('evaluation-version-select').selectOption('2');
+    await expect(page).toHaveURL(/version=2/);
+    await expect(startCard).toContainText('on v1', { timeout: 15_000 });
   });
 
   test('an Evaluator is added through its type\'s fields, read in full, and edited into a new version', async ({ page, request }) => {

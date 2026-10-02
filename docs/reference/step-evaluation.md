@@ -28,12 +28,18 @@ agent first.
 
 The **Evaluation** tab of a workflow shows one agent step of one workflow
 version at a time — picked with the **Version** selector (the runnable version
-unless `?version=` names another) and then the **Step** selector (`?step=`),
-each option marked with its validation (see Validation below) — its
-Acceptance Criteria with whether it is validated against them,
-Evaluators, Eval Cases and that version's Eval Runs — beside the
-Evaluation Assistant (`mediforce eval ask`, `POST /api/evaluation/assistant`),
-whose header holds the step's Brief.
+unless `?version=` names another live one; archived versions are not offered)
+and then the **Step** selector (`?step=`), each option marked with its
+validation (see Validation below) — its Acceptance Criteria with whether it is
+validated against them, Evaluators, Eval Cases and that version's finished Eval
+Runs, plus any prepared or running run of another version, tagged with it —
+beside the Evaluation Assistant (`mediforce eval ask`,
+`POST /api/evaluation/assistant`), whose header holds the step's Brief. The
+assistant reads and prepares runs of the step as the selected version has it
+(`definitionVersion`, `mediforce eval ask --version N`; the runnable version
+when absent). A step's Evaluators, cases, Brief and criteria are the step's,
+not a version's: they stay readable and editable from an older version even
+once the runnable version no longer has the step.
 Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 
 - **Runs freely:** reading the step (config, agent prompt and system prompt,
@@ -502,7 +508,9 @@ A Step Qualification cites the policy's modes only.
 
 An Eval Run runs the Step, as its runnable Definition version has it — or the
 version named (`run-prepare --version N`, `definitionVersion`; the tab prepares
-for the version selected) — over a frozen Dataset version: every case, `trialsPerCase` times. A case cited by the
+for the version selected), never an archived one — over a frozen Dataset
+version: every case, `trialsPerCase` times. Starting, stopping and reviewing a
+run go by the version it was prepared for. A case cited by the
 step's few-shot `agent.examples` is left out of the run (`exampleCaseIds`;
 [ADR-0024](../adr/0024-optimisation.md) D5).
 
@@ -673,7 +681,8 @@ does not count) on the champion:
   run rested on changed since: the step's Fingerprint, an Evaluator (added,
   archived or given a new version), the live Eval Cases (added, edited or
   archived — compared with the cases the run ran), or the Acceptance Criteria.
-  Run the step again to verify it.
+  Run the step again to verify it. A step that declares MCP servers inline
+  cannot be evaluated, so it stays not verified until they move onto its agent.
 
 It comes with `GET /api/evaluation/qualification` as `validation: { status,
 evalRunId, reason, runInProgress }`, as the first line of `mediforce eval
@@ -688,8 +697,10 @@ A **workflow version** is **Verified** when every agent step's validation in it
 passed, **Failed** when any failed, and **Not verified** otherwise (also with
 no agent step, where no badge is shown). `mediforce eval validation`,
 `GET /api/evaluation/workflow-validation?namespace=&workflowName=` list every
-version, newest first, with each agent step's validation. The **Definitions**
-tab shows the badge on each version, linking to that version on the Evaluation
-tab; in the workflow editor, each agent step's box carries its validation icon
-for the version being edited, linking to the Evaluation tab on that step and
-version. Steps added since the version was saved carry none.
+live version, newest first, with each agent step's validation; archived
+versions are left out. The **Definitions** tab shows the badge on each version,
+linking to that version on the Evaluation tab on its first failed step, else
+its first not verified one; in the workflow editor, each agent step's box
+carries its validation icon for the version being edited, linking to the
+Evaluation tab on that step and version. The icon speaks of the step as saved:
+a step added or edited since carries none until the version is saved and run.

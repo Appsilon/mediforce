@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { z } from 'zod';
 import type { CallerScope } from '../../../../repositories/index';
 import { EVALUATION_ASSISTANT_PLATFORM_TOOLS, type StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
-import { InMemoryAgentTrajectoryRepository } from '@mediforce/platform-core/testing';
+import { InMemoryAgentTrajectoryRepository, buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { createTestScope } from '../../../../repositories/__tests__/create-test-scope';
 import { loadEvaluatedStep } from '../../../evaluation/_lib/evaluated-step';
 import { createEvalCase } from '../../../evaluation/eval-cases';
@@ -12,7 +12,7 @@ import { prepareEvalRun } from '../../../evaluation/eval-runs';
 import { setAcceptanceCriteria } from '../../../evaluation/acceptance-criteria';
 import { recordScore } from '../../../scores/record-score';
 import { executeEvaluationTool, type UnattendedGrant } from '../run-evaluation-tool';
-import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN } from '../../../evaluation/__tests__/fixture';
+import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, WORKFLOW } from '../../../evaluation/__tests__/fixture';
 import { gitWorkspace } from '../../../evaluation/__tests__/git-workspace';
 import { evalScenario, finishEvalRun } from '../../../evaluation/__tests__/finished-eval-run';
 import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
@@ -242,8 +242,8 @@ describe('executeEvaluationTool', () => {
     })).rejects.toThrow('is not a run of this step');
   });
 
-  it('prepares a run of the step as it is, under the Acceptance Criteria set now', async () => {
-    const { scope, context } = await setup();
+  it('prepares a run of the step as the version it reads has it, under the Acceptance Criteria set now', async () => {
+    const { fixture, scope, context } = await setup();
     await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.9 } }, origin: 'user' }, scope);
     await createEvaluator({ ...STEP, name: 'findings-present', rule: 'The result lists findings.', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
     await createEvalCase({
@@ -259,10 +259,14 @@ describe('executeEvaluationTool', () => {
     }, scope);
     await freezeEvalDataset(STEP, scope);
 
-    const prepared = await executeEvaluationTool('prepare_eval_run', { trialsPerCase: 2, budgetUsd: 2 }, scope, context);
+    await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({ ...context.definition, version: 2 }));
+    await fixture.processRepo.setDefaultWorkflowVersion(NAMESPACE, WORKFLOW, 2);
+
+    const prepared = await executeEvaluationTool('prepare_eval_run', { trialsPerCase: 2, budgetUsd: 2 }, scope, context) as { prepared: { evalRunId: string } };
     expect(prepared).toMatchObject({
       prepared: { trials: 2, variants: [{ id: 'champion' }], budgetUsd: 2, acceptanceCriteria: { critical: { minPassRate: 0.9 } } },
     });
+    expect((await scope.evaluation.getEvalRun(prepared.prepared.evalRunId))?.definitionVersion).toBe(1);
   });
 
   it('reads the step\'s qualification and the Acceptance Criteria set now', async () => {

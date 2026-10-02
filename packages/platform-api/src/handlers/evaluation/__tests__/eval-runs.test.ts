@@ -1,17 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { WorkflowEngine } from '@mediforce/workflow-engine';
-import { buildAgentOutputEnvelope, buildAgentRun, buildStepExecution } from '@mediforce/platform-core/testing';
+import { buildAgentOutputEnvelope, buildAgentRun, buildStepExecution, buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { noopRunKicker, type NoopRunKicker } from '../../../runtime/run-kicker';
-import { ConflictError, ValidationError } from '../../../errors';
+import { ConflictError, NotFoundError, ValidationError } from '../../../errors';
 import type { CallerScope } from '../../../repositories/index';
 import { createEvaluator } from '../evaluators';
 import { createEvalCase } from '../eval-cases';
 import { freezeEvalDataset } from '../eval-datasets';
 import { listStepAgentRuns } from '../step-agent-runs';
-import { advanceEvalRunOfInstance, cancelEvalRun, getEvalRun, prepareEvalRun, startEvalRun } from '../eval-runs';
+import { advanceEvalRunOfInstance, cancelEvalRun, getEvalRun, listEvalRuns, prepareEvalRun, startEvalRun } from '../eval-runs';
+import { applyVariantToStep } from '../apply-step-variant';
 import { setEvaluationBrief } from '../briefs';
 import { setAcceptanceCriteria } from '../acceptance-criteria';
-import { evaluationFixture, GRADED_RUN, STEP, UNGRADED_RUN, type EvaluationFixture } from './fixture';
+import { evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, WORKFLOW, type EvaluationFixture } from './fixture';
 
 describe('Eval Runs (ADR-0023 D4, D10)', () => {
   let fixture: EvaluationFixture;
@@ -239,6 +240,32 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     expect(cancelled.status).toBe('cancelled');
     expect(report.trials.skipped).toBe(2);
     await expect(cancelEvalRun({ evalRunId: evalRun.id }, scope)).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('runs, stops and reads a step only an older version has; an unpinned run or a variant takes the runnable version, an archived one none', async () => {
+    await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
+      name: WORKFLOW,
+      namespace: NAMESPACE,
+      version: 2,
+      steps: [
+        { id: 'extract-aes', name: 'Extract AEs', type: 'creation', executor: 'script', script: { runtime: 'python', inlineScript: 'print(1)' } },
+        { id: 'grade-events', name: 'Grade events', type: 'creation', executor: 'agent', agentId: 'ae-grader', agent: { prompt: 'Grade each event.' } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'extract-aes', to: 'grade-events' }, { from: 'grade-events', to: 'done' }],
+    }));
+    await fixture.processRepo.setDefaultWorkflowVersion(NAMESPACE, WORKFLOW, 2);
+
+    await expect(prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope)).rejects.toBeInstanceOf(NotFoundError);
+    const { evalRun: prepared } = await prepareEvalRun({ ...STEP, definitionVersion: 1, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun: started } = await startEvalRun({ evalRunId: prepared.id, confirmedBudgetUsd: 5 }, scope);
+    expect(started).toMatchObject({ definitionVersion: 1, status: 'running' });
+    expect((await cancelEvalRun({ evalRunId: prepared.id }, scope)).evalRun.status).toBe('cancelled');
+    expect((await listEvalRuns(STEP, scope)).evalRuns.map((run) => run.id)).toEqual([prepared.id]);
+    await expect(applyVariantToStep({ ...STEP, patch: { model: 'openai/gpt-5' }, setAsDefault: false }, scope)).rejects.toBeInstanceOf(NotFoundError);
+
+    await fixture.processRepo.setVersionArchived(NAMESPACE, WORKFLOW, 1, true);
+    await expect(prepareEvalRun({ ...STEP, definitionVersion: 1, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope)).rejects.toThrow(/v1 is archived/);
   });
 
   it('still scores and charges a trial that was running when the run was cancelled', async () => {

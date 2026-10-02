@@ -308,7 +308,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
       expect((await getStepQualification({ ...STEP, definitionVersion: 1 }, scope)).validation.status).toBe('passed');
     });
 
-    it('rolls each workflow version up across its agent steps; a run prepared for an older version verifies that version', async () => {
+    it('rolls each live workflow version up across its agent steps; a run prepared for an older version verifies that version', async () => {
       await setAcceptanceCriteria({ ...STEP, criteria: criticalOnly, origin: 'user' }, scope);
       await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
         name: WORKFLOW,
@@ -341,6 +341,28 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
       await finishedRun(0, 2);
       const [newest] = (await getWorkflowValidation(workflow, scope)).versions;
       expect(newest).toMatchObject({ definitionVersion: 2, status: 'failed' });
+
+      await fixture.processRepo.setVersionArchived(NAMESPACE, WORKFLOW, 1, true);
+      expect((await getWorkflowValidation(workflow, scope)).versions.map((version) => version.definitionVersion)).toEqual([2]);
+    });
+
+    it('leaves a version not verified while its agent step declares MCP servers inline', async () => {
+      await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
+        name: WORKFLOW,
+        namespace: NAMESPACE,
+        version: 2,
+        steps: [
+          { id: 'grade-aes', name: 'Grade AEs', type: 'creation', executor: 'agent', agent: { prompt: 'Grade.', mcpServers: [{ name: 'edc', command: 'edc-mcp', args: [] }] } },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'grade-aes', to: 'done' }],
+      }));
+      const [inline] = (await getWorkflowValidation({ namespace: NAMESPACE, workflowName: WORKFLOW }, scope)).versions;
+      expect(inline).toMatchObject({
+        definitionVersion: 2,
+        status: 'not_verified',
+        steps: [{ stepId: 'grade-aes', validation: { status: 'not_verified', evalRunId: null, reason: expect.stringContaining('declares MCP servers inline (edc)') } }],
+      });
     });
 
     it('says when a run is under way', async () => {

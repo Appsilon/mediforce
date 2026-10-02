@@ -63,7 +63,7 @@ export async function reviewJudgeVerdict(
   const reviewedBy = resolveTargetUid(input, scope, 'review', 'review a judge verdict');
   const run = await scope.evaluation.getEvalRun(input.evalRunId);
   if (run === null) throw new NotFoundError(`Eval Run '${input.evalRunId}' not found`);
-  await loadEvaluatedStep(scope, stepRef(run), 'edit');
+  await loadEvaluatedStep(scope, stepRef(run), 'edit', run.definitionVersion);
   const trial = (await scope.evaluation.listTrials(run.id)).find((candidate) => candidate.id === input.trialId);
   if (trial === undefined) throw new NotFoundError(`Eval Run '${run.id}' has no trial '${input.trialId}'`);
   const judge = run.evaluators.find((evaluator) => evaluator.evaluatorId === input.evaluatorId);

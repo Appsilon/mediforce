@@ -342,6 +342,7 @@ export async function executeEvaluationTool(
       const { trialsPerCase, budgetUsd } = args as Args<'prepare_eval_run'>;
       const { evalRun } = await prepareEvalRun({
         ...step,
+        definitionVersion: definition.version,
         trialsPerCase: trialsPerCase ?? 3,
         concurrency: 2,
         challengers: [],

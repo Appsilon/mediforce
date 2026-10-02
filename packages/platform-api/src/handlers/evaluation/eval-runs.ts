@@ -98,19 +98,22 @@ async function buildVariants(
 
 /**
  * Prepares an Eval Run (ADR-0023 D4, D5, D10): the Step at its runnable
- * Definition version — or the `definitionVersion` given — and any
- * challengers patched over it, a frozen Dataset version less the cases any variant's few-shot examples came from (D12), the
- * Step's live Evaluator versions with whether each counts, the MCP eval policy
- * the trials will run under, the Acceptance Criteria it will be judged against,
- * and a cost estimate. Nothing runs yet — a person confirms
- * the budget with `start`.
+ * Definition version — or the `definitionVersion` given, unless archived — and
+ * any challengers patched over it, a frozen Dataset version less the cases any
+ * variant's few-shot examples came from (D12), the Step's live Evaluator
+ * versions with whether each counts, the MCP eval policy the trials will run
+ * under, the Acceptance Criteria it will be judged against, and a cost
+ * estimate. Nothing runs yet — a person confirms the budget with `start`.
  */
 export async function prepareEvalRun(
   input: z.output<typeof PrepareEvalRunInputSchema>,
   scope: CallerScope,
 ): Promise<EvalRunOutput> {
   const step = stepRef(input);
-  const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'run', input.definitionVersion);
+  const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'run', input.definitionVersion ?? 'runnable');
+  if (definition.archived === true) {
+    throw new ValidationError(`'${step.workflowName}' v${definition.version} is archived; evaluate a version still in use`);
+  }
 
   const dataset = input.datasetVersionId === undefined
     ? (await scope.evaluation.listDatasetVersions(step))[0]
@@ -243,7 +246,7 @@ export async function prepareEvalRun(
  */
 export async function startEvalRun(input: StartEvalRunInput, scope: CallerScope): Promise<EvalRunOutput> {
   const run = await loadEvalRun(scope, input.evalRunId);
-  await loadEvaluatedStep(scope, stepRef(run), 'run');
+  await loadEvaluatedStep(scope, stepRef(run), 'run', run.definitionVersion);
   if (input.confirmedBudgetUsd !== run.budgetUsd) {
     const estimate = run.estimate.totalUsd === null ? 'no estimate' : `estimated $${run.estimate.totalUsd}`;
     throw new ValidationError(
@@ -281,7 +284,7 @@ export async function listEvalRuns(input: ListEvalRunsInput, scope: CallerScope)
 /** Stops an Eval Run: no new trial starts; trials already running finish and are scored. */
 export async function cancelEvalRun(input: CancelEvalRunInput, scope: CallerScope): Promise<EvalRunOutput> {
   const run = await loadEvalRun(scope, input.evalRunId);
-  await loadEvaluatedStep(scope, stepRef(run), 'run');
+  await loadEvaluatedStep(scope, stepRef(run), 'run', run.definitionVersion);
   const now = new Date().toISOString();
   const cancelled = await scope.evaluation.transitionEvalRun(run.id, run.status === 'prepared' ? 'prepared' : 'running', {
     status: 'cancelled',

@@ -32,7 +32,7 @@ export async function applyVariantToStep(
   scope: CallerScope,
 ): Promise<ApplyStepVariantOutput> {
   const step = stepRef(input);
-  const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'edit');
+  const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'edit', 'runnable');
 
   let patch: StepVariantPatch;
   let applied: { evalRunId: string; variantId: string; label: string; frozen: StepFingerprint | null } | null = null;

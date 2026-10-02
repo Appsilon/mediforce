@@ -1,7 +1,12 @@
 import { DEFAULT_ACCEPTANCE_CRITERIA, describeAcceptanceCriteria as describeCriteria, describeMcpPolicy, type AcceptanceCriteria } from '@mediforce/platform-core';
+import type { GetStepQualificationOutput, StepValidation } from '@mediforce/platform-api/contract';
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson } from '../output';
 import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
+
+const QUALIFICATION_LABEL: Record<GetStepQualificationOutput['status'], string> = { qualified: 'qualified', stale: 'stale', not_qualified: 'not qualified' };
+const STEP_VALIDATION_LABEL: Record<StepValidation['status'], string> = { passed: 'passed', failed: 'failed', not_verified: 'not verified' };
+const VERSION_VALIDATION_LABEL: Record<StepValidation['status'], string> = { passed: 'verified', failed: 'failed', not_verified: 'not verified' };
 
 export const evalCriteriaGetCommand = defineCommand({
   name: 'mediforce eval criteria-get',
@@ -53,8 +58,8 @@ export const evalQualificationCommand = defineCommand({
       printJson(output, result);
       return 0;
     }
-    output.stdout(`validation ${result.validation.status.replace('_', ' ')}: ${result.validation.reason}${result.validation.runInProgress ? ' (an Eval Run is running)' : ''}`);
-    output.stdout(`${result.status.replace('_', ' ')}  (v${result.definitionVersion}, fingerprint ${result.fingerprint.hash.slice(0, 12)})`);
+    output.stdout(`validation ${STEP_VALIDATION_LABEL[result.validation.status]}: ${result.validation.reason}${result.validation.runInProgress ? ' (an Eval Run is running)' : ''}`);
+    output.stdout(`${QUALIFICATION_LABEL[result.status]}  (v${result.definitionVersion}, fingerprint ${result.fingerprint.hash.slice(0, 12)})`);
     const { qualification } = result;
     if (qualification === null) return 0;
     output.stdout(`signed by ${qualification.signature.signerName} at ${qualification.signature.signedAt} for '${qualification.variantLabel}' of Eval Run ${qualification.evalRunId}`);
@@ -69,7 +74,7 @@ export const evalQualificationCommand = defineCommand({
 
 export const evalValidationCommand = defineCommand({
   name: 'mediforce eval validation',
-  description: 'Print whether each version of a workflow is verified — every agent step passed its Acceptance Criteria in it — with each step\'s validation.',
+  description: 'Print whether each live version of a workflow is verified — every agent step passed its Acceptance Criteria in it — with each step\'s validation.',
   args: {
     namespace: { type: 'string', required: true, description: 'Workspace handle' },
     workflow: { type: 'string', required: true, description: 'Workflow name' },
@@ -81,8 +86,8 @@ export const evalValidationCommand = defineCommand({
       return 0;
     }
     for (const version of result.versions) {
-      output.stdout(`v${version.definitionVersion}  ${version.status === 'passed' ? 'verified' : version.status.replace('_', ' ')}`);
-      for (const step of version.steps) output.stdout(`  ${step.stepId}  ${step.validation.status.replace('_', ' ')}: ${step.validation.reason}`);
+      output.stdout(`v${version.definitionVersion}  ${VERSION_VALIDATION_LABEL[version.status]}`);
+      for (const step of version.steps) output.stdout(`  ${step.stepId}  ${STEP_VALIDATION_LABEL[step.validation.status]}: ${step.validation.reason}`);
     }
     return 0;
   },
