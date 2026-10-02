@@ -14,7 +14,7 @@ import {
 } from '../../errors';
 import { actorFromCaller } from '../_helpers';
 import { assertCallerMayEditWorkflow } from './_access-gate';
-import { checkRetiredModels } from './retired-model-check';
+import { checkRetiredModels } from './model-checks';
 import { seedDefaultWorkflowAccess } from './_seed-access';
 import { seedManualTrigger } from './_seed-triggers';
 import { isLocalAgentMode, fetchFromContainerWorker, fetchFromLocalDocker } from '../system/_docker';

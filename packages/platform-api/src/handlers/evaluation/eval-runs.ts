@@ -6,6 +6,7 @@ import {
   applyStepVariant,
   evaluatorTrust,
   isEmptyVariantPatch,
+  resolveDefinitionModels,
   variantPatchProblem,
   type EvalRun,
   type EvalRunEvaluator,
@@ -36,6 +37,7 @@ import { driveEvalRun } from './_lib/drive-eval-run';
 import { computeStepFingerprint } from './_lib/step-fingerprint';
 import { exampleCasesProblem } from './_lib/example-cases';
 import { DEFAULT_MCP_EVAL_SERVER_POLICY } from './mcp-eval-policy';
+import { checkRetiredModels, checkUnknownModels } from '../workflows/model-checks';
 
 async function loadEvalRun(scope: CallerScope, evalRunId: string): Promise<EvalRun> {
   const run = await scope.evaluation.getEvalRun(evalRunId);
@@ -47,6 +49,29 @@ async function evalRunOutput(scope: CallerScope, evalRunId: string): Promise<Eva
   const evalRun = await loadEvalRun(scope, evalRunId);
   const trials = await scope.evaluation.listTrials(evalRunId);
   return { evalRun, trials, report: await buildEvalRunReport(scope, evalRun, trials) };
+}
+
+/**
+ * Refuses an Eval Run whose trials the auto-runner's pre-flight would pause —
+ * every one of them, before the agent runs — on a model the registry does not
+ * list or has retired: the same checks, on each variant's definition.
+ */
+async function assertVariantModelsRunnable(
+  scope: CallerScope,
+  definition: WorkflowDefinition,
+  workflowStep: WorkflowStep,
+  variants: readonly EvalVariant[],
+): Promise<void> {
+  const allModels = await scope.models.list();
+  for (const variant of variants) {
+    const patched = applyStepVariant(definition, workflowStep, variant.patch).definition;
+    const problem = checkUnknownModels(patched, allModels)
+      ?? checkRetiredModels(await resolveDefinitionModels(patched, scope.agentDefinitions), allModels);
+    if (problem !== null) {
+      const label = variant.id === CHAMPION_VARIANT_ID ? 'The step' : `Challenger '${variant.label}'`;
+      throw new ValidationError(`${label} cannot run — ${problem.message}`);
+    }
+  }
 }
 
 /** A budget cap with headroom over the estimate, in whole cents. */
@@ -151,6 +176,7 @@ export async function prepareEvalRun(
     agentServers.map((name) => [name, policy?.servers[name] ?? DEFAULT_MCP_EVAL_SERVER_POLICY]),
   );
   const variants = await buildVariants(scope, step, definition, workflowStep, agentServers, input.challengers);
+  await assertVariantModelsRunnable(scope, definition, workflowStep, variants);
   const exampleSources = new Set([
     ...(workflowStep.agent?.examples ?? []),
     ...input.challengers.flatMap((challenger) => challenger.patch.examples ?? []),
@@ -246,13 +272,14 @@ export async function prepareEvalRun(
  */
 export async function startEvalRun(input: StartEvalRunInput, scope: CallerScope): Promise<EvalRunOutput> {
   const run = await loadEvalRun(scope, input.evalRunId);
-  await loadEvaluatedStep(scope, stepRef(run), 'run', run.definitionVersion);
+  const { definition, step: workflowStep } = await loadEvaluatedStep(scope, stepRef(run), 'run', run.definitionVersion);
   if (input.confirmedBudgetUsd !== run.budgetUsd) {
     const estimate = run.estimate.totalUsd === null ? 'no estimate' : `estimated $${run.estimate.totalUsd}`;
     throw new ValidationError(
       `Starting this Eval Run spends up to $${run.budgetUsd} (${estimate}); a person must confirm that budget`,
     );
   }
+  await assertVariantModelsRunnable(scope, definition, workflowStep, run.variants);
   const started = await scope.evaluation.transitionEvalRun(run.id, 'prepared', {
     status: 'running',
     startedAt: new Date().toISOString(),

@@ -3,6 +3,7 @@ import {
   InMemoryAgentRunRepository,
   InMemoryAuditRepository,
   InMemoryEvaluationRepository,
+  InMemoryModelRegistryRepository,
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
   InMemoryScoreRepository,
@@ -51,6 +52,15 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
   const agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
   const toolCatalogRepo = new InMemoryToolCatalogRepository();
   await toolCatalogRepo.upsert(NAMESPACE, { id: 'edc', command: 'edc-mcp' });
+  const modelRegistryRepo = new InMemoryModelRegistryRepository();
+  for (const [id, provider] of [['anthropic/claude-sonnet-5', 'anthropic'], ['openai/gpt-5', 'openai']]) {
+    await modelRegistryRepo.upsert({
+      id, canonicalSlug: null, name: id, provider, contextLength: 200_000, maxCompletionTokens: null,
+      pricing: { input: 0.000003, output: 0.000015 }, modality: 'text', inputModalities: ['text'], outputModalities: ['text'],
+      supportsTools: true, supportsVision: false, source: 'openrouter', requestCount: null,
+      lastSyncedAt: '2026-09-01T00:00:00Z', retiredAt: null,
+    });
+  }
 
   await agentDefinitionRepo.upsert('ae-grader', {
     kind: 'plugin',
@@ -97,6 +107,7 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
       auditRepo,
       agentDefinitionRepo,
       toolCatalogRepo,
+      modelRegistryRepo,
       caller,
     }),
   };

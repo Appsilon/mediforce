@@ -65,7 +65,7 @@ export { transferWorkflowNamespace } from './workflows/transfer-workflow';
 export { importWorkflow } from './workflows/import-workflow';
 export { getManifest } from './workflows/get-manifest';
 export { getWorkflowRunCount } from './workflows/get-run-count';
-export { checkRetiredModels } from './workflows/retired-model-check';
+export { checkRetiredModels, checkUnknownModels } from './workflows/model-checks';
 
 export { chatCoworkSession } from './cowork/chat';
 export { createVoiceEphemeralKey } from './cowork/voice-ephemeral-key';
