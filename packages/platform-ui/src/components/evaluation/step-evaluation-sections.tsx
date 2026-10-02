@@ -481,7 +481,7 @@ function SourceRunLog({ agentRunId }: { agentRunId: string }) {
 }
 
 /**
- * Name, split, the input the step is given beside the output expected of it,
+ * Name, the input the step is given beside the output expected of it,
  * whether the case is positive or negative and how it is compared, and which
  * Evaluators grade it. A case from a run marks each side edited or as the run
  * had it, and opens the run's log.
@@ -530,13 +530,7 @@ function CaseForm({ initial, inputHelp, evaluators, sourceAgentRunId, submitLabe
   const shownError = formError ?? error;
   return (
     <div className="space-y-3 text-xs" data-testid="case-form">
-      <div className="flex flex-wrap gap-2">
-        <input aria-label="Case name" className={cn(inputClass, 'min-w-48 flex-1')} placeholder="Name" value={values.name} onChange={(event) => setValues({ ...values, name: event.target.value })} />
-        <select aria-label="Split" className={inputClass} value={values.split} onChange={(event) => setValues({ ...values, split: EvalCaseSplitSchema.parse(event.target.value) })}>
-          <option value="dev">dev</option>
-          <option value="holdout">holdout</option>
-        </select>
-      </div>
+      <input aria-label="Case name" className={cn(inputClass, 'w-full')} placeholder="Name" value={values.name} onChange={(event) => setValues({ ...values, name: event.target.value })} />
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-1">
           <div className="flex min-h-6 items-center justify-between gap-2">
@@ -738,7 +732,7 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unfrozen, selected, onSe
     : evalCase.evaluatorIds.map((evaluatorId) => evaluators.find((evaluator) => evaluator.id === evaluatorId)?.name ?? evaluatorId.slice(0, 8)).join(', ');
   const labels = (
     <span className="text-xs text-muted-foreground">
-      {evalCase.expectedOutput === null ? '' : `${evalCase.expectation} · `}{evalCase.split} · {evalCase.source}{evalCase.perturbation === null ? '' : ` (${evalCase.perturbation.kind.replace(/_/g, ' ')})`}{evalCase.origin === 'assistant' ? ' · from the assistant' : ''}
+      {evalCase.expectedOutput === null ? '' : `${evalCase.expectation} · `}{evalCase.source}{evalCase.perturbation === null ? '' : ` (${evalCase.perturbation.kind.replace(/_/g, ' ')})`}{evalCase.origin === 'assistant' ? ' · from the assistant' : ''}
     </span>
   );
   return (
