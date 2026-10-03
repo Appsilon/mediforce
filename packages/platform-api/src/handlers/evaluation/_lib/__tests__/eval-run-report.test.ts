@@ -30,7 +30,7 @@ function trial(evalRunId: string, caseId: string, trialIndex: number, overrides:
   return {
     id: randomUUID(), evalRunId, caseId, variantId, trialIndex, status: 'scored', processInstanceId: `trial-${variantId}-${caseId}-${trialIndex}`,
     agentRunId: `agent-${variantId}-${caseId}-${trialIndex}`, costUsd: 0.1, inputTokens: 100, outputTokens: 10, durationMs: 1000,
-    confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], ...overrides,
+    confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {}, ...overrides,
   };
 }
 

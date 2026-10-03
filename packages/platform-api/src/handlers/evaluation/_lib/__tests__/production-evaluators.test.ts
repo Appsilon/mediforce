@@ -105,7 +105,7 @@ describe('production Evaluators (ADR-0023 D13)', () => {
     expect(await fixture.scoreRepo.list({ agentRunId: UNGRADED_RUN, limit: 100 })).toEqual([]);
   });
 
-  it('runs an llm_judge asynchronously and only writes its Score', async () => {
+  it('runs an llm_judge asynchronously and only writes its Score, without its answers', async () => {
     await addEvaluator(fixture, 'grades-present', judge, { runInProduction: true });
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({
       choices: [{ message: { content: '{"rationale": "No AE carries a grade.", "passed": false, "confidence": 0.9}' }, finish_reason: 'stop' }],
@@ -122,6 +122,7 @@ describe('production Evaluators (ADR-0023 D13)', () => {
       name: 'grades-present', source: 'llm_judge', value: 0, comment: 'No AE carries a grade.',
       metadata: { production: true, judgeConfidence: 0.9, judgeMinConfidence: 0.8 },
     });
+    expect((await fixture.scoreRepo.list({ agentRunId: UNGRADED_RUN, limit: 100 }))[0]?.metadata).not.toHaveProperty('judgeCalls');
   });
 
   it('never fails the step because an llm_judge could not run', async () => {

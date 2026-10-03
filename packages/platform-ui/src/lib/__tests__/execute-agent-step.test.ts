@@ -264,7 +264,7 @@ describe('executeAgentStep', () => {
     }, [{
       id: '55555555-5555-4555-8555-555555555555', evalRunId, caseId, variantId: 'challenger-1', trialIndex: 0, status: 'running',
       processInstanceId: 'inst-wf-001', agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
-      confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [],
+      confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
     }]);
     mockInstanceRepo.getById.mockResolvedValue({ ...defaultInstance, evalRunId });
     mockEngine.finishEvalTrial.mockResolvedValue({ status: 'completed', currentStepId: null });
@@ -301,7 +301,7 @@ describe('executeAgentStep', () => {
       }, [{
         id: trialId, evalRunId, caseId, variantId: 'champion', trialIndex: 0, status: 'running',
         processInstanceId: instanceId, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
-        confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [],
+        confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
       }]);
       mockInstanceRepo.getById.mockResolvedValue({ ...defaultInstance, id: instanceId, evalRunId });
       mockEngine.finishEvalTrial.mockResolvedValue({ status: 'completed', currentStepId: null });
@@ -361,7 +361,7 @@ describe('executeAgentStep', () => {
       }, [{
         id: trialId, evalRunId, caseId, variantId: 'champion', trialIndex: 0, status: 'running',
         processInstanceId: instanceId, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
-        confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [],
+        confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
       }]);
       mockInstanceRepo.getById.mockResolvedValue({ ...defaultInstance, id: instanceId, evalRunId });
       mockEngine.finishEvalTrial.mockResolvedValue({ status: 'completed', currentStepId: null });

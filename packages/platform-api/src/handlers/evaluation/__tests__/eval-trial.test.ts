@@ -94,7 +94,7 @@ describe('getEvalTrial (ADR-0023)', () => {
     });
   });
 
-  it('says why an Evaluator could not grade a trial', async () => {
+  it('says why an Evaluator could not grade a trial, and shows what its judge answered instead', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({
       choices: [{ message: { content: 'I would rather not say.' }, finish_reason: 'stop' }],
       usage: { prompt_tokens: 100, completion_tokens: 20 },
@@ -106,6 +106,7 @@ describe('getEvalTrial (ADR-0023)', () => {
 
     expect(judge).toMatchObject({ outcome: 'errored', score: null, error: expect.stringContaining('judge gave no usable verdict') });
     expect(judge.judgePrompt).not.toBeNull();
+    expect(judge.judgeCalls?.[0]).toMatchObject({ model: 'anthropic/claude-haiku-4.5', response: 'I would rather not say.' });
   });
 
   it('lists each run with how its champion fared on the Acceptance Criteria, none while it is prepared', async () => {

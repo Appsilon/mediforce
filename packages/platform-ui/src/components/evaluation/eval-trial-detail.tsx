@@ -75,7 +75,7 @@ interface EvaluatorLogEntry {
   readonly body: string;
 }
 
-/** A model-run check's log: the messages its model was sent, then each answer it gave, numbered like the agent's log. */
+/** A model-run check's log: the messages its model was sent, then each answer it gave. */
 function evaluatorLogEntries(entry: EvalTrialEvaluator): EvaluatorLogEntry[] {
   const sent = (entry.judgePrompt ?? []).map((message) => ({ kind: message.role, detail: null, body: message.content }));
   const answered = (entry.judgeCalls ?? []).map((call) => ({
@@ -84,6 +84,16 @@ function evaluatorLogEntries(entry: EvalTrialEvaluator): EvaluatorLogEntry[] {
     body: call.response,
   }));
   return [...sent, ...answered];
+}
+
+/** One log entry: a header line, then its text. */
+function LogRow({ id, className, body, children }: { id?: string; className?: string; body: string; children: React.ReactNode }) {
+  return (
+    <li id={id} className={cn('rounded-md border px-3 py-2', className)}>
+      <div className="flex flex-wrap items-baseline gap-x-2 text-xs">{children}</div>
+      <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-words font-mono text-xs">{body}</pre>
+    </li>
+  );
 }
 
 function EvaluatorLog({ entry }: { entry: EvalTrialEvaluator }) {
@@ -99,18 +109,14 @@ function EvaluatorLog({ entry }: { entry: EvalTrialEvaluator }) {
         <>
           <p className="text-muted-foreground">
             What the model was sent — rebuilt from the Evaluator version frozen into this run and this trial&apos;s input, log and output, by the same code that sent it — then what it answered.
-            {entry.judgeCalls === null && entry.score !== null && ' Its answers were not kept for this Score.'}
+            {entry.judgeCalls === null && entry.outcome !== null && ' No answer was kept for this trial.'}
           </p>
           <ol className="space-y-1.5">
             {entries.map((logEntry, index) => (
-              <li key={index} className="rounded-md border px-3 py-2">
-                <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="font-mono text-muted-foreground">[{index}]</span>
-                  <span className="font-medium">{logEntry.kind}</span>
-                  {logEntry.detail !== null && <span className="text-muted-foreground">{logEntry.detail}</span>}
-                </div>
-                <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-words font-mono">{logEntry.body}</pre>
-              </li>
+              <LogRow key={index} body={logEntry.body}>
+                <span className="font-medium">{logEntry.kind}</span>
+                {logEntry.detail !== null && <span className="text-muted-foreground">{logEntry.detail}</span>}
+              </LogRow>
             ))}
           </ol>
         </>
@@ -202,22 +208,17 @@ function AgentLog({ entries, citedBy }: { entries: readonly StoredAgentTrajector
         const citers = citedBy.get(entry.seq) ?? [];
         const tool = entry.tool ?? entry.tool_name;
         return (
-          <li
+          <LogRow
             key={entry.seq}
             id={`log-entry-${entry.seq}`}
-            className={cn(
-              'scroll-mt-6 rounded-md border px-3 py-2 target:ring-2 target:ring-primary',
-              citers.length > 0 && 'border-amber-500/60 bg-amber-500/5',
-            )}
+            className={cn('scroll-mt-6 target:ring-2 target:ring-primary', citers.length > 0 && 'border-amber-500/60 bg-amber-500/5')}
+            body={entryBody(entry)}
           >
-            <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
-              <span className="font-mono text-muted-foreground">[{entry.seq}]</span>
-              <span className="font-medium">{[entry.type, entry.subtype].filter((part) => part !== undefined).join(' / ')}</span>
-              {tool !== undefined && <span className="font-mono">{tool}</span>}
-              {citers.length > 0 && <span className="ml-auto text-amber-800 dark:text-amber-300">cited by {citers.join(', ')}</span>}
-            </div>
-            <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-words font-mono text-xs">{entryBody(entry)}</pre>
-          </li>
+            <span className="font-mono text-muted-foreground">[{entry.seq}]</span>
+            <span className="font-medium">{[entry.type, entry.subtype].filter((part) => part !== undefined).join(' / ')}</span>
+            {tool !== undefined && <span className="font-mono">{tool}</span>}
+            {citers.length > 0 && <span className="ml-auto text-amber-800 dark:text-amber-300">cited by {citers.join(', ')}</span>}
+          </LogRow>
         );
       })}
     </ol>

@@ -149,6 +149,16 @@ export const EvalTrialStatusSchema = z.enum([
   'skipped',
 ]);
 
+/** One call a check made to its model: what it answered, what it spent and how long it took. */
+export const JudgeCallSchema = z.object({
+  model: z.string(),
+  promptTokens: z.number(),
+  completionTokens: z.number(),
+  durationMs: z.number(),
+  /** The model's answer, as it gave it. */
+  response: z.string(),
+});
+
 export const EvalTrialSchema = z.object({
   id: z.uuid(),
   evalRunId: z.uuid(),
@@ -175,6 +185,8 @@ export const EvalTrialSchema = z.object({
   completedAt: z.iso.datetime().nullable(),
   /** Calls to a replayed MCP server that no recording answered (D6). */
   mcpReplayMisses: z.array(McpReplayMissSchema),
+  /** By Evaluator id, the model calls of a check that gave no Score — what its model answered instead of a verdict. */
+  erroredJudgeCalls: z.record(z.string(), z.array(JudgeCallSchema)),
 });
 
 /** One Evaluator's result over the whole run (D10). Rates are over graded trials; null when none were. */
@@ -396,6 +408,7 @@ export type EvalRunEstimate = z.infer<typeof EvalRunEstimateSchema>;
 export type EvalRun = z.infer<typeof EvalRunSchema>;
 export type EvalTrialStatus = z.infer<typeof EvalTrialStatusSchema>;
 export type EvalTrial = z.infer<typeof EvalTrialSchema>;
+export type JudgeCall = z.infer<typeof JudgeCallSchema>;
 export type EvalRunEvaluatorReport = z.infer<typeof EvalRunEvaluatorReportSchema>;
 export type EvalRunReport = z.infer<typeof EvalRunReportSchema>;
 export type EvalRunMcpReport = z.infer<typeof EvalRunMcpReportSchema>;

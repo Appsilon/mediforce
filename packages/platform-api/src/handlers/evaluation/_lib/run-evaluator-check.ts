@@ -1,4 +1,4 @@
-import { outputDifferences, type EvalCase, type EvaluatorCheck } from '@mediforce/platform-core';
+import { outputDifferences, type EvalCase, type EvaluatorCheck, type JudgeCall } from '@mediforce/platform-core';
 import {
   LlmJudgeReviewPlugin,
   judgeOutputAgreement,
@@ -6,7 +6,7 @@ import {
   validateOutputSchema,
   type LlmClient,
 } from '@mediforce/agent-runtime';
-import type { EvaluatorOutcome, JudgeCall } from '../../../contract/evaluation';
+import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { callOpenRouter } from '../../../services/openrouter-client';
 import { requireOpenRouterApiKey } from '../../../services/openrouter-key';

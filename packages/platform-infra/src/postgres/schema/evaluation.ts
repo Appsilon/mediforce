@@ -229,6 +229,7 @@ export const evalTrials = pgTable(
     scoringAttempts: integer('scoring_attempts').notNull().default(0),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     mcpReplayMisses: jsonb('mcp_replay_misses').notNull().default([]),
+    erroredJudgeCalls: jsonb('errored_judge_calls').notNull().default({}),
   },
   (table) => ({
     runIdx: index('eval_trials_run_idx').on(table.evalRunId, table.caseId, table.variantId, table.trialIndex),

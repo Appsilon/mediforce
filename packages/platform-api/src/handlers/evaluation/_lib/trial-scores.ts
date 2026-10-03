@@ -1,16 +1,17 @@
 import {
   JUDGE_PASS_VALUE,
+  JudgeCallSchema,
   evaluatorAppliesToCase,
   type EvalCase,
   type EvalRun,
   type EvalRunEvaluator,
   type EvalTrial,
   type EvaluatorCheck,
+  type JudgeCall,
   type JudgeReviewDecision,
   type Score,
 } from '@mediforce/platform-core';
 import { z } from 'zod';
-import { JudgeCallSchema, type JudgeCall } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 
 /** What an Eval Run recorded on one trial: its checks' Scores, and people's reviews of its judges' verdicts. */

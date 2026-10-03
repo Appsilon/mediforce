@@ -351,6 +351,9 @@ test.describe('Step Evaluation judge verdicts — API E2E', () => {
     expect(graded!.judgePrompt?.map((message) => message.role)).toEqual(['system', 'user']);
     expect(graded!.judgePrompt?.[0]?.content).toContain('Is the summary grounded in the input?');
     expect(graded!.judgePrompt?.[1]?.content).toContain(unsureKey);
+    expect(graded!.judgeCalls).toEqual([expect.objectContaining({
+      model: 'anthropic/claude-haiku-4.5', response: expect.stringContaining('The log does not show where the summary came from.'),
+    })]);
     expect(finished.report.trialResults.find((result) => result.trialId === unsure.trialId)).toMatchObject({
       caseName: 'Unsure', evaluators: [{ evaluatorId: judge.id, outcome: 'excluded' }],
     });

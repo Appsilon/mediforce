@@ -3,6 +3,7 @@ import {
   type EvaluatedStep,
   type Evaluator,
   type EvaluatorVersion,
+  type JudgeCall,
 } from '@mediforce/platform-core';
 import type { AgentOutputGate, AgentOutputGateVerdict } from '@mediforce/agent-runtime';
 import type { CallerScope } from '../../../repositories/index';
@@ -11,7 +12,6 @@ import { evaluatorProduction } from './evaluator-view';
 import type { EvaluationSubject } from './evaluation-subject';
 import { loadModelPrices } from './model-prices';
 import { judgeConfidenceMetadata } from './trial-scores';
-import type { JudgeCall } from '../../../contract/evaluation';
 import { runEvaluatorCheck } from './run-evaluator-check';
 
 interface ProductionEvaluator {
@@ -70,7 +70,7 @@ async function scoreProduction(
       evaluatorVersion: version.version,
       counted: true,
       ...judgeConfidenceMetadata(version.check, outcome.confidence),
-      ...(judgeCalls.length === 0 ? {} : { judgeCostUsd, judgeCalls }),
+      ...(judgeCalls.length === 0 ? {} : { judgeCostUsd }),
     },
     namespace: subject.instance.namespace ?? evaluator.namespace,
     processInstanceId: subject.agentRun.processInstanceId,

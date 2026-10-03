@@ -198,7 +198,7 @@ describe('mediforce eval trial', () => {
     trial: {
       id: TRIAL_ID, evalRunId: RUN_ID, caseId: '2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', variantId: 'champion', trialIndex: 0, status: 'scored',
       processInstanceId: 'trial-run', agentRunId: 'agent-run-1', costUsd: 0.1, inputTokens: 100, outputTokens: 10, durationMs: 1000,
-      confidence: 0.7, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 1, completedAt: null, mcpReplayMisses: [],
+      confidence: 0.7, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 1, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
     },
     variant: { id: 'champion', label: 'Current step', patch: {}, fingerprint: null },
     evalCase: null,

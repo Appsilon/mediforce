@@ -243,6 +243,7 @@ export async function prepareEvalRun(
       scoringAttempts: 0,
       completedAt: null,
       mcpReplayMisses: [],
+      erroredJudgeCalls: {},
     }))));
   await scope.evaluation.createEvalRun(run, trials);
   await appendEvaluationAudit(scope, {

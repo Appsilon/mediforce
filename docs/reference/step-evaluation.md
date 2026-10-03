@@ -651,8 +651,10 @@ answer its model gave, with the model, tokens and duration. The messages are
 rebuilt from the Evaluator version frozen into the run and the trial's input,
 log and output by the code that sent them (`llmJudgeMessages`,
 `outputAgreementMessages`); the answers are kept on the Score
-(`metadata.judgeCalls`, returned as `judgeCalls`) — a Score recorded before they
-were kept, or a check that gave no Score, shows the messages only. A case is never changed in
+(`metadata.judgeCalls`), or, for a check that gave no Score, on the trial
+(`erroredJudgeCalls`, by Evaluator id), and returned as `judgeCalls`. A trial
+scored before they were kept shows the messages only. Production Scores keep
+only what their judge cost, not its answers. A case is never changed in
 place — an edit is a new case — so the trial's case, and an agreement
 comparison's expected output, are what the judge read. Log entries a model
 judge's rationale cites as `[n]` link to the entry, which is marked in the log;

@@ -1,11 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { mcpReplayMissesOf, type AgentOutputSnapshot, type EvalCase, type EvalRun, type EvalTrial, type Score } from '@mediforce/platform-core';
+import { mcpReplayMissesOf, type AgentOutputSnapshot, type EvalCase, type EvalRun, type EvalTrial, type JudgeCall, type Score } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { recordScore } from '../../scores/record-score';
 import { loadEvaluationSubject } from './evaluation-subject';
 import { storeEvalRunAcceptance } from './eval-run-report';
 import { loadModelPrices } from './model-prices';
-import type { JudgeCall } from '../../../contract/evaluation';
 import { runEvaluatorCheck } from './run-evaluator-check';
 import { evaluatorsOfCase, judgeConfidenceMetadata, scoresOfTrial } from './trial-scores';
 
@@ -97,6 +96,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
   const alreadyScored = new Set(earlier.map((score) => score.evaluatorId));
   let judgeCostUsd = earlier.reduce((sum, score) => sum + judgeCostOf(score), 0);
   const errors: string[] = [];
+  const erroredJudgeCalls: Record<string, JudgeCall[]> = {};
   for (const frozen of evaluatorsOfCase(run, evalCase)) {
     if (alreadyScored.has(frozen.evaluatorId)) continue;
     // Keep the claim fresh, so a long pass over many Evaluators never looks like a dead driver's.
@@ -122,6 +122,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
     }
     if (outcome.passed === null || outcome.value === null) {
       errors.push(`${frozen.name}: ${outcome.error ?? 'no verdict'}`);
+      if (judgeCalls.length > 0) erroredJudgeCalls[frozen.evaluatorId] = judgeCalls;
       continue;
     }
     await recordScore({
@@ -163,6 +164,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
     error: errors.length === 0 ? null : errors.join('; '),
     completedAt: new Date().toISOString(),
     mcpReplayMisses: mcpReplayMissesOf(subject.trajectory),
+    erroredJudgeCalls,
   });
 }
 

@@ -259,7 +259,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       const trials = [0, 1].map((trialIndex) => ({
         id: randomUUID(), evalRunId: run.id, caseId, variantId: 'champion', trialIndex, status: 'pending' as const,
         processInstanceId: null, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null,
-        durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [],
+        durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
       }));
       await repo.createEvalRun(run, trials);
 
@@ -349,7 +349,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       const trials = (['challenger-1', 'champion'] as const).flatMap((variantId) => [1, 0].map((trialIndex) => ({
         id: randomUUID(), evalRunId: run.id, caseId: dataset.caseIds[0]!, variantId, trialIndex, status: 'pending' as const,
         processInstanceId: null, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null,
-        durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [],
+        durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
       })));
       await repo.createEvalRun(run, trials);
       await repo.transitionTrial(trials[0]!.id, 'pending', { status: 'skipped', confidence: 0.75 });
@@ -424,7 +424,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       await repo.createEvalRun(run, [{
         id: trialId, evalRunId: run.id, caseId, variantId: 'champion', trialIndex: 0, status: 'scoring',
         processInstanceId: null, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null,
-        durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [],
+        durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
       }]);
       const recording = (server: string, recordedAt: string, text: string) => ({
         ...step, id: randomUUID(), caseId, server, evalRunId: run.id, trialId, recordedAt,

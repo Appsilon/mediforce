@@ -37,7 +37,7 @@ describe('reviewJudgeVerdict', () => {
     trial = {
       id: randomUUID(), evalRunId: evalRun.id, caseId: CASE, variantId: 'champion', trialIndex: 0, status: 'scored',
       processInstanceId: 'trial-run', agentRunId: 'trial-agent-run', costUsd: 0.1, inputTokens: 100, outputTokens: 10, durationMs: 1000,
-      confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 1, completedAt: null, mcpReplayMisses: [],
+      confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 1, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
     };
     await fixture.evaluationRepo.createEvalRun(evalRun, [trial]);
     // A confident fail the person will deny, and a passing schema check.

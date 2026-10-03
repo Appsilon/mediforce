@@ -498,6 +498,13 @@
       "when": 1789641801700,
       "tag": "0070_eval_run_acceptance",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1789641801800,
+      "tag": "0071_eval_trial_errored_judge_calls",
+      "breakpoints": true
     }
   ]
 }
