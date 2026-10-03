@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { WorkflowEngine } from '@mediforce/workflow-engine';
+import { evalRunAcceptance } from '@mediforce/platform-core';
 import { buildAgentOutputEnvelope, buildAgentRun, buildStepExecution, buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { noopRunKicker, type NoopRunKicker } from '../../../runtime/run-kicker';
 import { ConflictError, NotFoundError, ValidationError } from '../../../errors';
@@ -200,6 +201,8 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
 
     const { evalRun: finished, trials, report } = await getEvalRun({ evalRunId: evalRun.id }, scope);
     expect(finished.status).toBe('completed');
+    expect(finished.acceptance).toMatchObject({ status: 'missed' });
+    expect((await listEvalRuns(STEP, scope)).evalRuns[0]!.acceptance).toEqual(finished.acceptance);
     expect(finished.spentUsd).toBeCloseTo(1, 10);
     expect(trials.every((trial) => trial.status === 'scored')).toBe(true);
 
@@ -271,13 +274,19 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   it('still scores and charges a trial that was running when the run was cancelled', async () => {
     const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
-    await cancelEvalRun({ evalRunId: evalRun.id }, scope);
+    const storeAcceptance = vi.spyOn(fixture.evaluationRepo, 'setEvalRunAcceptance');
+    const { evalRun: justCancelled } = await cancelEvalRun({ evalRunId: evalRun.id }, scope);
+    expect(justCancelled.acceptance).toMatchObject({ status: 'not_judged' });
+    expect(storeAcceptance).toHaveBeenCalledTimes(1);
     expect(await fixture.evaluationRepo.listEvalRunIdsToDrive()).toEqual([evalRun.id]);
 
     await finishTrial(kicker.kicks[0]!.instanceId, { findings: [] }, 0.25);
 
     const { evalRun: cancelled, report } = await getEvalRun({ evalRunId: evalRun.id }, scope);
     expect(cancelled.status).toBe('cancelled');
+    // The late trial's grades rewrite the stored acceptance.
+    expect(storeAcceptance).toHaveBeenCalledTimes(2);
+    expect(cancelled.acceptance).toEqual(evalRunAcceptance(cancelled, report));
     expect(cancelled.spentUsd).toBeCloseTo(0.25, 10);
     expect(report.trials).toMatchObject({ scored: 1, skipped: 3, inProgress: 0 });
     expect(await fixture.evaluationRepo.listEvalRunIdsToDrive()).toEqual([]);

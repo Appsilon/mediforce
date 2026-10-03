@@ -3,6 +3,7 @@ import { mcpReplayMissesOf, type AgentOutputSnapshot, type EvalCase, type EvalRu
 import type { CallerScope } from '../../../repositories/index';
 import { recordScore } from '../../scores/record-score';
 import { loadEvaluationSubject } from './evaluation-subject';
+import { storeEvalRunAcceptance } from './eval-run-report';
 import { loadModelPrices } from './model-prices';
 import { runEvaluatorCheck, type JudgeUsage } from './run-evaluator-check';
 import { evaluatorsOfCase, judgeConfidenceMetadata, scoresOfTrial } from './trial-scores';
@@ -229,6 +230,7 @@ export async function driveEvalRun(scope: CallerScope, evalRunId: string): Promi
   };
 
   const staleBefore = new Date(Date.now() - CLAIM_LEASE_MS).toISOString();
+  let graded = false;
   for (const trial of await scope.evaluation.listTrials(evalRunId)) {
     if (trial.status === 'scoring') {
       if (claimIsStale(trial.scoringStartedAt, staleBefore) === false) continue;
@@ -238,10 +240,14 @@ export async function driveEvalRun(scope: CallerScope, evalRunId: string): Promi
           error: `Scoring did not finish in ${trial.scoringAttempts} attempts`,
           completedAt: new Date().toISOString(),
         });
+        graded = true;
         continue;
       }
       const takenOver = await scope.evaluation.renewScoringClaim(trial, staleBefore, new Date().toISOString());
-      if (takenOver === true) await scoreTrial(scope, initial, trial, await caseFor(trial.caseId));
+      if (takenOver === true) {
+        await scoreTrial(scope, initial, trial, await caseFor(trial.caseId));
+        graded = true;
+      }
       continue;
     }
     if (trial.status !== 'running' || trial.processInstanceId === null) continue;
@@ -253,6 +259,7 @@ export async function driveEvalRun(scope: CallerScope, evalRunId: string): Promi
           error: 'The trial\'s Workflow Run was never created',
           completedAt: new Date().toISOString(),
         });
+        graded = true;
       }
       continue;
     }
@@ -260,10 +267,14 @@ export async function driveEvalRun(scope: CallerScope, evalRunId: string): Promi
     const claimed = await claimForScoring(scope, initial, trial);
     if (claimed === null) continue;
     await scoreTrial(scope, initial, claimed, await caseFor(trial.caseId));
+    graded = true;
   }
 
   const run = (await scope.evaluation.getEvalRun(evalRunId))!;
-  if (run.status !== 'running') return;
+  if (run.status !== 'running') {
+    if (graded === true) await storeEvalRunAcceptance(scope, run);
+    return;
+  }
   const trials = await scope.evaluation.listTrials(evalRunId);
   const pending = schedulingOrder(run, trials.filter((trial) => trial.status === 'pending'));
   const inFlight = trials.filter((trial) => trial.status === 'running' || trial.status === 'scoring').length;
@@ -286,11 +297,13 @@ export async function driveEvalRun(scope: CallerScope, evalRunId: string): Promi
   const after = await scope.evaluation.listTrials(evalRunId);
   const open = after.some((trial) => trial.status === 'pending' || trial.status === 'running' || trial.status === 'scoring');
   if (open) return;
-  const closed = await scope.evaluation.transitionEvalRun(evalRunId, 'running', {
-    status: after.some((trial) => trial.status === 'skipped') ? 'budget_exceeded' : 'completed',
+  const finished = {
+    status: after.some((trial) => trial.status === 'skipped') ? 'budget_exceeded' as const : 'completed' as const,
     completedAt: new Date().toISOString(),
-  });
+  };
+  const closed = await scope.evaluation.transitionEvalRun(evalRunId, 'running', finished);
   if (closed) {
+    await storeEvalRunAcceptance(scope, { ...run, ...finished });
     await scope.system.audit.append({
       actorId: 'eval-run-driver',
       actorType: 'system',

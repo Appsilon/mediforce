@@ -4,13 +4,11 @@ import {
   CHAMPION_VARIANT_ID,
   DEFAULT_ACCEPTANCE_CRITERIA,
   applyStepVariant,
-  evalRunAcceptance,
   evaluatorTrust,
   isEmptyVariantPatch,
   resolveDefinitionModels,
   variantPatchProblem,
   type EvalRun,
-  type EvalRunAcceptance,
   type EvalRunEvaluator,
   type EvalTrial,
   type EvalVariant,
@@ -34,7 +32,7 @@ import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { isSameStep, loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
 import { estimateEvalRun } from './_lib/estimate-eval-run';
-import { buildEvalRunReport } from './_lib/eval-run-report';
+import { buildEvalRunReport, rebuildEvalRunAcceptance, storeEvalRunAcceptance } from './_lib/eval-run-report';
 import { driveEvalRun } from './_lib/drive-eval-run';
 import { computeStepFingerprint } from './_lib/step-fingerprint';
 import { exampleCasesProblem } from './_lib/example-cases';
@@ -222,6 +220,7 @@ export async function prepareEvalRun(
     createdAt: now,
     startedAt: null,
     completedAt: null,
+    acceptance: null,
   };
   const trials: EvalTrial[] = caseIds.flatMap((caseId) => variants.flatMap((variant) =>
     Array.from({ length: input.trialsPerCase }, (_unused, trialIndex) => ({
@@ -305,17 +304,20 @@ export async function getEvalRun(input: GetEvalRunInput, scope: CallerScope): Pr
   return evalRunOutput(scope, input.evalRunId);
 }
 
-/** How the run's champion fared on the criteria frozen into it; a run still prepared or running has no report to read. */
-async function acceptanceOf(scope: CallerScope, run: EvalRun): Promise<EvalRunAcceptance | null> {
-  if (run.status === 'prepared' || run.status === 'running') return null;
-  return evalRunAcceptance(run, await buildEvalRunReport(scope, run, await scope.evaluation.listTrials(run.id)));
-}
-
-/** The Step's Eval Runs, newest first, each with how its champion fared on its criteria. */
+/**
+ * The Step's Eval Runs, newest first, each with how its champion fared on its
+ * criteria as stored on the run. A run that finished before acceptance was
+ * stored has it rebuilt from its report; a read never writes it.
+ */
 export async function listEvalRuns(input: ListEvalRunsInput, scope: CallerScope): Promise<ListEvalRunsOutput> {
   await loadEvaluatedStep(scope, input, 'read');
   const runs = await scope.evaluation.listEvalRuns(stepRef(input));
-  return { evalRuns: await Promise.all(runs.map(async (run) => ({ ...run, acceptance: await acceptanceOf(scope, run) }))) };
+  return {
+    evalRuns: await Promise.all(runs.map(async (run) => {
+      if (run.acceptance !== null || run.status === 'prepared' || run.status === 'running') return run;
+      return { ...run, acceptance: await rebuildEvalRunAcceptance(scope, run) };
+    })),
+  };
 }
 
 /** Stops an Eval Run: no new trial starts; trials already running finish and are scored. */
@@ -342,6 +344,7 @@ export async function cancelEvalRun(input: CancelEvalRunInput, scope: CallerScop
     inputSnapshot: {},
     basis: 'A person stopped the Eval Run',
   });
+  await storeEvalRunAcceptance(scope, { ...run, status: 'cancelled', completedAt: now });
   return evalRunOutput(scope, run.id);
 }
 

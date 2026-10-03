@@ -3,6 +3,7 @@ import {
   EvalRunSchema,
   EvalTrialSchema,
   type EvalRun,
+  type EvalRunAcceptance,
   type EvalRunStatus,
   type EvalTrial,
   type EvalTrialStatus,
@@ -246,6 +247,11 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
   async addEvalRunSpend(id: string, usd: number): Promise<void> {
     const run = this.runs.get(id);
     if (run !== undefined) this.runs.set(id, { ...run, spentUsd: run.spentUsd + usd });
+  }
+
+  async setEvalRunAcceptance(id: string, acceptance: EvalRunAcceptance): Promise<void> {
+    const run = this.runs.get(id);
+    if (run !== undefined) this.runs.set(id, { ...run, acceptance });
   }
 
   async listTrials(evalRunId: string): Promise<EvalTrial[]> {

@@ -260,7 +260,7 @@ describe('executeAgentStep', () => {
       ],
       acceptanceCriteria: null, mcpPolicy: {},
       estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
-      budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null,
+      budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null, acceptance: null,
     }, [{
       id: '55555555-5555-4555-8555-555555555555', evalRunId, caseId, variantId: 'challenger-1', trialIndex: 0, status: 'running',
       processInstanceId: 'inst-wf-001', agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
@@ -297,7 +297,7 @@ describe('executeAgentStep', () => {
         variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint }],
         acceptanceCriteria: null, mcpPolicy: {},
         estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
-        budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null,
+        budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null, acceptance: null,
       }, [{
         id: trialId, evalRunId, caseId, variantId: 'champion', trialIndex: 0, status: 'running',
         processInstanceId: instanceId, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
@@ -357,7 +357,7 @@ describe('executeAgentStep', () => {
         variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
         acceptanceCriteria: null, mcpPolicy,
         estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
-        budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null,
+        budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null, acceptance: null,
       }, [{
         id: trialId, evalRunId, caseId, variantId: 'champion', trialIndex: 0, status: 'running',
         processInstanceId: instanceId, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,

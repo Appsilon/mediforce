@@ -5,6 +5,7 @@ import { NotFoundError, ValidationError } from '../../errors';
 import { resolveTargetUid } from '../_helpers';
 import { recordScore } from '../scores/record-score';
 import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
+import { storeEvalRunAcceptance } from './_lib/eval-run-report';
 import { isModelVerdict, trialScores } from './_lib/trial-scores';
 
 /** The name of the human Score a person's review of a judge's verdict is recorded as. */
@@ -82,5 +83,6 @@ export async function reviewJudgeVerdict(
     comment: input.comment ?? null,
     reviewedBy,
   });
+  await storeEvalRunAcceptance(scope, run);
   return { score };
 }

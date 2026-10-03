@@ -1,4 +1,4 @@
-import type { EvalRun, EvalRunStatus, EvalTrial, EvalTrialStatus } from '../schemas/eval-run';
+import type { EvalRun, EvalRunAcceptance, EvalRunStatus, EvalTrial, EvalTrialStatus } from '../schemas/eval-run';
 import type { EvalOptimisation, EvalOptimisationStatus } from '../schemas/eval-optimisation';
 import type { StepQualification } from '../schemas/step-qualification';
 import type {
@@ -100,6 +100,7 @@ export interface EvaluationRepository {
   ): Promise<boolean>;
   /** Atomically adds a trial's cost to the run's spend. */
   addEvalRunSpend(id: string, usd: number): Promise<void>;
+  setEvalRunAcceptance(id: string, acceptance: EvalRunAcceptance): Promise<void>;
 
   /** By case, then variant, then trial index. */
   listTrials(evalRunId: string): Promise<EvalTrial[]>;

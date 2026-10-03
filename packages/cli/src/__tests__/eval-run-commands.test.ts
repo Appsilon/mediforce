@@ -20,7 +20,7 @@ const OUTPUT = {
     acceptanceCriteria: { critical: { minPassRate: 0.9 } },
     mcpPolicy: {}, estimate: { perTrialUsd: 0.2, totalUsd: 0.6, basis: 'history', sampleSize: 5 },
     budgetUsd: 0.9, spentUsd: 0, status: 'prepared', createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
-    startedAt: null, completedAt: null,
+    startedAt: null, completedAt: null, acceptance: null,
   },
   trials: [],
   report: {

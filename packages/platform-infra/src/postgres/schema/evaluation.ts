@@ -170,7 +170,8 @@ export const evalAcceptanceCriteria = pgTable(
  * Eval Runs (ADR-0023 D4, D10). The frozen parts — cases, Evaluator versions,
  * MCP policy, estimate — are written once at prepare; afterwards only
  * `status`, the timestamps and `spent_usd` change, each by a conditional
- * update so concurrent drivers cannot both move a run.
+ * update so concurrent drivers cannot both move a run — and `acceptance`,
+ * rewritten whenever the run's grades change.
  */
 export const evalRuns = pgTable(
   'eval_runs',
@@ -197,6 +198,7 @@ export const evalRuns = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp('started_at', { withTimezone: true }),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    acceptance: jsonb('acceptance'),
   },
   (table) => ({
     stepIdx: index('eval_runs_step_idx').on(table.workspace, table.workflowName, table.stepId, table.createdAt.desc()),

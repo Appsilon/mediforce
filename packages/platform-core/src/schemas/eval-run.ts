@@ -98,6 +98,16 @@ export const EvalVariantSchema = z.object({
   fingerprint: StepFingerprintSchema.nullable(),
 });
 
+/**
+ * How an Eval Run's champion fared on the Acceptance Criteria frozen into it:
+ * `met` every one, `missed` one, `not_judged` none missed but one not judged,
+ * `no_criteria` none were frozen.
+ */
+export const EvalRunAcceptanceSchema = z.object({
+  status: z.enum(['met', 'missed', 'not_judged', 'no_criteria']),
+  reason: z.string(),
+});
+
 export const EvalRunSchema = EvaluatedStepSchema.extend({
   id: z.uuid(),
   definitionVersion: z.number().int().positive(),
@@ -123,6 +133,8 @@ export const EvalRunSchema = EvaluatedStepSchema.extend({
   createdAt: z.iso.datetime(),
   startedAt: z.iso.datetime().nullable(),
   completedAt: z.iso.datetime().nullable(),
+  /** Written when the run finishes and whenever a late trial or a judge review changes it; null until then. */
+  acceptance: EvalRunAcceptanceSchema.nullable(),
 });
 
 export const EvalTrialStatusSchema = z.enum([
@@ -348,6 +360,7 @@ export const EvalTrialOutcomeSchema = z.enum(['pass', 'fail', 'excluded', 'error
 /** One trial as graded by every Evaluator its case selects; none until it is scored. */
 export const EvalTrialResultSchema = z.object({
   trialId: z.uuid(),
+  variantId: z.string(),
   /** Null when the case no longer exists. */
   caseName: z.string().nullable(),
   /** Whether every counted Evaluator graded it and passed it; null when one did not grade it or none counts. */
@@ -358,16 +371,6 @@ export const EvalTrialResultSchema = z.object({
     /** The check's comment or a judge's rationale; null when it gave none. */
     comment: z.string().nullable(),
   })),
-});
-
-/**
- * How an Eval Run's champion fared on the Acceptance Criteria frozen into it:
- * `met` every one, `missed` one, `not_judged` none missed but one not judged,
- * `no_criteria` none were frozen.
- */
-export const EvalRunAcceptanceSchema = z.object({
-  status: z.enum(['met', 'missed', 'not_judged', 'no_criteria']),
-  reason: z.string(),
 });
 
 export const EvalRunReportSchema = z.object({

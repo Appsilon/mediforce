@@ -1,6 +1,7 @@
 import {
   calibrateConfidence,
   caseReliability,
+  evalRunAcceptance,
   judgeAcceptanceCriteria,
   mcpServersByMode,
   recommendControl,
@@ -9,6 +10,7 @@ import {
   type ConfidenceOutcome,
   type EvalCase,
   type EvalRun,
+  type EvalRunAcceptance,
   type EvalRunEvaluatorReport,
   type EvalRunMcpReport,
   type EvalRunReport,
@@ -298,6 +300,7 @@ function trialResults(
       const recorded = scores.get(trial.id) ?? { checks: [], reviews: new Map() };
       return {
         trialId: trial.id,
+        variantId: trial.variantId,
         caseName: evalCase?.name ?? null,
         passed: passedEveryCounted(run, countedScores(recorded), evalCase),
         evaluators: trial.status !== 'scored' ? [] : evaluatorsOfCase(run, evalCase).map((evaluator) => {
@@ -338,4 +341,16 @@ export async function buildEvalRunReport(scope: CallerScope, run: EvalRun, trial
     inputTokens: trials.reduce((sum, trial) => sum + (trial.inputTokens ?? 0), 0),
     outputTokens: trials.reduce((sum, trial) => sum + (trial.outputTokens ?? 0), 0),
   };
+}
+
+/** How a finished run's champion fared on its criteria, rebuilt from its report; null while it is prepared or running. */
+export async function rebuildEvalRunAcceptance(scope: CallerScope, run: EvalRun): Promise<EvalRunAcceptance | null> {
+  return evalRunAcceptance(run, await buildEvalRunReport(scope, run, await scope.evaluation.listTrials(run.id)));
+}
+
+/** Rebuilds a finished run's acceptance and stores it on the run, so the run list reads it. */
+export async function storeEvalRunAcceptance(scope: CallerScope, run: EvalRun): Promise<EvalRunAcceptance | null> {
+  const acceptance = await rebuildEvalRunAcceptance(scope, run);
+  if (acceptance !== null) await scope.evaluation.setEvalRunAcceptance(run.id, acceptance);
+  return acceptance;
 }

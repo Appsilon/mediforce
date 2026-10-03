@@ -3,9 +3,10 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
-import type { EvalCase, EvaluatedStep, EvaluatorCheck, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
+import type { EvalCase, EvaluatedStep, EvaluatorCheck, JudgeVerdict, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { EvalTrialEvaluator, GetEvalTrialOutput } from '@mediforce/platform-api/contract';
 import { routes } from '@/lib/routes';
+import { formatCostUsd, formatDuration } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { useEvalRun, useEvalTrial } from '@/hooks/use-step-evaluation';
 import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
@@ -13,6 +14,7 @@ import { OutcomeChip, TrialResultBadge, TrialStatusBadge } from './eval-run-badg
 import { describePatch } from './eval-run-report';
 import { JudgeVerdictRow } from './judge-verdicts';
 import { CHECK_KINDS, CheckDetails } from './evaluator-check-editor';
+import { citationParts, citedEntries } from './judge-citations';
 
 const preClass = 'max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md border bg-muted/40 p-3 font-mono text-xs';
 
@@ -41,30 +43,13 @@ function Panel({ title, children, className }: { title: React.ReactNode; childre
   );
 }
 
-const CITATION = /\[(\d+)\]/g;
-
 /** A judge's text with every `[n]` that names an entry of the agent's log turned into a link to it. */
 function withCitations(text: string, entries: ReadonlySet<number>): React.ReactNode[] {
-  const parts: React.ReactNode[] = [];
-  let last = 0;
-  for (const match of text.matchAll(CITATION)) {
-    const seq = Number(match[1]);
-    if (entries.has(seq) === false) continue;
-    parts.push(text.slice(last, match.index));
-    parts.push(
-      <a key={match.index} href={`#log-entry-${seq}`} className="rounded bg-amber-500/15 px-0.5 font-mono text-amber-800 hover:underline dark:text-amber-300">
-        [{seq}]
-      </a>,
-    );
-    last = match.index + match[0].length;
-  }
-  parts.push(text.slice(last));
-  return parts;
-}
-
-/** The log entries a judge's text cites, as `[n]`. */
-function citedEntries(text: string | null): number[] {
-  return text === null ? [] : [...text.matchAll(CITATION)].map((match) => Number(match[1]));
+  return citationParts(text, entries).map((part, index) => ('text' in part ? part.text : (
+    <a key={index} href={`#log-entry-${part.seq}`} className="rounded bg-amber-500/15 px-0.5 font-mono text-amber-800 hover:underline dark:text-amber-300">
+      [{part.seq}]
+    </a>
+  )));
 }
 
 /** What a check reads to decide, in words — every part of it is on this page. */
@@ -105,13 +90,21 @@ function JudgePrompt({ messages }: { messages: NonNullable<EvalTrialEvaluator['j
 /** One Evaluator on this trial: what it looks for and reads, its verdict and why, and a person's review of a model's verdict. */
 function EvaluatorResult({ entry, context }: {
   entry: EvalTrialEvaluator;
-  context: { step: EvaluatedStep; evalRunId: string; output: GetEvalTrialOutput; logEntries: ReadonlySet<number>; mayEdit: boolean; editReason: string | undefined };
+  context: {
+    step: EvaluatedStep;
+    evalRunId: string;
+    output: GetEvalTrialOutput;
+    verdicts: readonly JudgeVerdict[];
+    logEntries: ReadonlySet<number>;
+    mayEdit: boolean;
+    editReason: string | undefined;
+  };
 }) {
   const { evaluator, check, score, outcome } = entry;
-  const run = useEvalRun(context.evalRunId);
-  const verdict = run.data?.report.judgeVerdicts.find((candidate) => candidate.trialId === context.output.trial.id && candidate.evaluatorId === evaluator.evaluatorId);
+  const verdict = context.verdicts.find((candidate) => candidate.evaluatorId === evaluator.evaluatorId);
   const said = score?.comment ?? null;
-  const rendered = said === null ? null : withCitations(said, context.logEntries);
+  // Only a judge reads the numbered log; `[0]` in a check's comment is not a citation.
+  const rendered = said === null || evaluator.kind !== 'llm_judge' ? said : withCitations(said, context.logEntries);
   return (
     <div className="space-y-3 rounded-md border p-4" id={`evaluator-${evaluator.evaluatorId}`} data-testid="trial-evaluator">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -217,14 +210,16 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
   const run = useEvalRun(evalRunId);
   const { mayEdit, reason: editReason } = useWorkflowEditGate(handle, workflowName);
 
-  if (trial.error instanceof Error) return <p className="p-6 text-sm text-destructive">{trial.error.message}</p>;
-  if (trial.data === undefined) return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
+  const failed = trial.error ?? run.error;
+  if (failed instanceof Error) return <p className="p-6 text-sm text-destructive">{failed.message}</p>;
+  if (trial.data === undefined || run.data === undefined) return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
 
   const output = trial.data;
   const { trial: evalTrial, variant, evalCase, evaluators } = output;
-  const evalRun = run.data?.evalRun;
-  const step: EvaluatedStep = { namespace: handle, workflowName, stepId: evalRun?.stepId ?? '' };
-  const passed = run.data?.report.trialResults.find((result) => result.trialId === evalTrial.id)?.passed ?? null;
+  const { evalRun, report } = run.data;
+  const step: EvaluatedStep = { namespace: evalRun.namespace, workflowName: evalRun.workflowName, stepId: evalRun.stepId };
+  const passed = report.trialResults.find((result) => result.trialId === evalTrial.id)?.passed ?? null;
+  const verdicts = report.judgeVerdicts.filter((verdict) => verdict.trialId === evalTrial.id);
   const logEntries = new Set(output.trajectory.map((entry) => entry.seq));
   const citedBy = new Map<number, string[]>();
   for (const entry of evaluators) {
@@ -249,15 +244,15 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
         </div>
         <p className="text-xs text-muted-foreground">
           {variant.label} — {describePatch(variant.patch)}
-          {evalTrial.costUsd !== null && ` · $${evalTrial.costUsd.toFixed(4)}`}
-          {evalTrial.durationMs !== null && ` · ${(evalTrial.durationMs / 1000).toFixed(1)}s`}
+          {evalTrial.costUsd !== null && ` · ${formatCostUsd(evalTrial.costUsd)}`}
+          {evalTrial.durationMs !== null && ` · ${formatDuration(evalTrial.durationMs)}`}
           {evalTrial.inputTokens !== null && ` · ${evalTrial.inputTokens + (evalTrial.outputTokens ?? 0)} tokens`}
         </p>
         <nav className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
           <a href="#trial-io" className="text-primary hover:underline">Input and output</a>
           <a href="#trial-evaluators" className="text-primary hover:underline">Evaluators ({evaluators.length})</a>
           <a href="#trial-log" className="text-primary hover:underline">Agent log ({output.trajectory.length})</a>
-          {instanceId !== null && evalRun !== undefined && (
+          {instanceId !== null && (
             <>
               <Link href={routes.workflowRunStep(handle, workflowName, instanceId, evalRun.stepId)} className="inline-flex items-center gap-1 text-primary hover:underline">
                 Step execution and full agent log <ExternalLink className="h-3 w-3" />
@@ -311,7 +306,7 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
         ) : (
           <div className="space-y-3">
             {evaluators.map((entry) => (
-              <EvaluatorResult key={entry.evaluator.evaluatorId} entry={entry} context={{ step, evalRunId, output, logEntries, mayEdit, editReason }} />
+              <EvaluatorResult key={entry.evaluator.evaluatorId} entry={entry} context={{ step, evalRunId, output, verdicts, logEntries, mayEdit, editReason }} />
             ))}
           </div>
         )}

@@ -8,7 +8,7 @@ import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-ve
 import { useWorkflowTriggers } from '@/hooks/use-workflow-triggers';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import type { StepEvaluationMark } from '@/components/workflows/workflow-diagram';
-import { VALIDATION_STATUS, evaluationHref } from '@/components/evaluation/validation-status';
+import { VALIDATION_STATUS } from '@/components/evaluation/validation-status';
 import { useWorkflowValidation } from '@/hooks/use-step-evaluation';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
@@ -46,7 +46,7 @@ export default function WorkflowDefinitionVersionPage() {
     return new Map<string, StepEvaluationMark>((version?.steps ?? []).map((step) => [step.stepId, {
       status: step.validation.status,
       title: `Evaluation: ${VALIDATION_STATUS[step.validation.status].label.toLowerCase()} — ${step.validation.reason}`,
-      href: evaluationHref(handle, decodedName, versionNumber, step.stepId),
+      href: routes.workflowEvaluation(handle, decodedName, { version: versionNumber, step: step.stepId }),
     }]));
   }, [validation, versionNumber, handle, decodedName]);
   // Hand-startable gate reads the unified triggers table (ADR-0011 / Issue #930),

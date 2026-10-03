@@ -75,6 +75,7 @@ describe('getEvalTrial (ADR-0023)', () => {
 
     expect(report.trialResults.find((entry) => entry.trialId === failing.id)).toEqual({
       trialId: failing.id,
+      variantId: 'champion',
       caseName: 'Grade 4 neutropenia',
       passed: false,
       evaluators: [

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { CircleCheck, CircleX, Clock, type LucideIcon } from 'lucide-react';
 import type { StepValidation, WorkflowVersionValidation } from '@mediforce/platform-api/contract';
+import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 
 type ValidationStatus = StepValidation['status'];
@@ -42,13 +43,6 @@ export const VALIDATION_STATUS: Record<ValidationStatus, {
   },
 };
 
-/** Where the Evaluation tab opens on one step of one version. */
-export function evaluationHref(handle: string, workflowName: string, definitionVersion: number, stepId?: string): string {
-  const params = new URLSearchParams({ tab: 'evaluation', version: String(definitionVersion) });
-  if (stepId !== undefined) params.set('step', stepId);
-  return `/${handle}/workflows/${encodeURIComponent(workflowName)}?${params}`;
-}
-
 /** What a version's status rests on: each agent step's validation in it. */
 function describeVersionValidation(version: WorkflowVersionValidation): string {
   if (version.steps.length === 0) return 'No agent steps to verify.';
@@ -71,7 +65,7 @@ export function VersionValidationBadge({ handle, workflowName, version }: { hand
     ?? version.steps[0]!;
   return (
     <Link
-      href={evaluationHref(handle, workflowName, version.definitionVersion, shown.stepId)}
+      href={routes.workflowEvaluation(handle, workflowName, { version: version.definitionVersion, step: shown.stepId })}
       title={describeVersionValidation(version)}
       data-testid="version-validation-badge"
       data-status={version.status}

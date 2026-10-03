@@ -20,7 +20,7 @@ function run(overrides: Partial<EvalRun> = {}): EvalRun {
     variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
     acceptanceCriteria: null,
     mcpPolicy: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
-    budgetUsd: 5, spentUsd: 0, status: 'completed', createdBy: 'a', createdAt: '2026-09-23T08:00:00.000Z', startedAt: null, completedAt: null,
+    budgetUsd: 5, spentUsd: 0, status: 'completed', createdBy: 'a', createdAt: '2026-09-23T08:00:00.000Z', startedAt: null, completedAt: null, acceptance: null,
     ...overrides,
   };
 }

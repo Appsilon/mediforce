@@ -2,6 +2,7 @@ import type {
   AcceptanceCriteriaVersion,
   StepQualification,
   EvalRun,
+  EvalRunAcceptance,
   EvalRunStatus,
   EvalTrial,
   EvalTrialStatus,
@@ -168,6 +169,11 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   addEvalRunSpend = async (id: string, usd: number): Promise<void> => {
     await this.writableRun(id);
     await this.raw.addEvalRunSpend(id, usd);
+  };
+
+  setEvalRunAcceptance = async (id: string, acceptance: EvalRunAcceptance): Promise<void> => {
+    await this.writableRun(id);
+    await this.raw.setEvalRunAcceptance(id, acceptance);
   };
 
   /** A run's trials; `[]` when the run is not visible. */

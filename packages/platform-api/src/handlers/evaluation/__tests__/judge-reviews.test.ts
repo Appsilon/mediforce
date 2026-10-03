@@ -4,7 +4,7 @@ import type { EvalRun, EvalTrial } from '@mediforce/platform-core';
 import { userCaller } from '../../../repositories/__tests__/create-test-scope';
 import type { CallerScope } from '../../../repositories/index';
 import { recordScore } from '../../scores/record-score';
-import { getEvalRun } from '../eval-runs';
+import { getEvalRun, listEvalRuns } from '../eval-runs';
 import { getEvalRunFailures } from '../eval-run-failures';
 import { reviewJudgeVerdict } from '../judge-reviews';
 import { evaluationFixture, NAMESPACE, STEP, type EvaluationFixture } from './fixture';
@@ -32,7 +32,7 @@ describe('reviewJudgeVerdict', () => {
       variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
       acceptanceCriteria: { critical: { minPassRate: 1 } },
       mcpPolicy: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
-      budgetUsd: 5, spentUsd: 0, status: 'completed', createdBy: 'author-1', createdAt: '2026-10-01T08:00:00.000Z', startedAt: null, completedAt: null,
+      budgetUsd: 5, spentUsd: 0, status: 'completed', createdBy: 'author-1', createdAt: '2026-10-01T08:00:00.000Z', startedAt: null, completedAt: null, acceptance: null,
     };
     trial = {
       id: randomUUID(), evalRunId: evalRun.id, caseId: CASE, variantId: 'champion', trialIndex: 0, status: 'scored',
@@ -56,6 +56,9 @@ describe('reviewJudgeVerdict', () => {
 
   it('a denied verdict leaves the judge out of the Acceptance Criteria without reversing it, and is audited', async () => {
     expect((await getEvalRun({ evalRunId: evalRun.id }, scope)).report.variants[0]!.criteria[0]!.status).toBe('missed');
+    // A run finished before acceptance was stored: the list rebuilds it, and does not write it.
+    expect((await listEvalRuns(STEP, scope)).evalRuns[0]!.acceptance).toMatchObject({ status: 'missed' });
+    expect((await fixture.evaluationRepo.getEvalRun(evalRun.id))!.acceptance).toBeNull();
     expect((await getEvalRunFailures({ evalRunId: evalRun.id, limit: 50 }, scope)).total).toBe(1);
 
     const { score } = await reviewJudgeVerdict({
@@ -71,6 +74,7 @@ describe('reviewJudgeVerdict', () => {
     })]);
     expect(report.variants[0]!.evaluators.find((evaluator) => evaluator.evaluatorId === JUDGE)).toMatchObject({ passes: 0, failures: 0, excluded: 1 });
     expect(report.variants[0]!.criteria[0]!.status).toBe('not_evaluable');
+    expect((await fixture.evaluationRepo.getEvalRun(evalRun.id))!.acceptance).toMatchObject({ status: 'not_judged' });
     expect((await getEvalRunFailures({ evalRunId: evalRun.id, limit: 50 }, scope)).total).toBe(0);
     expect((await fixture.auditRepo.getByEntity('score', score.id)).map((event) => event.action)).toEqual(['score.created']);
   });
