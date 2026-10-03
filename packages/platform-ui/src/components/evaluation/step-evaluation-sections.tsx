@@ -3,7 +3,9 @@
 import * as React from 'react';
 import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Bot, Info, Loader2, X } from 'lucide-react';
+import Link from 'next/link';
+import { formatDistanceToNow } from 'date-fns';
+import { Bot, ChevronRight, Info, Loader2, X } from 'lucide-react';
 import {
   CHAMPION_VARIANT_ID,
   DEFAULT_ACCEPTANCE_CRITERIA,
@@ -40,8 +42,10 @@ import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { AgentRunLog } from '@/components/agents/agent-log-panel';
 import { useAgentRun } from '@/hooks/use-agent-runs';
-import { useAgentRunIo, useEvalRun, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
-import { EvalRunReport, describePatch } from './eval-run-report';
+import { useAgentRunIo, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
+import { routes } from '@/lib/routes';
+import { describePatch } from './eval-run-report';
+import { AcceptanceBadge, EvalRunStatusBadge } from './eval-run-badges';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 import { VALIDATION_STATUS } from './validation-status';
 import {
@@ -1477,30 +1481,11 @@ export function StartEvalRunCard({ step, prepared, otherVersion, mayRun, runReas
   );
 }
 
-function EvalRunRow({ step, evalRunId, onOpen, open, mayEdit, editReason }: {
-  step: EvaluatedStep;
-  evalRunId: string;
-  onOpen: () => void;
-  open: boolean;
-  mayEdit: boolean;
-  editReason: string | undefined;
-}) {
-  const run = useEvalRun(open ? evalRunId : null);
-  return (
-    <li className="border-t pt-2 first:border-t-0 first:pt-0">
-      <button type="button" className="text-left text-xs font-mono hover:underline" onClick={onOpen}>{evalRunId.slice(0, 8)}</button>
-      {open && (run.data === undefined ? <Loading /> : (
-        <div className="mt-2"><EvalRunReport output={run.data} step={step} mayEdit={mayEdit} editReason={editReason} /></div>
-      ))}
-    </li>
-  );
-}
-
 /**
  * Prepare, confirm and read the Step's Eval Runs. Preparing and starting one is the workflow's
  * `run` verb; signing a qualification from a report is its `edit` verb.
  */
-export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRun, runReason, mayEdit, editReason }: {
+export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRun, runReason }: {
   step: EvaluatedStep;
   /**
    * The workflow version whose step a new run runs. Its finished runs are
@@ -1513,12 +1498,9 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
   datasets: StepEvaluation['datasets'];
   mayRun: boolean;
   runReason: string | undefined;
-  mayEdit: boolean;
-  editReason: string | undefined;
 }) {
   const [trials, setTrials] = React.useState(3);
   const [budget, setBudget] = React.useState('');
-  const [openRunId, setOpenRunId] = React.useState<string | null>(null);
   const prepare = useStepEvaluationMutation(step, () => mediforce.evaluation.prepareRun({
     ...step,
     definitionVersion,
@@ -1567,26 +1549,48 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
       {data.isLoading ? <Loading /> : runs.length === 0 ? (
         <p className="text-sm text-muted-foreground">No Eval Runs of v{definitionVersion} yet.</p>
       ) : (
-        <ul className="space-y-2">
-          {runs.map((run) => (
-            <li key={run.id} className="text-sm">
-              <span className="text-xs text-muted-foreground">
-                {run.createdAt.slice(0, 16).replace('T', ' ')}{otherVersion(run) === undefined ? '' : ` · v${run.definitionVersion}`} · {run.status}{datasetVersion.has(run.datasetVersionId) ? ` · Dataset v${datasetVersion.get(run.datasetVersionId)}` : ''} · ${run.spentUsd.toFixed(2)} of ${run.budgetUsd}
-                {run.variants.length > 1 && ` · ${run.variants.length} variants`}
-              </span>
-              <ul>
-                <EvalRunRow
-                  step={step}
-                  evalRunId={run.id}
-                  open={openRunId === run.id}
-                  onOpen={() => setOpenRunId(openRunId === run.id ? null : run.id)}
-                  mayEdit={mayEdit}
-                  editReason={editReason}
-                />
-              </ul>
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full text-sm" data-testid="eval-runs-table">
+            <thead>
+              <tr className="border-b bg-muted text-left text-xs text-muted-foreground">
+                <th className="px-3 py-2 font-medium">ID</th>
+                <th className="px-3 py-2 font-medium">Created</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Cost</th>
+                <th className="px-3 py-2 font-medium">Dataset</th>
+                <th className="px-3 py-2 font-medium">
+                  <InstantTooltip label="How the step as it is (the champion) fared on the Acceptance Criteria frozen into the run.">
+                    <span>Acceptance</span>
+                  </InstantTooltip>
+                </th>
+                <th className="px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map((run) => (
+                <tr key={run.id} className="border-b last:border-0 hover:bg-muted/30" data-testid="eval-run-row">
+                  <td className="px-3 py-2 font-mono text-xs">
+                    {run.id.slice(0, 8)}
+                    {otherVersion(run) !== undefined && <span className="ml-1.5 text-muted-foreground">v{run.definitionVersion}</span>}
+                    {run.variants.length > 1 && <span className="ml-1.5 font-sans text-muted-foreground">{run.variants.length} variants</span>}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground" title={run.createdAt}>
+                    {formatDistanceToNow(new Date(run.createdAt), { addSuffix: true })}
+                  </td>
+                  <td className="px-3 py-2"><EvalRunStatusBadge status={run.status} /></td>
+                  <td className="px-3 py-2 text-xs tabular-nums text-muted-foreground">${run.spentUsd.toFixed(2)} of ${run.budgetUsd}</td>
+                  <td className="px-3 py-2 text-xs">{datasetVersion.has(run.datasetVersionId) ? `v${datasetVersion.get(run.datasetVersionId)}` : '—'}</td>
+                  <td className="px-3 py-2"><AcceptanceBadge acceptance={run.acceptance} /></td>
+                  <td className="px-3 py-2 text-right">
+                    <Link href={routes.workflowEvalRun(step.namespace, step.workflowName, run.id)} className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline">
+                      Details <ChevronRight className="h-3 w-3" />
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </Section>
   );

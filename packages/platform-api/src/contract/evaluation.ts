@@ -12,8 +12,14 @@ import {
   EvalOptimisationSchema,
   EvalRunReportSchema,
   EvalRunSchema,
+  EvalRunAcceptanceSchema,
+  EvalRunEvaluatorSchema,
+  EvalTrialOutcomeSchema,
   EvalTrialSchema,
   EvalTrialStatusSchema,
+  EvalVariantSchema,
+  JudgeVerdictSchema,
+  StoredAgentTrajectoryEntrySchema,
   EvaluatedStepSchema,
   EvaluationBriefSchema,
   EvaluationOriginSchema,
@@ -357,7 +363,68 @@ export const EvalRunOutputSchema = z.object({
 });
 
 export const ListEvalRunsInputSchema = EvaluatedStepSchema;
-export const ListEvalRunsOutputSchema = z.object({ evalRuns: z.array(EvalRunSchema) });
+
+export const ListEvalRunsOutputSchema = z.object({
+  evalRuns: z.array(EvalRunSchema.extend({
+    /** Null while the run is prepared or running. */
+    acceptance: EvalRunAcceptanceSchema.nullable(),
+  })),
+});
+
+/** One trial of an Eval Run, with everything its Evaluators read and gave. */
+export const GetEvalTrialInputSchema = z.object({ evalRunId: z.uuid(), trialId: z.uuid() });
+
+/** One message as a model judge was sent it. */
+export const JudgeMessageSchema = z.object({
+  role: z.enum(['system', 'user', 'assistant']),
+  content: z.string(),
+});
+
+/** One Evaluator of the trial's case: what it checks, how it graded the trial, and what its model read. */
+export const EvalTrialEvaluatorSchema = z.object({
+  evaluator: EvalRunEvaluatorSchema,
+  /** The plain-language rule of the Evaluator version frozen into the run — what it looks for; null when that version is gone. */
+  rule: z.string().nullable(),
+  /** That version's check. */
+  check: EvaluatorCheckSchema.nullable(),
+  /** Null until the trial is scored. */
+  outcome: EvalTrialOutcomeSchema.nullable(),
+  /** The Score it gave; null when it gave none. */
+  score: z.object({
+    value: z.number().min(0).max(1),
+    label: z.string().nullable(),
+    /** The check's comment; a judge's rationale. */
+    comment: z.string().nullable(),
+    confidence: z.number().min(0).max(1).nullable(),
+    minConfidence: z.number().min(0).max(1).nullable(),
+    agreement: z.number().min(0).max(1).nullable(),
+  }).nullable(),
+  /** Why the check could not grade the trial. */
+  error: z.string().nullable(),
+  /** A person's newest review of a model's verdict. */
+  review: JudgeVerdictSchema.shape.review,
+  /**
+   * What the model was sent — rebuilt from the frozen check and the trial's
+   * input, log and output by the function that sent it. Null for a check no
+   * model runs, or while there is no output.
+   */
+  judgePrompt: z.array(JudgeMessageSchema).nullable(),
+});
+
+export const GetEvalTrialOutputSchema = z.object({
+  trial: EvalTrialSchema,
+  variant: EvalVariantSchema,
+  /** Null when the case no longer exists. */
+  evalCase: EvalCaseSchema.nullable(),
+  /** What the step was given; null before the trial has an Agent Run. */
+  stepInput: z.record(z.string(), z.unknown()).nullable(),
+  result: z.unknown(),
+  /** The agent's own summary of what it did. */
+  reasoningSummary: z.string().nullable(),
+  /** The Agent Run's log, as judges and code checks read it. */
+  trajectory: z.array(StoredAgentTrajectoryEntrySchema),
+  evaluators: z.array(EvalTrialEvaluatorSchema),
+});
 
 /**
  * One variant's failing trials in an Eval Run, the material a fix starts from
@@ -682,6 +749,10 @@ export type CancelEvalRunInput = z.infer<typeof CancelEvalRunInputSchema>;
 export type EvalRunOutput = z.infer<typeof EvalRunOutputSchema>;
 export type ListEvalRunsInput = z.infer<typeof ListEvalRunsInputSchema>;
 export type ListEvalRunsOutput = z.infer<typeof ListEvalRunsOutputSchema>;
+export type GetEvalTrialInput = z.infer<typeof GetEvalTrialInputSchema>;
+export type GetEvalTrialOutput = z.infer<typeof GetEvalTrialOutputSchema>;
+export type EvalTrialEvaluator = z.infer<typeof EvalTrialEvaluatorSchema>;
+export type JudgeMessage = z.infer<typeof JudgeMessageSchema>;
 export type GetEvalRunFailuresInput = z.input<typeof GetEvalRunFailuresInputSchema>;
 export type GetEvalRunFailuresOutput = z.infer<typeof GetEvalRunFailuresOutputSchema>;
 export type EvalTrialFailure = z.infer<typeof EvalTrialFailureSchema>;

@@ -53,6 +53,8 @@ export { OpenRouterLlmClient } from './runner/llm-client';
 export {
   LlmJudgeReviewPlugin,
   judgeOutputAgreement,
+  llmJudgeMessages,
+  outputAgreementMessages,
   type LlmJudgeConfig,
   type LlmJudgeResult,
   type OutputAgreement,

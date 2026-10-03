@@ -1,5 +1,5 @@
 import { EvaluatorSeveritySchema, type AcceptanceCriteria } from '../schemas/evaluation';
-import type { AcceptanceCriterionVerdict, EvalRunEvaluatorReport } from '../schemas/eval-run';
+import { CHAMPION_VARIANT_ID, type AcceptanceCriterionVerdict, type EvalRun, type EvalRunAcceptance, type EvalRunEvaluatorReport, type EvalRunReport } from '../schemas/eval-run';
 
 const SEVERITIES = EvaluatorSeveritySchema.options;
 
@@ -91,4 +91,24 @@ export function describeAcceptanceCriteria(criteria: AcceptanceCriteria): string
       return [`${severity}: pass rate ≥ ${criterion.minPassRate}${passHatK}`];
     })
     .join('; ');
+}
+
+/**
+ * How an Eval Run's champion fared on the criteria frozen into it — the
+ * step's validation when the run is its newest finished one. Null while the
+ * run is prepared or running.
+ */
+export function evalRunAcceptance(
+  run: Pick<EvalRun, 'status' | 'acceptanceCriteria'>,
+  report: Pick<EvalRunReport, 'variants'>,
+): EvalRunAcceptance | null {
+  if (run.status === 'prepared' || run.status === 'running') return null;
+  if (run.acceptanceCriteria === null) return { status: 'no_criteria', reason: 'No Acceptance Criteria were frozen into this run.' };
+  const verdicts = report.variants.find((variant) => variant.id === CHAMPION_VARIANT_ID)?.criteria ?? [];
+  const unmet = verdicts.filter((verdict) => verdict.status !== 'met');
+  if (unmet.length === 0) return { status: 'met', reason: 'Every criterion met.' };
+  return {
+    status: unmet.some((verdict) => verdict.status === 'missed') ? 'missed' : 'not_judged',
+    reason: unmet.map((verdict) => `${verdict.severity} ${verdict.status === 'missed' ? 'missed' : 'not judged'}`).join(', '),
+  };
 }

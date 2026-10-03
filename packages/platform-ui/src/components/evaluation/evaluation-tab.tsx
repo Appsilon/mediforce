@@ -127,7 +127,7 @@ function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit, editRe
           stepOutputSchema={outputSchema}
         />
         <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
-        <EvalRunsSection step={step} definitionVersion={definitionVersion} data={evaluation.runs} datasets={evaluation.datasets} mayRun={mayRun} runReason={runReason} mayEdit={mayEdit} editReason={editReason} />
+        <EvalRunsSection step={step} definitionVersion={definitionVersion} data={evaluation.runs} datasets={evaluation.datasets} mayRun={mayRun} runReason={runReason} />
       </div>
       <div className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
         <AssistantResizeHandle {...assistantWidth} />

@@ -8,14 +8,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
-import { casesOfRun, checkOutcome, evaluatorsOfCase, trialScores, type CaseSelection } from './_lib/trial-scores';
-
-/** The part of a trial's error that names one Evaluator — how the driver records a check that could not run. */
-function evaluatorError(trial: EvalTrial, name: string): string {
-  const prefix = `${name}: `;
-  const found = (trial.error ?? '').split('; ').find((part) => part.startsWith(prefix));
-  return found === undefined ? 'no Score recorded' : found.slice(prefix.length);
-}
+import { casesOfRun, checkOutcome, evaluatorError, evaluatorsOfCase, trialScores, type CaseSelection } from './_lib/trial-scores';
 
 /** The Evaluators of its case that failed or could not grade a scored trial; a judge verdict left out is neither. */
 async function evaluatorFailures(scope: CallerScope, run: EvalRun, trial: EvalTrial, evalCase: CaseSelection): Promise<TrialEvaluatorFailure[]> {

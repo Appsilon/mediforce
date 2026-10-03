@@ -45,6 +45,13 @@ export async function scoresOfTrial(scope: CallerScope, run: EvalRun, trial: Eva
   return (await trialScores(scope, run, trial)).checks;
 }
 
+/** The part of a trial's error that names one Evaluator — how the driver records a check that could not run. */
+export function evaluatorError(trial: EvalTrial, name: string): string {
+  const prefix = `${name}: `;
+  const found = (trial.error ?? '').split('; ').find((part) => part.startsWith(prefix));
+  return found === undefined ? 'no Score recorded' : found.slice(prefix.length);
+}
+
 /** Whether a model gave this Score — a judge's verdict or an agreement score — so a person can accept or deny it. */
 export function isModelVerdict(score: Score): boolean {
   return score.source === 'llm_judge';

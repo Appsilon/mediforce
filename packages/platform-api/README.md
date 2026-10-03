@@ -139,6 +139,9 @@ trial's variant); the driver does not know variants exist. Applying a variant to
 (`apply-step-variant.ts`) saves it through `registerWorkflow`, not a second write path, so a
 qualification carries over exactly when the saved step's Fingerprint equals the variant's.
 `getEvalRunFailures` is the assistant's `get_failures` and `mediforce eval failures`.
+`getEvalTrial` is one trial with everything its Evaluators read and gave; a model judge's
+messages are rebuilt with agent-runtime's `llmJudgeMessages` / `outputAgreementMessages`, the
+functions that sent them, so nothing extra is stored on the Score.
 A GEPA optimisation (`optimisations.ts`) is the start handler's grant, a
 background job, then an ordinary Eval Run: `startOptimisation` validates and
 records it `proposing`, then answers; `proposeAndEvaluate` builds the reflective

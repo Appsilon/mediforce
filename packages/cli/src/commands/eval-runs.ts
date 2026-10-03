@@ -133,7 +133,8 @@ export const evalRunListCommand = defineCommand({
     }
     if (result.evalRuns.length === 0) output.stdout('No Eval Runs.');
     for (const run of result.evalRuns) {
-      output.stdout(`${run.id}  ${run.status.padEnd(15)} ${run.createdAt}  budget $${run.budgetUsd}, spent $${run.spentUsd.toFixed(4)}`);
+      const acceptance = run.acceptance === null ? '' : `  ${run.acceptance.status.replace('_', ' ')}: ${run.acceptance.reason}`;
+      output.stdout(`${run.id}  ${run.status.padEnd(15)} ${run.createdAt}  budget $${run.budgetUsd}, spent $${run.spentUsd.toFixed(4)}${acceptance}`);
     }
     return 0;
   },
@@ -182,6 +183,40 @@ export const evalRunFailuresCommand = defineCommand({
       for (const evaluator of failure.evaluators) {
         const counted = evaluator.counted ? 'counted' : 'not counted';
         output.stdout(`  ${evaluator.outcome} ${evaluator.name} (${evaluator.severity} ${evaluator.kind}, ${counted}): ${evaluator.error ?? evaluator.comment ?? ''}`);
+      }
+    }
+    return 0;
+  },
+});
+
+export const evalTrialCommand = defineCommand({
+  name: 'mediforce eval trial',
+  description: 'Print one trial of an Eval Run: its case, the step\'s input and output, and per Evaluator its grade, comment or rationale; --prompts adds what each model judge was sent.',
+  args: {
+    evalRunId: { type: 'positional', required: true, description: 'Eval Run id' },
+    trialId: { type: 'positional', required: true, description: 'Trial id' },
+    prompts: { type: 'boolean', description: 'Also print every message each model judge was sent' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.getTrial({ evalRunId: args.evalRunId, trialId: args.trialId });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    const { trial, variant, evalCase } = result;
+    output.stdout(`trial ${trial.id}  ${trial.status}  ${variant.id} — ${variant.label}  case "${evalCase?.name ?? trial.caseId}" trial ${trial.trialIndex + 1}${trial.agentRunId === null ? '' : `  agent run ${trial.agentRunId}`}`);
+    if (trial.error !== null) output.stdout(`error: ${trial.error}`);
+    output.stdout(`input: ${JSON.stringify(result.stepInput)}`);
+    if (evalCase?.expectedOutput != null) output.stdout(`expected output (${evalCase.expectation === 'negative' ? 'to avoid' : 'to match'}): ${JSON.stringify(evalCase.expectedOutput)}`);
+    output.stdout(`output: ${JSON.stringify(result.result)}`);
+    for (const entry of result.evaluators) {
+      const { evaluator, score } = entry;
+      const confidence = score?.confidence == null ? '' : `, confidence ${score.confidence}`;
+      output.stdout(`\n${entry.outcome ?? 'not graded'}  ${evaluator.name} v${evaluator.version} (${evaluator.severity} ${evaluator.kind}${evaluator.counted ? '' : ', not counted'}${confidence})`);
+      const said = entry.error ?? score?.comment ?? null;
+      if (said !== null) output.stdout(`  ${said}`);
+      if (args.prompts === true) {
+        for (const message of entry.judgePrompt ?? []) output.stdout(`  --- ${message.role} ---\n${message.content}`);
       }
     }
     return 0;

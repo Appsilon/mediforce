@@ -338,6 +338,38 @@ export const JudgeVerdictSchema = z.object({
   counts: z.boolean(),
 });
 
+/**
+ * How one Evaluator graded one trial: `excluded`, a model verdict left out of
+ * the criteria (`EvalRunEvaluatorReportSchema.excluded`); `errored`, the check
+ * could not grade it.
+ */
+export const EvalTrialOutcomeSchema = z.enum(['pass', 'fail', 'excluded', 'errored']);
+
+/** One trial as graded by every Evaluator its case selects; none until it is scored. */
+export const EvalTrialResultSchema = z.object({
+  trialId: z.uuid(),
+  /** Null when the case no longer exists. */
+  caseName: z.string().nullable(),
+  /** Whether every counted Evaluator graded it and passed it; null when one did not grade it or none counts. */
+  passed: z.boolean().nullable(),
+  evaluators: z.array(z.object({
+    evaluatorId: z.uuid(),
+    outcome: EvalTrialOutcomeSchema,
+    /** The check's comment or a judge's rationale; null when it gave none. */
+    comment: z.string().nullable(),
+  })),
+});
+
+/**
+ * How an Eval Run's champion fared on the Acceptance Criteria frozen into it:
+ * `met` every one, `missed` one, `not_judged` none missed but one not judged,
+ * `no_criteria` none were frozen.
+ */
+export const EvalRunAcceptanceSchema = z.object({
+  status: z.enum(['met', 'missed', 'not_judged', 'no_criteria']),
+  reason: z.string(),
+});
+
 export const EvalRunReportSchema = z.object({
   k: z.number().int().positive(),
   trials: TrialCountsSchema,
@@ -348,6 +380,8 @@ export const EvalRunReportSchema = z.object({
   comparison: z.array(VariantComparisonSchema),
   /** Every model's verdict on a scored trial — judges' and agreement scores — by variant, case and trial. */
   judgeVerdicts: z.array(JudgeVerdictSchema),
+  /** Every trial's grades, by variant, case and trial. */
+  trialResults: z.array(EvalTrialResultSchema),
   costUsd: z.number().nonnegative(),
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
@@ -372,3 +406,6 @@ export type EvalRunVariantReport = z.infer<typeof EvalRunVariantReportSchema>;
 export type VariantComparison = z.infer<typeof VariantComparisonSchema>;
 export type JudgeReviewDecision = z.infer<typeof JudgeReviewDecisionSchema>;
 export type JudgeVerdict = z.infer<typeof JudgeVerdictSchema>;
+export type EvalTrialOutcome = z.infer<typeof EvalTrialOutcomeSchema>;
+export type EvalTrialResult = z.infer<typeof EvalTrialResultSchema>;
+export type EvalRunAcceptance = z.infer<typeof EvalRunAcceptanceSchema>;

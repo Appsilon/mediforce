@@ -200,6 +200,7 @@ export {
   getWorkflowValidation,
   signStepQualification,
   getEvalRunFailures,
+  getEvalTrial,
   reviewJudgeVerdict,
   applyVariantToStep,
   startOptimisation,

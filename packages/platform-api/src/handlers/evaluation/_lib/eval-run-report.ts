@@ -14,6 +14,7 @@ import {
   type EvalRunReport,
   type EvalRunVariantReport,
   type EvalTrial,
+  type EvalTrialResult,
   type EvalVariant,
   type JudgeVerdict,
   type VariantComparison,
@@ -277,6 +278,41 @@ function judgeVerdicts(
 }
 
 /**
+ * Every trial with its grade from each Evaluator its case selects — what the
+ * per-Evaluator rates are counted from, one trial at a time. An Evaluator with
+ * no Score on a scored trial could not grade it; a trial not scored has no grades.
+ */
+function trialResults(
+  run: EvalRun,
+  trials: readonly EvalTrial[],
+  scores: ReadonlyMap<string, TrialScores>,
+  cases: RunCases,
+): EvalTrialResult[] {
+  const variantOrder = new Map(run.variants.map((variant, index) => [variant.id, index]));
+  return [...trials]
+    .sort((left, right) => (variantOrder.get(left.variantId) ?? 0) - (variantOrder.get(right.variantId) ?? 0)
+      || left.caseId.localeCompare(right.caseId)
+      || left.trialIndex - right.trialIndex)
+    .map((trial) => {
+      const evalCase = cases.get(trial.caseId) ?? null;
+      const recorded = scores.get(trial.id) ?? { checks: [], reviews: new Map() };
+      return {
+        trialId: trial.id,
+        caseName: evalCase?.name ?? null,
+        passed: passedEveryCounted(run, countedScores(recorded), evalCase),
+        evaluators: trial.status !== 'scored' ? [] : evaluatorsOfCase(run, evalCase).map((evaluator) => {
+          const score = recorded.checks.find((candidate) => candidate.evaluatorId === evaluator.evaluatorId);
+          return {
+            evaluatorId: evaluator.evaluatorId,
+            outcome: score === undefined ? 'errored' : checkOutcome(score, recorded.reviews.get(evaluator.evaluatorId)),
+            comment: score?.comment ?? null,
+          };
+        }),
+      };
+    });
+}
+
+/**
  * The Eval Run report (ADR-0023 D5, D10), computed from the Scores its trials
  * received — so its numbers are the Scores' numbers by construction. Per
  * variant: every Evaluator's results, the verdict on each Acceptance
@@ -297,6 +333,7 @@ export async function buildEvalRunReport(scope: CallerScope, run: EvalRun, trial
     variants,
     comparison: champion === undefined ? [] : challengers.map((challenger) => compare(champion, challenger)),
     judgeVerdicts: judgeVerdicts(run, trials, scores, cases),
+    trialResults: trialResults(run, trials, scores, cases),
     costUsd: trials.reduce((sum, trial) => sum + (trial.costUsd ?? 0), 0),
     inputTokens: trials.reduce((sum, trial) => sum + (trial.inputTokens ?? 0), 0),
     outputTokens: trials.reduce((sum, trial) => sum + (trial.outputTokens ?? 0), 0),

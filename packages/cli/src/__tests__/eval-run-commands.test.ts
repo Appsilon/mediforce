@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { evalApplyVariantCommand, evalRunFailuresCommand, evalRunGetCommand, evalRunPrepareCommand, evalRunStartCommand } from '../commands/eval-runs';
+import { evalApplyVariantCommand, evalRunFailuresCommand, evalRunGetCommand, evalRunPrepareCommand, evalRunStartCommand, evalTrialCommand } from '../commands/eval-runs';
 import { evalAskCommand } from '../commands/eval-ask';
 import { captureOutput, jsonResponse } from './test-helpers';
 
@@ -43,6 +43,7 @@ const OUTPUT = {
     }],
     comparison: [],
     judgeVerdicts: [],
+    trialResults: [],
     costUsd: 0, inputTokens: 0, outputTokens: 0,
   },
 };
@@ -188,6 +189,50 @@ describe('mediforce eval failures', () => {
   it('rejects a limit that is not a positive integer', async () => {
     const output = captureOutput();
     expect(await evalRunFailuresCommand({ argv: [RUN_ID, '--limit', '0', ...BASE], env: ENV, output })).toBe(2);
+  });
+});
+
+describe('mediforce eval trial', () => {
+  const judgeId = '5e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
+  const trial = {
+    trial: {
+      id: TRIAL_ID, evalRunId: RUN_ID, caseId: '2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', variantId: 'champion', trialIndex: 0, status: 'scored',
+      processInstanceId: 'trial-run', agentRunId: 'agent-run-1', costUsd: 0.1, inputTokens: 100, outputTokens: 10, durationMs: 1000,
+      confidence: 0.7, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 1, completedAt: null, mcpReplayMisses: [],
+    },
+    variant: { id: 'champion', label: 'Current step', patch: {}, fingerprint: null },
+    evalCase: null,
+    stepInput: { events: [{ term: 'Sepsis' }] },
+    result: { findings: [{ term: 'Sepsis', grade: 4 }] },
+    reasoningSummary: 'Graded by CTCAE v5.',
+    trajectory: [],
+    evaluators: [{
+      evaluator: { evaluatorId: judgeId, name: 'death-graded-5', version: 2, kind: 'llm_judge', severity: 'critical', counted: true },
+      rule: 'A fatal AE is Grade 5.',
+      check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'A fatal AE is Grade 5.', minConfidence: 0.8 },
+      outcome: 'fail',
+      score: { value: 0, label: 'fail', comment: 'Grade 4 given for a fatal AE.', confidence: 0.9, minConfidence: 0.8, agreement: null },
+      error: null,
+      review: null,
+      judgePrompt: [{ role: 'system', content: 'Rubric:\nA fatal AE is Grade 5.' }, { role: 'user', content: 'Step output: ...' }],
+    }],
+  };
+
+  it('prints the trial\'s input and output and each Evaluator\'s grade, and the judge prompt only with --prompts', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse(trial));
+    const output = captureOutput();
+    expect(await evalTrialCommand({ argv: [RUN_ID, TRIAL_ID, ...BASE], env: ENV, output })).toBe(0);
+
+    expect(fetchSpy.mock.calls[0]![0]).toBe(`http://localhost:5555/api/evaluation/runs/${RUN_ID}/trials/${TRIAL_ID}`);
+    const printed = output.stdoutLines.join('\n');
+    expect(printed).toContain('output: {"findings":[{"term":"Sepsis","grade":4}]}');
+    expect(printed).toContain('fail  death-graded-5 v2 (critical llm_judge, confidence 0.9)');
+    expect(printed).toContain('Grade 4 given for a fatal AE.');
+    expect(printed).not.toContain('Rubric:');
+
+    const withPrompts = captureOutput();
+    await evalTrialCommand({ argv: [RUN_ID, TRIAL_ID, '--prompts', ...BASE], env: ENV, output: withPrompts });
+    expect(withPrompts.stdoutLines.join('\n')).toContain('--- system ---\nRubric:\nA fatal AE is Grade 5.');
   });
 });
 
