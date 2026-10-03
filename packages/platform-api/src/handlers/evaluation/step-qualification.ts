@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import {
   CHAMPION_VARIANT_ID,
-  evalRunAcceptance,
   DEFAULT_ACCEPTANCE_CRITERIA,
   inlineMcpServerNames,
   qualificationSignatureMeaning,
@@ -29,7 +28,7 @@ import type { CallerScope } from '../../repositories/index';
 import { ConflictError, ForbiddenError, NotFoundError, PreconditionFailedError, ValidationError } from '../../errors';
 import { inlineMcpReason, loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
 import { appendEvaluationAudit } from './_lib/audit';
-import { buildEvalRunReport } from './_lib/eval-run-report';
+import { buildEvalRunReport, rebuildEvalRunAcceptance } from './_lib/eval-run-report';
 import { checkPassword } from '../users/_lib/check-password';
 import { changedFingerprintComponents, computeStepFingerprint } from './_lib/step-fingerprint';
 
@@ -131,9 +130,10 @@ async function stepValidation(
     return notVerified(run.acceptanceCriteria === null ? `Eval Run ${run.id.slice(0, 8)} had no Acceptance Criteria to judge.` : `Acceptance Criteria changed ${since}.`);
   }
 
-  const acceptance = evalRunAcceptance(run, await buildEvalRunReport(scope, run, await scope.evaluation.listTrials(run.id)));
-  if (acceptance?.status === 'met') return { status: 'passed', evalRunId: run.id, reason: `Eval Run ${run.id.slice(0, 8)} met every criterion.`, runInProgress };
-  return { status: 'failed', evalRunId: run.id, reason: `Eval Run ${run.id.slice(0, 8)}: ${acceptance?.reason}.`, runInProgress };
+  const acceptance = run.acceptance ?? await rebuildEvalRunAcceptance(scope, run);
+  if (acceptance === null) return notVerified(`Eval Run ${run.id.slice(0, 8)} has not finished.`);
+  if (acceptance.status === 'met') return { status: 'passed', evalRunId: run.id, reason: `Eval Run ${run.id.slice(0, 8)} met every criterion.`, runInProgress };
+  return { status: 'failed', evalRunId: run.id, reason: `Eval Run ${run.id.slice(0, 8)}: ${acceptance.reason}.`, runInProgress };
 }
 
 /**

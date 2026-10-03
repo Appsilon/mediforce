@@ -254,6 +254,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         createdAt: '2026-09-23T08:00:00.000Z',
         startedAt: null,
         completedAt: null,
+        acceptance: null,
       };
       const trials = [0, 1].map((trialIndex) => ({
         id: randomUUID(), evalRunId: run.id, caseId, variantId: 'champion', trialIndex, status: 'pending' as const,
@@ -292,6 +293,9 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
 
       await repo.transitionTrial(first!.id, 'scoring', { status: 'scored' });
       expect(await repo.listEvalRunIdsToDrive()).toEqual([]);
+
+      await repo.setEvalRunAcceptance(run.id, { status: 'missed', reason: 'critical missed' });
+      expect((await repo.getEvalRun(run.id))?.acceptance).toEqual({ status: 'missed', reason: 'critical missed' });
     });
 
     it('stores an optimisation, newest first per step, and moves it only from the expected status', async () => {
@@ -474,6 +478,7 @@ function storedRun(datasetVersionId: string, caseIds: string[]): EvalRun {
     createdAt: '2026-09-23T08:00:00.000Z',
     startedAt: null,
     completedAt: null,
+    acceptance: null,
   };
 }
 

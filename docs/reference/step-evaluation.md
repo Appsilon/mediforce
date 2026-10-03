@@ -607,17 +607,20 @@ the judge calls. Then:
   reported no confidence, or no threshold holds. A recommendation to apply in
   the workflow editor.
 
-- **Trial results.** Every trial with each of its case's Evaluators' grade —
-  `pass`, `fail`, `excluded` (a model verdict left out) or `errored` — and
-  comment, and whether it passed every counted Evaluator (`report.trialResults`).
+- **Trial results.** Every trial, by variant, with each of its case's
+  Evaluators' grade — `pass`, `fail`, `excluded` (a model verdict left out) or
+  `errored` — and comment, and whether it passed every counted Evaluator
+  (`report.trialResults`).
 
 ### Reading an Eval Run
 
 The Evaluation tab lists the step's Eval Runs as a table — ID, created,
 status, cost against budget, Dataset version, **Acceptance** (how the champion
 fared on the criteria frozen into the run: Met, Missed, Not judged or No
-criteria; `acceptance` on `GET /api/evaluation/runs` and in `mediforce eval
-run-list`) — and **Details** opens the run on its own page
+criteria; `acceptance` on the run, from `GET /api/evaluation/runs` and in
+`mediforce eval run-list`). It is stored on the run when the run finishes or is
+cancelled, and rewritten when a late trial is scored or a person reviews a
+model's verdict, so the list never rebuilds a report. **Details** opens the run on its own page
 (`/<workspace>/workflows/<name>/eval-runs/<evalRunId>`): its header (status,
 acceptance, Dataset, trials, cost, Cancel while it runs, Start while
 prepared) and five views, from the whole run to one trial:
@@ -645,10 +648,11 @@ and what it reads, its verdict and comment or why it could not grade, a
 person's review, and for a model judge the exact messages it was sent. Those
 messages are rebuilt from the Evaluator version frozen into the run and the
 trial's input, log and output by the code that sent them
-(`llmJudgeMessages`, `outputAgreementMessages`); the case is read as it is
-now, so an agreement comparison's expected output reflects any later edit to
-the case. Log entries a judge's rationale cites as `[n]` link to the entry,
-which is marked in the log.
+(`llmJudgeMessages`, `outputAgreementMessages`). A case is never changed in
+place — an edit is a new case — so the trial's case, and an agreement
+comparison's expected output, are what the judge read. Log entries a model
+judge's rationale cites as `[n]` link to the entry, which is marked in the log;
+an `[n]` in a code or schema check's comment is left as text.
 
 ## Acceptance Criteria
 

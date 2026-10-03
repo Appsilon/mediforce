@@ -20,7 +20,7 @@ import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 
-function percent(value: number | null): string {
+export function percent(value: number | null): string {
   return value === null ? '—' : `${Math.round(value * 100)}%`;
 }
 

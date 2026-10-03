@@ -1,5 +1,5 @@
 import { EvaluatorSeveritySchema, type AcceptanceCriteria } from '../schemas/evaluation';
-import { CHAMPION_VARIANT_ID, type AcceptanceCriterionVerdict, type EvalRun, type EvalRunAcceptance, type EvalRunEvaluatorReport, type EvalRunReport } from '../schemas/eval-run';
+import { CHAMPION_VARIANT_ID, type AcceptanceCriterionVerdict, type EvalRun, type EvalRunAcceptance, type EvalRunEvaluatorReport, type EvalRunVariantReport } from '../schemas/eval-run';
 
 const SEVERITIES = EvaluatorSeveritySchema.options;
 
@@ -100,7 +100,7 @@ export function describeAcceptanceCriteria(criteria: AcceptanceCriteria): string
  */
 export function evalRunAcceptance(
   run: Pick<EvalRun, 'status' | 'acceptanceCriteria'>,
-  report: Pick<EvalRunReport, 'variants'>,
+  report: { variants: ReadonlyArray<Pick<EvalRunVariantReport, 'id' | 'criteria'>> },
 ): EvalRunAcceptance | null {
   if (run.status === 'prepared' || run.status === 'running') return null;
   if (run.acceptanceCriteria === null) return { status: 'no_criteria', reason: 'No Acceptance Criteria were frozen into this run.' };

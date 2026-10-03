@@ -15,6 +15,7 @@ import {
   type EvaluatorVersion,
 } from '@mediforce/platform-core';
 import type { EvalRunOutput } from '@mediforce/platform-api/contract';
+import { formatCostUsd, formatDuration } from '@/lib/format';
 import { mediforce } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
@@ -22,7 +23,7 @@ import { useEvalRun, useEvalRunMutation, useStepDatasets, useStepEvaluatorHistor
 import { useWorkflowEditGate, useWorkflowRunGate } from '@/hooks/use-workflow-access';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { AcceptanceBadge, EvalRunStatusBadge, OutcomeChip, TrialResultBadge, TrialStatusBadge } from './eval-run-badges';
-import { EvalRunSummary } from './eval-run-report';
+import { EvalRunSummary, percent } from './eval-run-report';
 import { JudgeVerdicts } from './judge-verdicts';
 import { CHECK_KINDS, CheckDetails } from './evaluator-check-editor';
 import { StartEvalRunCard } from './step-evaluation-sections';
@@ -33,10 +34,6 @@ type RunTab = (typeof RUN_TABS)[number];
 
 function isRunTab(value: string | null): value is RunTab {
   return RUN_TABS.some((tab) => tab === value);
-}
-
-function percent(value: number | null): string {
-  return value === null ? '—' : `${Math.round(value * 100)}%`;
 }
 
 function dateTime(value: string | null): string {
@@ -75,8 +72,23 @@ function trialLabel(result: EvalTrialResult, trial: EvalTrial): string {
 
 type TrialFilter = 'all' | 'failed' | 'problems';
 
-function hasProblem(trial: EvalTrial, result: EvalTrialResult): boolean {
-  return trial.status === 'failed' || trial.error !== null || result.evaluators.some((entry) => entry.outcome === 'errored');
+/** Why a trial had a problem — it failed, or a check could not grade it — or null when it had none. */
+function problemOf(trial: EvalTrial, result: EvalTrialResult | undefined, evaluators: readonly EvalRunEvaluator[]): string | null {
+  if (trial.error !== null) return trial.error;
+  const errored = (result?.evaluators ?? [])
+    .filter((entry) => entry.outcome === 'errored')
+    .map((entry) => evaluators.find((evaluator) => evaluator.evaluatorId === entry.evaluatorId)?.name ?? entry.evaluatorId);
+  if (errored.length > 0) return `Could not be graded by ${errored.join(', ')}.`;
+  return trial.status === 'failed' ? 'Failed without a recorded reason.' : null;
+}
+
+function trialProblems(output: EvalRunOutput): Array<{ trial: EvalTrial; result: EvalTrialResult | undefined; problem: string }> {
+  const results = new Map(output.report.trialResults.map((result) => [result.trialId, result]));
+  return output.trials.flatMap((trial) => {
+    const result = results.get(trial.id);
+    const problem = problemOf(trial, result, output.evalRun.evaluators);
+    return problem === null ? [] : [{ trial, result, problem }];
+  });
 }
 
 /** Every trial: its case, how each Evaluator graded it, what it cost; a row opens everything it read and gave. */
@@ -88,7 +100,7 @@ function TrialsTab({ output, trialHref, variantLabels }: RunContext) {
     .filter((row): row is { result: EvalTrialResult; trial: EvalTrial } => row.trial !== undefined)
     .filter(({ result, trial }) => filter === 'all'
       || (filter === 'failed' && (result.passed === false || trial.status === 'failed'))
-      || (filter === 'problems' && hasProblem(trial, result)));
+      || (filter === 'problems' && problemOf(trial, result, output.evalRun.evaluators) !== null));
   const evaluators = output.evalRun.evaluators;
   return (
     <div className="space-y-3">
@@ -152,8 +164,8 @@ function TrialsTab({ output, trialHref, variantLabels }: RunContext) {
                     );
                   })}
                   <td className="px-3 py-2 text-xs tabular-nums">{percent(trial.confidence)}</td>
-                  <td className="px-3 py-2 text-xs tabular-nums text-muted-foreground">{trial.costUsd === null ? '—' : `$${trial.costUsd.toFixed(4)}`}</td>
-                  <td className="px-3 py-2 text-xs tabular-nums text-muted-foreground">{trial.durationMs === null ? '—' : `${(trial.durationMs / 1000).toFixed(1)}s`}</td>
+                  <td className="px-3 py-2 text-xs tabular-nums text-muted-foreground">{trial.costUsd === null ? '—' : formatCostUsd(trial.costUsd)}</td>
+                  <td className="px-3 py-2 text-xs tabular-nums text-muted-foreground">{trial.durationMs === null ? '—' : formatDuration(trial.durationMs)}</td>
                   <td className="px-3 py-2 text-right"><TrialLink href={trialHref(trial.id)} /></td>
                 </tr>
               ))}
@@ -245,10 +257,9 @@ function EvaluatorsTab(context: RunContext) {
   );
 }
 
-/** Trials that failed before producing output, or that a check could not grade, with why. */
+/** Trials that failed, or that a check could not grade, with why. */
 function ProblemsTab({ output, trialHref, variantLabels }: RunContext) {
-  const results = new Map(output.report.trialResults.map((result) => [result.trialId, result]));
-  const problems = output.trials.filter((trial) => trial.status === 'failed' || trial.error !== null);
+  const problems = trialProblems(output);
   const { unrecordedCalls } = output.report.mcp;
   if (problems.length === 0 && unrecordedCalls.length === 0) return <p className="text-sm text-muted-foreground">No trial had a problem.</p>;
   return (
@@ -260,8 +271,7 @@ function ProblemsTab({ output, trialHref, variantLabels }: RunContext) {
       )}
       {problems.length > 0 && (
         <ul className="divide-y rounded-md border text-xs" data-testid="eval-run-problems">
-          {problems.map((trial) => {
-            const result = results.get(trial.id);
+          {problems.map(({ trial, result, problem }) => {
             return (
               <li key={trial.id} className="flex items-start gap-3 px-3 py-2">
                 <TrialStatusBadge status={trial.status} />
@@ -270,7 +280,7 @@ function ProblemsTab({ output, trialHref, variantLabels }: RunContext) {
                     {result === undefined ? `trial ${trial.trialIndex + 1}` : trialLabel(result, trial)}
                     {variantLabels.size > 0 && <span className="font-normal text-muted-foreground"> · {variantLabels.get(trial.variantId)}</span>}
                   </p>
-                  <p className="whitespace-pre-wrap text-muted-foreground">{trial.error ?? 'Failed without a recorded reason.'}</p>
+                  <p className="whitespace-pre-wrap text-muted-foreground">{problem}</p>
                 </div>
                 <TrialLink href={trialHref(trial.id)} />
               </li>
@@ -340,7 +350,7 @@ function RunHeader({ handle, workflowName, output, step, mayRun, runReason }: {
           </span>
         </Meta>
         <Meta label="Cost">
-          ${report.costUsd.toFixed(4)} <span className="text-xs text-muted-foreground">of ${evalRun.budgetUsd}</span>
+          {formatCostUsd(report.costUsd)} <span className="text-xs text-muted-foreground">of ${evalRun.budgetUsd}</span>
           <span className="block text-xs text-muted-foreground">{report.inputTokens + report.outputTokens} tokens</span>
         </Meta>
         <Meta label="Created">{dateTime(evalRun.createdAt)}<span className="block text-xs text-muted-foreground">by {evalRun.createdBy}</span></Meta>
@@ -382,7 +392,7 @@ export function EvalRunDetail({ handle, workflowName, evalRunId }: { handle: str
     variantLabels: new Map(evalRun.variants.length > 1 ? evalRun.variants.map((variant) => [variant.id, variant.label]) : []),
   };
   const leftOut = report.judgeVerdicts.filter((verdict) => verdict.counts === false).length;
-  const problems = output.trials.filter((trial) => trial.status === 'failed' || trial.error !== null).length;
+  const problems = trialProblems(output).length;
   const labels: Record<RunTab, string> = {
     summary: 'Summary',
     trials: `Trials (${report.trials.total})`,

@@ -12,7 +12,6 @@ import {
   EvalOptimisationSchema,
   EvalRunReportSchema,
   EvalRunSchema,
-  EvalRunAcceptanceSchema,
   EvalRunEvaluatorSchema,
   EvalTrialOutcomeSchema,
   EvalTrialSchema,
@@ -365,10 +364,7 @@ export const EvalRunOutputSchema = z.object({
 export const ListEvalRunsInputSchema = EvaluatedStepSchema;
 
 export const ListEvalRunsOutputSchema = z.object({
-  evalRuns: z.array(EvalRunSchema.extend({
-    /** Null while the run is prepared or running. */
-    acceptance: EvalRunAcceptanceSchema.nullable(),
-  })),
+  evalRuns: z.array(EvalRunSchema),
 });
 
 /** One trial of an Eval Run, with everything its Evaluators read and gave. */

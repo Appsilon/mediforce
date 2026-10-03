@@ -4,12 +4,14 @@ import {
   StepQualificationSchema,
   type AcceptanceCriteriaVersion,
   type StepQualification,
+  EvalRunAcceptanceSchema,
   EvalRunSchema,
   EvalTrialSchema,
   EvalOptimisationSchema,
   type EvalOptimisation,
   type EvalOptimisationStatus,
   type EvalRun,
+  type EvalRunAcceptance,
   type EvalRunStatus,
   type EvalTrial,
   type EvalTrialStatus,
@@ -186,6 +188,7 @@ function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
     createdAt: row.createdAt.toISOString(),
     startedAt: row.startedAt?.toISOString() ?? null,
     completedAt: row.completedAt?.toISOString() ?? null,
+    acceptance: row.acceptance,
   });
 }
 
@@ -511,6 +514,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
         createdAt: new Date(parsed.createdAt),
         startedAt: parsed.startedAt === null ? null : new Date(parsed.startedAt),
         completedAt: parsed.completedAt === null ? null : new Date(parsed.completedAt),
+        acceptance: parsed.acceptance,
       });
       if (trials.length > 0) {
         await tx.insert(evalTrials).values(trials.map((trial) => {
@@ -560,6 +564,10 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     await this.db.update(evalRuns)
       .set({ spentUsd: sql`${evalRuns.spentUsd} + ${usd}` })
       .where(eq(evalRuns.id, id));
+  }
+
+  async setEvalRunAcceptance(id: string, acceptance: EvalRunAcceptance): Promise<void> {
+    await this.db.update(evalRuns).set({ acceptance: EvalRunAcceptanceSchema.parse(acceptance) }).where(eq(evalRuns.id, id));
   }
 
   async listTrials(evalRunId: string): Promise<EvalTrial[]> {
