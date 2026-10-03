@@ -88,6 +88,11 @@ function claudeEventEntries(event: ClaudeStreamEvent): AgentTrajectoryEntry[] {
     return entries;
   }
 
+  // A running count of thinking tokens, streamed many times per turn — no content, only noise.
+  if (event.type === 'system' && event.subtype === 'thinking_tokens') {
+    return entries;
+  }
+
   // Generic fallback: capture any event type we don't explicitly handle
   const { type, subtype, ...rest } = event;
   entries.push({ ts, type, subtype, ...rest });

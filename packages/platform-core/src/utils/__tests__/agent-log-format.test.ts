@@ -70,6 +70,18 @@ describe('agentLogEntries', () => {
     expect(agentLogEntries('claude-stream-json', line)).toEqual(logged);
   });
 
+  it('drops claude thinking-token progress ticks, which carry a counter and no content', () => {
+    const line = JSON.stringify({
+      type: 'system',
+      subtype: 'thinking_tokens',
+      session_id: 'session-1',
+      estimated_tokens: 38,
+      estimated_tokens_delta: 37,
+    });
+
+    expect(agentLogEntries('claude-stream-json', line)).toEqual([]);
+  });
+
   it('yields nothing for raw script output, which has no event structure', () => {
     expect(agentLogEntries('raw', 'plain text')).toEqual([]);
     expect(formatAgentLogLine('raw', 'plain text')).toEqual(['plain text']);
