@@ -42,6 +42,13 @@ export const routes = {
     `/${handle}/workflows/${encode(name)}/runs/${runId}/steps/${stepId}`,
   workflowRunReport: (handle: string, name: string, runId: string) =>
     `/${handle}/workflows/${encode(name)}/runs/${runId}/report`,
+  /** The Evaluation tab on one agent step of one workflow version. */
+  workflowEvaluation: (handle: string, name: string, params: { version: number; step: string }) =>
+    `/${handle}/workflows/${encode(name)}?tab=evaluation&version=${params.version}&step=${encode(params.step)}`,
+  workflowEvalRun: (handle: string, name: string, evalRunId: string) =>
+    `/${handle}/workflows/${encode(name)}/eval-runs/${evalRunId}`,
+  workflowEvalTrial: (handle: string, name: string, evalRunId: string, trialId: string) =>
+    `/${handle}/workflows/${encode(name)}/eval-runs/${evalRunId}/trials/${trialId}`,
   workflowNew: (handle: string) => `/${handle}/workflows/new`,
 
   // ── Runs ───────────────────────────────────────────────────────

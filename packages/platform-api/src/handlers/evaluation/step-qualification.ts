@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import {
   CHAMPION_VARIANT_ID,
+  evalRunAcceptance,
   DEFAULT_ACCEPTANCE_CRITERIA,
   inlineMcpServerNames,
   qualificationSignatureMeaning,
@@ -130,16 +131,9 @@ async function stepValidation(
     return notVerified(run.acceptanceCriteria === null ? `Eval Run ${run.id.slice(0, 8)} had no Acceptance Criteria to judge.` : `Acceptance Criteria changed ${since}.`);
   }
 
-  const report = await buildEvalRunReport(scope, run, await scope.evaluation.listTrials(run.id));
-  const verdicts = report.variants.find((variant) => variant.id === CHAMPION_VARIANT_ID)?.criteria ?? [];
-  const unmet = verdicts.filter((verdict) => verdict.status !== 'met');
-  if (unmet.length === 0) return { status: 'passed', evalRunId: run.id, reason: `Eval Run ${run.id.slice(0, 8)} met every criterion.`, runInProgress };
-  return {
-    status: 'failed',
-    evalRunId: run.id,
-    reason: `Eval Run ${run.id.slice(0, 8)}: ${unmet.map((verdict) => `${verdict.severity} ${verdict.status === 'missed' ? 'missed' : 'not judged'}`).join(', ')}.`,
-    runInProgress,
-  };
+  const acceptance = evalRunAcceptance(run, await buildEvalRunReport(scope, run, await scope.evaluation.listTrials(run.id)));
+  if (acceptance?.status === 'met') return { status: 'passed', evalRunId: run.id, reason: `Eval Run ${run.id.slice(0, 8)} met every criterion.`, runInProgress };
+  return { status: 'failed', evalRunId: run.id, reason: `Eval Run ${run.id.slice(0, 8)}: ${acceptance?.reason}.`, runInProgress };
 }
 
 /**

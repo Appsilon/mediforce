@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
+import type { AgentOutputEnvelope, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { ReviewPlugin, ReviewPluginContext, ReviewPluginResult } from '../interfaces/review-plugin';
-import type { LlmClient } from '../interfaces/step-executor-plugin';
+import type { LlmClient, LlmMessage } from '../interfaces/step-executor-plugin';
 
 export interface LlmJudgeConfig {
   readonly model: string;
@@ -88,6 +88,42 @@ function parseAnswer<Answer>(content: string, schema: z.ZodType<Answer>): Answer
 }
 
 /**
+ * What an `llm_judge` is sent: the rubric and how to answer, then the step's
+ * input, the agent's log, its output and its own summary. The judge and
+ * anyone checking its verdict read the same messages.
+ */
+export function llmJudgeMessages(
+  config: Omit<LlmJudgeConfig, 'model'>,
+  output: Pick<AgentOutputEnvelope, 'result' | 'reasoning_summary'>,
+): LlmMessage[] {
+  return [
+    {
+      role: 'system',
+      content: [
+        'You grade one step of a pharmaceutical workflow against a rubric. You see what the step was given, the agent\'s log of everything it did — its reasoning, every tool call and every tool result, in order — and what it returned.',
+        `Rubric:\n${config.rubric}`,
+        [
+          'A person reads your rationale to accept or deny your verdict, so explain your judgment. Say what exactly contributed to the decision and why:',
+          'cite the parts of the input, the output and the log entries (by their [number]) that decided it, follow the agent\'s reasoning to where it went right or wrong,',
+          'and name anything you could not verify.',
+        ].join(' '),
+        'confidence is how sure you are of your verdict, from 0 to 1: lower it when the evidence is incomplete, ambiguous or the rubric does not clearly decide the case.',
+        'Answer with one JSON object and nothing else: {"rationale": "<your explanation>", "passed": <true or false>, "confidence": <0 to 1>}. Write the rationale before deciding.',
+      ].join('\n\n'),
+    },
+    {
+      role: 'user',
+      content: [
+        ...(config.stepInput === null ? [] : [`Step input:\n${section(config.stepInput)}`]),
+        ...(config.trajectory.length === 0 ? [] : [`Agent log:\n${formatTrajectory(config.trajectory)}`]),
+        `Step output:\n${section(output.result ?? null)}`,
+        ...(output.reasoning_summary.length > 0 ? [`The agent's own summary:\n${output.reasoning_summary}`] : []),
+      ].join('\n\n'),
+    },
+  ];
+}
+
+/**
  * An `llm_judge` Evaluator (ADR-0023 D3) on the `ReviewPlugin` seam. The judge
  * reads what the step was given, what it returned and the agent's whole log,
  * explains what decided its verdict, then answers pass or fail with how
@@ -98,31 +134,7 @@ export class LlmJudgeReviewPlugin implements ReviewPlugin {
   constructor(private readonly config: LlmJudgeConfig) {}
 
   async review(context: ReviewPluginContext): Promise<LlmJudgeResult> {
-    const response = await context.llm.complete([
-      {
-        role: 'system',
-        content: [
-          'You grade one step of a pharmaceutical workflow against a rubric. You see what the step was given, the agent\'s log of everything it did — its reasoning, every tool call and every tool result, in order — and what it returned.',
-          `Rubric:\n${this.config.rubric}`,
-          [
-            'A person reads your rationale to accept or deny your verdict, so explain your judgment. Say what exactly contributed to the decision and why:',
-            'cite the parts of the input, the output and the log entries (by their [number]) that decided it, follow the agent\'s reasoning to where it went right or wrong,',
-            'and name anything you could not verify.',
-          ].join(' '),
-          'confidence is how sure you are of your verdict, from 0 to 1: lower it when the evidence is incomplete, ambiguous or the rubric does not clearly decide the case.',
-          'Answer with one JSON object and nothing else: {"rationale": "<your explanation>", "passed": <true or false>, "confidence": <0 to 1>}. Write the rationale before deciding.',
-        ].join('\n\n'),
-      },
-      {
-        role: 'user',
-        content: [
-          ...(this.config.stepInput === null ? [] : [`Step input:\n${section(this.config.stepInput)}`]),
-          ...(this.config.trajectory.length === 0 ? [] : [`Agent log:\n${formatTrajectory(this.config.trajectory)}`]),
-          `Step output:\n${section(context.executorOutput.result ?? null)}`,
-          ...(context.executorOutput.reasoning_summary.length > 0 ? [`The agent's own summary:\n${context.executorOutput.reasoning_summary}`] : []),
-        ].join('\n\n'),
-      },
-    ], this.config.model);
+    const response = await context.llm.complete(llmJudgeMessages(this.config, context.executorOutput), this.config.model);
 
     const answer = parseAnswer(response.content, JudgeAnswerSchema);
     if (answer === null) {
@@ -160,14 +172,9 @@ const AgreementAnswerSchema = z.object({
   agreement: z.number().min(0).max(1),
 });
 
-/**
- * How far a step's output agrees with an Eval Case's expected output, 0–1,
- * as a model reads them with the check's and the case's instructions. An
- * answer without both throws — a comparison that did not happen must not be
- * scored as a disagreement.
- */
-export async function judgeOutputAgreement(llm: LlmClient, config: OutputAgreementConfig): Promise<OutputAgreement> {
-  const response = await llm.complete([
+/** What the agreement judge is sent: how to score, the instructions, then the expected output and the output. */
+export function outputAgreementMessages(config: Omit<OutputAgreementConfig, 'model'>): LlmMessage[] {
+  return [
     {
       role: 'system',
       content: [
@@ -186,7 +193,17 @@ export async function judgeOutputAgreement(llm: LlmClient, config: OutputAgreeme
         `Output:\n${section(config.actual)}`,
       ].join('\n\n'),
     },
-  ], config.model);
+  ];
+}
+
+/**
+ * How far a step's output agrees with an Eval Case's expected output, 0–1,
+ * as a model reads them with the check's and the case's instructions. An
+ * answer without both throws — a comparison that did not happen must not be
+ * scored as a disagreement.
+ */
+export async function judgeOutputAgreement(llm: LlmClient, config: OutputAgreementConfig): Promise<OutputAgreement> {
+  const response = await llm.complete(outputAgreementMessages(config), config.model);
 
   const answer = parseAnswer(response.content, AgreementAnswerSchema);
   if (answer === null) {

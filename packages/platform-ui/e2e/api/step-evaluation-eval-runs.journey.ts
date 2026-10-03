@@ -333,6 +333,29 @@ test.describe('Step Evaluation judge verdicts — API E2E', () => {
     const denied = await mediforce.evaluation.getRun({ evalRunId });
     expect(judgeReport(denied)).toMatchObject({ passes: 1, failures: 0, excluded: 1, passRate: 1 });
     expect(verdictOn(denied, unsureCase.id)).toMatchObject({ passed: false, counts: false, review: { decision: 'denied' } });
+
+    // The trial holds everything the judge read: its question, the messages it was sent — the case input among them — and the log it cites.
+    const trial = await mediforce.evaluation.getTrial({ evalRunId, trialId: unsure.trialId });
+    expect(trial.evalCase).toMatchObject({ id: unsureCase.id, name: 'Unsure' });
+    expect(JSON.stringify(trial.stepInput)).toContain(unsureKey);
+    expect(trial.trajectory.length).toBeGreaterThan(0);
+    const [graded] = trial.evaluators;
+    expect(graded).toMatchObject({
+      evaluator: { evaluatorId: judge.id, name: 'summary-grounded' },
+      rule: 'The summary is grounded in the input.',
+      check: { kind: 'llm_judge', rubric: 'Is the summary grounded in the input?' },
+      outcome: 'excluded',
+      score: { comment: 'The log does not show where the summary came from.', confidence: 0.4, minConfidence: 0.8 },
+      review: { decision: 'denied', reviewedBy: TEST_USER_ID },
+    });
+    expect(graded!.judgePrompt?.map((message) => message.role)).toEqual(['system', 'user']);
+    expect(graded!.judgePrompt?.[0]?.content).toContain('Is the summary grounded in the input?');
+    expect(graded!.judgePrompt?.[1]?.content).toContain(unsureKey);
+    expect(finished.report.trialResults.find((result) => result.trialId === unsure.trialId)).toMatchObject({
+      caseName: 'Unsure', evaluators: [{ evaluatorId: judge.id, outcome: 'excluded' }],
+    });
+    expect((await mediforce.evaluation.listRuns(step)).evalRuns.find((run) => run.id === evalRunId)?.acceptance)
+      .toEqual({ status: 'not_judged', reason: 'major not judged, minor not judged' });
   });
 
   test('an expected output compared exactly or by agreement, positive or negative; a case is graded only by the Evaluators it selects', async ({ request, baseURL }) => {

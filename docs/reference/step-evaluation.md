@@ -591,10 +591,14 @@ the judge calls. Then:
   whether it counts, the rationale
   and any review — with **Accept** and **Deny** for a person with `edit`
   (`report.judgeVerdicts`; `mediforce eval report` lists those left out).
-- **Confidence calibration.** The confidence each trial's agent reported,
+- **Confidence calibration.** Whether the agent's own confidence can be
+  trusted: the confidence each trial's agent reported,
   against whether its output passed every counted Evaluator — a trial some
   counted Evaluator could not grade is left out, since a missing Score is not
-  a pass: the pass rate in five confidence bins and the expected calibration error.
+  a pass: the pass rate in five confidence bins and the expected calibration
+  error (the count-weighted gap between stated confidence and pass rate; 0 is
+  a perfect match). It is what lets routing send only low-confidence outputs
+  to a person.
 - **Routing.** Once the trials are done, as the `autonomyLevel` to
   set: `L4` (Control Mode 4) with a `confidenceThreshold` — the lowest
   confidence at which the outputs at or above it (at least 5) passed every
@@ -602,6 +606,49 @@ the judge calls. Then:
   Mode 3), a person reviewing every output, when there are no criteria, one could not be judged, the agent
   reported no confidence, or no threshold holds. A recommendation to apply in
   the workflow editor.
+
+- **Trial results.** Every trial with each of its case's Evaluators' grade —
+  `pass`, `fail`, `excluded` (a model verdict left out) or `errored` — and
+  comment, and whether it passed every counted Evaluator (`report.trialResults`).
+
+### Reading an Eval Run
+
+The Evaluation tab lists the step's Eval Runs as a table — ID, created,
+status, cost against budget, Dataset version, **Acceptance** (how the champion
+fared on the criteria frozen into the run: Met, Missed, Not judged or No
+criteria; `acceptance` on `GET /api/evaluation/runs` and in `mediforce eval
+run-list`) — and **Details** opens the run on its own page
+(`/<workspace>/workflows/<name>/eval-runs/<evalRunId>`): its header (status,
+acceptance, Dataset, trials, cost, Cancel while it runs, Start while
+prepared) and five views, from the whole run to one trial:
+
+- **Summary** — the report per variant: Evaluators, criteria, a challenger
+  against the champion, confidence calibration and routing, and **Sign Step
+  Qualification**.
+- **Trials** — every trial with each Evaluator's grade, the agent's
+  confidence, cost and time; filters for failed trials and trials with
+  problems.
+- **Evaluators** — per Evaluator, what it looks for (its rule) and how it
+  checks, its numbers per variant, and its grade and comment on every trial.
+- **Model verdicts** — every judge verdict and agreement score to **Accept**
+  or **Deny**, each linking to what the judge read.
+- **Problems** — trials that failed or that a check could not grade, with why,
+  and replayed MCP calls no recording answered.
+
+Each trial opens on its own page (`…/eval-runs/<evalRunId>/trials/<trialId>`;
+`mediforce eval trial <evalRunId> <trialId> [--prompts]`,
+`GET /api/evaluation/runs/:id/trials/:trialId`): the case's input and expected
+output, the output and the agent's own summary, the agent's whole log as the
+judges read it, links to the trial's Workflow Run and step execution, and per
+Evaluator of the case what it looks for — a judge's question, or the rule —
+and what it reads, its verdict and comment or why it could not grade, a
+person's review, and for a model judge the exact messages it was sent. Those
+messages are rebuilt from the Evaluator version frozen into the run and the
+trial's input, log and output by the code that sent them
+(`llmJudgeMessages`, `outputAgreementMessages`); the case is read as it is
+now, so an agreement comparison's expected output reflects any later edit to
+the case. Log entries a judge's rationale cites as `[n]` link to the entry,
+which is marked in the log.
 
 ## Acceptance Criteria
 

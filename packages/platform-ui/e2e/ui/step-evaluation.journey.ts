@@ -174,22 +174,37 @@ test.describe('Step Evaluation tab', () => {
 
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
-    await page.getByRole('button', { name: prepared.evalRun.id.slice(0, 8) }).click();
-    const report = page.getByTestId('variant-report');
     // Below its minimum confidence, the judge's only verdict is left out: the critical criterion cannot be judged.
-    await expect(report.getByTestId('criteria-verdicts')).toContainText('critical not judged');
-    const verdict = report.getByTestId('judge-verdict');
+    const row = page.getByTestId('eval-run-row').filter({ hasText: prepared.evalRun.id.slice(0, 8) });
+    await expect(row.getByTestId('eval-run-acceptance')).toHaveText('Not judged');
+    await row.getByRole('link', { name: 'Details' }).click();
+    await expect(page.getByTestId('eval-run-detail')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('variant-report').getByTestId('criteria-verdicts')).toContainText('critical not judged');
+
+    await page.getByTestId('eval-run-tab-verdicts').click();
+    const verdict = page.getByTestId('judge-verdict');
     await expect(verdict).toContainText('confidence 0.5 (below 0.8)');
     await expect(verdict).toContainText('left out — below its minimum confidence');
     await expect(verdict.getByTestId('judge-rationale')).toHaveText(rationale);
 
-    await verdict.getByRole('button', { name: 'Accept' }).click();
-    await verdict.getByLabel('Why (optional)').fill('The summary matches the input; the judge was right to pass it.');
-    await verdict.getByRole('button', { name: 'Confirm accept' }).click();
+    // Everything the judge read, on the trial's page: its question, the exact messages it was sent, and the input in them.
+    await verdict.getByRole('link', { name: 'What the judge read' }).click();
+    const judge = page.getByTestId('trial-evaluator').filter({ hasText: 'summary-grounded' });
+    await expect(judge.getByTestId('evaluator-looks-for')).toContainText('Is the summary grounded in the input?');
+    await judge.getByTestId('judge-prompt').locator('summary').click();
+    await expect(judge.getByTestId('judge-prompt')).toContainText(judgeKey);
+    await expect(page.getByTestId('trial-input')).toContainText(judgeKey);
 
-    await expect(verdict).toContainText('counts — accepted by', { timeout: 10_000 });
-    await expect(verdict).toContainText('The summary matches the input; the judge was right to pass it.');
-    await expect(report.getByTestId('criteria-verdicts')).toContainText('critical met');
+    const review = judge.getByTestId('judge-verdict');
+    await review.getByRole('button', { name: 'Accept' }).click();
+    await review.getByLabel('Why (optional)').fill('The summary matches the input; the judge was right to pass it.');
+    await review.getByRole('button', { name: 'Confirm accept' }).click();
+    await expect(review).toContainText('counts — accepted by', { timeout: 10_000 });
+    await expect(review).toContainText('The summary matches the input; the judge was right to pass it.');
+
+    await page.getByRole('link', { name: `Eval Run ${prepared.evalRun.id.slice(0, 8)}` }).click();
+    await page.getByTestId('eval-run-tab-summary').click();
+    await expect(page.getByTestId('variant-report').getByTestId('criteria-verdicts')).toContainText('critical met');
   });
 
   test('accepted criteria judge a run, and the person signs a Step Qualification from its report — no Brief needed', async ({ page, request }) => {
@@ -246,9 +261,9 @@ test.describe('Step Evaluation tab', () => {
     await page.reload();
     // The newest finished run of the version missed its major criterion: validation fails, signed or not.
     await expect(page.getByTestId('validation-status')).toHaveAttribute('data-status', 'failed', { timeout: 10_000 });
-    await page.getByRole('button', { name: prepared.evalRun.id.slice(0, 8) }).click();
+    await page.getByTestId('eval-run-row').filter({ hasText: prepared.evalRun.id.slice(0, 8) }).getByRole('link', { name: 'Details' }).click();
     const report = page.getByTestId('variant-report');
-    await expect(report.getByTestId('criteria-verdicts')).toContainText('critical met');
+    await expect(report.getByTestId('criteria-verdicts')).toContainText('critical met', { timeout: 15_000 });
     await expect(report.getByTestId('criteria-verdicts')).toContainText('major missed');
     await report.getByTestId('sign-qualification').click();
     const form = page.getByTestId('sign-qualification-form');
@@ -257,8 +272,10 @@ test.describe('Step Evaluation tab', () => {
     await form.getByLabel('Justification for the major criterion').fill('Findings are listed downstream; a reviewer reads every grade.');
     await form.getByLabel('Your password').fill(TEST_USER_PASSWORD);
     await form.getByRole('button', { name: 'Sign' }).click();
+    await expect(form).toBeHidden({ timeout: 10_000 });
 
-    await expect(page.getByTestId('validation-status')).toHaveText('Validation failed');
+    await page.getByRole('link', { name: 'Evaluation · grade-aes' }).click();
+    await expect(page.getByTestId('validation-status')).toHaveText('Validation failed', { timeout: 15_000 });
     await page.getByTestId('validation-status').click();
     await expect(page.getByTestId('validation-reason')).toContainText('major missed');
     await expect(page.getByTestId('step-qualification')).toContainText(`Eval Run ${prepared.evalRun.id.slice(0, 8)}`);

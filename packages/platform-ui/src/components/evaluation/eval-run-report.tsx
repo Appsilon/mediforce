@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { Loader2 } from 'lucide-react';
 import {
   describeAcceptanceCriteria,
   describeMcpReport,
@@ -10,6 +9,7 @@ import {
   type EvalRunVariantReport,
   type EvaluatedStep,
   type StepVariantPatch,
+  type VariantComparison,
 } from '@mediforce/platform-core';
 import type { EvalRunOutput } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
@@ -19,7 +19,6 @@ import { useAuth } from '@/contexts/auth-context';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
-import { JudgeVerdicts } from './judge-verdicts';
 
 function percent(value: number | null): string {
   return value === null ? '—' : `${Math.round(value * 100)}%`;
@@ -100,40 +99,60 @@ function EvaluatorTable({ variant, k }: { variant: EvalRunVariantReport; k: numb
   );
 }
 
-/** Agent-reported confidence against the actual pass rate, bin by bin, and what it recommends for routing. */
+/**
+ * Whether the agent's own confidence can be trusted, and what that allows:
+ * the agent reports a confidence with every output; bin by bin, how often an
+ * output it was that sure of actually passed every counted Evaluator. When the
+ * two agree, outputs above a threshold can skip a person (Control Mode L4).
+ */
 function ConfidenceSection({ variant }: { variant: EvalRunVariantReport }) {
   const { confidence, recommendation } = variant;
   return (
-    <div className="space-y-1 text-xs" data-testid="confidence-calibration">
-      {confidence !== null && (
-        <details>
-          <summary className="cursor-pointer text-muted-foreground">
-            Confidence calibration: ECE {confidence.ece.toFixed(3)} over {confidence.count} trial(s)
-          </summary>
-          <table className="mt-1 text-xs">
+    <div className="space-y-2 text-xs" data-testid="confidence-calibration">
+      <p className="font-medium text-sm">Can the agent&apos;s confidence be trusted?</p>
+      <p className="text-muted-foreground">
+        The agent reports how sure it is of each output (0–1). This checks that claim against the results: of the outputs where it said, say, 90%, did about 90% pass every counted Evaluator?
+        If so, its confidence can decide which outputs need a person.
+      </p>
+      {confidence === null ? (
+        <p className="text-muted-foreground">The agent reported no confidence on any graded trial, so there is nothing to compare.</p>
+      ) : (
+        <>
+          <p>
+            <InstantTooltip label="Expected calibration error: the average gap between the confidence the agent stated and the share of those outputs that passed, weighted by how many trials each bin holds. 0 means its confidence matches its results exactly; 0.2 means it is off by 20 points on average.">
+              <span className="font-medium underline decoration-dotted">Calibration error {confidence.ece.toFixed(3)}</span>
+            </InstantTooltip>
+            <span className="text-muted-foreground"> over {confidence.count} graded trial(s) — 0 is a perfect match.</span>
+          </p>
+          <table className="text-xs">
             <thead className="text-muted-foreground">
-              <tr className="text-left"><th className="pr-3 font-medium">Confidence</th><th className="pr-3 font-medium">Trials</th><th className="pr-3 font-medium">Mean confidence</th><th className="font-medium">Passed</th></tr>
+              <tr className="text-left">
+                <th className="pr-4 font-medium">Agent said</th>
+                <th className="pr-4 font-medium">Trials</th>
+                <th className="pr-4 font-medium">Average stated</th>
+                <th className="font-medium">Actually passed</th>
+              </tr>
             </thead>
             <tbody>
               {confidence.bins.map((bin) => (
                 <tr key={bin.lower}>
-                  <td className="pr-3">{bin.lower.toFixed(1)}–{bin.upper.toFixed(1)}</td>
-                  <td className="pr-3">{bin.count}</td>
-                  <td className="pr-3">{percent(bin.meanConfidence)}</td>
-                  <td>{percent(bin.passRate)}</td>
+                  <td className="pr-4">{percent(bin.lower)}–{percent(bin.upper)}</td>
+                  <td className="pr-4">{bin.count}</td>
+                  <td className="pr-4">{percent(bin.meanConfidence)}</td>
+                  <td className={cn(Math.abs(bin.meanConfidence - bin.passRate) > 0.2 && 'font-medium text-amber-700 dark:text-amber-300')}>{percent(bin.passRate)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </details>
+        </>
       )}
       {recommendation !== null && (
         <p data-testid="control-recommendation">
           <span className="font-medium">
-            Routing: <ControlModeBadge executor="agent" autonomyLevel={recommendation.autonomyLevel} showNumber />
+            Recommended routing: <ControlModeBadge executor="agent" autonomyLevel={recommendation.autonomyLevel} showNumber />
             {recommendation.confidenceThreshold !== null && ` above confidence ${recommendation.confidenceThreshold}`}
           </span>
-          {recommendation.coverage !== null && <span className="text-muted-foreground"> ({percent(recommendation.coverage)} of outputs unreviewed)</span>}
+          {recommendation.coverage !== null && <span className="text-muted-foreground"> ({percent(recommendation.coverage)} of outputs would skip a person)</span>}
           <span className="text-muted-foreground"> — {recommendation.reason}</span>
         </p>
       )}
@@ -218,7 +237,7 @@ function VariantReport({ output, variant, step, mayEdit, editReason }: {
 }) {
   const [signing, setSigning] = React.useState(false);
   const blocked = signingBlocked(output, variant, mayEdit, editReason);
-  const verdicts = output.report.judgeVerdicts.filter((verdict) => verdict.variantId === variant.id);
+  const comparison = output.report.comparison.find((candidate) => candidate.variantId === variant.id);
   return (
     <div className="space-y-2 border-t pt-3 first:border-t-0 first:pt-0" data-testid="variant-report">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -234,7 +253,7 @@ function VariantReport({ output, variant, step, mayEdit, editReason }: {
       </div>
       <EvaluatorTable variant={variant} k={output.report.k} />
       {variant.criteria.length > 0 && <CriteriaVerdicts verdicts={variant.criteria} />}
-      {verdicts.length > 0 && <JudgeVerdicts step={step} evalRunId={output.evalRun.id} verdicts={verdicts} mayEdit={mayEdit} editReason={editReason} />}
+      {comparison !== undefined && <ComparisonTable comparison={comparison} />}
       <ConfidenceSection variant={variant} />
       {signing ? (
         <SignQualificationForm
@@ -258,57 +277,66 @@ function VariantReport({ output, variant, step, mayEdit, editReason }: {
   );
 }
 
+/** A challenger against the champion: a difference counts only when the two 95% intervals do not overlap. */
+function ComparisonTable({ comparison }: { comparison: VariantComparison }) {
+  return (
+    <div className="space-y-1 text-xs" data-testid="variant-comparison">
+      <p className="text-muted-foreground">
+        Against the step as it is
+        {comparison.meanCostDeltaUsd !== null && ` · mean cost ${comparison.meanCostDeltaUsd >= 0 ? '+' : ''}$${comparison.meanCostDeltaUsd.toFixed(4)}`}
+        {comparison.meanDurationDeltaMs !== null && ` · mean time ${comparison.meanDurationDeltaMs >= 0 ? '+' : ''}${(comparison.meanDurationDeltaMs / 1000).toFixed(1)}s`}
+      </p>
+      <table>
+        <tbody>
+          {comparison.evaluators.map((evaluator) => (
+            <tr key={evaluator.evaluatorId}>
+              <td className="pr-4">{evaluator.name}</td>
+              <td className="pr-4">{percent(evaluator.championPassRate)} → {percent(evaluator.challengerPassRate)}</td>
+              <td className={cn(
+                evaluator.verdict === 'better' && 'text-green-700 dark:text-green-400',
+                evaluator.verdict === 'worse' && 'text-red-700 dark:text-red-400',
+                evaluator.verdict === 'no_clear_difference' && 'text-muted-foreground',
+              )}>{evaluator.verdict.replace(/_/g, ' ')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /**
- * An Eval Run's report (ADR-0023 D5, D10): per variant, every Evaluator's pass
- * rate with its Wilson 95% interval, pass@k, pass^k and flakiness, the verdict
- * on each Acceptance Criterion, every judge verdict with its rationale for a
- * person to accept or deny, confidence calibration and routing. A person signs
- * a Step Qualification for a variant from here.
+ * An Eval Run's results (ADR-0023 D5, D10): per variant, every Evaluator's
+ * pass rate with its Wilson 95% interval, pass@k, pass^k and flakiness, the
+ * verdict on each Acceptance Criterion, a challenger against the champion,
+ * whether the agent's confidence can be trusted and the routing it allows. A
+ * person signs a Step Qualification for a variant from here.
  */
-export function EvalRunReport({ output, step, mayEdit, editReason }: {
+export function EvalRunSummary({ output, step, mayEdit, editReason }: {
   output: EvalRunOutput;
   step: EvaluatedStep;
   mayEdit: boolean;
   editReason: string | undefined;
 }) {
-  const { evalRun, report, trials } = output;
-  const labels = new Map(report.variants.map((variant) => [variant.id, variant.label]));
+  const { evalRun, report } = output;
   return (
-    <div className="space-y-3" data-testid="eval-run-report">
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <span>{report.trials.scored}/{report.trials.total} trials scored</span>
-        {report.trials.failed > 0 && <span>{report.trials.failed} failed</span>}
-        {report.trials.skipped > 0 && <span>{report.trials.skipped} skipped</span>}
-        {report.trials.inProgress > 0 && (
-          <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />{report.trials.inProgress} in progress</span>
-        )}
-        <span>spent ${report.costUsd.toFixed(4)} of ${evalRun.budgetUsd}</span>
-        <span>{report.inputTokens + report.outputTokens} tokens</span>
+    <div className="space-y-4" data-testid="eval-run-report">
+      <div className="space-y-1 text-xs text-muted-foreground">
+        <p>
+          {evalRun.acceptanceCriteria === null
+            ? 'No Acceptance Criteria were frozen into this run, so nothing is judged.'
+            : `Judged against ${describeAcceptanceCriteria(evalRun.acceptanceCriteria)}.`}
+        </p>
         {evalRun.exampleCaseIds.length > 0 && (
-          <span data-testid="example-cases-left-out">
-            {evalRun.exampleCaseIds.length} case(s) left out — a variant&apos;s few-shot examples came from them
-          </span>
+          <p data-testid="example-cases-left-out">
+            {evalRun.exampleCaseIds.length} case(s) left out — a variant&apos;s few-shot examples came from them.
+          </p>
         )}
+        <p data-testid="eval-run-mcp">{describeMcpReport(report.mcp)}</p>
       </div>
-      <p className="text-xs text-muted-foreground">
-        {evalRun.acceptanceCriteria === null
-          ? 'No Acceptance Criteria were frozen into this run, so nothing is judged.'
-          : `Judged against ${describeAcceptanceCriteria(evalRun.acceptanceCriteria)}.`}
-      </p>
-      <p className="text-xs text-muted-foreground" data-testid="eval-run-mcp">{describeMcpReport(report.mcp)}</p>
       {report.variants.map((variant) => (
         <VariantReport key={variant.id} output={output} variant={variant} step={step} mayEdit={mayEdit} editReason={editReason} />
       ))}
-      {trials.some((trial) => trial.error !== null) && (
-        <details className="text-xs">
-          <summary className="cursor-pointer text-muted-foreground">Trial problems</summary>
-          <ul className="mt-1 space-y-1">
-            {trials.filter((trial) => trial.error !== null).map((trial) => (
-              <li key={trial.id}><span className="font-mono">{trial.agentRunId ?? trial.id.slice(0, 8)}</span> ({labels.get(trial.variantId) ?? trial.variantId}): {trial.error}</li>
-            ))}
-          </ul>
-        </details>
-      )}
     </div>
   );
 }

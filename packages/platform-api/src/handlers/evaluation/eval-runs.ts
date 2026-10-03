@@ -4,11 +4,13 @@ import {
   CHAMPION_VARIANT_ID,
   DEFAULT_ACCEPTANCE_CRITERIA,
   applyStepVariant,
+  evalRunAcceptance,
   evaluatorTrust,
   isEmptyVariantPatch,
   resolveDefinitionModels,
   variantPatchProblem,
   type EvalRun,
+  type EvalRunAcceptance,
   type EvalRunEvaluator,
   type EvalTrial,
   type EvalVariant,
@@ -303,9 +305,17 @@ export async function getEvalRun(input: GetEvalRunInput, scope: CallerScope): Pr
   return evalRunOutput(scope, input.evalRunId);
 }
 
+/** How the run's champion fared on the criteria frozen into it; a run still prepared or running has no report to read. */
+async function acceptanceOf(scope: CallerScope, run: EvalRun): Promise<EvalRunAcceptance | null> {
+  if (run.status === 'prepared' || run.status === 'running') return null;
+  return evalRunAcceptance(run, await buildEvalRunReport(scope, run, await scope.evaluation.listTrials(run.id)));
+}
+
+/** The Step's Eval Runs, newest first, each with how its champion fared on its criteria. */
 export async function listEvalRuns(input: ListEvalRunsInput, scope: CallerScope): Promise<ListEvalRunsOutput> {
   await loadEvaluatedStep(scope, input, 'read');
-  return { evalRuns: await scope.evaluation.listEvalRuns(stepRef(input)) };
+  const runs = await scope.evaluation.listEvalRuns(stepRef(input));
+  return { evalRuns: await Promise.all(runs.map(async (run) => ({ ...run, acceptance: await acceptanceOf(scope, run) }))) };
 }
 
 /** Stops an Eval Run: no new trial starts; trials already running finish and are scored. */

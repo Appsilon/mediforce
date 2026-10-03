@@ -35,6 +35,7 @@ export { getAcceptanceCriteria, setAcceptanceCriteria } from './acceptance-crite
 export { getStepQualification, getWorkflowValidation, signStepQualification } from './step-qualification';
 export { computeStepFingerprint, changedFingerprintComponents } from './_lib/step-fingerprint';
 export { getEvalRunFailures } from './eval-run-failures';
+export { getEvalTrial } from './eval-trial';
 export { reviewJudgeVerdict } from './judge-reviews';
 export { applyVariantToStep } from './apply-step-variant';
 export { startOptimisation, getOptimisation, listOptimisations, failStaleOptimisations } from './optimisations';

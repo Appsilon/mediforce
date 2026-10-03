@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
 import type { EvaluatedStep, JudgeReviewDecision, JudgeVerdict } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
@@ -24,12 +26,19 @@ function confidenceText(verdict: JudgeVerdict): string {
   return `confidence ${verdict.confidence}${below ? ` (below ${verdict.minConfidence})` : ''}`;
 }
 
-function VerdictRow({ step, evalRunId, verdict, mayEdit, editReason }: {
+/** One model verdict with its rationale, and the Accept / Deny a person reviews it with. */
+export function JudgeVerdictRow({ step, evalRunId, verdict, mayEdit, editReason, variantLabel, trialHref, rationale }: {
   step: EvaluatedStep;
   evalRunId: string;
   verdict: JudgeVerdict;
   mayEdit: boolean;
   editReason: string | undefined;
+  /** Shown when the run has more than one variant. */
+  variantLabel?: string;
+  /** Where the trial's details are; omitted on the trial's own page. */
+  trialHref?: string;
+  /** The rationale as the page renders it; its plain text by default. */
+  rationale?: React.ReactNode;
 }) {
   const [deciding, setDeciding] = React.useState<JudgeReviewDecision | null>(null);
   const [comment, setComment] = React.useState('');
@@ -49,7 +58,7 @@ function VerdictRow({ step, evalRunId, verdict, mayEdit, editReason }: {
   return (
     <li className="space-y-1 border-t pt-2 first:border-t-0 first:pt-0" data-testid="judge-verdict">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="font-medium">{verdict.caseName ?? verdict.caseId.slice(0, 8)} · trial {verdict.trialIndex + 1}</span>
+        <span className="font-medium">{verdict.caseName ?? verdict.caseId.slice(0, 8)} · trial {verdict.trialIndex + 1}{variantLabel === undefined ? '' : ` · ${variantLabel}`}</span>
         <span className="text-muted-foreground">{verdict.name} · {verdict.severity}</span>
         <span className={cn(
           'rounded px-1.5 py-0.5 text-[11px] font-medium',
@@ -57,8 +66,13 @@ function VerdictRow({ step, evalRunId, verdict, mayEdit, editReason }: {
         )}>{verdict.passed ? 'pass' : 'fail'}</span>
         <span className="text-muted-foreground">{confidenceText(verdict)}</span>
         <span className={cn(verdict.counts ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-300')}>{standing(verdict)}</span>
+        {trialHref !== undefined && (
+          <Link href={trialHref} className="ml-auto inline-flex items-center gap-0.5 text-primary hover:underline">
+            What the judge read <ChevronRight className="h-3 w-3" />
+          </Link>
+        )}
       </div>
-      <p className="whitespace-pre-wrap" data-testid="judge-rationale">{verdict.rationale ?? 'The judge gave no rationale.'}</p>
+      <p className="whitespace-pre-wrap" data-testid="judge-rationale">{rationale ?? verdict.rationale ?? 'The judge gave no rationale.'}</p>
       {verdict.review?.comment !== null && verdict.review?.comment !== undefined && (
         <p className="text-muted-foreground">Reviewer: {verdict.review.comment}</p>
       )}
@@ -96,30 +110,43 @@ function VerdictRow({ step, evalRunId, verdict, mayEdit, editReason }: {
 }
 
 /**
- * Every model's verdict of one variant (ADR-0023) — a judge's, or an
+ * Every model's verdict in an Eval Run (ADR-0023) — a judge's, or an
  * expected-output agreement score: pass or fail, the judge's confidence
  * against its minimum or the agreement, and its rationale — what decided it
- * and why. A person accepts a verdict, so it counts however unsure the judge was,
- * or denies it, leaving it out of the Acceptance Criteria.
+ * and why, with a link to everything the judge read. A person accepts a
+ * verdict, so it counts however unsure the judge was, or denies it, leaving it
+ * out of the Acceptance Criteria.
  */
-export function JudgeVerdicts({ step, evalRunId, verdicts, mayEdit, editReason }: {
+export function JudgeVerdicts({ step, evalRunId, verdicts, mayEdit, editReason, variantLabels, trialHref }: {
   step: EvaluatedStep;
   evalRunId: string;
   verdicts: readonly JudgeVerdict[];
   mayEdit: boolean;
   editReason: string | undefined;
+  /** By variant id, when the run has more than one. */
+  variantLabels?: ReadonlyMap<string, string>;
+  trialHref?: (trialId: string) => string;
 }) {
   const leftOut = verdicts.filter((verdict) => verdict.counts === false).length;
   return (
-    <details className="text-xs" open={leftOut > 0}>
-      <summary className="cursor-pointer text-muted-foreground" data-testid="judge-verdicts-summary">
+    <div className="space-y-2 text-xs">
+      <p className="text-muted-foreground" data-testid="judge-verdicts-summary">
         Model verdicts — {verdicts.length}{leftOut > 0 ? `, ${leftOut} left out of the criteria` : ''}
-      </summary>
-      <ul className="mt-1.5 space-y-2">
+      </p>
+      <ul className="space-y-2">
         {verdicts.map((verdict) => (
-          <VerdictRow key={`${verdict.trialId}:${verdict.evaluatorId}`} step={step} evalRunId={evalRunId} verdict={verdict} mayEdit={mayEdit} editReason={editReason} />
+          <JudgeVerdictRow
+            key={`${verdict.trialId}:${verdict.evaluatorId}`}
+            step={step}
+            evalRunId={evalRunId}
+            verdict={verdict}
+            mayEdit={mayEdit}
+            editReason={editReason}
+            variantLabel={variantLabels?.get(verdict.variantId)}
+            trialHref={trialHref?.(verdict.trialId)}
+          />
         ))}
       </ul>
-    </details>
+    </div>
   );
 }

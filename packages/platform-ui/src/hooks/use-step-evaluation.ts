@@ -9,6 +9,7 @@ import { stopRetryOn4xx } from '@/lib/retry';
 type Section =
   | 'brief'
   | 'evaluators'
+  | 'evaluators-with-archived'
   | 'cases'
   | 'datasets'
   | 'runs'
@@ -41,6 +42,23 @@ export function useStepEvaluators(step: EvaluatedStep) {
     queryFn: () => mediforce.evaluation.listEvaluators(step),
     retry: stopRetryOn4xx,
   });
+}
+
+/**
+ * Every Evaluator the Step ever had, archived ones too, with all their
+ * versions — what an Eval Run froze may since have been archived.
+ */
+export function useStepEvaluatorHistory(step: EvaluatedStep) {
+  return useQuery({
+    queryKey: sectionKey(step, 'evaluators-with-archived'),
+    queryFn: () => mediforce.evaluation.listEvaluators({ ...step, includeArchived: 'true' }),
+    retry: stopRetryOn4xx,
+  });
+}
+
+/** The Step's frozen Dataset versions, newest first. */
+export function useStepDatasets(step: EvaluatedStep) {
+  return useQuery({ queryKey: sectionKey(step, 'datasets'), queryFn: () => mediforce.evaluation.listDatasets(step), retry: stopRetryOn4xx });
 }
 
 /**
@@ -79,7 +97,7 @@ export function useStepEvaluation(step: EvaluatedStep, definitionVersion: number
     brief: useQuery({ queryKey: sectionKey(step, 'brief'), queryFn: () => mediforce.evaluation.getBrief(step), ...options }),
     evaluators: useStepEvaluators(step),
     cases: useQuery({ queryKey: sectionKey(step, 'cases'), queryFn: () => mediforce.evaluation.listCases(step), ...options }),
-    datasets: useQuery({ queryKey: sectionKey(step, 'datasets'), queryFn: () => mediforce.evaluation.listDatasets(step), ...options }),
+    datasets: useStepDatasets(step),
     runs: useQuery({ queryKey: sectionKey(step, 'runs'), queryFn: () => mediforce.evaluation.listRuns(step), ...options }),
     criteria: useQuery({ queryKey: sectionKey(step, 'criteria'), queryFn: () => mediforce.evaluation.getAcceptanceCriteria(step), ...options }),
     qualification: useStepQualification(step, definitionVersion),
@@ -147,3 +165,20 @@ export function useEvalRun(evalRunId: string | null) {
   });
 }
 
+
+/**
+ * One trial of an Eval Run with everything its Evaluators read and gave,
+ * polled until it is scored. Under the run's key, so a review of one of its
+ * verdicts refreshes it.
+ */
+export function useEvalTrial(evalRunId: string, trialId: string) {
+  return useQuery({
+    queryKey: queryKeys.evalTrial(evalRunId, trialId),
+    queryFn: () => mediforce.evaluation.getTrial({ evalRunId, trialId }),
+    retry: stopRetryOn4xx,
+    refetchInterval: (query) => {
+      const status = query.state.data?.trial.status;
+      return status === 'pending' || status === 'running' || status === 'scoring' ? 3000 : false;
+    },
+  });
+}

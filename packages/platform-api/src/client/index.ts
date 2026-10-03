@@ -653,6 +653,8 @@ import {
   type ListEvalRunsOutput,
   GetEvalRunFailuresInputSchema,
   GetEvalRunFailuresOutputSchema,
+  GetEvalTrialInputSchema,
+  GetEvalTrialOutputSchema,
   ReviewJudgeVerdictInputSchema,
   ReviewJudgeVerdictOutputSchema,
   ApplyStepVariantInputSchema,
@@ -664,6 +666,8 @@ import {
   EvalOptimisationOutputSchema,
   type GetEvalRunFailuresInput,
   type GetEvalRunFailuresOutput,
+  type GetEvalTrialInput,
+  type GetEvalTrialOutput,
   type ReviewJudgeVerdictInput,
   type ReviewJudgeVerdictOutput,
   type ApplyStepVariantInput,
@@ -1092,6 +1096,8 @@ export class Mediforce {
     listRuns: (input: ListEvalRunsInput) => Promise<ListEvalRunsOutput>;
     cancelRun: (input: CancelEvalRunInput) => Promise<EvalRunOutput>;
     getRunFailures: (input: GetEvalRunFailuresInput) => Promise<GetEvalRunFailuresOutput>;
+    /** One trial of an Eval Run with everything its Evaluators read and gave. */
+    getTrial: (input: GetEvalTrialInput) => Promise<GetEvalTrialOutput>;
     /** A person accepts or denies one judge verdict of an Eval Run after reading its rationale. */
     reviewJudgeVerdict: (input: ReviewJudgeVerdictInput) => Promise<ReviewJudgeVerdictOutput>;
     applyVariant: (input: ApplyStepVariantInput) => Promise<ApplyStepVariantOutput>;
@@ -2626,6 +2632,11 @@ export class Mediforce {
         const { evalRunId, variantId, limit } = GetEvalRunFailuresInputSchema.parse(input);
         const qs = toSearchParams({ variantId, limit: String(limit) });
         return this.getJson(`/api/evaluation/runs/${encodeURIComponent(evalRunId)}/failures${qs}`, GetEvalRunFailuresOutputSchema, 'mediforce.evaluation.getRunFailures');
+      },
+      getTrial: async (input) => {
+        const { evalRunId, trialId } = GetEvalTrialInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/runs/${encodeURIComponent(evalRunId)}/trials/${encodeURIComponent(trialId)}`,
+          GetEvalTrialOutputSchema, 'mediforce.evaluation.getTrial');
       },
       reviewJudgeVerdict: async (input) => {
         const { evalRunId, ...body } = ReviewJudgeVerdictInputSchema.parse(input);
