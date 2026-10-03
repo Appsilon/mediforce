@@ -2,12 +2,13 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import type { EvalCase, EvaluatedStep, EvaluatorCheck, JudgeVerdict, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { EvalTrialEvaluator, GetEvalTrialOutput } from '@mediforce/platform-api/contract';
 import { routes } from '@/lib/routes';
 import { formatCostUsd, formatDuration } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { secondaryButtonClass } from '@/components/ui/button-styles';
 import { useEvalRun, useEvalTrial } from '@/hooks/use-step-evaluation';
 import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
 import { OutcomeChip, TrialResultBadge, TrialStatusBadge } from './eval-run-badges';
@@ -60,7 +61,7 @@ function readsOf(check: EvaluatorCheck, evalCase: EvalCase | null): string {
     case 'code':
       return 'Its script reads the output, the step\'s input, the agent\'s log and the Eval Case.';
     case 'llm_judge':
-      return 'The judge model reads the step\'s input, the agent\'s whole log, the output and the agent\'s own summary — exactly the messages below — and answers this question.';
+      return 'The judge model reads the step\'s input, the agent\'s whole log, the output and the agent\'s own summary — exactly the messages in its Evaluator logs — and answers this question.';
     case 'expected_output':
       return evalCase?.comparison === 'agreement'
         ? 'A model compares the output with the case\'s expected output, with the instructions below, and scores how far they agree.'
@@ -68,22 +69,53 @@ function readsOf(check: EvaluatorCheck, evalCase: EvalCase | null): string {
   }
 }
 
-function JudgePrompt({ messages }: { messages: NonNullable<EvalTrialEvaluator['judgePrompt']> }) {
+interface EvaluatorLogEntry {
+  readonly kind: string;
+  readonly detail: string | null;
+  readonly body: string;
+}
+
+/** A model-run check's log: the messages its model was sent, then each answer it gave, numbered like the agent's log. */
+function evaluatorLogEntries(entry: EvalTrialEvaluator): EvaluatorLogEntry[] {
+  const sent = (entry.judgePrompt ?? []).map((message) => ({ kind: message.role, detail: null, body: message.content }));
+  const answered = (entry.judgeCalls ?? []).map((call) => ({
+    kind: 'assistant',
+    detail: `${call.model} · ${call.promptTokens} in / ${call.completionTokens} out tokens · ${formatDuration(call.durationMs)}`,
+    body: call.response,
+  }));
+  return [...sent, ...answered];
+}
+
+function EvaluatorLog({ entry }: { entry: EvalTrialEvaluator }) {
+  const [open, setOpen] = React.useState(false);
+  const entries = evaluatorLogEntries(entry);
   return (
-    <details className="text-xs" data-testid="judge-prompt">
-      <summary className="cursor-pointer text-muted-foreground">What the model was sent ({messages.length} messages)</summary>
-      <p className="mt-1 text-muted-foreground">
-        Rebuilt from the Evaluator version frozen into this run and this trial&apos;s input, log and output, by the same code that sent it.
-      </p>
-      <div className="mt-2 space-y-2">
-        {messages.map((message, index) => (
-          <div key={index}>
-            <p className="font-mono text-[11px] uppercase text-muted-foreground">{message.role}</p>
-            <pre className={preClass}>{message.content}</pre>
-          </div>
-        ))}
-      </div>
-    </details>
+    <div className="space-y-2 text-xs" data-testid="evaluator-log">
+      <button type="button" className={secondaryButtonClass} aria-expanded={open} onClick={() => setOpen((current) => current === false)}>
+        {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        Evaluator logs ({entries.length})
+      </button>
+      {open && (
+        <>
+          <p className="text-muted-foreground">
+            What the model was sent — rebuilt from the Evaluator version frozen into this run and this trial&apos;s input, log and output, by the same code that sent it — then what it answered.
+            {entry.judgeCalls === null && entry.score !== null && ' Its answers were not kept for this Score.'}
+          </p>
+          <ol className="space-y-1.5">
+            {entries.map((logEntry, index) => (
+              <li key={index} className="rounded-md border px-3 py-2">
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-mono text-muted-foreground">[{index}]</span>
+                  <span className="font-medium">{logEntry.kind}</span>
+                  {logEntry.detail !== null && <span className="text-muted-foreground">{logEntry.detail}</span>}
+                </div>
+                <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-words font-mono">{logEntry.body}</pre>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -149,7 +181,7 @@ function EvaluatorResult({ entry, context }: {
           <div className="mt-2"><CheckDetails check={check} /></div>
         </details>
       )}
-      {entry.judgePrompt !== null && <JudgePrompt messages={entry.judgePrompt} />}
+      {(entry.judgePrompt !== null || entry.judgeCalls !== null) && <EvaluatorLog entry={entry} />}
     </div>
   );
 }
@@ -197,7 +229,7 @@ function AgentLog({ entries, citedBy }: { entries: readonly StoredAgentTrajector
  * Evaluators read and gave: the Eval Case's input and expected output, the
  * output and the agent's own summary; per Evaluator what it looks for and
  * reads, its verdict and rationale — log entries a judge cites link to the
- * log — the exact messages a model judge was sent, and a person's review; and
+ * log — a model's Evaluator logs: what it was sent and answered, and a person's review; and
  * the agent's whole log, as the judges read it.
  */
 export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
@@ -299,7 +331,7 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
       <Section
         id="trial-evaluators"
         title="Evaluators"
-        description="Each Evaluator the case selects: what it looks for, what it reads, its verdict and why. A model's verdict shows the exact messages it was sent; log entries it cites are linked and marked in the log below."
+        description="Each Evaluator the case selects: what it looks for, what it reads, its verdict and why. A model's Evaluator logs show the exact messages it was sent and what it answered; log entries it cites are linked and marked in the log below."
       >
         {evaluators.length === 0 ? (
           <p className="text-sm text-muted-foreground">No Evaluator grades this case.</p>

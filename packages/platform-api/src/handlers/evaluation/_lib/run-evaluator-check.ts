@@ -6,7 +6,7 @@ import {
   validateOutputSchema,
   type LlmClient,
 } from '@mediforce/agent-runtime';
-import type { EvaluatorOutcome } from '../../../contract/evaluation';
+import type { EvaluatorOutcome, JudgeCall } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { callOpenRouter } from '../../../services/openrouter-client';
 import { requireOpenRouterApiKey } from '../../../services/openrouter-key';
@@ -19,17 +19,11 @@ const CODE_CHECK_TIMEOUT_MS = 2 * 60_000;
 /** Room for a rationale that cites what decided the verdict. */
 const JUDGE_MAX_OUTPUT_TOKENS = 2000;
 
-/** The tokens one LLM judge call spent, for whoever pays for it. */
-export interface JudgeUsage {
-  readonly model: string;
-  readonly promptTokens: number;
-  readonly completionTokens: number;
-}
-
 /** The judge's model, through the platform's OpenRouter seam (mockable via `OPENROUTER_BASE_URL`). */
-function openRouterJudgeClient(apiKey: string, model: string, onUsage: (usage: JudgeUsage) => void): LlmClient {
+function openRouterJudgeClient(apiKey: string, model: string, onCall: (call: JudgeCall) => void): LlmClient {
   return {
     complete: async (messages) => {
+      const startedAt = Date.now();
       const response = await callOpenRouter({
         model,
         apiKey,
@@ -37,7 +31,7 @@ function openRouterJudgeClient(apiKey: string, model: string, onUsage: (usage: J
         temperature: 0,
         maxTokens: JUDGE_MAX_OUTPUT_TOKENS,
       });
-      onUsage({ model, ...response.usage });
+      onCall({ model, ...response.usage, durationMs: Date.now() - startedAt, response: response.content });
       return { content: response.content, model, usage: response.usage };
     },
   };
@@ -56,7 +50,7 @@ async function runJudgeCheck(
   scope: CallerScope,
   check: LlmJudgeCheck,
   subject: EvaluationSubject,
-  onJudgeUsage: (usage: JudgeUsage) => void,
+  onJudgeCall: (call: JudgeCall) => void,
 ): Promise<EvaluatorOutcome> {
   const { agentRun } = subject;
   const apiKey = await requireOpenRouterApiKey(scope, subject.instance.namespace ?? '');
@@ -71,7 +65,7 @@ async function runJudgeCheck(
     processInstanceId: agentRun.processInstanceId,
     executorOutput: agentRun.envelope!,
     iterationNumber: 0,
-    llm: openRouterJudgeClient(apiKey, check.model, onJudgeUsage),
+    llm: openRouterJudgeClient(apiKey, check.model, onJudgeCall),
   });
   return { ...binary(agentRun.id, verdict.passed, verdict.reasoning), confidence: verdict.confidence };
 }
@@ -87,7 +81,7 @@ async function runExpectedOutputCheck(
   subject: EvaluationSubject,
   evalCase: EvalCase | null,
   result: unknown,
-  onJudgeUsage: (usage: JudgeUsage) => void,
+  onJudgeCall: (call: JudgeCall) => void,
 ): Promise<EvaluatorOutcome> {
   const { agentRun } = subject;
   if (evalCase === null || evalCase.expectedOutput === null) {
@@ -103,7 +97,7 @@ async function runExpectedOutputCheck(
     return binary(agentRun.id, matches !== negative, comment);
   }
   const apiKey = await requireOpenRouterApiKey(scope, subject.instance.namespace ?? '');
-  const { agreement, rationale } = await judgeOutputAgreement(openRouterJudgeClient(apiKey, check.model, onJudgeUsage), {
+  const { agreement, rationale } = await judgeOutputAgreement(openRouterJudgeClient(apiKey, check.model, onJudgeCall), {
     model: check.model,
     instructions: check.instructions ?? null,
     caseInstructions: evalCase.agreementInstructions,
@@ -119,7 +113,7 @@ async function runExpectedOutputCheck(
  * Applies one check to one Agent Run's output. A run with no `result` fails
  * every check without running it. A check that cannot run — a crashing
  * script, a judge with no usable verdict — comes back as `error`, never as a
- * failed output: an Evaluator's defect is not the agent's. `onJudgeUsage`
+ * failed output: an Evaluator's defect is not the agent's. `onJudgeCall`
  * hears every judge call made, including one whose answer was unusable.
  */
 export async function runEvaluatorCheck(
@@ -127,7 +121,7 @@ export async function runEvaluatorCheck(
   check: EvaluatorCheck,
   subject: EvaluationSubject,
   evalCase: EvalCase | null,
-  onJudgeUsage: (usage: JudgeUsage) => void = () => {},
+  onJudgeCall: (call: JudgeCall) => void = () => {},
 ): Promise<EvaluatorOutcome> {
   const { agentRun } = subject;
   const envelope = agentRun.envelope;
@@ -160,9 +154,9 @@ export async function runEvaluatorCheck(
         return binary(agentRun.id, outcome.passed, outcome.comment);
       }
       case 'llm_judge':
-        return await runJudgeCheck(scope, check, subject, onJudgeUsage);
+        return await runJudgeCheck(scope, check, subject, onJudgeCall);
       case 'expected_output':
-        return await runExpectedOutputCheck(scope, check, subject, evalCase, result, onJudgeUsage);
+        return await runExpectedOutputCheck(scope, check, subject, evalCase, result, onJudgeCall);
     }
   } catch (err) {
     return {

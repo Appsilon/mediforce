@@ -5,7 +5,8 @@ import { recordScore } from '../../scores/record-score';
 import { loadEvaluationSubject } from './evaluation-subject';
 import { storeEvalRunAcceptance } from './eval-run-report';
 import { loadModelPrices } from './model-prices';
-import { runEvaluatorCheck, type JudgeUsage } from './run-evaluator-check';
+import type { JudgeCall } from '../../../contract/evaluation';
+import { runEvaluatorCheck } from './run-evaluator-check';
 import { evaluatorsOfCase, judgeConfidenceMetadata, scoresOfTrial } from './trial-scores';
 
 /**
@@ -106,12 +107,12 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
       errors.push(`${frozen.name}: version ${frozen.version} not found`);
       continue;
     }
-    const judgeUsages: JudgeUsage[] = [];
-    const outcome = await runEvaluatorCheck(scope, version.check, subject, evalCase, (usage) => judgeUsages.push(usage));
-    const prices = judgeUsages.map((usage) =>
-      priceOf(usage.model, { inputTokens: usage.promptTokens, outputTokens: usage.completionTokens }));
+    const judgeCalls: JudgeCall[] = [];
+    const outcome = await runEvaluatorCheck(scope, version.check, subject, evalCase, (call) => judgeCalls.push(call));
+    const prices = judgeCalls.map((call) =>
+      priceOf(call.model, { inputTokens: call.promptTokens, outputTokens: call.completionTokens }));
     const checkCostUsd = prices.reduce<number>((sum, price) => sum + (price ?? 0), 0);
-    const unpriced = judgeUsages.find((_usage, index) => prices[index] === null);
+    const unpriced = judgeCalls.find((_call, index) => prices[index] === null);
     if (unpriced !== undefined) {
       errors.push(`${frozen.name}: judge model '${unpriced.model}' has no registry price, so its calls are not counted`);
     }
@@ -139,7 +140,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
         counted: frozen.counted,
         ...judgeConfidenceMetadata(version.check, outcome.confidence),
         ...(outcome.agreement === null ? {} : { agreement: outcome.agreement }),
-        ...(judgeUsages.length === 0 ? {} : { judgeCostUsd: checkCostUsd }),
+        ...(judgeCalls.length === 0 ? {} : { judgeCostUsd: checkCostUsd, judgeCalls }),
       },
       namespace: run.namespace,
       processInstanceId: instanceId,

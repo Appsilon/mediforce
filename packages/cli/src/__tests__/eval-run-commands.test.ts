@@ -215,10 +215,11 @@ describe('mediforce eval trial', () => {
       error: null,
       review: null,
       judgePrompt: [{ role: 'system', content: 'Rubric:\nA fatal AE is Grade 5.' }, { role: 'user', content: 'Step output: ...' }],
+      judgeCalls: [{ model: 'anthropic/claude-haiku-4.5', promptTokens: 900, completionTokens: 60, durationMs: 1200, response: '{"rationale": "Grade 4 given for a fatal AE.", "passed": false, "confidence": 0.9}' }],
     }],
   };
 
-  it('prints the trial\'s input and output and each Evaluator\'s grade, and the judge prompt only with --prompts', async () => {
+  it('prints the trial\'s input and output and each Evaluator\'s grade, and the judge prompt and answer only with --prompts', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse(trial));
     const output = captureOutput();
     expect(await evalTrialCommand({ argv: [RUN_ID, TRIAL_ID, ...BASE], env: ENV, output })).toBe(0);
@@ -233,6 +234,7 @@ describe('mediforce eval trial', () => {
     const withPrompts = captureOutput();
     await evalTrialCommand({ argv: [RUN_ID, TRIAL_ID, '--prompts', ...BASE], env: ENV, output: withPrompts });
     expect(withPrompts.stdoutLines.join('\n')).toContain('--- system ---\nRubric:\nA fatal AE is Grade 5.');
+    expect(withPrompts.stdoutLines.join('\n')).toContain('--- assistant (anthropic/claude-haiku-4.5, 900 in / 60 out tokens, 1200 ms) ---\n{"rationale": "Grade 4 given for a fatal AE."');
   });
 });
 

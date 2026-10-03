@@ -645,10 +645,14 @@ output, the output and the agent's own summary, the agent's whole log as the
 judges read it, links to the trial's Workflow Run and step execution, and per
 Evaluator of the case what it looks for — a judge's question, or the rule —
 and what it reads, its verdict and comment or why it could not grade, a
-person's review, and for a model judge the exact messages it was sent. Those
-messages are rebuilt from the Evaluator version frozen into the run and the
-trial's input, log and output by the code that sent them
-(`llmJudgeMessages`, `outputAgreementMessages`). A case is never changed in
+person's review, and for a model judge (an `llm_judge`, or an agreement
+comparison) its **Evaluator logs**: the exact messages it was sent, then each
+answer its model gave, with the model, tokens and duration. The messages are
+rebuilt from the Evaluator version frozen into the run and the trial's input,
+log and output by the code that sent them (`llmJudgeMessages`,
+`outputAgreementMessages`); the answers are kept on the Score
+(`metadata.judgeCalls`, returned as `judgeCalls`) — a Score recorded before they
+were kept, or a check that gave no Score, shows the messages only. A case is never changed in
 place — an edit is a new case — so the trial's case, and an agreement
 comparison's expected output, are what the judge read. Log entries a model
 judge's rationale cites as `[n]` link to the entry, which is marked in the log;

@@ -187,12 +187,13 @@ test.describe('Step Evaluation tab', () => {
     await expect(verdict).toContainText('left out — below its minimum confidence');
     await expect(verdict.getByTestId('judge-rationale')).toHaveText(rationale);
 
-    // Everything the judge read, on the trial's page: its question, the exact messages it was sent, and the input in them.
+    // Everything the judge read, on the trial's page: its question, its Evaluator logs — the exact messages it was sent, and the input in them — and the input.
     await verdict.getByRole('link', { name: 'What the judge read' }).click();
     const judge = page.getByTestId('trial-evaluator').filter({ hasText: 'summary-grounded' });
     await expect(judge.getByTestId('evaluator-looks-for')).toContainText('Is the summary grounded in the input?');
-    await judge.getByTestId('judge-prompt').locator('summary').click();
-    await expect(judge.getByTestId('judge-prompt')).toContainText(judgeKey);
+    await judge.getByRole('button', { name: /Evaluator logs/ }).click();
+    await expect(judge.getByTestId('evaluator-log')).toContainText(judgeKey);
+    await expect(judge.getByTestId('evaluator-log')).toContainText(rationale);
     await expect(page.getByTestId('trial-input')).toContainText(judgeKey);
 
     const review = judge.getByTestId('judge-verdict');

@@ -191,11 +191,11 @@ export const evalRunFailuresCommand = defineCommand({
 
 export const evalTrialCommand = defineCommand({
   name: 'mediforce eval trial',
-  description: 'Print one trial of an Eval Run: its case, the step\'s input and output, and per Evaluator its grade, comment or rationale; --prompts adds what each model judge was sent.',
+  description: 'Print one trial of an Eval Run: its case, the step\'s input and output, and per Evaluator its grade, comment or rationale; --prompts adds what each model judge was sent and answered.',
   args: {
     evalRunId: { type: 'positional', required: true, description: 'Eval Run id' },
     trialId: { type: 'positional', required: true, description: 'Trial id' },
-    prompts: { type: 'boolean', description: 'Also print every message each model judge was sent' },
+    prompts: { type: 'boolean', description: 'Also print every message each model judge was sent, and its answers' },
   },
   async run({ args, output, mediforce, jsonMode }) {
     const result = await mediforce.evaluation.getTrial({ evalRunId: args.evalRunId, trialId: args.trialId });
@@ -217,6 +217,7 @@ export const evalTrialCommand = defineCommand({
       if (said !== null) output.stdout(`  ${said}`);
       if (args.prompts === true) {
         for (const message of entry.judgePrompt ?? []) output.stdout(`  --- ${message.role} ---\n${message.content}`);
+        for (const call of entry.judgeCalls ?? []) output.stdout(`  --- assistant (${call.model}, ${call.promptTokens} in / ${call.completionTokens} out tokens, ${call.durationMs} ms) ---\n${call.response}`);
       }
     }
     return 0;

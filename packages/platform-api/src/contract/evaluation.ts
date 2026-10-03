@@ -376,6 +376,16 @@ export const JudgeMessageSchema = z.object({
   content: z.string(),
 });
 
+/** One call a check made to its model: what it answered, what it spent and how long it took. */
+export const JudgeCallSchema = z.object({
+  model: z.string(),
+  promptTokens: z.number(),
+  completionTokens: z.number(),
+  durationMs: z.number(),
+  /** The model's answer, as it gave it. */
+  response: z.string(),
+});
+
 /** One Evaluator of the trial's case: what it checks, how it graded the trial, and what its model read. */
 export const EvalTrialEvaluatorSchema = z.object({
   evaluator: EvalRunEvaluatorSchema,
@@ -405,6 +415,11 @@ export const EvalTrialEvaluatorSchema = z.object({
    * model runs, or while there is no output.
    */
   judgePrompt: z.array(JudgeMessageSchema).nullable(),
+  /**
+   * Every call its model answered for the Score it gave, in order. Null when
+   * no model ran, it gave no Score, or the Score predates keeping them.
+   */
+  judgeCalls: z.array(JudgeCallSchema).nullable(),
 });
 
 export const GetEvalTrialOutputSchema = z.object({
@@ -749,6 +764,7 @@ export type GetEvalTrialInput = z.infer<typeof GetEvalTrialInputSchema>;
 export type GetEvalTrialOutput = z.infer<typeof GetEvalTrialOutputSchema>;
 export type EvalTrialEvaluator = z.infer<typeof EvalTrialEvaluatorSchema>;
 export type JudgeMessage = z.infer<typeof JudgeMessageSchema>;
+export type JudgeCall = z.infer<typeof JudgeCallSchema>;
 export type GetEvalRunFailuresInput = z.input<typeof GetEvalRunFailuresInputSchema>;
 export type GetEvalRunFailuresOutput = z.infer<typeof GetEvalRunFailuresOutputSchema>;
 export type EvalTrialFailure = z.infer<typeof EvalTrialFailureSchema>;

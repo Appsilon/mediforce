@@ -50,7 +50,7 @@ describe('getEvalTrial (ADR-0023)', () => {
       trial.caseId === scenario.caseIds['Grade 4 neutropenia'] ? { summary: 'no findings' } : { findings: ['Grade 5 sepsis'] });
   }
 
-  it('shows a trial\'s case, input and output, every Evaluator\'s grade, and exactly what the judge was sent', async () => {
+  it('shows a trial\'s case, input and output, every Evaluator\'s grade, and exactly what the judge was sent and answered', async () => {
     const evalRunId = await finishedRun();
     const { trials, report } = await getEvalRun({ evalRunId }, scenario.scope);
     const failing = trials.find((trial) => trial.caseId === scenario.caseIds['Grade 4 neutropenia'])!;
@@ -72,6 +72,15 @@ describe('getEvalTrial (ADR-0023)', () => {
     // The judge's two trials were scored in an order of their own; one of its calls is this trial's.
     expect(judgeCalls).toContainEqual(judge!.judgePrompt);
     expect(judge!.judgePrompt?.[0]?.content).toContain('Every grade follows CTCAE v5.');
+    // …and what it answered, as it answered it.
+    expect(judge!.judgeCalls).toEqual([{
+      model: 'anthropic/claude-haiku-4.5',
+      promptTokens: 100,
+      completionTokens: 20,
+      durationMs: expect.any(Number),
+      response: '{"rationale": "Entry [0] shows the grade.", "passed": true, "confidence": 0.9}',
+    }]);
+    expect(schemaCheck!.judgeCalls).toBeNull();
 
     expect(report.trialResults.find((entry) => entry.trialId === failing.id)).toEqual({
       trialId: failing.id,

@@ -141,12 +141,12 @@ describe('runEvaluatorCheck', () => {
       const evalCase = await caseExpecting(fixture, {
         expectedOutput: { findings: [{ term: 'Sepsis (fatal)', grade: 5 }] }, comparison: 'agreement', agreementInstructions: 'The term wording is trivial; the grade is not.',
       });
-      const usages: unknown[] = [];
+      const calls: unknown[] = [];
 
-      const outcome = await runEvaluatorCheck(scope, expected, await loadEvaluationSubject(scope, GRADED_RUN, STEP), evalCase, (usage) => usages.push(usage));
+      const outcome = await runEvaluatorCheck(scope, expected, await loadEvaluationSubject(scope, GRADED_RUN, STEP), evalCase, (call) => calls.push(call));
 
       expect(outcome).toMatchObject({ passed: true, value: 1, agreement: 0.9, comment: expect.stringContaining('Same term and grade.') });
-      expect(usages).toHaveLength(1);
+      expect(calls).toHaveLength(1);
       const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as { model: string; messages: Array<{ content: string }> };
       expect(body.model).toBe('anthropic/claude-haiku-4.5');
       expect(body.messages[0]!.content).toContain('Wording is never decisive.');
@@ -168,7 +168,7 @@ describe('runEvaluatorCheck', () => {
     });
   });
 
-  it('reports what a judge call spent even when its answer is unusable', async () => {
+  it('reports what a judge call spent and answered even when its answer is unusable', async () => {
     const fixture = await evaluationFixture();
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({
       choices: [{ message: { content: 'I would rather not choose.' }, finish_reason: 'stop' }],
@@ -176,13 +176,15 @@ describe('runEvaluatorCheck', () => {
     }))));
     const scope = fixture.scope();
     Object.assign(scope, { workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) } });
-    const usages: unknown[] = [];
+    const calls: unknown[] = [];
 
-    const outcome = await runEvaluatorCheck(scope, judge, await loadEvaluationSubject(scope, GRADED_RUN, STEP), null, (usage) => usages.push(usage));
+    const outcome = await runEvaluatorCheck(scope, judge, await loadEvaluationSubject(scope, GRADED_RUN, STEP), null, (call) => calls.push(call));
 
     expect(outcome).toMatchObject({ passed: null, value: null });
-    expect(usages.length).toBeGreaterThan(0);
-    expect(usages[0]).toEqual({ model: 'anthropic/claude-haiku-4.5', promptTokens: 4000, completionTokens: 500 });
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls[0]).toEqual({
+      model: 'anthropic/claude-haiku-4.5', promptTokens: 4000, completionTokens: 500, durationMs: expect.any(Number), response: 'I would rather not choose.',
+    });
   });
 
   it('reports a check that cannot run as an error, not a failure', async () => {

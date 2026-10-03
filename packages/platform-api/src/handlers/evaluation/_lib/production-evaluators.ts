@@ -11,7 +11,8 @@ import { evaluatorProduction } from './evaluator-view';
 import type { EvaluationSubject } from './evaluation-subject';
 import { loadModelPrices } from './model-prices';
 import { judgeConfidenceMetadata } from './trial-scores';
-import { runEvaluatorCheck, type JudgeUsage } from './run-evaluator-check';
+import type { JudgeCall } from '../../../contract/evaluation';
+import { runEvaluatorCheck } from './run-evaluator-check';
 
 interface ProductionEvaluator {
   readonly evaluator: Evaluator;
@@ -48,13 +49,13 @@ async function scoreProduction(
   scope: CallerScope,
   subject: EvaluationSubject,
   { evaluator, version }: ProductionEvaluator,
-  judgeUsages: readonly JudgeUsage[],
+  judgeCalls: readonly JudgeCall[],
   priceOf: Awaited<ReturnType<typeof loadModelPrices>>,
   outcome: Awaited<ReturnType<typeof runEvaluatorCheck>>,
 ): Promise<void> {
   if (outcome.passed === null || outcome.value === null) return;
-  const costs = judgeUsages.map((usage) =>
-    priceOf(usage.model, { inputTokens: usage.promptTokens, outputTokens: usage.completionTokens }));
+  const costs = judgeCalls.map((call) =>
+    priceOf(call.model, { inputTokens: call.promptTokens, outputTokens: call.completionTokens }));
   const judgeCostUsd = costs.reduce<number>((sum, price) => sum + (price ?? 0), 0);
   await recordScore({
     subject: { type: 'agent_run', id: subject.agentRun.id },
@@ -69,7 +70,7 @@ async function scoreProduction(
       evaluatorVersion: version.version,
       counted: true,
       ...judgeConfidenceMetadata(version.check, outcome.confidence),
-      ...(judgeUsages.length === 0 ? {} : { judgeCostUsd }),
+      ...(judgeCalls.length === 0 ? {} : { judgeCostUsd, judgeCalls }),
     },
     namespace: subject.instance.namespace ?? evaluator.namespace,
     processInstanceId: subject.agentRun.processInstanceId,
@@ -101,9 +102,9 @@ export async function scoreProductionRun(
   const judges: Promise<void>[] = [];
 
   const run = async (candidate: ProductionEvaluator) => {
-    const judgeUsages: JudgeUsage[] = [];
-    const outcome = await runEvaluatorCheck(scope, candidate.version.check, subject, null, (usage) => judgeUsages.push(usage));
-    await scoreProduction(scope, subject, candidate, judgeUsages, priceOf, outcome);
+    const judgeCalls: JudgeCall[] = [];
+    const outcome = await runEvaluatorCheck(scope, candidate.version.check, subject, null, (call) => judgeCalls.push(call));
+    await scoreProduction(scope, subject, candidate, judgeCalls, priceOf, outcome);
     return outcome;
   };
 

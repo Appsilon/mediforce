@@ -9,6 +9,8 @@ import {
   type JudgeReviewDecision,
   type Score,
 } from '@mediforce/platform-core';
+import { z } from 'zod';
+import { JudgeCallSchema, type JudgeCall } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 
 /** What an Eval Run recorded on one trial: its checks' Scores, and people's reviews of its judges' verdicts. */
@@ -70,6 +72,12 @@ export function judgeConfidenceMetadata(check: EvaluatorCheck, confidence: numbe
   return check.kind === 'llm_judge' && confidence !== null
     ? { judgeConfidence: confidence, judgeMinConfidence: check.minConfidence }
     : {};
+}
+
+/** A judge's calls as a Score keeps them; null on Scores from before they were kept. */
+export function judgeCallsOf(score: Score): JudgeCall[] | null {
+  const parsed = z.array(JudgeCallSchema).safeParse(score.metadata?.judgeCalls);
+  return parsed.success ? parsed.data : null;
 }
 
 /** The judge's confidence in its verdict and the floor it was held to; null on Scores from before judges reported one. */

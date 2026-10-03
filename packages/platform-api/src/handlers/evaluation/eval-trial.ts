@@ -14,6 +14,7 @@ import {
   checkOutcome,
   evaluatorError,
   evaluatorsOfCase,
+  judgeCallsOf,
   judgeConfidenceOf,
   reviewDecision,
   trialScores,
@@ -46,7 +47,7 @@ function judgePromptOf(check: EvaluatorCheck | null, subject: EvaluationSubject 
  * One trial of an Eval Run with everything its Evaluators read and gave: the
  * case, what the step was given, its log and output, and per Evaluator of the
  * case its frozen check, its Score or why it could not grade, a person's
- * review, and what its model was sent. Readable by whoever may read the
+ * review, what its model was sent and what it answered. Readable by whoever may read the
  * step's Evaluation.
  */
 export async function getEvalTrial(input: GetEvalTrialInput, scope: CallerScope): Promise<GetEvalTrialOutput> {
@@ -87,6 +88,7 @@ export async function getEvalTrial(input: GetEvalTrialInput, scope: CallerScope)
         ? null
         : { decision, reviewedBy: review.createdBy, reviewedAt: review.createdAt, comment: review.comment },
       judgePrompt: judgePromptOf(check, subject, evalCase),
+      judgeCalls: score === undefined ? null : judgeCallsOf(score),
     };
   }));
 
