@@ -20,6 +20,8 @@ import {
 import type {
   CancelEvalRunInput,
   EvalChallenger,
+  EstimateEvalRunInputSchema,
+  EstimateEvalRunOutput,
   EvalRunOutput,
   GetEvalRunInput,
   ListEvalRunsInput,
@@ -122,18 +124,14 @@ async function buildVariants(
 }
 
 /**
- * Prepares an Eval Run (ADR-0023 D4, D5, D10): the Step at its runnable
- * Definition version — or the `definitionVersion` given, unless archived — and
- * any challengers patched over it, a frozen Dataset version less the cases any
- * variant's few-shot examples came from (D12), the Step's live Evaluator
- * versions with whether each counts, the MCP eval policy the trials will run
- * under, the Acceptance Criteria it will be judged against, and a cost
- * estimate. Nothing runs yet — a person confirms the budget with `start`.
+ * What an Eval Run of the input would run (ADR-0023 D4, D5, D10): the Step at
+ * its runnable Definition version — or the `definitionVersion` given, unless
+ * archived — and any challengers patched over it, a frozen Dataset version
+ * less the cases any variant's few-shot examples came from (D12), the Step's
+ * live Evaluator versions with whether each counts, the MCP eval policy the
+ * trials will run under, and a cost estimate. Reads only.
  */
-export async function prepareEvalRun(
-  input: z.output<typeof PrepareEvalRunInputSchema>,
-  scope: CallerScope,
-): Promise<EvalRunOutput> {
+async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, scope: CallerScope) {
   const step = stepRef(input);
   const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'run', input.definitionVersion ?? 'runnable');
   if (definition.archived === true) {
@@ -188,13 +186,43 @@ export async function prepareEvalRun(
       `Every case of Eval Dataset v${dataset.version} is a variant's few-shot example — no case left to score`,
     );
   }
-  const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
-
   const trialsPerVariant = caseIds.length * input.trialsPerCase;
-  const trialCount = trialsPerVariant * variants.length;
   const estimate = await estimateEvalRun(scope, step, workflowStep, frozenEvaluators, variants, trialsPerVariant);
-  const budgetUsd = input.budgetUsd ?? (estimate.totalUsd === null ? undefined : defaultBudget(estimate.totalUsd));
-  if (budgetUsd === undefined) {
+  const suggestedBudgetUsd = estimate.totalUsd === null ? null : defaultBudget(estimate.totalUsd);
+  return { step, definition, dataset, frozenEvaluators, mcpPolicy, variants, caseIds, exampleCaseIds, estimate, suggestedBudgetUsd };
+}
+
+/**
+ * The cost of an Eval Run of the input before it is prepared: its estimate and
+ * the budget cap `prepare` would set when none is given. Creates nothing.
+ */
+export async function estimateEvalRunCost(
+  input: z.output<typeof EstimateEvalRunInputSchema>,
+  scope: CallerScope,
+): Promise<EstimateEvalRunOutput> {
+  const plan = await planEvalRun(input, scope);
+  return {
+    estimate: plan.estimate,
+    suggestedBudgetUsd: plan.suggestedBudgetUsd,
+    caseCount: plan.caseIds.length,
+    trialCount: plan.caseIds.length * input.trialsPerCase * plan.variants.length,
+  };
+}
+
+/**
+ * Prepares an Eval Run of what `planEvalRun` resolves, frozen with the
+ * Acceptance Criteria it will be judged against. Nothing runs yet — a person
+ * confirms the budget with `start`.
+ */
+export async function prepareEvalRun(
+  input: z.output<typeof PrepareEvalRunInputSchema>,
+  scope: CallerScope,
+): Promise<EvalRunOutput> {
+  const { step, definition, dataset, frozenEvaluators, mcpPolicy, variants, caseIds, exampleCaseIds, estimate, suggestedBudgetUsd } = await planEvalRun(input, scope);
+  const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
+  const trialCount = caseIds.length * input.trialsPerCase * variants.length;
+  const budgetUsd = input.budgetUsd ?? suggestedBudgetUsd;
+  if (budgetUsd === null) {
     throw new ValidationError('No cost history or model price for this step — set budgetUsd to cap the run');
   }
 

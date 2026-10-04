@@ -1,6 +1,6 @@
 'use client';
 
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EvaluatedStep } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
@@ -16,7 +16,8 @@ type Section =
   | 'agent-runs'
   | 'criteria'
   | 'drift'
-  | `qualification:${number | 'runnable'}`;
+  | `qualification:${number | 'runnable'}`
+  | `estimate:${number}:${number}`;
 
 const STEP_AGENT_RUNS_PAGE = 20;
 
@@ -87,6 +88,21 @@ export function useWorkflowValidation(namespace: string, workflowName: string) {
     refetchInterval: (query) => (
       query.state.data?.versions.some((version) => version.steps.some((step) => step.validation.runInProgress)) === true ? 5000 : false
     ),
+  });
+}
+
+/**
+ * What an Eval Run of `definitionVersion` would cost at `trialsPerCase` — off
+ * while the trial count is not valid; the last estimate stays shown while the
+ * next one loads.
+ */
+export function useEvalRunEstimate(step: EvaluatedStep, definitionVersion: number, trialsPerCase: number | null) {
+  return useQuery({
+    queryKey: sectionKey(step, `estimate:${definitionVersion}:${trialsPerCase ?? 0}`),
+    queryFn: () => mediforce.evaluation.estimateRun({ ...step, definitionVersion, trialsPerCase: trialsPerCase! }),
+    enabled: trialsPerCase !== null,
+    placeholderData: keepPreviousData,
+    retry: stopRetryOn4xx,
   });
 }
 

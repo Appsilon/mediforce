@@ -42,7 +42,8 @@ import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { AgentRunLog } from '@/components/agents/agent-log-panel';
 import { useAgentRun } from '@/hooks/use-agent-runs';
-import { useAgentRunIo, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
+import { useAgentRunIo, useEvalRunEstimate, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
+import { formatCostUsd } from '@/lib/format';
 import { routes } from '@/lib/routes';
 import { describePatch } from './eval-run-report';
 import { AcceptanceBadge, EvalRunStatusBadge } from './eval-run-badges';
@@ -1442,9 +1443,60 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
   );
 }
 
+/** The cap an Eval Run gets when the person sets no budget, as `prepare` sets it. */
+type BudgetChoice = { kind: 'set'; budgetUsd: number } | { kind: 'auto'; suggestedUsd: number | null };
+
 /**
- * The card a prepared Eval Run waits on: the person starts it by confirming
- * the budget shown (D15). The only place `confirmedBudgetUsd` is sent from.
+ * Asks the person to confirm an Eval Run's budget before it starts (D15): what
+ * it is estimated to cost and the cap it spends up to — with a warning when the
+ * budget was left on auto.
+ */
+function StartEvalRunDialog({ trials, estimatedUsd, budget, starting, error, onStart, onClose }: {
+  trials: number | null;
+  estimatedUsd: number | null;
+  budget: BudgetChoice;
+  starting: boolean;
+  error: Error | null;
+  onStart: () => void;
+  onClose: () => void;
+}) {
+  const cannotCap = budget.kind === 'auto' && budget.suggestedUsd === null;
+  return (
+    <Dialog.Root open onOpenChange={(open) => { if (open === false) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-6 shadow-lg" data-testid="start-eval-run-dialog">
+          <Dialog.Title className="text-lg font-semibold">Start the Eval Run?</Dialog.Title>
+          <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+            {trials === null ? 'Its trials' : `${trials} trial(s)`} run the step and its Evaluators{estimatedUsd === null ? ' — no cost estimate.' : `, estimated ${formatCostUsd(estimatedUsd)}.`}
+          </Dialog.Description>
+          {budget.kind === 'set' ? (
+            <p className="mt-3 text-sm">It spends up to <span className="font-semibold">${budget.budgetUsd}</span>.</p>
+          ) : (
+            <p className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm text-amber-800 dark:text-amber-200" data-testid="auto-budget-warning">
+              {cannotCap
+                ? 'Auto budget is selected, but this step has no cost history or model price to suggest one. Go back and set a budget.'
+                : `Auto budget: the run is capped at $${budget.suggestedUsd} (1.5× the estimate) and stops spending there. Go back to set your own cap.`}
+            </p>
+          )}
+          {error !== null && <p className="mt-3 text-xs text-destructive">{error.message}</p>}
+          <div className="mt-6 flex justify-end gap-2">
+            <Dialog.Close asChild>
+              <button type="button" className={buttonClass}>Back</button>
+            </Dialog.Close>
+            <button type="button" className={primaryButtonClass} disabled={cannotCap || starting} onClick={onStart}>
+              {starting ? 'Starting…' : 'Start'}
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+/**
+ * The card a prepared Eval Run waits on — prepared by the assistant or from
+ * the CLI: the person starts it by confirming the budget shown (D15).
  */
 export function StartEvalRunCard({ step, prepared, otherVersion, mayRun, runReason }: {
   step: EvaluatedStep;
@@ -1454,13 +1506,14 @@ export function StartEvalRunCard({ step, prepared, otherVersion, mayRun, runReas
   mayRun: boolean;
   runReason: string | undefined;
 }) {
+  const [confirming, setConfirming] = React.useState(false);
   const start = useStepEvaluationMutation(step, () =>
     mediforce.evaluation.startRun({ evalRunId: prepared.evalRunId, confirmedBudgetUsd: prepared.budgetUsd }));
   return (
     <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm" data-testid="start-eval-run-card">
       <p>
         Eval Run of {prepared.trials} trial(s){otherVersion === undefined ? '' : ` on v${otherVersion}`}
-        {prepared.estimatedUsd === null ? ' — no cost estimate' : ` — estimated $${prepared.estimatedUsd}`}.
+        {prepared.estimatedUsd === null ? ' — no cost estimate' : ` — estimated ${formatCostUsd(prepared.estimatedUsd)}`}.
       </p>
       <div className="mt-2 flex items-center gap-2">
         <InstantTooltip label={runReason}>
@@ -1468,21 +1521,43 @@ export function StartEvalRunCard({ step, prepared, otherVersion, mayRun, runReas
             <button
               type="button"
               className={primaryButtonClass}
-              disabled={!mayRun || start.isPending || start.isSuccess}
-              onClick={() => start.mutate(undefined)}
+              disabled={!mayRun || start.isSuccess}
+              onClick={() => { start.reset(); setConfirming(true); }}
             >
-              {start.isSuccess ? 'Started' : `Start — spend up to $${prepared.budgetUsd}`}
+              {start.isSuccess ? 'Started' : 'Start'}
             </button>
           </span>
         </InstantTooltip>
-        {start.error !== null && <span className="text-xs text-destructive">{start.error.message}</span>}
       </div>
+      {confirming && (
+        <StartEvalRunDialog
+          trials={prepared.trials}
+          estimatedUsd={prepared.estimatedUsd}
+          budget={{ kind: 'set', budgetUsd: prepared.budgetUsd }}
+          starting={start.isPending}
+          error={start.error}
+          onStart={() => start.mutate(undefined, { onSuccess: () => setConfirming(false) })}
+          onClose={() => setConfirming(false)}
+        />
+      )}
     </div>
   );
 }
 
+/** A whole number of trials per case the run accepts, or null. */
+function parseTrialsPerCase(text: string): number | null {
+  const trials = Number(text);
+  return text.trim() !== '' && Number.isInteger(trials) && trials >= 1 && trials <= 10 ? trials : null;
+}
+
+/** The person's spend cap, or null when left on auto (or not a positive amount). */
+function parseBudgetUsd(text: string): number | null {
+  const budget = Number(text);
+  return text.trim() !== '' && Number.isFinite(budget) && budget > 0 ? budget : null;
+}
+
 /**
- * Prepare, confirm and read the Step's Eval Runs. Preparing and starting one is the workflow's
+ * Start, confirm and read the Step's Eval Runs. Starting one is the workflow's
  * `run` verb; signing a qualification from a report is its `edit` verb.
  */
 export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRun, runReason }: {
@@ -1499,20 +1574,37 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
   mayRun: boolean;
   runReason: string | undefined;
 }) {
-  const [trials, setTrials] = React.useState(3);
-  const [budget, setBudget] = React.useState('');
-  const prepare = useStepEvaluationMutation(step, () => mediforce.evaluation.prepareRun({
-    ...step,
-    definitionVersion,
-    trialsPerCase: trials,
-    ...(budget === '' ? {} : { budgetUsd: Number(budget) }),
-  }));
+  const [trialsText, setTrialsText] = React.useState('3');
+  const [budgetText, setBudgetText] = React.useState('');
+  const [confirming, setConfirming] = React.useState(false);
+  const trials = parseTrialsPerCase(trialsText);
+  const budgetUsd = parseBudgetUsd(budgetText);
+  const estimate = useEvalRunEstimate(step, definitionVersion, mayRun ? trials : null);
+  const budget: BudgetChoice = budgetUsd === null
+    ? { kind: 'auto', suggestedUsd: estimate.data?.suggestedBudgetUsd ?? null }
+    : { kind: 'set', budgetUsd };
+  // Prepared and started in one go: the person confirmed the cap the dialog showed.
+  const start = useStepEvaluationMutation(step, async () => {
+    const prepared = await mediforce.evaluation.prepareRun({
+      ...step,
+      definitionVersion,
+      trialsPerCase: trials ?? undefined,
+      ...(budgetUsd === null ? {} : { budgetUsd }),
+    });
+    const confirmedBudgetUsd = budget.kind === 'set' ? budget.budgetUsd : budget.suggestedUsd ?? undefined;
+    return mediforce.evaluation.startRun({ evalRunId: prepared.evalRun.id, confirmedBudgetUsd });
+  });
+  const estimateLabel = trials === null ? null
+    : estimate.isError ? '(no estimate)'
+      : estimate.data === undefined ? '(estimating…)'
+        : estimate.data.estimate.totalUsd === null ? '(no estimate)'
+          : `(estimated ${formatCostUsd(estimate.data.estimate.totalUsd)})`;
   const runs = (data.data?.evalRuns ?? []).filter((run) => run.definitionVersion === definitionVersion || run.status === 'prepared' || run.status === 'running');
   const otherVersion = (run: { definitionVersion: number }) => (run.definitionVersion === definitionVersion ? undefined : run.definitionVersion);
   const versions = datasets.data?.datasets ?? [];
   const [nextDataset] = versions;
   const datasetVersion = new Map(versions.map((dataset) => [dataset.id, dataset.version]));
-  // Prepared here, by the assistant or from the CLI: each waits for a person to confirm its budget.
+  // Prepared by the assistant or from the CLI, or left when starting one failed: each waits for a person to confirm its budget.
   const waiting: { prepared: PreparedEvalRun; otherVersion: number | undefined }[] = runs.filter((run) => run.status === 'prepared').map((run) => ({
     prepared: {
       evalRunId: run.id,
@@ -1528,22 +1620,37 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
       {mayRun && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <label className="flex items-center gap-1">Trials per case
-            <input type="number" min={1} max={10} className={cn(inputClass, 'w-16')} value={trials} onChange={(event) => setTrials(Number(event.target.value))} />
+            <input type="number" min={1} max={10} className={cn(inputClass, 'w-16')} value={trialsText} onChange={(event) => setTrialsText(event.target.value)} />
           </label>
           <label className="flex items-center gap-1">Budget $
-            <input type="number" min={0} step={0.01} className={cn(inputClass, 'w-24')} placeholder="auto" value={budget} onChange={(event) => setBudget(event.target.value)} />
+            <input type="number" min={0} step={0.01} className={cn(inputClass, 'w-24')} placeholder="auto" value={budgetText} onChange={(event) => setBudgetText(event.target.value)} />
           </label>
+          {estimateLabel !== null && (
+            <span className="tabular-nums text-muted-foreground" data-testid="eval-run-estimate">{estimateLabel}</span>
+          )}
           <button
             type="button"
-            className={buttonClass}
-            disabled={prepare.isPending}
-            onClick={() => prepare.mutate(undefined)}
-          >Prepare</button>
+            className={primaryButtonClass}
+            disabled={trials === null || start.isPending || (budgetUsd === null && estimate.isPlaceholderData)}
+            onClick={() => { start.reset(); setConfirming(true); }}
+          >Start</button>
           <span className={nextDataset === undefined ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'} data-testid="eval-run-dataset">
             {nextDataset === undefined ? 'No Dataset saved yet — save the Eval Cases first.' : `Runs Dataset v${nextDataset.version} (${nextDataset.caseIds.length} case(s)).`}
           </span>
-          {prepare.error !== null && <span className="text-destructive">{prepare.error.message}</span>}
+          {trials === null && <span className="text-destructive">Trials per case must be a whole number from 1 to 10.</span>}
+          {estimate.error instanceof Error && <span className="text-destructive" data-testid="eval-run-estimate-error">{estimate.error.message}</span>}
         </div>
+      )}
+      {confirming && (
+        <StartEvalRunDialog
+          trials={estimate.data?.trialCount ?? null}
+          estimatedUsd={estimate.data?.estimate.totalUsd ?? null}
+          budget={budget}
+          starting={start.isPending}
+          error={start.error}
+          onStart={() => start.mutate(undefined, { onSuccess: () => setConfirming(false) })}
+          onClose={() => setConfirming(false)}
+        />
       )}
       {waiting.map((run) => <StartEvalRunCard key={run.prepared.evalRunId} step={step} prepared={run.prepared} otherVersion={run.otherVersion} mayRun={mayRun} runReason={runReason} />)}
       {data.isLoading ? <Loading /> : runs.length === 0 ? (

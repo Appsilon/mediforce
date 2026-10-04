@@ -23,6 +23,7 @@ export { getStepDrift } from './drift';
 export { listEvalDatasets, freezeEvalDataset } from './eval-datasets';
 export { getMcpEvalPolicy, setMcpEvalPolicy } from './mcp-eval-policy';
 export {
+  estimateEvalRunCost,
   prepareEvalRun,
   startEvalRun,
   getEvalRun,

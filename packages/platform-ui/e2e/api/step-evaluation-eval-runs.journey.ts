@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { APIRequestContext } from '@playwright/test';
 import {
+  EstimateEvalRunOutputSchema,
   EvalCaseOutputSchema,
   EvalRunOutputSchema,
+  ListEvalRunsOutputSchema,
   GetAgentTrajectoryOutputSchema,
   ListAgentRunsOutputSchema,
   ListRunsPageOutputSchema,
@@ -91,6 +93,13 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
       headers: JSON_HEADERS, data: { ...step, servers: { email: { mode: 'deny' } } },
     });
     expect(policyRes.status(), await policyRes.text()).toBe(200);
+
+    // The estimate the tab shows before a run exists: its trial count and cost, and nothing prepared.
+    const estimated = EstimateEvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs/estimate', { ...step, trialsPerCase: 2 }));
+    expect(estimated).toMatchObject({ caseCount: 1, trialCount: 2 });
+    expect(estimated.suggestedBudgetUsd === null).toBe(estimated.estimate.totalUsd === null);
+    const evalRunsRes = await request.get(`/api/evaluation/runs?namespace=${step.namespace}&workflowName=${step.workflowName}&stepId=${step.stepId}`, { headers: AUTH_HEADERS });
+    expect(ListEvalRunsOutputSchema.parse(await evalRunsRes.json()).evalRuns).toEqual([]);
 
     const prepared = EvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs', {
       ...step, trialsPerCase: 2, concurrency: 2, budgetUsd: 1,

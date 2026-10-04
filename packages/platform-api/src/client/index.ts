@@ -637,6 +637,8 @@ import {
   type SetEvaluationBriefOutput,
   type SetMcpEvalPolicyInput,
   type SetMcpEvalPolicyOutput,
+  EstimateEvalRunInputSchema,
+  EstimateEvalRunOutputSchema,
   PrepareEvalRunInputSchema,
   StartEvalRunInputSchema,
   GetEvalRunInputSchema,
@@ -644,6 +646,8 @@ import {
   EvalRunOutputSchema,
   ListEvalRunsInputSchema,
   ListEvalRunsOutputSchema,
+  type EstimateEvalRunInput,
+  type EstimateEvalRunOutput,
   type PrepareEvalRunInput,
   type StartEvalRunInput,
   type GetEvalRunInput,
@@ -1090,6 +1094,7 @@ export class Mediforce {
     freezeDataset: (input: FreezeEvalDatasetInput) => Promise<FreezeEvalDatasetOutput>;
     getMcpPolicy: (input: GetMcpEvalPolicyInput) => Promise<GetMcpEvalPolicyOutput>;
     setMcpPolicy: (input: SetMcpEvalPolicyInput) => Promise<SetMcpEvalPolicyOutput>;
+    estimateRun: (input: EstimateEvalRunInput) => Promise<EstimateEvalRunOutput>;
     prepareRun: (input: PrepareEvalRunInput) => Promise<EvalRunOutput>;
     startRun: (input: StartEvalRunInput) => Promise<EvalRunOutput>;
     getRun: (input: GetEvalRunInput) => Promise<EvalRunOutput>;
@@ -2605,6 +2610,10 @@ export class Mediforce {
       setMcpPolicy: async (input) => this.sendJson(
         'PUT', '/api/evaluation/mcp-policy', SetMcpEvalPolicyInputSchema.parse(input),
         SetMcpEvalPolicyOutputSchema, 'mediforce.evaluation.setMcpPolicy',
+      ),
+      estimateRun: async (input) => this.sendJson(
+        'POST', '/api/evaluation/runs/estimate', EstimateEvalRunInputSchema.parse(input),
+        EstimateEvalRunOutputSchema, 'mediforce.evaluation.estimateRun',
       ),
       prepareRun: async (input) => this.sendJson(
         'POST', '/api/evaluation/runs', PrepareEvalRunInputSchema.parse(input),

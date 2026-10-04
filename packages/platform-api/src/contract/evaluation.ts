@@ -10,6 +10,7 @@ import {
   EvalCaseSplitSchema,
   EvalDatasetVersionSchema,
   EvalOptimisationSchema,
+  EvalRunEstimateSchema,
   EvalRunReportSchema,
   EvalRunSchema,
   EvalRunEvaluatorSchema,
@@ -340,6 +341,17 @@ export const PrepareEvalRunInputSchema = EvaluatedStepSchema.extend({
   concurrency: z.number().int().min(1).max(8).default(2),
   /** Spend cap; defaults to 1.5× the estimate, and is required when there is no estimate. */
   budgetUsd: z.number().positive().max(10_000).optional(),
+});
+
+/** What an Eval Run of the step would cost, before it is prepared. */
+export const EstimateEvalRunInputSchema = PrepareEvalRunInputSchema.omit({ concurrency: true, budgetUsd: true });
+
+export const EstimateEvalRunOutputSchema = z.object({
+  estimate: EvalRunEstimateSchema,
+  /** The budget cap `prepare` sets when none is given: 1.5× the estimate; null without an estimate. */
+  suggestedBudgetUsd: z.number().positive().nullable(),
+  caseCount: z.number().int().nonnegative(),
+  trialCount: z.number().int().nonnegative(),
 });
 
 /**
@@ -746,6 +758,8 @@ export type GetMcpEvalPolicyOutput = z.infer<typeof GetMcpEvalPolicyOutputSchema
 export type SetMcpEvalPolicyInput = z.infer<typeof SetMcpEvalPolicyInputSchema>;
 export type SetMcpEvalPolicyOutput = z.infer<typeof SetMcpEvalPolicyOutputSchema>;
 export type PrepareEvalRunInput = z.input<typeof PrepareEvalRunInputSchema>;
+export type EstimateEvalRunInput = z.input<typeof EstimateEvalRunInputSchema>;
+export type EstimateEvalRunOutput = z.infer<typeof EstimateEvalRunOutputSchema>;
 export type StartEvalRunInput = z.infer<typeof StartEvalRunInputSchema>;
 export type GetEvalRunInput = z.infer<typeof GetEvalRunInputSchema>;
 export type CancelEvalRunInput = z.infer<typeof CancelEvalRunInputSchema>;

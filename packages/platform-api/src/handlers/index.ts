@@ -187,6 +187,7 @@ export {
   freezeEvalDataset,
   getMcpEvalPolicy,
   setMcpEvalPolicy,
+  estimateEvalRunCost,
   prepareEvalRun,
   startEvalRun,
   getEvalRun,

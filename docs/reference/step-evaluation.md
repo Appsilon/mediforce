@@ -514,6 +514,10 @@ run go by the version it was prepared for. A case cited by the
 step's few-shot `agent.examples` is left out of the run (`exampleCaseIds`;
 [ADR-0024](../adr/0024-optimisation.md) D5).
 
+0. **Estimate** (`run-estimate`, `POST /api/evaluation/runs/estimate`) returns
+   what a run of the same input would cost and the budget cap prepare would
+   set, and creates nothing — the tab shows it next to the budget as the trial
+   count changes.
 1. **Prepare** (`run-prepare`, `POST /api/evaluation/runs`) freezes the Dataset
    version (the newest unless named), the latest version of every live
    Evaluator — and whether each one counts — the MCP eval policy, the step's
@@ -527,7 +531,9 @@ step's few-shot `agent.examples` is left out of the run (`exampleCaseIds`;
    refused, at prepare and again at start, naming the model.
 2. **Start** (`run-start --confirm-budget <usd>`) needs the budget echoed back —
    the person confirming what the run may spend. Without it the start is
-   refused, which is also how an assistant's attempt to start one ends.
+   refused, which is also how an assistant's attempt to start one ends. The
+   tab's **Start** opens a dialog with the estimate and the cap — stating the
+   auto cap when the budget is left on auto — and prepares and starts the run on confirm.
 3. Each **trial** is a real Workflow Run flagged with the Eval Run's id. It
    enters the Step directly with the case's trigger payload and earlier step
    outputs, its workspace branched from the case's seed commit, and stops after

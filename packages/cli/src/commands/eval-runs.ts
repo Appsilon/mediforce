@@ -52,6 +52,41 @@ function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void 
   }
 }
 
+export const evalRunEstimateCommand = defineCommand({
+  name: 'mediforce eval run-estimate',
+  description: 'Print what an Eval Run of a step would cost and the budget cap run-prepare would set. Prepares nothing.',
+  args: {
+    ...STEP_ARGS,
+    version: { type: 'string', description: 'Workflow Definition version whose step runs (default: the runnable one)' },
+    dataset: { type: 'string', description: 'Eval Dataset version id (default: the newest)' },
+    trials: { type: 'string', description: 'Trials per case (default: 3)' },
+    challengers: { type: 'string', description: 'JSON file with up to 3 challengers, as for run-prepare' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const trials = parsePositiveIntArg(args.trials);
+    const version = parsePositiveIntArg(args.version);
+    if (trials === 'invalid' || version === 'invalid') {
+      output.stderr('--trials and --version must be positive integers');
+      return 2;
+    }
+    const result = await mediforce.evaluation.estimateRun({
+      ...stepFrom(args),
+      ...(version !== undefined ? { definitionVersion: version } : {}),
+      ...(args.dataset !== undefined ? { datasetVersionId: args.dataset } : {}),
+      ...(trials !== undefined ? { trialsPerCase: trials } : {}),
+      ...(args.challengers !== undefined ? { challengers: readJsonFile(args.challengers) as EvalChallenger[] } : {}),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    const estimate = result.estimate.totalUsd === null ? 'no estimate' : `est. $${result.estimate.totalUsd} (${result.estimate.basis})`;
+    const budget = result.suggestedBudgetUsd === null ? 'set --budget to cap it' : `default budget $${result.suggestedBudgetUsd}`;
+    output.stdout(`${result.caseCount} case(s), ${result.trialCount} trial(s)  ${estimate}  ${budget}`);
+    return 0;
+  },
+});
+
 export const evalRunPrepareCommand = defineCommand({
   name: 'mediforce eval run-prepare',
   description: 'Prepare an Eval Run of a step and print its cost estimate. Nothing runs until run-start.',
