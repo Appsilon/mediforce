@@ -12,6 +12,11 @@ import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles
 
 const DECISION_VERBS: Record<JudgeReviewDecision, string> = { accepted: 'accept', denied: 'deny' };
 
+const DECIDED_CLASSES: Record<JudgeReviewDecision, string> = {
+  accepted: 'border-green-600 bg-green-500/15 text-green-700 dark:text-green-400',
+  denied: 'border-red-600 bg-red-500/15 text-red-700 dark:text-red-400',
+};
+
 /** Whether a verdict counts toward the Acceptance Criteria, and what decided it. */
 function standing(verdict: JudgeVerdict): string {
   if (verdict.review?.decision === 'denied') return `left out — denied by ${verdict.review.reviewedBy ?? 'a person'}`;
@@ -42,6 +47,7 @@ export function JudgeVerdictRow({ step, evalRunId, verdict, mayEdit, editReason,
 }) {
   const [deciding, setDeciding] = React.useState<JudgeReviewDecision | null>(null);
   const [comment, setComment] = React.useState('');
+  const decided = verdict.review?.decision;
   const review = useEvalRunMutation(step, evalRunId, (decision: JudgeReviewDecision) => mediforce.evaluation.reviewJudgeVerdict({
     evalRunId,
     trialId: verdict.trialId,
@@ -79,16 +85,21 @@ export function JudgeVerdictRow({ step, evalRunId, verdict, mayEdit, editReason,
       {deciding === null ? (
         <InstantTooltip label={mayEdit ? undefined : editReason}>
           <span className="inline-flex gap-1.5">
-            <button type="button" className={buttonClass} disabled={mayEdit === false} onClick={() => setDeciding('accepted')}>Accept</button>
-            <button type="button" className={buttonClass} disabled={mayEdit === false} onClick={() => setDeciding('denied')}>Deny</button>
+            <button type="button" className={cn(buttonClass, decided === 'accepted' && DECIDED_CLASSES.accepted)} disabled={mayEdit === false} onClick={() => setDeciding('accepted')}>Accept</button>
+            <button type="button" className={cn(buttonClass, decided === 'denied' && DECIDED_CLASSES.denied)} disabled={mayEdit === false} onClick={() => setDeciding('denied')}>Deny</button>
           </span>
         </InstantTooltip>
       ) : (
         <div className="space-y-1 rounded-md border p-2">
+          {decided !== undefined && decided !== deciding && (
+            <p className="font-medium text-amber-700 dark:text-amber-300" data-testid="verdict-change-notice">
+              You are changing the decision from {DECISION_VERBS[decided]} to {DECISION_VERBS[deciding]}.
+            </p>
+          )}
           <p>
             {deciding === 'accepted'
-              ? 'Accepting counts this verdict toward the Acceptance Criteria, however unsure the judge was.'
-              : 'Denying leaves this verdict out of the Acceptance Criteria. It is not reversed.'}
+              ? 'Accepting counts this verdict toward the Acceptance Criteria as the judge gave it — a fail stays a fail — however unsure the judge was.'
+              : 'Denying leaves this verdict out of the Acceptance Criteria, pass or fail. It does not flip the judge\'s verdict.'}
           </p>
           <textarea
             aria-label="Why (optional)"
