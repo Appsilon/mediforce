@@ -37,7 +37,7 @@ const AssistantCheckSchema = EvaluatorCheckSchema.describe(
     source: 'import json\nwith open("/output/input.json") as handle:\n    data = json.load(handle)\nwith open("/output/result.json", "w") as handle:\n    json.dump({"passed": "findings" in data["result"]}, handle)',
   },
   { kind: 'llm_judge', model: 'anthropic/claude-sonnet-4', rubric: 'Does the result explain its findings?', minConfidence: 0.8 },
-  { kind: 'expected_output', model: 'anthropic/claude-sonnet-4', instructions: 'Wording of free text is trivial; a changed grade or term is not.', minAgreement: 0.8 },
+  { kind: 'expected_output', model: 'anthropic/claude-sonnet-4', instructions: 'Wording of free text is trivial; a changed grade or term is not.', minAgreement: 0.9, maxAgreement: 0.1 },
 ] });
 
 /** Models name rules in prose or snake_case; an Evaluator's name is kebab-case. */

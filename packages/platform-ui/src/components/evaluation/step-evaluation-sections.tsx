@@ -127,7 +127,7 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
             <span className="ml-1.5 text-xs text-muted-foreground">
               v{evaluator.latest.version} · {CHECK_KINDS[check.kind].label} · {evaluator.latest.severity}
               {check.kind === 'llm_judge' && ` · min confidence ${check.minConfidence}`}
-              {check.kind === 'expected_output' && ` · min agreement ${check.minAgreement}`}
+              {check.kind === 'expected_output' && ` · agreement ≥ ${check.minAgreement} positive, ≤ ${check.maxAgreement} negative`}
               {evaluator.latest.origin === 'assistant' ? ' · from the assistant' : ''}
             </span>
           </div>

@@ -72,7 +72,7 @@ describe('Evaluators', () => {
   });
 
   it('never runs an expected-output check in production, and keeps it one', async () => {
-    const check = { kind: 'expected_output' as const, model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8 };
+    const check = { kind: 'expected_output' as const, model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8, maxAgreement: 0.1 };
     const input = { ...STEP, name: 'matches-expected', rule: 'The output matches the expected output.', severity: 'critical' as const, check, origin: 'user' as const };
     await expect(createEvaluator({ ...input, runInProduction: true }, fixture.scope())).rejects.toThrow('never runs in production');
 

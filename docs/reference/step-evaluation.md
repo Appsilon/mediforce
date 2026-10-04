@@ -227,8 +227,9 @@ sets whether it also runs in production (see below).
 
 ### Expected outputs
 
-An `expected_output` check is `{ kind, model, instructions?, minAgreement }`
-(`minAgreement` 0–1, 0.8 when not set) and grades only Eval Run trials of a
+An `expected_output` check is `{ kind, model, instructions?, minAgreement,
+maxAgreement }` (each 0–1; `minAgreement` 0.9 and `maxAgreement` 0.1 when not
+set) and grades only Eval Run trials of a
 case that has an expected output. The case says how it is compared:
 
 - **`exact`** — the output must equal the expected output; object key order is
@@ -238,16 +239,18 @@ case that has an expected output. The case says how it is compared:
   output, with the check's `instructions` (for every case) and the case's
   `agreementInstructions` (this case only, e.g. "differences in the narrative
   are trivial; a changed grade means low agreement"), explains which
-  differences mattered and answers `{ "rationale", "agreement" }`. It passes at
-  `minAgreement`. The Score keeps the agreement in `metadata.agreement` and is
+  differences mattered and answers `{ "rationale", "agreement" }`. A positive
+  case passes at `minAgreement` or above. The Score keeps the agreement in `metadata.agreement` and is
   written with source `llm_judge`; its judge cost is charged to the run. A
   person can accept or deny it like a judge's verdict (see the judge review
-  above): 0.81 against a floor of 0.8 counts until someone reading the
+  above): 0.91 against a floor of 0.9 counts until someone reading the
   rationale denies it.
 
 A **negative** case's expected output is one the step must not return, so the
-verdict reverses: it passes when the output differs (exact) or agrees below
-`minAgreement` (agreement). A comparison that gives no usable agreement is an
+verdict reverses: it passes when the output differs (exact) or agrees at
+`maxAgreement` or below (agreement) — a threshold of its own, so 0.85 on a
+negative case fails rather than passing for being under the positive floor. A
+comparison that gives no usable agreement is an
 error, never a failed output. The check cannot be previewed (`evaluator-preview`
 refuses it: a production output has no expected output) and never runs in
 production — `runInProduction` is refused for it — and a version keeps its kind:
@@ -656,8 +659,10 @@ prepared) and five views, from the whole run to one trial:
 Each trial opens on its own page (`…/eval-runs/<evalRunId>/trials/<trialId>`;
 `mediforce eval trial <evalRunId> <trialId> [--prompts]`,
 `GET /api/evaluation/runs/:id/trials/:trialId`): the case's input and expected
-output, the output and the agent's own summary, the agent's whole log as the
-judges read it, links to the trial's Workflow Run and step execution, and per
+output (an exact comparison says no model is involved), the output with the
+confidence the step's agent reported, the agent's whole log as the judges read
+it — collapsed until opened or a citation links into it — beside links to the
+trial's Workflow Run and step execution, and per
 Evaluator of the case what it looks for — a judge's question, or the rule —
 and what it reads, its verdict and comment or why it could not grade, a
 person's review, and for a model judge (an `llm_judge`, or an agreement
@@ -672,7 +677,7 @@ scored before they were kept shows the messages only. Production Scores keep
 only what their judge cost, not its answers. A case is never changed in
 place — an edit is a new case — so the trial's case, and an agreement
 comparison's expected output, are what the judge read. Log entries a model
-judge's rationale cites as `[n]` link to the entry, which is marked in the log;
+judge's rationale cites as `[n]` link to the entry (the judge is told to cite one entry per bracket; older rationales' `[7, 8]`, `[9-16]` and `[log entries 8-11]` link too, a range marking every entry in it), which is marked in the log;
 an `[n]` in a code or schema check's comment is left as text.
 
 ## Acceptance Criteria

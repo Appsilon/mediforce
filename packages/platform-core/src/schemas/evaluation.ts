@@ -65,14 +65,17 @@ export const LlmJudgeCheckSchema = z.object({
 });
 
 /** A new agreement judge's floor: an output that agrees less with a positive case's expected output fails. */
-export const DEFAULT_MIN_AGREEMENT = 0.8;
+export const DEFAULT_MIN_AGREEMENT = 0.9;
+/** A new agreement judge's ceiling: an output that agrees more with a negative case's expected output fails. */
+export const DEFAULT_MAX_AGREEMENT = 0.1;
 
 /**
  * Compares the output with an Eval Case's expected output, the way the case
  * says: `exact` fails on any difference; `agreement` asks `model` how far the
- * two agree, 0–1, with `instructions` and the case's own instructions, and
- * passes at `minAgreement`. A negative case passes when the output does not
- * match. It grades only cases that have an expected output, never production.
+ * two agree, 0–1, with `instructions` and the case's own instructions; a
+ * positive case passes at `minAgreement` or above, a negative case at
+ * `maxAgreement` or below. It grades only cases that have an expected output,
+ * never production.
  */
 export const ExpectedOutputCheckSchema = z.object({
   kind: z.literal('expected_output'),
@@ -80,6 +83,7 @@ export const ExpectedOutputCheckSchema = z.object({
   /** What the agreement judge should treat as trivial or decisive on every case. */
   instructions: z.string().max(8000).optional(),
   minAgreement: z.number().min(0).max(1).default(DEFAULT_MIN_AGREEMENT),
+  maxAgreement: z.number().min(0).max(1).default(DEFAULT_MAX_AGREEMENT),
 });
 
 export const EvaluatorCheckSchema = z.discriminatedUnion('kind', [

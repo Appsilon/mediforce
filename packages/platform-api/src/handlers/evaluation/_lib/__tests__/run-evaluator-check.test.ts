@@ -20,6 +20,7 @@ const expected = {
   model: 'anthropic/claude-haiku-4.5',
   instructions: 'Wording is never decisive.',
   minAgreement: 0.8,
+  maxAgreement: 0.2,
 };
 
 /** GRADED_RUN returned `{ findings: [{ term: 'Sepsis', grade: 5 }] }`. */
@@ -150,11 +151,11 @@ describe('runEvaluatorCheck', () => {
       const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as { model: string; messages: Array<{ content: string }> };
       expect(body.model).toBe('anthropic/claude-haiku-4.5');
       expect(body.messages[0]!.content).toContain('Wording is never decisive.');
-      expect(body.messages[1]!.content).toContain('The term wording is trivial; the grade is not.');
+      expect(body.messages[0]!.content).toContain('The term wording is trivial; the grade is not.');
       expect(body.messages[1]!.content).toContain('Sepsis (fatal)');
     });
 
-    it('fails a positive case below minAgreement, and a negative case at it', async () => {
+    it('fails a positive case below minAgreement, and a negative case above maxAgreement', async () => {
       const fixture = await evaluationFixture();
       const scope = withOpenRouterKey(fixture);
       const subject = await loadEvaluationSubject(scope, GRADED_RUN, STEP);
@@ -163,8 +164,12 @@ describe('runEvaluatorCheck', () => {
       answeringOpenRouter('{"rationale": "The grade differs.", "agreement": 0.3}');
       expect(await runEvaluatorCheck(scope, expected, subject, await caseExpecting(fixture, label))).toMatchObject({ passed: false, agreement: 0.3 });
 
-      answeringOpenRouter('{"rationale": "They agree.", "agreement": 0.95}');
-      expect(await runEvaluatorCheck(scope, expected, subject, await caseExpecting(fixture, { ...label, expectation: 'negative' }))).toMatchObject({ passed: false, agreement: 0.95 });
+      const negative = { ...label, expectation: 'negative' };
+      answeringOpenRouter('{"rationale": "Partly the same.", "agreement": 0.5}');
+      expect(await runEvaluatorCheck(scope, expected, subject, await caseExpecting(fixture, negative))).toMatchObject({ passed: false, agreement: 0.5 });
+
+      answeringOpenRouter('{"rationale": "The grade differs.", "agreement": 0.2}');
+      expect(await runEvaluatorCheck(scope, expected, subject, await caseExpecting(fixture, negative))).toMatchObject({ passed: true, agreement: 0.2 });
     });
   });
 

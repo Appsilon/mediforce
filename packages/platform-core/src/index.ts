@@ -62,6 +62,7 @@ export {
   LlmJudgeCheckSchema,
   ExpectedOutputCheckSchema,
   DEFAULT_MIN_AGREEMENT,
+  DEFAULT_MAX_AGREEMENT,
   EvaluatorCheckSchema,
   JUDGE_PASS_VALUE,
   DEFAULT_JUDGE_MIN_CONFIDENCE,

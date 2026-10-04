@@ -107,6 +107,7 @@ export function llmJudgeMessages(
           'cite the parts of the input, the output and the log entries (by their [number]) that decided it, follow the agent\'s reasoning to where it went right or wrong,',
           'and name anything you could not verify.',
         ].join(' '),
+        'Cite a log entry by its number in square brackets, one entry per bracket, right after what it shows: "the agent looked up the term [7][8]". Never a range, a list or a word inside the brackets — not [7-9], [7, 8] or [entry 7].',
         'confidence is how sure you are of your verdict, from 0 to 1: lower it when the evidence is incomplete, ambiguous or the rubric does not clearly decide the case.',
         'Answer with one JSON object and nothing else: {"rationale": "<your explanation>", "passed": <true or false>, "confidence": <0 to 1>}. Write the rationale before deciding.',
       ].join('\n\n'),

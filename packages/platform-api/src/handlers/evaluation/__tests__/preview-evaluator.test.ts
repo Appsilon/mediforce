@@ -21,7 +21,7 @@ describe('previewEvaluator', () => {
 
   it('refuses an expected-output check: a production output has no expected output to compare with', async () => {
     const fixture = await evaluationFixture();
-    await expect(previewEvaluator({ ...STEP, check: { kind: 'expected_output', model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8 }, limit: 5 }, fixture.scope()))
+    await expect(previewEvaluator({ ...STEP, check: { kind: 'expected_output', model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8, maxAgreement: 0.1 }, limit: 5 }, fixture.scope()))
       .rejects.toThrow('cannot be tried on one');
   });
 

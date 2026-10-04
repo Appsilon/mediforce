@@ -72,8 +72,9 @@ async function runJudgeCheck(
 
 /**
  * Compares the output with the case's expected output: `exact` passes only
- * on no difference at all, `agreement` at the check's `minAgreement`. A
- * negative case's expected output is one to avoid, so the verdict reverses.
+ * on no difference at all, `agreement` at the check's `minAgreement` or above.
+ * A negative case's expected output is one to avoid, so `exact` reverses and
+ * `agreement` passes at the check's `maxAgreement` or below.
  */
 async function runExpectedOutputCheck(
   scope: CallerScope,
@@ -104,9 +105,9 @@ async function runExpectedOutputCheck(
     expected: evalCase.expectedOutput,
     actual: result,
   });
-  const agrees = agreement >= check.minAgreement;
-  const floor = negative ? `a negative case passes below ${check.minAgreement}` : `passes at ${check.minAgreement}`;
-  return { ...binary(agentRun.id, agrees !== negative, `Agreement ${agreement} (${floor}). ${rationale}`), agreement };
+  const passed = negative ? agreement <= check.maxAgreement : agreement >= check.minAgreement;
+  const threshold = negative ? `a negative case passes at ${check.maxAgreement} or below` : `passes at ${check.minAgreement} or above`;
+  return { ...binary(agentRun.id, passed, `Agreement ${agreement} (${threshold}). ${rationale}`), agreement };
 }
 
 /**

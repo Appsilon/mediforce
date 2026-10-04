@@ -96,7 +96,7 @@ describe('Eval Cases', () => {
 
   it('adds a manual case with its expected output and the Evaluators that grade it, and hides archived ones from the list', async () => {
     const { evaluator } = await createEvaluator(
-      { ...STEP, name: 'matches-expected', rule: 'The output matches the expected output.', severity: 'critical', check: { kind: 'expected_output', model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8 }, origin: 'user', runInProduction: false },
+      { ...STEP, name: 'matches-expected', rule: 'The output matches the expected output.', severity: 'critical', check: { kind: 'expected_output', model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8, maxAgreement: 0.1 }, origin: 'user', runInProduction: false },
       fixture.scope(),
     );
     const { evalCase } = await write({

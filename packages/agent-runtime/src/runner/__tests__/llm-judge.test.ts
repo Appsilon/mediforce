@@ -54,6 +54,15 @@ describe('LlmJudgeReviewPlugin', () => {
     expect(messages[1]!.content).toContain('"grade": 5');
   });
 
+  it('tells the judge to cite each log entry on its own as [n], never a range or a list', async () => {
+    const llm = answering('{"rationale": "r", "passed": true, "confidence": 0.9}');
+    await judge(llm);
+
+    const system = vi.mocked(llm.complete).mock.calls[0]![0][0]!.content;
+    expect(system).toContain('[7][8]');
+    expect(system).toMatch(/never a range/i);
+  });
+
   it('shows the judge everything the agent did during the step', async () => {
     const llm = answering('{"rationale": "r", "passed": false, "confidence": 0.7}');
     const result = await judge(llm);

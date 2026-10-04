@@ -4,9 +4,11 @@ import * as React from 'react';
 import {
   CodeCheckSchema,
   DEFAULT_JUDGE_MIN_CONFIDENCE,
+  DEFAULT_MAX_AGREEMENT,
   DEFAULT_MIN_AGREEMENT,
   EvaluatorCheckSchema,
   type AgentOutputSchema,
+  type EvalCase,
   type EvaluatorCheck,
 } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
@@ -20,7 +22,7 @@ export type CheckDraft =
   | { kind: 'schema'; schemaText: string }
   | { kind: 'code'; runtime: CodeRuntime; source: string }
   | { kind: 'llm_judge'; model: string; rubric: string; minConfidence: number }
-  | { kind: 'expected_output'; model: string; instructions: string; minAgreement: number };
+  | { kind: 'expected_output'; model: string; instructions: string; minAgreement: number; maxAgreement: number };
 
 export type CheckDraftKind = CheckDraft['kind'];
 
@@ -39,7 +41,7 @@ export const CHECK_KINDS: Record<CheckDraftKind, { label: string; description: s
   },
   expected_output: {
     label: 'Expected output',
-    description: 'Compares the output with each Eval Case\'s expected output, the way the case says: an exact match, where any difference fails, or an agreement score from 0 to 1 that the model below gives. A negative case passes when the output does not match. It grades only cases with an expected output, and never runs in production.',
+    description: 'Compares the output with each Eval Case\'s expected output, the way the case says: an exact match, where any difference fails, or an agreement score from 0 to 1 that the model below gives. A negative case passes when the output does not match, or agrees no more than the maximum. It grades only cases with an expected output, and never runs in production.',
   },
 };
 
@@ -72,7 +74,7 @@ export function emptyCheckDraft(kind: CheckDraftKind, stepOutputSchema?: AgentOu
     case 'schema': return { kind, schemaText: JSON.stringify(stepOutputSchema ?? { type: 'object', required: [] }, null, 2) };
     case 'code': return { kind, runtime: 'python', source: CODE_TEMPLATES.python };
     case 'llm_judge': return { kind, model: DEFAULT_JUDGE_MODEL, rubric: '', minConfidence: DEFAULT_JUDGE_MIN_CONFIDENCE };
-    case 'expected_output': return { kind, model: DEFAULT_JUDGE_MODEL, instructions: '', minAgreement: DEFAULT_MIN_AGREEMENT };
+    case 'expected_output': return { kind, model: DEFAULT_JUDGE_MODEL, instructions: '', minAgreement: DEFAULT_MIN_AGREEMENT, maxAgreement: DEFAULT_MAX_AGREEMENT };
   }
 }
 
@@ -82,7 +84,7 @@ export function draftFromCheck(check: EvaluatorCheck): CheckDraft {
     case 'schema': return { kind: 'schema', schemaText: JSON.stringify(check.schema, null, 2) };
     case 'code': return { kind: 'code', runtime: check.runtime, source: check.source };
     case 'llm_judge': return { kind: 'llm_judge', model: check.model, rubric: check.rubric, minConfidence: check.minConfidence };
-    case 'expected_output': return { kind: 'expected_output', model: check.model, instructions: check.instructions ?? '', minAgreement: check.minAgreement };
+    case 'expected_output': return { kind: 'expected_output', model: check.model, instructions: check.instructions ?? '', minAgreement: check.minAgreement, maxAgreement: check.maxAgreement };
   }
 }
 
@@ -117,6 +119,7 @@ export function checkFromDraft(draft: CheckDraft): { check: EvaluatorCheck } | {
         model: draft.model.trim(),
         ...(draft.instructions.trim() === '' ? {} : { instructions: draft.instructions.trim() }),
         minAgreement: draft.minAgreement,
+        maxAgreement: draft.maxAgreement,
       };
       break;
   }
@@ -232,18 +235,26 @@ function AgreementJudgeEditor({ draft, onChange }: {
           onChange={(event) => onChange({ ...draft, instructions: event.target.value })}
         />
       </Field>
-      <Field
-        label="Minimum agreement"
-        hint="A positive case passes at this agreement (0 to 1) or above; a negative case passes below it."
-      >
-        <input
-          aria-label="Minimum agreement"
-          type="number" min={0} max={1} step={0.05}
-          className={cn(inputClass, 'block w-24')}
-          value={draft.minAgreement}
-          onChange={(event) => onChange({ ...draft, minAgreement: Number(event.target.value) })}
-        />
-      </Field>
+      <div className="flex flex-wrap gap-4">
+        <Field label="Minimum agreement — positive cases" hint="A positive case passes at this agreement (0 to 1) or above.">
+          <input
+            aria-label="Minimum agreement for positive cases"
+            type="number" min={0} max={1} step={0.05}
+            className={cn(inputClass, 'block w-24')}
+            value={draft.minAgreement}
+            onChange={(event) => onChange({ ...draft, minAgreement: Number(event.target.value) })}
+          />
+        </Field>
+        <Field label="Maximum agreement — negative cases" hint="A negative case passes at this agreement (0 to 1) or below.">
+          <input
+            aria-label="Maximum agreement for negative cases"
+            type="number" min={0} max={1} step={0.05}
+            className={cn(inputClass, 'block w-24')}
+            value={draft.maxAgreement}
+            onChange={(event) => onChange({ ...draft, maxAgreement: Number(event.target.value) })}
+          />
+        </Field>
+      </div>
     </div>
   );
 }
@@ -301,8 +312,8 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
 
 const preClass = 'max-h-64 overflow-auto rounded bg-muted p-2 font-mono whitespace-pre-wrap';
 
-/** Everything one check does, read-only. */
-export function CheckDetails({ check }: { check: EvaluatorCheck }) {
+/** Everything one check does, read-only; given an Eval Case, only what applies to it. */
+export function CheckDetails({ check, evalCase = null }: { check: EvaluatorCheck; evalCase?: Pick<EvalCase, 'comparison' | 'expectation'> | null }) {
   switch (check.kind) {
     case 'schema':
       return <Detail label="JSON Schema"><pre className={preClass}>{JSON.stringify(check.schema, null, 2)}</pre></Detail>;
@@ -317,11 +328,15 @@ export function CheckDetails({ check }: { check: EvaluatorCheck }) {
         </div>
       );
     case 'expected_output':
+      if (evalCase?.comparison === 'exact') {
+        return <p>The case is compared exactly: a field-by-field comparison in code, with no model.</p>;
+      }
       return (
         <div className="space-y-2">
           <Detail label="Agreement judge model"><span className="font-mono">{check.model}</span></Detail>
           {check.instructions !== undefined && <Detail label="Instructions for every case"><pre className={cn(preClass, 'font-sans')}>{check.instructions}</pre></Detail>}
-          <Detail label="Minimum agreement">{check.minAgreement}</Detail>
+          {evalCase?.expectation !== 'negative' && <Detail label="Minimum agreement — positive cases">{check.minAgreement}</Detail>}
+          {evalCase?.expectation !== 'positive' && <Detail label="Maximum agreement — negative cases">{check.maxAgreement}</Detail>}
         </div>
       );
   }

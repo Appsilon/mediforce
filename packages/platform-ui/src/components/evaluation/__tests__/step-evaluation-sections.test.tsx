@@ -129,17 +129,19 @@ describe('EvaluatorsSection', () => {
     }));
   });
 
-  it('builds an expected-output check from an agreement judge model, instructions and a minimum agreement', async () => {
+  it('builds an expected-output check from an agreement judge model, instructions and agreement thresholds for positive and negative cases', async () => {
     evaluation.createEvaluator.mockClear();
     openForm();
     fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'expected_output' } });
     await waitFor(() => expect((screen.getByLabelText('Agreement judge model') as HTMLSelectElement).disabled).toBe(false));
     fireEvent.change(screen.getByLabelText('Agreement instructions'), { target: { value: 'A changed grade means low agreement.' } });
-    expect((screen.getByLabelText('Minimum agreement') as HTMLInputElement).value).toBe('0.8');
+    expect((screen.getByLabelText('Minimum agreement for positive cases') as HTMLInputElement).value).toBe('0.9');
+    expect((screen.getByLabelText('Maximum agreement for negative cases') as HTMLInputElement).value).toBe('0.1');
+    fireEvent.change(screen.getByLabelText('Maximum agreement for negative cases'), { target: { value: '0.2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
     expect(evaluation.createEvaluator).toHaveBeenCalledWith(expect.objectContaining({
-      check: { kind: 'expected_output', model: 'anthropic/claude-sonnet-4', instructions: 'A changed grade means low agreement.', minAgreement: 0.8 },
+      check: { kind: 'expected_output', model: 'anthropic/claude-sonnet-4', instructions: 'A changed grade means low agreement.', minAgreement: 0.9, maxAgreement: 0.2 },
     }));
   });
 

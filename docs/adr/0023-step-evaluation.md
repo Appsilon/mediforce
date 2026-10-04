@@ -288,7 +288,8 @@ restates badly. So an Eval Case carries an optional `expectedOutput`, an
 `expectation` (`positive`: the output must match it; `negative`: it must not)
 and a `comparison`: `exact`, where any difference fails, or `agreement`, where a
 model scores 0–1 how far the outputs agree. The comparison is an Evaluator kind,
-`expected_output` (`model`, `instructions`, `minAgreement`), not a built-in, so
+`expected_output` (`model`, `instructions`, `minAgreement` for positive
+cases, `maxAgreement` for negative ones), not a built-in, so
 it has a severity, versions, a report row and a place in the Acceptance
 Criteria like any other check, and one model choice serves every case; a case
 adds its own `agreementInstructions` (what is trivial, what decides). It counts
