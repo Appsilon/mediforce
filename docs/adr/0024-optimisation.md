@@ -39,14 +39,12 @@ it back. Its backend (handlers, REST routes, client methods, CLI commands,
 tables, the GEPA job) was at first kept, unreachable from the web tab and the
 Evaluation Assistant; on 2026-10-04 it was deleted, with migration
 `0072_drop_eval_optimisation.sql` dropping `eval_optimisations` and
-`eval_runs.example_case_ids` and stripping `examples` from the variant patches
-stored on Eval Runs and Step Qualifications, which the strict patch schema
-would otherwise refuse to read. That rewrite is a deliberate, one-time
-exception to Step Qualifications being insert-only (ADR-0023 D10): it removes
-a field nothing reads and the signature does not hash. A qualification signed
-from a run that left example cases out now reads not verified, since its run
-no longer covers every live case. A challenger trial still pending fails on
-its Step Fingerprint check rather than run unpatched.
+`eval_runs.example_case_ids`. Stored rows are not rewritten — a signed Step
+Qualification never changes (ADR-0023 D10) — so a variant patch stored with
+`examples` keeps it, and the patch schema ignores it on read. Validation of a
+step whose newest run left example cases out reads not verified, since that
+run no longer covers every live case. A trial of a challenger still pending is
+refused rather than run unpatched.
 
 ## What is parked, and where it lives at `aa8ac636`
 

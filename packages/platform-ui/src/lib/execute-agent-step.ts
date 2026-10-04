@@ -336,6 +336,9 @@ async function evalTrialConfig(
   if (trial === null) throw new Error(`Eval Run '${evalRunId}' has no trial for run '${instanceId}'`);
   const variant = evalRun.variants.find((candidate) => candidate.id === trial.variantId);
   if (variant === undefined) throw new Error(`Eval Run '${evalRunId}' has no variant for trial run '${instanceId}'`);
+  if (Object.keys(variant.patch).length > 0) {
+    throw new Error(`Eval Run '${evalRunId}' runs challenger '${variant.label}', and challengers are no longer run (ADR-0024)`);
+  }
   if (variant.fingerprint !== null) {
     const current = await computeStepFingerprint(
       { agentDefinitions: agentDefinitionRepo, toolCatalog: toolCatalogRepo },

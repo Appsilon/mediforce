@@ -596,7 +596,6 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
       .returning({ id: evalTrials.id });
     return rows.length === 1;
   }
-
 }
 
 function versionValues(version: EvaluatorVersion): typeof evaluatorVersions.$inferInsert {

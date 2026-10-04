@@ -704,7 +704,7 @@ its own so two Fingerprints say what differs:
 
 | Component | What is hashed |
 |---|---|
-| `step` | the agent config (including `examples`), plugin, agent id, params, step params, env and MCP restrictions — not its name, display, `autonomyLevel`, `review`, `confidenceThreshold` or `fallbackBehavior` |
+| `step` | the agent config, plugin, agent id, params, step params, env and MCP restrictions — not its name, display, `autonomyLevel`, `review`, `confidenceThreshold` or `fallbackBehavior` |
 | `model` | the step's model, or its agent's when the step names none |
 | `systemPrompt` | the agent's system prompt |
 | `skill` | every file the workflow carries under `<skillsDir>/<skill>/`, or the external skills repository, commit and path |

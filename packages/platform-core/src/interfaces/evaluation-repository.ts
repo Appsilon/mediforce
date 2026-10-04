@@ -112,5 +112,4 @@ export interface EvaluationRepository {
   ): Promise<boolean>;
   /** Takes over a `scoring` claim made before `staleBefore`, restamping it `now` and counting the attempt; true when it did. */
   renewScoringClaim(id: string, staleBefore: string, now: string): Promise<boolean>;
-
 }
