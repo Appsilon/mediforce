@@ -109,15 +109,24 @@ describe('judgeOutputAgreement', () => {
     const [messages, model] = vi.mocked(llm.complete).mock.calls[0]!;
     expect(model).toBe('anthropic/claude-haiku-4.5');
     expect(messages[0]!.content).toContain('Wording is never decisive.');
-    expect(messages[1]!.content).toContain('a changed grade means low agreement');
     expect(messages[1]!.content).toContain('"grade": 5');
     expect(messages[1]!.content).toContain('"grade": 4');
+  });
+
+  it('puts the case instructions right after the every-case ones, as overriding them', async () => {
+    const llm = answering('{"rationale": "r", "agreement": 1}');
+    await compare(llm);
+    const [system, user] = vi.mocked(llm.complete).mock.calls[0]![0];
+    expect(system!.content).toContain(
+      'Wording is never decisive.\n\nOn this case — this decides the comparison and overrides the instructions for every case where they conflict:\nDifferences in summary are trivial; a changed grade means low agreement.',
+    );
+    expect(user!.content).not.toContain('a changed grade means low agreement');
   });
 
   it('leaves out case instructions a case does not give', async () => {
     const llm = answering('{"rationale": "r", "agreement": 1}');
     await compare(llm, null);
-    expect(vi.mocked(llm.complete).mock.calls[0]![0][1]!.content).not.toMatch(/this case/i);
+    expect(vi.mocked(llm.complete).mock.calls[0]![0][0]!.content).not.toMatch(/this case/i);
   });
 
   it('throws on an answer without an agreement from 0 to 1, so it is never scored as a disagreement', async () => {

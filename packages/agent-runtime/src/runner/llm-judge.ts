@@ -172,7 +172,7 @@ const AgreementAnswerSchema = z.object({
   agreement: z.number().min(0).max(1),
 });
 
-/** What the agreement judge is sent: how to score, the instructions, then the expected output and the output. */
+/** What the agreement judge is sent: how to score and the instructions, the case's overriding the check's, then the expected output and the output. */
 export function outputAgreementMessages(config: Omit<OutputAgreementConfig, 'model'>): LlmMessage[] {
   return [
     {
@@ -181,6 +181,7 @@ export function outputAgreementMessages(config: Omit<OutputAgreementConfig, 'mod
         'You compare the output of one step of a pharmaceutical workflow with the output expected of it, and score how far they agree.',
         'agreement runs from 0 to 1: 1 when the output says the same as the expected output, 0 when it says something different. A difference that changes what a reader of the output would conclude or do lowers it a lot; a difference in form only — wording, ordering, formatting — lowers it little or not at all.',
         ...(config.instructions === null ? [] : [`On every case:\n${config.instructions}`]),
+        ...(config.caseInstructions === null ? [] : [`On this case — this decides the comparison and overrides the instructions for every case where they conflict:\n${config.caseInstructions}`]),
         'Explain your score: name each difference that mattered and why, and the ones you treated as trivial.',
         'Answer with one JSON object and nothing else: {"rationale": "<your explanation>", "agreement": <0 to 1>}. Write the rationale before scoring.',
       ].join('\n\n'),
@@ -188,7 +189,6 @@ export function outputAgreementMessages(config: Omit<OutputAgreementConfig, 'mod
     {
       role: 'user',
       content: [
-        ...(config.caseInstructions === null ? [] : [`On this case:\n${config.caseInstructions}`]),
         `Expected output:\n${section(config.expected)}`,
         `Output:\n${section(config.actual)}`,
       ].join('\n\n'),
